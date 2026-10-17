@@ -287,9 +287,9 @@ fn parse_section_header(inner: &str) -> Option<(String, Option<String>)> {
         || !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.'))
-        || sub.as_deref().is_some_and(|s| {
-            s.is_empty() || s.contains('\\') || s.contains('"')
-        })
+        || sub
+            .as_deref()
+            .is_some_and(|s| s.is_empty() || s.contains('\\') || s.contains('"'))
     {
         return None;
     }
@@ -384,7 +384,11 @@ mod tests {
     use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
     fn git(dir: &Path, args: &[&str]) {
-        let out = Cmd::new("git").args(args).current_dir(dir).output().unwrap();
+        let out = Cmd::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap();
         assert!(
             out.status.success(),
             "git {args:?} in {} failed: {}",
@@ -394,7 +398,11 @@ mod tests {
     }
 
     fn git_line(dir: &Path, args: &[&str]) -> Option<String> {
-        let out = Cmd::new("git").args(args).current_dir(dir).output().unwrap();
+        let out = Cmd::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap();
         if !out.status.success() {
             return None;
         }
@@ -413,8 +421,10 @@ mod tests {
         let root = std::fs::canonicalize(&root).ok()?;
         let branch = git_line(dir, &["rev-parse", "--abbrev-ref", "HEAD"])
             .or_else(|| git_line(dir, &["symbolic-ref", "--short", "HEAD"]))?;
-        let upstream =
-            git_line(dir, &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+        let upstream = git_line(
+            dir,
+            &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        );
         let is_worktree = match (
             git_line(dir, &["rev-parse", "--git-dir"]),
             git_line(dir, &["rev-parse", "--git-common-dir"]),
@@ -467,7 +477,10 @@ mod tests {
         let fetch_refspec = "+refs/heads/*:refs/remotes/origin/*";
         git(dir, &["config", branch_remote.as_str(), "origin"]);
         git(dir, &["config", branch_merge.as_str(), merge_ref.as_str()]);
-        git(dir, &["config", "remote.origin.url", "https://example.com/x.git"]);
+        git(
+            dir,
+            &["config", "remote.origin.url", "https://example.com/x.git"],
+        );
         git(dir, &["config", "remote.origin.fetch", fetch_refspec]);
         let sha = git_line(dir, &["rev-parse", merge_ref.as_str()]).unwrap();
         let tracking = dir.join(".git/refs/remotes/origin");
@@ -540,7 +553,10 @@ mod tests {
         init_repo(dir.path());
         let wt = dir.path().join("wt");
         let wt_arg = wt.to_string_lossy().into_owned();
-        git(dir.path(), &["worktree", "add", "-q", "-b", "feature", wt_arg.as_str()]);
+        git(
+            dir.path(),
+            &["worktree", "add", "-q", "-b", "feature", wt_arg.as_str()],
+        );
 
         let registry = WorkspaceRegistry::default();
         let info = resolve_repo_direct(&registry, &resolved_local(&wt)).expect("direct answer");
@@ -553,7 +569,10 @@ mod tests {
         std::fs::write(dir.path().join("x.txt"), b"y").unwrap();
 
         let registry = WorkspaceRegistry::default();
-        assert_eq!(resolve_repo_direct(&registry, &resolved_local(dir.path())), None);
+        assert_eq!(
+            resolve_repo_direct(&registry, &resolved_local(dir.path())),
+            None
+        );
         assert_eq!(git_answer(dir.path()), None);
     }
 
@@ -564,7 +583,10 @@ mod tests {
         let inside = dir.path().join(".git").join("hooks");
 
         let registry = WorkspaceRegistry::default();
-        assert_eq!(resolve_repo_direct(&registry, &resolved_local(&inside)), None);
+        assert_eq!(
+            resolve_repo_direct(&registry, &resolved_local(&inside)),
+            None
+        );
         assert_eq!(git_answer(&inside), None);
     }
 
@@ -577,7 +599,10 @@ mod tests {
         let branch_merge = format!("branch.{branch}.merge");
         let merge_ref = format!("refs/heads/{branch}");
         git(dir.path(), &["config", branch_remote.as_str(), "."]);
-        git(dir.path(), &["config", branch_merge.as_str(), merge_ref.as_str()]);
+        git(
+            dir.path(),
+            &["config", branch_merge.as_str(), merge_ref.as_str()],
+        );
 
         let registry = WorkspaceRegistry::default();
         let info =
@@ -611,7 +636,10 @@ mod tests {
         let merge_ref = format!("refs/heads/{branch}");
         let fetch_refspec = format!("+refs/heads/{branch}:refs/remotes/up/{branch}");
         git(dir.path(), &["config", branch_remote.as_str(), "up"]);
-        git(dir.path(), &["config", branch_merge.as_str(), merge_ref.as_str()]);
+        git(
+            dir.path(),
+            &["config", branch_merge.as_str(), merge_ref.as_str()],
+        );
         git(
             dir.path(),
             &["config", "remote.up.url", "https://example.com/up.git"],
@@ -628,13 +656,10 @@ mod tests {
         let registry = WorkspaceRegistry::default();
         registry.authorize(dir.path()).unwrap();
         let cwd = dir.path().to_string_lossy().into_owned();
-        let info = crate::modules::git::operations::resolve_repo(
-            &registry,
-            &cwd,
-            &WorkspaceEnv::Local,
-        )
-        .unwrap()
-        .expect("repo via the git process");
+        let info =
+            crate::modules::git::operations::resolve_repo(&registry, &cwd, &WorkspaceEnv::Local)
+                .unwrap()
+                .expect("repo via the git process");
         assert_eq!(info, git_answer(dir.path()).unwrap());
     }
 }

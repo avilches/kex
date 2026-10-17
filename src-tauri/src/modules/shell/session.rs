@@ -121,9 +121,7 @@ impl ShellSession {
 }
 
 fn wrap_posix_with_sentinel(command: &str, sentinel: &str) -> String {
-    format!(
-        "{command}\n__kex_rc=$?\nprintf '\\n%s%s\\n' '{sentinel}' \"$(pwd)\"\nexit $__kex_rc\n",
-    )
+    format!("{command}\n__kex_rc=$?\nprintf '\\n%s%s\\n' '{sentinel}' \"$(pwd)\"\nexit $__kex_rc\n",)
 }
 
 fn wrap_with_sentinel(command: &str, workspace: &WorkspaceEnv, sentinel: &str) -> String {
@@ -175,7 +173,10 @@ mod tests {
         let stdout = format!("{attacker}{trailer}");
         let (clean, cwd) = strip_cwd_sentinel(&stdout, "/fallback", &s.sentinel);
         assert_eq!(cwd.as_deref(), Some("/real"));
-        assert!(clean.contains(attacker), "attacker payload survives in stdout");
+        assert!(
+            clean.contains(attacker),
+            "attacker payload survives in stdout"
+        );
     }
 
     #[test]

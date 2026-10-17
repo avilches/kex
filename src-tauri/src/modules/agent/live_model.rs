@@ -28,7 +28,8 @@ fn model_from_transcript(path: &str) -> Option<String> {
     }
     let mut file = std::fs::File::open(path).ok()?;
     let len = file.metadata().ok()?.len();
-    file.seek(SeekFrom::Start(len.saturating_sub(TAIL_BYTES))).ok()?;
+    file.seek(SeekFrom::Start(len.saturating_sub(TAIL_BYTES)))
+        .ok()?;
     let mut tail = Vec::with_capacity(TAIL_BYTES as usize);
     file.take(TAIL_BYTES).read_to_end(&mut tail).ok()?;
     last_assistant_model(&String::from_utf8_lossy(&tail))
@@ -58,13 +59,23 @@ mod tests {
     use super::*;
 
     fn assistant(model: &str, extra: &str) -> String {
-        format!(r#"{{"type":"assistant"{extra},"message":{{"model":"{model}","role":"assistant"}}}}"#)
+        format!(
+            r#"{{"type":"assistant"{extra},"message":{{"model":"{model}","role":"assistant"}}}}"#
+        )
     }
 
     #[test]
     fn takes_the_newest_assistant_message() {
-        let t = [assistant("claude-opus-4-1", ""), r#"{"type":"user"}"#.into(), assistant("claude-sonnet-4-6", "")].join("\n");
-        assert_eq!(last_assistant_model(&t).as_deref(), Some("claude-sonnet-4-6"));
+        let t = [
+            assistant("claude-opus-4-1", ""),
+            r#"{"type":"user"}"#.into(),
+            assistant("claude-sonnet-4-6", ""),
+        ]
+        .join("\n");
+        assert_eq!(
+            last_assistant_model(&t).as_deref(),
+            Some("claude-sonnet-4-6")
+        );
     }
 
     #[test]
@@ -80,7 +91,10 @@ mod tests {
 
     #[test]
     fn tolerates_a_cut_first_line_and_garbage() {
-        let t = format!("ode\":\"x\"}}}}\nnot json\n{}\n", assistant("claude-opus-4-1", ""));
+        let t = format!(
+            "ode\":\"x\"}}}}\nnot json\n{}\n",
+            assistant("claude-opus-4-1", "")
+        );
         assert_eq!(last_assistant_model(&t).as_deref(), Some("claude-opus-4-1"));
         assert_eq!(last_assistant_model("{\"type\":\"user\"}\n"), None);
     }
@@ -93,9 +107,16 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("t.jsonl");
         let filler = format!("{}\n", assistant("claude-opus-4-1", "")).repeat(10_000);
-        std::fs::write(&file, format!("{filler}{}\n", assistant("claude-sonnet-4-6", ""))).unwrap();
+        std::fs::write(
+            &file,
+            format!("{filler}{}\n", assistant("claude-sonnet-4-6", "")),
+        )
+        .unwrap();
         assert!(std::fs::metadata(&file).unwrap().len() > TAIL_BYTES);
-        assert_eq!(model_from_transcript(file.to_str().unwrap()).as_deref(), Some("claude-sonnet-4-6"));
+        assert_eq!(
+            model_from_transcript(file.to_str().unwrap()).as_deref(),
+            Some("claude-sonnet-4-6")
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -1,5 +1,6 @@
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import ompLogoUrl from "@/modules/agents/assets/omp-color.svg";
 import {
   Popover,
   PopoverContent,
@@ -96,7 +97,8 @@ export function NotificationBell({ onActivate }: Props) {
   const setOpen = useBellStore((s) => s.setOpen);
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
   const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
-  const [installing, setInstalling] = useState<"claude" | "opencode" | null>(null);
+  const [ompReady, setOmpReady] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState<"claude" | "opencode" | "omp" | null>(null);
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -135,6 +137,9 @@ export function NotificationBell({ onActivate }: Props) {
     invoke<boolean>("agent_opencode_plugin_status")
       .then(setOpencodeReady)
       .catch(() => setOpencodeReady(null));
+    invoke<boolean>("agent_omp_extension_status")
+      .then(setOmpReady)
+      .catch(() => setOmpReady(null));
   }, []);
 
   useEffect(() => {
@@ -172,6 +177,19 @@ export function NotificationBell({ onActivate }: Props) {
     } catch (e) {
       console.error("[kex] agent_setup_opencode failed:", e);
       setOpencodeReady(false);
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const setupOmp = async () => {
+    setInstalling("omp");
+    try {
+      await invoke("agent_setup_omp");
+      setOmpReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_omp failed:", e);
+      setOmpReady(false);
     } finally {
       setInstalling(null);
     }
@@ -315,6 +333,38 @@ export function NotificationBell({ onActivate }: Props) {
             {opencodeReady === false && installing === null ? (
               <p className="px-2 pt-1 text-[11px] text-destructive">
                 Could not write the OpenCode plugin.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!ompReady ? (
+          <div className="border-t border-border/60 p-1">
+            <button
+              type="button"
+              onClick={setupOmp}
+              disabled={installing !== null}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+            >
+              {installing === "omp" ? (
+                <Spinner size={16} className="text-current" />
+              ) : (
+                <img src={ompLogoUrl} alt="" width={14} height={14} style={{ width: 14, height: 14 }} />
+              )}
+              <span className="text-left">
+                <span className="block font-medium">
+                  {installing === "omp"
+                    ? "Installing..."
+                    : "Install OMP integration"}
+                </span>
+                <span className="block text-[11px]">
+                  Session restore on close
+                </span>
+              </span>
+            </button>
+            {ompReady === false && installing === null ? (
+              <p className="px-2 pt-1 text-[11px] text-destructive">
+                Could not write the OMP extension.
               </p>
             ) : null}
           </div>

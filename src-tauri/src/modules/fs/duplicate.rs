@@ -104,7 +104,14 @@ fn copy_inner(
         }
         for entry in std::fs::read_dir(src)? {
             let entry = entry?;
-            copy_inner(&entry.path(), &dst.join(entry.file_name()), false, cancel, copied, on_bytes)?;
+            copy_inner(
+                &entry.path(),
+                &dst.join(entry.file_name()),
+                false,
+                cancel,
+                copied,
+                on_bytes,
+            )?;
         }
         Ok(())
     } else {
@@ -114,13 +121,17 @@ fn copy_inner(
         // and this open. Nested files inside a freshly created dir cannot
         // pre-exist, so a normal create is fine for them.
         let mut writer = if toplevel {
-            std::fs::OpenOptions::new().write(true).create_new(true).open(dst).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::AlreadyExists {
-                    CopyError::DestExists
-                } else {
-                    CopyError::Io(e.to_string())
-                }
-            })?
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(dst)
+                .map_err(|e| {
+                    if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        CopyError::DestExists
+                    } else {
+                        CopyError::Io(e.to_string())
+                    }
+                })?
         } else {
             std::fs::File::create(dst)?
         };
@@ -180,17 +191,28 @@ pub async fn fs_duplicate(
         *slot = Some(cancel.clone());
     }
 
-    let name = dest.split(['/', '\\']).next_back().unwrap_or(&dest).to_string();
+    let name = dest
+        .split(['/', '\\'])
+        .next_back()
+        .unwrap_or(&dest)
+        .to_string();
     let total = dir_size(&src);
 
     // Store initial snapshot and emit initial event.
-    *state.current.lock().unwrap() = Some(CopySnapshot { name: name.clone(), copied: 0, total });
-    let _ = app.emit("kex:duplicate-progress", DuplicateProgressEvent {
+    *state.current.lock().unwrap() = Some(CopySnapshot {
         name: name.clone(),
         copied: 0,
         total,
-        active: true,
     });
+    let _ = app.emit(
+        "kex:duplicate-progress",
+        DuplicateProgressEvent {
+            name: name.clone(),
+            copied: 0,
+            total,
+            active: true,
+        },
+    );
 
     let app_clone = app.clone();
     let name_clone = name.clone();
@@ -199,34 +221,63 @@ pub async fn fs_duplicate(
         let mut emit = |copied: u64| {
             if last_emit.elapsed() >= EMIT_INTERVAL {
                 last_emit = Instant::now();
-                let _ = app_clone.emit("kex:duplicate-progress", DuplicateProgressEvent {
-                    name: name_clone.clone(),
-                    copied,
-                    total,
-                    active: true,
-                });
+                let _ = app_clone.emit(
+                    "kex:duplicate-progress",
+                    DuplicateProgressEvent {
+                        name: name_clone.clone(),
+                        copied,
+                        total,
+                        active: true,
+                    },
+                );
             }
         };
         let outcome = copy_job(&src, &dst, total, &cancel, &mut emit);
         let (final_event, result) = match outcome {
             Ok(()) => (
-                DuplicateProgressEvent { name: name_clone.clone(), copied: total, total, active: false },
+                DuplicateProgressEvent {
+                    name: name_clone.clone(),
+                    copied: total,
+                    total,
+                    active: false,
+                },
                 Ok(()),
             ),
             Err(CopyError::Cancelled) => {
                 cleanup(&dst);
-                (DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false }, Ok(()))
+                (
+                    DuplicateProgressEvent {
+                        name: name_clone.clone(),
+                        copied: 0,
+                        total,
+                        active: false,
+                    },
+                    Ok(()),
+                )
             }
             Err(CopyError::Io(e)) => {
                 cleanup(&dst);
                 let msg = e.clone();
-                (DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false }, Err(msg))
+                (
+                    DuplicateProgressEvent {
+                        name: name_clone.clone(),
+                        copied: 0,
+                        total,
+                        active: false,
+                    },
+                    Err(msg),
+                )
             }
             // dst existed before we touched it; do not delete it.
             Err(CopyError::DestExists) => {
                 let msg = format!("already exists: {}", dst.display());
                 (
-                    DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false },
+                    DuplicateProgressEvent {
+                        name: name_clone.clone(),
+                        copied: 0,
+                        total,
+                        active: false,
+                    },
                     Err(msg),
                 )
             }
@@ -243,7 +294,11 @@ pub async fn fs_duplicate(
     // If the user tried to quit while this copy was running, let the app exit now
     // that the slot is clear. Both "wait for it to finish" and "cancel copy & quit"
     // paths reach here; cancel sets the pending flag, copy ends, and this fires.
-    if app.state::<crate::QuitGuard>().pending.load(Ordering::SeqCst) {
+    if app
+        .state::<crate::QuitGuard>()
+        .pending
+        .load(Ordering::SeqCst)
+    {
         let _ = app.emit("kex:before-quit", ());
     }
 
@@ -356,9 +411,17 @@ mod tests {
 
         let cancel = Arc::new(AtomicBool::new(false));
         let err = copy_job(&src_file, &dst_file, 6, &cancel, &mut |_| {}).unwrap_err();
-        assert!(matches!(err, CopyError::DestExists), "expected DestExists for file, got {:?}", err);
+        assert!(
+            matches!(err, CopyError::DestExists),
+            "expected DestExists for file, got {:?}",
+            err
+        );
         // The pre-existing file must be untouched.
-        assert_eq!(std::fs::read(&dst_file).unwrap(), b"original", "dst file must not be modified");
+        assert_eq!(
+            std::fs::read(&dst_file).unwrap(),
+            b"original",
+            "dst file must not be modified"
+        );
 
         // Dir case: dst exists as a directory with known content.
         let src_dir = dir.path().join("src_dir");
@@ -371,9 +434,17 @@ mod tests {
         let cancel2 = Arc::new(AtomicBool::new(false));
         let total2 = count_bytes(&src_dir);
         let err2 = copy_job(&src_dir, &dst_dir, total2, &cancel2, &mut |_| {}).unwrap_err();
-        assert!(matches!(err2, CopyError::DestExists), "expected DestExists for dir, got {:?}", err2);
+        assert!(
+            matches!(err2, CopyError::DestExists),
+            "expected DestExists for dir, got {:?}",
+            err2
+        );
         // The pre-existing directory and its contents must survive.
         assert!(dst_dir.exists(), "dst dir must still exist");
-        assert_eq!(std::fs::read(dst_dir.join("keep.txt")).unwrap(), b"keeper", "dst dir contents must not be deleted");
+        assert_eq!(
+            std::fs::read(dst_dir.join("keep.txt")).unwrap(),
+            b"keeper",
+            "dst dir contents must not be deleted"
+        );
     }
 }

@@ -29,7 +29,9 @@ pub static PROVIDERS: &[Provider] = &[
         sessions: Some(SessionsSource::ClaudeProjects),
         cwd_read: CwdRead::ScanEntries,
         resume: ResumeSpec::Flag { flag: "--resume" },
-        missing_transcript: MissingTranscriptPolicy::Reattach { flag: "--session-id" },
+        missing_transcript: MissingTranscriptPolicy::Reattach {
+            flag: "--session-id",
+        },
         keep_flags: CLAUDE_KEEP_FLAGS,
         keep_with_value: CLAUDE_KEEP_WITH_VALUE,
     },
@@ -57,6 +59,20 @@ pub static PROVIDERS: &[Provider] = &[
         keep_flags: &[],
         keep_with_value: &[],
     },
+    Provider {
+        name: "omp",
+        // OMP writes one JSONL per session under `~/.omp/agent/sessions/<cwd-encoded>/`; the
+        // file name is `<timestamp>_<id>.jsonl` and line 2 carries `{type:"session", id, cwd}`.
+        // The extension frame already records id and cwd, so the lookup only backs the plan:
+        // with the file gone there is nothing reliable to resume and the record is kept but
+        // never planned.
+        sessions: Some(SessionsSource::OmpSessions),
+        cwd_read: CwdRead::HeaderLine,
+        resume: ResumeSpec::Flag { flag: "--resume" },
+        missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
+        keep_flags: &[],
+        keep_with_value: &[],
+    },
 ];
 
 impl Provider {
@@ -80,12 +96,18 @@ impl Provider {
         let MissingTranscriptPolicy::Reattach { flag } = self.missing_transcript else {
             unreachable!("reattach_cmd is only reachable when the policy reattaches")
         };
-        format!("{} {} {}", base.unwrap_or(self.name), flag, shell_quote(session_id))
+        format!(
+            "{} {} {}",
+            base.unwrap_or(self.name),
+            flag,
+            shell_quote(session_id)
+        )
     }
 }
 
 pub enum SessionsSource {
     ClaudeProjects,
+    OmpSessions,
 }
 
 impl SessionsSource {
@@ -93,6 +115,7 @@ impl SessionsSource {
     pub fn find(&self, session_id: &str, transcript_path: &str) -> Option<PathBuf> {
         match self {
             Self::ClaudeProjects => find_in_claude_projects(session_id, transcript_path),
+            Self::OmpSessions => find_in_omp_sessions(session_id, transcript_path),
         }
     }
 }
@@ -126,11 +149,65 @@ fn find_in_claude_projects(session_id: &str, transcript_path: &str) -> Option<Pa
     None
 }
 
+fn find_in_omp_sessions(session_id: &str, transcript_path: &str) -> Option<PathBuf> {
+    if !transcript_path.is_empty() && Path::new(transcript_path).exists() {
+        return Some(PathBuf::from(transcript_path));
+    }
+    find_in_sessions_root(&omp_sessions_root(), session_id)
+}
+
+fn find_in_sessions_root(root: &Path, session_id: &str) -> Option<PathBuf> {
+    // File names start with a timestamp (`<date>_<id>.jsonl`), so the lexicographic
+    // maximum is the most recent session file; no mtime comparisons needed.
+    let mut best_name: Option<String> = None;
+    let mut best_path: Option<PathBuf> = None;
+    if let Ok(groups) = std::fs::read_dir(root) {
+        for group in groups.flatten() {
+            let Ok(files) = std::fs::read_dir(group.path()) else {
+                continue;
+            };
+            for file in files.flatten() {
+                let name = file.file_name();
+                // Session files are `<timestamp>_<id>.jsonl`; the suffix match is exact
+                // because ids are UUID-like. Lock sidecars share the name's head but end
+                // differently and are filtered by the `.jsonl` ending.
+                if !file.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                    continue;
+                }
+                let Some(name_str) = name.to_str() else {
+                    continue;
+                };
+                let ok = name_str == format!("{session_id}.jsonl")
+                    || name_str.ends_with(&format!("_{session_id}.jsonl"));
+                if !ok {
+                    continue;
+                }
+                if best_name.as_ref().is_none_or(|b| name_str > b.as_str()) {
+                    best_name = Some(name_str.to_string());
+                    best_path = Some(file.path());
+                }
+            }
+        }
+    }
+    best_path
+}
+
+fn omp_sessions_root() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/"))
+        .join(".omp")
+        .join("agent")
+        .join("sessions")
+}
+
 pub enum CwdRead {
     /// Walk the entries: `worktreeSession.originalCwd` wins (where the command was launched
     /// from while the session is inside a Kex worktree, which is often deleted later), else
     /// the first `cwd` entry.
     ScanEntries,
+    /// Read the `cwd` of the `session` header line (OMP: JSONL line 2, after an intro `title`
+    /// entry). The file is written when the session is created and the header never changes.
+    HeaderLine,
     /// Never consulted: only reachable when `sessions` is `None`.
     Unused,
 }
@@ -139,6 +216,7 @@ impl CwdRead {
     pub fn read_launch_cwd(&self, transcript: &Path) -> Option<String> {
         match self {
             Self::ScanEntries => scan_claude_entries(transcript),
+            Self::HeaderLine => scan_header_line(transcript),
             Self::Unused => None,
         }
     }
@@ -149,7 +227,9 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     let reader = std::io::BufReader::new(file);
     for line in reader.lines() {
         let line = line.ok()?;
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
         // Claude Code writes `worktree-state` before the first user message whenever the
         // session is inside a worktree; the entries' own `cwd` is the worktree, which is the
         // one the restore may not survive if the worktree folder is gone. `originalCwd` is
@@ -169,6 +249,29 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
         }
     }
     None
+}
+
+fn scan_header_line(jsonl: &Path) -> Option<String> {
+    let file = std::fs::File::open(jsonl).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut line = String::new();
+    // Line 1 is a `title` entry; line 2 is the `session` header. Missing either means the
+    // file was not written by OMP.
+    for _ in 0..2 {
+        line.clear();
+        if reader.read_line(&mut line).ok()? == 0 {
+            return None;
+        }
+    }
+    serde_json::from_str::<serde_json::Value>(&line)
+        .ok()
+        .filter(|obj| obj.get("type").and_then(|t| t.as_str()) == Some("session"))
+        .and_then(|obj| {
+            obj.get("cwd")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .filter(|c| !c.is_empty())
 }
 
 pub enum ResumeSpec {
@@ -215,9 +318,12 @@ const CLAUDE_KEEP_WITH_VALUE: &[&str] = &[
     "--add-dir",
     "--agent",
     "--agents",
-    "--allowedTools", "--allowed-tools",
-    "--disallowedTools", "--disallowed-tools",
-    "--name", "-n",
+    "--allowedTools",
+    "--allowed-tools",
+    "--disallowedTools",
+    "--disallowed-tools",
+    "--name",
+    "-n",
     "--permission-mode",
     "--mcp-config",
     "--settings",
@@ -232,8 +338,8 @@ const CLAUDE_KEEP_WITH_VALUE: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::launch_cmd::DEFAULT_AGENTS;
+    use super::*;
 
     #[test]
     fn default_agents_have_a_provider_row() {
@@ -255,7 +361,10 @@ mod tests {
     #[test]
     fn resume_cmd_claude() {
         let provider = Provider::of("claude").unwrap();
-        assert_eq!(provider.resume_cmd(None, "abc-123"), "claude --resume 'abc-123'");
+        assert_eq!(
+            provider.resume_cmd(None, "abc-123"),
+            "claude --resume 'abc-123'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("claude --safe-mode"), "abc-123"),
             "claude --safe-mode --resume 'abc-123'"
@@ -266,13 +375,19 @@ mod tests {
     fn resume_cmd_codex() {
         let provider = Provider::of("codex").unwrap();
         assert_eq!(provider.resume_cmd(None, "any"), "codex resume --last");
-        assert_eq!(provider.resume_cmd(Some("codex-max"), "abc-123"), "codex-max resume --last");
+        assert_eq!(
+            provider.resume_cmd(Some("codex-max"), "abc-123"),
+            "codex-max resume --last"
+        );
     }
 
     #[test]
     fn resume_cmd_opencode() {
         let provider = Provider::of("opencode").unwrap();
-        assert_eq!(provider.resume_cmd(None, "ses_abc"), "opencode --session 'ses_abc'");
+        assert_eq!(
+            provider.resume_cmd(None, "ses_abc"),
+            "opencode --session 'ses_abc'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("opencode --model g5"), "ses_abc"),
             "opencode --model g5 --session 'ses_abc'"
@@ -280,9 +395,87 @@ mod tests {
     }
 
     #[test]
+    fn resume_cmd_omp() {
+        let provider = Provider::of("omp").unwrap();
+        assert_eq!(
+            provider.resume_cmd(None, "01a1-abc"),
+            "omp --resume '01a1-abc'"
+        );
+        assert_eq!(
+            provider.resume_cmd(Some("omp --slow m5"), "01a1-abc"),
+            "omp --slow m5 --resume '01a1-abc'"
+        );
+    }
+
+    #[test]
+    fn an_omp_record_finds_its_session_file_by_id_suffix() {
+        let root = tempfile::tempdir().unwrap();
+        let group = root.path().join("-Users-avilches-proj");
+        std::fs::create_dir_all(&group).unwrap();
+        std::fs::write(
+            group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"),
+            "{}\n{}\n",
+        )
+        .unwrap();
+
+        let found = find_in_sessions_root(root.path(), "omp-test-id");
+
+        assert_eq!(
+            found,
+            Some(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"))
+        );
+    }
+
+    #[test]
+    fn an_omp_find_prefers_the_most_recent_session_file() {
+        let root = tempfile::tempdir().unwrap();
+        let group = root.path().join("-Users-avilches-proj");
+        std::fs::create_dir_all(&group).unwrap();
+        // Names sort by the embedded timestamp, so no mtime foolery is needed.
+        std::fs::write(group.join("2026-01-01T10_00_00Z_omp-test-id.jsonl"), "{}\n").unwrap();
+        std::fs::write(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"), "{}\n").unwrap();
+
+        let found = find_in_sessions_root(root.path(), "omp-test-id");
+
+        assert_eq!(
+            found,
+            Some(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"))
+        );
+    }
+
+    #[test]
+    fn an_omp_record_reads_the_cwd_of_the_session_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = dir.path().join("proj");
+        std::fs::create_dir_all(&cwd).unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(
+            &jsonl,
+            format!(
+                "{{\"type\":\"title\",\"title\":\"t\"}}\n{{\"type\":\"session\",\"version\":3,\"id\":\"s1\",\"cwd\":\"{}\"}}\n",
+                cwd.display()
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(scan_header_line(&jsonl), Some(cwd.display().to_string()));
+    }
+
+    #[test]
+    fn an_omp_record_ignores_a_session_file_without_the_header_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(&jsonl, "{\"type\":\"title\"}\n").unwrap();
+        assert_eq!(scan_header_line(&jsonl), None);
+    }
+
+    #[test]
     fn reattach_cmd_claude() {
         let provider = Provider::of("claude").unwrap();
-        assert_eq!(provider.reattach_cmd(None, "abc-123"), "claude --session-id 'abc-123'");
+        assert_eq!(
+            provider.reattach_cmd(None, "abc-123"),
+            "claude --session-id 'abc-123'"
+        );
         assert_eq!(
             provider.reattach_cmd(Some("claude --safe-mode"), "abc-123"),
             "claude --safe-mode --session-id 'abc-123'"

@@ -203,6 +203,17 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 ### Technical fixes and refactors
 
+- **OMP agent integration** (not present upstream): omp joins `DEFAULT_AGENTS` and gets a provider row
+  (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
+  `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
+  TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
+  (`agent_setup_omp`, marker `kex-omp-v1`), which translates `before_agent_start`/`agent_start` (plus one
+  `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
+  assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
+  inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the
+  id and cwd straight from the extension's frame; `agent.db` is never read (it is only auth and history). Measured
+  against omp 18.11.3 in the wild, not docs.
+
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to

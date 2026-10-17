@@ -3,12 +3,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import claudeCodeUrl from "@/modules/agents/assets/claudecode-color.svg";
 import codexUrl from "@/modules/agents/assets/codex-color.svg";
 import geminiCliUrl from "@/modules/agents/assets/geminicli-color.svg";
+import ompUrl from "@/modules/agents/assets/omp-color.svg";
 
 function svgUrlFor(agent: string): string | null {
   const a = agent.toLowerCase();
   if (a.includes("claude")) return claudeCodeUrl;
   if (a.includes("codex") || a.includes("gpt") || a.includes("openai")) return codexUrl;
   if (a.includes("gemini")) return geminiCliUrl;
+  if (a === "omp") return ompUrl;
   return null;
 }
 

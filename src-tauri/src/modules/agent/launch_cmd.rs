@@ -13,7 +13,7 @@
 //! is flagged `complete: false`, so that its text is never replayed. Command substitutions and
 //! `${...}` are consumed whole, quotes inside them included, but never analysed.
 
-pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "opencode"];
+pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "opencode", "omp"];
 
 /// Longest line the shell scripts send; a line this long may have been cut.
 pub const MAX_LINE_CHARS: usize = 256;
@@ -26,8 +26,16 @@ struct Wrapper {
     positionals: usize,
 }
 
-const fn wrapper(name: &'static str, value_opts: &'static [&'static str], positionals: usize) -> Wrapper {
-    Wrapper { name, value_opts, positionals }
+const fn wrapper(
+    name: &'static str,
+    value_opts: &'static [&'static str],
+    positionals: usize,
+) -> Wrapper {
+    Wrapper {
+        name,
+        value_opts,
+        positionals,
+    }
 }
 
 /// Commands that run their arguments as another command. Anything outside this list
@@ -40,7 +48,11 @@ const WRAPPERS: &[Wrapper] = &[
     wrapper("time", &[], 0),
     wrapper("nohup", &[], 0),
     wrapper("nice", &["-n"], 0),
-    wrapper("sudo", &["-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U"], 0),
+    wrapper(
+        "sudo",
+        &["-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U"],
+        0,
+    ),
     wrapper("noglob", &[], 0),
     wrapper("nocorrect", &[], 0),
     wrapper("npx", &["-p", "--package"], 0),
@@ -53,7 +65,16 @@ const WRAPPERS: &[Wrapper] = &[
 /// Wrapper options known to take no value. Any other option makes the command word
 /// unresolvable (`sudo -Eu claude ls`, `command -v claude`).
 const FLAG_OPTIONS: &[&str] = &[
-    "-i", "-p", "-y", "--yes", "-E", "-H", "-c", "-l", "--foreground", "--preserve-status",
+    "-i",
+    "-p",
+    "-y",
+    "--yes",
+    "-E",
+    "-H",
+    "-c",
+    "-l",
+    "--foreground",
+    "--preserve-status",
 ];
 
 /// Reserved words that may open a segment before the command (`if x; then claude; fi`).
@@ -73,12 +94,20 @@ pub struct Invocation {
 
 impl Invocation {
     pub fn command(&self) -> String {
-        self.head.iter().chain(self.args.iter()).map(String::as_str).collect::<Vec<_>>().join(" ")
+        self.head
+            .iter()
+            .chain(self.args.iter())
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// `-p` / `--print` among the agent's own options (not after `--`).
     pub fn is_print_mode(&self) -> bool {
-        self.args.iter().take_while(|t| t.as_str() != "--").any(|t| t == "-p" || t == "--print")
+        self.args
+            .iter()
+            .take_while(|t| t.as_str() != "--")
+            .any(|t| t == "-p" || t == "--print")
     }
 }
 
@@ -113,7 +142,13 @@ pub fn redirection_tokens(token: &str) -> Option<usize> {
     if rest.starts_with(['<', '>']) && rest[1..].starts_with('(') {
         return None;
     }
-    Some(if rest.trim_start_matches(['<', '>', '&', '|']).is_empty() { 2 } else { 1 })
+    Some(
+        if rest.trim_start_matches(['<', '>', '&', '|']).is_empty() {
+            2
+        } else {
+            1
+        },
+    )
 }
 
 fn match_segment(tokens: Vec<String>, agents: &[String], complete: bool) -> Option<Invocation> {
@@ -141,7 +176,8 @@ fn match_segment(tokens: Vec<String>, agents: &[String], complete: bool) -> Opti
             continue;
         }
         let agent = agents.iter().find(|a| {
-            word.strip_prefix(a.as_str()).is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
+            word.strip_prefix(a.as_str())
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
         })?;
         head.push(tokens[i].clone());
         return Some(Invocation {
@@ -179,10 +215,14 @@ fn skip_wrapper_args(tokens: &[String], mut i: usize, w: &Wrapper) -> Option<usi
 }
 
 fn is_assignment(tok: &str) -> bool {
-    let Some(eq) = tok.find('=') else { return false };
+    let Some(eq) = tok.find('=') else {
+        return false;
+    };
     let name = tok[..eq].strip_suffix('+').unwrap_or(&tok[..eq]);
     let mut chars = name.chars();
-    chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
@@ -191,12 +231,16 @@ fn is_assignment(tok: &str) -> bool {
 /// (`\claude`) and `my\claude` is just the command `myclaude`.
 fn base_name(tok: &str) -> &str {
     let unquoted = tok
-        .strip_prefix('"').and_then(|t| t.strip_suffix('"'))
+        .strip_prefix('"')
+        .and_then(|t| t.strip_suffix('"'))
         .or_else(|| tok.strip_prefix('\'').and_then(|t| t.strip_suffix('\'')))
         .unwrap_or(tok);
     let bytes = unquoted.as_bytes();
     let windows_path = unquoted.starts_with("\\\\")
-        || (bytes.len() > 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && matches!(bytes[2], b'\\' | b'/'));
+        || (bytes.len() > 2
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && matches!(bytes[2], b'\\' | b'/'));
     if windows_path {
         return unquoted.rsplit(['/', '\\']).next().unwrap_or(unquoted);
     }
@@ -461,7 +505,8 @@ mod tests {
 
     #[test]
     fn retry_line_drops_the_cd() {
-        let line = " cd '/Users/x/Library/Application Support/Taxes' && claude-max --resume 'abc-1'";
+        let line =
+            " cd '/Users/x/Library/Application Support/Taxes' && claude-max --resume 'abc-1'";
         assert_eq!(cmd(line).as_deref(), Some("claude-max --resume 'abc-1'"));
     }
 
@@ -482,13 +527,22 @@ mod tests {
 
     #[test]
     fn grouping_is_dropped() {
-        assert_eq!(cmd("(cd /tmp && claude --x)").as_deref(), Some("claude --x"));
-        assert_eq!(cmd("{ cd /tmp; claude --x; }").as_deref(), Some("claude --x"));
+        assert_eq!(
+            cmd("(cd /tmp && claude --x)").as_deref(),
+            Some("claude --x")
+        );
+        assert_eq!(
+            cmd("{ cd /tmp; claude --x; }").as_deref(),
+            Some("claude --x")
+        );
         assert_eq!(cmd("{ claude --x ; }").as_deref(), Some("claude --x"));
         assert_eq!(cmd("cd /tmp; claude --x").as_deref(), Some("claude --x"));
         assert_eq!(cmd("false || claude --x").as_deref(), Some("claude --x"));
         assert_eq!(cmd("claude --x &").as_deref(), Some("claude --x"));
-        assert_eq!(cmd("if true; then claude --x; fi").as_deref(), Some("claude --x"));
+        assert_eq!(
+            cmd("if true; then claude --x; fi").as_deref(),
+            Some("claude --x")
+        );
         assert_eq!(cmd("! claude --x").as_deref(), Some("claude --x"));
         assert_eq!(cmd("FOO=1 { claude; }"), None);
     }
@@ -509,7 +563,10 @@ mod tests {
         same("command claude --x");
         same("npx claude");
         same("npx -y claude");
-        assert_eq!(cmd("cd d && FOO=1 nohup claude").as_deref(), Some("FOO=1 nohup claude"));
+        assert_eq!(
+            cmd("cd d && FOO=1 nohup claude").as_deref(),
+            Some("FOO=1 nohup claude")
+        );
     }
 
     #[test]
@@ -549,7 +606,10 @@ mod tests {
 
     #[test]
     fn loop_keywords_before_the_command_are_skipped() {
-        assert_eq!(cmd("while true; do claude --x; done").as_deref(), Some("claude --x"));
+        assert_eq!(
+            cmd("while true; do claude --x; done").as_deref(),
+            Some("claude --x")
+        );
     }
 
     #[test]
@@ -573,7 +633,10 @@ mod tests {
         assert_eq!(cmd(">/tmp/o claude --x").as_deref(), Some("claude --x"));
         assert_eq!(cmd("> out.log claude --x").as_deref(), Some("claude --x"));
         assert_eq!(cmd("2>&1 claude --x").as_deref(), Some("claude --x"));
-        assert_eq!(cmd("FOO=1 >/tmp/o claude --x").as_deref(), Some("FOO=1 claude --x"));
+        assert_eq!(
+            cmd("FOO=1 >/tmp/o claude --x").as_deref(),
+            Some("FOO=1 claude --x")
+        );
         assert_eq!(cmd("</tmp/claude ls"), None);
         assert_eq!(cmd(">/tmp/claude echo hi"), None);
     }
@@ -610,13 +673,19 @@ mod tests {
     #[test]
     fn ansi_c_quoting_honours_escaped_quotes() {
         same("claude --name $'it\\'s' --x");
-        assert_eq!(cmd("claude --name $'it\\'s' && rm -rf /tmp/y").as_deref(), Some("claude --name $'it\\'s'"));
+        assert_eq!(
+            cmd("claude --name $'it\\'s' && rm -rf /tmp/y").as_deref(),
+            Some("claude --name $'it\\'s'")
+        );
     }
 
     #[test]
     fn quoting_whose_meaning_depends_on_the_shell_is_not_guessed() {
         assert_eq!(cmd("claude --name 'it\\'s' ; rm -rf y"), None);
-        assert_eq!(cmd("claude --append-system-prompt \"a`\"b\" ; rm -rf y"), None);
+        assert_eq!(
+            cmd("claude --append-system-prompt \"a`\"b\" ; rm -rf y"),
+            None
+        );
         assert_eq!(cmd("claude --name \"it`s\" ; rm -rf y"), None);
     }
 
@@ -633,7 +702,10 @@ mod tests {
 
     #[test]
     fn the_last_agent_segment_wins() {
-        assert_eq!(cmd("claude --a && codex resume --last").as_deref(), Some("codex resume --last"));
+        assert_eq!(
+            cmd("claude --a && codex resume --last").as_deref(),
+            Some("codex resume --last")
+        );
     }
 
     #[test]
@@ -671,12 +743,16 @@ mod tests {
         assert_eq!(cmd("\\"), None);
         assert_eq!(cmd("$("), None);
         assert_eq!(cmd("'"), None);
-        assert_eq!(cmd("claude \u{1F600} \u{e9} \u{4e2d}").as_deref(), Some("claude \u{1F600} \u{e9} \u{4e2d}"));
+        assert_eq!(
+            cmd("claude \u{1F600} \u{e9} \u{4e2d}").as_deref(),
+            Some("claude \u{1F600} \u{e9} \u{4e2d}")
+        );
     }
 
     #[test]
     fn invocation_separates_head_and_args() {
-        let inv = find_agent_invocation("cd x && FOO=1 claude-max --resume 'a'", &agents()).unwrap();
+        let inv =
+            find_agent_invocation("cd x && FOO=1 claude-max --resume 'a'", &agents()).unwrap();
         assert_eq!(inv.agent, "claude");
         assert_eq!(inv.head, vec!["FOO=1", "claude-max"]);
         assert_eq!(inv.args, vec!["--resume", "'a'"]);

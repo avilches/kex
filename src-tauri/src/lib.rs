@@ -1,6 +1,8 @@
 pub mod modules;
 
-use modules::{agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace};
+use modules::{
+    agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace,
+};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -27,7 +29,9 @@ pub(crate) struct QuitGuard {
 /// response to `kex:before-quit`, to let the deferred quit proceed.
 #[tauri::command]
 fn confirm_quit(app: tauri::AppHandle) {
-    app.state::<QuitGuard>().confirmed.store(true, Ordering::SeqCst);
+    app.state::<QuitGuard>()
+        .confirmed
+        .store(true, Ordering::SeqCst);
     app.exit(0);
 }
 
@@ -35,7 +39,9 @@ fn confirm_quit(app: tauri::AppHandle) {
 /// (the "Keep app open" action), so the next quit goes through the normal path.
 #[tauri::command]
 fn cancel_quit(app: tauri::AppHandle) {
-    app.state::<QuitGuard>().pending.store(false, Ordering::SeqCst);
+    app.state::<QuitGuard>()
+        .pending
+        .store(false, Ordering::SeqCst);
     let _ = app.emit("kex:duplicate-quit-dismissed", ());
 }
 
@@ -69,10 +75,7 @@ fn signal_quit_request(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
         .confirmed
         .store(true, Ordering::SeqCst);
-    let has_main = app
-        .webview_windows()
-        .keys()
-        .any(|l| l.starts_with("w-"));
+    let has_main = app.webview_windows().keys().any(|l| l.starts_with("w-"));
     if has_main {
         let _ = app.emit("kex:before-quit", ());
     } else {
@@ -131,15 +134,23 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         for item in &items.tab_items {
             let _ = item.set_enabled(!state.hibernated);
         }
-        for item in [&items.sidebar, &items.explorer, &items.git, &items.history, &items.show_hidden] {
+        for item in [
+            &items.sidebar,
+            &items.explorer,
+            &items.git,
+            &items.history,
+            &items.show_hidden,
+        ] {
             let _ = item.set_enabled(!state.hibernated);
         }
         let _ = items.sidebar_side.set_enabled(!state.hibernated);
-        let _ = items.sidebar_side.set_text(if state.sidebar_side == "left" {
-            "Move Sidebar to Right"
-        } else {
-            "Move Sidebar to Left"
-        });
+        let _ = items
+            .sidebar_side
+            .set_text(if state.sidebar_side == "left" {
+                "Move Sidebar to Right"
+            } else {
+                "Move Sidebar to Left"
+            });
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (app, state);
@@ -217,16 +228,15 @@ fn create_app_window(
 
     // Size only in the builder - position is applied on first Focused(true) to work
     // around macOS cascade which overrides any position set before or at show().
-    let builder =
-        WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
-            .title("Kex")
-            .inner_size(width, height)
-            .min_inner_size(640.0, 480.0)
-            .resizable(true)
-            .visible(false)
-            // Block file:// navigation so WKWebKit doesn't open Finder when the
-            // user clicks an OSC 8 link whose URI starts with file://.
-            .on_navigation(|url| url.scheme() != "file");
+    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+        .title("Kex")
+        .inner_size(width, height)
+        .min_inner_size(640.0, 480.0)
+        .resizable(true)
+        .visible(false)
+        // Block file:// navigation so WKWebKit doesn't open Finder when the
+        // user clicks an OSC 8 link whose URI starts with file://.
+        .on_navigation(|url| url.scheme() != "file");
 
     #[cfg(target_os = "macos")]
     let builder = builder
@@ -283,12 +293,16 @@ fn create_app_window(
             let mgr = app_handle.state::<window_state::WindowStateManager>();
             if live > 0 {
                 // User closed one window while others are open - remove from state.
-                log::info!("[window] Destroyed {win_label}: {live} window(s) remain, removing from state");
+                log::info!(
+                    "[window] Destroyed {win_label}: {live} window(s) remain, removing from state"
+                );
                 mgr.remove_window(&win_label);
                 mgr.save();
             } else {
                 // Last window closed (app quit) - keep state to restore next launch.
-                log::info!("[window] Destroyed {win_label}: last window, keeping state for restore");
+                log::info!(
+                    "[window] Destroyed {win_label}: last window, keeping state for restore"
+                );
                 if let Some(s) = app_handle.get_webview_window("settings") {
                     let _ = s.close();
                 }
@@ -303,7 +317,10 @@ fn create_app_window(
 }
 
 #[tauri::command]
-async fn open_settings_window(app: tauri::AppHandle, section: Option<String>) -> Result<(), String> {
+async fn open_settings_window(
+    app: tauri::AppHandle,
+    section: Option<String>,
+) -> Result<(), String> {
     let url_path = match section.as_deref() {
         Some(t) if !t.is_empty() => format!("settings.html?section={}", t),
         _ => "settings.html".to_string(),
@@ -363,9 +380,11 @@ async fn open_settings_window(app: tauri::AppHandle, section: Option<String>) ->
             .into_values()
             .find(|w| w.label().starts_with("w-"));
         if let Some(main) = main_win {
-            if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) =
-                (main.outer_position(), main.outer_size(), window.outer_size())
-            {
+            if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) = (
+                main.outer_position(),
+                main.outer_size(),
+                window.outer_size(),
+            ) {
                 let x = main_pos.x
                     + ((main_size.width as i32).saturating_sub(settings_size.width as i32)) / 2;
                 let y = main_pos.y
@@ -398,11 +417,10 @@ fn create_new_window(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn window_get_state(
-    app: tauri::AppHandle,
-    label: String,
-) -> Option<window_state::WindowEntry> {
-    let entry = app.state::<window_state::WindowStateManager>().get_entry(&label);
+fn window_get_state(app: tauri::AppHandle, label: String) -> Option<window_state::WindowEntry> {
+    let entry = app
+        .state::<window_state::WindowStateManager>()
+        .get_entry(&label);
     match &entry {
         Some(e) => {
             let ws = e.workspaces.as_array().map(|a| a.len()).unwrap_or(0);
@@ -428,18 +446,9 @@ fn window_save_workspace_state(
 }
 
 #[tauri::command]
-fn window_save_sidebar(
-    app: tauri::AppHandle,
-    label: String,
-    open: bool,
-    side: String,
-    width: u32,
-) {
+fn window_save_sidebar(app: tauri::AppHandle, label: String, open: bool, side: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
-    mgr.update_sidebar(
-        &label,
-        window_state::SidebarState { open, side, width },
-    );
+    mgr.update_sidebar(&label, window_state::SidebarState { open, side, width });
     mgr.save();
 }
 
@@ -475,9 +484,16 @@ fn window_save_groups(
 fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::AppHandle) {
     let label = webview_window.label().to_string();
     let mgr = app.state::<window_state::WindowStateManager>();
-    let Some(entry) = mgr.get_entry(&label) else { return };
+    let Some(entry) = mgr.get_entry(&label) else {
+        return;
+    };
     let g = &entry.geometry;
-    log::debug!("[window] restore size for {label}: {}x{} maximized={}", g.width, g.height, g.maximized);
+    log::debug!(
+        "[window] restore size for {label}: {}x{} maximized={}",
+        g.width,
+        g.height,
+        g.maximized
+    );
     if g.maximized {
         let _ = webview_window.maximize();
     } else if g.width > 0 && g.height > 0 {
@@ -489,13 +505,21 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
 fn agent_session_restore_plan(app: tauri::AppHandle) -> Vec<agent::session_store::RestorePlan> {
     log::debug!("[agent-session] agent_session_restore_plan invoked");
     let plans = agent::session_store::load_restore_plan();
-    let known = app.state::<window_state::WindowStateManager>().terminal_tab_ids();
+    let known = app
+        .state::<window_state::WindowStateManager>()
+        .terminal_tab_ids();
     let (plans, orphans) = agent::session_store::split_orphans(plans, &known);
     for orphan in &orphans {
-        log::info!("[agent-session] restore: tab {} is in no window, dropping its session", orphan.tab_id);
+        log::info!(
+            "[agent-session] restore: tab {} is in no window, dropping its session",
+            orphan.tab_id
+        );
         let _ = agent::session_store::detach_session(&orphan.tab_id);
     }
-    log::info!("[agent-session] restore: {} plan(s) ready for frontend", plans.len());
+    log::info!(
+        "[agent-session] restore: {} plan(s) ready for frontend",
+        plans.len()
+    );
     plans
 }
 
@@ -532,10 +556,21 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
-                .level_for("kex_lib::modules::agent", tauri_plugin_log::log::LevelFilter::Debug)
-                .level_for("kex_lib::modules::pty::agent_detect", tauri_plugin_log::log::LevelFilter::Debug)
-                .level_for("kex_lib::modules::pty::ipc", tauri_plugin_log::log::LevelFilter::Debug)
-                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview))
+                .level_for(
+                    "kex_lib::modules::agent",
+                    tauri_plugin_log::log::LevelFilter::Debug,
+                )
+                .level_for(
+                    "kex_lib::modules::pty::agent_detect",
+                    tauri_plugin_log::log::LevelFilter::Debug,
+                )
+                .level_for(
+                    "kex_lib::modules::pty::ipc",
+                    tauri_plugin_log::log::LevelFilter::Debug,
+                )
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Webview,
+                ))
                 // Default is KeepOne, which fs::remove_file()s the previous log with no
                 // backup, checked on every startup, so a log that filled up in the prior
                 // session is gone before the new one writes a byte. KeepSome(4) renames
@@ -782,15 +817,17 @@ pub fn run() {
                 let mgr = handle.state::<window_state::WindowStateManager>();
                 mgr.add_window(id.clone());
                 mgr.save();
-                create_app_window(&handle, id, None)
-                    .map_err(std::io::Error::other)?;
+                create_app_window(&handle, id, None).map_err(std::io::Error::other)?;
             } else {
                 let focused_label = handle
                     .state::<window_state::WindowStateManager>()
                     .get_focused_window();
                 let entries: Vec<_> = {
                     let m = handle.state::<window_state::WindowStateManager>();
-                    order.iter().map(|id| (id.clone(), m.get_entry(id))).collect()
+                    order
+                        .iter()
+                        .map(|id| (id.clone(), m.get_entry(id)))
+                        .collect()
                 };
                 for (id, entry) in entries {
                     if let Err(e) = create_app_window(&handle, id.clone(), entry.as_ref()) {
@@ -927,6 +964,8 @@ pub fn run() {
             agent::agent_claude_hooks_status,
             agent::agent_setup_opencode,
             agent::agent_opencode_plugin_status,
+            agent::agent_setup_omp,
+            agent::agent_omp_extension_status,
             agent::agent_detach_session,
             agent::agent_session_set_snapshot,
             agent::os_notify::agent_os_notify,
@@ -948,7 +987,11 @@ pub fn run() {
         .run(|app_handle, event| {
             // Dock icon click with no open windows: open a new window.
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } = event
+            {
                 if !has_visible_windows {
                     let _ = create_new_window(app_handle);
                 }

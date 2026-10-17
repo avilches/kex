@@ -47,7 +47,10 @@ fn percent_decode(s: &[u8]) -> String {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
-    Started { agent: String, cmd_string: String },
+    Started {
+        agent: String,
+        cmd_string: String,
+    },
     // First real interactive prompt (OSC 133;B) seen on this PTY. Independent
     // of agent detection: fires for every shell, armed or not, exactly once.
     ShellReady,
@@ -71,12 +74,27 @@ pub enum Transition {
         prompt: String,
     },
     // Estado del agente
-    Notification { message: String },
-    Stop { tab_id: String, transcript_path: String, last_message: String },
-    StopFailure { error_message: String },
-    SessionEnd { reason: String },
-    PermissionRequest { tool_name: String },
-    MessageDisplay { turn_id: String, message: String },
+    Notification {
+        message: String,
+    },
+    Stop {
+        tab_id: String,
+        transcript_path: String,
+        last_message: String,
+    },
+    StopFailure {
+        error_message: String,
+    },
+    SessionEnd {
+        reason: String,
+    },
+    PermissionRequest {
+        tool_name: String,
+    },
+    MessageDisplay {
+        turn_id: String,
+        message: String,
+    },
     Exited,
 }
 
@@ -94,28 +112,82 @@ pub struct AgentSignal {
 impl Transition {
     pub fn into_signal(self, id: u32) -> AgentSignal {
         match self {
-            Transition::Started { agent, .. } =>
-                AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None, prompt: None },
-            Transition::UserPromptSubmit { agent, prompt, .. } =>
-                AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None, prompt: Some(prompt) },
-            Transition::Notification { message } =>
-                AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None, prompt: None },
-            Transition::Stop { last_message, .. } =>
-                AgentSignal { id, kind: "Stop", agent: None, message: Some(last_message), tool_name: None, prompt: None },
-            Transition::StopFailure { error_message } =>
-                AgentSignal { id, kind: "StopFailure", agent: None, message: Some(error_message), tool_name: None, prompt: None },
-            Transition::SessionEnd { .. } =>
-                AgentSignal { id, kind: "SessionEnd", agent: None, message: None, tool_name: None, prompt: None },
-            Transition::PermissionRequest { tool_name } =>
-                AgentSignal { id, kind: "PermissionRequest", agent: None, message: None, tool_name: Some(tool_name), prompt: None },
-            Transition::MessageDisplay { message, .. } =>
-                AgentSignal { id, kind: "MessageDisplay", agent: None, message: Some(message), tool_name: None, prompt: None },
-            Transition::Exited =>
-                AgentSignal { id, kind: "exited", agent: None, message: None, tool_name: None, prompt: None },
-            Transition::SessionStart { .. } =>
-                unreachable!("SessionStart is handled before into_signal"),
-            Transition::ShellReady =>
-                unreachable!("ShellReady is handled before into_signal"),
+            Transition::Started { agent, .. } => AgentSignal {
+                id,
+                kind: "started",
+                agent: Some(agent),
+                message: None,
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::UserPromptSubmit { agent, prompt, .. } => AgentSignal {
+                id,
+                kind: "UserPromptSubmit",
+                agent: Some(agent),
+                message: None,
+                tool_name: None,
+                prompt: Some(prompt),
+            },
+            Transition::Notification { message } => AgentSignal {
+                id,
+                kind: "Notification",
+                agent: None,
+                message: Some(message),
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::Stop { last_message, .. } => AgentSignal {
+                id,
+                kind: "Stop",
+                agent: None,
+                message: Some(last_message),
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::StopFailure { error_message } => AgentSignal {
+                id,
+                kind: "StopFailure",
+                agent: None,
+                message: Some(error_message),
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::SessionEnd { .. } => AgentSignal {
+                id,
+                kind: "SessionEnd",
+                agent: None,
+                message: None,
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::PermissionRequest { tool_name } => AgentSignal {
+                id,
+                kind: "PermissionRequest",
+                agent: None,
+                message: None,
+                tool_name: Some(tool_name),
+                prompt: None,
+            },
+            Transition::MessageDisplay { message, .. } => AgentSignal {
+                id,
+                kind: "MessageDisplay",
+                agent: None,
+                message: Some(message),
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::Exited => AgentSignal {
+                id,
+                kind: "exited",
+                agent: None,
+                message: None,
+                tool_name: None,
+                prompt: None,
+            },
+            Transition::SessionStart { .. } => {
+                unreachable!("SessionStart is handled before into_signal")
+            }
+            Transition::ShellReady => unreachable!("ShellReady is handled before into_signal"),
         }
     }
 }
@@ -248,10 +320,7 @@ impl AgentDetector {
     }
 
     fn handle_kex_unified<F: FnMut(Transition)>(&mut self, data: &[u8], emit: &mut F) {
-        let fields: Vec<String> = data
-            .split(|&b| b == b';')
-            .map(percent_decode)
-            .collect();
+        let fields: Vec<String> = data.split(|&b| b == b';').map(percent_decode).collect();
 
         if fields.len() < 5 {
             log::debug!("[osc777] kex: malformed payload ({} fields)", fields.len());
@@ -268,8 +337,8 @@ impl AgentDetector {
         // termination events (StopFailure/SessionEnd) - those disarm immediately
         // and auto-arming before disarming would emit a spurious Started.
         match event.as_str() {
-            "SessionStart" | "UserPromptSubmit" | "Notification" | "Stop"
-            | "PermissionRequest" | "MessageDisplay" => {
+            "SessionStart" | "UserPromptSubmit" | "Notification" | "Stop" | "PermissionRequest"
+            | "MessageDisplay" => {
                 self.ensure_armed(emit);
             }
             _ => {}
@@ -391,13 +460,19 @@ impl AgentDetector {
             }
             Some(b'C') => {
                 let line = String::from_utf8_lossy(pt.strip_prefix(b"C;").unwrap_or(b""));
-                let Some(inv) = find_agent_invocation(&line, &self.agents) else { return };
+                let Some(inv) = find_agent_invocation(&line, &self.agents) else {
+                    return;
+                };
                 if inv.is_print_mode() {
                     log::debug!("[shell] osc133 C: skip arm (print mode) cmd={line}");
                     return;
                 }
                 // A cut line still names the agent, but replaying its text would be wrong.
-                let cmd_string = if inv.complete { inv.command() } else { String::new() };
+                let cmd_string = if inv.complete {
+                    inv.command()
+                } else {
+                    String::new()
+                };
                 let agent = inv.agent;
                 log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
                 self.armed = true;
@@ -420,14 +495,19 @@ impl AgentDetector {
             self.armed = true;
             self.status = Status::Idle;
             self.current_agent = "claude".into();
-            emit(Transition::Started { agent: "claude".into(), cmd_string: String::new() });
+            emit(Transition::Started {
+                agent: "claude".into(),
+                cmd_string: String::new(),
+            });
         }
     }
 
     fn generic_attention<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if self.armed {
             self.status = Status::Waiting;
-            emit(Transition::Notification { message: String::new() });
+            emit(Transition::Notification {
+                message: String::new(),
+            });
         }
     }
 }
@@ -451,11 +531,17 @@ mod tests {
 
     // Auto-arm case (no prior OSC 133;C): cmd_string is empty.
     fn started(agent: &str) -> Transition {
-        Transition::Started { agent: agent.into(), cmd_string: String::new() }
+        Transition::Started {
+            agent: agent.into(),
+            cmd_string: String::new(),
+        }
     }
 
     fn started_cmd(agent: &str, cmd: &str) -> Transition {
-        Transition::Started { agent: agent.into(), cmd_string: cmd.into() }
+        Transition::Started {
+            agent: agent.into(),
+            cmd_string: cmd.into(),
+        }
     }
 
     // Helper: build a kex unified OSC body with the required 5 fields
@@ -469,7 +555,9 @@ mod tests {
     }
 
     fn notification(msg: &str) -> Transition {
-        Transition::Notification { message: msg.into() }
+        Transition::Notification {
+            message: msg.into(),
+        }
     }
 
     fn user_prompt_submit() -> Transition {
@@ -486,7 +574,10 @@ mod tests {
     #[test]
     fn arms_on_agent_command() {
         let mut d = AgentDetector::new();
-        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started_cmd("claude", "claude")]);
+        assert_eq!(
+            run(&mut d, &osc("133;C;claude")),
+            vec![started_cmd("claude", "claude")]
+        );
         let mut d2 = AgentDetector::new();
         assert_eq!(
             run(&mut d2, &osc("133;C;claude --model opus")),
@@ -540,7 +631,10 @@ mod tests {
         let cut = format!("133;C;claude --append-system-prompt '{}", "x".repeat(300));
         assert_eq!(run(&mut d, &osc(&cut)), vec![started("claude")]);
         let mut d2 = AgentDetector::new();
-        assert_eq!(run(&mut d2, &osc("133;C;claude --add-dir /a\\")), vec![started("claude")]);
+        assert_eq!(
+            run(&mut d2, &osc("133;C;claude --add-dir /a\\")),
+            vec![started("claude")]
+        );
     }
 
     #[test]
@@ -603,10 +697,23 @@ mod tests {
             vec![notification("hello")]
         );
         // UserPromptSubmit while Waiting → Working
-        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_osc("UserPromptSubmit"))),
+            vec![user_prompt_submit()]
+        );
         // Duplicate UserPromptSubmit - always emits so JS can re-create session after ESC/CTRL+C
-        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { tab_id: "panel1".into(), transcript_path: "/tmp/transcript".into(), last_message: "".into() }]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_osc("UserPromptSubmit"))),
+            vec![user_prompt_submit()]
+        );
+        assert_eq!(
+            run(&mut d, &osc(&kex_osc("Stop"))),
+            vec![Transition::Stop {
+                tab_id: "panel1".into(),
+                transcript_path: "/tmp/transcript".into(),
+                last_message: "".into()
+            }]
+        );
     }
 
     #[test]
@@ -640,7 +747,10 @@ mod tests {
         assert!(run(&mut d, &osc("777;some-other-payload")).is_empty());
         run(&mut d, &osc("133;C;codex"));
         // Non-kex OSC 777 when armed → generic attention (Notification with empty message)
-        assert_eq!(run(&mut d, &osc("777;some-other-payload")), vec![notification("")]);
+        assert_eq!(
+            run(&mut d, &osc("777;some-other-payload")),
+            vec![notification("")]
+        );
         assert_eq!(run(&mut d, &osc("9;needs you")), vec![notification("")]);
         assert!(run(&mut d, &osc("9;4;1;50")).is_empty());
     }
@@ -689,9 +799,19 @@ mod tests {
     fn stays_armed_after_stop_ready_for_next_prompt() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { tab_id: "panel1".into(), transcript_path: "/tmp/transcript".into(), last_message: "".into() }]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_osc("Stop"))),
+            vec![Transition::Stop {
+                tab_id: "panel1".into(),
+                transcript_path: "/tmp/transcript".into(),
+                last_message: "".into()
+            }]
+        );
         // Stop leaves detector armed (Claude still running) - next prompt needs no auto-arm.
-        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_osc("UserPromptSubmit"))),
+            vec![user_prompt_submit()]
+        );
         // Explicit shell exit (133;D) disarms.
         assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
         // Now disarmed: next UserPromptSubmit auto-arms.
@@ -708,7 +828,10 @@ mod tests {
         run(&mut d, &osc("133;C;claude"));
         run(&mut d, &osc(&kex_osc("Stop")));
         // New invocation: 133;C fires again (no guard; Claude restarted in same terminal).
-        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started_cmd("claude", "claude")]);
+        assert_eq!(
+            run(&mut d, &osc("133;C;claude")),
+            vec![started_cmd("claude", "claude")]
+        );
     }
 
     #[test]
@@ -767,7 +890,9 @@ mod tests {
         );
         assert_eq!(
             stop_fail,
-            vec![Transition::StopFailure { error_message: "something bad".into() }]
+            vec![Transition::StopFailure {
+                error_message: "something bad".into()
+            }]
         );
         // Should be disarmed now - 133;D should produce no Exited
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
@@ -812,7 +937,9 @@ mod tests {
         );
         assert_eq!(
             transitions,
-            vec![Transition::PermissionRequest { tool_name: "Bash".into() }]
+            vec![Transition::PermissionRequest {
+                tool_name: "Bash".into()
+            }]
         );
     }
 }

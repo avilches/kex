@@ -286,10 +286,7 @@ fn remove_paths(inner: &mut WatchInner, paths: Vec<(PathBuf, String)>) {
 // No authorization check: the explorer reads any directory it navigates to
 // (fs_read_dir is unguarded), so refusing to watch one the shell reached with
 // `cd` only left its listing frozen.
-fn prepare_add(
-    workspace: &WorkspaceEnv,
-    paths: Vec<String>,
-) -> Vec<(PathBuf, String)> {
+fn prepare_add(workspace: &WorkspaceEnv, paths: Vec<String>) -> Vec<(PathBuf, String)> {
     paths
         .into_iter()
         .filter_map(|raw| {
@@ -357,7 +354,10 @@ pub fn fs_watch_remove(
         .map(|raw| {
             let resolved = resolve_path(&raw, &workspace);
             let spelled = to_canon(&resolved);
-            (std::fs::canonicalize(&resolved).unwrap_or(resolved), spelled)
+            (
+                std::fs::canonicalize(&resolved).unwrap_or(resolved),
+                spelled,
+            )
         })
         .collect();
     let mut guard = state.inner.lock().expect("fs watch state poisoned");
@@ -375,7 +375,10 @@ mod tests {
     fn prepare_add_accepts_a_dir_outside_every_authorized_root() {
         let dir = std::env::temp_dir().join(format!("kex-watch-unauth-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let prepared = prepare_add(&WorkspaceEnv::Local, vec![dir.to_string_lossy().into_owned()]);
+        let prepared = prepare_add(
+            &WorkspaceEnv::Local,
+            vec![dir.to_string_lossy().into_owned()],
+        );
         std::fs::remove_dir_all(&dir).ok();
         assert_eq!(prepared.len(), 1);
     }
@@ -457,7 +460,11 @@ mod tests {
         let aliases = aliases_of("/a/real", "/a/link");
         let mut paths = HashSet::from(["/a/realistic/x".to_string()]);
         expand_aliases(&mut paths, &aliases);
-        assert_eq!(paths.len(), 1, "a sibling that merely shares a prefix is not under the dir");
+        assert_eq!(
+            paths.len(),
+            1,
+            "a sibling that merely shares a prefix is not under the dir"
+        );
     }
 
     #[test]
@@ -475,10 +482,16 @@ mod tests {
         let mut paths = HashSet::from(["/real/f".to_string()]);
         expand_aliases(&mut paths, &aliases);
         assert!(!paths.contains("/link1/f"));
-        assert!(paths.contains("/link2/f"), "one requester of /link2 is still left");
+        assert!(
+            paths.contains("/link2/f"),
+            "one requester of /link2 is still left"
+        );
 
         release_alias(&mut aliases, Path::new("/real"), "/link2");
-        assert!(aliases.is_empty(), "the directory entry goes with its last alias");
+        assert!(
+            aliases.is_empty(),
+            "the directory entry goes with its last alias"
+        );
     }
 
     #[cfg(unix)]
