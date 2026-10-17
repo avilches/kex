@@ -8,6 +8,7 @@ import {
   CancelSquareIcon,
   CrosshairIcon,
   Image01Icon,
+  PaintBoardIcon,
   LockKeyIcon,
   FloppyDiskIcon,
   PencilEdit01Icon,
@@ -31,6 +32,8 @@ import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
+import { ColorPaletteGrid } from "./ColorPaletteGrid";
+import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
@@ -122,6 +125,27 @@ export function TabContextMenuItems({
           {onUpdateTab && (
             <ContextMenuSub>
               <ContextMenuSubTrigger className="gap-2">
+                <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
+                Color
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-[232px] p-2">
+                <ColorPaletteGrid
+                  value={tab.color}
+                  displayColor={tab.color ?? null}
+                  noneSelected={tab.color === undefined}
+                  onSelect={(color) =>
+                    onUpdateTab(tab.id, (p) => {
+                      const { color: _drop, ...rest } = p;
+                      return (color ? { ...rest, color } : rest) as Tab;
+                    })
+                  }
+                />
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+          {onUpdateTab && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">
                 <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
                 Icon
               </ContextMenuSubTrigger>
@@ -192,6 +216,8 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
+      <TabAgentMenuItems tabId={tab.id} />
+      <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>
           onUpdateTab?.(tab.id, (p) => {

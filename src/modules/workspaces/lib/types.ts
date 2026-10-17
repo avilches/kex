@@ -37,6 +37,8 @@ type TabCommon = {
   autofocus?: boolean;
   // Name from WORKSPACE_ICON_PALETTE that replaces the default icon of the kind.
   icon?: string;
+  // Hex color of the tab: tints its icon and side stripe, and its top line when the workspace has none.
+  color?: string;
 };
 
 export type Tab =
@@ -133,8 +135,20 @@ export function scriptsToDelete(ws: Workspace): number {
   return ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
 }
 
-export type ClosedEntry = {
+export type ClosedTabEntry = {
+  kind: "tab";
   tab: Tab;
   paneId: string;
   workspaceId: string;
+  // Closing it left the workspace without tabs.
+  lastOfWorkspace?: boolean;
 };
+
+// A closed workspace with everything it held. `index` is where it sat in the bar.
+export type ClosedWorkspaceEntry = {
+  kind: "workspace";
+  workspace: Workspace;
+  index: number;
+};
+
+export type ClosedEntry = ClosedTabEntry | ClosedWorkspaceEntry;

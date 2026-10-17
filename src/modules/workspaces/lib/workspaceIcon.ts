@@ -1,3 +1,4 @@
+import { catalogIcon } from "./iconCatalog";
 import {
   AnalyticsUpIcon,
   Analytics01Icon,
@@ -206,30 +207,8 @@ export const WORKSPACE_ICON_PALETTE = [
 
 export const PALETTE_PAGE_SIZE = 32;
 
-export type IconSearchResult = { name: string; label: string; icon: IconSvgElement };
-
-export function searchIcons(query: string, limit = 6): IconSearchResult[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const results: IconSearchResult[] = [];
-  for (const entry of WORKSPACE_ICON_PALETTE) {
-    if (entry.name.toLowerCase().includes(q) || entry.label.toLowerCase().includes(q)) {
-      results.push({ name: entry.name, label: entry.label, icon: entry.icon as IconSvgElement });
-    }
-  }
-  results.sort((a, b) => {
-    const aL = a.label.toLowerCase();
-    const bL = b.label.toLowerCase();
-    if (aL === q) return -1;
-    if (bL === q) return 1;
-    if (aL.startsWith(q) && !bL.startsWith(q)) return -1;
-    if (bL.startsWith(q) && !aL.startsWith(q)) return 1;
-    return aL.localeCompare(bL);
-  });
-  return results.slice(0, limit);
-}
-
 export function getWorkspaceIcon(name: string): IconSvgElement | null {
   const palette = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
-  return palette ? (palette.icon as IconSvgElement) : null;
+  if (palette) return palette.icon as IconSvgElement;
+  return catalogIcon(name);
 }

@@ -26,27 +26,20 @@ import {
   updatePane,
 } from "./splitNode";
 import { attachTab, workspaceForTab, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
-import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab, scriptsToDelete } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
 import type { SidebarView } from "./sidebarState";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
-
-export function captureClosedEntry(
-  entries: ClosedEntry[],
-  entry: ClosedEntry,
-  cap = 10,
-): ClosedEntry[] {
-  return [entry, ...entries].slice(0, cap);
-}
-
-export function buildReopenedTab(tab: Tab, newId: string): Tab {
-  const base = { ...tab, id: newId };
-  if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
-  if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
-  if (base.kind === "terminal") return { ...base, locked: false };
-  return base;
-}
+import {
+  buildReopenedTab,
+  captureClosedEntry,
+  captureClosedWorkspace,
+  clearStaleFolds,
+  insertRestoredWorkspace,
+  pickReopen,
+  reviveWorkspace,
+} from "./closedStack";
 
 // Whether a reopened closed tab is worth asking Rust for a live agent resume plan.
 // Mirrors the same "Run on start" gate the startup restore flow already applies
@@ -91,21 +84,6 @@ export function runOnce(inFlight: Map<string, Promise<void>>, key: string, task:
 }
 
 const wakesInFlight = new Map<string, Promise<void>>();
-
-export function findReopenTarget(
-  workspaces: Workspace[],
-  activeWorkspaceId: string,
-  entry: ClosedEntry,
-): { workspaceId: string; paneId: string } | null {
-  const awake = (id: string) => workspaces.find((w) => w.id === id && !w.hibernated);
-  const targetWs = awake(entry.workspaceId) ?? awake(activeWorkspaceId);
-  if (!targetWs) return null;
-  const pane = findPane(targetWs.paneTree, entry.paneId);
-  return {
-    workspaceId: targetWs.id,
-    paneId: pane ? entry.paneId : targetWs.activePaneId,
-  };
-}
 
 // New autofocus-capable tabs get the flag when "autofocusNewTabs" is on (also in
 // "always", so they keep it if the mode is switched back),
@@ -288,15 +266,25 @@ export function workspaceTabCount(ws: Workspace): number {
   return allPanes(ws.paneTree).reduce((n, p) => n + p.tabs.length, 0);
 }
 
-// A workspace left with no tabs folds away with its last tab: an empty chip has
-// nothing to show. The window's only workspace survives (the window would close
-// with it), and so does one holding configured scripts, whose deletion the
-// close-workspace confirmation dialog still owns.
+// A workspace left with no tabs folds away with its last tab only when it holds
+// nothing at all: an empty chip with no name, color, icon, workspace root or
+// scripts has nothing to keep. The window's only workspace survives (the window
+// would close with it), and so does any customized one; those that hold scripts
+// stay protected by the close-workspace confirmation dialog.
+export function isBlankWorkspace(ws: Workspace): boolean {
+  return (
+    workspaceTabCount(ws) === 0 &&
+    !ws.title.trim() &&
+    !ws.color &&
+    !ws.icon &&
+    !ws.workspaceRoot &&
+    !ws.scripts?.length
+  );
+}
+
 export function emptyWorkspaceToClose(workspaces: Workspace[]): Workspace | null {
   if (workspaces.length <= 1) return null;
-  return (
-    workspaces.find((w) => workspaceTabCount(w) === 0 && scriptsToDelete(w) === 0) ?? null
-  );
+  return workspaces.find(isBlankWorkspace) ?? null;
 }
 
 export type TabMoveDestination =
@@ -420,6 +408,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedTabsRef = useRef<ClosedEntry[]>([]);
+  useEffect(() => {
+    closedTabsRef.current = clearStaleFolds(closedTabsRef.current, workspaces);
+  }, [workspaces]);
 
   // paneId -> MRU activation history (tabIds, most recent first). Drives which
   // tab gets focus when the active one closes. In memory only, never persisted.
@@ -488,6 +479,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const closeWorkspace = useCallback((id: string) => {
+    const closing = workspacesRef.current.find((w) => w.id === id);
+    if (closing) {
+      const stash = useAgentStore.getState().stashClosedSession;
+      if (!closing.hibernated) for (const t of terminalTabs(closing)) stash(t.id);
+      closedTabsRef.current = captureClosedWorkspace(
+        closedTabsRef.current,
+        closing,
+        workspacesRef.current.findIndex((w) => w.id === id),
+      );
+    }
     setWorkspaces((prev) => prev.filter((w) => w.id !== id));
     setActiveWorkspaceId((prev) => {
       if (prev !== id) return prev;
@@ -503,7 +504,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // path (tab close, shell exit, move to another workspace, bulk closes): the
   // fold is decided on committed state, so batched closes in one tick see the
   // updated workspace too. Never leaves the window empty; workspaces with
-  // scripts are exempt so the close confirmation dialog still protects them.
+  // customized ones (name, color, icon, root, scripts) are exempt.
   useEffect(() => {
     const fold = emptyWorkspaceToClose(workspaces);
     if (fold) closeWorkspace(fold.id);
@@ -719,37 +720,60 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       if (found) {
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
+          kind: "tab",
           tab: found.tab,
           paneId: found.pane.id,
           workspaceId,
+          lastOfWorkspace: workspaceTabCount(ws) === 1,
         });
       }
     }
+    // Applied to the ref right away too: closes batched in one tick must see
+    // each other, or none of them knows it was the last tab of its workspace.
+    workspacesRef.current = applyCloseTab(workspacesRef.current, workspaceId, tabId, history);
     setWorkspaces((prev) => applyCloseTab(prev, workspaceId, tabId, history));
   }, []);
 
   const reopenClosed = useCallback(async () => {
-    const [entry, ...rest] = closedTabsRef.current;
-    if (!entry) return;
-    const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
-    if (!target) return;
-    closedTabsRef.current = rest;
+    const { picked, remaining } = pickReopen(closedTabsRef.current, workspacesRef.current);
+    closedTabsRef.current = remaining;
+    if (!picked) return;
 
-    const newId = newTabId();
     // A reopened terminal tab that used to run an agent gets the same live,
     // just-in-time resume plan the startup flow computes, keyed by the id the
     // tab had before it was closed (agent-sessions.json is indexed by tab id).
     // Seeding it under the new id lets useTerminalSession's normal restore-plan
     // consumption pick it up with no other change to the spawn path.
-    if (needsResumePlanLookup(entry.tab)) {
-      const plan = await previewResumeCmd(entry.tab.id);
+    const seedPlan = async (tab: Tab, newId: string) => {
+      if (!needsResumePlanLookup(tab)) return;
+      const plan = await previewResumeCmd(tab.id);
       if (plan) seedRestorePlan(newId, plan);
+    };
+
+    if (picked.kind === "workspace") {
+      const { workspace, idMap } = reviveWorkspace(picked.entry.workspace);
+      if (!workspace.hibernated) {
+        await Promise.all(
+          terminalTabs(picked.entry.workspace).map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)),
+        );
+      }
+      setWorkspaces((prev) => insertRestoredWorkspace(prev, workspace, picked.entry.index));
+      selectWorkspace(workspace.id);
+      if (!workspace.hibernated) {
+        const agents = useAgentStore.getState();
+        for (const [oldId, newId] of idMap) agents.restoreClosedSession(oldId, newId, workspace.id);
+      }
+      return;
     }
 
+    const { entry } = picked;
+    const newId = newTabId();
+    await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
-    openTab(target.workspaceId, target.paneId, newTab);
-    useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, target.workspaceId);
-  }, [openTab, activeWorkspaceId]);
+    openTab(picked.workspaceId, picked.paneId, newTab);
+    selectWorkspace(picked.workspaceId);
+    useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, picked.workspaceId);
+  }, [openTab, selectWorkspace]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
     if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
@@ -1061,6 +1085,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const resetWorkspaces = useCallback((cwd?: string) => {
     const ws = newWorkspace(cwd);
+    closedTabsRef.current = [];
     setWorkspaces([ws]);
     setActiveWorkspaceId(ws.id);
   }, []);

@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
 import { flushEditors } from "./app/lib/editorFlush";
+import { installGlobalErrorLogging, reactRootErrorOptions } from "./lib/errorLog";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { loadPreferences } from "./modules/settings/store";
@@ -14,6 +15,8 @@ import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
 import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
+
+installGlobalErrorLogging();
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
@@ -51,7 +54,10 @@ if (startupPrefs) {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+ReactDOM.createRoot(
+  document.getElementById("root") as HTMLElement,
+  reactRootErrorOptions,
+).render(
   <App />,
 );
 

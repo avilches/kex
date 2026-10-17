@@ -9,20 +9,20 @@ export type RenameOrigin = "pane" | "sidebar";
 type TabRenameStore = {
   renamingTabId: string | null;
   renamingOrigin: RenameOrigin;
-  saveSeq: number;
+  templatesOpen: boolean;
   startRename: (tabId: string, origin?: RenameOrigin) => void;
-  requestSave: () => void;
+  toggleTemplates: () => void;
   clearRename: () => void;
 };
 
 export const useTabRenameStore = create<TabRenameStore>((set) => ({
   renamingTabId: null,
   renamingOrigin: "pane",
-  saveSeq: 0,
+  templatesOpen: false,
   startRename: (tabId, origin = "pane") =>
-    set({ renamingTabId: tabId, renamingOrigin: origin }),
-  requestSave: () => set((s) => ({ saveSeq: s.saveSeq + 1 })),
-  clearRename: () => set({ renamingTabId: null }),
+    set({ renamingTabId: tabId, renamingOrigin: origin, templatesOpen: false }),
+  toggleTemplates: () => set((s) => ({ templatesOpen: !s.templatesOpen })),
+  clearRename: () => set({ renamingTabId: null, templatesOpen: false }),
 }));
 
 export function isRenamingAt(
@@ -33,16 +33,17 @@ export function isRenamingAt(
   return state.renamingTabId === tabId && state.renamingOrigin === origin;
 }
 
-export type RenameShortcutAction = "start" | "save" | "ignore";
+export type RenameShortcutAction = "start" | "toggle" | "ignore";
 
 // What a press of the rename shortcut does: the first opens the title field,
-// a second one while it is open saves and closes.
+// a second one while it is open expands or collapses the templates table.
+// Saving stays on Enter, Escape and clicking outside.
 export function resolveRenameShortcut(input: {
   renamingTabId: string | null;
   activeTabId: string | null;
   inTextField: boolean;
 }): RenameShortcutAction {
-  if (input.renamingTabId !== null) return "save";
+  if (input.renamingTabId !== null) return "toggle";
   if (input.inTextField || !input.activeTabId) return "ignore";
   return "start";
 }

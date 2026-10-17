@@ -39,17 +39,18 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
-import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
+import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
-  WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
+import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconSearch } from "@/modules/workspaces/lib/useIconCatalog";
 import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
+import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 
 function WorkspaceHeading({ ws }: { ws: Workspace | undefined }) {
@@ -130,68 +131,13 @@ function ColorPicker({
   displayColor: string | null;
   onSetColor: (id: string, color: string | null) => void;
 }) {
-  const customHex =
-    wsColor != null && !(WORKSPACE_COLOR_PALETTE as readonly string[]).includes(wsColor)
-      ? wsColor
-      : "";
-
   return (
-    <div className="flex items-center gap-1.5">
-      <div
-        className="size-5 shrink-0 rounded-full border border-border"
-        style={displayColor ? { backgroundColor: displayColor } : undefined}
-      />
-      <input
-        className="h-6 w-20 rounded border border-border bg-background px-1.5 text-[11px] font-mono outline-none ring-ring focus-visible:ring-1"
-        placeholder="#rrggbb"
-        defaultValue={customHex}
-        key={customHex}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (/^#[0-9a-fA-F]{6}$/.test(v)) onSetColor(wsId, v);
-        }}
-      />
-      <label
-        title="Pick color"
-        className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-        style={displayColor ? { backgroundColor: `${displayColor}33` } : undefined}
-      >
-        <input
-          type="color"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          value={displayColor ?? "#4f8ef7"}
-          onChange={(e) => onSetColor(wsId, e.target.value)}
-        />
-        <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
-      </label>
-      <div className="mx-0.5 h-4 w-px bg-border" />
-      <button
-        type="button"
-        title="No color"
-        onClick={() => onSetColor(wsId, null)}
-        className={cn(
-          "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
-          wsColor === null
-            ? "border-foreground"
-            : "border-transparent hover:border-muted-foreground/50",
-        )}
-      >
-        <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-      </button>
-      {WORKSPACE_COLOR_PALETTE.map((hex) => (
-        <button
-          key={hex}
-          type="button"
-          title={hex}
-          onClick={() => onSetColor(wsId, hex)}
-          className={cn(
-            "size-6 rounded-full border-2 transition-opacity",
-            wsColor === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
-          )}
-          style={{ backgroundColor: hex }}
-        />
-      ))}
-    </div>
+    <ColorPaletteGrid
+      value={wsColor}
+      displayColor={displayColor}
+      noneSelected={wsColor === null}
+      onSelect={(color) => onSetColor(wsId, color)}
+    />
   );
 }
 
@@ -208,16 +154,13 @@ function IconPicker({
 }) {
   const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
   const [query, setQuery] = useState(currentEntry?.label ?? "");
-  const [filtered, setFiltered] = useState<IconSearchResult[]>([]);
   const [page, setPage] = useState(() => {
     if (!wsIcon) return 0;
     const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === wsIcon);
     return idx === -1 ? 0 : Math.floor(idx / PALETTE_PAGE_SIZE);
   });
 
-  useEffect(() => {
-    setFiltered(searchIcons(query));
-  }, [query]);
+  const { results: filtered, loading: searchLoading } = useIconSearch(query, 60);
 
   function selectIcon(name: string | null) {
     onSetIcon(wsId, name);
@@ -274,7 +217,10 @@ function IconPicker({
               <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
             </button>
           ))}
-          {query.trim() && filtered.length === 0 && (
+          {query.trim() && searchLoading && (
+            <span className="text-[11px] text-muted-foreground">Loading icons...</span>
+          )}
+          {query.trim() && !searchLoading && filtered.length === 0 && (
             <span className="text-[11px] text-muted-foreground">No icons found</span>
           )}
         </div>
@@ -339,6 +285,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => clearTitleDraft(ws.id), [ws.id]);
   const cwdInputRef = useRef<HTMLInputElement>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   useEffect(() => {
     if (activeSection === "properties") {
@@ -416,7 +363,18 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
-            <TitleVariablesHelp subject="workspace" />
+            <RenameTemplates
+              open={templatesOpen}
+              onToggle={() => setTemplatesOpen((o) => !o)}
+              subject="workspace"
+              tab={focusedTab(ws.paneTree, ws.activePaneId)}
+              workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
+              getInput={() => nameInputRef.current}
+              onInserted={(value) => {
+                setTitleValue(value);
+                setTitleDraft(ws.id, value);
+              }}
+            />
           </div>
 
           {/* Working Directory */}

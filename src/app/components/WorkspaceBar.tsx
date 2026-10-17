@@ -24,7 +24,6 @@ import {
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
-  Cancel01Icon,
   ChevronRightIcon,
   Delete02Icon,
   Folder01Icon,
@@ -43,10 +42,11 @@ import { cn } from "@/lib/utils";
 import {
   chipColorOnWhite,
   resolveWorkspaceColor,
-  WORKSPACE_COLOR_PALETTE,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
+import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { SlideReveal } from "@/app/components/SlideReveal";
@@ -90,9 +90,8 @@ import {
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
-import { titleVariablesHint } from "@/modules/workspaces/lib/titleTemplate";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
-import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
+import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
 type WorkspaceItem = {
@@ -200,6 +199,7 @@ function SortableWorkspaceItem({
   hoverSwitch: HoverSwitch | null;
 }) {
   const shownTitle = useWorkspaceTitle(ws);
+  useIconCatalogVersion();
   const {
     attributes,
     listeners,
@@ -231,6 +231,8 @@ function SortableWorkspaceItem({
   );
 
   const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
+  const templatesOpen = useWorkspaceRenameStore((s) => s.templatesOpen);
+  const toggleTemplates = useWorkspaceRenameStore((s) => s.toggleTemplates);
   const clearRename = useWorkspaceRenameStore((s) => s.clearRename);
   const startRename = useWorkspaceRenameStore((s) => s.startRename);
 
@@ -558,43 +560,16 @@ function SortableWorkspaceItem({
               <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
               Color
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="p-2">
-              <div className="grid grid-cols-6 gap-1.5">
-                <button
-                  type="button"
-                  title="No color"
-                  onClick={() => {
-                    onSetColor(ws.id, null);
-                    setMenuOpen(false);
-                  }}
-                  className={cn(
-                    "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
-                    ws.color === null
-                      ? "border-foreground"
-                      : "border-transparent hover:border-muted-foreground/50",
-                  )}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-                </button>
-                {WORKSPACE_COLOR_PALETTE.map((hex) => (
-                  <button
-                    key={hex}
-                    type="button"
-                    title={hex}
-                    onClick={() => {
-                      onSetColor(ws.id, hex);
-                      setMenuOpen(false);
-                    }}
-                    className={cn(
-                      "size-6 rounded-full border-2 transition-colors",
-                      ws.color === hex
-                        ? "border-foreground"
-                        : "border-transparent hover:border-foreground/40",
-                    )}
-                    style={{ backgroundColor: hex }}
-                  />
-                ))}
-              </div>
+            <ContextMenuSubContent className="w-[232px] p-2">
+              <ColorPaletteGrid
+                value={ws.color}
+                displayColor={displayColor}
+                noneSelected={ws.color === null}
+                onSelect={(color) => {
+                  onSetColor(ws.id, color);
+                  setMenuOpen(false);
+                }}
+              />
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
@@ -677,7 +652,7 @@ function SortableWorkspaceItem({
       <PopoverContent
         side="right"
         align="center"
-        className="flex w-64 flex-col gap-1.5 p-1.5"
+        className={`flex flex-col gap-1.5 p-1.5 ${templatesOpen ? "w-[420px]" : "w-64"}`}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
@@ -688,7 +663,6 @@ function SortableWorkspaceItem({
           defaultValue={ws.title}
           onChange={(e) => setTitleDraft(ws.id, e.target.value)}
           placeholder={shownTitle || ws.kind}
-          title={titleVariablesHint("workspace")}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -700,7 +674,16 @@ function SortableWorkspaceItem({
             }
           }}
         />
-        <TitleVariablesHelp subject="workspace" />
+        <RenameTemplates
+          open={templatesOpen}
+          onToggle={toggleTemplates}
+          subject="workspace"
+          tab={ws.focusedTab}
+          workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
+          getInput={() => inputRef.current}
+          onInserted={(value) => setTitleDraft(ws.id, value)}
+          shortcutId="workspace.rename"
+        />
       </PopoverContent>
     </Popover>
   );

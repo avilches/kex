@@ -60,20 +60,20 @@ function setup(initial: Tab) {
 describe("PaneTabBar rename and note", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", RO);
-    useTabRenameStore.setState({ renamingTabId: null, saveSeq: 0 });
+    useTabRenameStore.setState({ renamingTabId: null, templatesOpen: false });
   });
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
   });
 
-  it("the rename popover has no note field and saves the title on request", () => {
+  it("the rename popover has no note field and saves its title on blur", () => {
     const { onRenameTab, getTab } = setup({ id: "tab-1", kind: "terminal", note: "keep me" });
     act(() => useTabRenameStore.getState().startRename("tab-1"));
     expect(document.querySelector("textarea")).toBeNull();
     const title = screen.getByPlaceholderText(/./) as HTMLInputElement;
     title.value = "  build ";
-    act(() => useTabRenameStore.getState().requestSave());
+    fireEvent.blur(title);
     expect(onRenameTab).toHaveBeenCalledWith("tab-1", "build");
     expect(getTab()).toMatchObject({ title: "build", note: "keep me" });
     expect(useTabRenameStore.getState().renamingTabId).toBeNull();

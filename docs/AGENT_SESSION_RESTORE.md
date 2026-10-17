@@ -27,6 +27,12 @@ Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifi
 it calls `agent_disable_claude_hooks`. Both commands are idempotent. On every startup, if `agentNotifications` is
 true, `agent_enable_claude_hooks` is called silently to repair any missing or outdated hooks.
 
+OpenCode is wired by `agent_setup_opencode` instead (bell popover, "Install OpenCode integration"): it writes a
+static plugin script to `<opencode config dir>/plugins/opencode-session.js` (`~/.config/opencode/` normally, the
+`OPENCODE_CONFIG_DIR` directory when set), which OpenCode's own process loads. There
+is no Settings toggle and no uninstall: without Kex's per-terminal env vars the plugin does nothing. `agent_opencode_plugin_status`
+greps the installed file for a version marker so an outdated install offers the button again.
+
 ### KEX_TAB_ID
 
 Every PTY session receives a `KEX_TAB_ID` environment variable (a UUID matching the tab's id in the workspace
@@ -41,17 +47,20 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v6`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v7`) handles all 10 registered Claude Code
 hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
    managed by Kex).
-2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler.
-   `jq` is not used to build anything downstream. The script no longer writes the payload to disk: an earlier
+2. Uses `jq` to re-serialize the payload tagged with `"agent": "claude"` (everything the script serves is a Claude
+   Code hook; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract `hook_event_name`,
+   only to pick the handler. The re-serialization is what conditions the reinstall check in
+   `agent_claude_hooks_status`: users with a `kex-session-v6` file see the install button again.
+   The script no longer writes the payload to disk: an earlier
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
    without rotation (TASK-557); removed with no replacement since nothing depended on it.
-3. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+3. Forwards the JSON payload, re-serialized by the `agent` tag, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
    falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
    `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
 4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
@@ -97,6 +106,32 @@ resume and `/clear`, so a record dropped while the process is still running woul
 tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
 destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
+### OpenCode plugin
+
+OpenCode has no hook commands; its extension surface is plugins (JS modules its own process loads from
+`~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, embedded
+with `include_str!` and written atomically by `agent_setup_opencode`). The plugin subscribes to `session.created`
+and, when `KEX_IPC` and `KEX_TAB_ID` are present in the plugin host's environment, sends one frame per new session
+directly on the socket, deduplicated by session id for the life of the OpenCode process:
+
+```
+{ hook_event_name: "SessionStart", agent: "opencode", session_id: <ses id>,
+  transcript_path: "", cwd: <session directory or process.cwd()>, source: "startup" }
+```
+
+Sessions carry `parentID` (task subagents) are skipped, and the frame is best-effort: no spooling, a 2 s send cap,
+silent failure. The plugin host is born in the launch directory and never moves, so `process.cwd()` is the launch
+cwd; `session.directory` is preferred when the event carries it.
+
+Known upstream limitation (anomalyco/opencode#39711): a TUI resumed with `--session`/`-s` fires no plugin events for
+that session, so a restored opencode tab updates nothing in the live mechanism. The restore itself is not affected:
+the record is keyed by the tab's old session id, is never pruned (its provider row's policy is `ResumeAnyway`), and
+`opencode --session '<id>'` runs in the same launch directory. The same gap affects OpenCode's attention state for
+restored tabs, not recordings.
+
+The OSC/`AgentDetector` layer still detects plain `opencode` invocations like any other agent (loaded via
+`DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal and the capture of the launch line.
+
 ### Launch command capture
 
 The original CLI invocation is captured from `OSC 133;C;<cmd>` (the shell integration "command started" signal).
@@ -120,8 +155,8 @@ flattened to spaces, and the zsh, fish and PowerShell scripts cut it at 256 char
 x`, `(cd dir; FOO=1 claude)` or `cd ~/claude-docs`, and only the invocation of the agent must be stored and replayed.
 
 `agent/launch_cmd.rs::find_agent_invocation` (pure, no IO) splits the line into segments at `&&`, `||`, `;`, `|`,
-`&` and parentheses outside quotes, and keeps the **last segment whose command word is an agent** (`claude`, `codex`;
-`claude-max`, `/opt/bin/claude` and `\claude` count). The command word is the first token that is not a leading
+`&` and parentheses outside quotes, and keeps the **last segment whose command word is an agent** (`claude`, `codex`,
+`opencode`; `claude-max`, `/opt/bin/claude` and `\claude` count). The command word is the first token that is not a leading
 reserved word (`{`, `!`, `then`, `do`, `else`), a `VAR=value` assignment, a redirection or a wrapper (`env`, `time`,
 `command`, `nohup`, `nice`, `sudo`, `exec`, `timeout`, `npx`, `caffeinate`, with the options listed in the code). What
 is stored is that segment from its first assignment or wrapper to its end, without any redirection that came before
@@ -190,7 +225,13 @@ never overwrites the stored one, because titles go empty while the app closes.
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
-Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produce an empty `resume_cmd`.
+Per-agent knowledge lives in one table: `src-tauri/src/modules/agent/provider.rs` (transcript source and scan root,
+how the launch cwd is read back from a transcript, resume and reattach templates, missing-transcript policy, and the
+stripping whitelists). `session_store.rs` stays agent-agnostic: it owns the store file, the print-mode gate (still
+driven by `DEFAULT_AGENTS`) and the launch-line recognizer, but builds no commands itself. Rows today: `"claude"`,
+`"codex"` and `"opencode"`. A record whose agent has no provider row emits no plan: the planner logs a warning and prunes the
+record once its launch directory is usable (kept otherwise), so the store cannot fill with entries nothing can
+ever resume.
 
 ---
 
@@ -202,31 +243,39 @@ Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produc
 
 For each session in the store:
 
-1. **Find the JSONL transcript.** Checks the stored `transcript_path` first, then globs
-   `~/.claude/projects/**/<sessionId>.jsonl` (or `CLAUDE_CONFIG_DIR`).
-2. **JSONL missing - reattach with `--session-id`.** If the transcript does not exist, the session was opened but
-   no message was ever sent (the JSONL is only created on the first exchange). Rather than silently discarding the
-   session, the plan is generated using `claude --session-id <id>`, which starts a *new* session that reuses the
-   same UUID - equivalent to what Claude would have done had the user run it again without `--resume`. The stale
-   store entry is removed now; if the session produces messages, hooks will re-record it with the new
-   `transcript_path`.
-3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed. If a
-   `worktree-state` entry with a non-null `worktreeSession` comes first (Claude Code writes it before the first entry
-   with a cwd), its `originalCwd` is used: it is where the command was launched from, while the `cwd` of the entries is
-   the worktree, which may be deleted by restore time. Otherwise the first `cwd` field is used, and `cwd_launch` from
-   the store if the transcript has none.
-4. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable). If it is not, the
-   plan carries a non-empty `error_reason`, an empty `resume_cmd`, and the command that would have run in
-   `attempted_cmd`. The terminal does not start: the tab is held on a modal (see "Blocked start" below). The store
-   entry is kept, including when the transcript is also missing (the `--session-id` entry is only dropped once the
-   directory check passes), so "Try again" can still find the session; it goes away when the agent exits, the tab is
-   closed, or the user cancels the restore.
-5. **Build the command.**
-   - JSONL found: if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --resume <id>`;
-     otherwise `claude --resume '<id>'` / `codex resume --last` / `gemini --resume '<id>'`
-   - JSONL missing (claude only): if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --session-id <id>`;
-     otherwise `claude --session-id '<id>'`
-   - others/unknown: empty string (tab shows restore error)
+1. **Resolve the provider row** (`provider::Provider::of`); `claude`, `codex` and `opencode` exist today. A record of an agent
+   with no row produces no plan and no command (see above).
+2. **Find the transcript.** Only providers with a sessions source do this; codex and opencode have none and jump straight
+   to their resume template. OpenCode keeps its sessions in a SQLite database (Kex does not read it; the plugin
+   supplies the session id and cwd directly), so there is nothing to seek on disk. Claude's source checks the stored `transcript_path` first, then scans
+   `$CLAUDE_CONFIG_DIR/projects/**/<sessionId>.jsonl` (or `~/.claude/projects` when the override is unset).
+3. **Transcript found - resume.** The launch cwd is read back with the row's cwd-read strategy (claude: if a
+   `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its
+   `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
+   the first `cwd` field, and `cwd_launch` from the store when the transcript has none). The command is the row's
+   resume template on top of the stripped launch line: `strip_for_resume_base(launch_cmd, agent) + --resume '<id>'`
+   (shell-quoted), or the plain `claude --resume '<id>'` when no launch command is known.
+4. **Transcript missing - the row's missing-transcript policy decides.**
+   - `Reattach` (claude): the session was opened but no message was ever sent (a transcript only appears on the
+     first exchange). The plan is `strip_for_resume_base(...) + --session-id '<id>'` (or the plain template), which
+     starts a new session reusing the same UUID, equivalent to rerunning the CLI with no `--resume`. The store
+     entry is pruned once the directory check passes; if the new session produces messages, hooks re-record it with
+     the new `transcript_path`.
+   - `ResumeAnyway` (codex, and opencode which likewise has no transcript source): the plan is `resume --last` on the
+     stripped launch line (or `codex resume --last`) for codex; opencode's template names the recorded id directly,
+     `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<id>'`, since its stripping
+     whitelists are empty). The entry is never pruned, because nothing re-records codex sessions in this store, and
+     the plugin is silent on the resumed session of an opencode TUI (anomalyco/opencode#39711).
+   - `Ignore` (reserved for providers whose sessions cannot be revived): no plan is emitted; the entry is pruned
+     once its directory is usable.
+5. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable) *before* any
+   pruning. If it is not, the plan carries a non-empty `error_reason`, an empty `resume_cmd`, and the command that
+   would have run in `attempted_cmd`. The terminal does not start: the tab is held on a modal (see "Blocked start"
+   below). The store entry is kept (even when the transcript is also missing), so "Try again" can still find the
+   session; it goes away when the agent exits, the tab is closed, or the user cancels the restore.
+
+`preview_resume_cmd` runs this same planner but passes no store path, so the preview can never mutate the file on
+disk.
 
 The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no `cd` prefix is needed in the command.
 
@@ -234,9 +283,11 @@ The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no
 
 `strip_for_resume_base(cmd, agent)` first runs `find_agent_invocation` again on the stored text, so a record written
 with a `cd dir && claude ...` prefix (the bug of TASK-826) is healed on read instead of restoring as `cd --resume`.
-It returns `None` when no agent is launched in the text, and the planner then uses the plain per-agent command. The
-launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through a
-whitelist-based filter. It keeps flags that remain meaningful for an
+It returns `None` when the agent has no provider row or no agent is launched in the text, and the planner then uses
+the plain per-agent template. The
+launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through the whitelist
+stored in the agent's provider row (`CLAUDE_KEEP_FLAGS` / `CLAUDE_KEEP_WITH_VALUE` in `provider.rs`). It keeps flags
+that remain meaningful for an
 interactive resume and drops one-time flags (e.g. `--worktree`, `--from-pr`, `--tmux`, `--model`, `--effort`).
 Redirections after the launcher (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value; `<(cmd)` and `>(cmd)` are values, not redirections, and are kept.
 
@@ -261,7 +312,9 @@ Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello
 Sessions started with `-p` / `--print` are non-interactive and transient. `agent_detect.rs` looks for the flag in
 the arguments of the agent segment only, and not after `--` (`ls -p; claude` and `time -p claude` are not print mode) and returns before
 arming the detector, so nothing is stashed. `record_session` checks the stashed `launch_cmd` once more via
-`is_print_mode_cmd` and skips recording if the flag is present.
+`is_print_mode_cmd` and skips recording if the flag is present. OpenCode's non-interactive entry point is the
+subcommand `opencode run <prompt>`, which carries no `-p`/`--print` flag and therefore passes this gate: it is
+recorded and its restored session reopens the TUI on that session.
 
 ### RestorePlan type
 
@@ -414,7 +467,7 @@ already exists), not earlier: a shell that sets its own terminal title would ove
 needs a session to attach to. It sets the OSC title, pushes the bell entry and, for `attention`, raises the amber dot,
 all silently (no toast, no OS notification). A staged snapshot expires after 90 seconds (`STAGED_SNAPSHOT_TTL_MS`): if the resume failed and the user starts an agent by hand in that tab much later, it must not inherit the old name and notification. If the user is already looking at that tab the bridge marks it seen.
 
-### Reopening a closed terminal tab
+### Reopening a closed terminal tab or workspace
 
 "Reopen Closed Tab" (`tab.reopenClosed` in `useWorkspaces.ts`) reuses this same consumption path instead of
 duplicating it. A reopened tab gets a brand new id, so it can never find a match in the startup-loaded
@@ -424,6 +477,11 @@ start" off never bothers) and, if a plan comes back, seeds it into the same map 
 `seedRestorePlan`. From there `useTerminalSession.ts` cannot tell the difference: it consumes the seeded plan
 exactly like one loaded at launch, same `cwdLaunch`, same 200ms injection delay, same `restored`/`restoreError`
 states.
+
+Reopening a closed workspace runs the same lookup for each of its terminal tabs, keyed by the old id and seeded
+under the new one, and moves the stashed attention sessions and notifications to the new ids with
+`restoreClosedSession`. A workspace closed while hibernated keeps its terminal ids and skips this: its stored sessions
+are untouched and the normal wake-up restores them.
 
 This is a fresh lookup, not a cached one: whether the resume command ends up as `--resume <id>` or
 `--session-id <id>` depends on whether the JSONL transcript exists yet, which can change between the moment the
@@ -440,8 +498,9 @@ writes a fresh record under the new tab id, and is cleaned up the same way any o
 ## Terminal path bar UI
 
 Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
-surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar` (tab id and agent
-session details). "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
+surfaced in the tab context menu (`TabAgentMenuItems`, rendered by `TabContextMenuItems`): Copy Tab ID for every tab, and
+for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
+with a `transcriptPath`). Each entry shows the value it acts on below its label. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
 `Run on Start` submenu with an `Enabled` checkbox and the command field inline (no third submenu). The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.

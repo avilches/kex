@@ -13,7 +13,7 @@
 //! is flagged `complete: false`, so that its text is never replayed. Command substitutions and
 //! `${...}` are consumed whole, quotes inside them included, but never analysed.
 
-pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
+pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "opencode"];
 
 /// Longest line the shell scripts send; a line this long may have been cut.
 pub const MAX_LINE_CHARS: usize = 256;

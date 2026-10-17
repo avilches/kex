@@ -1,0 +1,330 @@
+import { describe, expect, it } from "vitest";
+import type { ClosedEntry, ClosedTabEntry, Script, Tab, Workspace } from "./types";
+import { allPanes } from "./splitNode";
+import {
+  buildReopenedTab,
+  captureClosedEntry,
+  captureClosedWorkspace,
+  clearStaleFolds,
+  insertRestoredWorkspace,
+  pickReopen,
+  reviveWorkspace,
+} from "./closedStack";
+
+const term = (id: string): Tab => ({ id, kind: "terminal" });
+
+const makeWs = (id: string, paneId: string, tabs: Tab[] = []): Workspace => ({
+  id,
+  title: "W",
+  paneTree: { kind: "pane", id: paneId, tabs, activeTabId: tabs[0]?.id ?? null },
+  activePaneId: paneId,
+});
+
+const tabEntry = (id: string, workspaceId: string, paneId: string, over: Partial<ClosedTabEntry> = {}): ClosedTabEntry => ({
+  kind: "tab",
+  tab: term(id),
+  paneId,
+  workspaceId,
+  ...over,
+});
+
+const wsEntry = (ws: Workspace, index = 0): ClosedEntry => ({ kind: "workspace", workspace: ws, index });
+
+describe("captureClosedEntry", () => {
+  it("prepends the new entry (LIFO order)", () => {
+    const out = captureClosedEntry([tabEntry("t1", "w1", "p1")], tabEntry("t2", "w1", "p1"));
+    expect(out.map((e) => e.kind === "tab" && e.tab.id)).toEqual(["t2", "t1"]);
+  });
+
+  it("enforces the cap by dropping the oldest entry", () => {
+    const initial = Array.from({ length: 10 }, (_, i) => tabEntry(`t${i}`, "w1", "p1"));
+    const out = captureClosedEntry(initial, tabEntry("t10", "w1", "p1"));
+    expect(out).toHaveLength(10);
+    expect(out[0]).toMatchObject({ tab: { id: "t10" } });
+    expect(out[9]).toMatchObject({ tab: { id: "t8" } });
+  });
+
+  it("starts from empty correctly", () => {
+    const e = tabEntry("t1", "w1", "p1");
+    expect(captureClosedEntry([], e)).toEqual([e]);
+  });
+});
+
+describe("pickReopen", () => {
+  it("picks the newest entry in its original workspace and pane", () => {
+    const e1 = tabEntry("t1", "w1", "p1");
+    const e2 = tabEntry("t2", "w1", "p1");
+    const out = pickReopen([e2, e1], [makeWs("w1", "p1")]);
+    expect(out.picked).toEqual({ kind: "tab", entry: e2, workspaceId: "w1", paneId: "p1" });
+    expect(out.remaining).toEqual([e1]);
+  });
+
+  it("falls back to the workspace's active pane when the original pane no longer exists", () => {
+    const e = tabEntry("t1", "w1", "p1");
+    const out = pickReopen([e], [makeWs("w1", "p2")]);
+    expect(out.picked).toEqual({ kind: "tab", entry: e, workspaceId: "w1", paneId: "p2" });
+  });
+
+  it("never reopens in another workspace: a tab of a closed workspace is dropped", () => {
+    const out = pickReopen([tabEntry("t1", "w1", "p1")], [makeWs("w2", "p3")]);
+    expect(out.picked).toBeNull();
+    expect(out.remaining).toEqual([]);
+  });
+
+  it("skips a hibernated entry, keeps it, and reopens the next one", () => {
+    const hib = tabEntry("t2", "w1", "p1");
+    const awake = tabEntry("t1", "w2", "p3");
+    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
+    const out = pickReopen([hib, awake], workspaces);
+    expect(out.picked).toEqual({ kind: "tab", entry: awake, workspaceId: "w2", paneId: "p3" });
+    expect(out.remaining).toEqual([hib]);
+  });
+
+  it("keeps hibernated entries and picks nothing when all are hibernated", () => {
+    const e = tabEntry("t1", "w1", "p1");
+    const out = pickReopen([e], [{ ...makeWs("w1", "p1"), hibernated: true }]);
+    expect(out.picked).toBeNull();
+    expect(out.remaining).toEqual([e]);
+  });
+
+  it("picks the kept entry first once its workspace wakes up", () => {
+    const hib = tabEntry("t2", "w1", "p1");
+    const older = tabEntry("t1", "w2", "p3");
+    const first = pickReopen([hib, older], [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")]);
+    const second = pickReopen(first.remaining, [makeWs("w1", "p1"), makeWs("w2", "p3")]);
+    expect(second.picked).toMatchObject({ entry: hib });
+  });
+
+  it("returns nothing for an empty stack", () => {
+    expect(pickReopen([], [makeWs("w1", "p1")])).toEqual({ picked: null, remaining: [] });
+  });
+
+  it("picks a closed workspace when it is not open", () => {
+    const closed = wsEntry(makeWs("w1", "p1", [term("t1")]), 2);
+    const older = tabEntry("t0", "w2", "p9");
+    const out = pickReopen([closed, older], [makeWs("w2", "p9")]);
+    expect(out.picked).toEqual({ kind: "workspace", entry: closed });
+    expect(out.remaining).toEqual([older]);
+  });
+
+  it("drops a workspace entry whose workspace is already open and moves on", () => {
+    const closed = wsEntry(makeWs("w1", "p1", [term("t1")]));
+    const older = tabEntry("t0", "w1", "p1");
+    const out = pickReopen([closed, older], [makeWs("w1", "p1")]);
+    expect(out.picked).toMatchObject({ kind: "tab", entry: older });
+    expect(out.remaining).toEqual([]);
+  });
+
+  it("reopens tabs closed earlier into a restored workspace, after the workspace itself", () => {
+    const ws = makeWs("w1", "p1", [term("a")]);
+    const stack = [wsEntry(ws), tabEntry("b", "w1", "p1")];
+    const first = pickReopen(stack, []);
+    expect(first.picked?.kind).toBe("workspace");
+    const second = pickReopen(first.remaining, [ws]);
+    expect(second.picked).toMatchObject({ kind: "tab", workspaceId: "w1" });
+  });
+});
+
+describe("captureClosedWorkspace", () => {
+  it("records a workspace with its tabs and position", () => {
+    const ws = makeWs("w1", "p1", [term("t1")]);
+    const out = captureClosedWorkspace([], ws, 3);
+    expect(out).toEqual([wsEntry(ws, 3)]);
+  });
+
+  it("folds the last closed tab back into the workspace that closed with it", () => {
+    const ws = makeWs("w1", "p1");
+    const last = tabEntry("t1", "w1", "p1", { lastOfWorkspace: true });
+    const older = tabEntry("t0", "w2", "p2");
+    const out = captureClosedWorkspace([last, older], ws, 1);
+    expect(out).toHaveLength(2);
+    const restored = out[0] as Extract<ClosedEntry, { kind: "workspace" }>;
+    expect(restored.kind).toBe("workspace");
+    expect(allPanes(restored.workspace.paneTree)[0]!.tabs.map((t) => t.id)).toEqual(["t1"]);
+    expect(allPanes(restored.workspace.paneTree)[0]!.activeTabId).toBe("t1");
+    expect(out[1]).toBe(older);
+  });
+
+  it("puts the folded tab in the first pane when its own pane is gone", () => {
+    const ws = makeWs("w1", "p2");
+    const last = tabEntry("t1", "w1", "p1", { lastOfWorkspace: true });
+    const out = captureClosedWorkspace([last], ws, 0);
+    const restored = out[0] as Extract<ClosedEntry, { kind: "workspace" }>;
+    expect(restored.workspace.activePaneId).toBe("p2");
+    expect(allPanes(restored.workspace.paneTree)[0]!.tabs.map((t) => t.id)).toEqual(["t1"]);
+  });
+
+  it("does not fold a tab that was not the last of its workspace", () => {
+    const ws = makeWs("w1", "p1");
+    const out = captureClosedWorkspace([tabEntry("t1", "w1", "p1")], ws, 0);
+    expect(out).toEqual([tabEntry("t1", "w1", "p1")]);
+  });
+
+  it("does not fold the last tab of another workspace", () => {
+    const ws = makeWs("w1", "p1");
+    const other = tabEntry("t1", "w2", "p2", { lastOfWorkspace: true });
+    expect(captureClosedWorkspace([other], ws, 0)).toEqual([other]);
+  });
+
+  it("skips an empty workspace with nothing to bring back", () => {
+    expect(captureClosedWorkspace([], makeWs("w1", "p1"), 0)).toEqual([]);
+  });
+
+  it("keeps an empty workspace that still has scripts", () => {
+    const script: Script = { id: "s1", name: "dev", command: "pnpm dev" };
+    const ws = { ...makeWs("w1", "p1"), scripts: [script] };
+    expect(captureClosedWorkspace([], ws, 0)).toEqual([wsEntry(ws, 0)]);
+  });
+
+  it("enforces the cap by dropping the oldest entry", () => {
+    const initial: ClosedEntry[] = Array.from({ length: 10 }, (_, i) => tabEntry(`t${i}`, "w9", "p9"));
+    const out = captureClosedWorkspace(initial, makeWs("w1", "p1", [term("a")]), 0);
+    expect(out).toHaveLength(10);
+    expect(out[0]!.kind).toBe("workspace");
+  });
+});
+
+describe("clearStaleFolds", () => {
+  it("clears the flag once the workspace holds a tab again", () => {
+    const flagged = tabEntry("t1", "w1", "p1", { lastOfWorkspace: true });
+    const out = clearStaleFolds([flagged], [makeWs("w1", "p1", [term("new")])]);
+    expect((out[0] as ClosedTabEntry).lastOfWorkspace).toBeUndefined();
+  });
+
+  it("keeps the flag while the workspace is empty or already gone", () => {
+    const flagged = tabEntry("t1", "w1", "p1", { lastOfWorkspace: true });
+    const entries = [flagged];
+    expect(clearStaleFolds(entries, [makeWs("w1", "p1")])).toBe(entries);
+    expect(clearStaleFolds(entries, [])).toBe(entries);
+  });
+
+  it("returns the same array when nothing is flagged", () => {
+    const entries = [tabEntry("t1", "w1", "p1")];
+    expect(clearStaleFolds(entries, [makeWs("w1", "p1", [term("x")])])).toBe(entries);
+  });
+});
+
+describe("reviveWorkspace", () => {
+  const counter = () => {
+    let n = 0;
+    return () => `new-${++n}`;
+  };
+
+  it("gives every tab a fresh id and keeps the active tab", () => {
+    const ws = makeWs("w1", "p1", [term("a"), term("b")]);
+    ws.paneTree = { ...(ws.paneTree as typeof ws.paneTree & { kind: "pane" }), activeTabId: "b" };
+    const { workspace, idMap } = reviveWorkspace(ws, counter());
+    const pane = allPanes(workspace.paneTree)[0]!;
+    expect(pane.tabs.map((t) => t.id)).toEqual(["new-1", "new-2"]);
+    expect(pane.activeTabId).toBe("new-2");
+    expect(idMap.get("a")).toBe("new-1");
+    expect(workspace.id).toBe("w1");
+  });
+
+  it("walks split trees", () => {
+    const ws: Workspace = {
+      ...makeWs("w1", "p1"),
+      paneTree: {
+        kind: "split",
+        id: "s1",
+        orientation: "horizontal",
+        dividerPosition: 0.4,
+        first: { kind: "pane", id: "p1", tabs: [term("a")], activeTabId: "a" },
+        second: { kind: "pane", id: "p2", tabs: [term("b")], activeTabId: "b" },
+      },
+    };
+    const { workspace } = reviveWorkspace(ws, counter());
+    const ids = allPanes(workspace.paneTree).flatMap((p) => p.tabs.map((t) => t.id));
+    expect(ids).toEqual(["new-1", "new-2"]);
+    expect(workspace.paneTree).toMatchObject({ dividerPosition: 0.4 });
+  });
+
+  it("clears the unsaved flag of editors and the floating flag of browsers", () => {
+    const tabs: Tab[] = [
+      { id: "e", kind: "editor", path: "/f", dirty: true, preview: false },
+      { id: "m", kind: "markdown", path: "/f.md", dirty: true },
+      { id: "b", kind: "browser", url: "https://x.dev", floating: true },
+    ];
+    const { workspace } = reviveWorkspace(makeWs("w1", "p1", tabs), counter());
+    const out = allPanes(workspace.paneTree)[0]!.tabs;
+    expect(out[0]).toMatchObject({ dirty: false });
+    expect(out[1]).toMatchObject({ dirty: false });
+    expect(out[2]).toMatchObject({ floating: false });
+  });
+
+  it("points scripts at the new id of their tab", () => {
+    const ws = {
+      ...makeWs("w1", "p1", [term("a")]),
+      scripts: [
+        { id: "s1", name: "dev", command: "x", tabId: "a" },
+        { id: "s2", name: "gone", command: "y", tabId: "missing" },
+        { id: "s3", name: "idle", command: "z" },
+      ] as Script[],
+    };
+    const { workspace } = reviveWorkspace(ws, counter());
+    expect(workspace.scripts?.map((s) => s.tabId)).toEqual(["new-1", undefined, undefined]);
+  });
+
+  it("keeps the terminal ids of a hibernated workspace, whose stored sessions are indexed by them", () => {
+    const tabs: Tab[] = [term("a"), { id: "e", kind: "editor", path: "/f", dirty: false, preview: false }];
+    const ws = { ...makeWs("w1", "p1", tabs), hibernated: true };
+    const { workspace, idMap } = reviveWorkspace(ws, counter());
+    const out = allPanes(workspace.paneTree)[0]!.tabs;
+    expect(out[0]!.id).toBe("a");
+    expect(out[1]!.id).toBe("new-1");
+    expect(idMap.get("a")).toBe("a");
+    expect(workspace.hibernated).toBe(true);
+  });
+
+  it("does not mutate the original", () => {
+    const ws = makeWs("w1", "p1", [term("a")]);
+    reviveWorkspace(ws, counter());
+    expect(allPanes(ws.paneTree)[0]!.tabs[0]!.id).toBe("a");
+  });
+});
+
+describe("insertRestoredWorkspace", () => {
+  const w = (id: string) => makeWs(id, `p-${id}`);
+
+  it("puts the workspace back at its position", () => {
+    const out = insertRestoredWorkspace([w("a"), w("c")], w("b"), 1);
+    expect(out.map((x) => x.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("clamps an index past the end", () => {
+    expect(insertRestoredWorkspace([w("a")], w("b"), 9).map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("clamps a negative index", () => {
+    expect(insertRestoredWorkspace([w("a")], w("b"), -3).map((x) => x.id)).toEqual(["b", "a"]);
+  });
+
+  it("returns the same list when the workspace is already open", () => {
+    const list = [w("a")];
+    expect(insertRestoredWorkspace(list, w("a"), 0)).toBe(list);
+  });
+});
+
+describe("buildReopenedTab", () => {
+  it("assigns the new id and resets editor-specific transient flags", () => {
+    const tab: Tab = { id: "old", kind: "editor", path: "/f.ts", dirty: true, preview: true, locked: true };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "editor", path: "/f.ts", dirty: false, preview: false, locked: false });
+  });
+
+  it("unlocks a reopened terminal tab but keeps everything else", () => {
+    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
+  });
+
+  it("unlocks a reopened git-diff tab and drops its preview state", () => {
+    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, preview: true, locked: true };
+    const reopened = buildReopenedTab(tab, "new");
+    expect(reopened.locked).toBe(false);
+    expect(reopened).toMatchObject({ preview: false });
+  });
+
+  it("leaves other kinds unchanged besides the id", () => {
+    const tab: Tab = { id: "old", kind: "browser", url: "https://example.com" };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "browser", url: "https://example.com" });
+  });
+});

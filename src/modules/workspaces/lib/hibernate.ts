@@ -27,7 +27,12 @@ export function strippedTree(node: SplitNode): SplitNode {
 const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path.", "sidebar.", "explorer."];
 const BLOCKED_IDS: readonly ShortcutId[] = ["search.focus", "workspace.run", "view.zenMode"];
 
+// Reopening what was closed acts on the closed stack, not on the sleeping workspace:
+// a tab of a hibernated workspace is skipped there, and a closed workspace comes back.
+const ALLOWED_IDS: readonly ShortcutId[] = ["tab.reopenClosed"];
+
 export function blockedWhileHibernated(id: ShortcutId): boolean {
+  if (ALLOWED_IDS.includes(id)) return false;
   return BLOCKED_IDS.includes(id) || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
 }
 

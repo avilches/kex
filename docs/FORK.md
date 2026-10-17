@@ -149,7 +149,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   in-memory MRU list of tab ids (`paneActivationHistoryRef` in `useWorkspaces`, never persisted, cap 50) updated on every
   activation; `applyClosePanel` consumes it and falls back to the adjacent tab (right, then left) when the history is
   empty. A reconciliation effect prunes dead panes/tabs so a stale id is never selected. Independent from reopen-closed
-  (undo). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
+  (undo), which also restores a closed workspace with everything it held (`closedStack.ts`). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
   `docs/WORKSPACES.md` for the full lifecycle.
 - **Workspaces without tabs** - closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button). The close action shows the shared hibernate dialog only when something would be lost (scripts to delete, unsaved documents, running agents, scripts or processes) and closes directly otherwise. Closing the last workspace quits the app. Not present in upstream Terax.
 - **Directional pane focus shortcuts** - `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
@@ -203,6 +203,25 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 ### Technical fixes and refactors
 
+- **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
+  capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
+  whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to
+  `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it reports every
+  new `session.created` as one `SessionStart` IPC frame with `agent: opencode`, gated on Kex's env vars and inert
+  outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
+  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude`. A TUI restored with
+  `--session` fires no plugin events (anomalyco/opencode#39711), so opencode records are never pruned and restore is
+  unaffected by the gap; the same silence only costs live attention state on restored tabs.
+- **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
+  (transcript source and its `CLAUDE_CONFIG_DIR` root, cwd read-back strategy, resume/reattach command templates,
+  missing-transcript policy, launch-line whitelists) moved from `session_store.rs` hardcode into one
+  `Provider` table in `modules/agent/provider.rs`, shaped after Orca's `extractAgentProviderSession` /
+  `getAgentResumeArgv` so adding a second TUI agent (OMP, Pi) is a row addition. Behavior changes: codex records
+  always resume with `resume --last` on the stripped launch line (they used to build a broken `codex --resume <id>`
+  when a launch command was known) and their entries are never pruned; a record whose agent has no provider row
+  (e.g. a hand-edited `gemini` record) no longer restores with an empty command but produces no plan and is pruned
+  once its directory is usable. The restore log line for a missing transcript now reads "transcript not found"
+  (it used to say "JSONL not found, reattaching with --session-id").
 - **WebGL canvas refresh** - after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
   `useEffect` with `requestAnimationFrame` calls `refreshTerminalLeaf` on each visible panel to force the canvas to
   repaint.
@@ -328,9 +347,8 @@ Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitign
 through `RevealRequest.pendingAction` so the explorer performs the action immediately after revealing the file in
 the tree (nonce-guarded, fires once).
 
-The terminal path bar `[...]` DropdownMenu (`TerminalPathBarMenu`) surfaces session metadata that was previously in
-the floating tab HoverCard: run-on-start checkbox, persistent command input, and for agent sessions: session id
-(copy), started elapsed, restore error, plus the actions Open Transcript Folder (focuses the folder in the explorer) and Reveal Transcript in Finder. The floating tab HoverCard has been removed
+The tab context menu (`TabAgentMenuItems`) surfaces session metadata that was previously in
+the floating tab HoverCard: Copy Tab ID for every tab, and for agent sessions Copy Session ID plus the actions Open Transcript Folder (focuses the folder in the explorer) and Reveal Transcript in Finder. Run-on-start lives in the same menu. The floating tab HoverCard has been removed
 entirely; tabs use a native `title` tooltip (cwd, agent model/sessionId). None of this surface exists in upstream
 Terax.
 

@@ -295,7 +295,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.reopenClosed",
-    label: "Reopen Closed Tab",
+    label: "Reopen Closed Tab or Workspace",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },

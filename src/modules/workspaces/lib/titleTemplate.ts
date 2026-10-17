@@ -8,6 +8,7 @@ export const TITLE_VARIABLES = [
   "cmd",
   "file",
   "agent",
+  "model",
   "host",
   "osc",
   "session",
@@ -205,32 +206,10 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   { name: "cmd", description: "Command running right now", example: "npm run dev", group: "terminal" },
   { name: "osc", description: "Title the program in the terminal sets for itself", example: "vim notes.md", group: "terminal" },
   { name: "agent", description: "Coding agent running in the terminal", example: "claude", group: "terminal" },
+  { name: "model", description: "Model the agent answered with last, as the agent reports it", example: "claude-sonnet-4-6", group: "terminal" },
   { name: "session", description: "Title of that agent's session", example: "Fix login bug", group: "terminal" },
   { name: "file", description: "Name of the file", example: "index.ts", group: "file" },
   { name: "url", description: "Address of the page", example: "https://example.com/docs", group: "browser" },
   { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace" },
 ];
 
-const GROUPS_FOR: Record<TitleSubject, TitleVariableGroup[]> = {
-  terminal: ["common", "place", "terminal"],
-  editor: ["common", "place", "file"],
-  markdown: ["common", "place", "file"],
-  "git-diff": ["common", "place", "file"],
-  "git-commit-file": ["common", "place", "file"],
-  browser: ["common", "browser"],
-  "git-history": ["common", "place"],
-  workspace: ["common", "place", "terminal", "file", "browser", "workspace"],
-};
-
-// Only the variables the subject can have a value for.
-export function titleVariableDocs(subject: TitleSubject) {
-  const groups = GROUPS_FOR[subject];
-  return TITLE_VARIABLE_DOCS.filter((v) => groups.includes(v.group));
-}
-
-const TITLE_SYNTAX_HINT =
-  "{a|b} uses the first value that is not empty. {?a|b text} shows the text only when a or b has a value, {!a|b text} only when neither does. Use {{ and }} for literal braces.";
-
-export function titleVariablesHint(subject: TitleSubject): string {
-  return `${titleVariableDocs(subject).map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
-}

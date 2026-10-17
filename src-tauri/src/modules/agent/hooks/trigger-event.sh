@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# kex-session-v6
+# kex-session-v7
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 
 PAYLOAD="$(cat)"
+# Tag the agent into the frame so Kex's dispatcher can attribute it without guessing:
+# everything wired through this script is a Claude Code hook, while OpenCode's plugin
+# writes the socket itself with "agent":"opencode".
+PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c '. + {"agent": "claude"}')"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Caps the per-tab spool file so a tab that never reopens in Kex (and so

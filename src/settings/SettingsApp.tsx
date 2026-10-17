@@ -46,6 +46,15 @@ function parseSectionParam(raw: string | null): { section: SettingsSection; ext?
   return { section, ext: ext || undefined };
 }
 
+// Blocks a section can be asked to scroll to ("appearance:titles").
+const ANCHOR_IDS: Record<string, string> = { titles: "settings-title-templates" };
+
+function readInitialAnchor(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const { section, ext } = parseSectionParam(new URL(window.location.href).searchParams.get("section"));
+  return section === "appearance" ? ext : undefined;
+}
+
 function readInitialSection(): SettingsSection {
   if (typeof window === "undefined") return "general";
   const url = new URL(window.location.href);
@@ -55,7 +64,8 @@ function readInitialSection(): SettingsSection {
 function readInitialFileTypesExt(): string | undefined {
   if (typeof window === "undefined") return undefined;
   const url = new URL(window.location.href);
-  return parseSectionParam(url.searchParams.get("section")).ext;
+  const { section, ext } = parseSectionParam(url.searchParams.get("section"));
+  return section === "filetypes" ? ext : undefined;
 }
 
 export function SettingsApp() {
@@ -65,6 +75,17 @@ export function SettingsApp() {
   const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
   // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
   const fileTypesExtConsumed = useRef(false);
+  const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
+
+  useEffect(() => {
+    if (!anchor) return;
+    const frame = requestAnimationFrame(() => {
+      const id = ANCHOR_IDS[anchor];
+      if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+      setAnchor(undefined);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, active]);
 
   useEffect(() => {
     void init();
@@ -88,7 +109,8 @@ export function SettingsApp() {
     const apply = (raw: string) => {
       const { section, ext } = parseSectionParam(raw);
       setActive(section);
-      if (ext) {
+      setAnchor(section === "appearance" ? ext : undefined);
+      if (ext && section === "filetypes") {
         fileTypesExtConsumed.current = false;
         setFileTypesExt(ext);
       }

@@ -52,10 +52,10 @@ empty, where it renders a welcome screen. This invariant is locked by a unit tes
 reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it: the
 tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab
 to another workspace, and bulk closes such as Close All Tabs (the fold decides on committed
-state, so batched closes inside one tick are covered too). Two exceptions keep the workspace
-with its empty pane: the window's only workspace (folding it would close the window), and one
-holding scripts with a command, whose deletion the close-workspace confirmation dialog still
-owns (`scriptsToDelete`). `applyCloseTab` also resets `detailExpanded` to true when it empties
+state, so batched closes inside one tick are covered too). Only a blank workspace folds
+(`isBlankWorkspace`: no name, color, icon, workspace root or scripts). Two exceptions keep the
+workspace with its empty pane: the window's only workspace (folding it would close the window),
+and any customized one, so a workspace someone set up is never lost by closing its last tab. `applyCloseTab` also resets `detailExpanded` to true when it empties
 the sole pane, so an empty workspace shows no chevron in the WorkspaceBar while staying
 expanded: a tab opened into it appears in the nested list without touching anything. The
 nested list renders nothing with zero tabs, so the expanded state is invisible on the empty
@@ -281,7 +281,7 @@ commands store and the script state map, so a row disappears when its agent fini
 empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
 (script: the same stop the RunButton sends, without moving focus; disabled as "Stopping" while
 `waiting`). Closing a workspace (hibernated or awake) abandons its carried buffers (`abandonUnflushedBuffers`: an awake workspace's editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are refused) and clears its
-hibernating marks. Closing a workspace does not go through `closeTab`, so its tabs are not recorded for `tab.reopenClosed`. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
+hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see ARCHITECTURE 5.7a). Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
 #### Auto-hibernate

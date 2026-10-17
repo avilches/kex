@@ -139,7 +139,7 @@ describe("createCommandItems while the workspace is hibernated", () => {
 
   it("disables every command that acts on tabs, panes, git or the Sidebar", () => {
     const items = byId(true);
-    for (const id of ["tab.new", "tab.newBrowser", "tab.close", "tab.reopenClosed", "terminal.clear", "pane.splitRight", "pane.splitDown", "git.graph", "git.source", "search.focus", "explorer.search", "sidebar.toggle", "history.open", "search.content", "workspace.runScripts"]) {
+    for (const id of ["tab.new", "tab.newBrowser", "tab.close", "terminal.clear", "pane.splitRight", "pane.splitDown", "git.graph", "git.source", "search.focus", "explorer.search", "sidebar.toggle", "history.open", "search.content", "workspace.runScripts"]) {
       expect(items.get(id)?.disabledReason, id).toBe("Workspace hibernated");
     }
   });
@@ -151,7 +151,7 @@ describe("createCommandItems while the workspace is hibernated", () => {
 
   it("leaves settings, new workspace, new window and workspace properties usable", () => {
     const items = byId(true);
-    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "settings.section.general"]) {
+    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "tab.reopenClosed", "settings.section.general"]) {
       expect(items.get(id)?.disabledReason, id).toBeUndefined();
     }
   });

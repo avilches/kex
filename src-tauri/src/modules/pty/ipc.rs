@@ -10,7 +10,7 @@ use std::thread;
 
 use tauri::{AppHandle, Emitter};
 
-use crate::modules::agent::session_store;
+use crate::modules::agent::{live_model, session_store};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
@@ -170,6 +170,9 @@ struct Payload {
     session_id: String,
     transcript_path: String,
     cwd: String,
+    // Agent that produced the event ("claude" when absent, Claude Code's own hooks never
+    // send it; OpenCode's plugin does).
+    agent: Option<String>,
     // SessionStart
     source: Option<String>,
     session_title: Option<String>,
@@ -206,6 +209,7 @@ fn parse_payload(json: &str) -> Option<Payload> {
         session_id:      v["session_id"].as_str().unwrap_or("").to_string(),
         transcript_path: v["transcript_path"].as_str().unwrap_or("").to_string(),
         cwd:             v["cwd"].as_str().unwrap_or("").to_string(),
+        agent:           v["agent"].as_str().map(str::to_string),
         source:          v["source"].as_str().map(str::to_string),
         session_title:   v["sessionTitle"].as_str().map(str::to_string),
         model:           v["model"].as_str().map(str::to_string),
@@ -429,20 +433,20 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             let source        = p.source.as_deref().unwrap_or("");
             let session_title = p.session_title.as_deref().unwrap_or("");
             let model         = p.model.as_deref().unwrap_or("");
+            let agent         = p.agent.as_deref().unwrap_or("claude");
             log::debug!(
-                "[ipc] SessionStart tab={tab_id} session={} \
+                "[ipc] SessionStart tab={tab_id} agent={agent} session={} \
                  source={source} title={session_title:?} model={model:?}",
                 p.session_id
             );
-            // Agent name is not available in the SessionStart payload. "claude" is the default;
-            // TODO: infer agent from the transcript path or a future payload field.
             let same_process = matches!(source, "clear" | "compact" | "resume");
             let launch_known = session_store::record_session(
-                tab_id, "claude", &p.session_id, &p.transcript_path, &p.cwd, same_process,
+                tab_id, agent, &p.session_id, &p.transcript_path, &p.cwd, same_process,
             );
             let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
                 "tabId":          tab_id,
                 "sessionId":      p.session_id,
+                "agent":          agent,
                 "cwdLaunch":      p.cwd,
                 "sessionTitle":   session_title,
                 "model":          model,
@@ -527,6 +531,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "prompt":   null,
                 "backgroundSubagents": subagents,
             }));
+            live_model::emit_live_model(app, tab_id, &p.transcript_path);
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
@@ -815,6 +820,27 @@ mod tests {
         assert_eq!(p.event, "SessionEnd");
         assert_eq!(p.reason.as_deref(), Some("prompt_input_exit"));
         assert!(p.source.is_none());
+    }
+
+    #[test]
+    fn parse_payload_carries_the_agent_when_present() {
+        let json = r#"{
+          "hook_event_name": "SessionStart",
+          "agent": "opencode",
+          "session_id": "ses_abc",
+          "transcript_path": "",
+          "cwd": "/home/user",
+          "source": "startup"
+        }"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.agent.as_deref(), Some("opencode"));
+    }
+
+    #[test]
+    fn parse_payload_leaves_the_agent_absent_for_claude_frames() {
+        let json = r#"{"hook_event_name":"SessionStart","session_id":"abc","transcript_path":"","cwd":""}"#;
+        let p = parse_payload(json).unwrap();
+        assert!(p.agent.is_none());
     }
 
     #[test]

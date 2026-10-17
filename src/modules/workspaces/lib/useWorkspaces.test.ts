@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
+import type { Tab, Script, SplitNode, PaneNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, emptyWorkspaceToClose, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -220,6 +220,7 @@ describe("emptyWorkspaceToClose", () => {
   const withScripts = (command: string): Script => ({ id: "sc1", name: "run", command });
 
   const emptyWs = ws({
+    title: "",
     paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
     activePaneId: "p1",
   });
@@ -238,21 +239,27 @@ describe("emptyWorkspaceToClose", () => {
     expect(emptyWorkspaceToClose([fullWs])).toBeNull();
   });
 
-  it("skips workspaces holding scripts with a command", () => {
-    const scripted = ws({
-      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
-      activePaneId: "p1",
-      scripts: [withScripts("pnpm test")],
-    });
-    expect(emptyWorkspaceToClose([fullWs, scripted])).toBeNull();
+  const emptyTree: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+
+  it.each([
+    ["scripts with a command", { scripts: [withScripts("pnpm test")] }],
+    ["scripts with a blank command", { scripts: [withScripts("   ")] }],
+    ["a title", { title: "Backend" }],
+    ["a color", { color: "#ff0000" }],
+    ["an icon", { icon: "rocket" }],
+    ["a workspace root", { workspaceRoot: "/tmp/proj" }],
+  ])("keeps an empty workspace with %s", (_label, extra) => {
+    const custom = ws({ title: "", paneTree: emptyTree, activePaneId: "p1", ...extra });
+    expect(emptyWorkspaceToClose([fullWs, custom])).toBeNull();
   });
 
-  it("folds a workspace whose scripts are all blank commands", () => {
-    const blank = ws({
-      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
-      activePaneId: "p1",
-      scripts: [withScripts("   ")],
-    });
+  it("keeps the other customized workspaces untouched when only one is blank", () => {
+    const named = ws({ id: "w3", paneTree: emptyTree, activePaneId: "p1" });
+    expect(emptyWorkspaceToClose([fullWs, named])).toBeNull();
+  });
+
+  it("folds a workspace whose title is only whitespace", () => {
+    const blank = ws({ title: "  ", paneTree: emptyTree, activePaneId: "p1" });
     expect(emptyWorkspaceToClose([fullWs, blank])?.id).toBe("w1");
   });
 
@@ -332,125 +339,6 @@ describe("collectRunningTerminals", () => {
     ]);
     const out = await collectRunningTerminals(w, async () => null, () => undefined);
     expect(out).toEqual([]);
-  });
-});
-
-describe("captureClosedEntry", () => {
-  const entry = (id: string): ClosedEntry => ({
-    tab: { id, kind: "terminal" },
-    paneId: "p1",
-    workspaceId: "w1",
-  });
-
-  it("prepends the new entry (LIFO order)", () => {
-    const out = captureClosedEntry([entry("t1")], entry("t2"));
-    expect(out.map((e) => e.tab.id)).toEqual(["t2", "t1"]);
-  });
-
-  it("enforces the cap by dropping the oldest entry", () => {
-    const initial = Array.from({ length: 10 }, (_, i) => entry(`t${i}`));
-    const out = captureClosedEntry(initial, entry("t10"));
-    expect(out).toHaveLength(10);
-    expect(out[0].tab.id).toBe("t10");
-    expect(out[9].tab.id).toBe("t8");
-  });
-
-  it("starts from empty correctly", () => {
-    const out = captureClosedEntry([], entry("t1"));
-    expect(out).toEqual([entry("t1")]);
-  });
-});
-
-describe("findReopenTarget", () => {
-  const makeWs = (id: string, paneId: string): Workspace => ({
-    id,
-    title: "W",
-    paneTree: { kind: "pane", id: paneId, tabs: [], activeTabId: null },
-    activePaneId: paneId,
-  });
-
-  it("returns the original workspace and pane when both exist", () => {
-    const workspaces = [makeWs("w1", "p1")];
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
-      workspaceId: "w1",
-      paneId: "p1",
-    });
-  });
-
-  it("falls back to active pane when the original pane no longer exists", () => {
-    const workspaces = [makeWs("w1", "p2")]; // p1 was destroyed, now p2 is active
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
-      workspaceId: "w1",
-      paneId: "p2",
-    });
-  });
-
-  it("falls back to the active workspace when the original workspace was closed", () => {
-    const workspaces = [makeWs("w2", "p3")]; // w1 is gone
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({
-      workspaceId: "w2",
-      paneId: "p3",
-    });
-  });
-
-  it("skips a hibernated original workspace and uses the active one", () => {
-    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
-    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
-    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({ workspaceId: "w2", paneId: "p3" });
-  });
-
-  it("returns null when the original and the active workspaces are both hibernated", () => {
-    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, { ...makeWs("w2", "p3"), hibernated: true }];
-    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
-    expect(findReopenTarget(workspaces, "w2", entry)).toBeNull();
-  });
-
-  it("returns null when no workspaces exist", () => {
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget([], "w1", entry)).toBeNull();
-  });
-});
-
-describe("buildReopenedTab", () => {
-  it("assigns the new id and resets editor-specific transient flags", () => {
-    const tab: Tab = { id: "old", kind: "editor", path: "/f.ts", dirty: true, preview: true, locked: true };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "editor", path: "/f.ts", dirty: false, preview: false, locked: false });
-  });
-
-  it("unlocks a reopened terminal tab but keeps everything else", () => {
-    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
-  });
-
-  it("unlocks a reopened git-diff tab and drops its preview state", () => {
-    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, preview: true, locked: true };
-    const reopened = buildReopenedTab(tab, "new");
-    expect(reopened.locked).toBe(false);
-    expect(reopened).toMatchObject({ preview: false });
-  });
-
-  it("leaves other kinds unchanged besides the id", () => {
-    const tab: Tab = { id: "old", kind: "browser", url: "https://example.com" };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "browser", url: "https://example.com" });
   });
 });
 

@@ -1,5 +1,7 @@
 pub mod launch_cmd;
+pub mod live_model;
 pub mod os_notify;
+pub mod provider;
 pub mod session_store;
 
 use serde_json::{json, Value};
@@ -18,7 +20,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v6";
+// v7: the script tags its frames with agent "claude" (see trigger-event.sh).
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v7";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -35,7 +38,14 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v6";
 //   SubagentStop:       agent_id, agent_type
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
-// All 10 events handled by trigger-event.sh in v6.
+// OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, so the
+// integration ships as a static script instead of merged settings. agent_opencode_plugin_status
+// greps the version marker to notice an outdated install. It carries no uninstall: without
+// Kex's env vars the plugin does nothing.
+const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v1";
+const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
+
+// All 10 events handled by trigger-event.sh in v7.
 const SESSION_HOOK_EVENTS: [&str; 10] = [
     "SessionStart",
     "UserPromptSubmit",
@@ -249,6 +259,45 @@ pub fn agent_disable_claude_hooks() -> Result<(), String> {
 #[tauri::command]
 pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
     session_store::detach_session(&tab_id)
+}
+
+fn opencode_plugin_path() -> Result<std::path::PathBuf, String> {
+    let root = match std::env::var("OPENCODE_CONFIG_DIR") {
+        Ok(v) if !v.is_empty() => std::path::PathBuf::from(v),
+        _ => dirs::home_dir()
+            .ok_or_else(|| "could not resolve home dir".to_string())?
+            .join(".config")
+            .join("opencode"),
+    };
+    Ok(root.join("plugins").join("opencode-session.js"))
+}
+
+#[tauri::command]
+pub fn agent_setup_opencode() -> Result<(), String> {
+    let path = opencode_plugin_path()?;
+    // Same content already there: leave the file alone so repeated installs never touch it.
+    if std::fs::read_to_string(&path).is_ok_and(|current| current == OPENCODE_PLUGIN_SCRIPT) {
+        return Ok(());
+    }
+    let dir = path
+        .parent()
+        .ok_or_else(|| "opencode plugin path has no parent".to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    let tmp = path.with_extension("js.kex-tmp");
+    std::fs::write(&tmp, OPENCODE_PLUGIN_SCRIPT)
+        .map_err(|e| format!("write opencode plugin tmp: {e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename into {}: {e}", path.display())
+    })
+}
+
+#[tauri::command]
+pub fn agent_opencode_plugin_status() -> bool {
+    opencode_plugin_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .is_some_and(|content| content.contains(OPENCODE_PLUGIN_VERSION))
 }
 
 #[tauri::command]

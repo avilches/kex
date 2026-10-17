@@ -1051,3 +1051,52 @@ Evidencia: instrumentacion temporal que enviaba `{m, pos, refs}` por fetch a un 
 ### Leccion
 
 Un early return silencioso en un camino de medicion puede dejar un componente montado pero invisible para siempre si nada re-dispara la medicion. El orden real de attach de refs frente a los layout effects solo se manifiesta en el primer montaje del padre, asi que los tests con refs pre-asignados no lo cubren: hay que montar con el ref vacio. Y para observar valores del webview en un arranque real, un fetch a un servidor local resulta mas fiable que cualquier intento de leer la consola.
+
+## Bug 22: volver de Settings cerraba y guardaba el campo de renombrar (RESUELTO)
+
+### Sintoma
+
+Con el campo de renombrar de un tab o workspace abierto, abrir Settings (la rueda del propio
+field, un atajo o lo que sea): al volver a la ventana principal el campo se cerraba solo y, si
+estaba vacio, el titulo se guardaba como vacio (el tab volvia al titulo por defecto). Variantes
+segun como se abria: si la rueda cerraba el field para abrir Settings, al volver el context menu
+lo reabria y lo cerraba en cascada. El campo sobrevive sin problema a un cambio de tab o de
+workspace mientras la app no pierde el foco del OS.
+
+### Pistas falsas descartadas
+
+- Persistencia del store: `clearRename` solo corre desde los handlers del field (save, cancel,
+  unmount); nada la invoca al abrir Settings.
+- Interplay con `requestSave`/`saveSeq` (desde entonces eliminados): era un mecanismo de guardado
+  secundario, no la causa.
+- RadixPopover reacciona a focos externos: si la apertura de Settings quitase el foco del input,
+  el close seria inmediato, no al volver.
+
+### Causa raiz
+
+`App.tsx` replantea el foco al terminal activo cuando la ventana recupera el foco del OS
+(`getCurrentWindow().onFocusChanged(focused)` -> `requestAnimationFrame(() => requestLeafFocus(tabId))`).
+Abrir Settings roba el foco del OS y al volver DISPARA ese handler: `requestLeafFocus` hace focus()
+del textarea invisible de xterm y el input del rename pierde el foco del DOM. Un blur del input
+equivale a guardar y cerrar (`onBlur` -> `handleSave`), asi que se commitea el valor medio escrito
+(o vacio) y el popover se va. No interviene ningun evento `blur` nativo del input al perder el foco
+del OS (el webview no dispara blur en ese caso), por eso el field aguanta los Cmd+Tab y solo muere
+al volver.
+
+Evidencia: instrumentacion temporal por fetch a un servidor HTTP local (dbg en `onFocusChanged`,
+`requestLeafFocus` y los save/cancel de ambos fields), mas repro manual en la app corriendo.
+
+### Fix
+
+Guard en el replanteo de foco: `domFocusHoldsOsRefocus(document.activeElement)`
+(`src/app/lib/osRefocus.ts`) devuelve true si el elemento con foco es INPUT/TEXTAREA/contentEditable
+pero no el textarea helper de xterm (ese SI cede a `requestLeafFocus`, que es su mecanismo natural).
+Asi el replanteo sigue funcionando para terminales mientras un field de rename, la sticky note o
+cualquier input del usuario conserva el foco.
+
+### Leccion
+
+Cualquier restore automatico de foco disparado por `onFocusChanged` pisa el foco del DOM que el
+usuario tenia antes del Cmd+Tab, y el webview no avisa por Blur: hace falta comprobar
+`document.activeElement` en el camino del restore. Si un Bug de "algo se me apaga al volver de
+otra ventana" aparece, buscar primero este patron.

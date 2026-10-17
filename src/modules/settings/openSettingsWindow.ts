@@ -16,6 +16,12 @@ export async function openSettingsWindow(section?: SettingsSection): Promise<voi
   await invoke("open_settings_window", { section: section ?? null });
 }
 
+// Opens Settings > Appearance scrolled to the block that edits the default tab and workspace
+// titles. With Settings already open it only focuses the window and scrolls.
+export async function openTitleTemplatesSettings(): Promise<void> {
+  await invoke("open_settings_window", { section: "appearance:titles" });
+}
+
 // Opens Settings > File Types, expanding the entry for `ext` if it exists.
 // Encodes as "filetypes:ext" so SettingsApp can parse both section and ext in one param.
 export async function openFileTypesSettings(ext?: string): Promise<void> {
