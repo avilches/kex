@@ -417,10 +417,29 @@ the ones that were hibernated (manually or by auto-hibernate) stay hibernated, t
 `lastActiveAt` is seeded into `activityStamps`, so auto-hibernate keeps counting their inactivity from the
 last real activity instead of restarting the clock. Memory is controlled by auto-hibernate alone.
 
-Reopen Closed Tab (`reopenClosed`, `pickReopen`) only ever reopens a tab in the workspace it was closed in. An
-entry whose workspace was closed is dropped. An entry whose workspace is hibernated is skipped but kept in the
-stack, so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be
-reopened.
+Reopen Closed Tab or Workspace (`reopenClosed` in `useWorkspaces.ts`, pure logic in `closedStack.ts`) undoes the
+last close, whatever it closed. The closed stack (in memory, capped at 10) holds two kinds of entry:
+
+- A tab entry (`closeTab`) reopens only in the workspace it was closed in. If that workspace was closed, the entry is
+  dropped (unless a workspace entry restores it first, see below). If it is hibernated, the entry is skipped but kept,
+  so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be reopened.
+- A workspace entry (`closeWorkspace`) is a snapshot of the whole `Workspace` (pane tree, tabs, title, color, icon,
+  group, scripts, hibernation) plus its index in the bar. Undo puts it back at that index and selects it. It is
+  skipped when a workspace with that id is already open.
+
+A workspace that folds away because its last tab closed (`emptyWorkspaceToClose`) is the common way to lose one by
+accident. `closeTab` flags the entry `lastOfWorkspace` when it empties the workspace, and `captureClosedWorkspace`
+folds that tab back into the snapshot, so one undo returns the workspace with its tab instead of an empty shell.
+`clearStaleFolds` drops the flag as soon as the workspace holds a tab again, so a later close never folds an older
+tab by mistake. An empty workspace with no scripts is not recorded. Tabs closed before the workspace stay as tab
+entries below it and reopen into the restored workspace on the following undos.
+
+A restored workspace gets fresh tab ids (`reviveWorkspace`): the old ones carry marks that outlive the close
+(abandoned editor buffers, agent records), and scripts are re-pointed to the new ids. Editors come back clean,
+floating browsers docked. A hibernated workspace keeps its terminal ids, because its stored agent sessions are
+indexed by them and the wake-up looks them up. `tab.reopenClosed` is enabled while the active workspace is
+hibernated, since it acts on the stack and not on that workspace. Resetting the workspaces (`resetWorkspaces`)
+empties the stack.
 
 ### 5.8 Workspace authorization and file opening
 

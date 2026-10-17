@@ -171,6 +171,10 @@ describe("blockedWhileHibernated", () => {
     expect(blockedWhileHibernated("workspace.close")).toBe(false);
   });
 
+  it("lets reopen-closed through: it acts on the closed stack, not on the sleeping workspace", () => {
+    expect(blockedWhileHibernated("tab.reopenClosed")).toBe(false);
+  });
+
   it("lets workspace, window, view and settings shortcuts through", () => {
     for (const id of ["workspace.new", "workspace.next", "window.new", "view.zoomIn", "settings.open"] as const) {
       expect(blockedWhileHibernated(id)).toBe(false);

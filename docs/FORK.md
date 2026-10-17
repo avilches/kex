@@ -149,7 +149,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   in-memory MRU list of tab ids (`paneActivationHistoryRef` in `useWorkspaces`, never persisted, cap 50) updated on every
   activation; `applyClosePanel` consumes it and falls back to the adjacent tab (right, then left) when the history is
   empty. A reconciliation effect prunes dead panes/tabs so a stale id is never selected. Independent from reopen-closed
-  (undo). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
+  (undo), which also restores a closed workspace with everything it held (`closedStack.ts`). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
   `docs/WORKSPACES.md` for the full lifecycle.
 - **Workspaces without tabs** - closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button). The close action shows the shared hibernate dialog only when something would be lost (scripts to delete, unsaved documents, running agents, scripts or processes) and closes directly otherwise. Closing the last workspace quits the app. Not present in upstream Terax.
 - **Directional pane focus shortcuts** - `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the

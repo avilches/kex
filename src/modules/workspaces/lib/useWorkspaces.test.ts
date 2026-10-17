@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
+import type { Tab, Script, SplitNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, emptyWorkspaceToClose, pickReopen, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -332,119 +332,6 @@ describe("collectRunningTerminals", () => {
     ]);
     const out = await collectRunningTerminals(w, async () => null, () => undefined);
     expect(out).toEqual([]);
-  });
-});
-
-describe("captureClosedEntry", () => {
-  const entry = (id: string): ClosedEntry => ({
-    tab: { id, kind: "terminal" },
-    paneId: "p1",
-    workspaceId: "w1",
-  });
-
-  it("prepends the new entry (LIFO order)", () => {
-    const out = captureClosedEntry([entry("t1")], entry("t2"));
-    expect(out.map((e) => e.tab.id)).toEqual(["t2", "t1"]);
-  });
-
-  it("enforces the cap by dropping the oldest entry", () => {
-    const initial = Array.from({ length: 10 }, (_, i) => entry(`t${i}`));
-    const out = captureClosedEntry(initial, entry("t10"));
-    expect(out).toHaveLength(10);
-    expect(out[0].tab.id).toBe("t10");
-    expect(out[9].tab.id).toBe("t8");
-  });
-
-  it("starts from empty correctly", () => {
-    const out = captureClosedEntry([], entry("t1"));
-    expect(out).toEqual([entry("t1")]);
-  });
-});
-
-describe("pickReopen", () => {
-  const makeWs = (id: string, paneId: string): Workspace => ({
-    id,
-    title: "W",
-    paneTree: { kind: "pane", id: paneId, tabs: [], activeTabId: null },
-    activePaneId: paneId,
-  });
-  const entry = (id: string, workspaceId: string, paneId: string): ClosedEntry => ({
-    tab: { id, kind: "terminal" },
-    paneId,
-    workspaceId,
-  });
-
-  it("picks the newest entry in its original workspace and pane", () => {
-    const e1 = entry("t1", "w1", "p1");
-    const e2 = entry("t2", "w1", "p1");
-    const out = pickReopen([e2, e1], [makeWs("w1", "p1")]);
-    expect(out.picked).toEqual({ entry: e2, workspaceId: "w1", paneId: "p1" });
-    expect(out.remaining).toEqual([e1]);
-  });
-
-  it("falls back to the workspace's active pane when the original pane no longer exists", () => {
-    const e = entry("t1", "w1", "p1");
-    const out = pickReopen([e], [makeWs("w1", "p2")]);
-    expect(out.picked).toEqual({ entry: e, workspaceId: "w1", paneId: "p2" });
-  });
-
-  it("never reopens in another workspace: an entry of a closed workspace is dropped", () => {
-    const gone = entry("t1", "w1", "p1");
-    const out = pickReopen([gone], [makeWs("w2", "p3")]);
-    expect(out.picked).toBeNull();
-    expect(out.remaining).toEqual([]);
-  });
-
-  it("skips a hibernated entry, keeps it, and reopens the next one", () => {
-    const hib = entry("t2", "w1", "p1");
-    const awake = entry("t1", "w2", "p3");
-    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
-    const out = pickReopen([hib, awake], workspaces);
-    expect(out.picked).toEqual({ entry: awake, workspaceId: "w2", paneId: "p3" });
-    expect(out.remaining).toEqual([hib]);
-  });
-
-  it("keeps hibernated entries and picks nothing when all are hibernated", () => {
-    const e = entry("t1", "w1", "p1");
-    const out = pickReopen([e], [{ ...makeWs("w1", "p1"), hibernated: true }]);
-    expect(out.picked).toBeNull();
-    expect(out.remaining).toEqual([e]);
-  });
-
-  it("picks the kept entry first once its workspace wakes up", () => {
-    const hib = entry("t2", "w1", "p1");
-    const older = entry("t1", "w2", "p3");
-    const first = pickReopen([hib, older], [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")]);
-    const second = pickReopen(first.remaining, [makeWs("w1", "p1"), makeWs("w2", "p3")]);
-    expect(second.picked?.entry).toBe(hib);
-  });
-
-  it("returns nothing for an empty stack", () => {
-    expect(pickReopen([], [makeWs("w1", "p1")])).toEqual({ picked: null, remaining: [] });
-  });
-});
-
-describe("buildReopenedTab", () => {
-  it("assigns the new id and resets editor-specific transient flags", () => {
-    const tab: Tab = { id: "old", kind: "editor", path: "/f.ts", dirty: true, preview: true, locked: true };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "editor", path: "/f.ts", dirty: false, preview: false, locked: false });
-  });
-
-  it("unlocks a reopened terminal tab but keeps everything else", () => {
-    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
-  });
-
-  it("unlocks a reopened git-diff tab and drops its preview state", () => {
-    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, preview: true, locked: true };
-    const reopened = buildReopenedTab(tab, "new");
-    expect(reopened.locked).toBe(false);
-    expect(reopened).toMatchObject({ preview: false });
-  });
-
-  it("leaves other kinds unchanged besides the id", () => {
-    const tab: Tab = { id: "old", kind: "browser", url: "https://example.com" };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "browser", url: "https://example.com" });
   });
 });
 

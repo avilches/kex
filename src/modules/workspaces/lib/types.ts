@@ -135,8 +135,20 @@ export function scriptsToDelete(ws: Workspace): number {
   return ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
 }
 
-export type ClosedEntry = {
+export type ClosedTabEntry = {
+  kind: "tab";
   tab: Tab;
   paneId: string;
   workspaceId: string;
+  // Closing it left the workspace without tabs.
+  lastOfWorkspace?: boolean;
 };
+
+// A closed workspace with everything it held. `index` is where it sat in the bar.
+export type ClosedWorkspaceEntry = {
+  kind: "workspace";
+  workspace: Workspace;
+  index: number;
+};
+
+export type ClosedEntry = ClosedTabEntry | ClosedWorkspaceEntry;

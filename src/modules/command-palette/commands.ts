@@ -135,9 +135,9 @@ export function createCommandItems(
     },
     {
       id: "tab.reopenClosed",
-      title: "Reopen closed tab",
+      title: "Reopen closed tab or workspace",
       group: "Tabs",
-      keywords: ["reopen", "undo close", "restore tab"],
+      keywords: ["reopen", "undo close", "restore tab", "restore workspace"],
       icon: ArrowReloadHorizontalIcon,
       shortcutId: "tab.reopenClosed",
       run: ctx.reopenClosedTab,

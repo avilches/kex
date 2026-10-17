@@ -427,7 +427,7 @@ already exists), not earlier: a shell that sets its own terminal title would ove
 needs a session to attach to. It sets the OSC title, pushes the bell entry and, for `attention`, raises the amber dot,
 all silently (no toast, no OS notification). A staged snapshot expires after 90 seconds (`STAGED_SNAPSHOT_TTL_MS`): if the resume failed and the user starts an agent by hand in that tab much later, it must not inherit the old name and notification. If the user is already looking at that tab the bridge marks it seen.
 
-### Reopening a closed terminal tab
+### Reopening a closed terminal tab or workspace
 
 "Reopen Closed Tab" (`tab.reopenClosed` in `useWorkspaces.ts`) reuses this same consumption path instead of
 duplicating it. A reopened tab gets a brand new id, so it can never find a match in the startup-loaded
@@ -437,6 +437,11 @@ start" off never bothers) and, if a plan comes back, seeds it into the same map 
 `seedRestorePlan`. From there `useTerminalSession.ts` cannot tell the difference: it consumes the seeded plan
 exactly like one loaded at launch, same `cwdLaunch`, same 200ms injection delay, same `restored`/`restoreError`
 states.
+
+Reopening a closed workspace runs the same lookup for each of its terminal tabs, keyed by the old id and seeded
+under the new one, and moves the stashed attention sessions and notifications to the new ids with
+`restoreClosedSession`. A workspace closed while hibernated keeps its terminal ids and skips this: its stored sessions
+are untouched and the normal wake-up restores them.
 
 This is a fresh lookup, not a cached one: whether the resume command ends up as `--resume <id>` or
 `--session-id <id>` depends on whether the JSONL transcript exists yet, which can change between the moment the
