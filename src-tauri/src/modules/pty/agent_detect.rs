@@ -72,7 +72,7 @@ pub enum Transition {
     },
     // Estado del agente
     Notification { message: String },
-    Stop { last_message: String },
+    Stop { tab_id: String, transcript_path: String, last_message: String },
     StopFailure { error_message: String },
     SessionEnd { reason: String },
     PermissionRequest { tool_name: String },
@@ -100,7 +100,7 @@ impl Transition {
                 AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None, prompt: Some(prompt) },
             Transition::Notification { message } =>
                 AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None, prompt: None },
-            Transition::Stop { last_message } =>
+            Transition::Stop { last_message, .. } =>
                 AgentSignal { id, kind: "Stop", agent: None, message: Some(last_message), tool_name: None, prompt: None },
             Transition::StopFailure { error_message } =>
                 AgentSignal { id, kind: "StopFailure", agent: None, message: Some(error_message), tool_name: None, prompt: None },
@@ -337,7 +337,11 @@ impl AgentDetector {
                     "[osc777] kex: Stop tab={tab_id} reason={reason} \
                      last_msg={last_message:?}"
                 );
-                emit(Transition::Stop { last_message });
+                emit(Transition::Stop {
+                    tab_id: tab_id.clone(),
+                    transcript_path: transcript_path.clone(),
+                    last_message,
+                });
                 self.status = Status::Idle;
             }
             "StopFailure" => {
@@ -602,7 +606,7 @@ mod tests {
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Duplicate UserPromptSubmit - always emits so JS can re-create session after ESC/CTRL+C
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { last_message: "".into() }]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { tab_id: "panel1".into(), transcript_path: "/tmp/transcript".into(), last_message: "".into() }]);
     }
 
     #[test]
@@ -685,7 +689,7 @@ mod tests {
     fn stays_armed_after_stop_ready_for_next_prompt() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { last_message: "".into() }]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { tab_id: "panel1".into(), transcript_path: "/tmp/transcript".into(), last_message: "".into() }]);
         // Stop leaves detector armed (Claude still running) - next prompt needs no auto-arm.
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Explicit shell exit (133;D) disarms.
