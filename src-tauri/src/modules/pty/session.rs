@@ -47,8 +47,7 @@ const READ_BUF: usize = 16 * 1024;
 const MAX_PENDING: usize = 4 * 1024 * 1024;
 // Hard reset (ESC c) + dim notice. Written verbatim into the stream when
 // we're forced to discard backlog.
-const OVERFLOW_NOTICE: &[u8] =
-    b"\x1bc\x1b[2m[kex: dropped output due to backpressure]\x1b[0m\r\n";
+const OVERFLOW_NOTICE: &[u8] = b"\x1bc\x1b[2m[kex: dropped output due to backpressure]\x1b[0m\r\n";
 
 pub struct Session {
     // Field drop order is intentional. Rust drops fields top-to-bottom:
@@ -105,7 +104,9 @@ struct ChildKillGuard {
 
 impl ChildKillGuard {
     fn new(killer: Box<dyn ChildKiller + Send + Sync>) -> Self {
-        Self { killer: Some(killer) }
+        Self {
+            killer: Some(killer),
+        }
     }
 
     fn disarm(&mut self) {
@@ -154,7 +155,15 @@ pub fn spawn(
     #[cfg(not(unix))]
     let ipc_path_opt: Option<&str> = None;
 
-    let cmd = shell_init::build_command(id, cwd, workspace, blocks, tab_id.clone(), ipc_path_opt, shell)?;
+    let cmd = shell_init::build_command(
+        id,
+        cwd,
+        workspace,
+        blocks,
+        tab_id.clone(),
+        ipc_path_opt,
+        shell,
+    )?;
 
     #[cfg(unix)]
     let ipc_guard = super::ipc::spawn_listener(
@@ -204,10 +213,8 @@ pub fn spawn(
         exited: exited.clone(),
     });
 
-    let pending: Arc<(Mutex<Vec<u8>>, Condvar)> = Arc::new((
-        Mutex::new(Vec::with_capacity(READ_BUF)),
-        Condvar::new(),
-    ));
+    let pending: Arc<(Mutex<Vec<u8>>, Condvar)> =
+        Arc::new((Mutex::new(Vec::with_capacity(READ_BUF)), Condvar::new()));
     let done = Arc::new(AtomicBool::new(false));
     let spawn_at = Instant::now();
 
@@ -230,49 +237,108 @@ pub fn spawn(
                     Ok(n) => {
                         if !logged_first {
                             logged_first = true;
-                            log::debug!("pty first byte after {}ms", spawn_at.elapsed().as_millis());
+                            log::debug!(
+                                "pty first byte after {}ms",
+                                spawn_at.elapsed().as_millis()
+                            );
                         }
                         agent_detect.process(&buf[..n], |t| {
                             // Shell readiness is orthogonal to agent detection (fires for
                             // every PTY, armed or not) - route it to its own event and skip
                             // the agent-signal plumbing below entirely.
                             if matches!(t, Transition::ShellReady) {
-                                let _ = app_reader.emit(SHELL_READY_EVENT, ShellReadyPayload { id });
+                                let _ =
+                                    app_reader.emit(SHELL_READY_EVENT, ShellReadyPayload { id });
                                 return;
                             }
                             // Events that carry session data - update store + emit meta to frontend
                             let session_data = match &t {
-                                Transition::SessionStart { tab_id, agent, session_id, transcript_path, cwd, session_title, model, .. } => {
-                                    Some((tab_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), session_title.clone(), model.clone()))
-                                }
-                                Transition::UserPromptSubmit { tab_id, agent, session_id, transcript_path, cwd, .. } => {
-                                    Some((tab_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), String::new(), String::new()))
-                                }
+                                Transition::SessionStart {
+                                    tab_id,
+                                    agent,
+                                    session_id,
+                                    transcript_path,
+                                    cwd,
+                                    session_title,
+                                    model,
+                                    ..
+                                } => Some((
+                                    tab_id.clone(),
+                                    agent.clone(),
+                                    session_id.clone(),
+                                    transcript_path.clone(),
+                                    cwd.clone(),
+                                    session_title.clone(),
+                                    model.clone(),
+                                )),
+                                Transition::UserPromptSubmit {
+                                    tab_id,
+                                    agent,
+                                    session_id,
+                                    transcript_path,
+                                    cwd,
+                                    ..
+                                } => Some((
+                                    tab_id.clone(),
+                                    agent.clone(),
+                                    session_id.clone(),
+                                    transcript_path.clone(),
+                                    cwd.clone(),
+                                    String::new(),
+                                    String::new(),
+                                )),
                                 _ => None,
                             };
-                            if let Some((tab_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
-                                let launch_known = session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd, true);
-                                let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
-                                    tab_id: &tab_id,
-                                    session_id: &session_id,
-                                    cwd_launch: &cwd,
-                                    session_title: &session_title,
-                                    model: &model,
-                                    launch_known,
-                                });
+                            if let Some((
+                                tab_id,
+                                agent,
+                                session_id,
+                                transcript_path,
+                                cwd,
+                                session_title,
+                                model,
+                            )) = session_data
+                            {
+                                let launch_known = session_store::record_session(
+                                    &tab_id,
+                                    &agent,
+                                    &session_id,
+                                    &transcript_path,
+                                    &cwd,
+                                    true,
+                                );
+                                let _ = app_reader.emit(
+                                    AGENT_SESSION_META_EVENT,
+                                    AgentSessionMetaPayload {
+                                        tab_id: &tab_id,
+                                        session_id: &session_id,
+                                        cwd_launch: &cwd,
+                                        session_title: &session_title,
+                                        model: &model,
+                                        launch_known,
+                                    },
+                                );
                                 // SessionStart has no frontend handler - skip emitting to kex:agent-signal
                                 if matches!(t, Transition::SessionStart { .. }) {
                                     return;
                                 }
                                 // UserPromptSubmit continues to emit below
                             }
-                            if let Transition::Stop { tab_id, transcript_path, .. } = &t {
+                            if let Transition::Stop {
+                                tab_id,
+                                transcript_path,
+                                ..
+                            } = &t
+                            {
                                 live_model::emit_live_model(&app_reader, tab_id, transcript_path);
                             }
                             // Stash launch command for record_session (called on SessionStart IPC).
                             if let Transition::Started { ref cmd_string, .. } = t {
                                 if !cmd_string.is_empty() {
-                                    session_store::stash_cmd(&tab_id_for_reader, cmd_string.clone());
+                                    session_store::stash_cmd(
+                                        &tab_id_for_reader,
+                                        cmd_string.clone(),
+                                    );
                                 }
                             }
                             // The agent is gone: a command stashed for a launch that never reached

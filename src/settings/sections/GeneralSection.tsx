@@ -35,6 +35,8 @@ export function GeneralSection() {
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
   const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
   const [opencodeInstalling, setOpencodeInstalling] = useState(false);
+  const [ompReady, setOmpReady] = useState<boolean | null>(null);
+  const [ompInstalling, setOmpInstalling] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,6 +53,9 @@ export function GeneralSection() {
     invoke<boolean>("agent_opencode_plugin_status")
       .then((on) => alive && setOpencodeReady(on))
       .catch(() => alive && setOpencodeReady(null));
+    invoke<boolean>("agent_omp_extension_status")
+      .then((on) => alive && setOmpReady(on))
+      .catch(() => alive && setOmpReady(null));
     return () => {
       alive = false;
     };
@@ -85,6 +90,19 @@ export function GeneralSection() {
       setOpencodeReady(false);
     } finally {
       setOpencodeInstalling(false);
+    }
+  };
+
+  const onInstallOmp = async () => {
+    setOmpInstalling(true);
+    try {
+      await invoke("agent_setup_omp");
+      setOmpReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_omp failed:", e);
+      setOmpReady(false);
+    } finally {
+      setOmpInstalling(false);
     }
   };
 
@@ -270,6 +288,48 @@ export function GeneralSection() {
         {opencodeReady === false && (
           <p className="text-[11px] text-destructive">
             Could not write the OpenCode plugin.
+          </p>
+        )}
+        <SettingRow
+          title={
+            <span className="flex items-center gap-1.5">
+              OMP integration
+              {ompReady !== null && (
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-normal",
+                    ompReady ? "text-green-500" : "text-destructive",
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={ompReady ? CheckmarkCircle02Icon : CancelCircleIcon}
+                    size={12}
+                    strokeWidth={2}
+                  />
+                  {ompReady ? "Installed" : "Not installed"}
+                </span>
+              )}
+            </span>
+          }
+          description={
+            ompReady
+              ? "The Kex extension is active: Kex restores your OMP sessions and notifies you in the tab bar when OMP needs input or finishes. File: ~/.omp/agent/extensions/kex-agent-status.ts."
+              : "Install the Kex extension so OMP reports its sessions to Kex: your OMP sessions are restored when you reopen it and the tab bar shows attention and finish signals. Writes ~/.omp/agent/extensions/kex-agent-status.ts."
+          }
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-[11px]"
+            disabled={ompInstalling || ompReady === null}
+            onClick={() => void onInstallOmp()}
+          >
+            {ompInstalling ? "Installing..." : ompReady ? "Reinstall" : "Install"}
+          </Button>
+        </SettingRow>
+        {ompReady === false && (
+          <p className="text-[11px] text-destructive">
+            Could not write the OMP extension.
           </p>
         )}
       </div>

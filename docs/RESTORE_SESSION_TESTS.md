@@ -388,6 +388,43 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 - [ ] Con una sesion grabada en `dir-a`, lanzar `opencode --session '<ses_id>'` desde `dir-b`
 - [ ] Esperado: el record de la sesion sigue intacto y la proxima restauracion usa el `cwd_launch` grabado (el plugin no sobreescribe: esta silencio por 39711)
 
+## Bloque G - OMP
+
+Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el campanazo
+> "Install OMP integration" (o Settings > General > OMP integration) antes de empezar.
+
+### G1 La extension carga sin config extra
+
+- [ ] Clicar el campanazo > "Install OMP integration"
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-omp-v1` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
+- [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
+
+### G2 La sesion nueva se graba con agent omp
+
+- [ ] Lanzar `omp` en un terminal de Kex y escribir un prompt
+- [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "omp"`, `session_id` UUID, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "omp"` (grabado por OSC 133;C)
+- [ ] El icono del tab aparece sin la strike de "launch unknown"
+- [ ] Mientras el agente trabaja el spinner gira; generar una peticion de permiso (una accion de fichero en modo seguro): el tab muestra la atencion
+
+### G3 Restore del tab cerrado
+
+- [ ] Cerrar el tab de la sesion y reabrir Kex
+- [ ] Esperado: Kex escribe `omp --resume '<uuid>'` (con los flags conservados si el lanzamiento lo tenia) en el directorio grabado
+- [ ] El preview "Run on start" del tab muestra el mismo comando antes de cerrar
+
+### G4 Resume por prefijo del id
+
+- [ ] Lanzar `omp` fresco en Kex y reanudar una sesion previa con `omp --resume <prefijo-de-id>`
+- [ ] Esperado: el evento `before_agent_start` con el id completo actualiza la entrada del tab (mismo `session_id`; `same_process` no aplica porque omp no comunica el origen, pero la sustitucion del record es indolora: mismo id y cwd)
+- [ ] Nota: no midas aqui el estado de atencion en vivo del TUI reanudado antes del primer prompt; omp no da evento de sesion al arrancar/resume, Kex solo graba al primer turno
+
+### G5 Una sesion que nunca (se) abre fichero
+
+- [ ] Quedar en un tab donde `omp` corre en modo no interactivo `omp -p "hola"` (print mode: no se graba)
+- [ ] Esperado: `agent-sessions.json` sin entrada para ese tab
+- [ ] Y: borrar a mano el `.jsonl` de una sesion grabada y reabrir Kex: el scan ya no encuentra fichero, no hay plan (nada que resumir) y la entrada del store sigue ahi (no se purga nunca)
+
 ---
 
 ## Checklist de diagnostico rapido (en caso de que no restaure)

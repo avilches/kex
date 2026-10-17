@@ -22,7 +22,11 @@ pub struct WindowGeometry {
 
 impl Default for WindowGeometry {
     fn default() -> Self {
-        Self { width: 1280, height: 800, maximized: false }
+        Self {
+            width: 1280,
+            height: 800,
+            maximized: false,
+        }
     }
 }
 
@@ -127,7 +131,10 @@ struct DiskCache {
 /// Workspace ids are used verbatim as filenames; reject anything that could
 /// escape the workspaces directory or otherwise be an unsafe path component.
 fn is_safe_id(id: &str) -> bool {
-    !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    !id.is_empty()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// Atomic write: `.tmp` then rename so a crash can't leave a half-written file.
@@ -182,7 +189,9 @@ impl WindowStateManager {
     /// Delete any `*.json` / leftover `*.tmp` in the workspaces dir whose id is
     /// not referenced by the index. Recovers space after crashes mid-write.
     fn gc_orphans(ws_dir: &Path, referenced: &HashSet<String>) {
-        let Ok(rd) = std::fs::read_dir(ws_dir) else { return };
+        let Ok(rd) = std::fs::read_dir(ws_dir) else {
+            return;
+        };
         for entry in rd.flatten() {
             let path = entry.path();
             let ext = path.extension().and_then(|e| e.to_str());
@@ -286,7 +295,11 @@ impl WindowStateManager {
     /// plus the small index file, then deletes bodies no longer referenced.
     /// Each file is written atomically (`.tmp` then rename).
     pub fn save(&self) {
-        let state = self.inner.read().expect("window state lock poisoned").clone();
+        let state = self
+            .inner
+            .read()
+            .expect("window state lock poisoned")
+            .clone();
         let ws_dir = self.workspaces_dir();
         let _ = std::fs::create_dir_all(&ws_dir);
 
@@ -308,7 +321,9 @@ impl WindowStateManager {
                     }
                     ids.push(id.to_string());
                     referenced.insert(id.to_string());
-                    let Ok(json) = serde_json::to_string_pretty(body) else { continue };
+                    let Ok(json) = serde_json::to_string_pretty(body) else {
+                        continue;
+                    };
                     if disk.written.get(id) != Some(&json)
                         && write_atomic(&ws_dir.join(format!("{id}.json")), &json)
                     {
@@ -371,20 +386,35 @@ impl WindowStateManager {
     }
 
     pub fn window_order(&self) -> Vec<String> {
-        self.inner.read().expect("window state lock poisoned").window_order.clone()
+        self.inner
+            .read()
+            .expect("window state lock poisoned")
+            .window_order
+            .clone()
     }
 
     pub fn set_focused_window(&self, label: &str) {
-        self.inner.write().expect("window state lock poisoned").focused_window =
-            Some(label.to_string());
+        self.inner
+            .write()
+            .expect("window state lock poisoned")
+            .focused_window = Some(label.to_string());
     }
 
     pub fn get_focused_window(&self) -> Option<String> {
-        self.inner.read().expect("window state lock poisoned").focused_window.clone()
+        self.inner
+            .read()
+            .expect("window state lock poisoned")
+            .focused_window
+            .clone()
     }
 
     pub fn get_entry(&self, label: &str) -> Option<WindowEntry> {
-        self.inner.read().expect("window state lock poisoned").windows.get(label).cloned()
+        self.inner
+            .read()
+            .expect("window state lock poisoned")
+            .windows
+            .get(label)
+            .cloned()
     }
 
     pub fn add_window(&self, label: String) {
@@ -418,7 +448,11 @@ impl WindowStateManager {
     pub fn update_geometry(&self, label: &str, width: u32, height: u32, maximized: bool) {
         let mut state = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = state.windows.get_mut(label) {
-            entry.geometry = WindowGeometry { width, height, maximized };
+            entry.geometry = WindowGeometry {
+                width,
+                height,
+                maximized,
+            };
         }
     }
 
@@ -428,7 +462,11 @@ impl WindowStateManager {
             _ => "left".to_string(),
         };
         let width = state.width.clamp(12, 70);
-        let sanitized = SidebarState { open: state.open, side, width };
+        let sanitized = SidebarState {
+            open: state.open,
+            side,
+            width,
+        };
         let mut guard = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = guard.windows.get_mut(label) {
             entry.sidebar = Some(sanitized);
@@ -463,7 +501,9 @@ impl WindowStateManager {
 /// Uses low bits of Unix timestamp XOR'd with subsecond nanos for low collision probability.
 pub fn generate_window_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let d = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let v = (d.as_secs() as u32) ^ d.subsec_nanos();
     format!("w-{:08x}", v)
 }
@@ -713,8 +753,7 @@ mod tests {
     #[test]
     fn sidebar_with_legacy_view_key_still_deserializes() {
         let sb: SidebarState =
-            serde_json::from_str(r#"{"open":true,"view":"git","side":"left","width":20}"#)
-                .unwrap();
+            serde_json::from_str(r#"{"open":true,"view":"git","side":"left","width":20}"#).unwrap();
         assert!(sb.open);
         assert_eq!(sb.width, 20);
     }
@@ -804,8 +843,14 @@ mod tests {
         mgr.update_groups(
             "w-1",
             vec![
-                WorkspaceGroupEntry { id: "grp-a".to_string(), label: "Group A".to_string() },
-                WorkspaceGroupEntry { id: "grp-b".to_string(), label: "Group B".to_string() },
+                WorkspaceGroupEntry {
+                    id: "grp-a".to_string(),
+                    label: "Group A".to_string(),
+                },
+                WorkspaceGroupEntry {
+                    id: "grp-b".to_string(),
+                    label: "Group B".to_string(),
+                },
             ],
         );
         mgr.save();
@@ -825,7 +870,10 @@ mod tests {
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.update_groups(
             "w-ghost",
-            vec![WorkspaceGroupEntry { id: "grp-a".to_string(), label: "A".to_string() }],
+            vec![WorkspaceGroupEntry {
+                id: "grp-a".to_string(),
+                label: "A".to_string(),
+            }],
         );
         assert!(mgr.get_entry("w-ghost").is_none());
     }
@@ -866,11 +914,18 @@ mod tests {
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.add_window("w-main".to_string());
         mgr.add_window("w-small".to_string());
-        mgr.update_workspace("w-main", ws_with_tabs(&[("tab-a", "terminal"), ("tab-b", "editor")]), 0);
+        mgr.update_workspace(
+            "w-main",
+            ws_with_tabs(&[("tab-a", "terminal"), ("tab-b", "editor")]),
+            0,
+        );
         mgr.update_workspace("w-small", ws_with_tabs(&[("tab-c", "terminal")]), 0);
 
         let ids = mgr.terminal_tab_ids();
-        assert_eq!(ids, HashSet::from(["tab-a".to_string(), "tab-c".to_string()]));
+        assert_eq!(
+            ids,
+            HashSet::from(["tab-a".to_string(), "tab-c".to_string()])
+        );
     }
 
     #[test]

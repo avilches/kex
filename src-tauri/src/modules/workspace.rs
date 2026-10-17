@@ -77,7 +77,9 @@ impl WorkspaceRegistry {
     /// of the repo was explicitly authorized.
     pub fn has_child_authorized(&self, root: &Path) -> bool {
         let lru = self.roots.lock().expect("workspace registry poisoned");
-        lru.entries.iter().any(|r| r.starts_with(root) && r.as_path() != root)
+        lru.entries
+            .iter()
+            .any(|r| r.starts_with(root) && r.as_path() != root)
     }
 
     pub fn canonicalize_cached<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
@@ -804,20 +806,16 @@ mod auth_tests {
 
     #[test]
     fn validate_spawn_cwd_accepts_none() {
-        assert!(
-            validate_spawn_cwd(None, &WorkspaceEnv::Local)
-                .unwrap()
-                .is_none()
-        );
+        assert!(validate_spawn_cwd(None, &WorkspaceEnv::Local)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
     fn validate_spawn_cwd_accepts_empty_string() {
-        assert!(
-            validate_spawn_cwd(Some("   "), &WorkspaceEnv::Local)
-                .unwrap()
-                .is_none()
-        );
+        assert!(validate_spawn_cwd(Some("   "), &WorkspaceEnv::Local)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -825,13 +823,19 @@ mod auth_tests {
         let dir = tempdir("validate-ok");
         let s = dir.to_string_lossy().into_owned();
         let reg = WorkspaceRegistry::default();
-        assert!(!reg.is_authorized(&dir), "registry must be empty before validate");
+        assert!(
+            !reg.is_authorized(&dir),
+            "registry must be empty before validate"
+        );
         let resolved = validate_spawn_cwd(Some(&s), &WorkspaceEnv::Local)
             .expect("valid dir accepted")
             .expect("returned canonical");
         assert_eq!(resolved, dir);
         // validate must not register anything
-        assert!(!reg.is_authorized(&dir), "registry must still be empty after validate");
+        assert!(
+            !reg.is_authorized(&dir),
+            "registry must still be empty after validate"
+        );
     }
 
     #[test]
@@ -845,11 +849,8 @@ mod auth_tests {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
-        let err = validate_spawn_cwd(
-            Some(&missing.to_string_lossy()),
-            &WorkspaceEnv::Local,
-        )
-        .expect_err("missing path must fail");
+        let err = validate_spawn_cwd(Some(&missing.to_string_lossy()), &WorkspaceEnv::Local)
+            .expect_err("missing path must fail");
         assert!(err.contains("cwd not accessible"), "got: {err}");
     }
 
@@ -857,8 +858,7 @@ mod auth_tests {
     fn spawn_cwd_or_home_keeps_valid_dir() {
         let dir = tempdir("spawn-orhome-ok");
         let s = dir.to_string_lossy().into_owned();
-        let (spawn, canonical) =
-            spawn_cwd_or_home(Some(s.clone()), &WorkspaceEnv::Local);
+        let (spawn, canonical) = spawn_cwd_or_home(Some(s.clone()), &WorkspaceEnv::Local);
         assert_eq!(spawn, Some(s));
         assert_eq!(canonical, Some(dir));
     }
@@ -884,10 +884,7 @@ mod auth_tests {
 
     #[test]
     fn spawn_cwd_or_home_passes_through_empty() {
-        assert_eq!(
-            spawn_cwd_or_home(None, &WorkspaceEnv::Local),
-            (None, None)
-        );
+        assert_eq!(spawn_cwd_or_home(None, &WorkspaceEnv::Local), (None, None));
         assert_eq!(
             spawn_cwd_or_home(Some("  ".to_owned()), &WorkspaceEnv::Local),
             (None, None)
@@ -925,7 +922,10 @@ mod auth_tests {
         let _ = reg.authorize(&sub).unwrap();
         // authorize canonicalizes the path; query must be canonical too
         let canonical_tmp = fs::canonicalize(tmp.path()).unwrap();
-        assert!(reg.has_child_authorized(&canonical_tmp), "parent of authorized path should be accepted");
+        assert!(
+            reg.has_child_authorized(&canonical_tmp),
+            "parent of authorized path should be accepted"
+        );
     }
 
     #[test]
@@ -934,7 +934,10 @@ mod auth_tests {
         let tmp = tempfile::tempdir().unwrap();
         let canonical_tmp = fs::canonicalize(tmp.path()).unwrap();
         let _ = reg.authorize(&canonical_tmp).unwrap();
-        assert!(!reg.has_child_authorized(&canonical_tmp), "exact match is not a child");
+        assert!(
+            !reg.has_child_authorized(&canonical_tmp),
+            "exact match is not a child"
+        );
     }
 
     #[test]
@@ -947,7 +950,10 @@ mod auth_tests {
         std::fs::create_dir_all(&sub_b).unwrap();
         let _ = reg.authorize(&sub_a).unwrap();
         let canonical_b = fs::canonicalize(&sub_b).unwrap();
-        assert!(!reg.has_child_authorized(&canonical_b), "sibling should not match");
+        assert!(
+            !reg.has_child_authorized(&canonical_b),
+            "sibling should not match"
+        );
     }
 }
 
@@ -977,13 +983,22 @@ mod appimage_tests {
         let env = reader(&[
             ("LD_LIBRARY_PATH", "/tmp/.mount_Kex_X/usr/lib:/usr/lib"),
             ("PATH", "/tmp/.mount_Kex_X/usr/bin:/usr/bin:/bin"),
-            ("GST_PLUGIN_SYSTEM_PATH", "/tmp/.mount_Kex_X/usr/lib/gstreamer-1.0"),
+            (
+                "GST_PLUGIN_SYSTEM_PATH",
+                "/tmp/.mount_Kex_X/usr/lib/gstreamer-1.0",
+            ),
             ("APPDIR", "/tmp/.mount_Kex_X"),
         ]);
         let out = compute_appimage_env_overrides(appdir, env);
 
-        assert_eq!(find(&out, "LD_LIBRARY_PATH"), Some(&Some(OsString::from("/usr/lib"))));
-        assert_eq!(find(&out, "PATH"), Some(&Some(OsString::from("/usr/bin:/bin"))));
+        assert_eq!(
+            find(&out, "LD_LIBRARY_PATH"),
+            Some(&Some(OsString::from("/usr/lib")))
+        );
+        assert_eq!(
+            find(&out, "PATH"),
+            Some(&Some(OsString::from("/usr/bin:/bin")))
+        );
         // Only an APPDIR entry, so the var is removed entirely.
         assert_eq!(find(&out, "GST_PLUGIN_SYSTEM_PATH"), Some(&None));
         assert_eq!(find(&out, "APPDIR"), Some(&None));
@@ -1007,9 +1022,16 @@ mod appimage_tests {
     fn unsets_value_vars_only_when_pointing_into_appdir() {
         let appdir = Path::new("/tmp/.mount_Kex_X");
         let into = reader(&[("LD_PRELOAD", "/tmp/.mount_Kex_X/usr/lib/x.so")]);
-        assert_eq!(find(&compute_appimage_env_overrides(appdir, into), "LD_PRELOAD"), Some(&None));
+        assert_eq!(
+            find(&compute_appimage_env_overrides(appdir, into), "LD_PRELOAD"),
+            Some(&None)
+        );
 
         let outside = reader(&[("FONTCONFIG_FILE", "/etc/fonts/fonts.conf")]);
-        assert!(find(&compute_appimage_env_overrides(appdir, outside), "FONTCONFIG_FILE").is_none());
+        assert!(find(
+            &compute_appimage_env_overrides(appdir, outside),
+            "FONTCONFIG_FILE"
+        )
+        .is_none());
     }
 }

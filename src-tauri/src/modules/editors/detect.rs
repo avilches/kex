@@ -1,4 +1,4 @@
-use crate::modules::editors::catalog::{EditorEntry, is_jetbrains, is_macos_open_only, CATALOG};
+use crate::modules::editors::catalog::{is_jetbrains, is_macos_open_only, EditorEntry, CATALOG};
 use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
@@ -41,7 +41,11 @@ pub(crate) fn which_binary(name: &str) -> Option<String> {
         return None;
     }
     let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if path.is_empty() { None } else { Some(path) }
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
 }
 
 // ---- macOS ------------------------------------------------------------------
@@ -71,7 +75,9 @@ fn find_app_by_bundle_id_in_dirs(bundle_id: &str) -> Option<String> {
     let needle = format!("<string>{}</string>", bundle_id);
     let needle_setapp = format!("<string>{}-setapp</string>", bundle_id);
     for dir in &dirs {
-        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("app") {
@@ -167,7 +173,14 @@ fn resolve_launch_macos(entry: &EditorEntry, app_path: &str) -> Option<(String, 
 
     // General case: prefer CLI in PATH, fall back to `open -a`
     if let Some(cli) = which_binary(entry.cli_binary) {
-        return Some((cli, entry.args_before_path.iter().map(|s| s.to_string()).collect()));
+        return Some((
+            cli,
+            entry
+                .args_before_path
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ));
     }
 
     // Fall back to `open -a "<App Name>.app"`
@@ -175,7 +188,10 @@ fn resolve_launch_macos(entry: &EditorEntry, app_path: &str) -> Option<(String, 
         .file_stem()
         .and_then(|s| s.to_str())
         .map(str::to_string)?;
-    Some(("open".to_string(), vec!["-a".to_string(), format!("{}.app", app_name)]))
+    Some((
+        "open".to_string(),
+        vec!["-a".to_string(), format!("{}.app", app_name)],
+    ))
 }
 
 #[cfg(target_os = "macos")]
@@ -204,8 +220,7 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
     }
 
     let binary = if is_jetbrains(entry.id) {
-        jetbrains_toolbox_path_linux(entry.cli_binary)
-            .or_else(|| which_binary(entry.cli_binary))?
+        jetbrains_toolbox_path_linux(entry.cli_binary).or_else(|| which_binary(entry.cli_binary))?
     } else {
         which_binary(entry.cli_binary)?
     };
@@ -214,7 +229,11 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
         id: entry.id.to_string(),
         name: entry.name.to_string(),
         binary,
-        args_before_path: entry.args_before_path.iter().map(|s| s.to_string()).collect(),
+        args_before_path: entry
+            .args_before_path
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
     })
 }
 
@@ -253,7 +272,11 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
         id: entry.id.to_string(),
         name: entry.name.to_string(),
         binary,
-        args_before_path: entry.args_before_path.iter().map(|s| s.to_string()).collect(),
+        args_before_path: entry
+            .args_before_path
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
     })
 }
 
@@ -271,7 +294,11 @@ fn where_binary(name: &str) -> Option<String> {
         .map(str::trim)
         .find(|l| !l.is_empty())
         .map(str::to_string)?;
-    if path.is_empty() { None } else { Some(path) }
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -309,7 +336,11 @@ fn detect_via_which(entry: &EditorEntry) -> Option<DetectedEditor> {
         id: entry.id.to_string(),
         name: entry.name.to_string(),
         binary,
-        args_before_path: entry.args_before_path.iter().map(|s| s.to_string()).collect(),
+        args_before_path: entry
+            .args_before_path
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
     })
 }
 
@@ -321,7 +352,8 @@ mod tests {
 
     #[test]
     fn extract_first_app_path_returns_first_line() {
-        let output = "/Applications/Visual Studio Code.app\n/Applications/Visual Studio Code 2.app\n";
+        let output =
+            "/Applications/Visual Studio Code.app\n/Applications/Visual Studio Code 2.app\n";
         assert_eq!(
             extract_first_app_path(output),
             Some("/Applications/Visual Studio Code.app".to_string())

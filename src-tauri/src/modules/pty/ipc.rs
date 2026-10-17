@@ -154,7 +154,9 @@ fn parse_background_subagents(v: &serde_json::Value) -> Vec<BackgroundSubagent> 
     };
     tasks
         .iter()
-        .filter(|t| t["type"].as_str() == Some("subagent") && t["status"].as_str() == Some("running"))
+        .filter(|t| {
+            t["type"].as_str() == Some("subagent") && t["status"].as_str() == Some("running")
+        })
         .filter_map(|t| {
             Some(BackgroundSubagent {
                 id: t["id"].as_str()?.to_string(),
@@ -206,27 +208,27 @@ fn parse_payload(json: &str) -> Option<Payload> {
     let event = v["hook_event_name"].as_str()?.to_string();
     Some(Payload {
         event,
-        session_id:      v["session_id"].as_str().unwrap_or("").to_string(),
+        session_id: v["session_id"].as_str().unwrap_or("").to_string(),
         transcript_path: v["transcript_path"].as_str().unwrap_or("").to_string(),
-        cwd:             v["cwd"].as_str().unwrap_or("").to_string(),
-        agent:           v["agent"].as_str().map(str::to_string),
-        source:          v["source"].as_str().map(str::to_string),
-        session_title:   v["sessionTitle"].as_str().map(str::to_string),
-        model:           v["model"].as_str().map(str::to_string),
-        reason:          v["reason"].as_str().map(str::to_string),
-        prompt:          v["prompt"].as_str().map(str::to_string),
-        notif_message:   v["message"].as_str().map(str::to_string),
-        notif_type:      v["notification_type"].as_str().map(str::to_string),
-        stop_reason:     v["stop_reason"].as_str().map(str::to_string),
-        last_message:    v["last_assistant_message"].as_str().map(str::to_string),
+        cwd: v["cwd"].as_str().unwrap_or("").to_string(),
+        agent: v["agent"].as_str().map(str::to_string),
+        source: v["source"].as_str().map(str::to_string),
+        session_title: v["sessionTitle"].as_str().map(str::to_string),
+        model: v["model"].as_str().map(str::to_string),
+        reason: v["reason"].as_str().map(str::to_string),
+        prompt: v["prompt"].as_str().map(str::to_string),
+        notif_message: v["message"].as_str().map(str::to_string),
+        notif_type: v["notification_type"].as_str().map(str::to_string),
+        stop_reason: v["stop_reason"].as_str().map(str::to_string),
+        last_message: v["last_assistant_message"].as_str().map(str::to_string),
         background_subagents: parse_background_subagents(&v),
-        agent_id:        v["agent_id"].as_str().map(str::to_string),
-        agent_type:      v["agent_type"].as_str().map(str::to_string),
-        error_message:   v["error_message"].as_str().map(str::to_string),
-        tool_name:       v["tool_name"].as_str().map(str::to_string),
-        is_final:        v["final"].as_bool().unwrap_or(false),
-        turn_id:         v["turn_id"].as_str().map(str::to_string),
-        delta:           v["delta"].as_str().map(str::to_string),
+        agent_id: v["agent_id"].as_str().map(str::to_string),
+        agent_type: v["agent_type"].as_str().map(str::to_string),
+        error_message: v["error_message"].as_str().map(str::to_string),
+        tool_name: v["tool_name"].as_str().map(str::to_string),
+        is_final: v["final"].as_bool().unwrap_or(false),
+        turn_id: v["turn_id"].as_str().map(str::to_string),
+        delta: v["delta"].as_str().map(str::to_string),
     })
 }
 
@@ -294,12 +296,19 @@ fn drain_file(path: &Path, tab_id: &str, on_line: &mut impl FnMut(&str)) {
         }
     };
 
-    let lines: Vec<&str> = contents.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    let lines: Vec<&str> = contents
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
     if !lines.is_empty() {
         for line in &lines {
             on_line(line);
         }
-        log::debug!("[ipc] drained {} spooled event(s) for tab={tab_id}", lines.len());
+        log::debug!(
+            "[ipc] drained {} spooled event(s) for tab={tab_id}",
+            lines.len()
+        );
     }
 
     if let Err(e) = std::fs::remove_file(path) {
@@ -325,7 +334,10 @@ pub fn spawn_listener(
         Ok(l) => l,
         Err(e) => {
             log::warn!("[ipc] bind {:?} failed: {e}", socket_path);
-            return IpcGuard { path: socket_path, shutdown };
+            return IpcGuard {
+                path: socket_path,
+                shutdown,
+            };
         }
     };
     // bind() creates the socket file honoring the process umask, which on a
@@ -342,7 +354,10 @@ pub fn spawn_listener(
     {
         log::warn!("[ipc] failed to spawn listener thread: {e}");
     }
-    IpcGuard { path: socket_path, shutdown }
+    IpcGuard {
+        path: socket_path,
+        shutdown,
+    }
 }
 
 /// True when a spooled line is a `SessionEnd`/`StopFailure` notification: a
@@ -419,21 +434,41 @@ fn reports_agent_cwd(event: &str, cwd: &str) -> bool {
     !cwd.is_empty() && !matches!(event, "SessionEnd" | "SubagentStart" | "SubagentStop")
 }
 
+// Agents that only report their identity on SessionStart (or whose first lifecycle
+// event races it) still reach the frontend first: every signal carries the frame's
+// agent so the session the UI creates is never mistagged as "claude".
+fn agent_signal(id: u32, kind: &str, agent: Option<&str>) -> serde_json::Value {
+    serde_json::json!({
+        "id":       id,
+        "kind":     kind,
+        "agent":    agent.unwrap_or("claude"),
+        "message":  null,
+        "toolName": null,
+        "prompt":   null,
+    })
+}
+
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
-        log::debug!("[ipc] invalid JSON: {}", truncate_for_log(json, MAX_LOG_FIELD_LEN));
+        log::debug!(
+            "[ipc] invalid JSON: {}",
+            truncate_for_log(json, MAX_LOG_FIELD_LEN)
+        );
         return;
     };
     if reports_agent_cwd(&p.event, &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
-        let _ = app.emit(AGENT_CWD_EVENT, serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }));
+        let _ = app.emit(
+            AGENT_CWD_EVENT,
+            serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }),
+        );
     }
     match p.event.as_str() {
         "SessionStart" => {
-            let source        = p.source.as_deref().unwrap_or("");
+            let source = p.source.as_deref().unwrap_or("");
             let session_title = p.session_title.as_deref().unwrap_or("");
-            let model         = p.model.as_deref().unwrap_or("");
-            let agent         = p.agent.as_deref().unwrap_or("claude");
+            let model = p.model.as_deref().unwrap_or("");
+            let agent = p.agent.as_deref().unwrap_or("claude");
             log::debug!(
                 "[ipc] SessionStart tab={tab_id} agent={agent} session={} \
                  source={source} title={session_title:?} model={model:?}",
@@ -441,30 +476,34 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let same_process = matches!(source, "clear" | "compact" | "resume");
             let launch_known = session_store::record_session(
-                tab_id, agent, &p.session_id, &p.transcript_path, &p.cwd, same_process,
+                tab_id,
+                agent,
+                &p.session_id,
+                &p.transcript_path,
+                &p.cwd,
+                same_process,
             );
-            let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
-                "tabId":          tab_id,
-                "sessionId":      p.session_id,
-                "agent":          agent,
-                "cwdLaunch":      p.cwd,
-                "sessionTitle":   session_title,
-                "model":          model,
-                "transcriptPath": p.transcript_path,
-                "launchKnown":    launch_known,
-            }));
+            let _ = app.emit(
+                AGENT_SESSION_META_EVENT,
+                serde_json::json!({
+                    "tabId":          tab_id,
+                    "sessionId":      p.session_id,
+                    "agent":          agent,
+                    "cwdLaunch":      p.cwd,
+                    "sessionTitle":   session_title,
+                    "model":          model,
+                    "transcriptPath": p.transcript_path,
+                    "launchKnown":    launch_known,
+                }),
+            );
         }
         "SessionEnd" => {
             let reason = p.reason.as_deref().unwrap_or("");
             log::debug!("[ipc] SessionEnd tab={tab_id} reason={reason}");
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":      pty_id,
-                "kind":    "SessionEnd",
-                "agent":   null,
-                "message": null,
-                "toolName": null,
-                "prompt":  null,
-            }));
+            let _ = app.emit(
+                AGENT_EVENT,
+                agent_signal(pty_id, "SessionEnd", p.agent.as_deref()),
+            );
         }
         "UserPromptSubmit" => {
             let prompt = p.prompt.as_deref().unwrap_or("");
@@ -473,14 +512,9 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 p.session_id,
                 truncate_for_log(prompt, MAX_LOG_FIELD_LEN)
             );
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "UserPromptSubmit",
-                "agent":    null,
-                "prompt":   prompt,
-                "message":  null,
-                "toolName": null,
-            }));
+            let mut sig = agent_signal(pty_id, "UserPromptSubmit", p.agent.as_deref());
+            sig["prompt"] = prompt.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         "Notification" => {
             let notif_type = p.notif_type.as_deref().unwrap_or("");
@@ -497,18 +531,13 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "[ipc] Notification tab={tab_id} type={notif_type:?} msg={:?}",
                 truncate_for_log(msg, MAX_LOG_FIELD_LEN)
             );
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "Notification",
-                "agent":    null,
-                "message":  msg,
-                "toolName": null,
-                "prompt":   null,
-            }));
+            let mut sig = agent_signal(pty_id, "Notification", p.agent.as_deref());
+            sig["message"] = msg.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
-            let last   = p.last_message.as_deref().unwrap_or("");
+            let last = p.last_message.as_deref().unwrap_or("");
             log::debug!(
                 "[ipc] Stop tab={tab_id} reason={reason} last={:?}",
                 truncate_for_log(last, MAX_LOG_FIELD_LEN)
@@ -516,21 +545,18 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             let subagents: Vec<serde_json::Value> = p
                 .background_subagents
                 .iter()
-                .map(|s| serde_json::json!({
-                    "id":          s.id,
-                    "agentType":   s.agent_type,
-                    "description": s.description,
-                }))
+                .map(|s| {
+                    serde_json::json!({
+                        "id":          s.id,
+                        "agentType":   s.agent_type,
+                        "description": s.description,
+                    })
+                })
                 .collect();
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "Stop",
-                "agent":    null,
-                "message":  last,
-                "toolName": null,
-                "prompt":   null,
-                "backgroundSubagents": subagents,
-            }));
+            let mut sig = agent_signal(pty_id, "Stop", p.agent.as_deref());
+            sig["message"] = last.into();
+            sig["backgroundSubagents"] = subagents.into();
+            let _ = app.emit(AGENT_EVENT, sig);
             live_model::emit_live_model(app, tab_id, &p.transcript_path);
         }
         "StopFailure" => {
@@ -539,62 +565,44 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "[ipc] StopFailure tab={tab_id} err={:?}",
                 truncate_for_log(err, MAX_LOG_FIELD_LEN)
             );
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "StopFailure",
-                "agent":    null,
-                "message":  err,
-                "toolName": null,
-                "prompt":   null,
-            }));
+            let mut sig = agent_signal(pty_id, "StopFailure", p.agent.as_deref());
+            sig["message"] = err.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         "PermissionRequest" => {
             let tool = p.tool_name.as_deref().unwrap_or("");
             log::debug!("[ipc] PermissionRequest tab={tab_id} tool={tool}");
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "PermissionRequest",
-                "agent":    null,
-                "message":  null,
-                "toolName": tool,
-                "prompt":   null,
-            }));
+            let mut sig = agent_signal(pty_id, "PermissionRequest", p.agent.as_deref());
+            sig["toolName"] = tool.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         "SubagentStart" | "SubagentStop" => {
             let Some(agent_id) = p.agent_id.as_deref() else {
                 return;
             };
             let agent_type = p.agent_type.as_deref().unwrap_or("");
-            log::debug!("[ipc] {} tab={tab_id} agent={agent_id} type={agent_type}", p.event);
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":        pty_id,
-                "kind":      p.event,
-                "agent":     null,
-                "message":   null,
-                "toolName":  null,
-                "prompt":    null,
-                "agentId":   agent_id,
-                "agentType": agent_type,
-            }));
+            log::debug!(
+                "[ipc] {} tab={tab_id} agent={agent_id} type={agent_type}",
+                p.event
+            );
+            let mut sig = agent_signal(pty_id, &p.event, p.agent.as_deref());
+            sig["agentId"] = agent_id.into();
+            sig["agentType"] = agent_type.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         "MessageDisplay" => {
             if !p.is_final {
                 return;
             }
-            let delta   = p.delta.as_deref().unwrap_or("");
+            let delta = p.delta.as_deref().unwrap_or("");
             let turn_id = p.turn_id.as_deref().unwrap_or("");
             log::debug!(
                 "[ipc] MessageDisplay tab={tab_id} turn={turn_id} delta={:?}",
                 truncate_for_log(delta, MAX_LOG_FIELD_LEN)
             );
-            let _ = app.emit(AGENT_EVENT, serde_json::json!({
-                "id":       pty_id,
-                "kind":     "MessageDisplay",
-                "agent":    null,
-                "message":  delta,
-                "toolName": null,
-                "prompt":   null,
-            }));
+            let mut sig = agent_signal(pty_id, "MessageDisplay", p.agent.as_deref());
+            sig["message"] = delta.into();
+            let _ = app.emit(AGENT_EVENT, sig);
         }
         other => {
             log::debug!("[ipc] unhandled event {other} from tab={tab_id}");
@@ -605,6 +613,23 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn agent_signal_carries_the_frame_agent() {
+        let sig = agent_signal(7, "Stop", Some("omp"));
+        assert_eq!(sig["agent"], "omp");
+        assert_eq!(sig["id"], 7);
+        assert_eq!(sig["kind"], "Stop");
+        assert_eq!(sig["message"], serde_json::Value::Null);
+        assert_eq!(sig["toolName"], serde_json::Value::Null);
+        assert_eq!(sig["prompt"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn agent_signal_falls_back_to_claude() {
+        let sig = agent_signal(1, "UserPromptSubmit", None);
+        assert_eq!(sig["agent"], "claude");
+    }
 
     #[test]
     fn socket_path_for_id_is_short_enough() {
@@ -649,7 +674,12 @@ mod tests {
         child.wait().unwrap();
         let orphan = socket_file_name(dead, 1);
         let live = socket_file_name(std::process::id(), 1);
-        for name in [orphan.as_str(), live.as_str(), "kex-ipc-5.sock", "notes.txt"] {
+        for name in [
+            orphan.as_str(),
+            live.as_str(),
+            "kex-ipc-5.sock",
+            "notes.txt",
+        ] {
             std::fs::write(dir.path().join(name), b"").unwrap();
         }
         sweep_orphaned_sockets(dir.path());
@@ -693,7 +723,10 @@ mod tests {
         // an even max, which happens to fall on a char boundary by coincidence).
         let s = "€".repeat(300);
         let truncated = truncate_for_log(&s, 250);
-        assert_eq!(truncated.chars().count(), 250 + "...(50 more)".chars().count());
+        assert_eq!(
+            truncated.chars().count(),
+            250 + "...(50 more)".chars().count()
+        );
     }
 
     #[test]
@@ -703,7 +736,10 @@ mod tests {
 
         let dir = owned_runtime_subdir(base.path(), uid);
         let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o700, "runtime subdir must be owner-only, got {mode:o}");
+        assert_eq!(
+            mode, 0o700,
+            "runtime subdir must be owner-only, got {mode:o}"
+        );
     }
 
     #[test]
@@ -724,7 +760,9 @@ mod tests {
     #[test]
     fn spawn_listener_leaves_the_socket_file_owner_only() {
         let base = tempfile::tempdir().unwrap();
-        let socket_path = base.path().join(format!("kex-test-perms-{}.sock", std::process::id()));
+        let socket_path = base
+            .path()
+            .join(format!("kex-test-perms-{}.sock", std::process::id()));
 
         // Use a Tauri-less path: bind directly the way spawn_listener does,
         // without going through the full AppHandle machinery this test has
@@ -733,7 +771,11 @@ mod tests {
         std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600)).unwrap();
         drop(listener);
 
-        let mode = std::fs::metadata(&socket_path).unwrap().permissions().mode() & 0o777;
+        let mode = std::fs::metadata(&socket_path)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
     }
 
@@ -743,7 +785,10 @@ mod tests {
         let path = dir.join(format!("kex-test-guard-{}.sock", std::process::id()));
         std::fs::write(&path, b"").unwrap();
         assert!(path.exists());
-        let guard = IpcGuard { path: path.clone(), shutdown: Arc::new(AtomicBool::new(false)) };
+        let guard = IpcGuard {
+            path: path.clone(),
+            shutdown: Arc::new(AtomicBool::new(false)),
+        };
         drop(guard);
         assert!(!path.exists());
     }
@@ -772,7 +817,10 @@ mod tests {
         // Give the thread a moment to reach accept() before we try to wake it.
         thread::sleep(std::time::Duration::from_millis(50));
 
-        let guard = IpcGuard { path: path.clone(), shutdown };
+        let guard = IpcGuard {
+            path: path.clone(),
+            shutdown,
+        };
         drop(guard);
 
         let joined = {
@@ -783,7 +831,10 @@ mod tests {
             });
             rx.recv_timeout(std::time::Duration::from_secs(2)).is_ok()
         };
-        assert!(joined, "listener thread did not exit after guard was dropped");
+        assert!(
+            joined,
+            "listener thread did not exit after guard was dropped"
+        );
         assert!(!path.exists());
     }
 
@@ -942,7 +993,10 @@ mod tests {
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
         assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
-        assert!(!path.exists(), "spool file should be removed after a full drain");
+        assert!(
+            !path.exists(),
+            "spool file should be removed after a full drain"
+        );
     }
 
     #[test]
@@ -1042,13 +1096,20 @@ mod tests {
     fn stale_spooled_event_kind_flags_session_end_and_stop_failure() {
         let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
         let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
-        assert_eq!(stale_spooled_event_kind(session_end).as_deref(), Some("SessionEnd"));
-        assert_eq!(stale_spooled_event_kind(stop_failure).as_deref(), Some("StopFailure"));
+        assert_eq!(
+            stale_spooled_event_kind(session_end).as_deref(),
+            Some("SessionEnd")
+        );
+        assert_eq!(
+            stale_spooled_event_kind(stop_failure).as_deref(),
+            Some("StopFailure")
+        );
     }
 
     #[test]
     fn stale_spooled_event_kind_is_none_for_other_events_and_invalid_json() {
-        let session_start = r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
+        let session_start =
+            r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
         assert_eq!(stale_spooled_event_kind(session_start), None);
         assert_eq!(stale_spooled_event_kind("not json"), None);
     }
@@ -1065,7 +1126,8 @@ mod tests {
         let path = spool_path_for_tab(dir.path(), tab_id);
         let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
         let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
-        let session_start = r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
+        let session_start =
+            r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
         let notification = r#"{"hook_event_name":"Notification","session_id":"s","transcript_path":"","cwd":"","message":"hi","notification_type":"other"}"#;
         std::fs::write(
             &path,

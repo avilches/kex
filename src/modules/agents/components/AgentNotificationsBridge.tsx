@@ -214,7 +214,7 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
         isTabSeen(ctx, session.workspaceId, tabId),
       );
       store.setStatus(tabId, outcome);
-      if (outcome === "attention") route(session, "attention", ctx);
+      if (outcome === "attention") route(session, "attention", ctx, sig.message ?? undefined);
       return;
     }
     case "SubagentStart": {

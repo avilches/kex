@@ -90,7 +90,17 @@ pub async fn fs_search(
     }
 
     tauri::async_runtime::spawn_blocking(move || {
-        search_blocking(&root_path, &root, &q, cap, depth, &workspace, show_hidden, gen, my_gen)
+        search_blocking(
+            &root_path,
+            &root,
+            &q,
+            cap,
+            depth,
+            &workspace,
+            show_hidden,
+            gen,
+            my_gen,
+        )
     })
     .await
     .map_err(|e| e.to_string())?

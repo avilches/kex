@@ -38,12 +38,15 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v7";
 //   SubagentStop:       agent_id, agent_type
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
-// OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, so the
-// integration ships as a static script instead of merged settings. agent_opencode_plugin_status
-// greps the version marker to notice an outdated install. It carries no uninstall: without
-// Kex's env vars the plugin does nothing.
+// OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, and OMP/Pi
+// every one in ~/.omp/agent/extensions/ and ~/.pi/agent/extensions/, so the analogue
+// integrations ship as static scripts instead of merged settings. agent_opencode_plugin_status
+// and agent_omp_extension_status grep the installed file for a version
+// marker so an outdated install can be detected (the updater only re-writes it).
 const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v1";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
+const OMP_EXTENSION_VERSION: &str = "kex-omp-v1";
+const OMP_EXTENSION_SCRIPT: &str = include_str!("plugins/kex-agent-status.ts");
 
 // All 10 events handled by trigger-event.sh in v7.
 const SESSION_HOOK_EVENTS: [&str; 10] = [
@@ -143,7 +146,9 @@ fn merge_hooks(mut root: Value) -> Value {
         }
         let arr = arr.as_array_mut().unwrap();
         // Remove old-style notify hooks and any prior session hook before adding v4.
-        arr.retain(|group| !is_session_hook(group) && !is_old_notify(group) && !is_empty_group(group));
+        arr.retain(|group| {
+            !is_session_hook(group) && !is_old_notify(group) && !is_empty_group(group)
+        });
         arr.push(json!({
             "hooks": [ { "type": "command", "command": session_hook_cmd(), "timeout": 10 } ]
         }));
@@ -154,7 +159,10 @@ fn merge_hooks(mut root: Value) -> Value {
 fn existing_config(contents: Option<&str>, path: &std::path::Path) -> Result<Value, String> {
     match contents {
         Some(s) if !s.trim().is_empty() => serde_json::from_str::<Value>(s).map_err(|e| {
-            format!("{} is not valid JSON ({e}); refusing to overwrite", path.display())
+            format!(
+                "{} is not valid JSON ({e}); refusing to overwrite",
+                path.display()
+            )
         }),
         _ => Ok(json!({})),
     }
@@ -204,7 +212,11 @@ pub fn agent_enable_claude_hooks() -> Result<(), String> {
     };
 
     let existing = existing_config(
-        if existing_str.is_empty() { None } else { Some(&existing_str) },
+        if existing_str.is_empty() {
+            None
+        } else {
+            Some(&existing_str)
+        },
         &path,
     )?;
     let merged = merge_hooks(existing.clone());
@@ -238,7 +250,11 @@ pub fn agent_disable_claude_hooks() -> Result<(), String> {
         Err(e) => return Err(format!("read {}: {e}", path.display())),
     };
     let existing = existing_config(
-        if existing_str.is_empty() { None } else { Some(&existing_str) },
+        if existing_str.is_empty() {
+            None
+        } else {
+            Some(&existing_str)
+        },
         &path,
     )?;
     let cleaned = remove_hooks(existing.clone());
@@ -261,6 +277,32 @@ pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
     session_store::detach_session(&tab_id)
 }
 
+fn write_agent_file(
+    path: std::path::PathBuf,
+    script: &str,
+    label: &str,
+    tmp_ext: &str,
+) -> Result<(), String> {
+    // Same content already there: leave the file alone so repeated installs never touch it.
+    if std::fs::read_to_string(&path).is_ok_and(|current| current == script) {
+        return Ok(());
+    }
+    let dir = path
+        .parent()
+        .ok_or_else(|| format!("{label} path has no parent"))?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    let tmp = path.with_extension(tmp_ext);
+    std::fs::write(&tmp, script).map_err(|e| format!("write {label} tmp: {e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename into {}: {e}", path.display())
+    })
+}
+
+fn agent_file_has_version(path: std::path::PathBuf, version: &str) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|content| content.contains(version))
+}
+
 fn opencode_plugin_path() -> Result<std::path::PathBuf, String> {
     let root = match std::env::var("OPENCODE_CONFIG_DIR") {
         Ok(v) if !v.is_empty() => std::path::PathBuf::from(v),
@@ -272,32 +314,49 @@ fn opencode_plugin_path() -> Result<std::path::PathBuf, String> {
     Ok(root.join("plugins").join("opencode-session.js"))
 }
 
+fn omp_extension_path() -> Result<std::path::PathBuf, String> {
+    dirs::home_dir()
+        .map(|home| {
+            home.join(".omp")
+                .join("agent")
+                .join("extensions")
+                .join("kex-agent-status.ts")
+        })
+        .ok_or_else(|| "could not resolve home dir".to_string())
+}
+
 #[tauri::command]
 pub fn agent_setup_opencode() -> Result<(), String> {
-    let path = opencode_plugin_path()?;
-    // Same content already there: leave the file alone so repeated installs never touch it.
-    if std::fs::read_to_string(&path).is_ok_and(|current| current == OPENCODE_PLUGIN_SCRIPT) {
-        return Ok(());
-    }
-    let dir = path
-        .parent()
-        .ok_or_else(|| "opencode plugin path has no parent".to_string())?;
-    std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
-    let tmp = path.with_extension("js.kex-tmp");
-    std::fs::write(&tmp, OPENCODE_PLUGIN_SCRIPT)
-        .map_err(|e| format!("write opencode plugin tmp: {e}"))?;
-    std::fs::rename(&tmp, &path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("rename into {}: {e}", path.display())
-    })
+    write_agent_file(
+        opencode_plugin_path()?,
+        OPENCODE_PLUGIN_SCRIPT,
+        "opencode plugin",
+        "js.kex-tmp",
+    )
 }
 
 #[tauri::command]
 pub fn agent_opencode_plugin_status() -> bool {
     opencode_plugin_path()
         .ok()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .is_some_and(|content| content.contains(OPENCODE_PLUGIN_VERSION))
+        .is_some_and(|p| agent_file_has_version(p, OPENCODE_PLUGIN_VERSION))
+}
+
+#[tauri::command]
+pub fn agent_setup_omp() -> Result<(), String> {
+    write_agent_file(
+        omp_extension_path()?,
+        OMP_EXTENSION_SCRIPT,
+        "omp extension",
+        "ts.kex-tmp",
+    )
+}
+
+#[tauri::command]
+pub fn agent_omp_extension_status() -> bool {
+    omp_extension_path()
+        .ok()
+        .is_some_and(|p| agent_file_has_version(p, OMP_EXTENSION_VERSION))
 }
 
 #[tauri::command]
@@ -350,8 +409,7 @@ fn detect_json_indent(s: &str) -> usize {
 }
 
 fn serialize_pretty(value: &Value, indent: usize) -> Result<String, String> {
-    let raw = serde_json::to_string_pretty(value)
-        .map_err(|e| format!("serialize: {e}"))?;
+    let raw = serde_json::to_string_pretty(value).map_err(|e| format!("serialize: {e}"))?;
     if indent == 2 {
         return Ok(raw);
     }
@@ -405,8 +463,14 @@ mod tests {
             let arr = out["hooks"][event].as_array().unwrap();
             assert!(!arr.is_empty(), "{event} missing");
             let cmd = arr[0]["hooks"][0]["command"].as_str().unwrap();
-            assert!(cmd.contains(SESSION_HOOK_MARKER), "{event} cmd missing marker");
-            assert!(cmd.contains("trigger-event.sh"), "{event} cmd missing trigger-event.sh");
+            assert!(
+                cmd.contains(SESSION_HOOK_MARKER),
+                "{event} cmd missing marker"
+            );
+            assert!(
+                cmd.contains("trigger-event.sh"),
+                "{event} cmd missing trigger-event.sh"
+            );
             let timeout = arr[0]["hooks"][0]["timeout"].as_u64().unwrap();
             assert_eq!(timeout, 10, "{event} timeout should be 10");
         }
@@ -452,13 +516,36 @@ mod tests {
         let out = merge_hooks(input);
         // Each event: foreign hook preserved at index 0, session hook appended.
         assert_eq!(out["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
-        assert_eq!(out["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap(), "echo hello");
-        assert_eq!(out["hooks"]["UserPromptSubmit"].as_array().unwrap().len(), 2);
-        assert_eq!(out["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"].as_str().unwrap(), "echo world");
+        assert_eq!(
+            out["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+                .as_str()
+                .unwrap(),
+            "echo hello"
+        );
+        assert_eq!(
+            out["hooks"]["UserPromptSubmit"].as_array().unwrap().len(),
+            2
+        );
+        assert_eq!(
+            out["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+                .as_str()
+                .unwrap(),
+            "echo world"
+        );
         assert_eq!(out["hooks"]["Notification"].as_array().unwrap().len(), 2);
-        assert_eq!(out["hooks"]["Notification"][0]["hooks"][0]["command"].as_str().unwrap(), "echo notify");
+        assert_eq!(
+            out["hooks"]["Notification"][0]["hooks"][0]["command"]
+                .as_str()
+                .unwrap(),
+            "echo notify"
+        );
         assert_eq!(out["hooks"]["Stop"].as_array().unwrap().len(), 2);
-        assert_eq!(out["hooks"]["Stop"][0]["hooks"][0]["command"].as_str().unwrap(), "echo stop");
+        assert_eq!(
+            out["hooks"]["Stop"][0]["hooks"][0]["command"]
+                .as_str()
+                .unwrap(),
+            "echo stop"
+        );
     }
 
     #[test]
@@ -483,9 +570,16 @@ mod tests {
         // Old notify hooks must be gone; only session hook remains.
         for event in ["UserPromptSubmit", "Notification", "Stop"] {
             let arr = out["hooks"][event].as_array().unwrap();
-            assert_eq!(arr.len(), 1, "{event}: expected only session hook after replace");
+            assert_eq!(
+                arr.len(),
+                1,
+                "{event}: expected only session hook after replace"
+            );
             let cmd = arr[0]["hooks"][0]["command"].as_str().unwrap();
-            assert!(cmd.contains(SESSION_HOOK_MARKER), "{event}: missing session hook marker");
+            assert!(
+                cmd.contains(SESSION_HOOK_MARKER),
+                "{event}: missing session hook marker"
+            );
         }
     }
 }

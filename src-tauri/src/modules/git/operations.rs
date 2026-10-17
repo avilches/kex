@@ -298,14 +298,24 @@ pub fn diff_content(
         read_text_file(&worktree_path)?
     };
     let patch = diff_inner(&repo_root, Some(&rel_path), original_rel.as_deref(), staged)?;
-    let is_binary =
-        matches!(original, TextSource::Binary)
+    let is_binary = matches!(original, TextSource::Binary)
         || matches!(modified, TextSource::Binary)
-        || patch.diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
+        || patch
+            .diff_text
+            .lines()
+            .any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
-        original_content: if is_binary { String::new() } else { original.into_text() },
-        modified_content: if is_binary { String::new() } else { modified.into_text() },
+        original_content: if is_binary {
+            String::new()
+        } else {
+            original.into_text()
+        },
+        modified_content: if is_binary {
+            String::new()
+        } else {
+            modified.into_text()
+        },
         is_binary,
         fallback_patch: patch.diff_text,
         truncated: patch.truncated,
@@ -365,12 +375,7 @@ pub fn unstage(
     if !looks_like_no_head(&output) {
         return ensure_success(&output, "git reset failed");
     }
-    let mut rm_args: Vec<OsString> = vec![
-        "rm".into(),
-        "--cached".into(),
-        "-r".into(),
-        "--".into(),
-    ];
+    let mut rm_args: Vec<OsString> = vec!["rm".into(), "--cached".into(), "-r".into(), "--".into()];
     for p in &resolved {
         rm_args.push(p.clone().into());
     }
@@ -817,14 +822,23 @@ pub fn commit_file_diff(
         Err(e) => String::from_utf8_lossy(&e.into_bytes()).into_owned(),
     };
 
-    let is_binary =
-        matches!(original, TextSource::Binary)
+    let is_binary = matches!(original, TextSource::Binary)
         || matches!(modified, TextSource::Binary)
-        || patch_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
+        || patch_text
+            .lines()
+            .any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
-        original_content: if is_binary { String::new() } else { original.into_text() },
-        modified_content: if is_binary { String::new() } else { modified.into_text() },
+        original_content: if is_binary {
+            String::new()
+        } else {
+            original.into_text()
+        },
+        modified_content: if is_binary {
+            String::new()
+        } else {
+            modified.into_text()
+        },
         is_binary,
         fallback_patch: patch_text,
         truncated: patch_output.truncated,
@@ -892,7 +906,12 @@ pub fn list_branches(
     let remote_out = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["branch", "-r", "--format=%(refname:short)\t%(committerdate:unix)", "--no-color"],
+        [
+            "branch",
+            "-r",
+            "--format=%(refname:short)\t%(committerdate:unix)",
+            "--no-color",
+        ],
         DEFAULT_TIMEOUT_SECS,
     )?;
 
@@ -961,7 +980,11 @@ pub fn list_branches(
         let is_current = parts.next().map(|s| s.trim() == "*").unwrap_or(false);
         let upstream = parts.next().and_then(|s| {
             let s = s.trim();
-            if s.is_empty() { None } else { Some(s.to_string()) }
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
         });
         let (ahead, behind) = parts
             .next()
@@ -971,7 +994,11 @@ pub fn list_branches(
             .next()
             .and_then(|s| s.trim().parse::<i64>().ok())
             .filter(|&t| t > 0);
-        let worktree = if is_current { None } else { branch_to_wt.get(name).cloned() };
+        let worktree = if is_current {
+            None
+        } else {
+            branch_to_wt.get(name).cloned()
+        };
         branches.push(GitBranchInfo {
             name: name.to_string(),
             is_current,
@@ -1055,7 +1082,12 @@ pub fn checkout_branch(
     let has_local_ref = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")],
+        [
+            "show-ref",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{branch}"),
+        ],
         DEFAULT_TIMEOUT_SECS,
     )?
     .exit_code
@@ -1254,8 +1286,16 @@ fn apply_numstat_by_path(files: &mut [GitCommitFileChange], bytes: &[u8]) {
         let removed_raw = cols.next().unwrap_or("0");
         let inline_path = cols.next().unwrap_or("");
         let is_binary = added_raw == "-" && removed_raw == "-";
-        let added: u32 = if is_binary { 0 } else { added_raw.parse().unwrap_or(0) };
-        let removed: u32 = if is_binary { 0 } else { removed_raw.parse().unwrap_or(0) };
+        let added: u32 = if is_binary {
+            0
+        } else {
+            added_raw.parse().unwrap_or(0)
+        };
+        let removed: u32 = if is_binary {
+            0
+        } else {
+            removed_raw.parse().unwrap_or(0)
+        };
 
         let path = if inline_path.is_empty() {
             // Rename case: next two tokens are new_path then old_path
@@ -1345,12 +1385,11 @@ pub fn mv(
     }
     ensure_git_available(&cwd.workspace)?;
 
-    let repo_info = resolve_repo_in_authorized(registry, &cwd)?.ok_or_else(|| {
-        GitError::CommandFailed {
+    let repo_info =
+        resolve_repo_in_authorized(registry, &cwd)?.ok_or_else(|| GitError::CommandFailed {
             context: "not a git repository",
             detail: from.to_string(),
-        }
-    })?;
+        })?;
 
     let root_resolved = canonical_dir(registry, &repo_info.repo_root, &cwd.workspace)?;
     let to_path = resolve_path(to, workspace);
@@ -1413,10 +1452,10 @@ pub fn get_worktree_status(
     }
 
     let main_path = paths.first().map(|s| s.as_str()).unwrap_or("");
-    let repo_canonical = std::fs::canonicalize(repo_root)
-        .unwrap_or_else(|_| std::path::PathBuf::from(repo_root));
-    let main_canonical = std::fs::canonicalize(main_path)
-        .unwrap_or_else(|_| std::path::PathBuf::from(main_path));
+    let repo_canonical =
+        std::fs::canonicalize(repo_root).unwrap_or_else(|_| std::path::PathBuf::from(repo_root));
+    let main_canonical =
+        std::fs::canonicalize(main_path).unwrap_or_else(|_| std::path::PathBuf::from(main_path));
 
     if repo_canonical == main_canonical {
         return Ok(GitWorktreeStatus {
@@ -1453,8 +1492,8 @@ pub fn list_worktrees(
     )?;
     ensure_success(&output, "git worktree list failed")?;
 
-    let repo_canonical = std::fs::canonicalize(&repo.local_path)
-        .unwrap_or_else(|_| repo.local_path.clone());
+    let repo_canonical =
+        std::fs::canonicalize(&repo.local_path).unwrap_or_else(|_| repo.local_path.clone());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1600,16 +1639,36 @@ mod tests {
         assert!(!looks_like_no_head(&mk("fatal: pathspec did not match")));
     }
 
-    use std::process::Command as Cmd;
     use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
+    use std::process::Command as Cmd;
 
     fn git_init_with_commit(dir: &std::path::Path) {
-        Cmd::new("git").arg("init").current_dir(dir).status().unwrap();
-        Cmd::new("git").args(["config", "user.email", "t@t.com"]).current_dir(dir).status().unwrap();
-        Cmd::new("git").args(["config", "user.name", "T"]).current_dir(dir).status().unwrap();
+        Cmd::new("git")
+            .arg("init")
+            .current_dir(dir)
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["config", "user.email", "t@t.com"])
+            .current_dir(dir)
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["config", "user.name", "T"])
+            .current_dir(dir)
+            .status()
+            .unwrap();
         std::fs::write(dir.join("a.txt"), b"hello").unwrap();
-        Cmd::new("git").args(["add", "a.txt"]).current_dir(dir).status().unwrap();
-        Cmd::new("git").args(["commit", "-m", "init"]).current_dir(dir).status().unwrap();
+        Cmd::new("git")
+            .args(["add", "a.txt"])
+            .current_dir(dir)
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(dir)
+            .status()
+            .unwrap();
     }
 
     #[test]
@@ -1634,7 +1693,10 @@ mod tests {
             .output()
             .unwrap();
         let status = String::from_utf8_lossy(&output.stdout);
-        assert!(status.contains("R "), "expected staged rename, got: {status}");
+        assert!(
+            status.contains("R "),
+            "expected staged rename, got: {status}"
+        );
     }
 
     #[test]
@@ -1743,7 +1805,10 @@ mod tests {
         assert!(!branches.is_empty(), "expected at least one branch");
         let current = branches.iter().find(|b| b.is_current);
         assert!(current.is_some(), "expected a branch marked as current");
-        assert!(!current.unwrap().is_remote, "current branch should not be remote");
+        assert!(
+            !current.unwrap().is_remote,
+            "current branch should not be remote"
+        );
     }
 
     #[test]
@@ -1763,7 +1828,10 @@ mod tests {
         let branches = super::list_branches(&registry, &root, &WorkspaceEnv::Local).unwrap();
 
         let names: Vec<&str> = branches.iter().map(|b| b.name.as_str()).collect();
-        assert!(names.contains(&"feature"), "expected feature branch, got: {names:?}");
+        assert!(
+            names.contains(&"feature"),
+            "expected feature branch, got: {names:?}"
+        );
         let feature = branches.iter().find(|b| b.name == "feature").unwrap();
         assert!(feature.is_current, "feature should be current");
     }
@@ -1837,19 +1905,34 @@ mod tests {
             .output()
             .unwrap();
         let list = String::from_utf8_lossy(&branches.stdout);
-        let names: Vec<&str> = list.lines().map(|l| l.trim_start_matches('*').trim()).collect();
-        assert!(!names.contains(&"login"), "should not have created a spurious 'login' branch, got: {list}");
+        let names: Vec<&str> = list
+            .lines()
+            .map(|l| l.trim_start_matches('*').trim())
+            .collect();
+        assert!(
+            !names.contains(&"login"),
+            "should not have created a spurious 'login' branch, got: {list}"
+        );
     }
 
     #[test]
     fn checkout_branch_creates_tracking_branch_for_remote_ref() {
         let remote_dir = tempfile::tempdir().unwrap();
-        Cmd::new("git").args(["init", "--bare"]).current_dir(remote_dir.path()).status().unwrap();
+        Cmd::new("git")
+            .args(["init", "--bare"])
+            .current_dir(remote_dir.path())
+            .status()
+            .unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         git_init_with_commit(dir.path());
         Cmd::new("git")
-            .args(["remote", "add", "origin", &remote_dir.path().to_string_lossy()])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                &remote_dir.path().to_string_lossy(),
+            ])
             .current_dir(dir.path())
             .status()
             .unwrap();
@@ -1858,10 +1941,26 @@ mod tests {
             .current_dir(dir.path())
             .status()
             .unwrap();
-        Cmd::new("git").args(["push", "origin", "other"]).current_dir(dir.path()).status().unwrap();
-        Cmd::new("git").args(["checkout", "main"]).current_dir(dir.path()).status().unwrap();
-        Cmd::new("git").args(["branch", "-D", "other"]).current_dir(dir.path()).status().unwrap();
-        Cmd::new("git").args(["fetch", "origin"]).current_dir(dir.path()).status().unwrap();
+        Cmd::new("git")
+            .args(["push", "origin", "other"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["checkout", "main"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["branch", "-D", "other"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["fetch", "origin"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
 
         let registry = WorkspaceRegistry::default();
         registry.authorize(dir.path()).unwrap();
@@ -1924,7 +2023,10 @@ mod tests {
             .output()
             .unwrap();
         let list = String::from_utf8_lossy(&branches.stdout);
-        assert!(!list.contains('x'), "orphan branch must not have been created, got: {list}");
+        assert!(
+            !list.contains('x'),
+            "orphan branch must not have been created, got: {list}"
+        );
     }
 
     #[test]
@@ -2022,7 +2124,11 @@ mod tests {
 
         let marker = dir.path().join("pwned-marker");
         let script = dir.path().join("pwn.sh");
-        std::fs::write(&script, format!("#!/bin/sh\ntouch \"{}\"\nexit 1\n", marker.display())).unwrap();
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\ntouch \"{}\"\nexit 1\n", marker.display()),
+        )
+        .unwrap();
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let registry = WorkspaceRegistry::default();
@@ -2114,12 +2220,15 @@ mod workspace_auth_tests {
 #[cfg(test)]
 mod binary_detection_tests {
     fn is_binary_patch(diff_text: &str) -> bool {
-        diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"))
+        diff_text
+            .lines()
+            .any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"))
     }
 
     #[test]
     fn patch_binary_marker_detected() {
-        let patch = "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
+        let patch =
+            "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
         assert!(is_binary_patch(patch));
     }
 
@@ -2131,7 +2240,8 @@ mod binary_detection_tests {
 
     #[test]
     fn lfs_comment_not_false_positive() {
-        let patch = "@@ -1,1 +1,1 @@\n-Binary files are stored in LFS\n+Binary files are tracked in LFS\n";
+        let patch =
+            "@@ -1,1 +1,1 @@\n-Binary files are stored in LFS\n+Binary files are tracked in LFS\n";
         assert!(!is_binary_patch(patch));
     }
 }

@@ -297,8 +297,7 @@ mod tests {
     // an entry with original_path == Some("").
     #[test]
     fn truncated_rename_without_orig_token_is_dropped() {
-        let parsed =
-            parse_porcelain_v2("2 R. N... 100644 100644 100644 abc def R100 new.rs\0");
+        let parsed = parse_porcelain_v2("2 R. N... 100644 100644 100644 abc def R100 new.rs\0");
         assert!(parsed.files.is_empty());
     }
 
@@ -306,9 +305,7 @@ mod tests {
     // not produce a nameless entry; surrounding valid entries still parse.
     #[test]
     fn ordinary_with_empty_path_is_dropped() {
-        let parsed = parse_porcelain_v2(
-            "1 .M N... 100644 100644 100644 abc def \0? ok.rs\0",
-        );
+        let parsed = parse_porcelain_v2("1 .M N... 100644 100644 100644 abc def \0? ok.rs\0");
         assert_eq!(parsed.files.len(), 1);
         assert_eq!(parsed.files[0].path, "ok.rs");
     }

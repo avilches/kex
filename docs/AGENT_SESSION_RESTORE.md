@@ -33,7 +33,8 @@ static plugin script to `<opencode config dir>/plugins/opencode-session.js` (`~/
 is no Settings toggle and no uninstall: without Kex's per-terminal env vars the plugin does nothing. `agent_opencode_plugin_status`
 greps the installed file for a version marker so an outdated install offers the button again. The same install button
 lives in Settings > General (OpenCode integration row), install-only: it reinstalls the current plugin file when the
-installed one is already current.
+installed one is already current. OMP is wired the same way (`agent_setup_omp`, "Install OMP integration" in the
+bell popover and an OMP integration row in Settings > General, install-only, `agent_omp_extension_status`).
 
 ### KEX_TAB_ID
 
@@ -134,6 +135,28 @@ restored tabs, not recordings.
 The OSC/`AgentDetector` layer still detects plain `opencode` invocations like any other agent (loaded via
 `DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal and the capture of the launch line.
 
+### OMP extension
+
+OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
+`~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships
+`plugins/kex-agent-status.ts` (`agent::OMP_EXTENSION_SCRIPT`, marker `kex-omp-v1`, embedded with `include_str!` and
+written atomically by `agent_setup_omp`). The extension computes nothing about sessions itself: it translates the
+runtime's lifecycle events into the frames Claude Code's hooks emit (`before_agent_start`/`agent_start` into
+`SessionStart` once per session id plus `UserPromptSubmit`; `tool_approval_requested` into `PermissionRequest`;
+`message_end` caches the assistant text and `agent_end`/`agent_settled` into `Stop` carrying it). Agent_end with
+`willContinue` is skipped, exactly like OMP's continuation markers. Frames go on the `KEX_IPC` socket (1 s send
+cap, silent failure), session ids come from `ctx.sessionManager.getSessionId()` and every send is gated on
+`KEX_IPC` + `KEX_TAB_ID`, so a bare `omp` run is untouched. Child processes inheriting a parent's environment may
+load the extension again; the first loader asserts itself with `KEX_AGENT_STATUS_OWNED` (pid).
+
+Pi does not use this file: its install ( TASK-842) will bring its own marker and `agent: pi` frames. Exam format
+measured on omp 18.11.3: resume is `omp --resume` (id, prefix or path, picker when no value); sessions are
+`~/.omp/agent/sessions/<cwd-encoded>/<timestamp>_<id>.jsonl`, whose line 2 is the `session` header
+(`{type:"session", version, id, timestamp, cwd}`) after a `title` line; `agent.db` is auth and history only.
+
+The OSC/`AgentDetector` layer still detects plain `omp` invocations like any other agent (loaded via
+`DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal and the capture of the launch line.
+
 ### Launch command capture
 
 The original CLI invocation is captured from `OSC 133;C;<cmd>` (the shell integration "command started" signal).
@@ -186,6 +209,9 @@ Anything it cannot resolve with certainty is not guessed, and what happens depen
 The process the shell runs is not a source for the command: a wrapper such as `claude-max` ends with `exec claude`,
 so the process shows a plain `claude` and its cleaned environment is gone.
 
+The stripping whitelists are empty for `omp`, so the stripped base collapses to the launcher (same repo-wide
+behavior as opencode, pinned by tests). `omp --resume` accepts id, prefix or path.
+
 ### CLAUDE_CONFIG_DIR support
 
 If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcripts under that directory instead of
@@ -231,7 +257,7 @@ Per-agent knowledge lives in one table: `src-tauri/src/modules/agent/provider.rs
 how the launch cwd is read back from a transcript, resume and reattach templates, missing-transcript policy, and the
 stripping whitelists). `session_store.rs` stays agent-agnostic: it owns the store file, the print-mode gate (still
 driven by `DEFAULT_AGENTS`) and the launch-line recognizer, but builds no commands itself. Rows today: `"claude"`,
-`"codex"` and `"opencode"`. A record whose agent has no provider row emits no plan: the planner logs a warning and prunes the
+`"codex"`, `"opencode"` and `"omp"`. A record whose agent has no provider row emits no plan: the planner logs a warning and prunes the
 record once its launch directory is usable (kept otherwise), so the store cannot fill with entries nothing can
 ever resume.
 
@@ -245,29 +271,38 @@ ever resume.
 
 For each session in the store:
 
-1. **Resolve the provider row** (`provider::Provider::of`); `claude`, `codex` and `opencode` exist today. A record of an agent
+1. **Resolve the provider row** (`provider::Provider::of`); `claude`, `codex`, `opencode` and `omp` exist today. A record of an agent
    with no row produces no plan and no command (see above).
 2. **Find the transcript.** Only providers with a sessions source do this; codex and opencode have none and jump straight
    to their resume template. OpenCode keeps its sessions in a SQLite database (Kex does not read it; the plugin
    supplies the session id and cwd directly), so there is nothing to seek on disk. Claude's source checks the stored `transcript_path` first, then scans
    `$CLAUDE_CONFIG_DIR/projects/**/<sessionId>.jsonl` (or `~/.claude/projects` when the override is unset).
+   OMP's source (`OmpSessions`) keeps the never-populated `transcript_path` shortcut for symmetry and scans
+   `~/.omp/agent/sessions/**/<timestamp>_<sessionId>.jsonl`, keeping the lexicographically latest file (names carry a
+   timestamp).
 3. **Transcript found - resume.** The launch cwd is read back with the row's cwd-read strategy (claude: if a
    `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its
    `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
-   the first `cwd` field, and `cwd_launch` from the store when the transcript has none). The command is the row's
+   the first `cwd` field, and `cwd_launch` from the store when the transcript has none. omp: the `cwd` of the
+   `session` header, JSONL line 2). The command is the row's
    resume template on top of the stripped launch line: `strip_for_resume_base(launch_cmd, agent) + --resume '<id>'`
-   (shell-quoted), or the plain `claude --resume '<id>'` when no launch command is known.
+   (shell-quoted), or the plain per-agent template when no launch command is known (`claude --resume '<id>'`,
+   `omp --resume '<id>'`).
 4. **Transcript missing - the row's missing-transcript policy decides.**
    - `Reattach` (claude): the session was opened but no message was ever sent (a transcript only appears on the
      first exchange). The plan is `strip_for_resume_base(...) + --session-id '<id>'` (or the plain template), which
      starts a new session reusing the same UUID, equivalent to rerunning the CLI with no `--resume`. The store
      entry is pruned once the directory check passes; if the new session produces messages, hooks re-record it with
      the new `transcript_path`.
-   - `ResumeAnyway` (codex, and opencode which likewise has no transcript source): the plan is `resume --last` on the
-     stripped launch line (or `codex resume --last`) for codex; opencode's template names the recorded id directly,
-     `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<id>'`, since its stripping
-     whitelists are empty). The entry is never pruned, because nothing re-records codex sessions in this store, and
-     the plugin is silent on the resumed session of an opencode TUI (anomalyco/opencode#39711).
+    - `ResumeAnyway` (codex, opencode and omp): the plan is `resume --last` on the
+      stripped launch line (or `codex resume --last`) for codex; opencode's template names the recorded id directly,
+      `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<ses id>'`,
+      since its stripping whitelists are empty); omp's is `launch base/launcher + --resume '<id>'`
+      (or the plain `omp --resume '<id>'`), which accepts id, prefix or path. For omp this branch is
+      reachable when its sessions root no longer holds the file (omp cleans nothing today, but a copy deleted
+      by the user is the case in point): without the file there is nothing to verify, the record is kept and no plan runs.
+      For codex/opencode the entry is never pruned, because nothing re-records codex sessions in this store, and
+      the plugin is silent on the resumed session of an opencode TUI (anomalyco/opencode#39711).
    - `Ignore` (reserved for providers whose sessions cannot be revived): no plan is emitted; the entry is pruned
      once its directory is usable.
 5. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable) *before* any

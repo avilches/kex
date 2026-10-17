@@ -58,7 +58,9 @@ pub fn list_shells() -> Vec<ShellInfo> {
 // Honor the override only if it matches an enumerated shell, so a tampered
 // setting can't spawn an arbitrary binary across the IPC boundary.
 fn sanitize_shell_override(shell: Option<String>) -> Option<String> {
-    let candidate = shell.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())?;
+    let candidate = shell
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())?;
     let target = std::fs::canonicalize(&candidate).ok();
     let allowed = list_shells().into_iter().any(|s| {
         s.path == candidate || (target.is_some() && std::fs::canonicalize(&s.path).ok() == target)
@@ -84,8 +86,7 @@ const ZSHRC_SCRIPT: &str = include_str!("scripts/zshrc.zsh");
 #[cfg(windows)]
 const FISH_INIT_SCRIPT: &str = include_str!("scripts/init.fish");
 #[cfg(unix)]
-const FISH_REINSTALL_PROMPT: &str =
-    "functions -q __kex_install_prompt; and __kex_install_prompt";
+const FISH_REINSTALL_PROMPT: &str = "functions -q __kex_install_prompt; and __kex_install_prompt";
 
 #[cfg(windows)]
 fn bashrc_script() -> &'static str {
@@ -352,7 +353,13 @@ mod unix {
         out
     }
 
-    pub fn build(cwd: Option<String>, blocks: bool, tab_id: Option<&str>, ipc_path: Option<&str>, shell_override: Option<String>) -> Result<CommandBuilder, String> {
+    pub fn build(
+        cwd: Option<String>,
+        blocks: bool,
+        tab_id: Option<&str>,
+        ipc_path: Option<&str>,
+        shell_override: Option<String>,
+    ) -> Result<CommandBuilder, String> {
         let (shell, shell_path) = Shell::resolve(shell_override);
         let mut cmd = CommandBuilder::new(&shell_path);
         super::apply_common(&mut cmd, cwd, blocks, tab_id, ipc_path);
@@ -450,7 +457,13 @@ mod unix {
             let dir = std::env::temp_dir().join(format!("kex-pwd-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             let mut cmd = portable_pty::CommandBuilder::new("sh");
-            super::super::apply_common(&mut cmd, Some(dir.to_string_lossy().into_owned()), false, None, None);
+            super::super::apply_common(
+                &mut cmd,
+                Some(dir.to_string_lossy().into_owned()),
+                false,
+                None,
+                None,
+            );
             std::fs::remove_dir_all(&dir).ok();
             assert_eq!(cmd.get_env("PWD"), Some(dir.as_os_str()));
         }
@@ -528,7 +541,9 @@ mod windows {
             zdotdir: String,
             user_zdotdir: Option<String>,
         },
-        Bash { rcfile: String },
+        Bash {
+            rcfile: String,
+        },
         Fish,
         None,
     }
@@ -1078,7 +1093,7 @@ fn which_in_path(name: &str) -> Option<PathBuf> {
 mod tests {
     use std::path::Path;
 
-    use super::{resolve_spawn_dir, spawn_dir_report, sanitize_shell_override};
+    use super::{resolve_spawn_dir, sanitize_shell_override, spawn_dir_report};
     use crate::modules::workspace::WorkspaceEnv;
 
     #[test]
@@ -1127,7 +1142,9 @@ mod tests {
 
     #[test]
     fn spawn_dir_report_passes_wsl_folder_through_and_skips_fallbacks() {
-        let wsl = WorkspaceEnv::Wsl { distro: "Ubuntu".into() };
+        let wsl = WorkspaceEnv::Wsl {
+            distro: "Ubuntu".into(),
+        };
         assert_eq!(
             spawn_dir_report(Some("/home/u/repo".into()), &wsl),
             Some("/home/u/repo".into())

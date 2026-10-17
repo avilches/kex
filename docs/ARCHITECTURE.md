@@ -192,9 +192,11 @@ The Unix socket (`kex-ipc-{pid}-{pty_id}.sock`, path in `KEX_IPC`; the Kex proce
 
 When an agent session is running at the time Kex closes, Kex offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a `✦` icon, and a status indicator (spinner while working, amber dot while waiting for input, nothing when idle). If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
 
-Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. All per-agent session knowledge (transcript source, cwd read-back, resume templates, missing-transcript policy, stripping whitelists) lives in one `Provider` table (`src-tauri/src/modules/agent/provider.rs`; `claude`, `codex` and `opencode` today), and `session_store.rs` consults it instead of hardcoding agents. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
+Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. All per-agent session knowledge (transcript source, cwd read-back, resume templates, missing-transcript policy, stripping whitelists) lives in one `Provider` table (`src-tauri/src/modules/agent/provider.rs`; `claude`, `codex`, `opencode` and `omp` today), and `session_store.rs` consults it instead of hardcoding agents. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
 
 **OpenCode.** It has no hook commands, so its integration ships as a plugin script Kex writes into `~/.config/opencode/plugins/` (`agent_setup_opencode`, bell popover, "Install OpenCode integration"): the plugin translates every `session.created` into one `SessionStart` frame with `agent: opencode` on the per-terminal socket, adding nothing to OpenCode's memory. Its provider row has no transcript source (OpenCode keeps sessions in a SQLite database Kex does not touch) and its `--session <id>` resume; a session resumed via `--session` fires no plugin events (anomalyco/opencode#39711), so the row never prunes records, and a resumed tab has no live attention state - only restore - for the same reason.
+
+**OMP.** Its extension API (shared with Pi) is TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex writes `kex-agent-status.ts` there (`agent_setup_omp`), which translates the runtime's lifecycle events into the same hook-event frames. Its provider row scans `~/.omp/agent/sessions` for `<timestamp>_<id>.jsonl` files, reads the cwd from the `session` header (JSONL line 2) and resumes with `omp --resume '<id>'`. Frames are gated on the per-terminal `KEX_IPC`/`KEX_TAB_ID` env vars, so a bare `omp` run is untouched. Pi reuses the extension format but installs its own file (TASK-842).
 
 ### 3.7 Web preview
 
@@ -384,7 +386,7 @@ SSH is on the roadmap but not yet implemented. Kex does not manage SSH connectio
 
 Terminal sessions are not persisted across restarts. When you close and reopen Kex, terminal tabs restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
 
-**Exception: agent sessions.** If the per-agent integration is installed (`agent_enable_claude_hooks` for Claude Code, `agent_setup_opencode` for OpenCode), Kex records the active session id and cwd at agent exit and restores it automatically on next launch by running the provider's resume command (`claude --resume '<id>'`, `opencode --session '<id>'`, ...) in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
+**Exception: agent sessions.** If the per-agent integration is installed (`agent_enable_claude_hooks` for Claude Code, `agent_setup_opencode` for OpenCode, `agent_setup_omp` for OMP), Kex records the active session id and cwd at agent exit and restores it automatically on next launch by running the provider's resume command (`claude --resume '<id>'`, `opencode --session '<id>'`, `omp --resume '<id>'`, ...) in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
 
 ### 5.3 No LSP / language server
 

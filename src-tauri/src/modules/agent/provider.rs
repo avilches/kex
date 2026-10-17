@@ -29,7 +29,9 @@ pub static PROVIDERS: &[Provider] = &[
         sessions: Some(SessionsSource::ClaudeProjects),
         cwd_read: CwdRead::ScanEntries,
         resume: ResumeSpec::Flag { flag: "--resume" },
-        missing_transcript: MissingTranscriptPolicy::Reattach { flag: "--session-id" },
+        missing_transcript: MissingTranscriptPolicy::Reattach {
+            flag: "--session-id",
+        },
         keep_flags: CLAUDE_KEEP_FLAGS,
         keep_with_value: CLAUDE_KEEP_WITH_VALUE,
     },
@@ -94,7 +96,12 @@ impl Provider {
         let MissingTranscriptPolicy::Reattach { flag } = self.missing_transcript else {
             unreachable!("reattach_cmd is only reachable when the policy reattaches")
         };
-        format!("{} {} {}", base.unwrap_or(self.name), flag, shell_quote(session_id))
+        format!(
+            "{} {} {}",
+            base.unwrap_or(self.name),
+            flag,
+            shell_quote(session_id)
+        )
     }
 }
 
@@ -150,10 +157,15 @@ fn find_in_omp_sessions(session_id: &str, transcript_path: &str) -> Option<PathB
 }
 
 fn find_in_sessions_root(root: &Path, session_id: &str) -> Option<PathBuf> {
-    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    // File names start with a timestamp (`<date>_<id>.jsonl`), so the lexicographic
+    // maximum is the most recent session file; no mtime comparisons needed.
+    let mut best_name: Option<String> = None;
+    let mut best_path: Option<PathBuf> = None;
     if let Ok(groups) = std::fs::read_dir(root) {
         for group in groups.flatten() {
-            let Ok(files) = std::fs::read_dir(group.path()) else { continue };
+            let Ok(files) = std::fs::read_dir(group.path()) else {
+                continue;
+            };
             for file in files.flatten() {
                 let name = file.file_name();
                 // Session files are `<timestamp>_<id>.jsonl`; the suffix match is exact
@@ -162,25 +174,22 @@ fn find_in_sessions_root(root: &Path, session_id: &str) -> Option<PathBuf> {
                 if !file.file_type().map(|t| t.is_file()).unwrap_or(false) {
                     continue;
                 }
-                let ok = name
-                    .to_str()
-                    .is_some_and(|n| n == format!("{session_id}.jsonl") || n.ends_with(&format!("_{session_id}.jsonl")));
+                let Some(name_str) = name.to_str() else {
+                    continue;
+                };
+                let ok = name_str == format!("{session_id}.jsonl")
+                    || name_str.ends_with(&format!("_{session_id}.jsonl"));
                 if !ok {
                     continue;
                 }
-                let modified = file.metadata().and_then(|m| m.modified()).ok();
-                let candidate = (modified, file.path());
-                let newer = best
-                    .as_ref()
-                    .map(|(best_time, _)| best_time.is_some() && candidate.0.as_ref().is_none_or(|t| t > best_time))
-                    .unwrap_or(true);
-                if newer {
-                    best = candidate;
+                if best_name.as_ref().is_none_or(|b| name_str > b.as_str()) {
+                    best_name = Some(name_str.to_string());
+                    best_path = Some(file.path());
                 }
             }
         }
     }
-    best.map(|(_, p)| p)
+    best_path
 }
 
 fn omp_sessions_root() -> PathBuf {
@@ -218,7 +227,9 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     let reader = std::io::BufReader::new(file);
     for line in reader.lines() {
         let line = line.ok()?;
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
         // Claude Code writes `worktree-state` before the first user message whenever the
         // session is inside a worktree; the entries' own `cwd` is the worktree, which is the
         // one the restore may not survive if the worktree folder is gone. `originalCwd` is
@@ -255,9 +266,12 @@ fn scan_header_line(jsonl: &Path) -> Option<String> {
     serde_json::from_str::<serde_json::Value>(&line)
         .ok()
         .filter(|obj| obj.get("type").and_then(|t| t.as_str()) == Some("session"))
-        .and_then(|obj| obj.get("cwd").and_then(|c| c.as_str()))
+        .and_then(|obj| {
+            obj.get("cwd")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
         .filter(|c| !c.is_empty())
-        .map(str::to_string)
 }
 
 pub enum ResumeSpec {
@@ -304,9 +318,12 @@ const CLAUDE_KEEP_WITH_VALUE: &[&str] = &[
     "--add-dir",
     "--agent",
     "--agents",
-    "--allowedTools", "--allowed-tools",
-    "--disallowedTools", "--disallowed-tools",
-    "--name", "-n",
+    "--allowedTools",
+    "--allowed-tools",
+    "--disallowedTools",
+    "--disallowed-tools",
+    "--name",
+    "-n",
     "--permission-mode",
     "--mcp-config",
     "--settings",
@@ -321,8 +338,8 @@ const CLAUDE_KEEP_WITH_VALUE: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::launch_cmd::DEFAULT_AGENTS;
+    use super::*;
 
     #[test]
     fn default_agents_have_a_provider_row() {
@@ -344,7 +361,10 @@ mod tests {
     #[test]
     fn resume_cmd_claude() {
         let provider = Provider::of("claude").unwrap();
-        assert_eq!(provider.resume_cmd(None, "abc-123"), "claude --resume 'abc-123'");
+        assert_eq!(
+            provider.resume_cmd(None, "abc-123"),
+            "claude --resume 'abc-123'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("claude --safe-mode"), "abc-123"),
             "claude --safe-mode --resume 'abc-123'"
@@ -355,13 +375,19 @@ mod tests {
     fn resume_cmd_codex() {
         let provider = Provider::of("codex").unwrap();
         assert_eq!(provider.resume_cmd(None, "any"), "codex resume --last");
-        assert_eq!(provider.resume_cmd(Some("codex-max"), "abc-123"), "codex-max resume --last");
+        assert_eq!(
+            provider.resume_cmd(Some("codex-max"), "abc-123"),
+            "codex-max resume --last"
+        );
     }
 
     #[test]
     fn resume_cmd_opencode() {
         let provider = Provider::of("opencode").unwrap();
-        assert_eq!(provider.resume_cmd(None, "ses_abc"), "opencode --session 'ses_abc'");
+        assert_eq!(
+            provider.resume_cmd(None, "ses_abc"),
+            "opencode --session 'ses_abc'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("opencode --model g5"), "ses_abc"),
             "opencode --model g5 --session 'ses_abc'"
@@ -371,7 +397,10 @@ mod tests {
     #[test]
     fn resume_cmd_omp() {
         let provider = Provider::of("omp").unwrap();
-        assert_eq!(provider.resume_cmd(None, "01a1-abc"), "omp --resume '01a1-abc'");
+        assert_eq!(
+            provider.resume_cmd(None, "01a1-abc"),
+            "omp --resume '01a1-abc'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("omp --slow m5"), "01a1-abc"),
             "omp --slow m5 --resume '01a1-abc'"
@@ -391,7 +420,10 @@ mod tests {
 
         let found = find_in_sessions_root(root.path(), "omp-test-id");
 
-        assert_eq!(found, Some(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl")));
+        assert_eq!(
+            found,
+            Some(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"))
+        );
     }
 
     #[test]
@@ -399,16 +431,16 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let group = root.path().join("-Users-avilches-proj");
         std::fs::create_dir_all(&group).unwrap();
-        let old = group.join("2026-01-01T10_00_00Z_omp-test-id.jsonl");
-        let new = group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl");
-        std::fs::write(&old, "{}\n").unwrap();
-        let back = filetime::FileTime::now() - std::time::Duration::from_secs(3600);
-        filetime::set_file_times(&old, back, back).unwrap();
-        std::fs::write(&new, "{}\n").unwrap();
+        // Names sort by the embedded timestamp, so no mtime foolery is needed.
+        std::fs::write(group.join("2026-01-01T10_00_00Z_omp-test-id.jsonl"), "{}\n").unwrap();
+        std::fs::write(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"), "{}\n").unwrap();
 
         let found = find_in_sessions_root(root.path(), "omp-test-id");
 
-        assert_eq!(found, Some(new));
+        assert_eq!(
+            found,
+            Some(group.join("2026-10-17T10_00_00Z_omp-test-id.jsonl"))
+        );
     }
 
     #[test]
@@ -440,7 +472,10 @@ mod tests {
     #[test]
     fn reattach_cmd_claude() {
         let provider = Provider::of("claude").unwrap();
-        assert_eq!(provider.reattach_cmd(None, "abc-123"), "claude --session-id 'abc-123'");
+        assert_eq!(
+            provider.reattach_cmd(None, "abc-123"),
+            "claude --session-id 'abc-123'"
+        );
         assert_eq!(
             provider.reattach_cmd(Some("claude --safe-mode"), "abc-123"),
             "claude --safe-mode --session-id 'abc-123'"

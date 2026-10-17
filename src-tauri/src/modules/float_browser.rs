@@ -1,7 +1,7 @@
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
-use serde_json::json;
 
 #[derive(Debug)]
 pub struct FloatMeta {
@@ -67,31 +67,27 @@ pub fn float_browser_open(
     let tab_id_focus = tab_id.clone();
     let app_focus = app.clone();
 
-    let window = WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::External(parsed_url),
-    )
-    .title("Kex Browser")
-    .inner_size(1200.0, 800.0)
-    .min_inner_size(640.0, 480.0)
-    .resizable(true)
-    .on_page_load(move |_webview, payload| {
-        use tauri::webview::PageLoadEvent;
-        if matches!(payload.event(), PageLoadEvent::Finished) {
-            if let Some(origin_win) = app_nav.get_webview_window(&origin_nav) {
-                let _ = origin_win.emit(
-                    "kex:float-navigated",
-                    json!({
-                        "tabId": tab_id_nav,
-                        "url": payload.url().to_string(),
-                    }),
-                );
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed_url))
+        .title("Kex Browser")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(640.0, 480.0)
+        .resizable(true)
+        .on_page_load(move |_webview, payload| {
+            use tauri::webview::PageLoadEvent;
+            if matches!(payload.event(), PageLoadEvent::Finished) {
+                if let Some(origin_win) = app_nav.get_webview_window(&origin_nav) {
+                    let _ = origin_win.emit(
+                        "kex:float-navigated",
+                        json!({
+                            "tabId": tab_id_nav,
+                            "url": payload.url().to_string(),
+                        }),
+                    );
+                }
             }
-        }
-    })
-    .build()
-    .map_err(|e| e.to_string())?;
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
 
     // Track which float window holds OS focus so the "Dock Browser" menu item
     // reflects the active float and greys out when focus leaves it.
@@ -139,12 +135,7 @@ pub fn float_browser_open(
 
 /// Shared logic: remove from state, emit kex:float-dock to origin, destroy window.
 /// Idempotent: if the tab is already gone from state (concurrent call), returns early.
-pub fn do_dock_and_destroy(
-    app: &AppHandle,
-    tab_id: &str,
-    origin_label: &str,
-    win_label: &str,
-) {
+pub fn do_dock_and_destroy(app: &AppHandle, tab_id: &str, origin_label: &str, win_label: &str) {
     {
         let st = app.state::<FloatBrowserState>();
         let mut map = st.tabs.lock().unwrap();
@@ -229,10 +220,7 @@ pub fn float_browser_close(
 }
 
 #[tauri::command]
-pub fn float_browser_focus(
-    app: AppHandle,
-    tab_id: String,
-) -> Result<(), String> {
+pub fn float_browser_focus(app: AppHandle, tab_id: String) -> Result<(), String> {
     let label = window_label(&tab_id);
     if let Some(window) = app.get_webview_window(&label) {
         window.set_focus().map_err(|e| e.to_string())?;
@@ -241,11 +229,7 @@ pub fn float_browser_focus(
 }
 
 #[tauri::command]
-pub fn float_browser_navigate(
-    app: AppHandle,
-    tab_id: String,
-    url: String,
-) -> Result<(), String> {
+pub fn float_browser_navigate(app: AppHandle, tab_id: String, url: String) -> Result<(), String> {
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
     let label = window_label(&tab_id);
     if let Some(window) = app.get_webview_window(&label) {
