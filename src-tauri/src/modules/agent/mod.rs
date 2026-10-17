@@ -1,5 +1,6 @@
 pub mod launch_cmd;
 pub mod os_notify;
+pub mod provider;
 pub mod session_store;
 
 use serde_json::{json, Value};

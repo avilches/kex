@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use super::launch_cmd::{self, find_agent_invocation, DEFAULT_AGENTS};
+use super::provider::{MissingTranscriptPolicy, Provider};
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
@@ -100,61 +100,6 @@ fn store_path() -> Option<PathBuf> {
     DATA_DIR.get().map(|d| d.join("agent-sessions.json"))
 }
 
-fn claude_projects_root() -> PathBuf {
-    if let Ok(v) = std::env::var("CLAUDE_CONFIG_DIR") {
-        if !v.is_empty() {
-            return PathBuf::from(v).join("projects");
-        }
-    }
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/"))
-        .join(".claude")
-        .join("projects")
-}
-
-fn find_jsonl(session_id: &str, transcript_path: &str) -> Option<PathBuf> {
-    let tp = PathBuf::from(transcript_path);
-    if tp.exists() {
-        return Some(tp);
-    }
-    let root = claude_projects_root();
-    if let Ok(entries) = std::fs::read_dir(&root) {
-        for entry in entries.flatten() {
-            let candidate = entry.path().join(format!("{session_id}.jsonl"));
-            if candidate.exists() {
-                return Some(candidate);
-            }
-        }
-    }
-    None
-}
-
-fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
-    let file = std::fs::File::open(jsonl).ok()?;
-    let reader = std::io::BufReader::new(file);
-    for line in reader.lines() {
-        let line = line.ok()?;
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
-        // Claude Code writes `worktree-state` before the first entry carrying a cwd. While the
-        // session is inside a worktree, `originalCwd` is where the command was launched from;
-        // the entry's own `cwd` is the worktree, which may be deleted by the time of the restore.
-        if let Some(original) = obj
-            .get("worktreeSession")
-            .and_then(|w| w.get("originalCwd"))
-            .and_then(|v| v.as_str())
-            .filter(|c| !c.is_empty())
-        {
-            return Some(original.to_string());
-        }
-        if let Some(cwd) = obj.get("cwd").and_then(|v| v.as_str()) {
-            if !cwd.is_empty() {
-                return Some(cwd.to_string());
-            }
-        }
-    }
-    None
-}
-
 /// True when the original invocation was non-interactive (`-p` / `--print`).
 /// Such sessions are never persisted.
 pub fn is_print_mode_cmd(cmd: &str, agent: &str) -> bool {
@@ -178,41 +123,10 @@ fn known_agents(agent: &str) -> Vec<String> {
 /// Tokens keep their quotes, so a quoted value with spaces stays one value. Assignments and
 /// wrappers before the launcher (`FOO=1 claude`, `env X=1 claude-max`) are kept as written.
 fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
-    // Boolean flags - keep as-is, no following value token.
-    const KEEP_FLAGS: &[&str] = &[
-        "--allow-dangerously-skip-permissions",
-        "--dangerously-skip-permissions",
-        "--safe-mode",
-        "--bare",
-        "--verbose",
-        "--no-chrome",
-        "--chrome",
-        "--ide",
-        "--strict-mcp-config",
-        "--exclude-dynamic-system-prompt-sections",
-        "--disable-slash-commands",
-        "--brief",
-    ];
-    // Value flags - keep flag + consume all immediately-following non-flag tokens.
-    // Handles both "--flag value" and "--flag=value" forms.
-    const KEEP_WITH_VALUE: &[&str] = &[
-        "--add-dir",
-        "--agent",
-        "--agents",
-        "--allowedTools", "--allowed-tools",
-        "--disallowedTools", "--disallowed-tools",
-        "--name", "-n",
-        "--permission-mode",
-        "--mcp-config",
-        "--settings",
-        "--setting-sources",
-        "--append-system-prompt",
-        "--system-prompt",
-        "--tools",
-        "--plugin-dir",
-        "--plugin-url",
-        "--betas",
-    ];
+    let (keep_flags, keep_with_value) = match Provider::of(agent) {
+        Some(provider) => (provider.keep_flags, provider.keep_with_value),
+        None => return None,
+    };
 
     // A record written before the launch line was reduced to the agent segment can still
     // carry `cd dir && claude ...`; reducing it again here heals it on read.
@@ -233,12 +147,12 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
             Some(pos) => (&token[..pos], true),
             None => (token, false),
         };
-        if KEEP_FLAGS.contains(&flag) {
+        if keep_flags.contains(&flag) {
             result.push(token);
             i += 1;
             continue;
         }
-        if KEEP_WITH_VALUE.contains(&flag) {
+        if keep_with_value.contains(&flag) {
             result.push(token);
             i += 1;
             if !has_eq {
@@ -259,31 +173,6 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
     Some(result.join(" "))
 }
 
-// Returns only the agent command. The frontend spawns the PTY with plan.cwdLaunch as the
-// initial working directory, so no `cd` prefix is needed here.
-fn resume_cmd_for_agent(agent: &str, session_id: &str) -> String {
-    match agent {
-        "claude" => format!("claude --resume {}", shell_quote(session_id)),
-        "codex" => "codex resume --last".to_string(),
-        "gemini" => format!("gemini --resume {}", shell_quote(session_id)),
-        _ => String::new(),
-    }
-}
-
-// Used when the JSONL transcript is missing: starts a new session but reuses the same
-// session ID (equivalent to what Claude would have done with no arguments, except the
-// UUID is preserved so the user's session identity is not lost).
-fn reattach_cmd_for_agent(agent: &str, session_id: &str) -> String {
-    match agent {
-        "claude" => format!("claude --session-id {}", shell_quote(session_id)),
-        _ => String::new(),
-    }
-}
-
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
-
 /// Why `path` cannot be the working directory of a restored terminal, or `None` when it can.
 pub fn launch_dir_problem(path: &str) -> Option<String> {
     let p = Path::new(path);
@@ -298,63 +187,91 @@ pub fn launch_dir_problem(path: &str) -> Option<String> {
 fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
     for (tab_id, record) in tabs {
-        let agent = record.agent.unwrap_or_else(|| "claude".to_string());
+        // Records written before `agent` existed only ever came from Claude's hooks.
+        let agent_name = record.agent.clone().unwrap_or_else(|| "claude".to_string());
+        let Some(provider) = Provider::of(&agent_name) else {
+            // Nothing can re-open a session of an agent with no provider definition, so the
+            // record is dead weight: warn and prune it. A blocked launch directory is
+            // special-cased as usual, so the directory state decides the same way it does
+            // for a missing transcript.
+            log::warn!("[agent-session] restore: tab={tab_id} agent '{agent_name}' has no provider row, nothing to resume");
+            if let Some(path) = store_path {
+                if launch_dir_problem(&record.cwd_launch).is_none() {
+                    remove_panel_from_store(&tab_id, path);
+                }
+            }
+            continue;
+        };
 
-        // Prefer the launch directory recorded in the transcript (the worktree's originalCwd when
-        // the session entered one, else the first cwd) over cwd_launch.
-        let jsonl = find_jsonl(&record.session_id, &record.transcript_path);
+        // Base the reuse command on the whitelisted args of the stored launch line.
+        let base = record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent_name));
 
-        // When JSONL is absent the session was opened but no message was ever sent.
-        // Use --session-id to start a new session that reuses the same UUID instead of
-        // dropping it silently. Remove the stale entry now; hooks will re-record if the
-        // new session produces messages.
-        let (cwd_launch, cmd) = if let Some(ref j) = jsonl {
-            let cwd_launch = read_launch_cwd_from_jsonl(j).unwrap_or_else(|| record.cwd_launch.clone());
-            let cmd = match record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent)) {
-                Some(base) => format!("{base} --resume {}", shell_quote(&record.session_id)),
-                None => resume_cmd_for_agent(&agent, &record.session_id),
-            };
-            (cwd_launch, cmd)
-        } else {
-            log::info!(
-                "[agent-session] restore plan: tab={tab_id} agent={agent} session={} \
-                 JSONL not found, reattaching with --session-id",
-                record.session_id
-            );
-            let cwd_launch = record.cwd_launch.clone();
-            let cmd = match record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent)) {
-                Some(base) => format!("{base} --session-id {}", shell_quote(&record.session_id)),
-                None => reattach_cmd_for_agent(&agent, &record.session_id),
-            };
-            (cwd_launch, cmd)
+        let (cwd_launch, cmd, transcript_missing, plan_wanted) = match (&provider.sessions, &provider.missing_transcript) {
+            (None, _) => {
+                (record.cwd_launch.clone(), Some(provider.resume_cmd(base.as_deref(), &record.session_id)), false, true)
+            }
+            (Some(source), policy) => match source.find(&record.session_id, &record.transcript_path) {
+                Some(transcript) => (
+                    provider.cwd_read.read_launch_cwd(&transcript).unwrap_or_else(|| record.cwd_launch.clone()),
+                    Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
+                    false,
+                    true,
+                ),
+                None => {
+                    log::info!(
+                        "[agent-session] restore plan: tab={tab_id} agent={agent_name} session={} \
+                         transcript not found",
+                        record.session_id
+                    );
+                    match policy {
+                        MissingTranscriptPolicy::Reattach { .. } => (
+                            record.cwd_launch.clone(),
+                            Some(provider.reattach_cmd(base.as_deref(), &record.session_id)),
+                            true,
+                            true,
+                        ),
+                        MissingTranscriptPolicy::Ignore => (record.cwd_launch.clone(), None, true, false),
+                        // ResumeAnyway only makes sense without a transcript source; with one,
+                        // the missing file leaves nothing to run and nothing to prune for.
+                        MissingTranscriptPolicy::ResumeAnyway => (record.cwd_launch.clone(), None, true, false),
+                    }
+                }
+            },
         };
 
         if let Some(reason) = launch_dir_problem(&cwd_launch) {
-            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} {reason}");
-            plans.push(RestorePlan {
-                tab_id, agent,
-                resume_cmd: String::new(),
-                attempted_cmd: cmd,
-                cwd_launch,
-                error_reason: reason,
-                title: record.title,
-                notification: record.notification,
-            });
+            if plan_wanted {
+                log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent_name} {reason}");
+                plans.push(RestorePlan {
+                    tab_id: tab_id.clone(),
+                    agent: agent_name.clone(),
+                    resume_cmd: String::new(),
+                    attempted_cmd: cmd.clone().unwrap_or_default(),
+                    cwd_launch,
+                    error_reason: reason,
+                    title: record.title.clone(),
+                    notification: record.notification.clone(),
+                });
+            }
             continue;
         }
 
-        // Dropped only now: a plan blocked by its directory keeps the entry so "Try again" can
-        // still find the session once the directory is back.
-        if jsonl.is_none() {
+        // Pruned only now, after the directory check: a plan blocked by its directory keeps
+        // the entry so "Try again" can still find the session once the directory is back.
+        // The policy decides: ResumeAnyway rows never prune (their record cannot be
+        // re-recorded by anything). No-op without a `store_path` (preview must not mutate).
+        if transcript_missing && !matches!(provider.missing_transcript, MissingTranscriptPolicy::ResumeAnyway) {
             if let Some(path) = store_path {
                 remove_panel_from_store(&tab_id, path);
             }
         }
 
-        log::info!("[agent-session] restore plan: tab={tab_id} agent={agent} session={} cwd_launch={cwd_launch} cmd={cmd:?}", record.session_id);
+        let Some(cmd) = cmd else { continue };
+
+        log::info!("[agent-session] restore plan: tab={tab_id} agent={agent_name} session={} cwd_launch={cwd_launch} cmd={cmd:?}", record.session_id);
         plans.push(RestorePlan {
             tab_id,
-            agent,
+            agent: agent_name,
             resume_cmd: cmd,
             attempted_cmd: String::new(),
             cwd_launch,
@@ -632,42 +549,7 @@ fn load_restore_plan_from_path(path: &PathBuf) -> Vec<RestorePlan> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn shell_quote_escapes_single_quotes() {
-        assert_eq!(shell_quote("/home/user/my repo"), "'/home/user/my repo'");
-        assert_eq!(shell_quote("/path/with'quote"), "'/path/with'\\''quote'");
-    }
-
-    #[test]
-    fn resume_cmd_claude() {
-        let cmd = resume_cmd_for_agent("claude", "abc-123");
-        assert_eq!(cmd, "claude --resume 'abc-123'");
-    }
-
-    #[test]
-    fn resume_cmd_codex() {
-        let cmd = resume_cmd_for_agent("codex", "any");
-        assert_eq!(cmd, "codex resume --last");
-    }
-
-    #[test]
-    fn resume_cmd_unknown_agent() {
-        let cmd = resume_cmd_for_agent("amp", "any");
-        assert_eq!(cmd, "");
-    }
-
-    #[test]
-    fn reattach_cmd_claude() {
-        let cmd = reattach_cmd_for_agent("claude", "abc-123");
-        assert_eq!(cmd, "claude --session-id 'abc-123'");
-    }
-
-    #[test]
-    fn reattach_cmd_unknown_agent_returns_empty() {
-        let cmd = reattach_cmd_for_agent("codex", "any");
-        assert_eq!(cmd, "");
-    }
+    use crate::modules::agent::provider::shell_quote;
 
     #[test]
     fn is_print_mode_detects_p_flag() {
@@ -1469,5 +1351,104 @@ mod tests {
         let (kept, orphans) = split_orphans(vec![plan("tab-a")], &std::collections::HashSet::new());
         assert!(kept.is_empty());
         assert_eq!(orphans.len(), 1);
+    }
+
+    fn record(agent: Option<&str>, cwd_launch: &Path, transcript: &str, launch_cmd: Option<&str>) -> SessionRecord {
+        SessionRecord {
+            agent: agent.map(str::to_string),
+            session_id: "abc-123".to_string(),
+            cwd_launch: cwd_launch.display().to_string(),
+            transcript_path: transcript.to_string(),
+            launch_cmd: launch_cmd.map(str::to_string),
+            title: None,
+            notification: None,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn a_codex_record_always_resumes_last_and_survives_a_restore() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("codex"), &project, "/tmp/missing-codex.jsonl", None));
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert_eq!(plans[0].resume_cmd, "codex resume --last");
+        assert!(plans[0].error_reason.is_empty());
+
+        // Never pruned: the command re-appears every time the store is loaded.
+        let second = load_restore_plan_from_path(&store_path);
+        assert_eq!(second[0].resume_cmd, "codex resume --last");
+    }
+
+    #[test]
+    fn a_codex_record_with_a_launch_cmd_resumes_last_on_the_stripped_base() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("codex"), &project, "/tmp/missing-codex.jsonl", Some("codex-max --model g5")),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert_eq!(plans[0].resume_cmd, "codex-max resume --last");
+    }
+
+    #[test]
+    fn a_codex_record_with_a_dead_launch_dir_errors_and_keeps_the_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let missing = dir.path().join("gone");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("codex"), &missing, "/tmp/missing-codex.jsonl", None));
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans[0].resume_cmd.is_empty());
+        assert!(plans[0].attempted_cmd.contains("resume --last"), "{}", plans[0].attempted_cmd);
+
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"), "a blocked codex entry stays for Try again");
+    }
+
+    #[test]
+    fn a_record_without_a_provider_row_is_pruned_when_its_dir_is_viable() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("gemini"), &project, "/tmp/missing-gem.jsonl", None));
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans.is_empty());
+
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(!store.tabs.contains_key("tab-1"), "an unknowable record is dead weight");
+    }
+
+    #[test]
+    fn a_record_without_a_provider_row_and_a_dead_dir_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let missing = dir.path().join("gone");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("gemini"), &missing, "/tmp/missing-gem.jsonl", None));
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans.is_empty());
+
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"), "same keep rule as a missing transcript");
     }
 }
