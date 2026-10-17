@@ -1,7 +1,40 @@
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
-import { WORKSPACE_COLOR_PALETTE } from "@/modules/workspaces/lib/workspaceColor";
+
+// 29 swatches that fill three rows of ten together with the "No color" cell.
+// Kept apart from WORKSPACE_COLOR_PALETTE, which seeds the automatic workspace colors.
+export const COLOR_SWATCHES = [
+  "#3b82f6", // blue
+  "#0ea5e9", // sky
+  "#06b6d4", // cyan
+  "#14b8a6", // teal
+  "#10b981", // emerald
+  "#22c55e", // green
+  "#84cc16", // lime
+  "#eab308", // yellow
+  "#f59e0b", // amber
+  "#f97316", // orange
+  "#ef4444", // red
+  "#f43f5e", // rose
+  "#ec4899", // pink
+  "#d946ef", // fuchsia
+  "#a855f7", // purple
+  "#8b5cf6", // violet
+  "#6366f1", // indigo
+  "#64748b", // slate
+  "#78716c", // stone
+  "#1d4ed8", // dark blue
+  "#0e7490", // dark cyan
+  "#0f766e", // dark teal
+  "#15803d", // dark green
+  "#a16207", // dark yellow
+  "#c2410c", // dark orange
+  "#b91c1c", // dark red
+  "#be185d", // dark pink
+  "#7c3aed", // dark violet
+  "#fb7185", // light rose
+] as const;
 
 type Props = {
   // Explicit color of the entity, if any; drives the swatch highlight and the hex field.
@@ -14,74 +47,77 @@ type Props = {
 };
 
 // The color picker shared by the workspace properties dialog and the
-// workspace and tab context menus: preview, hex field, native picker, "No
-// color" and the palette.
+// workspace and tab context menus: "No color" and the palette first, the
+// free editor (preview, hex field, native picker) last.
 export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect }: Props) {
   const customHex =
-    value != null && !(WORKSPACE_COLOR_PALETTE as readonly string[]).includes(value) ? value : "";
+    value != null && !(COLOR_SWATCHES as readonly string[]).includes(value) ? value : "";
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <div
-        className="size-5 shrink-0 rounded-full border border-border"
-        style={displayColor ? { backgroundColor: displayColor } : undefined}
-      />
-      <input
-        className="h-6 w-20 rounded border border-border bg-background px-1.5 font-mono text-[11px] outline-none ring-ring focus-visible:ring-1"
-        placeholder="#rrggbb"
-        defaultValue={customHex}
-        key={customHex}
-        spellCheck={false}
-        autoComplete="off"
-        // Radix menus run typeahead and arrow navigation on keydown.
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") e.stopPropagation();
-        }}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (/^#[0-9a-fA-F]{6}$/.test(v)) onSelect(v);
-        }}
-      />
-      <label
-        title="Pick color"
-        className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-        style={displayColor ? { backgroundColor: `${displayColor}33` } : undefined}
-      >
-        <input
-          type="color"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          value={displayColor ?? "#4f8ef7"}
-          onChange={(e) => onSelect(e.target.value)}
-        />
-        <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
-      </label>
-      <div className="mx-0.5 h-4 w-px bg-border" />
-      <button
-        type="button"
-        title="No color"
-        onClick={() => onSelect(null)}
-        className={cn(
-          "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
-          noneSelected
-            ? "border-foreground"
-            : "border-transparent hover:border-muted-foreground/50",
-        )}
-      >
-        <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-      </button>
-      {WORKSPACE_COLOR_PALETTE.map((hex) => (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-10 gap-1.5">
         <button
-          key={hex}
           type="button"
-          title={hex}
-          onClick={() => onSelect(hex)}
+          title="No color"
+          onClick={() => onSelect(null)}
           className={cn(
-            "size-6 rounded-full border-2 transition-opacity",
-            value === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
+            "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
+            noneSelected
+              ? "border-foreground"
+              : "border-transparent hover:border-muted-foreground/50",
           )}
-          style={{ backgroundColor: hex }}
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+        </button>
+        {COLOR_SWATCHES.map((hex) => (
+          <button
+            key={hex}
+            type="button"
+            title={hex}
+            onClick={() => onSelect(hex)}
+            className={cn(
+              "size-6 rounded-full border-2 transition-opacity",
+              value === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
+            )}
+            style={{ backgroundColor: hex }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div
+          className="size-5 shrink-0 rounded-full border border-border"
+          style={displayColor ? { backgroundColor: displayColor } : undefined}
         />
-      ))}
+        <input
+          className="h-6 w-20 rounded border border-border bg-background px-1.5 font-mono text-[11px] outline-none ring-ring focus-visible:ring-1"
+          placeholder="#rrggbb"
+          defaultValue={customHex}
+          key={customHex}
+          spellCheck={false}
+          autoComplete="off"
+          // Radix menus run typeahead and arrow navigation on keydown.
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) onSelect(v);
+          }}
+        />
+        <label
+          title="Pick color"
+          className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+          style={displayColor ? { backgroundColor: `${displayColor}33` } : undefined}
+        >
+          <input
+            type="color"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={displayColor ?? "#4f8ef7"}
+            onChange={(e) => onSelect(e.target.value)}
+          />
+          <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
+        </label>
+      </div>
     </div>
   );
 }

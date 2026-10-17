@@ -127,7 +127,7 @@ export function TabContextMenuItems({
                 <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
                 Color
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-[288px] p-2">
+              <ContextMenuSubContent className="w-[320px] p-2">
                 <ColorPaletteGrid
                   value={tab.color}
                   displayColor={tab.color ?? null}
