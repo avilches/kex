@@ -2,38 +2,29 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 
-// 29 swatches that fill three rows of ten together with the "No color" cell.
+// 20 swatches that fill three rows of seven together with the "No color" cell.
 // Kept apart from WORKSPACE_COLOR_PALETTE, which seeds the automatic workspace colors.
 export const COLOR_SWATCHES = [
-  "#3b82f6", // blue
-  "#0ea5e9", // sky
-  "#06b6d4", // cyan
-  "#14b8a6", // teal
-  "#10b981", // emerald
-  "#22c55e", // green
-  "#84cc16", // lime
-  "#eab308", // yellow
-  "#f59e0b", // amber
-  "#f97316", // orange
   "#ef4444", // red
-  "#f43f5e", // rose
-  "#ec4899", // pink
-  "#d946ef", // fuchsia
-  "#a855f7", // purple
-  "#8b5cf6", // violet
+  "#f97316", // orange
+  "#f59e0b", // amber
+  "#eab308", // yellow
+  "#84cc16", // lime
+  "#22c55e", // green
+  "#14b8a6", // teal
+  "#06b6d4", // cyan
+  "#0ea5e9", // sky
+  "#3b82f6", // blue
   "#6366f1", // indigo
+  "#8b5cf6", // violet
+  "#a855f7", // purple
+  "#d946ef", // fuchsia
+  "#ec4899", // pink
+  "#f43f5e", // rose
+  "#b91c1c", // dark red
+  "#1d4ed8", // dark blue
   "#64748b", // slate
   "#78716c", // stone
-  "#1d4ed8", // dark blue
-  "#0e7490", // dark cyan
-  "#0f766e", // dark teal
-  "#15803d", // dark green
-  "#a16207", // dark yellow
-  "#c2410c", // dark orange
-  "#b91c1c", // dark red
-  "#be185d", // dark pink
-  "#7c3aed", // dark violet
-  "#fb7185", // light rose
 ] as const;
 
 type Props = {
@@ -55,7 +46,7 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect }
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-10 gap-1.5">
+      <div className="grid grid-cols-7 gap-1.5">
         <button
           type="button"
           title="No color"
