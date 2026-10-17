@@ -315,8 +315,8 @@ Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command bo
 
 | Kind | Factory default | Meaning |
 |---|---|---|
-| terminal | `{?cmd\|osc {cmd\|osc} · }{branch\|dir}` | what is running (foreground command from OSC 133 C, else the title the program set with OSC 0/2) followed by where, which is the branch if there is one and else the folder: `npm run dev · main`; an idle shell shows just `main` or `kex` |
-| terminal with an agent | `{osc\|session\|{agent}} · {branch\|dir}` | OSC title, else the agent session title, else the agent name, followed by the branch or else the folder: `✳ Fix login · main`, `claude · kex` |
+| terminal | `{?cmd\|osc {cmd\|osc} · }{dir}{?branch · {branch}}` | what is running (foreground command from OSC 133 C, else the title the program set with OSC 0/2) followed by where, which is the folder plus the branch inside a repository: `npm run dev · kex · main`; an idle shell shows `kex · main`, or just `kex` outside a repo |
+| terminal with an agent | `{osc\|session\|{agent}} · {dir}{?branch · {branch}}` | OSC title, else the agent session title, else the agent name, followed by the folder and the branch: `✳ Fix login · kex · main`, `claude · kex` |
 | editor, markdown | `{file}` | file name |
 | git diff, commit file | `{file}` | file name |
 | browser | `{url}` | address |

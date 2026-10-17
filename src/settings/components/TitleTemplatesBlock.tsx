@@ -178,7 +178,7 @@ function HelpTable() {
 
 export function TitleTemplatesBlock() {
   return (
-    <div className="flex flex-col gap-2">
+    <div id="settings-title-templates" className="flex flex-col gap-2">
       <FieldLabel>Tab and workspace titles</FieldLabel>
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
         <p className="text-[11px] leading-snug text-muted-foreground">

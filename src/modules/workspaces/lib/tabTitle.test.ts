@@ -9,17 +9,17 @@ const terminal = (overrides: Partial<{ cwd: string; title: string }> = {}): Tab 
   ...overrides,
 });
 
-describe("tabTitle - terminal factory default: what is running, then the branch or the folder", () => {
+describe("tabTitle - terminal factory default: what is running, then the folder and branch", () => {
   const t = terminal({ cwd: "/home/me/kex" });
   const inRepo = { git: { branch: "main", repoRoot: "/home/me/kex" } };
 
-  it("an idle shell shows the branch, or the folder outside a repository", () => {
-    expect(tabTitle(t, null, undefined, inRepo)).toBe("main");
+  it("an idle shell shows the folder, plus the branch inside a repository", () => {
+    expect(tabTitle(t, null, undefined, inRepo)).toBe("kex · main");
     expect(tabTitle(t, null, undefined)).toBe("kex");
   });
 
-  it("a running command is followed by the branch, or by the folder outside a repository", () => {
-    expect(tabTitle(t, "cargo build", undefined, inRepo)).toBe("cargo build · main");
+  it("a running command is followed by the folder, plus the branch inside a repository", () => {
+    expect(tabTitle(t, "cargo build", undefined, inRepo)).toBe("cargo build · kex · main");
     expect(tabTitle(t, "cargo build", undefined)).toBe("cargo build · kex");
   });
 
@@ -28,8 +28,8 @@ describe("tabTitle - terminal factory default: what is running, then the branch 
   });
 
   it("the title the program sets is used when no command is running", () => {
-    expect(tabTitle(t, null, "vim notes.md", inRepo)).toBe("vim notes.md · main");
-    expect(tabTitle(t, null, "", inRepo)).toBe("main");
+    expect(tabTitle(t, null, "vim notes.md", inRepo)).toBe("vim notes.md · kex · main");
+    expect(tabTitle(t, null, "", inRepo)).toBe("kex · main");
   });
 
   it("runningCommand overrides oscTitle", () => {
@@ -112,9 +112,9 @@ describe("tabTitle - agent terminals", () => {
     expect(tabTitle(t, null, undefined, agent)).toBe("claude · me");
   });
 
-  it("shows the branch instead of the folder inside a repository", () => {
-    expect(tabTitle(t, null, "live status", { ...agent, ...inRepo })).toBe("live status · main");
-    expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · main");
+  it("adds the branch to the folder inside a repository", () => {
+    expect(tabTitle(t, null, "live status", { ...agent, ...inRepo })).toBe("live status · me · main");
+    expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · me · main");
   });
 
   it("shows the folder at the root of the disk too", () => {
