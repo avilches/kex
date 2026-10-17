@@ -72,7 +72,7 @@ export function useTitleSources(
     (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
       templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
   const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined, tab?.id);
-  return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
+  return { git, agent: agentSession?.agent, model: agentSession?.meta?.model, home: sys.home, host: sys.host, defaults };
 }
 
 export function resolveAgentTabTitle(
@@ -97,6 +97,7 @@ export function resolveAgentTabTitle(
   const src = {
     ...sources,
     agent: hasAgent ? (sources?.agent ?? agentSession?.agent) : undefined,
+    model: hasAgent ? agentSession?.meta?.model : undefined,
     session: sessionTitle,
   };
   const displayTitle = tabTitle(tab, runningCommand, osc, src);

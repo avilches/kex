@@ -12,6 +12,7 @@ describe("titleVariablesFor", () => {
       "cmd",
       "osc",
       "agent",
+      "model",
       "session",
     ]);
   });

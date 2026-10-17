@@ -11,6 +11,7 @@ export type TitleSources = {
   runningCommand?: string | null;
   git?: DirGit;
   agent?: string;
+  model?: string;
   // Title the running program set through OSC 0/2, and the agent's own session title.
   osc?: string;
   session?: string;
@@ -51,6 +52,7 @@ export function tabTitleVars(tab: Tab | null, src: TitleSources = {}): TitleVars
     cmd: (src.runningCommand ?? "").trim().replace(/\s+/g, " "),
     file: file ? base(file) : "",
     agent: src.agent ?? "",
+    model: (src.model ?? "").trim(),
     host: src.host ?? "",
     osc: (src.osc ?? "").trim(),
     session: (src.session ?? "").trim(),
