@@ -209,8 +209,10 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `Provider` table in `modules/agent/provider.rs`, shaped after Orca's `extractAgentProviderSession` /
   `getAgentResumeArgv` so adding a second TUI agent (OMP, Pi) is a row addition. Behavior changes: codex records
   always resume with `resume --last` on the stripped launch line (they used to build a broken `codex --resume <id>`
-  when a launch command was known) and their entries are never pruned; a record whose agent has no provider row no
-  longer restores with an empty command but produces no plan and is pruned once its directory is usable.
+  when a launch command was known) and their entries are never pruned; a record whose agent has no provider row
+  (e.g. a hand-edited `gemini` record) no longer restores with an empty command but produces no plan and is pruned
+  once its directory is usable. The restore log line for a missing transcript now reads "transcript not found"
+  (it used to say "JSONL not found, reattaching with --session-id").
 - **WebGL canvas refresh** - after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
   `useEffect` with `requestAnimationFrame` calls `refreshTerminalLeaf` on each visible panel to force the canvas to
   repaint.
