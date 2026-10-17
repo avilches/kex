@@ -98,3 +98,12 @@ export function fuzzyBestLower(
   }
   return best;
 }
+
+// A subsequence scorer matches almost any short query against a long string. Words that start
+// the query's letters score well; letters scattered across a long id do not. 8 points per typed
+// character separates the two (measured: "ser" on "search" 28, on "sidebar.showexplorer" 17).
+const MIN_POINTS_PER_CHAR = 8;
+
+export function passesQuality(queryLength: number, score: number): boolean {
+  return score >= queryLength * MIN_POINTS_PER_CHAR;
+}

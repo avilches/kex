@@ -1,4 +1,5 @@
-import { fuzzyScoreLower } from "./fuzzy";
+import { fuzzyScoreLower, passesQuality } from "./fuzzy";
+import { type LearnedMap, learnedBoost } from "./learned";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 export const RECENT_LIMIT = 8;
@@ -27,8 +28,16 @@ export function recentTabs(entries: readonly TabEntry[], limit = RECENT_LIMIT, a
 
 function fuzzy(query: string, field: string): number | null {
   const s = fuzzyScoreLower(query, field.toLowerCase());
-  return s === null ? null : Math.min(1, s / (query.length * MAX_PER_CHAR));
+  if (s === null || !passesQuality(query.length, s)) return null;
+  return Math.min(1, s / (query.length * MAX_PER_CHAR));
 }
+
+// What the user chose for this term is worth a fraction of the 0..1 score, so it reorders
+// near ties inside a tier and can never push a hit into a better tier.
+const LEARNED_SCALE = 1 / (MAX_PER_CHAR * 3);
+
+export const tabRowKey = (tabId: string) => `tab:${tabId}`;
+export const workspaceRowKey = (id: string) => `ws:${id}`;
 
 // Long free-form fields (paths, notes, commands) match by substring: a fuzzy
 // subsequence over a long path matches almost any short query.
@@ -56,25 +65,34 @@ function hitOf(e: TabEntry, q: string): Hit | null {
   return null;
 }
 
-export function rankTabEntries(entries: readonly TabEntry[], term: string, activeTabId?: string | null): TabEntry[] {
+export function rankTabEntries(
+  entries: readonly TabEntry[],
+  term: string,
+  activeTabId?: string | null,
+  learned: LearnedMap = {},
+): TabEntry[] {
   const q = term.trim().toLowerCase();
   if (!q) return recentTabs(entries, RECENT_LIMIT, activeTabId);
   const hits: { entry: TabEntry; hit: Hit }[] = [];
   for (const entry of entries) {
     const hit = hitOf(entry, q);
-    if (hit) hits.push({ entry, hit });
+    if (hit) hits.push({ entry, hit: { ...hit, score: hit.score + learnedBoost(learned, q, tabRowKey(entry.tabId)) * LEARNED_SCALE } });
   }
   hits.sort((a, b) => a.hit.tier - b.hit.tier || b.hit.score - a.hit.score || byRecency(a.entry, b.entry));
   return hits.slice(0, SEARCH_LIMIT).map((h) => h.entry);
 }
 
-export function rankWorkspaceEntries(entries: readonly WorkspaceEntry[], term: string): WorkspaceEntry[] {
+export function rankWorkspaceEntries(
+  entries: readonly WorkspaceEntry[],
+  term: string,
+  learned: LearnedMap = {},
+): WorkspaceEntry[] {
   const q = term.trim().toLowerCase();
   if (!q) return [];
   const hits: { entry: WorkspaceEntry; score: number }[] = [];
   for (const entry of entries) {
     const score = fuzzy(q, entry.title);
-    if (score !== null) hits.push({ entry, score });
+    if (score !== null) hits.push({ entry, score: score + learnedBoost(learned, q, workspaceRowKey(entry.workspaceId)) * LEARNED_SCALE });
   }
   hits.sort(
     (a, b) =>

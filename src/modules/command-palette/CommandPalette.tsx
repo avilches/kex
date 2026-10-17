@@ -8,7 +8,6 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -26,18 +25,20 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMMAND_GROUPS } from "./commands";
 import { useCommandHistory } from "./hooks/useCommandHistory";
 import {
   CONTENT_SEARCH_MIN_QUERY,
   useContentSearch,
 } from "./hooks/useContentSearch";
-import { fuzzyBest, fuzzyBestLower } from "./lib/fuzzy";
+import { fuzzyBest } from "./lib/fuzzy";
+import { learnedSnapshot, recordChoice } from "./lib/learned";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
-import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
+import { mruSnapshot, recordUse } from "./lib/mru";
+import { buildSearchBlobs, commandRowKey, rankCommands } from "./lib/rankCommands";
 import { duplicateTitleIds, type TabEntry, type WorkspaceEntry } from "./lib/tabEntries";
-import { rankTabEntries, rankWorkspaceEntries } from "./lib/tabRank";
+import { rankTabEntries, rankWorkspaceEntries, tabRowKey, workspaceRowKey } from "./lib/tabRank";
 import { TabItem } from "./TabItem";
 import { hasPreview, TabPreview } from "./TabPreview";
 import type { PaletteItem } from "./types";
@@ -95,23 +96,24 @@ export function CommandPalette({
   );
 
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
+  const learned = useMemo(() => (open ? learnedSnapshot() : {}), [open]);
 
   // Precomputed once per items change; reused across keystrokes.
   const searchBlobs = useMemo(() => buildSearchBlobs(commandItems), [commandItems]);
 
   const rankedCommands = useMemo(() => {
     if (inThemes || parsed.mode !== "commands") return [];
-    return rankCommands(commandItems, searchBlobs, parsed.term, mru);
-  }, [commandItems, searchBlobs, parsed.term, parsed.mode, inThemes, mru]);
+    return rankCommands(commandItems, searchBlobs, parsed.term, mru, learned);
+  }, [commandItems, searchBlobs, parsed.term, parsed.mode, inThemes, mru, learned]);
 
   const inCommands = !inThemes && parsed.mode === "commands";
   const rankedTabs = useMemo(
-    () => (inCommands ? rankTabEntries(tabEntries, parsed.term, activeTabId) : []),
-    [inCommands, tabEntries, parsed.term, activeTabId],
+    () => (inCommands ? rankTabEntries(tabEntries, parsed.term, activeTabId, learned) : []),
+    [inCommands, tabEntries, parsed.term, activeTabId, learned],
   );
   const rankedWorkspaces = useMemo(
-    () => (inCommands ? rankWorkspaceEntries(workspaceEntries, parsed.term) : []),
-    [inCommands, workspaceEntries, parsed.term],
+    () => (inCommands ? rankWorkspaceEntries(workspaceEntries, parsed.term, learned) : []),
+    [inCommands, workspaceEntries, parsed.term, learned],
   );
   const ambiguous = useMemo(() => duplicateTitleIds(tabEntries), [tabEntries]);
   const selectedTab = useMemo(
@@ -122,6 +124,14 @@ export function CommandPalette({
     [value, rankedTabs],
   );
   const showPreview = !!selectedTab && hasPreview(selectedTab);
+
+  // The new first row is selected on every keystroke, but a list scrolled down for the
+  // previous query stays where it was and hides it.
+  const listRef = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the top whenever the typed text changes
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')?.scrollTo({ top: 0 });
+  }, [query]);
 
   const themes = useMemo(() => {
     if (!inThemes) return [];
@@ -202,9 +212,10 @@ export function CommandPalette({
       if (item.id === "search.content") return setQuery("#");
       if (item.id === "history.open") return setQuery(">");
       recordUse(item.id);
+      recordChoice(parsed.term, commandRowKey(item.id));
       runAfterClose(item.run);
     },
-    [enterThemes, runAfterClose],
+    [enterThemes, runAfterClose, parsed.term],
   );
 
   const openContent = useCallback(
@@ -256,12 +267,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      className={cn(
-        "top-1/2 -translate-y-1/2",
-        showPreview
-          ? "w-[min(940px,calc(100vw-32px))]"
-          : "w-[min(680px,calc(100vw-32px))]",
-      )}
+      className="top-1/2 w-[min(860px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
         shouldFilter={false}
@@ -278,7 +284,7 @@ export function CommandPalette({
           autoFocus
         />
         <div className="flex min-h-0">
-        <ScrollArea className="max-h-[420px] min-w-0 flex-1">
+        <ScrollArea ref={listRef} className="max-h-[420px] min-w-0 flex-1">
           <CommandList className="max-h-none overflow-visible pr-3">
             {inThemes ? (
               <CommandGroup heading="Themes">
@@ -328,7 +334,10 @@ export function CommandPalette({
                           key={entry.tabId}
                           entry={entry}
                           ambiguous={ambiguous.has(entry.tabId)}
-                          onRun={() => runAfterClose(() => onSelectTab(entry))}
+                          onRun={() => {
+                            recordChoice(parsed.term, tabRowKey(entry.tabId));
+                            runAfterClose(() => onSelectTab(entry));
+                          }}
                         />
                       ))}
                     </CommandGroup>
@@ -339,7 +348,10 @@ export function CommandPalette({
                         <WorkspaceItem
                           key={entry.workspaceId}
                           entry={entry}
-                          onRun={() => runAfterClose(() => onSelectWorkspace(entry))}
+                          onRun={() => {
+                            recordChoice(parsed.term, workspaceRowKey(entry.workspaceId));
+                            runAfterClose(() => onSelectWorkspace(entry));
+                          }}
                         />
                       ))}
                     </CommandGroup>
@@ -459,36 +471,6 @@ export function CommandPalette({
       </Command>
     </CommandDialog>
   );
-}
-
-// Precomputed once per items change; reused across keystrokes.
-function buildSearchBlobs(items: PaletteItem[]): string[][] {
-  return items.map((item) => [
-    item.title.toLowerCase(),
-    item.group.toLowerCase(),
-    ...(item.keywords?.map((k) => k.toLowerCase()) ?? []),
-  ]);
-}
-
-function rankCommands(
-  items: PaletteItem[],
-  blobs: string[][],
-  term: string,
-  mru: Record<string, number>,
-): PaletteItem[] {
-  if (!term) {
-    return [...items].sort((a, b) => mruRank(mru, b.id) - mruRank(mru, a.id));
-  }
-  const lowerTerm = term.toLowerCase();
-  const scored: { item: PaletteItem; s: number }[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const s = fuzzyBestLower(lowerTerm, blobs[i]);
-    if (s !== null) scored.push({ item: items[i], s });
-  }
-  scored.sort(
-    (a, b) => b.s - a.s || mruRank(mru, b.item.id) - mruRank(mru, a.item.id),
-  );
-  return scored.map((x) => x.item);
 }
 
 function ActionItem({

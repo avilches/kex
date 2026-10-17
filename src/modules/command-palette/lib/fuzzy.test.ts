@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fuzzyBest, fuzzyBestLower, fuzzyScore, fuzzyScoreLower } from "./fuzzy";
+import { fuzzyBest, fuzzyBestLower, fuzzyScore, fuzzyScoreLower, passesQuality } from "./fuzzy";
 
 function score(query: string, target: string): number {
   const s = fuzzyScore(query, target);
@@ -106,5 +106,30 @@ describe("fuzzyBestLower", () => {
 
   it("returns 0 for empty query", () => {
     expect(fuzzyBestLower("", ["anything"])).toBe(0);
+  });
+});
+
+describe("passesQuality", () => {
+  it("rejects a sparse subsequence of a long id-like string", () => {
+    expect(passesQuality(3, fuzzyScoreLower("ser", "sidebar.showexplorer") ?? 0)).toBe(false);
+    expect(passesQuality(3, fuzzyScoreLower("ser", "sidebar: show git history") ?? 0)).toBe(false);
+  });
+
+  it("accepts a word-start or consecutive match", () => {
+    expect(passesQuality(3, fuzzyScoreLower("ser", "search") ?? 0)).toBe(true);
+    expect(passesQuality(3, fuzzyScoreLower("ser", "settings.section.terminal") ?? 0)).toBe(true);
+    expect(passesQuality(4, fuzzyScoreLower("splr", "split pane right") ?? 0)).toBe(true);
+    expect(passesQuality(3, fuzzyScoreLower("blb", "backlog board") ?? 0)).toBe(true);
+    expect(passesQuality(3, fuzzyScoreLower("git", "show git changes") ?? 0)).toBe(true);
+  });
+
+  it("asks 8 points per typed character", () => {
+    expect(passesQuality(2, 16)).toBe(true);
+    expect(passesQuality(2, 15)).toBe(false);
+  });
+
+  it("lets a one-character query through on any match", () => {
+    expect(passesQuality(1, 1)).toBe(false);
+    expect(passesQuality(1, 8)).toBe(true);
   });
 });

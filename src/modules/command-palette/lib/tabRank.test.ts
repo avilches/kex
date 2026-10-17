@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { LearnedMap } from "./learned";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import {
   RECENT_LIMIT,
@@ -68,6 +69,27 @@ describe("active tab", () => {
   it("is still found when typing", () => {
     const entries = [entry({ tabId: "current", title: "build" })];
     expect(ids(rankTabEntries(entries, "build", "current"))).toEqual(["current"]);
+  });
+});
+
+describe("learned choices", () => {
+  it("lifts the tab chosen for that term above an equal match", () => {
+    const entries = [entry({ tabId: "a", title: "backlog" }), entry({ tabId: "b", title: "backlog" })];
+    expect(ids(rankTabEntries(entries, "bac"))[0]).toBe("a");
+    const learned: LearnedMap = { bac: { "tab:b": 4 } };
+    expect(ids(rankTabEntries(entries, "bac", null, learned))[0]).toBe("b");
+  });
+
+  it("never lets learning move a title match below a location match", () => {
+    const entries = [entry({ tabId: "cwd", cwd: "/work/deploy" }), entry({ tabId: "title", title: "deploy" })];
+    const learned: LearnedMap = { deploy: { "tab:cwd": 500 } };
+    expect(ids(rankTabEntries(entries, "deploy", null, learned))).toEqual(["title", "cwd"]);
+  });
+
+  it("lifts a workspace chosen for that term", () => {
+    const ws = (id: string): WorkspaceEntry => ({ workspaceId: id, title: "Backlog", color: null, hibernated: false, tabCount: 1, lastUsedAt: 0 });
+    const learned: LearnedMap = { bac: { "ws:y": 3 } };
+    expect(rankWorkspaceEntries([ws("x"), ws("y")], "bac", learned).map((w) => w.workspaceId)[0]).toBe("y");
   });
 });
 

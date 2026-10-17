@@ -373,7 +373,6 @@ export function createCommandItems(
       id: s.id,
       title: paletteTitle(s.label, s.group),
       group: s.group,
-      keywords: [s.id],
       shortcutId: s.id,
       disabledReason: handler && ctx.isShortcutAvailable(s.id) ? undefined : "Not available here",
       run: () => handler?.(new KeyboardEvent("keydown")),
