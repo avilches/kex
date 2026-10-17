@@ -10,7 +10,7 @@ use std::thread;
 
 use tauri::{AppHandle, Emitter};
 
-use crate::modules::agent::session_store;
+use crate::modules::agent::{live_model, session_store};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
@@ -527,6 +527,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "prompt":   null,
                 "backgroundSubagents": subagents,
             }));
+            live_model::emit_live_model(app, tab_id, &p.transcript_path);
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
