@@ -33,7 +33,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
-import { TabCopyMenuItems } from "./TabCopyMenuItems";
+import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
@@ -216,8 +216,8 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <TabCopyMenuItems tabId={tab.id} />
-      <ContextMenuSeparator />
+      <TabAgentMenuItems tabId={tab.id} />
+      <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>
           onUpdateTab?.(tab.id, (p) => {

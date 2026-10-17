@@ -347,7 +347,7 @@ Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitign
 through `RevealRequest.pendingAction` so the explorer performs the action immediately after revealing the file in
 the tree (nonce-guarded, fires once).
 
-The tab context menu (`TabCopyMenuItems`) surfaces session metadata that was previously in
+The tab context menu (`TabAgentMenuItems`) surfaces session metadata that was previously in
 the floating tab HoverCard: Copy Tab ID for every tab, and for agent sessions Copy Session ID plus the actions Open Transcript Folder (focuses the folder in the explorer) and Reveal Transcript in Finder. Run-on-start lives in the same menu. The floating tab HoverCard has been removed
 entirely; tabs use a native `title` tooltip (cwd, agent model/sessionId). None of this surface exists in upstream
 Terax.

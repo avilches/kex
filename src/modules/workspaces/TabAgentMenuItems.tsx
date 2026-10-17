@@ -5,7 +5,12 @@ import {
   FolderOpenIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
-import { ContextMenuItem } from "@/components/ui/context-menu";
+import {
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { revealInFinder } from "@/modules/explorer/lib/contextActions";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -30,17 +35,15 @@ function ValueItem({
   icon,
   label,
   value,
-  disabled,
   onSelect,
 }: {
   icon: typeof Copy01Icon;
   label: ReactNode;
   value: string;
-  disabled?: boolean;
   onSelect: () => void;
 }) {
   return (
-    <ContextMenuItem disabled={disabled} onSelect={onSelect}>
+    <ContextMenuItem onSelect={onSelect}>
       <HugeiconsIcon icon={icon} size={14} strokeWidth={2} />
       <span className="min-w-0">
         {label}
@@ -67,43 +70,72 @@ function useFileExists(path: string | undefined): boolean | null {
   return exists;
 }
 
-export function TabCopyMenuItems({ tabId }: { tabId: string }) {
-  const meta = useAgentStore((s) => s.sessions[tabId]?.meta);
+export function CopyTabIdItem({ tabId }: { tabId: string }) {
+  return (
+    <ValueItem
+      icon={Copy01Icon}
+      label="Copy Tab ID"
+      value={tabId}
+      onSelect={() => void writeClipboardText(tabId)}
+    />
+  );
+}
+
+function agentTitle(agent: string): string {
+  return agent.charAt(0).toUpperCase() + agent.slice(1);
+}
+
+export function TabAgentMenuItems({ tabId }: { tabId: string }) {
+  const session = useAgentStore((s) => s.sessions[tabId]);
   const { onRevealInExplorer } = useSidebarTabMenu();
-  const sessionId = meta?.sessionId;
+  const meta = session?.meta;
   const transcriptPath = meta?.transcriptPath;
   const transcriptExists = useFileExists(transcriptPath);
-  const copy = (value: string) => () => void writeClipboardText(value);
+  if (!session) return null;
+  const sessionId = meta?.sessionId;
+  const hasTranscript = !!transcriptPath && transcriptExists !== false;
 
   return (
     <>
-      <ValueItem icon={Copy01Icon} label="Copy Tab ID" value={tabId} onSelect={copy(tabId)} />
+      <ContextMenuLabel className="flex items-center gap-2 px-2 py-1.5">
+        <AgentIcon agent={session.agent} size={14} />
+        <span className="min-w-0">
+          <span className="block font-medium text-foreground">{agentTitle(session.agent)}</span>
+          {meta?.model && (
+            <span className="block truncate font-mono text-[10px] font-normal">{meta.model}</span>
+          )}
+        </span>
+      </ContextMenuLabel>
       {sessionId && (
         <ValueItem
           icon={Copy01Icon}
           label="Copy Session ID"
           value={sessionId}
-          onSelect={copy(sessionId)}
+          onSelect={() => void writeClipboardText(sessionId)}
         />
       )}
-      {transcriptPath && (
+      {hasTranscript ? (
         <>
           <ValueItem
             icon={FolderOpenIcon}
             label="Open Transcript Folder"
             value={parentDir(transcriptPath)}
-            disabled={transcriptExists === false}
             onSelect={() => onRevealInExplorer(parentDir(transcriptPath))}
           />
           <ValueItem
             icon={Search01Icon}
             label={REVEAL_TRANSCRIPT_LABEL}
             value={transcriptPath}
-            disabled={transcriptExists === false}
             onSelect={() => void revealInFinder(transcriptPath)}
           />
         </>
+      ) : (
+        <ContextMenuItem disabled>
+          <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+          Transcript not created yet
+        </ContextMenuItem>
       )}
+      <ContextMenuSeparator />
     </>
   );
 }
