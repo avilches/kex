@@ -90,9 +90,8 @@ import {
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
-import { titleVariablesHint } from "@/modules/workspaces/lib/titleTemplate";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
-import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
+import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
 type WorkspaceItem = {
@@ -231,6 +230,8 @@ function SortableWorkspaceItem({
   );
 
   const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
+  const templatesOpen = useWorkspaceRenameStore((s) => s.templatesOpen);
+  const toggleTemplates = useWorkspaceRenameStore((s) => s.toggleTemplates);
   const clearRename = useWorkspaceRenameStore((s) => s.clearRename);
   const startRename = useWorkspaceRenameStore((s) => s.startRename);
 
@@ -677,7 +678,7 @@ function SortableWorkspaceItem({
       <PopoverContent
         side="right"
         align="center"
-        className="flex w-64 flex-col gap-1.5 p-1.5"
+        className={`flex flex-col gap-1.5 p-1.5 ${templatesOpen ? "w-[420px]" : "w-64"}`}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
@@ -688,7 +689,6 @@ function SortableWorkspaceItem({
           defaultValue={ws.title}
           onChange={(e) => setTitleDraft(ws.id, e.target.value)}
           placeholder={shownTitle || ws.kind}
-          title={titleVariablesHint("workspace")}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -700,7 +700,16 @@ function SortableWorkspaceItem({
             }
           }}
         />
-        <TitleVariablesHelp subject="workspace" />
+        <RenameTemplates
+          open={templatesOpen}
+          onToggle={toggleTemplates}
+          subject="workspace"
+          tab={ws.focusedTab}
+          workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
+          getInput={() => inputRef.current}
+          onInserted={(value) => setTitleDraft(ws.id, value)}
+          shortcutId="workspace.rename"
+        />
       </PopoverContent>
     </Popover>
   );

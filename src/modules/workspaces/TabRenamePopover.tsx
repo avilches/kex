@@ -2,15 +2,16 @@ import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { clearTitleDraft, setTitleDraft } from "./lib/titleDraftStore";
-import { titleVariablesHint } from "./lib/titleTemplate";
+import { titleSubjectForTab } from "./lib/titleVariablesFor";
 import type { Tab } from "./lib/types";
-import { TitleVariablesHelp } from "./TitleVariablesHelp";
+import { RenameTemplates } from "./RenameTemplates";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
 
 type Props = {
   tabId: string;
-  // Decides which variables the field offers: a browser has {url}, a terminal {cmd}.
-  kind: Tab["kind"];
+  // The tab itself: which variables the templates list offers, and its id is the key of
+  // the live title draft while the field is open.
+  tab: Tab;
   origin: RenameOrigin;
   title: string | undefined;
   placeholder: string;
@@ -21,8 +22,10 @@ type Props = {
 
 // The rename field of a tab, shared by the pane tab and the sidebar row. Both
 // mount one; only the one whose origin matches the store opens.
-export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRenameTab, children }: Props) {
+export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRenameTab, children }: Props) {
   const isRenaming = useTabRenameStore((s) => isRenamingAt(s, tabId, origin));
+  const templatesOpen = useTabRenameStore((s) => s.templatesOpen);
+  const toggleTemplates = useTabRenameStore((s) => s.toggleTemplates);
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -51,29 +54,7 @@ export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRe
     handleSave();
   }
 
-  const saveRef = useRef(handleSave);
-  saveRef.current = handleSave;
-
-  // Subscribed only while this field is open, so the other tabs and rows do
-  // not re-render or run an effect on every save request.
-  useEffect(() => {
-    if (!isRenaming) return;
-    let seen = useTabRenameStore.getState().saveSeq;
-    return useTabRenameStore.subscribe((state) => {
-      if (state.saveSeq === seen) return;
-      seen = state.saveSeq;
-      saveRef.current();
-    });
-  }, [isRenaming]);
-
-  // What is being typed shows live in every title of this tab until the field closes;
-  // cancelling just drops it.
-  useEffect(() => {
-    if (!isRenaming) return;
-    return () => clearTitleDraft(tabId);
-  }, [isRenaming, tabId]);
-
-  // A row can unmount with its field open (collapsed list, detail filter,
+  // The row can unmount with its field open (collapsed list, detail filter,
   // compact bar); without this the store keeps pointing at it forever.
   useEffect(
     () => () => {
@@ -82,6 +63,13 @@ export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRe
     },
     [tabId, origin],
   );
+
+  // What is being typed shows live in every title of this tab until the field closes;
+  // cancelling just drops it. The draft also feeds the template table's {tab}.
+  useEffect(() => {
+    if (!isRenaming) return;
+    return () => clearTitleDraft(tabId);
+  }, [isRenaming, tabId]);
 
   return (
     <Popover
@@ -96,7 +84,7 @@ export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRe
         side="bottom"
         align="start"
         sideOffset={4}
-        className="flex w-64 flex-col gap-1 rounded-lg p-2"
+        className={`flex flex-col gap-1 rounded-lg p-2 ${templatesOpen ? "w-[420px]" : "w-64"}`}
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           handleCancel();
@@ -116,7 +104,6 @@ export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRe
           defaultValue={title ?? ""}
           onChange={(e) => setTitleDraft(tabId, e.target.value)}
           placeholder={placeholder}
-          title={titleVariablesHint(kind)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -126,7 +113,15 @@ export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRe
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
         />
-        <TitleVariablesHelp subject={kind} />
+        <RenameTemplates
+          open={templatesOpen}
+          onToggle={toggleTemplates}
+          subject={titleSubjectForTab(tab.kind)}
+          tab={tab}
+          getInput={() => inputRef.current}
+          onInserted={(value) => setTitleDraft(tabId, value)}
+          shortcutId="tab.rename"
+        />
       </PopoverContent>
     </Popover>
   );

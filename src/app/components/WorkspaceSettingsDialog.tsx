@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
-import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
+import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
@@ -339,6 +339,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
   const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => clearTitleDraft(ws.id), [ws.id]);
   const cwdInputRef = useRef<HTMLInputElement>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   useEffect(() => {
     if (activeSection === "properties") {
@@ -416,7 +417,18 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
-            <TitleVariablesHelp subject="workspace" />
+            <RenameTemplates
+              open={templatesOpen}
+              onToggle={() => setTemplatesOpen((o) => !o)}
+              subject="workspace"
+              tab={focusedTab(ws.paneTree, ws.activePaneId)}
+              workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
+              getInput={() => nameInputRef.current}
+              onInserted={(value) => {
+                setTitleValue(value);
+                setTitleDraft(ws.id, value);
+              }}
+            />
           </div>
 
           {/* Working Directory */}

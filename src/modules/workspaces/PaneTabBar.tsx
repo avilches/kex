@@ -338,7 +338,7 @@ function DraggableTab({
   return (
     <TabRenamePopover
       tabId={tab.id}
-      kind={tab.kind}
+      tab={tab}
       origin="pane"
       title={tab.title}
       placeholder={agentTitle}

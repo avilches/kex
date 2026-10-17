@@ -2985,8 +2985,12 @@ export default function App() {
       },
       "workspace.rename": () => {
         useContextMenuCloseStore.getState().closeAll();
-        if (activeWorkspaceId)
-          useWorkspaceRenameStore.getState().startRename(activeWorkspaceId);
+        const store = useWorkspaceRenameStore.getState();
+        if (store.renamingId !== null) {
+          store.toggleTemplates();
+          return;
+        }
+        if (activeWorkspaceId) store.startRename(activeWorkspaceId);
       },
       "workspace.settings": () => {
         if (activeWorkspaceId) {
@@ -3041,7 +3045,7 @@ export default function App() {
           useContextMenuCloseStore.getState().closeAll();
           store.startRename(activeTabId);
         }
-        else if (action === "save") store.requestSave();
+        else if (action === "toggle") store.toggleTemplates();
       },
       "tab.note": () => {
         if (!activeTabId || !activeTab) return;
