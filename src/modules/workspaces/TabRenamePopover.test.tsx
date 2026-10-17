@@ -9,9 +9,19 @@ import type { RenameOrigin } from "./lib/tabRenameStore";
 import { getTitleDraft } from "./lib/titleDraftStore";
 import type { Tab } from "./lib/types";
 
+const TABS: Record<Tab["kind"], Tab> = {
+  terminal: { id: "tab-1", kind: "terminal", cwd: "/code/kex" },
+  browser: { id: "tab-1", kind: "browser", url: "https://example.com" },
+  editor: { id: "tab-1", kind: "editor", path: "/code/kex/src/index.ts", dirty: false, preview: false },
+  markdown: { id: "tab-1", kind: "markdown", path: "/code/kex/notes.md" },
+  "git-diff": { id: "tab-1", kind: "git-diff", path: "/code/kex/index.ts", repoRoot: "/code/kex", mode: "-", originalPath: null, preview: false },
+  "git-history": { id: "tab-1", kind: "git-history", repoRoot: "/code/kex" },
+  "git-commit-file": { id: "tab-1", kind: "git-commit-file", repoRoot: "/code/kex", sha: "abc", path: "/code/kex/index.ts", originalPath: null, preview: false },
+};
+
 function field(tabId: string, origin: RenameOrigin, onRenameTab = vi.fn(), kind: Tab["kind"] = "terminal") {
   return (
-    <TabRenamePopover tabId={tabId} kind={kind} origin={origin} title="old" placeholder="ph" onRenameTab={onRenameTab}>
+    <TabRenamePopover tabId={tabId} tab={{ ...TABS[kind], id: tabId }} origin={origin} title="old" placeholder="ph" onRenameTab={onRenameTab}>
       <PopoverAnchor asChild>
         <div>anchor</div>
       </PopoverAnchor>
@@ -21,7 +31,7 @@ function field(tabId: string, origin: RenameOrigin, onRenameTab = vi.fn(), kind:
 
 describe("TabRenamePopover", () => {
   beforeEach(() => {
-    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", saveSeq: 0 });
+    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", templatesOpen: false });
   });
   afterEach(cleanup);
 
@@ -45,28 +55,27 @@ describe("TabRenamePopover", () => {
     expect(useTabRenameStore.getState().renamingTabId).toBe("tab-3");
   });
 
-  it("saves on a save request only while its field is open", () => {
-    const onRenameTab = vi.fn();
-    render(field("tab-1", "sidebar", onRenameTab));
-    act(() => useTabRenameStore.getState().requestSave());
-    expect(onRenameTab).not.toHaveBeenCalled();
-    act(() => useTabRenameStore.getState().startRename("tab-1", "sidebar"));
-    act(() => useTabRenameStore.getState().requestSave());
-    expect(onRenameTab).toHaveBeenCalledTimes(1);
-    expect(useTabRenameStore.getState().renamingTabId).toBeNull();
+  it("keeps the templates list collapsed until it is asked for", () => {
+    render(field("tab-1", "pane"));
+    act(() => useTabRenameStore.getState().startRename("tab-1", "pane"));
+    expect(screen.queryByTitle("Only the name of that folder")).toBeNull();
+    act(() => useTabRenameStore.getState().toggleTemplates());
+    expect(screen.getByTitle("Only the name of that folder")).toBeTruthy();
+    act(() => useTabRenameStore.getState().toggleTemplates());
+    expect(screen.queryByTitle("Only the name of that folder")).toBeNull();
   });
 
-  it.each([
-    ["terminal", ["{cmd}", "{osc}", "{cwd}"], ["{url}", "{file}", "{tab}"]],
-    ["browser", ["{url}", "{host}"], ["{cwd}", "{dir}", "{branch}", "{repo}", "{cmd}", "{file}", "{tab}"]],
-    ["editor", ["{file}", "{dir}"], ["{cmd}", "{url}", "{tab}"]],
-    ["git-history", ["{dir}", "{repo}"], ["{cmd}", "{file}", "{url}", "{tab}"]],
-  ] as const)("offers only the variables a %s tab has", (kind, offered, hidden) => {
-    render(field("tab-1", "pane", vi.fn(), kind));
+  it("offers only the variables the tab kind has and inserts them at the caret", () => {
+    render(field("tab-1", "pane"));
     act(() => useTabRenameStore.getState().startRename("tab-1", "pane"));
-    const help = screen.getByText(/You can use/).textContent ?? "";
-    for (const v of offered) expect(help).toContain(v);
-    for (const v of hidden) expect(help).not.toContain(v);
+    act(() => useTabRenameStore.getState().toggleTemplates());
+    expect(screen.queryByTitle("Address of the page")).toBeNull();
+    const input = screen.getByPlaceholderText("ph") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "a·" } });
+    fireEvent.click(screen.getByTitle("Only the name of that folder"));
+    expect(input.value).toBe("a·{dir}");
+    expect(getTitleDraft("tab-1")).toBe("a·{dir}");
+    expect(useTabRenameStore.getState().renamingTabId).toBe("tab-1");
   });
 
   it("previews what is typed and drops the preview when the field closes", () => {

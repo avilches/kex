@@ -300,7 +300,7 @@ describe("WorkspaceDetailList context menu", () => {
 
   beforeEach(() => {
     for (const fn of Object.values(actions)) if (vi.isMockFunction(fn)) fn.mockClear();
-    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", saveSeq: 0 });
+    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", templatesOpen: false });
   });
 
   it("offers the tab actions and none of the New ones", () => {

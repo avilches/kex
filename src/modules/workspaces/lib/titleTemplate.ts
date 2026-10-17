@@ -211,26 +211,3 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace" },
 ];
 
-const GROUPS_FOR: Record<TitleSubject, TitleVariableGroup[]> = {
-  terminal: ["common", "place", "terminal"],
-  editor: ["common", "place", "file"],
-  markdown: ["common", "place", "file"],
-  "git-diff": ["common", "place", "file"],
-  "git-commit-file": ["common", "place", "file"],
-  browser: ["common", "browser"],
-  "git-history": ["common", "place"],
-  workspace: ["common", "place", "terminal", "file", "browser", "workspace"],
-};
-
-// Only the variables the subject can have a value for.
-export function titleVariableDocs(subject: TitleSubject) {
-  const groups = GROUPS_FOR[subject];
-  return TITLE_VARIABLE_DOCS.filter((v) => groups.includes(v.group));
-}
-
-const TITLE_SYNTAX_HINT =
-  "{a|b} uses the first value that is not empty. {?a|b text} shows the text only when a or b has a value, {!a|b text} only when neither does. Use {{ and }} for literal braces.";
-
-export function titleVariablesHint(subject: TitleSubject): string {
-  return `${titleVariableDocs(subject).map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
-}

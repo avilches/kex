@@ -3,7 +3,16 @@ import { isRenamingAt, resolveRenameShortcut, useTabRenameStore } from "./tabRen
 
 describe("tabRenameStore", () => {
   beforeEach(() => {
-    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", saveSeq: 0 });
+    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", templatesOpen: false });
+  });
+
+  test("initial state has no tab being renamed", () => {
+    expect(useTabRenameStore.getState().renamingTabId).toBeNull();
+  });
+
+  test("startRename sets the renaming tab id", () => {
+    useTabRenameStore.getState().startRename("tab-abc");
+    expect(useTabRenameStore.getState().renamingTabId).toBe("tab-abc");
   });
 
   test("startRename defaults to the pane origin and records the sidebar one", () => {
@@ -21,31 +30,27 @@ describe("tabRenameStore", () => {
     expect(isRenamingAt(state, "tab-xyz", "sidebar")).toBe(false);
   });
 
-  test("initial state has no tab being renamed", () => {
-    expect(useTabRenameStore.getState().renamingTabId).toBeNull();
-  });
-
-  test("startRename sets the renaming tab id", () => {
+  test("startRename replaces a previous rename in progress and collapses its table", () => {
     useTabRenameStore.getState().startRename("tab-abc");
-    expect(useTabRenameStore.getState().renamingTabId).toBe("tab-abc");
-  });
-
-  test("startRename replaces a previous rename in progress", () => {
-    useTabRenameStore.getState().startRename("tab-abc");
+    useTabRenameStore.getState().toggleTemplates();
+    expect(useTabRenameStore.getState().templatesOpen).toBe(true);
     useTabRenameStore.getState().startRename("tab-xyz");
     expect(useTabRenameStore.getState().renamingTabId).toBe("tab-xyz");
+    expect(useTabRenameStore.getState().templatesOpen).toBe(false);
   });
 
-  test("clearRename resets to null", () => {
+  test("clearRename resets to null and collapses the table", () => {
     useTabRenameStore.getState().startRename("tab-abc");
+    useTabRenameStore.getState().toggleTemplates();
     useTabRenameStore.getState().clearRename();
     expect(useTabRenameStore.getState().renamingTabId).toBeNull();
+    expect(useTabRenameStore.getState().templatesOpen).toBe(false);
   });
 
-  test("requestSave bumps saveSeq on every call", () => {
-    useTabRenameStore.getState().requestSave();
-    useTabRenameStore.getState().requestSave();
-    expect(useTabRenameStore.getState().saveSeq).toBe(2);
+  test("toggleTemplates flips a single boolean, not per tab", () => {
+    useTabRenameStore.getState().toggleTemplates();
+    useTabRenameStore.getState().toggleTemplates();
+    expect(useTabRenameStore.getState().templatesOpen).toBe(false);
   });
 });
 
@@ -64,7 +69,7 @@ describe("resolveRenameShortcut", () => {
     expect(resolveRenameShortcut({ ...base, activeTabId: null })).toBe("ignore");
   });
 
-  test("a second press while renaming saves", () => {
-    expect(resolveRenameShortcut({ ...base, renamingTabId: "tab-1", inTextField: true })).toBe("save");
+  test("a press while renaming expands the templates table instead of saving", () => {
+    expect(resolveRenameShortcut({ ...base, renamingTabId: "tab-1", inTextField: true })).toBe("toggle");
   });
 });
