@@ -162,7 +162,8 @@ export function handleSessionMeta(p: AgentSessionMetaPayload, ctx: Ctx): void {
     sessionId: p.sessionId,
     cwdLaunch: p.cwdLaunch,
     sessionTitle: p.sessionTitle,
-    model: p.model,
+    // The OSC prompt event carries no model; an empty one must not wipe the known one.
+    ...(p.model ? { model: p.model } : {}),
     transcriptPath: p.transcriptPath || undefined,
     launchKnown: p.launchKnown,
   });
@@ -292,6 +293,10 @@ export function AgentNotificationsBridge({
 
   useTauriListen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) =>
     handleSessionMeta(e.payload, ctxRef.current),
+  );
+
+  useTauriListen<{ tabId: string; model: string }>("kex:agent-model", (e) =>
+    useAgentStore.getState().setMeta(e.payload.tabId, { model: e.payload.model }),
   );
 
   useTauriListen<{ tabId: string; cwd: string }>("kex:agent-cwd", (e) =>

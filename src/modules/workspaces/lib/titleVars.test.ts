@@ -40,6 +40,11 @@ describe("tabTitleVars", () => {
     expect(v).toMatchObject({ cmd: "npm run dev", cwd: "", branch: "", agent: "", host: "" });
   });
 
+  it("exposes the model, trimmed, and leaves it empty without one", () => {
+    expect(tabTitleVars(terminal(), { model: " claude-sonnet-4-6 " }).model).toBe("claude-sonnet-4-6");
+    expect(tabTitleVars(terminal()).model).toBe("");
+  });
+
   it("falls back to fallbackDir when the tab has no location", () => {
     const browser: Tab = { id: "b", kind: "browser", url: "http://x" };
     expect(tabTitleVars(browser, { fallbackDir: "/w/root" })).toMatchObject({ dir: "root" });

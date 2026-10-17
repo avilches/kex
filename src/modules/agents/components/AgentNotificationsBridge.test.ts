@@ -169,6 +169,12 @@ describe("handleSessionMeta", () => {
     expect(session().meta?.launchKnown).toBe(true);
   });
 
+  test("an empty model from a later event keeps the one already known", () => {
+    handleSessionMeta(meta(false), ctx());
+    handleSessionMeta({ ...meta(false), model: "" }, ctx());
+    expect(session().meta?.model).toBe("opus");
+  });
+
   test("a later prompt on the session created by SessionStart does not duplicate it", () => {
     handleSessionMeta(meta(false), ctx());
     handleSignal(sig("UserPromptSubmit"), ctx());

@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::agent_detect::{AgentDetector, Transition};
 use super::da_filter::DaFilter;
 use super::shell_init;
-use crate::modules::agent::session_store;
+use crate::modules::agent::{live_model, session_store};
 use crate::modules::workspace::WorkspaceEnv;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
@@ -265,6 +265,9 @@ pub fn spawn(
                                     return;
                                 }
                                 // UserPromptSubmit continues to emit below
+                            }
+                            if let Transition::Stop { tab_id, transcript_path, .. } = &t {
+                                live_model::emit_live_model(&app_reader, tab_id, transcript_path);
                             }
                             // Stash launch command for record_session (called on SessionStart IPC).
                             if let Transition::Started { ref cmd_string, .. } = t {
