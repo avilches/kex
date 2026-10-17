@@ -84,7 +84,7 @@ describe("TabAgentMenuItems", () => {
     expect(screen.queryByText("Open Transcript Folder")).toBeNull();
   });
 
-  it("shows the session id and transcript actions with the value under each label", () => {
+  it("shows the copied id under its label but no path under the transcript actions", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "claude");
     useAgentStore.getState().setMeta("tab-1", {
       sessionId: "sess-9",
@@ -94,8 +94,9 @@ describe("TabAgentMenuItems", () => {
     open(reveal);
     expect(screen.getByText("Copy Session ID")).toBeTruthy();
     expect(screen.getByText("sess-9")).toBeTruthy();
-    expect(screen.getByText("/t/dir")).toBeTruthy();
-    expect(screen.getByText("/t/dir/sess-9.jsonl")).toBeTruthy();
+    expect(screen.getByText("Open Transcript Folder")).toBeTruthy();
+    expect(screen.queryByText("/t/dir")).toBeNull();
+    expect(screen.queryByText("/t/dir/sess-9.jsonl")).toBeNull();
 
     fireEvent.click(screen.getByText("Copy Session ID"));
     expect(writeClipboardText).toHaveBeenCalledWith("sess-9");
