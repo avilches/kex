@@ -9,6 +9,7 @@ import { useDirGit } from "./dirGitStore";
 import { defaultKindFor, type TitleDefaults } from "./defaultTitles";
 import { tabTitle } from "./tabTitle";
 import { useSystemInfo } from "./systemInfoStore";
+import { useTabWorkspaceRoot } from "./tabWorkspaceRootStore";
 import { useTitleDefaults } from "./titleDefaultsPrefs";
 import { titleVariablesUsed } from "./titleTemplate";
 import { useTitleDraft, withTitleDraft } from "./titleDraftStore";
@@ -72,7 +73,16 @@ export function useTitleSources(
     (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
       templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
   const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined, tab?.id);
-  return { git, agent: agentSession?.agent, model: agentSession?.meta?.model, home: sys.home, host: sys.host, defaults };
+  const workspaceRoot = useTabWorkspaceRoot(tab?.id);
+  return {
+    git,
+    agent: agentSession?.agent,
+    model: agentSession?.meta?.model,
+    home: sys.home,
+    host: sys.host,
+    defaults,
+    workspaceRoot,
+  };
 }
 
 export function resolveAgentTabTitle(

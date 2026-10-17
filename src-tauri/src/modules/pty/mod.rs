@@ -85,8 +85,10 @@ pub async fn pty_open(
         // Same thread that stats the cwd for the spawn also answers the
         // report: an is_dir on a slow mount stays off the async runtime.
         let dir = shell_init::spawn_dir_report(cwd.clone(), &report_workspace);
-        session::spawn(id, app, cols, rows, cwd, workspace, blocks, tab_id, shell, on_data, on_exit)
-            .map(|(s, _)| (s, dir))
+        session::spawn(
+            id, app, cols, rows, cwd, workspace, blocks, tab_id, shell, on_data, on_exit,
+        )
+        .map(|(s, _)| (s, dir))
     })
     .await
     .map_err(|e| {
@@ -104,7 +106,10 @@ pub async fn pty_open(
         })?;
     }
     state.sessions.write().unwrap().insert(id, session);
-    state.window_sessions.write().unwrap()
+    state
+        .window_sessions
+        .write()
+        .unwrap()
         .entry(window_label.clone())
         .or_default()
         .push(id);
@@ -219,7 +224,10 @@ pub fn pty_resize(
 
 #[tauri::command]
 pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
-    state.window_sessions.write().unwrap()
+    state
+        .window_sessions
+        .write()
+        .unwrap()
         .values_mut()
         .for_each(|ids| ids.retain(|&i| i != id));
     let session = state.sessions.write().unwrap().remove(&id);
@@ -250,7 +258,10 @@ pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn pty_has_foreground_process(state: tauri::State<PtyState>, id: u32) -> Result<Option<String>, String> {
+pub fn pty_has_foreground_process(
+    state: tauri::State<PtyState>,
+    id: u32,
+) -> Result<Option<String>, String> {
     let sessions = state.sessions.read().unwrap();
     let session = sessions.get(&id).ok_or_else(|| {
         log::warn!("pty_has_foreground_process: unknown session id={id}");
@@ -349,8 +360,7 @@ fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
     use std::mem::{size_of, zeroed};
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
-        TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
     };
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -390,12 +400,17 @@ pub fn pty_close_all(
     state: tauri::State<PtyState>,
 ) -> Result<usize, String> {
     let window_label = webview_window.label().to_string();
-    let ids: Vec<u32> = state.window_sessions.write().unwrap()
+    let ids: Vec<u32> = state
+        .window_sessions
+        .write()
+        .unwrap()
         .remove(&window_label)
         .unwrap_or_default();
     let sessions: Vec<(u32, Arc<Session>)> = {
         let mut all = state.sessions.write().unwrap();
-        ids.iter().filter_map(|id| all.remove(id).map(|s| (*id, s))).collect()
+        ids.iter()
+            .filter_map(|id| all.remove(id).map(|s| (*id, s)))
+            .collect()
     };
     let count = sessions.len();
     for (id, s) in sessions {

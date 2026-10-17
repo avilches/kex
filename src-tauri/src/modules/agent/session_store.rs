@@ -92,7 +92,10 @@ pub struct RestorePlan {
 /// Splits plans into those whose tab exists in some window and those whose tab is gone
 /// from every window. A single window cannot tell the two apart, so `known` must be the
 /// union over all windows.
-pub fn split_orphans(plans: Vec<RestorePlan>, known: &std::collections::HashSet<String>) -> (Vec<RestorePlan>, Vec<RestorePlan>) {
+pub fn split_orphans(
+    plans: Vec<RestorePlan>,
+    known: &std::collections::HashSet<String>,
+) -> (Vec<RestorePlan>, Vec<RestorePlan>) {
     plans.into_iter().partition(|p| known.contains(&p.tab_id))
 }
 
@@ -110,7 +113,12 @@ pub fn is_print_mode_cmd(cmd: &str, agent: &str) -> bool {
 // may name another known agent; match both so the launcher is never silently swapped.
 fn known_agents(agent: &str) -> Vec<String> {
     let mut agents = vec![agent.to_string()];
-    agents.extend(DEFAULT_AGENTS.iter().filter(|a| **a != agent).map(|a| a.to_string()));
+    agents.extend(
+        DEFAULT_AGENTS
+            .iter()
+            .filter(|a| **a != agent)
+            .map(|a| a.to_string()),
+    );
     agents
 }
 
@@ -157,7 +165,10 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
             i += 1;
             if !has_eq {
                 // Consume all immediately-following non-flag tokens as values.
-                while i < tokens.len() && !tokens[i].starts_with('-') && launch_cmd::redirection_tokens(tokens[i]).is_none() {
+                while i < tokens.len()
+                    && !tokens[i].starts_with('-')
+                    && launch_cmd::redirection_tokens(tokens[i]).is_none()
+                {
                     result.push(tokens[i]);
                     i += 1;
                 }
@@ -166,7 +177,10 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         }
         // Not in whitelist: skip this token (and any orphaned non-flag value that follows).
         i += 1;
-        while i < tokens.len() && !tokens[i].starts_with('-') && launch_cmd::redirection_tokens(tokens[i]).is_none() {
+        while i < tokens.len()
+            && !tokens[i].starts_with('-')
+            && launch_cmd::redirection_tokens(tokens[i]).is_none()
+        {
             i += 1;
         }
     }
@@ -177,14 +191,21 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
 pub fn launch_dir_problem(path: &str) -> Option<String> {
     let p = Path::new(path);
     match std::fs::metadata(p) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(format!("Directory not found: {path}")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Some(format!("Directory not found: {path}"))
+        }
         Err(e) => Some(format!("Cannot access directory: {path} ({e})")),
         Ok(m) if !m.is_dir() => Some(format!("Not a directory: {path}")),
-        Ok(_) => std::fs::read_dir(p).err().map(|e| format!("Cannot access directory: {path} ({e})")),
+        Ok(_) => std::fs::read_dir(p)
+            .err()
+            .map(|e| format!("Cannot access directory: {path} ({e})")),
     }
 }
 
-fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
+fn build_plans_from(
+    tabs: HashMap<String, SessionRecord>,
+    store_path: Option<&PathBuf>,
+) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
     for (tab_id, record) in tabs {
         // Records written before `agent` existed only ever came from Claude's hooks.
@@ -204,44 +225,62 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
         };
 
         // Base the reuse command on the whitelisted args of the stored launch line.
-        let base = record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent_name));
+        let base = record
+            .launch_cmd
+            .as_deref()
+            .and_then(|lc| strip_for_resume_base(lc, &agent_name));
 
-        let (cwd_launch, cmd, transcript_missing, plan_wanted) = match (&provider.sessions, &provider.missing_transcript) {
-            (None, _) => {
-                (record.cwd_launch.clone(), Some(provider.resume_cmd(base.as_deref(), &record.session_id)), false, true)
-            }
-            (Some(source), policy) => match source.find(&record.session_id, &record.transcript_path) {
-                Some(transcript) => (
-                    provider.cwd_read.read_launch_cwd(&transcript).unwrap_or_else(|| record.cwd_launch.clone()),
+        let (cwd_launch, cmd, transcript_missing, plan_wanted) =
+            match (&provider.sessions, &provider.missing_transcript) {
+                (None, _) => (
+                    record.cwd_launch.clone(),
                     Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
                     false,
                     true,
                 ),
-                None => {
-                    log::info!(
+                (Some(source), policy) => match source
+                    .find(&record.session_id, &record.transcript_path)
+                {
+                    Some(transcript) => (
+                        provider
+                            .cwd_read
+                            .read_launch_cwd(&transcript)
+                            .unwrap_or_else(|| record.cwd_launch.clone()),
+                        Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
+                        false,
+                        true,
+                    ),
+                    None => {
+                        log::info!(
                         "[agent-session] restore plan: tab={tab_id} agent={agent_name} session={} \
                          transcript not found",
                         record.session_id
                     );
-                    match policy {
-                        MissingTranscriptPolicy::Reattach { .. } => (
-                            record.cwd_launch.clone(),
-                            Some(provider.reattach_cmd(base.as_deref(), &record.session_id)),
-                            true,
-                            true,
-                        ),
-                        MissingTranscriptPolicy::Ignore => (record.cwd_launch.clone(), None, true, false),
-                        // ResumeAnyway only makes sense without a transcript source; with one,
-                        // the missing file leaves nothing to run and nothing to prune for.
-                        MissingTranscriptPolicy::ResumeAnyway => (record.cwd_launch.clone(), None, true, false),
+                        match policy {
+                            MissingTranscriptPolicy::Reattach { .. } => (
+                                record.cwd_launch.clone(),
+                                Some(provider.reattach_cmd(base.as_deref(), &record.session_id)),
+                                true,
+                                true,
+                            ),
+                            MissingTranscriptPolicy::Ignore => {
+                                (record.cwd_launch.clone(), None, true, false)
+                            }
+                            // ResumeAnyway only makes sense without a transcript source; with one,
+                            // the missing file leaves nothing to run and nothing to prune for.
+                            MissingTranscriptPolicy::ResumeAnyway => {
+                                (record.cwd_launch.clone(), None, true, false)
+                            }
+                        }
                     }
-                }
-            },
-        };
+                },
+            };
 
         if let Some(reason) = launch_dir_problem(&cwd_launch) {
             if plan_wanted {
-                log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent_name} {reason}");
+                log::warn!(
+                    "[agent-session] restore plan: tab={tab_id} agent={agent_name} {reason}"
+                );
                 plans.push(RestorePlan {
                     tab_id: tab_id.clone(),
                     agent: agent_name.clone(),
@@ -260,7 +299,12 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
         // the entry so "Try again" can still find the session once the directory is back.
         // The policy decides: ResumeAnyway rows never prune (their record cannot be
         // re-recorded by anything). No-op without a `store_path` (preview must not mutate).
-        if transcript_missing && !matches!(provider.missing_transcript, MissingTranscriptPolicy::ResumeAnyway) {
+        if transcript_missing
+            && !matches!(
+                provider.missing_transcript,
+                MissingTranscriptPolicy::ResumeAnyway
+            )
+        {
             if let Some(path) = store_path {
                 remove_panel_from_store(&tab_id, path);
             }
@@ -291,10 +335,16 @@ fn write_backup(path: &Path, previous_content: &str) {
 
 fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
-    let Ok(content) = std::fs::read_to_string(path) else { return };
-    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else {
+        return;
+    };
     store.tabs.remove(tab_id);
-    let Ok(out) = serde_json::to_string_pretty(&store) else { return };
+    let Ok(out) = serde_json::to_string_pretty(&store) else {
+        return;
+    };
     let tmp = path.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
         write_backup(path, &content);
@@ -326,12 +376,35 @@ pub fn record_session(
         Some(p) => p,
         None => return false,
     };
-    record_session_at_path_with(&path, tab_id, agent, session_id, transcript_path, cwd_launch, same_process)
+    record_session_at_path_with(
+        &path,
+        tab_id,
+        agent,
+        session_id,
+        transcript_path,
+        cwd_launch,
+        same_process,
+    )
 }
 
 #[cfg(test)]
-fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
-    record_session_at_path_with(path, tab_id, agent, session_id, transcript_path, cwd_launch, false);
+fn record_session_at_path(
+    path: &PathBuf,
+    tab_id: &str,
+    agent: &str,
+    session_id: &str,
+    transcript_path: &str,
+    cwd_launch: &str,
+) {
+    record_session_at_path_with(
+        path,
+        tab_id,
+        agent,
+        session_id,
+        transcript_path,
+        cwd_launch,
+        false,
+    );
 }
 
 fn record_session_at_path_with(
@@ -344,7 +417,10 @@ fn record_session_at_path_with(
     same_process: bool,
 ) -> bool {
     let launch_cmd = take_stashed_cmd(tab_id);
-    if launch_cmd.as_deref().is_some_and(|c| is_print_mode_cmd(c, agent)) {
+    if launch_cmd
+        .as_deref()
+        .is_some_and(|c| is_print_mode_cmd(c, agent))
+    {
         log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
         return false;
     }
@@ -379,7 +455,10 @@ fn record_session_at_path_with(
     // up. A corrupt main file must leave any existing .bak untouched, or a
     // second corruption (this write) destroys the last recoverable copy that
     // load_restore_plan could otherwise fall back to.
-    let mut store = SessionStore { version: 1, tabs: HashMap::new() };
+    let mut store = SessionStore {
+        version: 1,
+        tabs: HashMap::new(),
+    };
     let mut valid_existing: Option<&str> = None;
     if let Some(s) = existing_content.as_deref() {
         if let Ok(parsed) = serde_json::from_str::<SessionStore>(s) {
@@ -391,7 +470,11 @@ fn record_session_at_path_with(
     // pending notification it held must survive until the frontend reports new ones. A resume
     // keeps the session id, while /clear or an agent launched by hand brings a new one, which
     // must not inherit the old conversation's name.
-    if let Some(previous) = store.tabs.get(tab_id).filter(|p| p.session_id == session_id) {
+    if let Some(previous) = store
+        .tabs
+        .get(tab_id)
+        .filter(|p| p.session_id == session_id)
+    {
         record.title = previous.title.clone();
         record.notification = previous.notification.clone();
     }
@@ -428,11 +511,23 @@ pub fn set_snapshot(tab_id: &str, session_id: &str, title: &str, notification: &
     }
 }
 
-fn set_snapshot_at_path(path: &Path, tab_id: &str, session_id: &str, title: &str, notification: &str) -> bool {
+fn set_snapshot_at_path(
+    path: &Path,
+    tab_id: &str,
+    session_id: &str,
+    title: &str,
+    notification: &str,
+) -> bool {
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
-    let Ok(content) = std::fs::read_to_string(path) else { return false };
-    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return false };
-    let Some(record) = store.tabs.get_mut(tab_id) else { return false };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else {
+        return false;
+    };
+    let Some(record) = store.tabs.get_mut(tab_id) else {
+        return false;
+    };
     if record.session_id != session_id {
         return false;
     }
@@ -449,7 +544,9 @@ fn set_snapshot_at_path(path: &Path, tab_id: &str, session_id: &str, title: &str
     }
     record.title = next_title;
     record.notification = next_notification;
-    let Ok(out) = serde_json::to_string_pretty(&store) else { return false };
+    let Ok(out) = serde_json::to_string_pretty(&store) else {
+        return false;
+    };
     let tmp = path.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_err() {
         return false;
@@ -528,7 +625,9 @@ fn load_restore_plan_from_path(path: &PathBuf) -> Vec<RestorePlan> {
         Some(s) => s,
         None => match read_backup_store(path) {
             Some(s) => {
-                log::warn!("[agent-session] restore: main store unavailable, recovered from backup");
+                log::warn!(
+                    "[agent-session] restore: main store unavailable, recovered from backup"
+                );
                 s
             }
             None => {
@@ -542,7 +641,10 @@ fn load_restore_plan_from_path(path: &PathBuf) -> Vec<RestorePlan> {
             }
         },
     };
-    log::info!("[agent-session] restore: {} session(s) in store", store.tabs.len());
+    log::info!(
+        "[agent-session] restore: {} session(s) in store",
+        store.tabs.len()
+    );
     build_plans_from(store.tabs, Some(path))
 }
 
@@ -563,20 +665,29 @@ mod tests {
     #[test]
     fn strip_keeps_whitelisted_flags() {
         // --model and --effort are NOT kept (configurable in-session via /model)
-        let base = strip_for_resume_base("claude --model opus --effort high --safe-mode", "claude").unwrap();
+        let base = strip_for_resume_base("claude --model opus --effort high --safe-mode", "claude")
+            .unwrap();
         assert_eq!(base, "claude --safe-mode");
     }
 
     #[test]
     fn strip_removes_non_whitelisted_flags() {
-        let base = strip_for_resume_base("claude --model opus --worktree my-branch --effort high", "claude").unwrap();
+        let base = strip_for_resume_base(
+            "claude --model opus --worktree my-branch --effort high",
+            "claude",
+        )
+        .unwrap();
         assert_eq!(base, "claude");
     }
 
     #[test]
     fn strip_removes_flag_with_value() {
         // --debug-file has a value; both flag and value should be dropped
-        let base = strip_for_resume_base("claude --model opus --debug-file /tmp/out.log --effort high", "claude").unwrap();
+        let base = strip_for_resume_base(
+            "claude --model opus --debug-file /tmp/out.log --effort high",
+            "claude",
+        )
+        .unwrap();
         assert_eq!(base, "claude");
     }
 
@@ -622,19 +733,26 @@ mod tests {
         let cwd_launch = dir.path().join("project");
         std::fs::create_dir_all(&cwd_launch).unwrap();
         let jsonl = dir.path().join("session.jsonl");
-        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        std::fs::write(
+            &jsonl,
+            format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display()),
+        )
+        .unwrap();
 
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), SessionRecord {
-            agent: Some("claude".to_string()),
-            session_id: "abc-123".to_string(),
-            cwd_launch: cwd_launch.display().to_string(),
-            transcript_path: jsonl.display().to_string(),
-            launch_cmd: Some("claude --model opus --safe-mode".to_string()),
-            title: None,
-            notification: None,
-            updated_at: 0,
-        });
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("claude".to_string()),
+                session_id: "abc-123".to_string(),
+                cwd_launch: cwd_launch.display().to_string(),
+                transcript_path: jsonl.display().to_string(),
+                launch_cmd: Some("claude --model opus --safe-mode".to_string()),
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
         let store_path = dir.path().join("agent-sessions.json");
         write_store(&store_path, tabs);
 
@@ -647,21 +765,39 @@ mod tests {
     #[test]
     fn strip_heals_a_launch_cmd_stored_with_the_cd_prefix() {
         let lc = " cd '/Users/x/Application Support/Taxes' && claude --resume 'old-id'";
-        assert_eq!(strip_for_resume_base(lc, "claude").as_deref(), Some("claude"));
+        assert_eq!(
+            strip_for_resume_base(lc, "claude").as_deref(),
+            Some("claude")
+        );
         let lc = " cd '/x' && claude-max --resume 'old-id'";
-        assert_eq!(strip_for_resume_base(lc, "claude").as_deref(), Some("claude-max"));
+        assert_eq!(
+            strip_for_resume_base(lc, "claude").as_deref(),
+            Some("claude-max")
+        );
     }
 
     #[test]
     fn strip_keeps_assignments_and_wrappers_before_the_launcher() {
-        let base = strip_for_resume_base("FOO=1 env BAR=2 claude-max --model opus --safe-mode", "claude");
-        assert_eq!(base.as_deref(), Some("FOO=1 env BAR=2 claude-max --safe-mode"));
+        let base = strip_for_resume_base(
+            "FOO=1 env BAR=2 claude-max --model opus --safe-mode",
+            "claude",
+        );
+        assert_eq!(
+            base.as_deref(),
+            Some("FOO=1 env BAR=2 claude-max --safe-mode")
+        );
     }
 
     #[test]
     fn strip_keeps_a_quoted_value_with_spaces_whole() {
-        let base = strip_for_resume_base("claude --append-system-prompt 'hello world' --model opus", "claude");
-        assert_eq!(base.as_deref(), Some("claude --append-system-prompt 'hello world'"));
+        let base = strip_for_resume_base(
+            "claude --append-system-prompt 'hello world' --model opus",
+            "claude",
+        );
+        assert_eq!(
+            base.as_deref(),
+            Some("claude --append-system-prompt 'hello world'")
+        );
     }
 
     #[test]
@@ -681,27 +817,43 @@ mod tests {
     #[test]
     fn healed_command_round_trips_through_the_retry_line() {
         let line = " cd '/Users/x/Application Support/Taxes' && FOO=1 claude-max --model opus --safe-mode --resume 'id-1'";
-        let stored = find_agent_invocation(line, &known_agents("claude")).unwrap().command();
+        let stored = find_agent_invocation(line, &known_agents("claude"))
+            .unwrap()
+            .command();
         let base = strip_for_resume_base(&stored, "claude").unwrap();
         let resume = format!("{base} --resume {}", shell_quote("id-2"));
         assert_eq!(resume, "FOO=1 claude-max --safe-mode --resume 'id-2'");
 
         let retyped = format!(" cd '/Users/x/Application Support/Taxes' && {resume}");
-        let stored_again = find_agent_invocation(&retyped, &known_agents("claude")).unwrap().command();
+        let stored_again = find_agent_invocation(&retyped, &known_agents("claude"))
+            .unwrap()
+            .command();
         assert_eq!(stored_again, resume);
-        assert_eq!(strip_for_resume_base(&stored_again, "claude").unwrap(), base);
+        assert_eq!(
+            strip_for_resume_base(&stored_again, "claude").unwrap(),
+            base
+        );
     }
 
     #[test]
     fn strip_refuses_a_stored_command_that_was_cut() {
-        assert_eq!(strip_for_resume_base("claude --append-system-prompt 'abc def", "claude"), None);
-        assert_eq!(strip_for_resume_base("claude --add-dir /a\\", "claude"), None);
+        assert_eq!(
+            strip_for_resume_base("claude --append-system-prompt 'abc def", "claude"),
+            None
+        );
+        assert_eq!(
+            strip_for_resume_base("claude --add-dir /a\\", "claude"),
+            None
+        );
     }
 
     #[test]
     fn strip_keeps_process_substitution_values() {
         let base = strip_for_resume_base("claude --mcp-config <(echo '{}') --verbose", "claude");
-        assert_eq!(base.as_deref(), Some("claude --mcp-config <(echo '{}') --verbose"));
+        assert_eq!(
+            base.as_deref(),
+            Some("claude --mcp-config <(echo '{}') --verbose")
+        );
     }
 
     #[test]
@@ -710,8 +862,24 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
 
         stash_cmd("tab-known", "claude-max --safe-mode".to_string());
-        assert!(record_session_at_path_with(&path, "tab-known", "claude", "s1", "/tmp/s.jsonl", "/tmp/p", false));
-        assert!(!record_session_at_path_with(&path, "tab-unknown", "claude", "s2", "/tmp/s.jsonl", "/tmp/p", false));
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-known",
+            "claude",
+            "s1",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-unknown",
+            "claude",
+            "s2",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
     }
 
     #[test]
@@ -720,10 +888,30 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
 
         stash_cmd("tab-clear-keeps", "claude-max".to_string());
-        assert!(record_session_at_path_with(&path, "tab-clear-keeps", "claude", "old", "/tmp/s.jsonl", "/tmp/p", false));
-        assert!(record_session_at_path_with(&path, "tab-clear-keeps", "claude", "new", "/tmp/s.jsonl", "/tmp/p", true));
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(store.tabs["tab-clear-keeps"].launch_cmd.as_deref(), Some("claude-max"));
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-clear-keeps",
+            "claude",
+            "old",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-clear-keeps",
+            "claude",
+            "new",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            true
+        ));
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            store.tabs["tab-clear-keeps"].launch_cmd.as_deref(),
+            Some("claude-max")
+        );
     }
 
     #[test]
@@ -733,7 +921,15 @@ mod tests {
 
         stash_cmd("tab-stash-dropped", "claude-max".to_string());
         drop_stashed_cmd("tab-stash-dropped");
-        assert!(!record_session_at_path_with(&path, "tab-stash-dropped", "claude", "s1", "/tmp/s.jsonl", "/tmp/p", false));
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-stash-dropped",
+            "claude",
+            "s1",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
     }
 
     #[test]
@@ -742,9 +938,26 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
 
         stash_cmd("tab-new-unrecognised", "claude-max".to_string());
-        record_session_at_path_with(&path, "tab-new-unrecognised", "claude", "old", "/tmp/s.jsonl", "/tmp/p", false);
-        assert!(!record_session_at_path_with(&path, "tab-new-unrecognised", "claude", "new", "/tmp/s.jsonl", "/tmp/p", false));
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        record_session_at_path_with(
+            &path,
+            "tab-new-unrecognised",
+            "claude",
+            "old",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false,
+        );
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-new-unrecognised",
+            "claude",
+            "new",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(store.tabs["tab-new-unrecognised"].launch_cmd, None);
     }
 
@@ -760,19 +973,26 @@ mod tests {
         let cwd_launch = dir.path().join("project");
         std::fs::create_dir_all(&cwd_launch).unwrap();
         let jsonl = dir.path().join("session.jsonl");
-        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        std::fs::write(
+            &jsonl,
+            format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display()),
+        )
+        .unwrap();
 
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), SessionRecord {
-            agent: Some("claude".to_string()),
-            session_id: "abc-123".to_string(),
-            cwd_launch: cwd_launch.display().to_string(),
-            transcript_path: jsonl.display().to_string(),
-            launch_cmd: Some(" cd '/somewhere' && claude-max --resume 'abc-123'".to_string()),
-            title: None,
-            notification: None,
-            updated_at: 0,
-        });
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("claude".to_string()),
+                session_id: "abc-123".to_string(),
+                cwd_launch: cwd_launch.display().to_string(),
+                transcript_path: jsonl.display().to_string(),
+                launch_cmd: Some(" cd '/somewhere' && claude-max --resume 'abc-123'".to_string()),
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
         let store_path = dir.path().join("agent-sessions.json");
         write_store(&store_path, tabs);
 
@@ -799,16 +1019,19 @@ mod tests {
     fn preview_resume_cmd_from_path_reports_missing_cwd_without_mutating_store() {
         let dir = tempfile::tempdir().unwrap();
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), SessionRecord {
-            agent: Some("claude".to_string()),
-            session_id: "abc-123".to_string(),
-            cwd_launch: dir.path().join("does-not-exist").display().to_string(),
-            transcript_path: dir.path().join("missing.jsonl").display().to_string(),
-            launch_cmd: None,
-            title: None,
-            notification: None,
-            updated_at: 0,
-        });
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("claude".to_string()),
+                session_id: "abc-123".to_string(),
+                cwd_launch: dir.path().join("does-not-exist").display().to_string(),
+                transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
         let store_path = dir.path().join("agent-sessions.json");
         write_store(&store_path, tabs);
         let before = std::fs::read_to_string(&store_path).unwrap();
@@ -822,13 +1045,86 @@ mod tests {
         assert_eq!(before, after);
     }
 
-    fn plan_for_transcript(dir: &Path, lines: &[String], cwd_launch: &Path) -> (RestorePlan, PathBuf) {
+    fn plan_for_transcript(
+        dir: &Path,
+        lines: &[String],
+        cwd_launch: &Path,
+    ) -> (RestorePlan, PathBuf) {
         let jsonl = dir.join("session.jsonl");
         std::fs::write(&jsonl, lines.join("\n") + "\n").unwrap();
         let store_path = dir.join("agent-sessions.json");
         write_store(&store_path, sample_tabs(cwd_launch, &jsonl));
         let plans = load_restore_plan_from_path(&store_path);
         (plans.into_iter().next().expect("one plan"), store_path)
+    }
+
+    #[test]
+    fn an_omp_record_with_a_live_session_file_resumes_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let jsonl = dir.path().join("2026-10-17T10_00_00Z_omp-abc.jsonl");
+        std::fs::write(
+            &jsonl,
+            format!(
+                "{{\"type\":\"title\",\"title\":\"t\"}}\n{{\"type\":\"session\",\"id\":\"omp-abc\",\"cwd\":\"{}\"}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("omp".to_string()),
+                session_id: "omp-abc".to_string(),
+                cwd_launch: launch.display().to_string(),
+                transcript_path: jsonl.display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].agent, "omp");
+        assert_eq!(plans[0].resume_cmd, "omp --resume 'omp-abc'");
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+    }
+
+    #[test]
+    fn an_omp_record_without_a_session_file_gets_no_plan_and_is_never_pruned() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("omp".to_string()),
+                session_id: "omp-abc".to_string(),
+                cwd_launch: launch.display().to_string(),
+                transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert!(plans.is_empty());
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
     }
 
     #[test]
@@ -841,7 +1137,8 @@ mod tests {
             r#"{"type":"mode"}"#.to_string(),
             format!(
                 r#"{{"type":"worktree-state","worktreeSession":{{"originalCwd":"{}","worktreePath":"{}"}}}}"#,
-                launch.display(), worktree.display()
+                launch.display(),
+                worktree.display()
             ),
             format!(r#"{{"type":"user","cwd":"{}"}}"#, worktree.display()),
         ];
@@ -873,13 +1170,17 @@ mod tests {
     fn restore_keeps_store_entry_when_launch_dir_is_missing() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("gone");
-        let lines = vec![format!(r#"{{"type":"user","cwd":"{}"}}"#, missing.display())];
+        let lines = vec![format!(
+            r#"{{"type":"user","cwd":"{}"}}"#,
+            missing.display()
+        )];
 
         let (plan, store_path) = plan_for_transcript(dir.path(), &lines, &missing);
 
         assert!(plan.error_reason.contains("Directory not found"));
         assert_eq!(plan.resume_cmd, "");
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(store.tabs.contains_key("tab-1"));
     }
 
@@ -887,12 +1188,19 @@ mod tests {
     fn restore_error_plan_carries_the_blocked_command() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("gone");
-        let lines = vec![format!(r#"{{"type":"user","cwd":"{}"}}"#, missing.display())];
+        let lines = vec![format!(
+            r#"{{"type":"user","cwd":"{}"}}"#,
+            missing.display()
+        )];
 
         let (plan, _) = plan_for_transcript(dir.path(), &lines, &missing);
 
         assert_eq!(plan.resume_cmd, "");
-        assert!(plan.attempted_cmd.contains("--resume 'abc-123'"), "{}", plan.attempted_cmd);
+        assert!(
+            plan.attempted_cmd.contains("--resume 'abc-123'"),
+            "{}",
+            plan.attempted_cmd
+        );
     }
 
     #[test]
@@ -900,16 +1208,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("gone");
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), SessionRecord {
-            agent: Some("claude".to_string()),
-            session_id: "abc-123".to_string(),
-            cwd_launch: missing.display().to_string(),
-            transcript_path: dir.path().join("missing.jsonl").display().to_string(),
-            launch_cmd: None,
-            title: None,
-            notification: None,
-            updated_at: 0,
-        });
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("claude".to_string()),
+                session_id: "abc-123".to_string(),
+                cwd_launch: missing.display().to_string(),
+                transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
         let store_path = dir.path().join("agent-sessions.json");
         write_store(&store_path, tabs);
 
@@ -917,7 +1228,8 @@ mod tests {
 
         assert!(plans[0].error_reason.contains("Directory not found"));
         assert!(plans[0].attempted_cmd.contains("--session-id 'abc-123'"));
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(store.tabs.contains_key("tab-1"));
     }
 
@@ -931,7 +1243,10 @@ mod tests {
     fn launch_dir_problem_reports_missing_directory() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("gone").display().to_string();
-        assert_eq!(launch_dir_problem(&missing), Some(format!("Directory not found: {missing}")));
+        assert_eq!(
+            launch_dir_problem(&missing),
+            Some(format!("Directory not found: {missing}"))
+        );
     }
 
     #[test]
@@ -940,7 +1255,10 @@ mod tests {
         let file = dir.path().join("f.txt");
         std::fs::write(&file, "x").unwrap();
         let file = file.display().to_string();
-        assert_eq!(launch_dir_problem(&file), Some(format!("Not a directory: {file}")));
+        assert_eq!(
+            launch_dir_problem(&file),
+            Some(format!("Not a directory: {file}"))
+        );
     }
 
     #[cfg(unix)]
@@ -967,16 +1285,19 @@ mod tests {
 
     fn sample_tabs(cwd_launch: &Path, jsonl: &Path) -> HashMap<String, SessionRecord> {
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), SessionRecord {
-            agent: Some("claude".to_string()),
-            session_id: "abc-123".to_string(),
-            cwd_launch: cwd_launch.display().to_string(),
-            transcript_path: jsonl.display().to_string(),
-            launch_cmd: None,
-            title: None,
-            notification: None,
-            updated_at: 0,
-        });
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("claude".to_string()),
+                session_id: "abc-123".to_string(),
+                cwd_launch: cwd_launch.display().to_string(),
+                transcript_path: jsonl.display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
         tabs
     }
 
@@ -994,7 +1315,8 @@ mod tests {
         let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
         assert_eq!(bak_content, original_content);
 
-        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        let after: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(after.tabs.is_empty());
     }
 
@@ -1012,7 +1334,8 @@ mod tests {
         let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
         assert_eq!(bak_content, original_content);
 
-        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        let after: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(after.tabs.is_empty());
     }
 
@@ -1021,7 +1344,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store_path = dir.path().join("agent-sessions.json");
 
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", "/tmp/session.jsonl", "/tmp/project");
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            "/tmp/session.jsonl",
+            "/tmp/project",
+        );
 
         assert!(store_path.exists());
         assert!(!store_path.with_extension("json.bak").exists());
@@ -1032,10 +1362,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store_path = dir.path().join("agent-sessions.json");
 
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", "/tmp/session.jsonl", "/tmp/project");
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            "/tmp/session.jsonl",
+            "/tmp/project",
+        );
         let first_write = std::fs::read_to_string(&store_path).unwrap();
 
-        record_session_at_path(&store_path, "tab-2", "claude", "def-456", "/tmp/session2.jsonl", "/tmp/project2");
+        record_session_at_path(
+            &store_path,
+            "tab-2",
+            "claude",
+            "def-456",
+            "/tmp/session2.jsonl",
+            "/tmp/project2",
+        );
 
         let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
         assert_eq!(bak_content, first_write);
@@ -1047,12 +1391,30 @@ mod tests {
         let cwd_launch = dir.path().join("project");
         std::fs::create_dir_all(&cwd_launch).unwrap();
         let jsonl = dir.path().join("session.jsonl");
-        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        std::fs::write(
+            &jsonl,
+            format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display()),
+        )
+        .unwrap();
         let store_path = dir.path().join("agent-sessions.json");
 
         // Two writes so the second one produces a .bak of the first, valid version.
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            &jsonl.display().to_string(),
+            &cwd_launch.display().to_string(),
+        );
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            &jsonl.display().to_string(),
+            &cwd_launch.display().to_string(),
+        );
         assert!(store_path.with_extension("json.bak").exists());
 
         std::fs::write(&store_path, "{ not valid json").unwrap();
@@ -1069,12 +1431,30 @@ mod tests {
         let cwd_launch = dir.path().join("project");
         std::fs::create_dir_all(&cwd_launch).unwrap();
         let jsonl = dir.path().join("session.jsonl");
-        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        std::fs::write(
+            &jsonl,
+            format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display()),
+        )
+        .unwrap();
         let store_path = dir.path().join("agent-sessions.json");
 
         // Two writes so the second one produces a .bak of the first, valid version.
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
-        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            &jsonl.display().to_string(),
+            &cwd_launch.display().to_string(),
+        );
+        record_session_at_path(
+            &store_path,
+            "tab-1",
+            "claude",
+            "abc-123",
+            &jsonl.display().to_string(),
+            &cwd_launch.display().to_string(),
+        );
         assert!(store_path.with_extension("json.bak").exists());
 
         std::fs::remove_file(&store_path).unwrap();
@@ -1162,17 +1542,31 @@ mod tests {
         let jsonl = dir.path().join("session.jsonl");
         let store_path = dir.path().join("agent-sessions.json");
 
-        let valid_store = SessionStore { version: 1, tabs: sample_tabs(&cwd_launch, &jsonl) };
+        let valid_store = SessionStore {
+            version: 1,
+            tabs: sample_tabs(&cwd_launch, &jsonl),
+        };
         let valid_content = serde_json::to_string_pretty(&valid_store).unwrap();
         std::fs::write(store_path.with_extension("json.bak"), &valid_content).unwrap();
         std::fs::write(&store_path, "{ not valid json").unwrap();
 
-        record_session_at_path(&store_path, "tab-2", "claude", "def-456", "/tmp/session2.jsonl", "/tmp/project2");
+        record_session_at_path(
+            &store_path,
+            "tab-2",
+            "claude",
+            "def-456",
+            "/tmp/session2.jsonl",
+            "/tmp/project2",
+        );
 
         let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
-        assert_eq!(bak_content, valid_content, "a corrupt main file must not clobber a valid backup");
+        assert_eq!(
+            bak_content, valid_content,
+            "a corrupt main file must not clobber a valid backup"
+        );
 
-        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        let after: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(after.tabs.contains_key("tab-2"));
     }
 
@@ -1212,7 +1606,13 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "new", "/tmp/s.jsonl", "/tmp/p");
 
-        assert!(!set_snapshot_at_path(&path, "tab-1", "old", "stale title", "attention"));
+        assert!(!set_snapshot_at_path(
+            &path,
+            "tab-1",
+            "old",
+            "stale title",
+            "attention"
+        ));
 
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.title, None);
@@ -1240,7 +1640,13 @@ mod tests {
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
 
         assert!(set_snapshot_at_path(&path, "tab-1", "abc", "x", "bogus"));
-        assert!(!set_snapshot_at_path(&path, "tab-2", "abc", "y", "attention"));
+        assert!(!set_snapshot_at_path(
+            &path,
+            "tab-2",
+            "abc",
+            "y",
+            "attention"
+        ));
 
         let store = read_store(&path);
         assert_eq!(store.tabs["tab-1"].notification, None);
@@ -1268,7 +1674,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         let missing = dir.path().join("gone");
-        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", &missing.display().to_string());
+        record_session_at_path(
+            &path,
+            "tab-1",
+            "claude",
+            "abc",
+            "/tmp/s.jsonl",
+            &missing.display().to_string(),
+        );
         set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "error");
 
         let plans = load_restore_plan_from_path(&path);
@@ -1289,7 +1702,10 @@ mod tests {
 
         set_snapshot_at_path(&path, "tab-1", "abc", "t", "error");
 
-        assert!(!bak.exists(), "an identical snapshot must not write a backup");
+        assert!(
+            !bak.exists(),
+            "an identical snapshot must not write a backup"
+        );
     }
 
     #[test]
@@ -1327,9 +1743,20 @@ mod tests {
         let cwd_launch = dir.path().join("project");
         std::fs::create_dir_all(&cwd_launch).unwrap();
         let jsonl = dir.path().join("session.jsonl");
-        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        std::fs::write(
+            &jsonl,
+            format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display()),
+        )
+        .unwrap();
         let path = dir.path().join("agent-sessions.json");
-        record_session_at_path(&path, "tab-1", "claude", "abc", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        record_session_at_path(
+            &path,
+            "tab-1",
+            "claude",
+            "abc",
+            &jsonl.display().to_string(),
+            &cwd_launch.display().to_string(),
+        );
         set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "attention");
 
         let plans = load_restore_plan_from_path(&path);
@@ -1341,9 +1768,19 @@ mod tests {
     #[test]
     fn split_orphans_keeps_plans_whose_tab_lives_in_any_window() {
         let known = std::collections::HashSet::from(["tab-a".to_string(), "tab-c".to_string()]);
-        let (kept, orphans) = split_orphans(vec![plan("tab-a"), plan("tab-b"), plan("tab-c")], &known);
-        assert_eq!(kept.iter().map(|p| p.tab_id.as_str()).collect::<Vec<_>>(), vec!["tab-a", "tab-c"]);
-        assert_eq!(orphans.iter().map(|p| p.tab_id.as_str()).collect::<Vec<_>>(), vec!["tab-b"]);
+        let (kept, orphans) =
+            split_orphans(vec![plan("tab-a"), plan("tab-b"), plan("tab-c")], &known);
+        assert_eq!(
+            kept.iter().map(|p| p.tab_id.as_str()).collect::<Vec<_>>(),
+            vec!["tab-a", "tab-c"]
+        );
+        assert_eq!(
+            orphans
+                .iter()
+                .map(|p| p.tab_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["tab-b"]
+        );
     }
 
     #[test]
@@ -1353,7 +1790,12 @@ mod tests {
         assert_eq!(orphans.len(), 1);
     }
 
-    fn record(agent: Option<&str>, cwd_launch: &Path, transcript: &str, launch_cmd: Option<&str>) -> SessionRecord {
+    fn record(
+        agent: Option<&str>,
+        cwd_launch: &Path,
+        transcript: &str,
+        launch_cmd: Option<&str>,
+    ) -> SessionRecord {
         SessionRecord {
             agent: agent.map(str::to_string),
             session_id: "abc-123".to_string(),
@@ -1373,7 +1815,10 @@ mod tests {
         std::fs::create_dir_all(&project).unwrap();
         let store_path = dir.path().join("agent-sessions.json");
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), record(Some("codex"), &project, "/tmp/missing-codex.jsonl", None));
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("codex"), &project, "/tmp/missing-codex.jsonl", None),
+        );
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
@@ -1394,7 +1839,12 @@ mod tests {
         let mut tabs = HashMap::new();
         tabs.insert(
             "tab-1".to_string(),
-            record(Some("codex"), &project, "/tmp/missing-codex.jsonl", Some("codex-max --model g5")),
+            record(
+                Some("codex"),
+                &project,
+                "/tmp/missing-codex.jsonl",
+                Some("codex-max --model g5"),
+            ),
         );
         write_store(&store_path, tabs);
 
@@ -1408,15 +1858,26 @@ mod tests {
         let store_path = dir.path().join("agent-sessions.json");
         let missing = dir.path().join("gone");
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), record(Some("codex"), &missing, "/tmp/missing-codex.jsonl", None));
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("codex"), &missing, "/tmp/missing-codex.jsonl", None),
+        );
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
         assert!(plans[0].resume_cmd.is_empty());
-        assert!(plans[0].attempted_cmd.contains("resume --last"), "{}", plans[0].attempted_cmd);
+        assert!(
+            plans[0].attempted_cmd.contains("resume --last"),
+            "{}",
+            plans[0].attempted_cmd
+        );
 
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
-        assert!(store.tabs.contains_key("tab-1"), "a blocked codex entry stays for Try again");
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(
+            store.tabs.contains_key("tab-1"),
+            "a blocked codex entry stays for Try again"
+        );
     }
 
     #[test]
@@ -1428,7 +1889,12 @@ mod tests {
         let mut tabs = HashMap::new();
         tabs.insert(
             "tab-1".to_string(),
-            record(Some("opencode"), &project, "/tmp/missing-opencode.jsonl", None),
+            record(
+                Some("opencode"),
+                &project,
+                "/tmp/missing-opencode.jsonl",
+                None,
+            ),
         );
         write_store(&store_path, tabs);
 
@@ -1473,7 +1939,12 @@ mod tests {
         let mut tabs = HashMap::new();
         tabs.insert(
             "tab-1".to_string(),
-            record(Some("opencode"), &missing, "/tmp/missing-opencode.jsonl", None),
+            record(
+                Some("opencode"),
+                &missing,
+                "/tmp/missing-opencode.jsonl",
+                None,
+            ),
         );
         write_store(&store_path, tabs);
 
@@ -1481,8 +1952,12 @@ mod tests {
         assert!(plans[0].resume_cmd.is_empty());
         assert_eq!(plans[0].attempted_cmd, "opencode --session 'abc-123'");
 
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
-        assert!(store.tabs.contains_key("tab-1"), "a blocked opencode entry stays for Try again");
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(
+            store.tabs.contains_key("tab-1"),
+            "a blocked opencode entry stays for Try again"
+        );
     }
 
     #[test]
@@ -1492,14 +1967,21 @@ mod tests {
         std::fs::create_dir_all(&project).unwrap();
         let store_path = dir.path().join("agent-sessions.json");
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), record(Some("gemini"), &project, "/tmp/missing-gem.jsonl", None));
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("gemini"), &project, "/tmp/missing-gem.jsonl", None),
+        );
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
         assert!(plans.is_empty());
 
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
-        assert!(!store.tabs.contains_key("tab-1"), "an unknowable record is dead weight");
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(
+            !store.tabs.contains_key("tab-1"),
+            "an unknowable record is dead weight"
+        );
     }
 
     #[test]
@@ -1508,13 +1990,20 @@ mod tests {
         let store_path = dir.path().join("agent-sessions.json");
         let missing = dir.path().join("gone");
         let mut tabs = HashMap::new();
-        tabs.insert("tab-1".to_string(), record(Some("gemini"), &missing, "/tmp/missing-gem.jsonl", None));
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("gemini"), &missing, "/tmp/missing-gem.jsonl", None),
+        );
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
         assert!(plans.is_empty());
 
-        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
-        assert!(store.tabs.contains_key("tab-1"), "same keep rule as a missing transcript");
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(
+            store.tabs.contains_key("tab-1"),
+            "same keep rule as a missing transcript"
+        );
     }
 }

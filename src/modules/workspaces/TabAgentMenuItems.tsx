@@ -39,7 +39,7 @@ function ValueItem({
 }: {
   icon: typeof Copy01Icon;
   label: ReactNode;
-  value: string;
+  value?: string;
   onSelect: () => void;
 }) {
   return (
@@ -47,7 +47,7 @@ function ValueItem({
       <HugeiconsIcon icon={icon} size={14} strokeWidth={2} />
       <span className="min-w-0">
         {label}
-        <ValueHint value={value} />
+        {value !== undefined && <ValueHint value={value} />}
       </span>
     </ContextMenuItem>
   );
@@ -119,13 +119,11 @@ export function TabAgentMenuItems({ tabId }: { tabId: string }) {
           <ValueItem
             icon={FolderOpenIcon}
             label="Open Transcript Folder"
-            value={parentDir(transcriptPath)}
             onSelect={() => onRevealInExplorer(parentDir(transcriptPath))}
           />
           <ValueItem
             icon={Search01Icon}
             label={REVEAL_TRANSCRIPT_LABEL}
-            value={transcriptPath}
             onSelect={() => void revealInFinder(transcriptPath)}
           />
         </>

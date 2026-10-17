@@ -199,7 +199,8 @@ pub(crate) fn is_safe_rel(rel: &str) -> bool {
         return false;
     }
     let b = rel.as_bytes();
-    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'/' || b[2] == b'\\') {
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'/' || b[2] == b'\\')
+    {
         return false;
     }
     !rel.split('/').any(|seg| seg == "..")
@@ -523,7 +524,11 @@ mod tests {
     #[test]
     fn snippet_skips_headings_and_blank_lines_and_truncates() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "a.md", "# Title\n\n## Sub\n\nFirst body line here.\nsecond\n");
+        write(
+            dir.path(),
+            "a.md",
+            "# Title\n\n## Sub\n\nFirst body line here.\nsecond\n",
+        );
         let long = "x".repeat(500);
         write(dir.path(), "b.md", &format!("{long}\n"));
         let res = read_dirs(dir.path(), &[""]);
@@ -564,11 +569,17 @@ mod tests {
         let res = read_dirs(dir.path(), &[""]);
         let root = one(&res, "");
         assert_eq!(
-            root.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
+            root.notes
+                .iter()
+                .map(|n| n.rel_path.as_str())
+                .collect::<Vec<_>>(),
             vec!["root.md"],
         );
         assert_eq!(
-            root.subfolders.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            root.subfolders
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["docs"],
         );
         assert!(!root.missing);
@@ -586,7 +597,10 @@ mod tests {
         let res = read_dirs(dir.path(), &[""]);
         let root = one(&res, "");
         let docs = root.subfolders.iter().find(|s| s.name == "docs").unwrap();
-        assert_eq!(docs.note_count, 2, "counts markdown directly inside, not the .txt, not the grandchild");
+        assert_eq!(
+            docs.note_count, 2,
+            "counts markdown directly inside, not the .txt, not the grandchild"
+        );
         assert!(docs.has_subfolders);
         let flat = root.subfolders.iter().find(|s| s.name == "flat").unwrap();
         assert_eq!(flat.note_count, 1);
@@ -603,8 +617,15 @@ mod tests {
         let sub = read_dirs(dir.path(), &["docs/sub"]);
         let d = one(&sub, "docs/sub");
         assert_eq!(
-            d.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
-            vec!["docs/sub/keep.md", "docs/sub/keep2.markdown", "docs/sub/keep3.mdx"],
+            d.notes
+                .iter()
+                .map(|n| n.rel_path.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "docs/sub/keep.md",
+                "docs/sub/keep2.markdown",
+                "docs/sub/keep3.mdx"
+            ],
         );
     }
 
@@ -639,14 +660,21 @@ mod tests {
         let res = read_dirs(dir.path(), &["", "gone", "../escape", "docs/../../escape"]);
         assert!(one(&res, "").notes.len() == 1);
         assert!(one(&res, "gone").missing);
-        assert!(one(&res, "../escape").missing, "unsafe paths are missing, never an error");
+        assert!(
+            one(&res, "../escape").missing,
+            "unsafe paths are missing, never an error"
+        );
         assert!(one(&res, "docs/../../escape").missing);
     }
 
     #[test]
     fn note_metadata_matches_the_head_parser() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "fm.md", "---\ntitle: From Frontmatter\ncreated: 2020-01-02\n---\n\nFirst body line.\n");
+        write(
+            dir.path(),
+            "fm.md",
+            "---\ntitle: From Frontmatter\ncreated: 2020-01-02\n---\n\nFirst body line.\n",
+        );
         let res = read_dirs(dir.path(), &[""]);
         let n = &one(&res, "").notes[0];
         assert_eq!(n.title, "From Frontmatter");
@@ -666,7 +694,10 @@ mod tests {
         let res = read_dirs(dir.path(), &[""]);
         let root = one(&res, "");
         assert_eq!(
-            root.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
+            root.notes
+                .iter()
+                .map(|n| n.rel_path.as_str())
+                .collect::<Vec<_>>(),
             vec!["public.md"],
         );
         assert!(root.subfolders.is_empty());
@@ -690,7 +721,11 @@ mod tests {
     #[test]
     fn heads_resolve_titles_and_mark_missing() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "docs/a.md", "---\ntitle: Pinned A\n---\nbody line\n");
+        write(
+            dir.path(),
+            "docs/a.md",
+            "---\ntitle: Pinned A\n---\nbody line\n",
+        );
         write(dir.path(), "b.md", "# Heading B\nbody\n");
         let heads = heads_blocking(
             dir.path(),
@@ -707,7 +742,10 @@ mod tests {
         assert!(!heads[0].missing);
         assert_eq!(heads[1].title, "Heading B");
         assert!(heads[2].missing);
-        assert_eq!(heads[2].title, "gone", "a missing pin still shows its file stem");
+        assert_eq!(
+            heads[2].title, "gone",
+            "a missing pin still shows its file stem"
+        );
         assert!(heads[3].missing, "unsafe paths are missing, never an error");
     }
 
@@ -734,7 +772,10 @@ mod tests {
         assert!(matches!(kind("docs"), PathKind::Dir));
         assert!(matches!(kind("docs/a.md"), PathKind::File));
         assert!(matches!(kind("docs/gone.md"), PathKind::Absent));
-        assert!(matches!(kind(""), PathKind::Dir), "the vault root is a directory");
+        assert!(
+            matches!(kind(""), PathKind::Dir),
+            "the vault root is a directory"
+        );
         assert!(matches!(kind("../escape"), PathKind::Absent));
     }
 
@@ -742,10 +783,7 @@ mod tests {
     fn drive_prefix_rejection_needs_a_separator_after_the_colon() {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "a:b.md", "a\n");
-        let got = paths_exist_blocking(
-            dir.path(),
-            &["a:b.md".to_string(), "C:/x.md".to_string()],
-        );
+        let got = paths_exist_blocking(dir.path(), &["a:b.md".to_string(), "C:/x.md".to_string()]);
         let kind = |rel: &str| {
             got.iter()
                 .find(|p| p.rel_path == rel)

@@ -325,7 +325,7 @@ function DetailTabRow({
               <span
                 className={cn(
                   "min-w-0 truncate",
-                  (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") &&
+                  (tab.kind === "editor" || tab.kind === "markdown" || tab.kind === "git-diff" || tab.kind === "git-commit-file") &&
                     tab.preview &&
                     "italic",
                 )}

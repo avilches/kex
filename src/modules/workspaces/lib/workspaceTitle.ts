@@ -45,6 +45,7 @@ export function resolveWorkspaceTitle(ws: WorkspaceTitleSubject, inp: Inputs): s
     home: inp.sys.home,
     host: inp.sys.host,
     defaults: inp.defaults,
+    workspaceRoot: ws.workspaceRoot,
   };
   const focusedTitle = ws.focusedTab
     ? resolveAgentTabTitle(ws.focusedTab, inp.runningCommand, inp.oscTitle, inp.agentSession, src)

@@ -8,6 +8,7 @@ describe("titleVariablesFor", () => {
       "dir",
       "branch",
       "repo",
+      "workspace",
       "host",
       "cmd",
       "osc",
@@ -17,8 +18,8 @@ describe("titleVariablesFor", () => {
     ]);
   });
 
-  test("a browser only offers the host and the URL", () => {
-    expect(titleVariablesFor("browser").map((v) => v.name)).toEqual(["host", "url"]);
+  test("a browser only offers the workspace root, the host and the URL", () => {
+    expect(titleVariablesFor("browser").map((v) => v.name)).toEqual(["workspace", "host", "url"]);
   });
 
   test("git history only offers the place and common variables", () => {
@@ -27,6 +28,7 @@ describe("titleVariablesFor", () => {
       "dir",
       "branch",
       "repo",
+      "workspace",
       "host",
     ]);
   });

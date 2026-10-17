@@ -33,6 +33,7 @@ import { useUiFont } from "@/lib/useUiFont";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
 import { isMarkdownPath } from "@/lib/utils";
 import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
+import { findReplaceableFilePreview, isFilePreviewTab } from "@/modules/workspaces/lib/fileTabPreview";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -1459,9 +1460,9 @@ export default function App() {
       const existingOpenTab = findOpenPathTab(activeWorkspace.paneTree, path);
       if (existingOpenTab) {
         const existing = existingOpenTab.tab;
-        if (pin && existing.kind === "editor" && existing.preview) {
+        if (pin && isFilePreviewTab(existing)) {
           updateTabData(activeWorkspace.id, existing.id, (p) =>
-            p.kind === "editor" ? { ...p, preview: false } : p,
+            isFilePreviewTab(p) ? { ...p, preview: false } : p,
           );
         }
         activateTab(activeWorkspace.id, existing.id);
@@ -1470,44 +1471,29 @@ export default function App() {
       }
       const tabId = newTabId();
       const isPreview = !(pin ?? false);
+      const newTab: Tab = markdown
+        ? { id: tabId, kind: "markdown", path, preview: isPreview }
+        : { id: tabId, kind: "editor", path, dirty: false, preview: isPreview };
 
-      if (!markdown && isPreview) {
+      if (isPreview) {
         const activePane = allPanes(activeWorkspace.paneTree).find(
           (p) => p.id === activeWorkspace.activePaneId,
         );
-        const existingPreview = activePane?.tabs.find(
-          (p) => p.kind === "editor" && p.preview,
-        );
+        const existingPreview = activePane
+          ? findReplaceableFilePreview(activePane.tabs)
+          : undefined;
         if (existingPreview) {
           replaceTab(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
             existingPreview.id,
-            {
-              id: tabId,
-              kind: "editor",
-              path,
-              dirty: false,
-              preview: true,
-            },
+            newTab,
           );
           return tabId;
         }
       }
 
-      openTab(
-        activeWorkspace.id,
-        activeWorkspace.activePaneId,
-        markdown
-          ? { id: tabId, kind: "markdown", path }
-          : {
-              id: tabId,
-              kind: "editor",
-              path,
-              dirty: false,
-              preview: isPreview,
-            },
-      );
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
       return tabId;
     },
     [activeWorkspace, activateTab, openTab, replaceTab],
@@ -2614,11 +2600,9 @@ export default function App() {
         const found = findTabGlobal(tabId);
         if (found)
           updateTabData(found.workspace.id, tabId, (p) =>
-            p.kind === "editor"
+            p.kind === "editor" || p.kind === "markdown"
               ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
-              : p.kind === "markdown"
-                ? { ...p, dirty }
-                : p,
+              : p,
           );
       },
       onEditorClose: (tabId) => {
@@ -3221,7 +3205,7 @@ export default function App() {
         if (found)
           updateTabData(found.workspace.id, activeTabId, (p) => {
             const newLocked = !p.locked;
-            if (p.kind === "editor") {
+            if (p.kind === "editor" || p.kind === "markdown") {
               return {
                 ...p,
                 locked: newLocked,

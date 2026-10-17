@@ -26,11 +26,7 @@ impl Default for ProcessMonitor {
 /// Sum CPU and memory across `root` and all of its descendants.
 /// The returned CPU is normalized to 0..=100 by dividing the per-core sum by
 /// `num_cpus`; memory is the raw byte sum of the tree.
-pub fn aggregate_tree(
-    procs: &HashMap<u32, ProcStat>,
-    root: u32,
-    num_cpus: usize,
-) -> (f32, u64) {
+pub fn aggregate_tree(procs: &HashMap<u32, ProcStat>, root: u32, num_cpus: usize) -> (f32, u64) {
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for (pid, st) in procs {
         children.entry(st.parent).or_default().push(*pid);
