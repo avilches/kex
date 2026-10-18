@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { AppSuggestion } from "./appSuggestions";
 import {
   actionProblems,
+  commandDraft,
   commandVariableDocs,
+  commitCommand,
+  currentSuggestionKey,
   dropEmptyActions,
   withKind,
   withSuggestion,
@@ -117,6 +120,63 @@ describe("actionProblems", () => {
 
   it("does not report a command problem for an empty command", () => {
     expect(actionProblems({ ...app, command: "  " }, ctx)).toEqual([]);
+  });
+});
+
+describe("commandDraft", () => {
+  it("shows what is being typed while the box has focus, even when the stored command changes", () => {
+    expect(commandDraft({ draft: "pnpm de", stored: "pnpm dev", focused: true })).toEqual({ shown: "pnpm de", required: false });
+  });
+
+  it("follows the stored command when the box is not focused", () => {
+    expect(commandDraft({ draft: "old", stored: "new", focused: false })).toEqual({ shown: "new", required: false });
+  });
+
+  it("flags an empty draft as required without touching the stored command", () => {
+    expect(commandDraft({ draft: "  ", stored: "pnpm dev", focused: true })).toEqual({ shown: "  ", required: true });
+  });
+
+  it("an empty draft after losing focus goes back to the stored command", () => {
+    expect(commandDraft({ draft: "", stored: "pnpm dev", focused: false })).toEqual({ shown: "pnpm dev", required: false });
+  });
+
+  it("a brand new row with no stored command keeps showing the empty box and asks for a command", () => {
+    expect(commandDraft({ draft: "", stored: "", focused: false })).toEqual({ shown: "", required: true });
+  });
+});
+
+describe("commitCommand", () => {
+  it("saves a non-empty command, trimmed", () => {
+    expect(commitCommand("pnpm dev", "  pnpm test ")).toEqual({ save: "pnpm test" });
+  });
+
+  it("saves nothing for an empty command, so the last valid one stays", () => {
+    expect(commitCommand("pnpm dev", "   ")).toEqual({ save: null });
+  });
+
+  it("saves nothing when the command did not change", () => {
+    expect(commitCommand("pnpm dev", "pnpm dev")).toEqual({ save: null });
+  });
+});
+
+describe("currentSuggestionKey", () => {
+  const zed: AppSuggestion = { key: "zed", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {path}" };
+  const zedWs: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed (workspace)", iconId: "zed", defaultCommand: "zed {workspace}" };
+
+  it("tells the file variant from the workspace variant of the same app", () => {
+    const base: Action = { id: "a", name: "Zed", runInTerminal: false, command: "zed {path}", appId: "zed", ownButton: false };
+    expect(currentSuggestionKey(base, [zed, zedWs])).toBe("zed");
+    expect(currentSuggestionKey({ ...base, command: "zed {workspace}" }, [zed, zedWs])).toBe("zed:workspace");
+  });
+
+  it("falls back to the first suggestion of the app when the command was edited", () => {
+    const edited: Action = { id: "a", name: "Zed", runInTerminal: false, command: "zed --new {path}", appId: "zed", ownButton: false };
+    expect(currentSuggestionKey(edited, [zed, zedWs])).toBe("zed");
+  });
+
+  it("is the custom app when the action has no app", () => {
+    const custom: Action = { id: "a", name: "x", runInTerminal: false, command: "x", ownButton: false };
+    expect(currentSuggestionKey(custom, [zed])).toBe("custom");
   });
 });
 

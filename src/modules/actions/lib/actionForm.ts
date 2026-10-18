@@ -4,7 +4,7 @@ import {
   type TitleVariableGroup,
 } from "@/modules/workspaces/lib/titleTemplate";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import type { AppSuggestion } from "./appSuggestions";
+import { CUSTOM_APP_SUGGESTION, type AppSuggestion } from "./appSuggestions";
 import {
   commandProblem,
   missingVariables,
@@ -101,6 +101,36 @@ export function actionProblems(
     }
   }
   return out;
+}
+
+// The command box keeps what is being typed apart from what is saved. While it has focus the
+// draft is shown as typed; an empty one is flagged and never saved, so the stored action
+// keeps its last valid command. Once focus leaves, the box shows the stored command again:
+// that also picks up a change made from outside (a suggestion, another window).
+export function commandDraft(input: { draft: string; stored: string; focused: boolean }): {
+  shown: string;
+  required: boolean;
+} {
+  const { draft, stored, focused } = input;
+  const empty = !draft.trim();
+  if (focused) return { shown: draft, required: empty };
+  if (empty && stored.trim()) return { shown: stored, required: false };
+  return { shown: stored || draft, required: !(stored || draft).trim() };
+}
+
+// What leaving the command box saves: the trimmed command when it is new and not empty.
+export function commitCommand(stored: string, draft: string): { save: string | null } {
+  const next = draft.trim();
+  return { save: next && next !== stored ? next : null };
+}
+
+// The suggestion a saved app Action corresponds to. An app can have two (Zed opens a file or
+// a folder), told apart by the command they start from; an edited command falls back to the
+// first one of the app.
+export function currentSuggestionKey(action: Action, suggestions: readonly AppSuggestion[]): string {
+  const ofApp = suggestions.filter((s) => s.appId && s.appId === action.appId);
+  const exact = ofApp.find((s) => s.defaultCommand === action.command);
+  return (exact ?? ofApp[0])?.key ?? CUSTOM_APP_SUGGESTION.key;
 }
 
 // A row with no command is a form the user abandoned; it goes when the editor closes.
