@@ -26,6 +26,7 @@ import {
   useContentSearch,
 } from "./hooks/useContentSearch";
 import { fuzzyBest } from "./lib/fuzzy";
+import { commandChoice } from "./lib/commandChoice";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
@@ -199,12 +200,13 @@ export function CommandPalette({
 
   const runCommand = useCallback(
     (item: PaletteItem) => {
-      if (item.disabledReason) return;
-      if (item.id === "theme.pick") return enterThemes();
-      if (item.id === "search.content") return setQuery("#");
-      if (item.id === "history.open") return setQuery(">");
+      const choice = commandChoice(item);
+      if (choice.action === "none") return;
+      if (choice.learn) recordChoice(parsed.term, commandRowKey(item.id));
+      if (choice.action === "themes") return enterThemes();
+      if (choice.action === "content") return setQuery("#");
+      if (choice.action === "history") return setQuery(">");
       recordUse(item.id);
-      recordChoice(parsed.term, commandRowKey(item.id));
       runAfterClose(item.run);
     },
     [enterThemes, runAfterClose, parsed.term],
