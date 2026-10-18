@@ -1,8 +1,6 @@
 import {
-  CopySlashIcon,
   File01Icon,
   FolderOpenIcon,
-  Link01Icon,
   LinkSquare02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -17,7 +15,10 @@ import {
 } from "@/components/ui/context-menu";
 import { IS_MAC } from "@/lib/platform";
 import {
-  copyToClipboard,
+  CopyAbsolutePathItem,
+  CopyRelativeTextItem,
+} from "@/modules/explorer/lib/copyPathItems";
+import {
   OPEN_EXTERNAL_LABEL,
   openWithDefaultApp,
   REVEAL_LABEL,
@@ -71,20 +72,8 @@ export function WikiLinkContextMenu({
             {REVEAL_LABEL}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void copyToClipboard(note.path, "Copied absolute path")}
-          >
-            <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-            Copy Absolute Path
-          </ContextMenuItem>
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void copyToClipboard(note.relativePath, "Copied relative path")}
-          >
-            <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-            Copy Relative Path
-          </ContextMenuItem>
+          <CopyAbsolutePathItem path={note.path} />
+          <CopyRelativeTextItem text={note.relativePath} />
         </ContextMenuContent>
       ) : null}
     </ContextMenu>

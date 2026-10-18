@@ -35,13 +35,26 @@ function ValueItem({
   icon,
   label,
   value,
+  inline,
   onSelect,
 }: {
   icon: typeof Copy01Icon;
   label: ReactNode;
   value?: string;
+  inline?: boolean;
   onSelect: () => void;
 }) {
+  if (inline && value !== undefined) {
+    return (
+      <ContextMenuItem onSelect={onSelect}>
+        <HugeiconsIcon icon={icon} size={14} strokeWidth={2} />
+        {label}
+        <span className="ml-auto max-w-[140px] truncate pl-3 font-mono text-[10px] font-normal text-muted-foreground">
+          {value}
+        </span>
+      </ContextMenuItem>
+    );
+  }
   return (
     <ContextMenuItem onSelect={onSelect}>
       <HugeiconsIcon icon={icon} size={14} strokeWidth={2} />
@@ -76,6 +89,7 @@ export function CopyTabIdItem({ tabId }: { tabId: string }) {
       icon={Copy01Icon}
       label="Copy Tab ID"
       value={tabId}
+      inline
       onSelect={() => void writeClipboardText(tabId)}
     />
   );
