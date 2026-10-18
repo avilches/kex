@@ -56,6 +56,37 @@ describe("sanitizeWorkspace", () => {
     expect(pane.activeTabId).toBeNull();
   });
 
+  it("normalizes saved actions and drops an active action that no longer exists", () => {
+    const w = {
+      id: "w1",
+      title: "W",
+      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+      activePaneId: "p1",
+      actions: [
+        { id: "ac-1", name: " Dev ", runInTerminal: true, command: " npm run dev ", ownButton: true },
+        { id: "ac-2", name: "Empty", runInTerminal: true, command: " ", ownButton: false },
+      ],
+      activeAction: "ac-2",
+    } as Workspace;
+    const out = sanitizeWorkspace(w);
+    expect(out.actions).toEqual([
+      { id: "ac-1", name: "Dev", runInTerminal: true, command: "npm run dev", ownButton: true },
+    ]);
+    expect(out.activeAction).toBeUndefined();
+  });
+
+  it("leaves a workspace without actions untouched", () => {
+    const w: Workspace = {
+      id: "w1",
+      title: "W",
+      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+      activePaneId: "p1",
+    };
+    const out = sanitizeWorkspace(w);
+    expect(out).not.toHaveProperty("actions");
+    expect(out).not.toHaveProperty("activeAction");
+  });
+
   it("keeps two markdown tabs open on the same path", () => {
     const w: Workspace = {
       id: "ws-1",

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { normalizeActions } from "@/modules/actions";
 import { debouncedInvoke } from "./debouncedInvoke";
 import { seedActivity, withActivity } from "./autoHibernate";
 import type { Tab, SplitNode, Workspace } from "./types";
@@ -43,9 +44,18 @@ function sanitizeTree(node: SplitNode): SplitNode {
   return { ...node, first: sanitizeTree(node.first), second: sanitizeTree(node.second) };
 }
 
+function sanitizeActions(w: Workspace): Pick<Workspace, "actions" | "activeAction"> {
+  if (w.actions === undefined) return {};
+  const actions = normalizeActions(w.actions);
+  const active = actions.some((a) => a.id === w.activeAction) ? w.activeAction : undefined;
+  return { actions, activeAction: active };
+}
+
 export function sanitizeWorkspace(w: Workspace): Workspace {
+  const { actions: _actions, activeAction: _activeAction, ...rest } = w;
   return {
-    ...w,
+    ...rest,
+    ...sanitizeActions(w),
     showHidden: w.showHidden,
     sidebar: sanitizeWorkspaceSidebar(w.sidebar),
     paneTree: sanitizeTree(w.paneTree),

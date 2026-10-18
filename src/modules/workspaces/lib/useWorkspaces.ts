@@ -3,7 +3,16 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  addAction,
+  promoteToGlobal,
+  removeAction,
+  reorderActions,
+  updateAction,
+  type Action,
+} from "@/modules/actions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setGlobalActions } from "@/modules/settings/store";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
@@ -167,6 +176,47 @@ export function applyWorkspaceGroup(
   return workspaces.map((w) =>
     w.id === workspaceId ? { ...w, groupId: groupId ?? undefined } : w,
   );
+}
+
+export function applyWorkspaceActions(
+  workspaces: Workspace[],
+  workspaceId: string,
+  change: (actions: Action[]) => Action[],
+): Workspace[] {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) return w;
+    const actions = change(w.actions ?? []);
+    const keepActive = actions.some((a) => a.id === w.activeAction);
+    return { ...w, actions, activeAction: keepActive ? w.activeAction : undefined };
+  });
+}
+
+export function applySetActiveAction(
+  workspaces: Workspace[],
+  workspaceId: string,
+  actionId: string | null,
+): Workspace[] {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) return w;
+    const exists = actionId !== null && (w.actions ?? []).some((a) => a.id === actionId);
+    return { ...w, activeAction: exists ? actionId : undefined };
+  });
+}
+
+// The caller persists `global`; the workspace side is plain state.
+export function applyPromoteAction(
+  workspaces: Workspace[],
+  workspaceId: string,
+  actionId: string,
+  global: Action[],
+): { workspaces: Workspace[]; global: Action[] } {
+  const source = workspaces.find((w) => w.id === workspaceId)?.actions ?? [];
+  const moved = promoteToGlobal(source, global, actionId);
+  if (moved.workspace === source) return { workspaces, global };
+  return {
+    workspaces: applyWorkspaceActions(workspaces, workspaceId, () => moved.workspace),
+    global: moved.global,
+  };
 }
 
 // Where a freshly opened tab lands. An explicit index (drag/reorder) wins;
@@ -1021,6 +1071,43 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const addWorkspaceAction = useCallback((workspaceId: string, action: Action) => {
+    setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
+  }, []);
+
+  const updateWorkspaceAction = useCallback(
+    (workspaceId: string, actionId: string, patch: Partial<Omit<Action, "id">>) => {
+      setWorkspaces((prev) =>
+        applyWorkspaceActions(prev, workspaceId, (list) => updateAction(list, actionId, patch)),
+      );
+    },
+    [],
+  );
+
+  const removeWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => removeAction(list, actionId)));
+  }, []);
+
+  const reorderWorkspaceActions = useCallback((workspaceId: string, fromId: string, toId: string) => {
+    setWorkspaces((prev) =>
+      applyWorkspaceActions(prev, workspaceId, (list) => reorderActions(list, fromId, toId)),
+    );
+  }, []);
+
+  const setActiveWorkspaceAction = useCallback((workspaceId: string, actionId: string | null) => {
+    setWorkspaces((prev) => applySetActiveAction(prev, workspaceId, actionId));
+  }, []);
+
+  // The move is computed from the committed state so the global list is written once, outside
+  // any state updater (an updater can run twice and must not have side effects).
+  const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    const global = usePreferencesStore.getState().actions;
+    const moved = applyPromoteAction(workspacesRef.current, workspaceId, actionId, global);
+    if (moved.workspaces === workspacesRef.current) return;
+    setWorkspaces((prev) => applyPromoteAction(prev, workspaceId, actionId, global).workspaces);
+    void setGlobalActions(moved.global);
+  }, []);
+
   const setAgentTitles = useCallback((titles: ReadonlyMap<string, string>) => {
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
   }, []);
@@ -1141,6 +1228,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setActiveScript,
     setScriptPaneId,
     validateScriptTabs,
+    addWorkspaceAction,
+    updateWorkspaceAction,
+    removeWorkspaceAction,
+    reorderWorkspaceActions,
+    setActiveWorkspaceAction,
+    promoteWorkspaceAction,
     setTerminalRunningCommand,
     toggleOverlayPreview,
     toggleSplitPreview,
