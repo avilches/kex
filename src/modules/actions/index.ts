@@ -12,6 +12,9 @@ export {
 } from "./lib/actions";
 export type { Action } from "./lib/types";
 export { ActionIcon } from "./ActionIcon";
+export { ActionsEditor } from "./ActionsEditor";
+export { dropEmptyActions } from "./lib/actionForm";
+export { useActionContext, type ActionContext } from "./lib/useActionContext";
 export {
   CUSTOM_APP_SUGGESTION,
   suggestionFor,
