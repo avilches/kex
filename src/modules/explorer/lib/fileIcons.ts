@@ -93,7 +93,7 @@ const fileIcons: FileIcons = {
     fileExtensions: ["ino"],
   },
   asciidoc: {
-    fileExtensions: ["adoc", "asciidoc", "asc"],
+    fileExtensions: ["adoc", "asciidoc"],
   },
   assembly: {
     fileExtensions: [
@@ -983,7 +983,6 @@ const fileIcons: FileIcons = {
       "ico",
       "tif",
       "tiff",
-      "psb",
       "ami",
       "apx",
       "avif",
@@ -1147,7 +1146,6 @@ const fileIcons: FileIcons = {
       ".jsbeautifyrc",
       ".esformatter",
       "cdp.pid",
-      ".lintstagedrc",
       ".whitesource",
     ],
   },
@@ -1183,7 +1181,6 @@ const fileIcons: FileIcons = {
     fileNames: [
       "knip.json",
       "knip.jsonc",
-      ".knip.jsonc",
       ".knip.jsonc",
       "knip.ts",
       "knip.js",
@@ -1300,7 +1297,6 @@ const fileIcons: FileIcons = {
   lua: {
     languageIds: ["lua"],
     fileExtensions: ["lua"],
-    fileNames: [".luacheckrc"],
   },
   "luau-check": {
     fileNames: ["selene.toml", "selene.yml", "selene.yaml"],
@@ -2038,7 +2034,7 @@ const fileIcons: FileIcons = {
     fileExtensions: ["sublime-project", "sublime-workspace"],
   },
   "super-collider": {
-    fileExtensions: ["sc", "scd"],
+    fileExtensions: ["scd"],
   },
   "svelte-config": {
     fileNames: [
@@ -2635,7 +2631,6 @@ const fileIcons: FileIcons = {
       "aseprite-extension",
       "bz",
       "bz2",
-      "db",
       "gz",
       "paq8n",
       "paq8o",

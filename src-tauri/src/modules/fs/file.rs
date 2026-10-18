@@ -146,11 +146,11 @@ pub fn fs_canonicalize(path: String, workspace: Option<WorkspaceEnv>) -> Result<
 pub fn fs_stat(path: String, workspace: Option<WorkspaceEnv>) -> Result<FileStat, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let p = resolve_path(&path, &workspace);
-    let meta = std::fs::metadata(&p).map_err(|e| e.to_string())?;
-    let kind = if meta.is_dir() {
-        StatKind::Dir
-    } else if meta.file_type().is_symlink() {
+    let meta = std::fs::symlink_metadata(&p).map_err(|e| e.to_string())?;
+    let kind = if meta.file_type().is_symlink() {
         StatKind::Symlink
+    } else if meta.is_dir() {
+        StatKind::Dir
     } else {
         StatKind::File
     };
@@ -235,5 +235,20 @@ mod tests {
         assert_eq!(std::fs::read(&target).unwrap(), b"payload");
         // The pre-staged symlink target must not have been written through.
         assert_eq!(std::fs::read(&outside).unwrap(), b"untouched");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stat_reports_symlink_kind_without_following_it() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("a.txt");
+        std::fs::write(&target, b"hello").unwrap();
+        let link = dir.path().join("link.txt");
+        symlink(&target, &link).unwrap();
+
+        let stat = fs_stat(link.to_string_lossy().into_owned(), None).unwrap();
+
+        assert!(matches!(stat.kind, StatKind::Symlink));
     }
 }
