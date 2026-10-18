@@ -5,11 +5,13 @@ import {
   StateField,
 } from "@codemirror/state";
 import {
-  EditorView,
+  type EditorView,
   keymap,
   showTooltip,
   type Tooltip,
   type TooltipView,
+  ViewPlugin,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { Clock01Icon } from "@hugeicons/core-free-icons";
 import { hugeIcon } from "./completionIcons";
@@ -124,25 +126,11 @@ function historyTooltipView(view: EditorView): TooltipView {
 }
 
 export function historyPopover(fetch: Fetcher) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
   const open = (view: EditorView) => {
     const query = view.state.doc.toString();
     void fetch(query, LIMIT).then((items) => {
       if (items.length) dispatch(view, { open: true, items, index: 0 });
     });
-  };
-
-  const refilter = (view: EditorView) => {
-    if (timer) clearTimeout(timer);
-    const query = view.state.doc.toString();
-    timer = setTimeout(() => {
-      void fetch(query, LIMIT).then((items) => {
-        if (view.state.field(historyField, false)?.open) {
-          dispatch(view, { open: true, items, index: 0 });
-        }
-      });
-    }, REFILTER_MS);
   };
 
   const upOrOpen = (view: EditorView): boolean => {
@@ -188,9 +176,33 @@ export function historyPopover(fetch: Fetcher) {
         { key: "Escape", run: dismiss },
       ]),
     ),
-    EditorView.updateListener.of((u) => {
-      if (!u.docChanged) return;
-      if (u.state.field(historyField, false)?.open) refilter(u.view);
-    }),
+    refilterPlugin(fetch),
   ];
+}
+
+function refilterPlugin(fetch: Fetcher) {
+  return ViewPlugin.fromClass(
+    class {
+      private timer: ReturnType<typeof setTimeout> | null = null;
+
+      update(u: ViewUpdate) {
+        if (!u.docChanged) return;
+        if (!u.state.field(historyField, false)?.open) return;
+        if (this.timer) clearTimeout(this.timer);
+        const view = u.view;
+        const query = view.state.doc.toString();
+        this.timer = setTimeout(() => {
+          void fetch(query, LIMIT).then((items) => {
+            if (view.state.field(historyField, false)?.open) {
+              dispatch(view, { open: true, items, index: 0 });
+            }
+          });
+        }, REFILTER_MS);
+      }
+
+      destroy() {
+        if (this.timer) clearTimeout(this.timer);
+      }
+    },
+  );
 }
