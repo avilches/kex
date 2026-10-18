@@ -97,9 +97,21 @@ export function SettingsApp() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        void getCurrentWebviewWindow().close();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Let an open dialog/popover consume Escape first (Radix closes it), and
+      // never close the window out from under a field being edited.
+      if (
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      void getCurrentWebviewWindow().close();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
