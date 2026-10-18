@@ -147,17 +147,18 @@ function gitRows(): HTMLElement {
     );
     box.append(row);
   }
+  const ignoredDim = `${toHex("var(--muted-foreground)")}d9`;
   box.append(
     h(
       "div",
       {
-        class: "flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px] text-muted-foreground",
+        class: "flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px] text-muted-foreground/85",
         "data-file": "node_modules",
-        "data-hex": toHex("var(--muted-foreground)"),
+        "data-hex": ignoredDim,
       },
       h("span", {}, "node_modules/"),
       h("span", { class: "ml-auto text-[10px] font-semibold" }, "ignored"),
-      h("span", { class: "font-mono text-[10px] text-muted-foreground" }, toHex("var(--muted-foreground)")),
+      h("span", { class: "font-mono text-[10px] text-muted-foreground" }, ignoredDim),
     ),
   );
   return box;
