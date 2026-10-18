@@ -271,13 +271,13 @@ function DraggableTab({
         {hasAgent && (isRestoreError || !tab.icon)
           ? isRestoreError
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
-                <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
+                <HugeiconsIcon icon={Alert02Icon} size={13} strokeWidth={1.5} />
               </span>
             : iconMark
-              ? <StruckAgentIcon agent={agentSession!.agent} size={12} title={ICON_MARK_TITLES[iconMark]} />
-              : <AgentIcon agent={agentSession!.agent} size={12} />
+              ? <StruckAgentIcon agent={agentSession!.agent} size={13} title={ICON_MARK_TITLES[iconMark]} />
+              : <AgentIcon agent={agentSession!.agent} size={13} />
           : tab.kind === "browser" && tab.floating
-            ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
+            ? <HugeiconsIcon icon={LinkSquare02Icon} size={13} strokeWidth={1.75} className="opacity-60" />
             : tabIcon(tab, !!runningCommand)}
       </span>
       <span
@@ -292,7 +292,7 @@ function DraggableTab({
         {displayTitle}
       </span>
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-        <span className="shrink-0 text-[8px] text-primary">●</span>
+        <span className="shrink-0 text-[9px] text-primary">●</span>
       )}
       {tab.note !== undefined && (
         <TabNoteButton
@@ -344,7 +344,7 @@ function DraggableTab({
             }}
             title="Close tab"
           >
-            <span className="text-[13px] leading-none">×</span>
+            <span className="text-[14px] leading-none">×</span>
           </button>
         </span>
       )}

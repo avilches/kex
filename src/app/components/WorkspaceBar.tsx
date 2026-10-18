@@ -443,7 +443,7 @@ function SortableWorkspaceItem({
               {ws.icon && getWorkspaceIcon(ws.icon) && (
                 <HugeiconsIcon
                   icon={getWorkspaceIcon(ws.icon)!}
-                  size={18}
+                  size={19}
                   strokeWidth={1.5}
                   className="shrink-0"
                 />
@@ -453,7 +453,7 @@ function SortableWorkspaceItem({
               {agentCount > 0 && (
                 <span
                   title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
-                  className="ml-auto shrink-0 pr-0.5 text-[11px] font-normal tabular-nums opacity-50"
+                  className="ml-auto shrink-0 pr-0.5 text-[12px] font-normal tabular-nums opacity-50"
                 >
                   {agentCount}
                 </span>
@@ -1175,7 +1175,7 @@ export function WorkspaceBar({
                   <div
                     className={cn(
                       "flex items-center justify-center rounded-lg font-semibold opacity-90",
-                      compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
+                      compact ? "h-9 w-9 text-[13px]" : "h-9 px-2 text-[13px]",
                     )}
                     style={
                       displayColor
