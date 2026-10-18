@@ -5,7 +5,7 @@ import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
@@ -488,20 +488,23 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     ),
     focusedTabId ?? "",
   );
-  // A tab that is the active one of a pane has its note drawn by that pane, at its own position
-  // and sticky once opened. Any other tab's note is docked next to its row.
+  // A tab a pane shows hides its own note while the WorkspaceBar row previews it, so every tab
+  // previews next to its row the same way, whether or not a pane is drawing that note.
   const visibleSet = useMemo(() => new Set(visibleTabIds.split(",")), [visibleTabIds]);
+  useLayoutEffect(() => {
+    const id = notePreview.tabId && visibleSet.has(notePreview.tabId) ? notePreview.tabId : null;
+    if (!id) return;
+    setSidebarHover(id);
+    return () => {
+      if (useTabNoteStore.getState().sidebarHoverTabId === id) setSidebarHover(null);
+    };
+  }, [notePreview.tabId, visibleSet, setSidebarHover]);
   const handleNoteHover = useCallback(
     (tabId: string, hovering: boolean) => {
-      if (visibleSet.has(tabId)) {
-        setSidebarHover(hovering ? tabId : null);
-      } else if (hovering) {
-        notePreview.show(tabId);
-      } else {
-        notePreview.leave(tabId);
-      }
+      if (hovering) notePreview.show(tabId);
+      else notePreview.leave(tabId);
     },
-    [visibleSet, setSidebarHover, notePreview.show, notePreview.leave],
+    [notePreview.show, notePreview.leave],
   );
   // A visible tab's pane resets its own preview when the note opens or closes. A docked preview
   // stays under the pointer when the note is turned on (now with its close button) and goes away
@@ -510,12 +513,11 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     (tabId: string) => {
       // The pointer is still on the icon, so no new enter event will reopen the preview.
       if (tabsById.get(tabId)?.noteOpen) notePreview.close();
-      else if (!visibleSet.has(tabId)) notePreview.show(tabId);
+      else notePreview.show(tabId);
       onUpdateTab(tabId, toggleTabNote);
     },
-    [tabsById, visibleSet, notePreview.close, notePreview.show, onUpdateTab],
+    [tabsById, notePreview.close, notePreview.show, onUpdateTab],
   );
-  useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
 
   if (rows.length === 0) return null;
@@ -568,7 +570,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
           </div>
         );
       })}
-      {previewTab && previewTab.note !== undefined && !visibleSet.has(previewTab.id) &&
+      {previewTab && previewTab.note !== undefined &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-50">
             <FloatingTabNote

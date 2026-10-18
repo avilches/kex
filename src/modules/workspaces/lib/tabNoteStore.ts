@@ -6,7 +6,8 @@ type TabNoteStore = {
   focusTabId: string | null;
   requestFocus: (tabId: string) => void;
   clearFocus: () => void;
-  // Tab whose WorkspaceBar note icon is hovered and whose note lives in a pane: that pane previews it.
+  // Tab a WorkspaceBar row is previewing in the side while a pane also draws its note:
+  // that pane hides its copy for as long as the preview is up.
   sidebarHoverTabId: string | null;
   setSidebarHover: (tabId: string | null) => void;
 };

@@ -224,19 +224,9 @@ export const PaneView = memo(function PaneView({
     (tabId: string, hovering: boolean) => (hovering ? notePreview.show(tabId) : notePreview.leave(tabId)),
     [notePreview.show, notePreview.leave],
   );
+  // Hovering a WorkspaceBar row's note icon previews that note next to the row, so the pane
+  // hides its own copy of the same tab's note while that preview is up.
   const sidebarHoverId = useTabNoteStore((s) => s.sidebarHoverTabId);
-  const prevSidebarHover = useRef<string | null>(null);
-  const paneTabsRef = useRef(pane.tabs);
-  paneTabsRef.current = pane.tabs;
-  // Only a change of the hovered icon opens or releases the preview: re-running on every tabs
-  // update would reopen it right after the click that hid the note.
-  useEffect(() => {
-    const prev = prevSidebarHover.current;
-    prevSidebarHover.current = sidebarHoverId;
-    const has = (id: string) => paneTabsRef.current.some((t) => t.id === id);
-    if (sidebarHoverId && has(sidebarHoverId)) notePreview.show(sidebarHoverId);
-    else if (prev && has(prev)) notePreview.leave(prev);
-  }, [sidebarHoverId, notePreview.show, notePreview.leave]);
   const closeNote = (tabId: string) => {
     notePreview.close();
     callbacks.onUpdateTab?.(tabId, hideTabNote);
@@ -306,23 +296,25 @@ export const PaneView = memo(function PaneView({
       onFocus={handleFocus}
     >
       <PaneFlashBorder tabId={pane.activeTabId} />
-      {activeTab?.note !== undefined && (activeTab.noteOpen || previewTab?.id === activeTab.id) && (
-        <FloatingTabNote
-          key={activeTab.id}
-          tab={activeTab}
-          active
-          preview={previewTab?.id === activeTab.id}
-          paneRef={containerRef}
-          tabBarRef={tabBarRef}
-          layoutKey={pane.tabs.map((t) => t.id).join(",")}
-          onUpdateTab={callbacks.onUpdateTab}
-          onClose={() => closeNote(activeTab.id)}
-          onDismiss={notePreview.close}
-          onPointerEnter={() => notePreview.show(activeTab.id)}
-          onPointerLeave={() => notePreview.leave(activeTab.id)}
-          surface={noteSurfaceKind(activeTab)}
-        />
-      )}
+      {activeTab?.note !== undefined &&
+        sidebarHoverId !== activeTab.id &&
+        (activeTab.noteOpen || previewTab?.id === activeTab.id) && (
+          <FloatingTabNote
+            key={activeTab.id}
+            tab={activeTab}
+            active
+            preview={previewTab?.id === activeTab.id}
+            paneRef={containerRef}
+            tabBarRef={tabBarRef}
+            layoutKey={pane.tabs.map((t) => t.id).join(",")}
+            onUpdateTab={callbacks.onUpdateTab}
+            onClose={() => closeNote(activeTab.id)}
+            onDismiss={notePreview.close}
+            onPointerEnter={() => notePreview.show(activeTab.id)}
+            onPointerLeave={() => notePreview.leave(activeTab.id)}
+            surface={noteSurfaceKind(activeTab)}
+          />
+        )}
       {previewTab && previewTab.id !== activeTab?.id && (
         <FloatingTabNote
           key={`preview-${previewTab.id}`}

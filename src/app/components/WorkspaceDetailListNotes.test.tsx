@@ -82,6 +82,7 @@ const docked = (id: string) => document.querySelector(`[data-tab-note-id="${id}"
 const closeButton = () => document.querySelector('button[aria-label="Close note"]');
 
 afterEach(() => {
+  vi.useRealTimers();
   for (const un of mounted.splice(0)) un();
   document.body.innerHTML = "";
   useTabNoteStore.setState({ sidebarHoverTabId: null });
@@ -95,14 +96,17 @@ describe("WorkspaceDetailList tab notes", () => {
     expect(noteButton("t-c")).toBeFalsy();
   });
 
-  it("hovering the icon of a tab a pane shows asks that pane to preview the note", () => {
+  it("hovering the icon of a tab a pane shows docks its note next to the row and hides the pane's copy", () => {
+    vi.useFakeTimers();
     const { noteButton } = mount("t-a");
     const btn = noteButton("t-a")!;
     hover(btn, true);
     expect(useTabNoteStore.getState().sidebarHoverTabId).toBe("t-a");
-    expect(docked("t-a")).toBeNull();
+    expect(docked("t-a")).not.toBeNull();
     hover(btn, false);
+    act(() => void vi.advanceTimersByTime(250));
     expect(useTabNoteStore.getState().sidebarHoverTabId).toBeNull();
+    expect(docked("t-a")).toBeNull();
   });
 
   it("hovering the icon of a tab no pane shows docks its note next to the row", () => {
