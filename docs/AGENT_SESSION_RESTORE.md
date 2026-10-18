@@ -112,25 +112,34 @@ destroyed before the PTYs finish shutting down, so a single store file is suffic
 ### OpenCode plugin
 
 OpenCode has no hook commands; its extension surface is plugins (JS modules its own process loads from
-`~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, embedded
-with `include_str!` and written atomically by `agent_setup_opencode`). The plugin subscribes to `session.created`
-and, when `KEX_IPC` and `KEX_TAB_ID` are present in the plugin host's environment, sends one frame per new session
-directly on the socket, deduplicated by session id for the life of the OpenCode process:
+`~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, marker
+`kex-opencode-v2`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
+`KEX_TAB_ID` are present in the plugin host's environment it translates the session lifecycle into the frames Claude
+Code's hooks emit, sent directly on the socket:
 
-```
-{ hook_event_name: "SessionStart", agent: "opencode", session_id: <ses id>,
-  transcript_path: "", cwd: <session directory or process.cwd()>, source: "startup" }
-```
+- `SessionStart` once per session id, with `agent: "opencode"`, an empty `transcript_path` and a `cwd` (the session
+  directory from `session.created`, `process.cwd()` otherwise). It is sent on `session.created` and, for a TUI resumed
+  with `--session`, on the first `session.status` busy, `permission.asked` or `question.asked` that names the session
+  (measured on opencode 1.19.3: those arrive although `session.created` does not, the gap reported in
+  anomalyco/opencode#39711). A second session in the same process is sent with `source: "resume"`, so the tab keeps its
+  launch line, and switching back to a known session re-records it as the tab's.
+- `UserPromptSubmit` when `session.status` turns `busy` or `retry` and no session of the process was working.
+- `Stop` when the last working session goes idle (`session.idle` and `session.status` idle both mean that; one `Stop`
+  per turn). A user abort (`MessageAbortedError`) also ends the turn this way.
+- `PermissionRequest` on `permission.asked` (the permission is the tool name) and `question.asked`. A subagent that
+  asks sends it on behalf of its parent session.
+- `StopFailure` on any other `session.error`, carrying the message; the turn then sends no `Stop`.
 
-Sessions carry `parentID` (task subagents) are skipped, and the frame is best-effort: no spooling, a 2 s send cap,
-silent failure. The plugin host is born in the launch directory and never moves, so `process.cwd()` is the launch
-cwd; `session.directory` is preferred when the event carries it.
+Subagent sessions (those with a `parentID`) are never reported. `session.created` carries the parent; for a session that
+already existed, the plugin asks the OpenCode client once (`client.session.get`) and treats the session as a subagent
+when the lookup fails. OpenCode does not await plugin handlers, so the plugin claims a session before its first send and
+remembers a turn that ends while the registration is still in flight. Frames are best-effort: no spooling, a 2 s send
+cap, silent failure. The plugin host is born in the launch directory and never moves.
 
-Known upstream limitation (anomalyco/opencode#39711): a TUI resumed with `--session`/`-s` fires no plugin events for
-that session, so a restored opencode tab updates nothing in the live mechanism. The restore itself is not affected:
-the record is keyed by the tab's old session id, is never pruned (its provider row's policy is `ResumeAnyway`), and
-`opencode --session '<id>'` runs in the same launch directory. The same gap affects OpenCode's attention state for
-restored tabs, not recordings.
+OpenCode keeps its history in a SQLite database (`~/.local/share/opencode/opencode.db`), not in a per-session file, so
+the frames carry no transcript path and the tab's "Reveal Transcript" menu entry stays on "Transcript not created yet".
+A restored tab has the same record as any other: it is keyed by the tab's old session id, never pruned (the provider
+row's policy is `ResumeAnyway`) and `opencode --session '<id>'` runs in the same launch directory.
 
 The OSC/`AgentDetector` layer still detects plain `opencode` invocations like any other agent (loaded via
 `DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal and the capture of the launch line.
