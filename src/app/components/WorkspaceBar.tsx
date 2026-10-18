@@ -386,8 +386,8 @@ function SortableWorkspaceItem({
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             compact
-              ? "h-9 justify-center text-[12px]"
-              : "h-9 gap-2 px-2.5 text-[12px]",
+              ? "h-9 justify-center text-[13px]"
+              : "h-9 gap-2 px-2.5 text-[13px]",
             hibernatedLook && "relative overflow-hidden",
             chipFx && "hib-chip-pop",
             lit
@@ -435,7 +435,7 @@ function SortableWorkspaceItem({
                 strokeWidth={1.5}
               />
             ) : (
-              <span className="text-[12px]">{abbrev(shownTitle, ws.kind)}</span>
+              <span className="text-[13px]">{abbrev(shownTitle, ws.kind)}</span>
             )
           ) : (
             <>
