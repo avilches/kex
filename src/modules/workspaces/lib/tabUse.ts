@@ -7,15 +7,23 @@ export const TAB_USE_MAX_ENTRIES = 300;
 
 export type TabUseMap = Record<string, number>;
 
+// Ids are ours, but the stored JSON is not: a map without a prototype keeps any key a plain key.
+const bare = (): TabUseMap => Object.create(null);
+
 function read(): TabUseMap {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return {};
+    if (!raw) return bare();
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed as TabUseMap;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return bare();
+    // A stamp that is not a positive finite number would make the recency sort inconsistent.
+    const out = bare();
+    for (const [id, at] of Object.entries(parsed)) {
+      if (typeof at === "number" && Number.isFinite(at) && at > 0) out[id] = at;
+    }
+    return out;
   } catch {
-    return {};
+    return bare();
   }
 }
 

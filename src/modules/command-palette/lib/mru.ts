@@ -6,13 +6,21 @@ const MAX_ENTRIES = 120;
 
 type MruMap = Record<string, number>;
 
+// Ids are ours, but the stored JSON is not: a map without a prototype keeps any key a plain
+// key, and a stamp that is not a positive finite number would make the sort inconsistent.
 function read(): MruMap {
+  const out: MruMap = Object.create(null);
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as MruMap) : {};
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return out;
+    for (const [id, at] of Object.entries(parsed)) {
+      if (typeof at === "number" && Number.isFinite(at) && at > 0) out[id] = at;
+    }
   } catch {
-    return {};
+    /* an unreadable value counts as empty */
   }
+  return out;
 }
 
 export function recordUse(id: string): void {
@@ -38,5 +46,5 @@ export function mruSnapshot(): MruMap {
 }
 
 export function mruRank(snapshot: MruMap, id: string): number {
-  return snapshot[id] ?? 0;
+  return Object.hasOwn(snapshot, id) ? snapshot[id] : 0;
 }
