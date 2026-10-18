@@ -17,7 +17,7 @@ import { writeClipboardText } from "@/lib/clipboard";
 import { native } from "@/lib/native";
 import { IS_MAC } from "@/lib/platform";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
-import { showsAgentMenu } from "./lib/agentMenu";
+import { agentDisplayName, hasTranscriptActions, showsAgentMenu } from "./lib/agentMenu";
 import { parentDir } from "./lib/transcriptPath";
 
 const REVEAL_TRANSCRIPT_LABEL = IS_MAC
@@ -96,10 +96,6 @@ export function CopyTabIdItem({ tabId }: { tabId: string }) {
   );
 }
 
-function agentTitle(agent: string): string {
-  return agent.charAt(0).toUpperCase() + agent.slice(1);
-}
-
 // The agent block of the tab menu. `children` render inside it, after the session actions:
 // Run on Start belongs to the agent, so it sits with it instead of with the generic tab items.
 export function TabAgentMenuItems({
@@ -130,7 +126,7 @@ export function TabAgentMenuItems({
       <ContextMenuLabel className="flex items-center gap-2 px-2 py-1.5">
         <AgentIcon agent={session.agent} size={14} />
         <span className="min-w-0">
-          <span className="block font-medium text-foreground">{agentTitle(session.agent)}</span>
+          <span className="block font-medium text-foreground">{agentDisplayName(session.agent)}</span>
           {meta?.model && (
             <span className="block truncate font-mono text-[10px] font-normal">{meta.model}</span>
           )}
@@ -144,7 +140,7 @@ export function TabAgentMenuItems({
           onSelect={() => void writeClipboardText(sessionId)}
         />
       )}
-      {hasTranscript ? (
+      {!hasTranscriptActions(session) ? null : hasTranscript ? (
         <>
           <ValueItem
             icon={FolderOpenIcon}
