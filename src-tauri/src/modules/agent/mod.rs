@@ -43,7 +43,7 @@ const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 // integrations ship as static scripts instead of merged settings. The OpenCode status greps
 // the installed file for a version marker; the OMP and Pi statuses compare the whole file with
 // the script stamped for that runtime, so an outdated or wrongly stamped copy counts as not installed.
-const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v1";
+const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v2";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
 const AGENT_EXTENSION_TEMPLATE: &str = include_str!("plugins/kex-agent-status.ts");
 

@@ -362,7 +362,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ### F1 El plugin global carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OpenCode integration"
-- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v1` en la primera linea)
+- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v2` en la primera linea)
 - [ ] Lanzar `opencode --print-logs` desde un terminal de Kex y crear una sesion nueva: en el log no debe aparecer ningun error del plugin (la carga del directorio global es automatica en 1.19.x)
 - [ ] Reiniciar: el campanazo ya no muestra el boton OpenCode (status via `agent_opencode_plugin_status`)
 
@@ -371,6 +371,8 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 - [ ] Lanzar `opencode` en un terminal de Kex y escribir un prompt
 - [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "opencode"`, `session_id` tipo `ses_...`, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "opencode"` (grabada por OSC 133;C)
 - [ ] El icono del tab aparece sin la strike de "launch unknown"
+- [ ] Mientras OpenCode trabaja el tab muestra el spinner y al terminar el turno pasa a atencion una sola vez; una peticion de permiso (`bash` en modo `ask`) muestra la atencion
+- [ ] Menu contextual del tab: "Transcript not created yet" (OpenCode guarda el historial en SQLite, no en un fichero por sesion)
 
 ### F3 Restore del tab cerrado
 
@@ -381,12 +383,12 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ### F4 Resume desde el picker del TUI
 
 - [ ] Lanzar `opencode` fresco en Kex, abrir el picker de sesiones del TUI y reanudar una sesion previa
-- [ ] Medir aqui si el plugin dispara `session.created` para esa sesion (el issue anomalyco/opencode#39711 solo menciona el flag `--session`): si dispara, el store deberia actualizar la entrada del tab; si no, es la misma limitacion documentada
+- [ ] Esperado: el plugin registra la sesion reanudada con el primer evento que la nombra (aunque no haya `session.created`), el tab muestra el spinner mientras trabaja y la entrada del store pasa a ese `session_id`
 
 ### F5 `--session` apuntando a otro directorio
 
 - [ ] Con una sesion grabada en `dir-a`, lanzar `opencode --session '<ses_id>'` desde `dir-b`
-- [ ] Esperado: el record de la sesion sigue intacto y la proxima restauracion usa el `cwd_launch` grabado (el plugin no sobreescribe: esta silencio por 39711)
+- [ ] Esperado: el record pasa a la sesion reanudada con `cwd_launch` = `dir-b` (el directorio desde el que se lanzo el proceso, que es donde `opencode --session` se volvera a ejecutar al restaurar)
 
 ## Bloque G - OMP
 

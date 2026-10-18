@@ -478,7 +478,13 @@ fn record_session_at_path_with(
         record.title = previous.title.clone();
         record.notification = previous.notification.clone();
     }
-    if record.launch_cmd.is_none() && same_process {
+    // The same session id is the same process: a duplicate SessionStart (two plugin instances,
+    // a re-registered session) brings no launch line and must not erase the known one.
+    let same_session = store
+        .tabs
+        .get(tab_id)
+        .is_some_and(|p| p.session_id == session_id);
+    if record.launch_cmd.is_none() && (same_process || same_session) {
         record.launch_cmd = store.tabs.get(tab_id).and_then(|p| p.launch_cmd.clone());
     }
     let launch_known = record.launch_cmd.is_some();
@@ -912,6 +918,56 @@ mod tests {
             store.tabs["tab-clear-keeps"].launch_cmd.as_deref(),
             Some("claude-max")
         );
+    }
+
+    #[test]
+    fn a_duplicate_session_start_of_the_same_session_keeps_the_launch_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-dup-start", "opencode".to_string());
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-dup-start",
+            "opencode",
+            "ses_1",
+            "",
+            "/tmp/p",
+            false
+        ));
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-dup-start",
+            "opencode",
+            "ses_1",
+            "",
+            "/tmp/p",
+            false
+        ));
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            store.tabs["tab-dup-start"].launch_cmd.as_deref(),
+            Some("opencode")
+        );
+    }
+
+    #[test]
+    fn a_new_session_in_the_same_tab_does_not_inherit_the_old_launch_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-new-sess", "claude-max".to_string());
+        record_session_at_path_with(&path, "tab-new-sess", "claude", "a", "", "/tmp/p", false);
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-new-sess",
+            "claude",
+            "b",
+            "",
+            "/tmp/p",
+            false
+        ));
     }
 
     #[test]

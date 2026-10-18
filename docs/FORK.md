@@ -222,12 +222,12 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to
-  `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it reports every
-  new `session.created` as one `SessionStart` IPC frame with `agent: opencode`, gated on Kex's env vars and inert
-  outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
+  `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it turns the session lifecycle
+  (`session.created`, `session.status`, `session.idle`, `permission.asked`, `question.asked`, `session.error`) into the
+  same IPC frames Claude's hooks send, with `agent: opencode`, gated on Kex's env vars and inert outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
   `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude`. A TUI restored with
-  `--session` fires no plugin events (anomalyco/opencode#39711), so opencode records are never pruned and restore is
-  unaffected by the gap; the same silence only costs live attention state on restored tabs.
+  `--session` fires no `session.created` (anomalyco/opencode#39711), so the plugin registers the session on the first
+  event that names it; opencode records are never pruned.
 - **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
   (transcript source and its `CLAUDE_CONFIG_DIR` root, cwd read-back strategy, resume/reattach command templates,
   missing-transcript policy, launch-line whitelists) moved from `session_store.rs` hardcode into one
