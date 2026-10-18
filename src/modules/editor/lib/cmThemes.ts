@@ -1,6 +1,5 @@
-import { createTheme } from "@uiw/codemirror-themes";
 import { tags as t } from "@lezer/highlight";
-import type { Extension } from "@codemirror/state";
+import type { CmThemeSpec } from "./readableSyntax";
 
 // Syntax palette shared by every locally-defined theme. The editor renders as
 // glass over the app surface, so `background`/`selection`/`caret` here are
@@ -32,8 +31,8 @@ type Palette = {
   invalid: string;
 };
 
-function build(p: Palette): Extension {
-  return createTheme({
+function build(p: Palette): CmThemeSpec {
+  return ({
     theme: p.mode,
     settings: {
       background: p.bg,
