@@ -11,6 +11,26 @@ use std::path::Path;
 
 use crate::modules::workspace::WorkspaceEnv;
 
+/// Copies a symlink as a symlink, preserving its target, instead of following
+/// it. Following would materialize whole trees, recurse forever on a cycle and
+/// abort a whole copy on a single broken link.
+pub fn copy_symlink(src: &Path, dst: &Path) -> std::io::Result<()> {
+    let target = std::fs::read_link(src)?;
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, dst)
+    }
+    #[cfg(windows)]
+    {
+        let is_dir = std::fs::metadata(src).map(|m| m.is_dir()).unwrap_or(false);
+        if is_dir {
+            std::os::windows::fs::symlink_dir(target, dst)
+        } else {
+            std::os::windows::fs::symlink_file(target, dst)
+        }
+    }
+}
+
 /// The single canonical-to-display conversion: forward slashes, Windows
 /// verbatim `\\?\` prefix stripped. Route every such conversion through here.
 pub fn to_canon(p: impl AsRef<Path>) -> String {
