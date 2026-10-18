@@ -23,6 +23,8 @@ import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspac
 import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { unlinkTab } from "@/modules/actions/lib/actionStateStore";
+import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
@@ -776,6 +778,7 @@ export default function App() {
         scriptCommandSeen.current.delete(id);
         clearRunningCommandEntry(id);
         clearScriptRunningEntry(id);
+        unlinkTab(id);
         clearMetricsEntry(id);
       }
     }
@@ -1045,6 +1048,22 @@ export default function App() {
       setActiveWorkspaceId,
     ],
   );
+
+  const { toggleActiveAction } = useActionRunner({
+    activeWorkspace,
+    activeWorkspaceId,
+    findTabGlobal,
+    setActiveWorkspaceId,
+    activateTab,
+    revealTab,
+    focusPane,
+    openTab,
+    splitPaneAndOpenTab,
+    setScriptPaneId,
+    terminalHandles,
+    scriptCommandSeen,
+    focusFolder: scriptFocusFolderRef,
+  });
 
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
@@ -3012,7 +3031,13 @@ export default function App() {
       },
       "workspace.run": () => {
         if (!activeWorkspace) return;
-        const configs = activeWorkspace.scripts ?? [];
+        if ((activeWorkspace.actions ?? []).length > 0) {
+          toggleActiveAction();
+          return;
+        }
+        const configs = (activeWorkspace.scripts ?? []).filter(
+          (c) => c.command.trim() !== "",
+        );
         if (configs.length === 0) return;
         const active =
           configs.find((c) => c.id === activeWorkspace.activeScript) ??
@@ -3287,6 +3312,7 @@ export default function App() {
       toggleSplitPreview,
       runWorkspaceConfig,
       stopWorkspaceConfig,
+      toggleActiveAction,
       requestHibernate,
     ],
   );
