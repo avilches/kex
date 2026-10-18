@@ -6,6 +6,55 @@ export type ScanShell = "posix" | "powershell";
 const PS_DOUBLE = '"“”„';
 const PS_SINGLE = "'‘’‚‛";
 
+// The delimiter of a heredoc is a full shell word, not just letters: `<<A-B`, `<<a.b`,
+// `<<A"B"C` and `<<A\<newline>B` all have a terminator the body must be matched against.
+// Returns the terminator the way the shell computes it (quotes and backslashes removed,
+// backslash-newline joined), or null when it cannot be known with confidence (a `$` or a
+// backtick would expand, a quote is unterminated, the word is empty); the caller then
+// treats everything after it as heredoc body.
+function readHeredocWord(src: string, from: number): { word: string | null; end: number } {
+  let i = from;
+  while (src.charAt(i) === " " || src.charAt(i) === "\t") i++;
+  let word = "";
+  let sure = true;
+  for (; i < src.length; i++) {
+    const c = src.charAt(i);
+    if (/[\s;&|()<>]/.test(c)) break;
+    if (c === "\\") {
+      const nx = src.charAt(i + 1);
+      if (nx === "") break;
+      if (nx !== "\n") word += nx;
+      i++;
+    } else if (c === "'") {
+      const close = src.indexOf("'", i + 1);
+      if (close === -1) return { word: null, end: src.length };
+      word += src.slice(i + 1, close);
+      i = close;
+    } else if (c === '"') {
+      let j = i + 1;
+      let part = "";
+      for (; j < src.length && src.charAt(j) !== '"'; j++) {
+        const d = src.charAt(j);
+        const nx = src.charAt(j + 1);
+        if (d === "\\" && nx !== "" && '$`"\\\n'.includes(nx)) {
+          if (nx !== "\n") part += nx;
+          j++;
+        } else {
+          if (d === "$" || d === "`") sure = false;
+          part += d;
+        }
+      }
+      if (j >= src.length) return { word: null, end: src.length };
+      word += part;
+      i = j;
+    } else {
+      if (c === "$" || c === "`") sure = false;
+      word += c;
+    }
+  }
+  return { word: sure && word !== "" ? word : null, end: i };
+}
+
 type Ctx = "dq" | "sq" | "ansi" | "cmd";
 
 // Names of the known variables a script places where Kex's own quoting cannot protect
@@ -28,7 +77,7 @@ export function quotedVariables(
   const found = new Set<string>();
   const stack: Ctx[] = [];
   const depths: number[] = [];
-  const heredocs: { word: string; strip: boolean }[] = [];
+  const heredocs: { word: string | null; strip: boolean }[] = [];
   const isDouble = (c: string) => (ps ? PS_DOUBLE.includes(c) : c === '"');
   const isSingle = (c: string) => (ps ? PS_SINGLE.includes(c) : c === "'");
 
@@ -126,14 +175,19 @@ export function quotedVariables(
       const end = command.indexOf("#>", i + 2);
       i = end === -1 ? n : end + 1;
     } else if (!ps && ch === "<" && next === "<" && prev !== "<" && command.charAt(i + 2) !== "<") {
-      const m = /^<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([A-Za-z0-9_]+))/.exec(command.slice(i));
-      if (m) {
-        heredocs.push({ word: m[2] ?? m[3] ?? m[4] ?? "", strip: m[1] === "-" });
-        i += m[0].length - 1;
-      }
+      const strip = command.charAt(i + 2) === "-";
+      const w = readHeredocWord(command, i + (strip ? 3 : 2));
+      heredocs.push({ word: w.word, strip });
+      if (w.end >= n) flagBody(i, n);
+      i = w.end - 1;
     } else if (ch === "\n" && heredocs.length > 0) {
       let pos = i + 1;
       for (const h of heredocs.splice(0)) {
+        if (h.word === null) {
+          flagBody(pos, n);
+          pos = n;
+          break;
+        }
         while (pos < n) {
           let end = command.indexOf("\n", pos);
           if (end === -1) end = n;

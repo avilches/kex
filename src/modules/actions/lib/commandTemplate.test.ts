@@ -282,6 +282,75 @@ describe("quote detector: cases that used to slip through", () => {
   });
 });
 
+describe("heredoc delimiters are full shell words", () => {
+  const body = (delimiter: string, closing = delimiter) => `cat <<${delimiter}\nA\n{cwd}\n${closing}\n`;
+  const tricky: [string, string][] = [
+    ["a dash", body("A-B")],
+    ["a dot", body("a.b")],
+    ["a colon", body("A:")],
+    ["a quoted fragment", body('A"B"C', "ABC")],
+    ["a single-quoted fragment", body("A'B'C", "ABC")],
+    ["a backslash-newline join", "cat <<A\\\nB\nA\n{cwd}\nAB\n"],
+    ["an escaped character", body("A\\-B", "A-B")],
+    ["a dash-stripped delimiter", "cat <<-A-B\n\tA\n\t{cwd}\n\tA-B\n"],
+    ["two heredocs on a line", "cat <<X <<Y-Z\nx\nX\n{cwd}\nY-Z\n"],
+  ];
+  for (const [name, command] of tricky) {
+    it(`flags a variable in the body of a heredoc with ${name}`, () => {
+      expect(commandProblem(command, "posix")).toMatch(/\{cwd\}/);
+    });
+  }
+
+  it("is conservative when the delimiter cannot be known: the rest is body", () => {
+    for (const d of ["$x", "`id`", '"unterminated', "'unterminated"]) {
+      expect(commandProblem(`cat <<${d}\nx\n{cwd}\n`, "posix")).toMatch(/\{cwd\}/);
+    }
+  });
+
+  it("lets a variable stand outside the body", () => {
+    expect(commandProblem("cat <<A-B\nx\nA-B\necho {cwd}\n", "posix")).toBeNull();
+    expect(commandProblem("cat <<'EOF'\nit's\nEOF\nls {cwd}", "posix")).toBeNull();
+    expect(commandProblem("cat <<-EOF\n\tx\n\tEOF\nls {cwd}", "posix")).toBeNull();
+    expect(commandProblem("cat {cwd} <<A.B\nx\nA.B\n", "posix")).toBeNull();
+    expect(commandProblem('cat <<A"B"C\nx\nABC\nls {cwd}\n', "posix")).toBeNull();
+  });
+});
+
+for (const shell of ["bash", "zsh"]) {
+  describe.skipIf(!hasShell(shell))(`heredoc canary run by ${shell}`, () => {
+    for (const delimiter of ["A-B", "a.b", "A:"]) {
+      it(`<<${delimiter}: the body would run as written, and Kex refuses it`, () => {
+        const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+        try {
+          const command = `cat <<${delimiter}\nA\n{cwd}\n${delimiter}\n`;
+          expect(() => expandCommandShell(command, { cwd: INJECTION }, "posix")).toThrow();
+          spawnSync(shell, ["-c", command.replace("{cwd}", INJECTION)], { cwd: dir });
+          expect(existsSync(join(dir, "PWNED"))).toBe(true);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+    }
+
+    it("a backslash-newline joined delimiter is refused and would run", () => {
+      const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+      try {
+        const command = "cat <<A\\\nB\nA\n{cwd}\nAB\n";
+        expect(() => expandCommandShell(command, { cwd: INJECTION }, "posix")).toThrow();
+        spawnSync(shell, ["-c", command.replace("{cwd}", INJECTION)], { cwd: dir });
+        expect(existsSync(join(dir, "PWNED"))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("a legitimate heredoc with the variable outside the body runs normally", () => {
+      const line = expandCommandShell("cat <<A-B\nhello\nA-B\nprintf '%s' {cwd}\n", { cwd: "/x y" }, "posix");
+      expect(spawnSync(shell, ["-c", line]).stdout.toString()).toBe("hello\n/x y");
+    });
+  });
+}
+
 describe("second line of defense on values", () => {
   it("refuses a risky value when the command has double quotes, a backtick or $(", () => {
     for (const command of [`echo "x" {cwd}`, "echo `date` {cwd}", "echo $(date) {cwd}"]) {
