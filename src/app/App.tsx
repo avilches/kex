@@ -550,6 +550,7 @@ export default function App() {
   // Also fires on first window focus after startup, ensuring the terminal gets the
   // cursor even if the PTY wasn't ready when the workspace-switch effect ran.
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
@@ -570,10 +571,17 @@ export default function App() {
         });
       })
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
-      .catch(() => {});
-    return () => unlisten?.();
+      .catch((e) => console.error("[kex] onFocusChanged listen failed:", e));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Return focus to the active terminal when the notification bell closes
@@ -3384,6 +3392,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<{ workspaceId: string; tabId: string }>(
@@ -3393,10 +3402,15 @@ export default function App() {
         },
       )
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
       .catch((e) => console.error("[kex] kex:activate-tab listen failed:", e));
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [onActivateAgent]);
@@ -3457,14 +3471,20 @@ export default function App() {
 
   useEffect(() => {
     if (!IS_MAC) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<string>("kex:menu", (e) => menuDispatchRef.current(e.payload))
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
       .catch((e) => console.error("[kex] kex:menu listen failed:", e));
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);
