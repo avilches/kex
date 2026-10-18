@@ -166,7 +166,7 @@ function hibernatedItem(label: string): HTMLElement {
   return h(
     "div",
     {
-      class: "relative flex h-9 items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.09] text-[12px] text-muted-foreground",
+      class: "relative flex h-9 items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.09] text-[13px] text-muted-foreground",
       "data-surface": "hibernated-chip",
     },
     h("span", { class: "ws-hib-look", "data-surface": "hibernated-chip-veil" }),
@@ -197,8 +197,8 @@ function workspaceBar(): HTMLElement {
       "div",
       {
         class: active
-          ? "flex h-9 items-center justify-center rounded-lg bg-primary text-[12px] text-primary-foreground"
-          : "flex h-9 items-center justify-center rounded-lg bg-foreground/[0.09] text-[12px] text-muted-foreground",
+          ? "flex h-9 items-center justify-center rounded-lg bg-primary text-[13px] text-primary-foreground"
+          : "flex h-9 items-center justify-center rounded-lg bg-foreground/[0.09] text-[13px] text-muted-foreground",
       },
       label,
     );

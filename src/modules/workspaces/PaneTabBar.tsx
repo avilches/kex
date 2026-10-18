@@ -221,7 +221,7 @@ function DraggableTab({
       onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
       {...wrappedListeners}
       className={cn(
-        "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+        "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[12px] transition-colors",
         isThisDragging ? "cursor-grabbing" : "cursor-default",
         connected
           ? [
