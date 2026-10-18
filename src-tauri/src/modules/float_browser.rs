@@ -72,6 +72,9 @@ pub fn float_browser_open(
         .inner_size(1200.0, 800.0)
         .min_inner_size(640.0, 480.0)
         .resizable(true)
+        // Same file:// block as the main and settings windows so a float browser
+        // never opens local files through the OS.
+        .on_navigation(|url| url.scheme() != "file")
         .on_page_load(move |_webview, payload| {
             use tauri::webview::PageLoadEvent;
             if matches!(payload.event(), PageLoadEvent::Finished) {
