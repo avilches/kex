@@ -14,21 +14,54 @@ function svgUrlFor(agent: string): string | null {
   return null;
 }
 
-function PiMark({ size, className }: { size: number; className?: string }) {
+// Marks drawn inline follow the text color, which an <img> cannot: a monochrome logo loaded
+// through <img> renders black and disappears on dark themes.
+function InlineMark({
+  size,
+  className,
+  label,
+  viewBox,
+  children,
+}: {
+  size: number;
+  className?: string;
+  label: string;
+  viewBox: string;
+  children: React.ReactNode;
+}) {
   return (
     <svg
-      viewBox="0 0 560 560"
+      viewBox={viewBox}
       width={size}
       height={size}
       fill="currentColor"
-      aria-label="pi"
+      aria-label={label}
       role="img"
       className={className}
     >
+      {children}
+    </svg>
+  );
+}
+
+function PiMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <InlineMark size={size} className={className} label="pi" viewBox="0 0 560 560">
       <path d="M420 280H280V140H0V0H420V280Z" />
       <path d="M560 560H420V280H560V560Z" />
       <path d="M140 560H0V140H140V280H280V420H140V560Z" />
-    </svg>
+    </InlineMark>
+  );
+}
+
+// The official mark is a frame with a lighter block in its lower half; the two tones become
+// the text color at full and reduced strength so it reads on any theme.
+function OpenCodeMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <InlineMark size={size} className={className} label="opencode" viewBox="0 0 240 300">
+      <path d="M180 240H60V120H180V240Z" opacity={0.45} />
+      <path fillRule="evenodd" d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" />
+    </InlineMark>
   );
 }
 
@@ -54,9 +87,9 @@ export function AgentIcon({
     );
   }
 
-  if (agent.toLowerCase() === "pi") {
-    return <PiMark size={size} className={className} />;
-  }
+  const inline = agent.toLowerCase();
+  if (inline === "pi") return <PiMark size={size} className={className} />;
+  if (inline === "opencode") return <OpenCodeMark size={size} className={className} />;
 
   const svgUrl = svgUrlFor(agent);
   if (svgUrl) {

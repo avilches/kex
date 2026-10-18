@@ -20,7 +20,7 @@ import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
 
 const noop = () => {};
 
-function open(onRevealInExplorer: (p: string) => void = noop) {
+function open(onRevealInExplorer: (p: string) => void = noop, extra?: React.ReactNode) {
   const actions: SidebarTabMenuActions = {
     paneTabCount: () => 1,
     onClose: noop,
@@ -37,7 +37,7 @@ function open(onRevealInExplorer: (p: string) => void = noop) {
         <ContextMenuTrigger>target</ContextMenuTrigger>
         <ContextMenuContent>
           <CopyTabIdItem tabId="tab-1" />
-          <TabAgentMenuItems tabId="tab-1" />
+          <TabAgentMenuItems tabId="tab-1">{extra}</TabAgentMenuItems>
         </ContextMenuContent>
       </ContextMenu>
     </SidebarTabMenuProvider>,
@@ -111,5 +111,28 @@ describe("TabAgentMenuItems", () => {
     open(reveal);
     fireEvent.click(screen.getByText("Open Transcript Folder"));
     expect(reveal).toHaveBeenCalledWith("/t/dir");
+  });
+
+  it("places the extra items inside the agent block, after the transcript actions", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "omp");
+    open(noop, <div>Run on Start</div>);
+    const html = document.body.innerHTML;
+    expect(html.indexOf("Transcript not created yet")).toBeLessThan(html.indexOf("Run on Start"));
+    expect(screen.getByText("Run on Start")).toBeTruthy();
+  });
+
+  it("still shows the extra items for a tab without an agent session", () => {
+    open(noop, <div>Run on Start</div>);
+    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.queryByText("Transcript not created yet")).toBeNull();
+  });
+
+  it("shows no agent block for OpenCode but keeps the extra items", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "opencode");
+    open(noop, <div>Run on Start</div>);
+    expect(screen.queryByText("Opencode")).toBeNull();
+    expect(screen.queryByText("OpenCode")).toBeNull();
+    expect(screen.queryByText("Transcript not created yet")).toBeNull();
+    expect(screen.getByText("Run on Start")).toBeTruthy();
   });
 });

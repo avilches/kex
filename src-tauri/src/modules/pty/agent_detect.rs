@@ -200,6 +200,12 @@ pub struct AgentDetector {
     status: Status,
     current_agent: String,
     shell_ready_emitted: bool,
+    /// The armed agent was recognised from a shell `C` mark that carried the command text,
+    /// which only zsh, fish and pwsh emit (bash sends a bare `C`).
+    armed_by_command: bool,
+    /// The previous thing in the stream was a `C` mark without command text, with nothing
+    /// (text, another escape sequence) between it and the next byte.
+    last_mark_bare_c: bool,
 }
 
 impl AgentDetector {
@@ -216,6 +222,8 @@ impl AgentDetector {
             status: Status::Idle,
             current_agent: String::new(),
             shell_ready_emitted: false,
+            armed_by_command: false,
+            last_mark_bare_c: false,
         }
     }
 
@@ -224,6 +232,9 @@ impl AgentDetector {
     /// so a TUI agent that repaints continuously never flaps working/waiting.
     pub fn process<F: FnMut(Transition)>(&mut self, input: &[u8], mut emit: F) {
         if self.state == State::Ground && !input.contains(&ESC) {
+            if !input.is_empty() {
+                self.last_mark_bare_c = false;
+            }
             return;
         }
 
@@ -232,6 +243,8 @@ impl AgentDetector {
                 State::Ground => {
                     if b == ESC {
                         self.state = State::Esc;
+                    } else {
+                        self.last_mark_bare_c = false;
                     }
                 }
                 State::Esc => match b {
@@ -240,7 +253,10 @@ impl AgentDetector {
                         self.osc.clear();
                     }
                     ESC => {}
-                    _ => self.state = State::Ground,
+                    _ => {
+                        self.last_mark_bare_c = false;
+                        self.state = State::Ground;
+                    }
                 },
                 State::Osc => match b {
                     BEL => {
@@ -283,6 +299,8 @@ impl AgentDetector {
 
     fn disarm(&mut self) {
         self.armed = false;
+        self.armed_by_command = false;
+        self.last_mark_bare_c = false;
         self.status = Status::Idle;
     }
 
@@ -297,6 +315,9 @@ impl AgentDetector {
             String::from_utf8_lossy(ps),
             String::from_utf8_lossy(pt)
         );
+        if ps != b"133" {
+            self.last_mark_bare_c = false;
+        }
         match ps {
             b"133" => self.handle_osc133(pt, emit),
             // OSC 9;4 is taskbar progress, not a notification.
@@ -450,6 +471,7 @@ impl AgentDetector {
     }
 
     fn handle_osc133<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
+        let after_bare_c = std::mem::take(&mut self.last_mark_bare_c);
         match pt.first() {
             Some(b'B') => {
                 if !self.shell_ready_emitted {
@@ -460,6 +482,7 @@ impl AgentDetector {
             }
             Some(b'C') => {
                 let line = String::from_utf8_lossy(pt.strip_prefix(b"C;").unwrap_or(b""));
+                self.last_mark_bare_c = line.trim().is_empty();
                 let Some(inv) = find_agent_invocation(&line, &self.agents) else {
                     return;
                 };
@@ -476,9 +499,17 @@ impl AgentDetector {
                 let agent = inv.agent;
                 log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
                 self.armed = true;
+                self.armed_by_command = true;
                 self.status = Status::Idle;
                 self.current_agent = agent.clone();
                 emit(Transition::Started { agent, cmd_string });
+            }
+            // OMP draws `B C D;0` as one unbroken string around each message and when it resumes
+            // a session. A shell that names its commands never sends a bare `C`, and its own `D`
+            // arrives after the agent's output, so a `D` stuck to a bare `C` is the TUI, not the
+            // end of the command. Pi draws `A B C` and no `D`, so the shell's `D` after it is real.
+            Some(b'D') if self.armed && self.armed_by_command && after_bare_c => {
+                log::debug!("[shell] osc133 D: ignored (drawn by the agent's own UI)");
             }
             Some(b'D') if self.armed => {
                 log::debug!("[shell] osc133 D: exited");
@@ -493,6 +524,7 @@ impl AgentDetector {
         if !self.armed {
             log::debug!("[osc777] auto-arming (no shell OSC 133;C seen)");
             self.armed = true;
+            self.armed_by_command = false;
             self.status = Status::Idle;
             self.current_agent = "claude".into();
             emit(Transition::Started {
@@ -753,6 +785,92 @@ mod tests {
         );
         assert_eq!(run(&mut d, &osc("9;needs you")), vec![notification("")]);
         assert!(run(&mut d, &osc("9;4;1;50")).is_empty());
+    }
+
+    #[test]
+    fn an_agent_drawing_its_own_command_marks_does_not_end_the_session() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;B"));
+        assert_eq!(
+            run(&mut d, &osc("133;C;omp --resume 'abc'")),
+            vec![started_cmd("omp", "omp --resume 'abc'")]
+        );
+        for mark in ["133;A", "133;B", "133;C", "133;D;0", "133;A"] {
+            assert!(run(&mut d, &osc(mark)).is_empty(), "mark {mark}");
+        }
+        for _ in 0..2 {
+            for mark in ["133;B", "133;C", "133;D;0", "133;A"] {
+                assert!(run(&mut d, &osc(mark)).is_empty(), "mark {mark}");
+            }
+        }
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn pi_drawing_marks_without_a_d_does_not_swallow_the_shells_real_exit() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;B"));
+        run(&mut d, &osc("133;C;pi"));
+        for _ in 0..2 {
+            for mark in ["133;A", "133;B", "133;C"] {
+                assert!(run(&mut d, &osc(mark)).is_empty(), "mark {mark}");
+            }
+            run(&mut d, b" Hi there");
+        }
+        run(&mut d, b"\x1b[?25h\r\nTo resume this session...\r\n");
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn plain_text_between_a_bare_c_and_the_shells_d_is_enough_to_keep_the_exit() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;B"));
+        run(&mut d, &osc("133;C;pi"));
+        run(&mut d, &osc("133;C"));
+        run(&mut d, b"goodbye\r\n");
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn a_d_split_from_its_c_by_another_sequence_is_the_shells() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;B"));
+        run(&mut d, &osc("133;C;omp"));
+        run(&mut d, &osc("133;C"));
+        run(&mut d, b"\x1b[0m");
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn the_agents_own_c_and_d_are_ignored_even_when_a_read_splits_them() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;B"));
+        run(&mut d, &osc("133;C;omp"));
+        let mut joined = osc("133;B");
+        joined.extend(osc("133;C"));
+        joined.extend(osc("133;D;0"));
+        let (first, second) = joined.split_at(joined.len() - 5);
+        assert!(run(&mut d, first).is_empty());
+        assert!(run(&mut d, second).is_empty());
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn a_bare_c_followed_by_d_still_exits_an_agent_armed_without_a_command() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc(&kex_osc("SessionStart")));
+        run(&mut d, &osc("133;C"));
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn a_normal_exit_after_the_agents_own_marks_is_still_detected() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;omp"));
+        run(&mut d, &osc("133;C"));
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+        run(&mut d, &osc("133;A"));
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
     }
 
     #[test]

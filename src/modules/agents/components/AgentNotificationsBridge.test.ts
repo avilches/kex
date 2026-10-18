@@ -182,4 +182,22 @@ describe("handleSessionMeta", () => {
     expect(session().status).toBe("working");
     expect(session().meta?.launchKnown).toBe(false);
   });
+
+  test("a session reported at startup, before any prompt, already has the agent and the transcript", () => {
+    handleSessionMeta(
+      { ...meta(true), tabId: "tab-1", transcriptPath: "/p/omp/s.jsonl", model: "" },
+      ctx(),
+    );
+    expect(session().agent).toBe("claude");
+    handleSessionMeta({ ...meta(true), agent: "omp", transcriptPath: "/p/omp/s.jsonl", model: "" }, ctx());
+    expect(session().meta?.transcriptPath).toBe("/p/omp/s.jsonl");
+  });
+
+  test("an omp session reported before its first prompt is tagged omp and keeps the launch command", () => {
+    handleSessionMeta({ ...meta(true), agent: "omp", transcriptPath: "/p/omp/s.jsonl", model: "" }, ctx());
+    expect(session().agent).toBe("omp");
+    expect(session().status).toBe("idle");
+    expect(session().meta?.launchKnown).toBe(true);
+    expect(session().meta?.transcriptPath).toBe("/p/omp/s.jsonl");
+  });
 });

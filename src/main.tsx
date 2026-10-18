@@ -10,7 +10,8 @@ import { flushEditors } from "./app/lib/editorFlush";
 import { installGlobalErrorLogging, reactRootErrorOptions } from "./lib/errorLog";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
-import { loadPreferences } from "./modules/settings/store";
+import { syncIntegrations } from "./modules/agents/lib/integrationActions";
+import { loadPreferences, updateInstalledIntegrations } from "./modules/settings/store";
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
 import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
@@ -52,6 +53,9 @@ if (startupPrefs) {
   } else {
     invoke("agent_disable_claude_hooks").catch(() => {});
   }
+  // OpenCode, OMP and Pi read their script from their own config folder, so an app update
+  // rewrites the ones the user installed instead of leaving them on an old version.
+  syncIntegrations(startupPrefs.installedIntegrations, updateInstalledIntegrations).catch(() => {});
 }
 
 ReactDOM.createRoot(

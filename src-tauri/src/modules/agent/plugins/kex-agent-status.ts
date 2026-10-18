@@ -1,4 +1,4 @@
-// kex-agent-status-v1
+// kex-agent-status-v3
 // Kex terminal integration. Loaded by OpenCode's plugin system or by OMP/Pi extension
 // discovery, it translates the runtime's lifecycle events into the same JSON frames the
 // Claude Code hooks emit on Kex's Unix socket (KEX_IPC). Without the per-terminal KEX_IPC
@@ -21,13 +21,21 @@ interface KexFrame {
   prompt?: string;
   tool_name?: string;
   last_assistant_message?: string;
+  source?: string;
 }
 
 const socketPath = String(process.env.KEX_IPC || "");
 const tabId = String(process.env.KEX_TAB_ID || "");
 
+// A one-shot run (-p / --print) is not a session worth restoring or showing in the tab.
+const printMode = (() => {
+  const args = process.argv.slice(2);
+  const end = args.indexOf("--");
+  return (end < 0 ? args : args.slice(0, end)).some((a) => a === "-p" || a === "--print");
+})();
+
 function send(frame: KexFrame): void {
-  if (!socketPath || !tabId) return;
+  if (!socketPath || !tabId || printMode) return;
   try {
     let client: {
       on(eventName: string, handler: (...args: unknown[]) => void): void;
@@ -57,6 +65,9 @@ const seenSessions = new Set<string>();
 
 function reportSession(agent: string, sessionId: unknown, cwd: string, file: string): void {
   if (typeof sessionId !== "string" || !sessionId || seenSessions.has(sessionId)) return;
+  // A second session in the same process (/new, /resume) continues the command the tab
+  // already launched, so Kex keeps that launch line instead of forgetting it.
+  const source = seenSessions.size > 0 ? "resume" : "startup";
   seenSessions.add(sessionId);
   send({
     hook_event_name: "SessionStart",
@@ -64,6 +75,7 @@ function reportSession(agent: string, sessionId: unknown, cwd: string, file: str
     session_id: sessionId,
     cwd,
     transcript_path: file,
+    source,
   });
 }
 
@@ -90,6 +102,16 @@ export default function (pi: KexRuntime): void {
 
   const cwd = process.cwd();
   const agent = "__KEX_AGENT__";
+
+  // The session exists as soon as the runtime starts it, before any prompt: reporting it
+  // here is what puts the agent icon and the transcript menu on a restored tab right away.
+  // OMP announces a /new or /resume with session_switch; Pi fires session_start again.
+  for (const name of ["session_start", "session_switch"]) {
+    pi.on(name, (_event, ctx) => {
+      const [id, dir, file] = sessionCoords(ctx, cwd);
+      reportSession(agent, id, dir, file);
+    });
+  }
 
   pi.on("before_agent_start", (event, ctx) => {
     lastAssistantMessage = "";

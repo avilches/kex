@@ -27,14 +27,23 @@ Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifi
 it calls `agent_disable_claude_hooks`. Both commands are idempotent. On every startup, if `agentNotifications` is
 true, `agent_enable_claude_hooks` is called silently to repair any missing or outdated hooks.
 
-OpenCode is wired by `agent_setup_opencode` instead (bell popover, "Install OpenCode integration"): it writes a
-static plugin script to `<opencode config dir>/plugins/opencode-session.js` (`~/.config/opencode/` normally, the
-`OPENCODE_CONFIG_DIR` directory when set), which OpenCode's own process loads. There
-is no Settings toggle and no uninstall: without Kex's per-terminal env vars the plugin does nothing. `agent_opencode_plugin_status`
-greps the installed file for a version marker so an outdated install offers the button again. The same install button
-lives in Settings > General (OpenCode integration row), install-only: it reinstalls the current plugin file when the
-installed one is already current. OMP and Pi are wired the same way (`agent_setup_omp` / `agent_setup_pi`, "Install OMP integration" and "Install Pi integration" in the
-bell popover and one integration row each in Settings > General, install-only, `agent_omp_extension_status` / `agent_pi_extension_status`).
+OpenCode, OMP and Pi are wired by file instead of by a settings merge. Kex writes one script into the agent's own
+config folder, and the agent's process loads it: `agent_setup_opencode` writes
+`<opencode config dir>/plugins/opencode-session.js` (`~/.config/opencode/` normally, the `OPENCODE_CONFIG_DIR`
+directory when set), `agent_setup_omp` writes `~/.omp/agent/extensions/kex-agent-status.ts` and `agent_setup_pi` the
+same file under `~/.pi/agent/extensions/`. Without Kex's per-terminal env vars the script does nothing. The install
+lives in the bell popover (a row per agent, shown only while the integration is missing) and in Settings > General
+(`IntegrationRow`: Install, Reinstall and Remove). `agent_*_status` tells whether the installed file is current.
+
+Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
+`omp` and `pi`) is written only after the file is on disk, and removed when the user presses Remove. On every startup
+`syncIntegrations` calls `agent_sync_integrations` with that list, which rewrites each file to the version this build
+ships, so an app update reaches the agent without pressing Reinstall. The sync never creates a file and never turns a
+newer one back to an older version. A file that does not start with Kex's marker is left alone and the agent drops out
+of the list; one that is merely missing (a dotfiles link or a synced folder not there yet) stays on it. A link is
+written through, not replaced.
+`agent_remove_integration` deletes only a file that starts with Kex's marker (`// kex-opencode-v`,
+`// kex-agent-status-v`) and refuses any other name than the three agents.
 
 ### KEX_TAB_ID
 
@@ -148,7 +157,7 @@ The OSC/`AgentDetector` layer still detects plain `opencode` invocations like an
 
 OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
 `~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships one
-source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v1`, embedded with
+source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v3`, embedded with
 `include_str!`). `agent_setup_omp` and `agent_setup_pi` stamp the runtime name into the template's `agent` constant and
 write the result atomically into the matching folder, so one file reports `agent: omp` and the other `agent: pi`. Their
 status commands compare the whole installed file with the script stamped for that runtime, so an outdated copy, or one
@@ -157,7 +166,15 @@ stamped for the other runtime, counts as not installed.
 The extension computes nothing about sessions itself: it translates the runtime's lifecycle events into the frames
 Claude Code's hooks emit.
 
-- `before_agent_start` and `agent_start` become `SessionStart` once per session id plus `UserPromptSubmit`.
+- `session_start` becomes `SessionStart` as soon as the runtime opens the session, before any prompt, so a restored or
+  woken tab gets its icon and transcript menu right away; OMP announces `/new` and `/resume` with `session_switch`
+  instead, which is handled the same way; `before_agent_start` and `agent_start` report it too if it was missed and add
+  `UserPromptSubmit`. One `SessionStart` per session id. The first one is sent with `source: "startup"` and any later one
+  with `source: "resume"`, so a `/new` inside the TUI keeps the tab's launch command.
+- A run started with `-p` or `--print` (before any `--`) sends nothing at all: a one-shot answer is not a session to
+  restore.
+- Because the session is reported at startup, a tab where the agent was opened and closed without a prompt records a
+  session whose file does not exist yet. It has no restore plan and replaces the tab's previous record.
 - Every frame carries `transcript_path`, the runtime's session file (`ctx.sessionManager.getSessionFile()`), which feeds the
   tab's "Reveal Transcript" menu and the live model read (`live_model` also understands their `{type:"message"}` entries).
 - `message_end` caches the assistant text.
@@ -180,11 +197,22 @@ Measured facts that drive the two provider rows:
 - **Pi** (1.3.0): resume is `pi --session <path|id>` (`--resume` only opens a picker; `--session-id` creates a session
   when missing and is not used). Sessions are `~/.pi/agent/sessions/<cwd-encoded>/<timestamp>_<id>.jsonl`, with the
   `session` header on line 1 and no `title` line. A Pi started without a prompt creates an empty group directory but no
-  file, and the extension only emits from the first turn, so a session without any turn has no record and nothing to
-  resume.
+  file, and the extension reports the session at startup, so the record exists but its file does not, which means no restore plan
+  and nothing to resume.
 
 Both rows use `ResumeAnyway` with empty whitelists and the same suffix scan (`SessionsSource::OmpSessions` /
 `PiSessions`, `CwdRead::HeaderLine(2)` / `HeaderLine(1)`).
+
+OMP draws its own OSC 133 marks as one unbroken `B C D;0` string around every message it shows and again when it
+resumes a session. `AgentDetector` ignores a `D` that is stuck to a `C` without command text (nothing at all between
+them) while an agent armed by a named command is running: a shell that names its commands never sends a bare `C`, and
+its own `D` comes after the agent's output. Without this the tab lost its agent on the first message, the launch
+command was forgotten and the icon was struck through. Pi draws `A B C` and never a `D`, so the shell's `D` after it is
+the real exit and ends the session; any text or escape sequence between the `C` and the `D` has the same effect.
+
+OMP does not start in the user's home folder: unless `--allow-home` is given it switches to a temporary directory, so
+its session header and the extension's frames report `/tmp`. Kex restores such a tab in `/tmp`, which is where OMP
+says the session lives.
 
 The OSC/`AgentDetector` layer still detects plain `omp` and `pi` invocations like any other agent (loaded via
 `DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal, the capture of the launch line and the
