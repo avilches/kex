@@ -1,7 +1,7 @@
 pub mod modules;
 
 use modules::{
-    agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace,
+    actions, agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -938,7 +938,7 @@ pub fn run() {
             shell::shell_bg_kill,
             shell::shell_bg_list,
             editors::editor_scan,
-            editors::editor_open,
+            actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,
             workspace::wsl_home,
