@@ -57,7 +57,9 @@ describe("TabAgentMenuItems", () => {
   it("offers only Copy Tab ID for a tab without an agent session", () => {
     open();
     expect(screen.getByText("Copy Tab ID")).toBeTruthy();
-    expect(screen.getByText("tab-1")).toBeTruthy();
+    const id = screen.getByText("tab-1");
+    expect(id.className).toContain("ml-auto");
+    expect(id.parentElement?.textContent).toContain("Copy Tab ID");
     expect(screen.queryByText("Claude")).toBeNull();
     expect(screen.queryByText("Copy Session ID")).toBeNull();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();

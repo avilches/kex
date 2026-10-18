@@ -29,11 +29,11 @@ import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
-  copyToClipboard,
   OPEN_EXTERNAL_LABEL,
   openWithDefaultApp,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
+import { CopyAbsolutePathItem, CopyRelativeTextItem } from "@/modules/explorer/lib/copyPathItems";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
@@ -54,7 +54,6 @@ import {
   ArrowDown01Icon,
   ArrowRight01Icon,
   CheckmarkCircle01Icon,
-  CopySlashIcon,
   File01Icon,
   LinkSquare02Icon,
   FileDiffIcon,
@@ -62,7 +61,6 @@ import {
   FolderTreeIcon,
   Cancel01Icon,
   GitBranchIcon,
-  Link01Icon,
   ListViewIcon,
   MinusSignIcon,
   PlusSignIcon,
@@ -1908,22 +1906,8 @@ const EntryRow = memo(function EntryRow({
           </>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"), "Copied relative path")}
-        >
-          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-          Copy Relative Path
-        </ContextMenuItem>
-        {absolutePath ? (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void copyToClipboard(absolutePath, "Copied absolute path")}
-          >
-            <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-            Copy Absolute Path
-          </ContextMenuItem>
-        ) : null}
+        <CopyRelativeTextItem text={entry.path.replace(/\\/g, "/")} />
+        {absolutePath ? <CopyAbsolutePathItem path={absolutePath} /> : null}
       </ContextMenuContent>
     </ContextMenu>
   );

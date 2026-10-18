@@ -40,6 +40,22 @@ export function CopyRelativePathItem({
   );
 }
 
+// For callers that already hold the relative path (wiki links, source control).
+export function CopyRelativeTextItem({ text }: { text: string }) {
+  return (
+    <ContextMenuItem
+      className={COMPACT_ITEM}
+      onSelect={() => void copyToClipboard(text, "Copied relative path")}
+    >
+      <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+      <span className="flex min-w-0 flex-col">
+        <span>Copy Relative Path</span>
+        <Sub text={text} />
+      </span>
+    </ContextMenuItem>
+  );
+}
+
 export function CopyAbsolutePathItem({ path }: { path: string }) {
   return (
     <ContextMenuItem
