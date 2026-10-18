@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Action } from "@/modules/actions";
-import { scriptsToDelete, type ExplorerRootMode, type Script, type Workspace } from "./types";
+import { actionsToDelete, type ExplorerRootMode, type Workspace } from "./types";
 
 describe("ExplorerRootMode", () => {
   it("only allows workspace or filesystem", () => {
@@ -9,31 +9,7 @@ describe("ExplorerRootMode", () => {
   });
 });
 
-describe("Script", () => {
-  it("tabId is optional", () => {
-    const cfg: Script = { id: "1", name: "Dev", command: "pnpm dev" };
-    expect(cfg.tabId).toBeUndefined();
-  });
-
-  it("cwd is optional", () => {
-    const cfg: Script = { id: "2", name: "Test", command: "pnpm test" };
-    expect(cfg.cwd).toBeUndefined();
-  });
-
-  it("accepts all fields", () => {
-    const cfg: Script = {
-      id: "3",
-      name: "Build",
-      command: "pnpm build",
-      cwd: "/home/user/proj",
-      tabId: "tab-1",
-    };
-    expect(cfg.id).toBe("3");
-    expect(cfg.tabId).toBe("tab-1");
-  });
-});
-
-describe("scriptsToDelete", () => {
+describe("actionsToDelete", () => {
   const base: Workspace = {
     id: "w1",
     title: "",
@@ -42,17 +18,16 @@ describe("scriptsToDelete", () => {
   };
   const action = (command: string): Action => ({ id: "ac-1", name: "A", runInTerminal: false, command, ownButton: false });
 
-  it("counts scripts and Actions that have a command", () => {
-    const ws = { ...base, scripts: [{ id: "1", name: "a", command: "x" }], actions: [action("code {cwd}")] };
-    expect(scriptsToDelete(ws)).toBe(2);
+  it("counts the Actions that have a command", () => {
+    const ws = { ...base, actions: [action("code {cwd}"), action("pnpm dev")] };
+    expect(actionsToDelete(ws)).toBe(2);
   });
 
-  it("ignores blank commands in both", () => {
-    const ws = { ...base, scripts: [{ id: "1", name: "a", command: " " }], actions: [action("  ")] };
-    expect(scriptsToDelete(ws)).toBe(0);
+  it("ignores blank commands", () => {
+    expect(actionsToDelete({ ...base, actions: [action("  ")] })).toBe(0);
   });
 
-  it("is zero for a workspace with neither", () => {
-    expect(scriptsToDelete(base)).toBe(0);
+  it("is zero for a workspace without Actions", () => {
+    expect(actionsToDelete(base)).toBe(0);
   });
 });

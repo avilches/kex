@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildScriptInput,
   isSafeScriptCwd,
-  planReusedTabInput,
   resolveScriptCwd,
   scriptCwdProblem,
   scriptFolderMissingMessage,
@@ -325,19 +324,3 @@ for (const shell of ["bash", "zsh"]) {
     });
   });
 }
-
-describe("planReusedTabInput", () => {
-  it("writes nothing when the tab is busy", () => {
-    expect(planReusedTabInput(true, "ls", "/a", "posix")).toBeNull();
-  });
-
-  it("cds first on an idle tab whenever a folder resolves", () => {
-    expect(planReusedTabInput(false, "ls", "/a", "posix")).toBe(
-      "cd -- '/a' && { ls\n\n}\r",
-    );
-  });
-
-  it("only runs the command on an idle tab without a folder", () => {
-    expect(planReusedTabInput(false, "ls", undefined, "posix")).toBe("ls\r");
-  });
-});

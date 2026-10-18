@@ -6,16 +6,6 @@ import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
 export type ScriptCwdMode = "workspace" | "context" | "fixed";
 
-export type Script = {
-  id: string;
-  name: string;
-  command: string;
-  cwdMode?: ScriptCwdMode;
-  /** Only used when cwdMode is "fixed". */
-  cwd?: string;
-  tabId?: string;
-};
-
 // What the sleeping overlay shows for a terminal tab besides its title: the agent and the
 // restore command are gone with the PTY, so they are captured when the workspace goes to sleep.
 // `title` is the name the tab showed when it went to sleep, kept because the process that fed it is gone.
@@ -113,8 +103,6 @@ export type Workspace = {
   color?: string | null;
   icon?: string;
   groupId?: string;
-  scripts?: Script[];
-  activeScript?: string;
   scriptPaneId?: string;
   // Workspace-scoped Actions (the global ones live in settings-tools.json) and the one F12 runs.
   actions?: Action[];
@@ -132,13 +120,10 @@ export type Workspace = {
   lastActiveAt?: number;
 };
 
-// Scripts and Actions with a command: the ones a workspace close would delete. The
-// close-workspace dialog warns about them, and the fold-on-empty rule spares
-// a workspace that still has any.
-export function scriptsToDelete(ws: Workspace): number {
-  const scripts = ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
-  const actions = ws.actions?.filter((a) => a.command.trim()).length ?? 0;
-  return scripts + actions;
+// Actions with a command: the ones a workspace close would delete. The close-workspace
+// dialog warns about them, and the fold-on-empty rule spares a workspace that still has any.
+export function actionsToDelete(ws: Workspace): number {
+  return ws.actions?.filter((a) => a.command.trim()).length ?? 0;
 }
 
 export type ClosedTabEntry = {

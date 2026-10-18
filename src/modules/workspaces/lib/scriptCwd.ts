@@ -88,13 +88,3 @@ export function buildScriptInput(
   }
   return `cd -- ${quoteShellArg(cwd, false)} && { ${command}\n\n}\r`;
 }
-
-/** What to type into an existing script tab, or null if it is still busy. */
-export function planReusedTabInput(
-  running: boolean,
-  command: string,
-  cwd: string | undefined,
-  shell: ScriptShell,
-): string | null {
-  return running ? null : buildScriptInput(command, cwd, shell);
-}

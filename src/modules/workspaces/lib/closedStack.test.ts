@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedEntry, ClosedTabEntry, Script, Tab, Workspace } from "./types";
+import type { ClosedEntry, ClosedTabEntry, Tab, Workspace } from "./types";
 import { allPanes } from "./splitNode";
 import {
   buildReopenedTab,
@@ -170,9 +170,8 @@ describe("captureClosedWorkspace", () => {
     expect(captureClosedWorkspace([], makeWs("w1", "p1"), 0)).toEqual([]);
   });
 
-  it("keeps an empty workspace that still has scripts", () => {
-    const script: Script = { id: "s1", name: "dev", command: "pnpm dev" };
-    const ws = { ...makeWs("w1", "p1"), scripts: [script] };
+  it("keeps an empty workspace that still has actions", () => {
+    const ws = { ...makeWs("w1", "p1"), actions: [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }] };
     expect(captureClosedWorkspace([], ws, 0)).toEqual([wsEntry(ws, 0)]);
   });
 
@@ -250,19 +249,6 @@ describe("reviveWorkspace", () => {
     expect(out[0]).toMatchObject({ dirty: false });
     expect(out[1]).toMatchObject({ dirty: false });
     expect(out[2]).toMatchObject({ floating: false });
-  });
-
-  it("points scripts at the new id of their tab", () => {
-    const ws = {
-      ...makeWs("w1", "p1", [term("a")]),
-      scripts: [
-        { id: "s1", name: "dev", command: "x", tabId: "a" },
-        { id: "s2", name: "gone", command: "y", tabId: "missing" },
-        { id: "s3", name: "idle", command: "z" },
-      ] as Script[],
-    };
-    const { workspace } = reviveWorkspace(ws, counter());
-    expect(workspace.scripts?.map((s) => s.tabId)).toEqual(["new-1", undefined, undefined]);
   });
 
   it("keeps the terminal ids of a hibernated workspace, whose stored sessions are indexed by them", () => {

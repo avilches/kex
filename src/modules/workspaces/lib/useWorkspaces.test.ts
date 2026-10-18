@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Tab, Script, SplitNode, PaneNode, Workspace } from "./types";
+import type { Tab, SplitNode, PaneNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
 import { addAction, removeAction, type Action } from "@/modules/actions";
-import { applyCloseTab, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -218,7 +218,6 @@ describe("workspaceTabCount", () => {
 
 describe("emptyWorkspaceToClose", () => {
   const term = (id: string): Tab => ({ id, kind: "terminal" });
-  const withScripts = (command: string): Script => ({ id: "sc1", name: "run", command });
 
   const emptyWs = ws({
     title: "",
@@ -243,8 +242,6 @@ describe("emptyWorkspaceToClose", () => {
   const emptyTree: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
 
   it.each([
-    ["scripts with a command", { scripts: [withScripts("pnpm test")] }],
-    ["scripts with a blank command", { scripts: [withScripts("   ")] }],
     ["an Action", { actions: [{ id: "ac-1", name: "Dev", runInTerminal: false, command: "code {cwd}", ownButton: false }] }],
     ["a title", { title: "Backend" }],
     ["a color", { color: "#ff0000" }],
@@ -362,29 +359,10 @@ describe("needsResumePlanLookup", () => {
   });
 });
 
-describe("Script actions", () => {
-  const cfg = (id: string): Script => ({ id, name: `Config ${id}`, command: `cmd-${id}` });
-
+describe("workspace helpers", () => {
   it("applyWorkspaceRoot sets mode to workspace", () => {
     const out = applyWorkspaceRoot([ws()], "w1", "/proj");
     expect(out[0].explorerRootMode).toBe("workspace");
-  });
-
-  it("Workspace type accepts color, scripts, and activeScript", () => {
-    const w: Workspace = {
-      ...ws(),
-      color: "#ff0000",
-      scripts: [cfg("r1")],
-      activeScript: "r1",
-    };
-    expect(w.color).toBe("#ff0000");
-    expect(w.scripts).toHaveLength(1);
-    expect(w.activeScript).toBe("r1");
-  });
-
-  it("Script tabId is optional", () => {
-    const c: Script = { id: "1", name: "Dev", command: "pnpm dev" };
-    expect(c.tabId).toBeUndefined();
   });
 });
 
@@ -692,5 +670,22 @@ describe("workspace actions", () => {
     const start = [ws({ actions: [action("a")] })];
     expect(takeWorkspaceAction(start, "w1", "zz")).toEqual({ workspaces: start, action: null });
     expect(takeWorkspaceAction(start, "nope", "a")).toEqual({ workspaces: start, action: null });
+  });
+});
+
+describe("applyDropDeadScriptPanes", () => {
+  const tree = (paneId: string): PaneNode => ({ kind: "pane", id: paneId, tabs: [], activeTabId: null });
+
+  it("clears a scripts pane that no longer exists and keeps one that does", () => {
+    const gone = ws({ id: "w1", paneTree: tree("p1"), activePaneId: "p1", scriptPaneId: "p-missing" });
+    const live = ws({ id: "w2", paneTree: tree("p2"), activePaneId: "p2", scriptPaneId: "p2" });
+    const out = applyDropDeadScriptPanes([gone, live]);
+    expect(out[0]!.scriptPaneId).toBeUndefined();
+    expect(out[1]).toBe(live);
+  });
+
+  it("returns the same array when nothing has to change", () => {
+    const list = [ws({ paneTree: tree("p1"), activePaneId: "p1" })];
+    expect(applyDropDeadScriptPanes(list)).toBe(list);
   });
 });

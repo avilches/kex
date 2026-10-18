@@ -64,7 +64,6 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
-import type { OpenInEditorTarget } from "@/modules/external-editors";
 import { runEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
@@ -124,7 +123,7 @@ import {
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
-import type { Script, WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import type { WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceMoveProvider } from "@/modules/workspaces/WorkspaceMoveContext";
 import { buildGitStatusMap } from "@/modules/explorer/lib/gitStatusUtils";
@@ -221,7 +220,6 @@ import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
   getRunningCommandsSnapshot,
-  setScriptCommand,
   getRunningScriptCommand,
   setScriptRunning,
   getScriptRunningSnapshot,
@@ -241,22 +239,11 @@ import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
-  buildScriptInput,
-  planReusedTabInput,
-  resolveScriptCwd,
-  scriptCwdProblem,
-  scriptFolderMissingMessage,
-  scriptShellFor,
-  type ScriptShell,
-} from "@/modules/workspaces/lib/scriptCwd";
-import {
   planCommandEvent,
-  planDelayedWrite,
   planScriptStop,
   displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
 import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
-import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -330,14 +317,12 @@ export default function App() {
     setWorkspaceDetailExpanded,
     setWorkspaceGroup,
     setWorkspaceGitConfig,
-    updateScript,
     addWorkspaceAction,
     updateWorkspaceAction,
     removeWorkspaceAction,
     reorderWorkspaceActions,
     promoteWorkspaceAction,
-    setActiveScript,
-    validateScriptTabs,
+    dropDeadScriptPanes,
     setScriptPaneId,
     setTerminalRunningCommand,
     toggleOverlayPreview,
@@ -399,29 +384,6 @@ export default function App() {
     ? ((activeTab as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
-
-  const openInEditorTarget = useMemo<OpenInEditorTarget | null>(() => {
-    if (!activeTab) return null;
-    switch (activeTab.kind) {
-      case "terminal":
-        return activeTab.cwd ? { path: activeTab.cwd, kind: "dir" } : null;
-      case "editor":
-        return { path: activeTab.path, kind: "file" };
-      case "markdown":
-        return { path: activeTab.path, kind: "file" };
-      case "git-diff":
-      case "git-commit-file":
-        return { path: activeTab.repoRoot, kind: "dir" };
-      case "git-history":
-        return { path: activeTab.repoRoot, kind: "dir" };
-      case "browser":
-        return activeWorkspace?.cwd
-          ? { path: activeWorkspace.cwd, kind: "dir" }
-          : null;
-      default:
-        return null;
-    }
-  }, [activeTab, activeWorkspace]);
 
   const contextCwdFilePath = activeTab ? tabFilePath(activeTab) : null;
   const contextCwd =
@@ -487,13 +449,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    for (const ws of workspacesRef.current) {
-      const livingTabIds = new Set<string>();
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const tab of pane.tabs) livingTabIds.add(tab.id);
-      }
-      validateScriptTabs(ws.id, livingTabIds);
-    }
+    dropDeadScriptPanes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -835,231 +791,7 @@ export default function App() {
     setActiveEditorHandle(null);
   }, []);
 
-  // ── Script execution ──────────────────────────────────────────────────────
-
-  const scheduleScriptWrite = useCallback(
-    (tabId: string, input: string, delay: number) => {
-      const tryWrite = (attempts = 0) => {
-        const step = planDelayedWrite(
-          getScriptRunningSnapshot().get(tabId),
-          terminalHandles.current.has(tabId),
-          attempts,
-        );
-        if (step === "write") {
-          terminalHandles.current.get(tabId)?.write(input);
-        } else if (step === "retry") {
-          setTimeout(() => tryWrite(attempts + 1), 100);
-        } else {
-          setScriptRunning(tabId, false);
-        }
-      };
-      setTimeout(tryWrite, delay);
-    },
-    [],
-  );
-
-  const runWorkspaceConfig = useCallback(
-    (config: Script) => {
-      if (!activeWorkspace || activeWorkspace.hibernated) return;
-
-      // The user's own leaf, captured up front so a same-workspace script run
-      // reveals its tab without moving activePaneId or focus away from here.
-      const userPaneId = activeWorkspace.activePaneId;
-      const scriptShell: ScriptShell = scriptShellFor(
-        IS_WINDOWS,
-        useWorkspaceEnvStore.getState().env.kind,
-      );
-      const scriptCwd = resolveScriptCwd({
-        mode: config.cwdMode,
-        fixedFolder: config.cwd,
-        focusFolder: scriptFocusFolderRef.current,
-        workspaceRoot: activeWorkspace.workspaceRoot,
-        workspaceCwd: activeWorkspace.cwd,
-      });
-      const busyReusedTab =
-        !!config.tabId &&
-        !!findTabGlobal(config.tabId) &&
-        !!getScriptRunningSnapshot().get(config.tabId);
-      const cwdProblem = scriptCwd ? scriptCwdProblem(scriptCwd) : null;
-      if (cwdProblem && !busyReusedTab) {
-        toast.error(`Script not run: ${cwdProblem}`, { duration: 4000 });
-        return;
-      }
-      // The typed cd already keeps the command from running in a missing
-      // folder; this only tells the user why nothing happened.
-      if (scriptCwd && !busyReusedTab) {
-        void native
-          .fsStat(scriptCwd)
-          .catch(() => null)
-          .then((stat) => {
-            const msg = scriptFolderMissingMessage(scriptCwd, stat);
-            if (msg) toast.error(msg, { duration: 6000 });
-          });
-      }
-      const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
-
-      // Case 1: tab already exists -- reveal it (same workspace, different
-      // pane) or focus it (other workspace, or same pane as the user: a pane
-      // shows one tab, so revealing without stealing focus is impossible)
-      // and re-run if idle
-      if (config.tabId) {
-        const found = findTabGlobal(config.tabId);
-        if (found) {
-          if (found.workspace.id === activeWorkspace.id) {
-            if (found.pane.id === userPaneId) {
-              activateTab(found.workspace.id, config.tabId);
-              requestLeafFocus(config.tabId);
-            } else {
-              revealTab(found.workspace.id, config.tabId);
-              if (userLeafId) requestLeafFocus(userLeafId);
-            }
-          } else {
-            setActiveWorkspaceId(found.workspace.id);
-            activateTab(found.workspace.id, config.tabId);
-            requestLeafFocus(config.tabId);
-          }
-          const tabId = config.tabId;
-          const wasBusy = !!getScriptRunningSnapshot().get(tabId);
-          if (wasBusy) flashTab(tabId);
-          const input = planReusedTabInput(
-            !!getScriptRunningSnapshot().get(tabId),
-            config.command,
-            scriptCwd,
-            scriptShell,
-          );
-          if (input !== null) {
-            setScriptRunning(tabId, "running");
-            setScriptCommand(tabId, config.command);
-            scheduleScriptWrite(tabId, input, 50);
-          }
-          return;
-        }
-      }
-
-      const freshTabId = newTabId();
-      const tab: Tab = {
-        id: freshTabId,
-        kind: "terminal",
-        cwd: scriptCwd,
-        title: config.name || undefined,
-      };
-
-      // Case 2: existing script pane -- add tab to it without splitting.
-      // openTab only sets the target pane's own activeTabId, it never touches
-      // the workspace's activePaneId, so this reveals without stealing focus
-      // unless the script pane IS the user's own pane, in which case a pane
-      // showing one tab makes reveal-without-stealing impossible: activation
-      // follows the script instead.
-      const existingScriptPane = activeWorkspace.scriptPaneId
-        ? findPane(activeWorkspace.paneTree, activeWorkspace.scriptPaneId)
-        : null;
-
-      if (existingScriptPane) {
-        openTab(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
-        if (existingScriptPane.id === userPaneId) {
-          activateTab(activeWorkspace.id, freshTabId);
-          requestLeafFocus(freshTabId);
-        } else if (userLeafId) {
-          requestLeafFocus(userLeafId);
-        }
-      } else {
-        // Case 3: no script pane yet -- split and record the new pane
-        const { workspacePaneLimit } = usePreferencesStore.getState();
-        const atLimit =
-          allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
-        if (atLimit) {
-          // The tab lands in the user's own active pane by definition, so
-          // activation follows the script instead of trying to reveal it.
-          openTab(activeWorkspace.id, activeWorkspace.activePaneId, tab);
-          setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
-          activateTab(activeWorkspace.id, freshTabId);
-          requestLeafFocus(freshTabId);
-        } else {
-          // splitPaneAndOpenTab activates the freshly created pane, which is
-          // never the user's own pane, so restore it and keep focus put.
-          const freshPaneId = splitPaneAndOpenTab(
-            activeWorkspace.id,
-            activeWorkspace.activePaneId,
-            "bottom",
-            tab,
-          );
-          setScriptPaneId(activeWorkspace.id, freshPaneId);
-          focusPane(activeWorkspace.id, userPaneId);
-          if (userLeafId) requestLeafFocus(userLeafId);
-        }
-      }
-
-      updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
-
-      setScriptRunning(freshTabId, "running");
-      setScriptCommand(freshTabId, config.command);
-      scheduleScriptWrite(
-        freshTabId,
-        buildScriptInput(config.command, scriptCwd, scriptShell),
-        150,
-      );
-    },
-    [
-      activeWorkspace,
-      findTabGlobal,
-      setActiveWorkspaceId,
-      activateTab,
-      revealTab,
-      splitPaneAndOpenTab,
-      focusPane,
-      updateScript,
-      openTab,
-      setScriptPaneId,
-      scheduleScriptWrite,
-    ],
-  );
-
-  const stopWorkspaceConfig = useCallback(
-    (config: Script) => {
-      if (!config.tabId) return;
-      const found = findTabGlobal(config.tabId);
-      if (found && found.workspace.id === activeWorkspaceId) {
-        // Same workspace: reveal the script tab without moving the user's
-        // pane or focus away from wherever they currently are, unless the
-        // script's pane IS the user's own pane (a pane shows one tab, so
-        // reveal-without-stealing is impossible there): activation follows
-        // the script instead.
-        const userPaneId = found.workspace.activePaneId;
-        if (found.pane.id === userPaneId) {
-          activateTab(found.workspace.id, config.tabId);
-          requestLeafFocus(config.tabId);
-        } else {
-          const userLeafId = focusedTabId(found.workspace.paneTree, userPaneId);
-          revealTab(found.workspace.id, config.tabId);
-          if (userLeafId) requestLeafFocus(userLeafId);
-        }
-      } else if (found) {
-        // Different workspace: jump to the script's workspace and tab,
-        // mirroring runWorkspaceConfig's different-workspace case.
-        setActiveWorkspaceId(found.workspace.id);
-        activateTab(found.workspace.id, config.tabId);
-        requestLeafFocus(config.tabId);
-      } else {
-        activateTab(activeWorkspaceId, config.tabId);
-        requestLeafFocus(config.tabId);
-      }
-      setScriptRunning(
-        config.tabId,
-        planScriptStop(scriptCommandSeen.current.has(config.tabId)),
-      );
-      const handle = terminalHandles.current.get(config.tabId);
-      handle?.write("\x03");
-    },
-    [
-      activateTab,
-      activeWorkspaceId,
-      findTabGlobal,
-      revealTab,
-      setActiveWorkspaceId,
-    ],
-  );
-
-  const { toggleActiveAction } = useActionRunner({
+  const { toggleActiveAction, runAction, stopAction, focusActionTab } = useActionRunner({
     activeWorkspace,
     activeWorkspaceId,
     findTabGlobal,
@@ -3036,27 +2768,7 @@ export default function App() {
         else void requestHibernate(activeWorkspace.id);
       },
       "workspace.run": () => {
-        if (!activeWorkspace) return;
-        if ((activeWorkspace.actions ?? []).length > 0) {
-          toggleActiveAction();
-          return;
-        }
-        const configs = (activeWorkspace.scripts ?? []).filter(
-          (c) => c.command.trim() !== "",
-        );
-        if (configs.length === 0) return;
-        const active =
-          configs.find((c) => c.id === activeWorkspace.activeScript) ??
-          configs[0];
-        if (!active) return;
-        const isRunning = !!(
-          active.tabId && getScriptRunningSnapshot().get(active.tabId)
-        );
-        if (isRunning) {
-          stopWorkspaceConfig(active);
-        } else {
-          runWorkspaceConfig(active);
-        }
+        if (activeWorkspace) toggleActiveAction();
       },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
@@ -3316,8 +3028,6 @@ export default function App() {
       rotateExplorerRoot,
       toggleOverlayPreview,
       toggleSplitPreview,
-      runWorkspaceConfig,
-      stopWorkspaceConfig,
       toggleActiveAction,
       requestHibernate,
     ],
@@ -3328,9 +3038,9 @@ export default function App() {
       hibernated: !!activeWorkspace?.hibernated,
       activeTab,
       hasWorkspaceRoot: !!activeWorkspace?.workspaceRoot,
-      scriptCount: activeWorkspace?.scripts?.length ?? 0,
+      scriptCount: activeWorkspace?.actions?.length ?? 0,
     }),
-    [activeWorkspace?.hibernated, activeWorkspace?.workspaceRoot, activeWorkspace?.scripts, activeTab],
+    [activeWorkspace?.hibernated, activeWorkspace?.workspaceRoot, activeWorkspace?.actions, activeTab],
   );
 
   const shortcutsDisabled = useCallback(
@@ -3647,9 +3357,14 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const onOpenExternalEditorSettings = useCallback(() => {
-    void openSettingsWindow("actions");
-  }, []);
+  const actionsController = useMemo(
+    () => ({ run: runAction, stop: stopAction, focus: focusActionTab }),
+    [runAction, stopAction, focusActionTab],
+  );
+
+  const onOpenActionsSettings = useCallback(() => {
+    useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "actions");
+  }, [activeWorkspaceId]);
 
   const sidebarRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
@@ -3696,24 +3411,8 @@ export default function App() {
             onOpenSettings={() => void openSettingsWindow()}
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
-            openInEditorTarget={openInEditorTarget}
-            workspaceRoot={workspaceRootPath}
-            onOpenExternalEditorSettings={onOpenExternalEditorSettings}
-            onSetWorkspaceRoot={() =>
-              useWorkspaceSettingsStore
-                .getState()
-                .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
-            }
-            scripts={activeWorkspace?.scripts ?? []}
-            activeScript={activeWorkspace?.activeScript}
-            onSelectScript={(id) => setActiveScript(activeWorkspaceId, id)}
-            onRunScript={runWorkspaceConfig}
-            onStopConfig={stopWorkspaceConfig}
-            onOpenRunSettings={() =>
-              useWorkspaceSettingsStore
-                .getState()
-                .openSettings(activeWorkspaceId, "actions")
-            }
+            actionsController={actionsController}
+            onOpenActionsSettings={onOpenActionsSettings}
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
             groups={groups}

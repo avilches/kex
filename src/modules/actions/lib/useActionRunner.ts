@@ -8,6 +8,7 @@ import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { requestLeafFocus } from "@/modules/terminal/lib/useTerminalSession";
 import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptFolderMissingMessage, scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
+import { planDelayedWrite } from "@/modules/workspaces/lib/scriptRunState";
 import { allPanes, findPane, focusedTab, focusedTabId } from "@/modules/workspaces/lib/splitNode";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -58,7 +59,6 @@ export type ActionRunnerDeps = {
 const WRITE_DELAY_NEW_MS = 150;
 const WRITE_DELAY_REUSED_MS = 50;
 const WRITE_RETRY_MS = 100;
-const WRITE_MAX_ATTEMPTS = 20;
 
 function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   const tabId = getActionTab(actionId);
@@ -111,11 +111,9 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   const scheduleWrite = useCallback(
     (tabId: string, input: string, delay: number) => {
       const attempt = (n: number) => {
-        const mark = getScriptRunningSnapshot().get(tabId);
-        const handle = terminalHandles.current.get(tabId);
-        if (mark !== "running") return void setScriptRunning(tabId, false);
-        if (handle) return void handle.write(input);
-        if (n < WRITE_MAX_ATTEMPTS) setTimeout(() => attempt(n + 1), WRITE_RETRY_MS);
+        const step = planDelayedWrite(getScriptRunningSnapshot().get(tabId), terminalHandles.current.has(tabId), n);
+        if (step === "write") terminalHandles.current.get(tabId)?.write(input);
+        else if (step === "retry") setTimeout(() => attempt(n + 1), WRITE_RETRY_MS);
         else setScriptRunning(tabId, false);
       };
       setTimeout(() => attempt(0), delay);
