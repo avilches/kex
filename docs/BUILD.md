@@ -94,6 +94,8 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 | `bundle/macos/Kex.app` | App bundle, drag to `/Applications` |
 | `bundle/dmg/Kex_<ver>_aarch64.dmg` | Installer DMG |
 
+**Web inspector:** the `tauri` crate is built with the `devtools` feature, so release builds also show "Inspect Element" in the right-click menu. It adds nothing at runtime until it is opened. On macOS it relies on a private WebKit API, which only matters for a Mac App Store submission (Kex does not ship there).
+
 **Gatekeeper:** first launch of an unsigned build requires right-click > Open to bypass the "unidentified developer" warning.
 
 ### Fast local install (no signing key, no dmg)
