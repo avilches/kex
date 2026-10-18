@@ -3501,7 +3501,7 @@ export default function App() {
         showHidden: activeShowHidden,
         hibernated: !!activeWorkspace?.hibernated,
       },
-    }).catch(() => {});
+    }).catch((e) => console.error("[kex] sync_menu failed:", e));
   }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden, activeWorkspace?.hibernated]);
 
   // ── Command palette ───────────────────────────────────────────────────────
