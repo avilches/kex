@@ -1034,6 +1034,7 @@ export function WorkspaceBar({
     [agentSessions, agentNotifications, tabLocations],
   );
   const lastJump = useRef(new Map<string, string>());
+  const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
   const jumpAgent = useCallback(
     (workspaceId: string, entries: AgentEntry[]) => {
       const tabId = nextEntryTab(entries, lastJump.current.get(workspaceId));
@@ -1350,22 +1351,24 @@ export function WorkspaceBar({
       <div
         className="absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center outline-none"
         onPointerDown={(e) => {
-          const startX = e.clientX;
-          const startWidth = width;
+          resizeStartRef.current = { x: e.clientX, width };
           e.currentTarget.setPointerCapture(e.pointerId);
-          const onMove = (ev: PointerEvent) => {
-            const next = Math.min(
-              440,
-              Math.max(52, startWidth + (ev.clientX - startX)),
-            );
-            onWidthChange(next);
-          };
-          const onUp = () => {
-            document.removeEventListener("pointermove", onMove);
-            document.removeEventListener("pointerup", onUp);
-          };
-          document.addEventListener("pointermove", onMove);
-          document.addEventListener("pointerup", onUp);
+        }}
+        onPointerMove={(e) => {
+          const start = resizeStartRef.current;
+          if (!start || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+          onWidthChange(
+            Math.min(440, Math.max(52, start.width + (e.clientX - start.x))),
+          );
+        }}
+        onPointerUp={(e) => {
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+          resizeStartRef.current = null;
+        }}
+        onLostPointerCapture={() => {
+          resizeStartRef.current = null;
         }}
       ></div>
     </nav>
