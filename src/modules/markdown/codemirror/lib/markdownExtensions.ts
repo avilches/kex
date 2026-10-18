@@ -127,7 +127,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       "&.cm-lp-mod .cm-lp-link-text, &.cm-lp-mod .cm-lp-link-text *": { cursor: "pointer" },
       [LP_TEXT_COLOR_SELECTORS]: { color: "var(--editor-foreground) !important" },
       // After the rule above (same specificity), so H6 keeps its dimmer color.
-      ".cm-lp-h6, .cm-lp-h6 *": { color: "color-mix(in srgb, var(--editor-foreground) 70%, transparent) !important" },
+      ".cm-lp-h6, .cm-lp-h6 *": { color: `color-mix(in srgb, var(--editor-foreground) ${H6_TEXT_SHARE * 100}%, transparent) !important` },
       // Same reason as LP_TEXT_COLOR_SELECTORS: the syntax highlighter's own
       // nested span (ordered-list digits, unordered-list dash/star/plus, or a
       // link inside a quote) otherwise sets its own color, beating this one.
@@ -138,7 +138,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       // Same specificity as the two rules above, so it must come after them for
       // a link nested in bold, a heading, or a quote (or bold nested in a link)
       // to keep its color.
-      ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
+      ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--link, #3b82f6) !important" },
       // Brackets that turned out not to be a link (`[TODO]`, `[[Wiki Link]]`):
       // the syntax theme colors any Link node as a link, this puts it back.
       // A `[[Note]]` that names no note yet: a click creates it.
@@ -235,6 +235,8 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         padding: "0 6px",
         fontSize: "0.9em",
       },
+      // A line decoration: each frontmatter line is as wide as the editor, so the
+      // background reads as one block, and a blank line keeps the monospace height.
       ".cm-lp-frontmatter": {
         fontFamily: "var(--font-mono, monospace)",
         backgroundColor: "color-mix(in srgb, var(--editor-foreground) 4%, transparent)",

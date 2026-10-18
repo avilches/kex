@@ -29,6 +29,7 @@ export type ThemeColors = Partial<{
   sidebarRing: string;
   radius: string;
   tabFocusIndicator: string;
+  link: string;
 }>;
 
 export type TerminalPalette = Partial<{

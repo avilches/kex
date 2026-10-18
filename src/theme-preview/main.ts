@@ -54,7 +54,7 @@ const TOKENS = [
   "accent-foreground", "destructive", "border", "input", "ring", "sidebar",
   "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
   "sidebar-accent", "sidebar-accent-foreground", "sidebar-border",
-  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "note-editor-background", "note-editor-foreground", "note-terminal-background", "note-terminal-foreground", "terminal-background",
+  "sidebar-ring", "tab-focus-indicator", "link", "editor-background", "editor-foreground", "note-editor-background", "note-editor-foreground", "note-terminal-background", "note-terminal-foreground", "terminal-background",
   "terminal-foreground", "terminal-cursor", "terminal-cursor-accent",
   "terminal-selection", ...ANSI_NAMES.map((n) => `terminal-ansi-${n}`),
 ];
@@ -505,7 +505,7 @@ function markdownView(): HTMLElement {
   const preview = pane("Preview", markdownDemo, buildStaticPreviewExtensions(identity));
   markdownViews.rich = rich.view;
   markdownViews.preview = preview.view;
-  return h("div", { class: "grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] gap-3", "data-editor-theme": id }, rich.node, preview.node);
+  return h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2", "data-editor-theme": id }, rich.node, preview.node);
 }
 
 function allThemes(): Theme[] {
@@ -571,7 +571,7 @@ function render(): void {
       "div",
       { class: "flex min-w-[380px] flex-1 flex-col gap-3" },
       header(), tabBar(),
-      h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2" }, pane("terminal", true), pane("terminal", false), pane("editor", true), pane("editor", false)),
+      h("div", { class: "grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] gap-3" }, pane("terminal", true), pane("terminal", false), pane("editor", true), pane("editor", false)),
     ),
   );
   const buttons = h(
