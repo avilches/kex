@@ -5,17 +5,11 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandShortcut,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  getShortcutLabel,
-  type KeyBinding,
-  type ShortcutId,
-} from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import {
   AlertCircleIcon,
@@ -26,7 +20,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { COMMAND_GROUPS } from "./commands";
 import { useCommandHistory } from "./hooks/useCommandHistory";
 import {
   CONTENT_SEARCH_MIN_QUERY,
@@ -36,13 +29,13 @@ import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
-import { buildSearchBlobs, commandRowKey, rankCommands } from "./lib/rankCommands";
+import { commandRowKey } from "./lib/rankCommands";
+import { mergeRows } from "./lib/mergeRows";
 import { duplicateTitleIds, type TabEntry, type WorkspaceEntry } from "./lib/tabEntries";
-import { rankTabEntries, rankWorkspaceEntries, tabRowKey, workspaceRowKey } from "./lib/tabRank";
-import { TabItem } from "./TabItem";
+import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
 import { hasPreview, TabPreview } from "./TabPreview";
 import type { PaletteItem } from "./types";
-import { WorkspaceItem } from "./WorkspaceItem";
+import { MergedList } from "./MergedList";
 
 type Props = {
   open: boolean;
@@ -98,30 +91,29 @@ export function CommandPalette({
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
   const learned = useMemo(() => (open ? learnedSnapshot() : {}), [open]);
 
-  // Precomputed once per items change; reused across keystrokes.
-  const searchBlobs = useMemo(() => buildSearchBlobs(commandItems), [commandItems]);
-
-  const rankedCommands = useMemo(() => {
-    if (inThemes || parsed.mode !== "commands") return [];
-    return rankCommands(commandItems, searchBlobs, parsed.term, mru, learned);
-  }, [commandItems, searchBlobs, parsed.term, parsed.mode, inThemes, mru, learned]);
-
   const inCommands = !inThemes && parsed.mode === "commands";
-  const rankedTabs = useMemo(
-    () => (inCommands ? rankTabEntries(tabEntries, parsed.term, activeTabId, learned) : []),
-    [inCommands, tabEntries, parsed.term, activeTabId, learned],
-  );
-  const rankedWorkspaces = useMemo(
-    () => (inCommands ? rankWorkspaceEntries(workspaceEntries, parsed.term, learned) : []),
-    [inCommands, workspaceEntries, parsed.term, learned],
+  const merged = useMemo(
+    () =>
+      inCommands
+        ? mergeRows({
+            commands: commandItems,
+            tabs: tabEntries,
+            workspaces: workspaceEntries,
+            term: parsed.term,
+            activeTabId,
+            learned,
+            mru,
+          })
+        : [],
+    [inCommands, commandItems, tabEntries, workspaceEntries, parsed.term, activeTabId, learned, mru],
   );
   const ambiguous = useMemo(() => duplicateTitleIds(tabEntries), [tabEntries]);
   const selectedTab = useMemo(
     () =>
       value.startsWith("tab:")
-        ? rankedTabs.find((t) => t.tabId === value.slice("tab:".length))
+        ? tabEntries.find((t) => t.tabId === value.slice("tab:".length))
         : undefined,
-    [value, rankedTabs],
+    [value, tabEntries],
   );
   const showPreview = !!selectedTab && hasPreview(selectedTab);
 
@@ -321,61 +313,24 @@ export function CommandPalette({
                 {themes.length === 0 ? <StatusItem label="No themes" /> : null}
               </CommandGroup>
             ) : parsed.mode === "commands" ? (
-              rankedCommands.length === 0 &&
-              rankedTabs.length === 0 &&
-              rankedWorkspaces.length === 0 ? (
+              merged.length === 0 ? (
                 <EmptyHint />
               ) : (
-                <>
-                  {rankedTabs.length > 0 ? (
-                    <CommandGroup heading={parsed.term ? "Tabs" : "Recent tabs"}>
-                      {rankedTabs.map((entry) => (
-                        <TabItem
-                          key={entry.tabId}
-                          entry={entry}
-                          ambiguous={ambiguous.has(entry.tabId)}
-                          onRun={() => {
-                            recordChoice(parsed.term, tabRowKey(entry.tabId));
-                            runAfterClose(() => onSelectTab(entry));
-                          }}
-                        />
-                      ))}
-                    </CommandGroup>
-                  ) : null}
-                  {rankedWorkspaces.length > 0 ? (
-                    <CommandGroup heading="Workspaces">
-                      {rankedWorkspaces.map((entry) => (
-                        <WorkspaceItem
-                          key={entry.workspaceId}
-                          entry={entry}
-                          onRun={() => {
-                            recordChoice(parsed.term, workspaceRowKey(entry.workspaceId));
-                            runAfterClose(() => onSelectWorkspace(entry));
-                          }}
-                        />
-                      ))}
-                    </CommandGroup>
-                  ) : null}
-                  {COMMAND_GROUPS.map((group) => {
-                    const rows = rankedCommands.filter((a) => a.group === group);
-                    if (rows.length === 0) return null;
-                    return (
-                      <CommandGroup key={group} heading={group}>
-                        {rows.map((item) => (
-                          <ActionItem
-                            key={item.id}
-                            item={item}
-                            shortcutLabel={formatShortcut(
-                              item.shortcutId,
-                              userShortcuts,
-                            )}
-                            onRun={() => runCommand(item)}
-                          />
-                        ))}
-                      </CommandGroup>
-                    );
-                  })}
-                </>
+                <MergedList
+                  rows={merged}
+                  typing={parsed.term.length > 0}
+                  ambiguous={ambiguous}
+                  userShortcuts={userShortcuts}
+                  onRunCommand={runCommand}
+                  onRunTab={(entry) => {
+                    recordChoice(parsed.term, tabRowKey(entry.tabId));
+                    runAfterClose(() => onSelectTab(entry));
+                  }}
+                  onRunWorkspace={(entry) => {
+                    recordChoice(parsed.term, workspaceRowKey(entry.workspaceId));
+                    runAfterClose(() => onSelectWorkspace(entry));
+                  }}
+                />
               )
             ) : parsed.mode === "content" ? (
               <CommandGroup heading="Contents">
@@ -473,43 +428,6 @@ export function CommandPalette({
   );
 }
 
-function ActionItem({
-  item,
-  shortcutLabel,
-  onRun,
-}: {
-  item: PaletteItem;
-  shortcutLabel: string | null;
-  onRun: () => void;
-}) {
-  const rightLabel = item.disabledReason ?? item.trailing ?? shortcutLabel;
-  return (
-    <CommandItem
-      value={`cmd:${item.id}`}
-      disabled={!!item.disabledReason}
-      onSelect={onRun}
-      className="text-[12.5px]"
-    >
-      {item.icon ? (
-        <HugeiconsIcon
-          icon={item.icon}
-          size={14}
-          strokeWidth={1.75}
-          className="text-muted-foreground"
-        />
-      ) : null}
-      <span className="truncate">{item.title}</span>
-      {rightLabel ? (
-        <CommandShortcut
-          className={item.disabledReason ? "normal-case tracking-normal" : ""}
-        >
-          {rightLabel}
-        </CommandShortcut>
-      ) : null}
-    </CommandItem>
-  );
-}
-
 function AsyncBody({
   loading,
   error,
@@ -577,11 +495,4 @@ function EmptyHint() {
       <span>No commands found. Type ? to see search modes.</span>
     </div>
   );
-}
-
-function formatShortcut(
-  shortcutId: ShortcutId | undefined,
-  userShortcuts: Record<ShortcutId, KeyBinding[]>,
-): string | null {
-  return shortcutId ? getShortcutLabel(shortcutId, userShortcuts) : null;
 }

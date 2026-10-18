@@ -657,7 +657,7 @@ src/
     ├── external-editors/          - Detection and launch of external editors (`OpenInEditorButton`)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
-    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, tiered ranking, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
+    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 
 ### Tab kinds (tagged union)

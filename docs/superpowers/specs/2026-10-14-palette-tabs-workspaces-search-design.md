@@ -78,18 +78,13 @@ Un tab sin ningun uso registrado (recien restaurado) cuenta como `lastUsedAt = 0
 
 ### Orden al escribir
 
-Cada tab entra en el nivel del mejor campo que coincide, y los niveles son estrictos: una coincidencia en un nivel siempre le gana a una en el siguiente, aunque la puntuacion del segundo sea mejor.
+Al escribir, tabs, workspaces y acciones forman **una sola lista ordenada por puntuacion** (`lib/mergeRows.ts`), sin bloques ni cabeceras: la mejor coincidencia es la primera fila sea del tipo que sea. La puntuacion es la de `fuzzyScoreLower` para el titulo de un tab, el titulo de un workspace y el titulo, grupo o keywords de una accion, asi que los puntos son comparables entre tipos. Una coincidencia solo cuenta si pasa `passesQuality` (8 puntos por letra tecleada); sin eso, tres letras casaban con casi cualquier id largo.
 
-| Nivel | Campos | Como coincide |
-|---|---|---|
-| 0 | titulo del tab, nota | titulo difuso (fuzzy), nota por subcadena |
-| 1 | nombre del workspace | difuso |
-| 2 | cwd, worktree, rama | subcadena |
-| 3 | proceso / agente | subcadena |
+Los demas campos de un tab no tienen puntos fuzzy y se colocan por debajo de cualquier coincidencia fuzzy, uno por escalon de 1000 puntos: nota, nombre del workspace, cwd/worktree/rama y proceso, en ese orden. Los campos largos (rutas, notas, comandos) usan subcadena porque un fuzzy sobre una ruta larga casa con casi cualquier consulta corta. Los escalones son mayores que cualquier aprendizaje (tope 36 puntos), de modo que lo elegido nunca sube un tab de un escalon a otro. Los empates entre tabs los resuelve `byRecency` (workspace no hibernado primero, luego `lastUsedAt`, luego actividad del workspace, luego orden en el arbol).
 
-Los campos largos (rutas, notas, comandos) usan subcadena porque un fuzzy sobre una ruta larga casa con casi cualquier consulta corta. Dentro de un nivel manda la puntuacion y despues `byRecency` (workspace no hibernado primero, luego `lastUsedAt`, luego actividad del workspace, luego orden en el arbol). Los workspaces se puntuan por titulo difuso.
+**Aprendizaje.** `lib/learned.ts` guarda, por cada texto tecleado, cuantas veces se eligio cada fila (accion, tab o workspace). Esa fila suma hasta 36 puntos (`12 * log2(1 + veces)`, con tope) cuando se vuelve a teclear lo mismo, y un texto mas largo hereda lo aprendido por un prefijo en proporcion a su longitud ("serv" hereda 3/4 de "ser", "settings" solo 3/8 de "set"). Asi lo elegido repetidamente llega a ser la primera fila sin hundir una coincidencia claramente mejor.
 
-Las filas se agrupan con cabeceras en orden fijo: Tabs, Workspaces, las acciones por sus grupos de siempre y Settings. Los grupos vacios no se pintan. Los tabs mostrados al escribir se limitan a 40 (`SEARCH_LIMIT`): cada fila es un item de cmdk que se registra en cada pulsacion. El tab activo si aparece al buscar. El limite de 8 es solo para la caja vacia.
+Los tabs mostrados al escribir se limitan a 40 (`SEARCH_LIMIT`): cada fila es un item de cmdk que se registra en cada pulsacion. Las acciones no se limitan. El tab activo si aparece al buscar. El limite de 8 es solo para la caja vacia.
 
 ### Filas
 
