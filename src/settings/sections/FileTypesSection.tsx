@@ -96,8 +96,7 @@ export function FileTypesSection({
       setFilterText(focusExt);
     }
     onFocusConsumed?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusExt, editorViewByExt]);
+  }, [focusExt, editorViewByExt, onFocusConsumed]);
 
   const allEntries = sortedEntries(editorViewByExt);
   const filter = filterText.trim().toLowerCase();
@@ -285,21 +284,14 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               <span className="text-[12px] text-muted-foreground">
                 Indent size
               </span>
-              <input
-                type="number"
+              <NumberField
+                value={effective.indentSize}
                 min={EDITOR_INDENT_MIN}
                 max={EDITOR_INDENT_MAX}
-                value={effective.indentSize}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const n = Number.parseInt(e.target.value, 10);
-                  if (Number.isNaN(n)) return;
-                  void patchEditorViewEntry(entryKey, {
-                    indentSize: clampIndentSize(n),
-                  });
-                }}
-                className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+                clamp={clampIndentSize}
+                onCommit={(n) =>
+                  void patchEditorViewEntry(entryKey, { indentSize: n })
+                }
               />
             </div>
           </div>
@@ -309,27 +301,70 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               <span className="text-[12px] text-muted-foreground">
                 {effective.columnRuler === 0 ? "off" : "col"}
               </span>
-              <input
-                type="number"
+              <NumberField
+                value={effective.columnRuler}
                 min={0}
                 max={EDITOR_COLUMN_RULER_MAX}
-                value={effective.columnRuler}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const n = Number.parseInt(e.target.value, 10);
-                  if (Number.isNaN(n)) return;
-                  void patchEditorViewEntry(entryKey, {
-                    columnRuler: clampColumnRuler(n),
-                  });
-                }}
-                className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+                clamp={clampColumnRuler}
+                onCommit={(n) =>
+                  void patchEditorViewEntry(entryKey, { columnRuler: n })
+                }
               />
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function NumberField({
+  value,
+  min,
+  max,
+  clamp,
+  onCommit,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  clamp: (n: number) => number;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const n = Number.parseInt(draft, 10);
+    if (Number.isNaN(n)) {
+      setDraft(String(value));
+      return;
+    }
+    const next = clamp(n);
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={draft}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+    />
   );
 }
 

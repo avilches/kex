@@ -258,7 +258,7 @@ import {
 import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
-import { pathBasename } from "@/lib/pathUtils";
+import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
 // Same reference for every workspace whose nested list is closed, so the bar items stay stable.
@@ -550,6 +550,7 @@ export default function App() {
   // Also fires on first window focus after startup, ensuring the terminal gets the
   // cursor even if the PTY wasn't ready when the workspace-switch effect ran.
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
@@ -570,10 +571,17 @@ export default function App() {
         });
       })
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
-      .catch(() => {});
-    return () => unlisten?.();
+      .catch((e) => console.error("[kex] onFocusChanged listen failed:", e));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Return focus to the active terminal when the notification bell closes
@@ -1544,7 +1552,6 @@ export default function App() {
         flashTab(existingOpenTab.tab.id);
         return;
       }
-      const i = path.lastIndexOf("/");
       splitPaneAndOpenTab(
         activeWorkspace.id,
         activeWorkspace.activePaneId,
@@ -1553,7 +1560,7 @@ export default function App() {
           id: newTabId(),
           kind: "markdown",
           path,
-          title: i === -1 ? path : path.slice(i + 1),
+          title: pathBasename(path),
         },
       );
     },
@@ -2046,21 +2053,19 @@ export default function App() {
             if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
             const ep = tab as { path: string };
             if (ep.path === from) {
-              const i = to.lastIndexOf("/");
               updateTabData(ws.id, tab.id, (p) =>
                 p.kind === "editor" || p.kind === "markdown"
-                  ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) }
+                  ? { ...p, path: to, title: pathBasename(to) }
                   : p,
               );
             } else if (ep.path.startsWith(`${from}/`)) {
               const newPath = `${to}${ep.path.slice(from.length)}`;
-              const i = newPath.lastIndexOf("/");
               updateTabData(ws.id, tab.id, (p) =>
                 p.kind === "editor" || p.kind === "markdown"
                   ? {
                       ...p,
                       path: newPath,
-                      title: i === -1 ? newPath : newPath.slice(i + 1),
+                      title: pathBasename(newPath),
                     }
                   : p,
               );
@@ -2079,8 +2084,7 @@ export default function App() {
       const foundTab = found.tab;
       if (foundTab.kind !== "editor" && foundTab.kind !== "markdown") return;
       const oldPath = foundTab.path;
-      const lastSlash = oldPath.lastIndexOf("/");
-      const parent = lastSlash >= 0 ? oldPath.slice(0, lastSlash) : oldPath;
+      const parent = pathDirname(oldPath);
       const newPath = `${parent}/${newName}`;
       try {
         await native.renameFile(oldPath, newPath);
@@ -3384,6 +3388,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<{ workspaceId: string; tabId: string }>(
@@ -3393,10 +3398,15 @@ export default function App() {
         },
       )
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
       .catch((e) => console.error("[kex] kex:activate-tab listen failed:", e));
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [onActivateAgent]);
@@ -3457,14 +3467,20 @@ export default function App() {
 
   useEffect(() => {
     if (!IS_MAC) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<string>("kex:menu", (e) => menuDispatchRef.current(e.payload))
       .then((u) => {
+        if (disposed) {
+          u();
+          return;
+        }
         unlisten = u;
       })
       .catch((e) => console.error("[kex] kex:menu listen failed:", e));
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);
@@ -3481,7 +3497,7 @@ export default function App() {
         showHidden: activeShowHidden,
         hibernated: !!activeWorkspace?.hibernated,
       },
-    }).catch(() => {});
+    }).catch((e) => console.error("[kex] sync_menu failed:", e));
   }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden, activeWorkspace?.hibernated]);
 
   // ── Command palette ───────────────────────────────────────────────────────

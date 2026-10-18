@@ -56,14 +56,24 @@ export function AboutSection() {
   };
 
   useEffect(() => {
-    void getVersion().then(setVersion);
-    void getName().then(setName);
-    void invoke<{ hash: string; branch: string }>("get_build_info").then(
-      ({ hash, branch }) => {
-        setGitHash(hash);
-        setGitBranch(branch);
-      },
-    );
+    let cancelled = false;
+    void getVersion()
+      .then((v) => {
+        if (!cancelled) setVersion(v);
+      })
+      .catch(() => {});
+    void getName()
+      .then((n) => {
+        if (!cancelled) setName(n);
+      })
+      .catch(() => {});
+    void invoke<{ hash: string; branch: string }>("get_build_info")
+      .then((info) => {
+        if (cancelled) return;
+        setGitHash(info.hash);
+        setGitBranch(info.branch);
+      })
+      .catch((e) => console.error("[kex] get_build_info failed:", e));
     try {
       const p = platform();
       const a = arch();
@@ -72,6 +82,9 @@ export function AboutSection() {
     } catch {
       setBuild("");
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
