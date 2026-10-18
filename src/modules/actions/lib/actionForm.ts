@@ -52,10 +52,12 @@ export function withKind(action: Action, runInTerminal: boolean): Action {
 // Picking a suggestion fills the name, the icon (through appId) and the command. A name
 // the user already typed is theirs and stays.
 export function withSuggestion(action: Action, suggestion: AppSuggestion): Action {
+  // The custom app has no command of its own: it only lets go of the app, so choosing it
+  // never empties a command the store would refuse to save.
   const next: Action = {
     ...action,
     runInTerminal: false,
-    command: suggestion.defaultCommand,
+    command: suggestion.defaultCommand || action.command,
     name: action.name.trim() ? action.name : suggestion.name,
   };
   delete next.cwdMode;
@@ -107,13 +109,14 @@ export function actionProblems(
 // draft is shown as typed; an empty one is flagged and never saved, so the stored action
 // keeps its last valid command. Once focus leaves, the box shows the stored command again:
 // that also picks up a change made from outside (a suggestion, another window).
-export function commandDraft(input: { draft: string; stored: string; focused: boolean }): {
+export function commandDraft(input: { draft: string; stored: string; focused: boolean; saved?: boolean }): {
   shown: string;
   required: boolean;
 } {
-  const { draft, stored, focused } = input;
+  const { draft, stored, focused, saved = true } = input;
   const empty = !draft.trim();
-  if (focused) return { shown: draft, required: empty };
+  // A row the store has not accepted yet has no earlier value to go back to.
+  if (focused || !saved) return { shown: draft, required: empty };
   if (empty && stored.trim()) return { shown: stored, required: false };
   return { shown: stored || draft, required: !(stored || draft).trim() };
 }

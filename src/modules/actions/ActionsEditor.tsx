@@ -9,7 +9,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
@@ -23,7 +23,8 @@ type Props = {
   suggestions: readonly AppSuggestion[];
   context: ActionContext | null;
   emptyHint: string;
-  onAdd: (action: Action) => void;
+  /** May return a promise: when it rejects the row stays, as a draft that can be saved again. */
+  onAdd: (action: Action) => void | Promise<unknown>;
   onUpdate: (id: string, next: Action) => void;
   onRemove: (id: string) => void;
   onReorder: (fromId: string, toId: string) => void;
@@ -51,7 +52,11 @@ export function ActionsEditor({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [drafts, setDrafts] = useState<Action[]>([]);
   const rows = useRef<Map<string, ActionRowHandle>>(new Map());
+  // Drafts already handed to the store, which has not echoed them back yet.
+  const handedOver = useRef<Set<string>>(new Set());
   const saved = new Set(actions.map((a) => a.id));
+  // A draft stays rendered, under the same key, until the store shows an action with its id,
+  // so the row keeps its DOM node and its focus while the write is on its way.
   const visible = [...actions, ...drafts.filter((d) => !saved.has(d.id))];
 
   const addRow = () => {
@@ -65,13 +70,19 @@ export function ActionsEditor({
       onUpdate(current.id, next);
       return;
     }
-    if (next.command.trim()) {
-      onAdd(next);
-      setDrafts((d) => d.filter((x) => x.id !== current.id));
-    } else {
-      setDrafts((d) => d.map((x) => (x.id === current.id ? next : x)));
+    setDrafts((d) => d.map((x) => (x.id === current.id ? next : x)));
+    if (next.command.trim() && !handedOver.current.has(current.id)) {
+      handedOver.current.add(current.id);
+      Promise.resolve(onAdd(next)).catch(() => handedOver.current.delete(current.id));
     }
   };
+
+  // Once the store shows a draft, the saved row takes its place and the bookkeeping goes.
+  useEffect(() => {
+    if (drafts.every((d) => !saved.has(d.id))) return;
+    for (const id of saved) handedOver.current.delete(id);
+    setDrafts((d) => d.filter((x) => !saved.has(x.id)));
+  });
 
   const remove = (action: Action) => {
     if (saved.has(action.id)) onRemove(action.id);
@@ -104,6 +115,7 @@ export function ActionsEditor({
                 action={action}
                 suggestions={suggestions}
                 context={context}
+                saved={saved.has(action.id)}
                 onMakeGlobal={onMakeGlobal && saved.has(action.id) ? () => onMakeGlobal(action.id) : undefined}
                 onChange={(next) => change(action, next)}
                 onRemove={() => remove(action)}

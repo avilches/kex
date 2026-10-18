@@ -74,10 +74,11 @@ describe("withSuggestion", () => {
     expect(next.cwd).toBeUndefined();
   });
 
-  it("the custom app clears the appId and leaves an empty command to fill in", () => {
+  it("the custom app only forgets the app: the command and the name stay as they are", () => {
     const next = withSuggestion(app, { key: "custom", name: "Custom app", iconId: null, defaultCommand: "" });
     expect(next.appId).toBeUndefined();
-    expect(next.command).toBe("");
+    expect(next.command).toBe("pycharm {cwd}");
+    expect(next.name).toBe("PyCharm");
   });
 });
 
@@ -142,6 +143,20 @@ describe("commandDraft", () => {
 
   it("a brand new row with no stored command keeps showing the empty box and asks for a command", () => {
     expect(commandDraft({ draft: "", stored: "", focused: false })).toEqual({ shown: "", required: true });
+  });
+
+  it("a row that is not saved yet keeps what was typed, since there is no earlier value to go back to", () => {
+    expect(commandDraft({ draft: "pnpm build", stored: "pnpm test", focused: false, saved: false })).toEqual({
+      shown: "pnpm build",
+      required: false,
+    });
+  });
+
+  it("an unsaved row still flags an empty command", () => {
+    expect(commandDraft({ draft: " ", stored: "pnpm test", focused: false, saved: false })).toEqual({
+      shown: " ",
+      required: true,
+    });
   });
 });
 

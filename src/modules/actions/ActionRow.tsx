@@ -8,7 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,7 +28,10 @@ import { ActionIcon } from "./ActionIcon";
 import {
   actionProblems,
   CWD_MODE_LABELS,
+  commandDraft,
   commandVariableDocs,
+  commitCommand,
+  currentSuggestionKey,
   withKind,
   withSuggestion,
 } from "./lib/actionForm";
@@ -43,6 +46,8 @@ type Props = {
   action: Action;
   suggestions: readonly AppSuggestion[];
   context: ActionContext | null;
+  /** False while the row is a draft the store has not accepted yet. */
+  saved: boolean;
   /** Short button that moves a workspace Action to the global list; absent in Settings. */
   onMakeGlobal?: () => void;
   onChange: (next: Action) => void;
@@ -53,19 +58,27 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, suggestions, context, onMakeGlobal, onChange, onRemove },
+  { action, suggestions, context, saved, onMakeGlobal, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
   const commandRef = useRef<HTMLInputElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
-  const [commandDirty, setCommandDirty] = useState(false);
-  const [command, setCommand] = useState(action.command);
-  const problems = actionProblems({ ...action, command }, context);
+  const [draft, setDraft] = useState(action.command);
+  const [commandFocused, setCommandFocused] = useState(false);
+  const [name, setName] = useState(action.name);
+  const [nameFocused, setNameFocused] = useState(false);
+  const command = commandDraft({ draft, stored: action.command, focused: commandFocused, saved });
+  const shownName = nameFocused ? name : action.name;
+  const problems = actionProblems({ ...action, command: command.shown }, context);
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
   const kindId = `${action.id}-kind`;
+
+  // The latest values for the unmount flush, which closes over nothing else.
+  const pending = useRef({ action, draft, onChange });
+  pending.current = { action, draft, onChange };
 
   useImperativeHandle(ref, () => ({
     focusCommand: () => {
@@ -74,19 +87,28 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
     },
   }));
 
-  const change = (patch: Action) => {
-    onChange(patch);
-    setCommand(patch.command);
+  const saveCommand = (value: string) => {
+    const { save } = commitCommand(pending.current.action.command, value);
+    if (save !== null) pending.current.onChange({ ...pending.current.action, command: save });
+  };
+
+  // Closing the dialog or Settings while a command is still being typed must not lose it.
+  useEffect(() => () => saveCommand(pending.current.draft), []);
+
+  const change = (next: Action) => {
+    onChange(next);
+    setDraft(next.command);
+    setName(next.name);
   };
 
   const pickSuggestion = (key: string) => {
     const picked = key === CUSTOM_APP_SUGGESTION.key
       ? CUSTOM_APP_SUGGESTION
       : suggestions.find((s) => s.key === key);
-    if (picked) change(withSuggestion({ ...action, command }, picked));
+    if (picked) change(withSuggestion(action, picked));
   };
 
-  const currentKey = suggestions.find((s) => s.appId && s.appId === action.appId)?.key;
+  const currentKey = currentSuggestionKey(action, suggestions);
 
   return (
     <div
@@ -95,7 +117,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
       className="flex flex-col gap-2 rounded-md border border-border/60 p-2"
     >
       <div className="flex items-center gap-1.5">
-        <span {...attributes} {...listeners} className="shrink-0 cursor-grab text-muted-foreground">
+        <span {...attributes} {...listeners} aria-label="Drag to reorder" className="shrink-0 cursor-grab text-muted-foreground">
           <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
         </span>
         <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
@@ -106,8 +128,16 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
           aria-label="Action name"
           placeholder="Name"
           spellCheck={false}
-          defaultValue={action.name}
-          onBlur={(e) => onChange({ ...action, name: e.target.value })}
+          value={shownName}
+          onFocus={() => {
+            setName(action.name);
+            setNameFocused(true);
+          }}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={(e) => {
+            setNameFocused(false);
+            if (e.target.value.trim() && e.target.value.trim() !== action.name) onChange({ ...action, name: e.target.value });
+          }}
         />
         {onMakeGlobal && (
           <button type="button" title="Make global: move to Settings" aria-label="Make global" onClick={onMakeGlobal} className={SMALL_BUTTON}>
@@ -122,7 +152,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
       <RadioGroup
         className="flex w-auto gap-4 pl-1"
         value={action.runInTerminal ? "script" : "app"}
-        onValueChange={(v) => change(withKind({ ...action, command }, v === "script"))}
+        onValueChange={(v) => change(withKind(action, v === "script"))}
       >
         <div className="flex items-center gap-2">
           <RadioGroupItem value="script" id={`${kindId}-script`} />
@@ -135,7 +165,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
       </RadioGroup>
 
       {!action.runInTerminal && (
-        <Select value={currentKey ?? CUSTOM_APP_SUGGESTION.key} onValueChange={pickSuggestion}>
+        <Select value={currentKey} onValueChange={pickSuggestion}>
           <SelectTrigger size="sm" aria-label="App" className="h-8 w-full text-[12px]">
             <SelectValue />
           </SelectTrigger>
@@ -151,17 +181,23 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
       <div className="flex flex-col gap-1">
         <input
           ref={commandRef}
-          className={cn(INPUT_CLASS, "font-mono", commandDirty && (!command.trim() || blocking.some((p) => p.kind === "command")) && "border-destructive")}
+          className={cn(INPUT_CLASS, "font-mono", (command.required || blocking.some((p) => p.kind === "command")) && "border-destructive")}
           aria-label="Command"
+          aria-invalid={command.required}
           placeholder={action.runInTerminal ? "Command (e.g. pnpm dev)" : "Command (e.g. pycharm {workspace})"}
           spellCheck={false}
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
+          value={command.shown}
+          onFocus={() => {
+            setDraft(action.command);
+            setCommandFocused(true);
+          }}
+          onChange={(e) => setDraft(e.target.value)}
           onBlur={(e) => {
-            setCommandDirty(true);
-            onChange({ ...action, command: e.target.value });
+            setCommandFocused(false);
+            saveCommand(e.target.value);
           }}
         />
+        {command.required && <div className="text-[11px] text-destructive">Command is required</div>}
         <button
           type="button"
           aria-expanded={variablesOpen}
@@ -183,7 +219,8 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
                   const input = commandRef.current;
                   if (!input) return;
                   const { value } = insertTitleVariable(input, `{${v.name}}`);
-                  setCommand(value);
+                  setDraft(value);
+                  saveCommand(value);
                 }}
                 className="flex items-center gap-2 border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
               >

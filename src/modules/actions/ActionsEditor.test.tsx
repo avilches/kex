@@ -24,12 +24,24 @@ function mount(actions: Action[], extra: Partial<Parameters<typeof ActionsEditor
   return { container, ...handlers, unmount: () => act(() => root.unmount()) };
 }
 
+function mountWithRerender(actions: Action[]) {
+  const handlers = { onAdd: vi.fn(), onUpdate: vi.fn(), onRemove: vi.fn(), onReorder: vi.fn() };
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const render = (list: Action[]) =>
+    act(() => root.render(createElement(ActionsEditor, { actions: list, suggestions: [], context: null, emptyHint: "No actions yet.", ...handlers })));
+  render(actions);
+  return { container, ...handlers, rerender: render, unmount: () => act(() => root.unmount()) };
+}
+
 const click = (el: Element | null | undefined) => act(() => void (el as HTMLElement).click());
 const addButton = (c: HTMLElement) =>
   [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Action"));
 
 function type(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  act(() => input.focus());
   act(() => {
     setter.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -59,6 +71,36 @@ describe("ActionsEditor", () => {
     type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "pnpm test");
     expect(onAdd).toHaveBeenCalledTimes(1);
     expect(onAdd.mock.calls[0]![0]).toMatchObject({ command: "pnpm test", runInTerminal: true });
+    unmount();
+  });
+
+  it("a draft keeps its row, and its focus, until the store shows it, and is handed over once", () => {
+    const { container, onAdd, rerender, unmount } = mountWithRerender([]);
+    click(addButton(container));
+    const before = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    type(before, "pnpm test");
+    const after = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    expect(after).toBe(before);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const added = onAdd.mock.calls[0]![0] as Action;
+    rerender([added]);
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("a rejected add leaves the row in place so it can be saved again", async () => {
+    const onAdd = vi.fn().mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(undefined);
+    const { container, unmount } = mount([], { onAdd });
+    click(addButton(container));
+    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    type(command, "pnpm test");
+    await act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "pnpm build");
+    expect(onAdd).toHaveBeenCalledTimes(2);
     unmount();
   });
 
@@ -103,6 +145,62 @@ describe("ActionsEditor", () => {
     click(container.querySelector("button[aria-label='Make global']"));
     expect(onMakeGlobal).toHaveBeenCalledWith("ac-1");
     unmount();
+  });
+
+  it("the name box follows the stored name when it changes from outside", () => {
+    const first = mount([saved]);
+    const name = first.container.querySelector("input[aria-label='Action name']") as HTMLInputElement;
+    expect(name.value).toBe("Dev");
+    first.unmount();
+    const renamed = mount([{ ...saved, name: "Dev server" }]);
+    expect((renamed.container.querySelector("input[aria-label='Action name']") as HTMLInputElement).value).toBe("Dev server");
+    renamed.unmount();
+  });
+
+  it("clearing the name saves nothing and shows the stored name again", () => {
+    const { container, onUpdate, unmount } = mount([saved]);
+    const input = container.querySelector("input[aria-label='Action name']") as HTMLInputElement;
+    type(input, "");
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect((container.querySelector("input[aria-label='Action name']") as HTMLInputElement).value).toBe("Dev");
+    unmount();
+  });
+
+  it("a renamed action is saved with the new name", () => {
+    const { container, onUpdate, unmount } = mount([saved]);
+    type(container.querySelector("input[aria-label='Action name']") as HTMLInputElement, "Server");
+    expect(onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ name: "Server" }));
+    unmount();
+  });
+
+  it("clearing the command flags it as required and saves nothing", () => {
+    const { container, onUpdate, unmount } = mount([saved]);
+    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    act(() => command.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(command, "");
+      command.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Command is required");
+    act(() => void command.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect((container.querySelector("input[aria-label='Command']") as HTMLInputElement).value).toBe("pnpm dev");
+    unmount();
+  });
+
+  it("saves a command still being typed when the editor goes away", () => {
+    const { container, onUpdate, unmount } = mount([saved]);
+    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    act(() => command.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(command, "pnpm build");
+      command.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+    unmount();
+    expect(onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ command: "pnpm build" }));
   });
 
   it("a script shows the folder choice and an app does not", () => {
