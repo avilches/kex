@@ -12,7 +12,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
-import type { BarItem } from "./lib/actionsBar";
+import { menuEntries, type BarItem } from "./lib/actionsBar";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -94,24 +94,34 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
 
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
-  const disabled = item.disabledReason !== null;
+  const blocked = item.state === "idle" && item.disabledReason !== null;
+  const [main, stop] = menuEntries(item);
   return (
-    <DropdownMenuItem
-      title={item.disabledReason ? `${item.name}: ${item.disabledReason}` : undefined}
-      disabled={!script && disabled}
-      className="gap-1 px-1 py-0.5"
-      onSelect={() => {
-        if (!script) h.run(item.action);
-        else nameClick(item, h);
-      }}
-    >
-      {script ? <ScriptControl item={item} {...h} /> : <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>}
-      <span className={cn("flex-1 truncate px-1 text-[12px]", disabled && item.state === "idle" && "text-muted-foreground/60")}>{item.name}</span>
-      {disabled && item.state === "idle" && (
-        <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
+    <>
+      <DropdownMenuItem
+        title={item.disabledReason ? `${item.name}: ${item.disabledReason}` : undefined}
+        disabled={!main?.enabled}
+        className="gap-1 px-1 py-0.5"
+        onSelect={() => {
+          if (!script) h.run(item.action);
+          else nameClick(item, h);
+        }}
+      >
+        {script ? <ScriptControl item={item} {...h} /> : <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>}
+        <span className={cn("flex-1 truncate px-1 text-[12px]", blocked && "text-muted-foreground/60")}>{item.name}</span>
+        {blocked && <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>}
+        {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
+      </DropdownMenuItem>
+      {stop && (
+        <DropdownMenuItem
+          disabled={!stop.enabled}
+          className="gap-1 px-1 py-0.5 pl-7 text-[12px] text-destructive focus:text-destructive"
+          onSelect={() => h.stop(item.action)}
+        >
+          {item.state === "waiting" ? "Stopping..." : `Stop ${item.name}`}
+        </DropdownMenuItem>
       )}
-      {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
-    </DropdownMenuItem>
+    </>
   );
 }
 

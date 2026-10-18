@@ -6,10 +6,12 @@ import {
   COMPACT_WIDTH,
   describeMissing,
   isCompactBar,
+  menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
 } from "./actionsBar";
+import type { BarItem } from "./actionsBar";
 import type { Action } from "./types";
 
 const script = (o: Partial<Action> = {}): Action => ({
@@ -94,6 +96,48 @@ describe("isCompactBar", () => {
   it("collapses own buttons below the compact width only", () => {
     expect(isCompactBar(COMPACT_WIDTH - 1)).toBe(true);
     expect(isCompactBar(COMPACT_WIDTH)).toBe(false);
+  });
+});
+
+describe("menuEntries", () => {
+  const idle = (a: Action, over: Partial<BarItem> = {}): BarItem => ({
+    id: a.id,
+    name: a.name,
+    action: a,
+    state: "idle",
+    active: false,
+    stoppable: false,
+    disabledReason: null,
+    ...over,
+  });
+
+  it("gives an idle script one row that runs it", () => {
+    expect(menuEntries(idle(script()))).toEqual([{ kind: "main", enabled: true }]);
+  });
+
+  it("adds a Stop row, reachable by keyboard, to a running script", () => {
+    const entries = menuEntries(idle(script(), { state: "running", stoppable: true }));
+    expect(entries).toEqual([
+      { kind: "main", enabled: true },
+      { kind: "stop", enabled: true },
+    ]);
+  });
+
+  it("shows a script that is stopping with its Stop row disabled", () => {
+    const entries = menuEntries(idle(script(), { state: "waiting" }));
+    expect(entries).toEqual([
+      { kind: "main", enabled: false },
+      { kind: "stop", enabled: false },
+    ]);
+  });
+
+  it("disables the row of a script or an app that cannot run, with no Stop row", () => {
+    expect(menuEntries(idle(script(), { disabledReason: "needs a git branch" }))).toEqual([{ kind: "main", enabled: false }]);
+    expect(menuEntries(idle(app(), { disabledReason: "needs an open file" }))).toEqual([{ kind: "main", enabled: false }]);
+  });
+
+  it("never gives an app a Stop row", () => {
+    expect(menuEntries(idle(app()))).toEqual([{ kind: "main", enabled: true }]);
   });
 });
 
