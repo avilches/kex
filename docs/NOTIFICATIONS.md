@@ -9,13 +9,8 @@ end up emitting `kex:agent-signal` to the frontend, but never touch each other:
 2. **Claude Code hook JSON over a Unix socket, one per PTY.** `trigger-event.sh` forwards the hook's payload
    unmodified to `pty/ipc.rs::run_listener`, which parses it directly and emits `kex:agent-signal` (or, for
    `SessionStart`, records the session first). This path is entirely out of band from the PTY byte stream: it never
-   passes through `agent_detect.rs`, and it does not touch the OSC-driven `armed`/`status` state kept there. See
+   passes through `agent_detect.rs`, and it does not touch the OSC-driven `armed` state kept there. See
    `docs/AGENT_SESSION_RESTORE.md` for the hook script and socket details.
-
-A previous version of the hook script (`kex-session-hook`, before it was renamed `trigger-event.sh`) fed its JSON
-through channel 1 instead, encoded as a single `OSC 777;kex;...` sequence and parsed by `agent_detect.rs`. That
-parser (`handle_kex_unified`, still tested) is kept in the code but nothing emits that sequence anymore; treat it as
-legacy/dead, not a live path (see TASK-733 for the decision on deleting it).
 
 ---
 
@@ -27,10 +22,10 @@ legacy/dead, not a live path (see TASK-733 for the decision on deleting it).
 | `OSC 7;file://<host><path>` | Shell (Kex init scripts) | Segunda instrucción de `_kex_precmd`: justo después de `D`, antes del prompt | | Updates `panel.cwd`. Ignorado si `state.inCommand` | |
 | `OSC 133;A` | Shell (Kex init scripts) | Última instrucción de `_kex_precmd`: el prompt está a punto de renderizarse | | `state.inCommand=false`, crea marker de posición del prompt | |
 | `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: el shell renderizó el prompt | | `state.inCommand=true` | |
-| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `find_agent_invocation(cmd)` encuentra un segmento cuya palabra de orden es un agente: `armed=true`, `status=Idle`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
-| `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
+| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `find_agent_invocation(cmd)` encuentra un segmento cuya palabra de orden es un agente: `armed=true`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
+| `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
 
-`OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY: a partir de ahí, `armed`/`status` en `agent_detect.rs` ya no avanzan (solo `OSC 9` y `OSC 133;D` los tocan); el estado working/attention real durante la sesión se conoce a través del canal 2, más abajo.
+`OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY: a partir de ahí, `armed` en `agent_detect.rs` ya no avanza (solo `OSC 9` y `OSC 133;D` lo tocan); el estado working/attention real durante la sesión se conoce a través del canal 2, más abajo.
 
 `OSC 9;4;...` es taskbar progress (Windows); se ignora aunque el detector esté armado.
 
@@ -53,17 +48,9 @@ directamente, sin pasar por `agent_detect.rs`:
 | `PermissionRequest` | Claude Code pide permiso para usar una herramienta | emit `kex:agent-signal` `kind: "PermissionRequest"` | `setStatus("attention")` + route |
 | `MessageDisplay` | Mensaje final de un turno (campos por confirmar) | Si `final` es falso, ignorado; si es verdad, emit `kex:agent-signal` `kind: "MessageDisplay"` | `ensureSession` (sin efecto adicional hoy) |
 
-Ningún evento de este canal arma ni desarma `agent_detect.rs`: `armed`/`status` ahí solo reaccionan a `OSC 133`/`OSC 9`
+Ningún evento de este canal arma ni desarma `agent_detect.rs`: `armed` ahí solo reacciona a `OSC 133`/`OSC 9`
 (canal 1). El estado `working`/`attention`/`idle` que ve el usuario vive enteramente en `agentStore` del frontend,
 actualizado por `handleSignal` en `AgentNotificationsBridge.tsx` a partir de estos eventos.
-
----
-
-## Auto-arming (`ensure_armed`), legado
-
-`ensure_armed` solo lo llama `handle_kex_unified`, el parser del extinto `OSC 777;kex;*` (ver arriba). Con ese canal
-muerto, `ensure_armed` es código sin ninguna ruta de entrada viva hoy: no arma nada a partir de los eventos del
-socket Unix, que nunca pasan por `agent_detect.rs`.
 
 ---
 
@@ -82,10 +69,10 @@ Ground ──────────────────► Armed
                            Ground (disarmed)
 ```
 
-Mientras está `Armed`, `OSC 9` sigue produciendo una señal `Notification` genérica (sin `session_id`, para cuando
-Claude Code no tiene hooks instalados). El resto de transiciones que antes vivían en este mismo diagrama
-(`Working`/`Waiting` por `UserPromptSubmit`/`Notification`/`Stop`/etc.) ya no las lleva Rust: las decide directamente
-`agentStore` en el frontend a partir de los eventos del canal 2, uno por uno, según la tabla de la sección anterior.
+Mientras está `Armed`, `OSC 9` (y cualquier `OSC 777` que no sea el progreso de taskbar) sigue produciendo una señal
+`Notification` genérica (sin `session_id`, para cuando Claude Code no tiene hooks instalados). El ciclo
+`working`/`attention`/`idle` no lo lleva Rust: lo decide `agentStore` en el frontend a partir de los eventos del
+canal 2, uno por uno, según la tabla de la sección anterior.
 
 Notas clave:
 - **`Stop` no cierra la sesión**: Claude sigue corriendo, solo ha terminado de responder. En el frontend, `Stop` es

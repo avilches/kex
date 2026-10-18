@@ -588,8 +588,8 @@ titulo del workspace) mostraba solo el nombre del agente ("claude"). La barra de
 
 ### Pistas falsas investigadas (para no repetirlas)
 
-1. **`OSC 777` / `AgentSignal.message`**: el protocolo custom de hooks de Claude Code
-   (`agent_detect.rs`, evento `kex:agent-signal`) trae un campo `message` en eventos
+1. **`AgentSignal.message`**: el protocolo de hooks de Claude Code
+   (`ipc.rs`, evento `kex:agent-signal`) trae un campo `message` en eventos
    `Notification`/`Stop`/`StopFailure`. Se investigo a fondo pensando que era la fuente del texto
    que faltaba en el header. **No lo es**: ese `message` se usa solo para el toast puntual
    (`route.ts` -> `showAgentToast`) y nunca se persiste; no es la fuente del texto que si se ve en
