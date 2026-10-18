@@ -15,7 +15,7 @@ import type { Action } from "./types";
 
 // A command runs against a place (folder, file, workspace), never against a running
 // program or a browser page, so only these variables exist for it.
-const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "file", "path", "host"] as const;
+export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "file", "path", "host"] as const;
 
 export type CommandVariable = (typeof COMMAND_VARIABLES)[number];
 

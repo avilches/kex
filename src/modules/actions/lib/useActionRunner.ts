@@ -16,7 +16,9 @@ import {
   setScriptCommand,
   setScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { tabRawValues } from "@/modules/workspaces/lib/titleVars";
+import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
+import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
+import { buildCommandVars } from "./commandVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
   pickRunnableAction,
@@ -77,14 +79,12 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
 
 function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps): RunContext {
   const focused = focusedTab(ws.paneTree, ws.activePaneId);
-  const fallbackDir = ws.cwd || ws.workspaceRoot || undefined;
-  const raw = tabRawValues(focused, { fallbackDir, workspaceRoot: ws.workspaceRoot });
-  const git = getDirGit(raw.cwd || undefined);
+  const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
     hibernated: !!ws.hibernated,
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
-    vars: { ...raw, branch: git.branch, repo: git.repoRoot.split(/[\\/]/).filter(Boolean).pop() ?? "" },
+    vars: buildCommandVars(focused, ws, info, getSystemInfo().host),
     folders: { focusFolder: deps.focusFolder.current, workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },
     link: action.runInTerminal ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
