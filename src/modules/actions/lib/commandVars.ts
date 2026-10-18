@@ -1,6 +1,6 @@
 import { tabRawValues } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
-import { COMMAND_VARIABLES } from "./actionForm";
+import type { COMMAND_VARIABLES } from "./actionForm";
 
 export type GitInfo = { branch: string; repoRoot: string };
 
