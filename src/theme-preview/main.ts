@@ -44,10 +44,21 @@ import { resolveTerminalPalette, terminalThemeOptions } from "@/modules/theme/re
 import markdownDemo from "./live-preview-demo.md?raw";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
-import type { Theme, ThemeMode } from "@/modules/theme/types";
+import type { TerminalPalette, Theme, ThemeColors, ThemeMode } from "@/modules/theme/types";
 import { fileIcon, folderIcon, icon } from "./icons";
 import { toHex, tokenValue } from "./color";
-import { applyTune, DEFAULT_TUNE, loadTune, readTune, saveTune, tuneSnapshot, type Tune } from "./tuner";
+import {
+  applyTokens,
+  applyTune,
+  DEFAULT_TUNE,
+  loadTokens,
+  loadTune,
+  readTune,
+  saveTokens,
+  saveTune,
+  tuneSnapshot,
+  type Tune,
+} from "./tuner";
 
 type Scheme = "vscode" | "jetbrains";
 
@@ -63,10 +74,12 @@ const state = {
   editor: params.get("editor") ?? "auto",
   custom: null as Theme | null,
   tune: { ...DEFAULT_TUNE } as Tune,
+  tokens: {} as Record<string, string>,
 };
 
 const tuneKey = (): string => `${state.themeId}|${state.mode}`;
 state.tune = loadTune(tuneKey());
+state.tokens = loadTokens(tuneKey());
 
 const ANSI_NAMES = [
   "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
@@ -144,17 +157,26 @@ const TREE: TreeNode[] = [
   { name: "naming-refactor", dir: true, depth: 2 },
   { name: "palette-adversarial", dir: true, depth: 2 },
   { name: "task-829-zoom-slider", dir: true, depth: 2 },
+  { name: ".DS_Store", depth: 2, ignored: true },
   { name: ".git", dir: true, depth: 0 },
   { name: ".github", dir: true, depth: 0 },
   { name: ".idea", dir: true, ignored: true, depth: 0 },
+  { name: ".superpowers", dir: true, ignored: true, depth: 0 },
   { name: "docs", dir: true, depth: 0 },
   { name: "src", dir: true, depth: 0 },
+  { name: "target", dir: true, ignored: true, depth: 0 },
   { name: "CLAUDE.md", depth: 0 },
   { name: "GEMINI.md", depth: 0, selected: true },
   { name: "kex.json", depth: 0 },
   { name: "NEXT.md", depth: 0 },
+  { name: "HANDOFF-2026-06-25-20-30-terminal-links.md", depth: 0, ignored: true },
+  { name: "break-remote.sh", depth: 0, ignored: true },
+  { name: ".DS_Store", depth: 0, ignored: true },
   { name: "node_modules", dir: true, ignored: true, depth: 0 },
   { name: "dist", dir: true, ignored: true, depth: 0 },
+  { name: "dist-ssr", dir: true, ignored: true, depth: 0 },
+  { name: "stats.html", depth: 0, ignored: true },
+  { name: "user-data", dir: true, ignored: true, depth: 0 },
 ];
 
 function treeRow(node: TreeNode): HTMLElement {
@@ -722,16 +744,40 @@ function controls(): HTMLElement {
   );
 }
 
-function slider(label: string, value: number, min: number, max: number, step: number, format: (v: number) => string, onInput: (v: number) => void): HTMLElement {
-  const input = h("input", { type: "range", class: "w-56", min: String(min), max: String(max), step: String(step) });
-  (input as HTMLInputElement).value = String(value);
-  const out = h("span", { class: "w-16 shrink-0 text-right font-mono text-[11px]" }, format(value));
-  input.oninput = () => {
-    const v = Number((input as HTMLInputElement).value);
-    out.textContent = format(v);
-    onInput(v);
+type SliderField = "bgLightness" | "bgHue" | "normalAlpha" | "ignoredAlpha";
+
+function smallButton(label: string): HTMLButtonElement {
+  return h("button", { class: "shrink-0 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-card hover:text-foreground" }, label) as HTMLButtonElement;
+}
+
+function slider(opts: {
+  label: string;
+  field: SliderField;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onInput: (v: number) => void;
+}): { node: HTMLElement; sync: () => void } {
+  const input = h("input", { type: "range", class: "w-52 grow", min: String(opts.min), max: String(opts.max), step: String(opts.step) }) as HTMLInputElement;
+  const out = h("span", { class: "w-14 shrink-0 text-right font-mono text-[11px]" });
+  const reset = smallButton("reset");
+  reset.title = "Back to the theme default for this one";
+  const sync = () => {
+    input.value = String(state.tune[opts.field]);
+    out.textContent = opts.format(state.tune[opts.field]);
   };
-  return h("label", { class: "flex items-center gap-2 text-[11px]" }, h("span", { class: "w-40 shrink-0 text-muted-foreground" }, label), input, out);
+  input.oninput = () => {
+    const v = Number(input.value);
+    out.textContent = opts.format(v);
+    opts.onInput(v);
+  };
+  reset.onclick = () => opts.onInput(DEFAULT_TUNE[opts.field]);
+  sync();
+  return {
+    node: h("div", { class: "flex items-center gap-2 text-[11px]" }, h("span", { class: "w-40 shrink-0 text-muted-foreground" }, opts.label), input, out, reset),
+    sync,
+  };
 }
 
 function tunerPanel(): HTMLElement {
@@ -744,48 +790,131 @@ function tunerPanel(): HTMLElement {
       h("span", { "data-read": "ignored", "data-hex": r.ignored.hex }, `ignored ${r.ignored.hex} ${r.ignored.ratio.toFixed(2)}:1`),
     );
   };
+
+  const sliders: { sync: () => void }[] = [];
+  const tokenRows: { sync: () => void }[] = [];
+  const exportArea = h("textarea", { class: "h-40 w-full rounded border border-border bg-transparent p-1 font-mono text-[11px]", readonly: "true" }) as HTMLTextAreaElement;
+  let exportIsChanges = true;
+
+  const snapshot = () => tuneSnapshot(state.themeId, currentTheme().name, state.mode, state.tune, readTune(state.tune), changedTokens());
+
+  const syncAll = () => {
+    sliders.forEach((s) => s.sync());
+    tokenRows.forEach((t) => t.sync());
+  };
+  const refresh = () => {
+    paint();
+    paintReadout();
+    syncAll();
+    exportArea.value = exportIsChanges ? snapshot() : fullThemeJson();
+  };
   const patch = (p: Partial<Tune>) => {
     state.tune = { ...state.tune, ...p };
     saveTune(tuneKey(), state.tune);
-    paint();
-    paintReadout();
-    snapshotArea.value = snapshot();
+    refresh();
   };
-  const snapshot = () => tuneSnapshot(state.themeId, currentTheme().name, state.mode, state.tune, readTune(state.tune));
-  const snapshotArea = h("textarea", { class: "h-40 w-full rounded border border-border bg-transparent p-1 font-mono text-[11px]", readonly: "true" });
-  const copyBtn = h("button", { class: "rounded border border-border px-2 py-1 text-[12px]" }, "Export changes (copy)");
+  const setToken = (name: string, value: string) => {
+    state.tokens = { ...state.tokens, [name]: value };
+    saveTokens(tuneKey(), state.tokens);
+    refresh();
+  };
+  const clearToken = (name: string) => {
+    const next = { ...state.tokens };
+    delete next[name];
+    state.tokens = next;
+    saveTokens(tuneKey(), state.tokens);
+    refresh();
+  };
+
+  const addSlider = (label: string, field: SliderField, min: number, max: number, step: number, format: (v: number) => string): HTMLElement => {
+    const s = slider({ label, field, min, max, step, format, onInput: (v) => patch({ [field]: v } as Partial<Tune>) });
+    sliders.push(s);
+    return s.node;
+  };
+
+  const tokenRow = (name: string): HTMLElement => {
+    const color = h("input", { type: "color", class: "size-6 shrink-0 rounded border border-border" }) as HTMLInputElement;
+    const text = h("input", { type: "text", class: "w-24 shrink-0 rounded border border-border bg-transparent px-1 font-mono text-[11px]" }) as HTMLInputElement;
+    const reset = smallButton("reset");
+    const row = h("div", { class: "flex items-center gap-2", "data-token-row": name },
+      color, text, h("span", { class: "min-w-0 flex-1 truncate text-[11px]" }, name), reset);
+    const sync = () => {
+      const hex = state.tokens[name] ?? toHex(tokenValue(name));
+      color.value = hex.slice(0, 7);
+      if (document.activeElement !== text) text.value = hex;
+      text.placeholder = baseline[name] ?? "";
+      row.dataset.changed = String(name in state.tokens);
+    };
+    color.oninput = () => setToken(name, color.value);
+    text.onchange = () => {
+      const v = text.value.trim().toLowerCase();
+      if (/^#([0-9a-f]{6}|[0-9a-f]{8})$/.test(v)) setToken(name, v);
+      else sync();
+    };
+    reset.onclick = () => clearToken(name);
+    tokenRows.push({ sync });
+    return row;
+  };
+
+  const tokenGrid = h("div", { class: "grid grid-cols-1 gap-1 xl:grid-cols-2" }, ...TOKENS.map(tokenRow));
+  const tokenDetails = h("details", { class: "rounded border border-border p-1.5" },
+    h("summary", { class: "cursor-pointer text-[11px] font-medium" }, "Any token (buttons included). Pick a color or type a hex, with alpha if you want."),
+    h("div", { class: "mt-2" }, tokenGrid),
+  );
+
+  const resetAll = smallButton("Reset all");
+  resetAll.title = "Back to the theme defaults, drops the token overrides too";
+  resetAll.onclick = () => {
+    state.tune = { ...DEFAULT_TUNE };
+    saveTune(tuneKey(), state.tune);
+    state.tokens = {};
+    saveTokens(tuneKey(), {});
+    refresh();
+  };
+
   const copyStatus = h("span", { class: "text-[11px] text-muted-foreground" });
-  snapshotArea.value = snapshot();
-  copyBtn.onclick = async () => {
-    const text = snapshot();
-    snapshotArea.value = text;
+  const copy = async (getText: () => string, isChanges: boolean) => {
+    exportIsChanges = isChanges;
+    const text = getText();
+    exportArea.value = text;
     try {
       await navigator.clipboard.writeText(text);
-      copyStatus.textContent = "Copied. Paste it back to me and I apply it to the theme.";
+      copyStatus.textContent = isChanges ? "Copied the changes. Paste it back to me and I bake it in." : "Copied the full theme. You can also paste it in the box above as a custom theme.";
     } catch {
-      snapshotArea.select();
+      exportArea.select();
       copyStatus.textContent = "Clipboard blocked. The JSON is in the box, copy it by hand.";
     }
   };
-  const resetBtn = h("button", { class: "rounded border border-border px-2 py-1 text-[12px]" }, "Reset");
-  resetBtn.onclick = () => patch({ ...DEFAULT_TUNE });
+  const copyChanges = smallButton("Export changes (copy)");
+  copyChanges.onclick = () => void copy(snapshot, true);
+  const copyFull = smallButton("Export full theme (copy)");
+  copyFull.onclick = () => void copy(fullThemeJson, false);
+
   paintReadout();
+  syncAll();
+  exportArea.value = snapshot();
+
   return section(
     "Tuner (changes are saved per theme and mode, and survive a reload)",
     h("div", { class: "flex flex-col gap-1.5" },
-      slider("Background lightness", state.tune.bgLightness, -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`, (v) => patch({ bgLightness: v })),
-      slider("Background tone (warm/cool)", state.tune.bgHue, -40, 40, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`, (v) => patch({ bgHue: v })),
-      slider("Normal text alpha", state.tune.normalAlpha, 0.5, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => patch({ normalAlpha: v })),
-      slider("Ignored text alpha", state.tune.ignoredAlpha, 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => patch({ ignoredAlpha: v })),
+      addSlider("Background lightness", "bgLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+      addSlider("Background tone (warm/cool)", "bgHue", -40, 40, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`),
+      addSlider("Normal text alpha", "normalAlpha", 0.5, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
+      addSlider("Ignored text alpha", "ignoredAlpha", 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       readout,
-      h("div", { class: "flex items-center gap-2" }, resetBtn, copyBtn, copyStatus),
-      snapshotArea,
+      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, copyStatus),
+      exportArea,
+      tokenDetails,
     ),
   );
 }
 
 // ---------------------------------------------------------------------------
 // Render
+
+// Token hexes as the theme declares them, captured before the tone sliders and
+// the manual overrides touch anything, so the export can tell what changed.
+let baseline: Record<string, string> = {};
 
 function paint(): void {
   const theme = currentTheme();
@@ -797,10 +926,80 @@ function paint(): void {
     resolveTerminalPalette(state.terminal, theme, [...allThemes(), ...listTerminalOnlyThemes()], state.mode),
     isEditorThemeId(state.editor) ? readEditorThemeSurface(state.editor) : undefined,
   );
+  baseline = {};
+  for (const t of TOKENS) {
+    const declared = tokenValue(t);
+    if (declared) baseline[t] = toHex(declared);
+  }
   applyTune(state.tune);
+  applyTokens(state.tokens);
   document.documentElement.dataset.previewTheme = theme.id;
   document.documentElement.dataset.previewTerminal = state.terminal;
   document.documentElement.dataset.previewMode = state.mode;
+}
+
+function changedTokens(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(state.tokens)) {
+    if (baseline[name]?.toLowerCase() !== value.toLowerCase()) out[name] = value;
+  }
+  return out;
+}
+
+const COLOR_TOKEN: Record<string, keyof ThemeColors> = {
+  background: "background",
+  foreground: "foreground",
+  card: "card",
+  "card-foreground": "cardForeground",
+  popover: "popover",
+  "popover-foreground": "popoverForeground",
+  primary: "primary",
+  "primary-foreground": "primaryForeground",
+  secondary: "secondary",
+  "secondary-foreground": "secondaryForeground",
+  muted: "muted",
+  "muted-foreground": "mutedForeground",
+  accent: "accent",
+  "accent-foreground": "accentForeground",
+  destructive: "destructive",
+  border: "border",
+  input: "input",
+  ring: "ring",
+  sidebar: "sidebar",
+  "sidebar-foreground": "sidebarForeground",
+  "sidebar-primary": "sidebarPrimary",
+  "sidebar-primary-foreground": "sidebarPrimaryForeground",
+  "sidebar-accent": "sidebarAccent",
+  "sidebar-accent-foreground": "sidebarAccentForeground",
+  "sidebar-border": "sidebarBorder",
+  "sidebar-ring": "sidebarRing",
+  "tab-focus-indicator": "tabFocusIndicator",
+  link: "link",
+};
+
+// The whole theme with the on-screen values baked in, so it can be pasted into
+// the "Load custom theme" box or handed over to be written into the theme file.
+function fullThemeJson(): string {
+  const theme: Theme = structuredClone(currentTheme());
+  const variant = theme.variants[state.mode] ?? theme.variants.dark ?? theme.variants.light;
+  if (!variant) return JSON.stringify(theme, null, 2);
+  const colors = { ...(variant.colors ?? {}) };
+  for (const [token, key] of Object.entries(COLOR_TOKEN)) colors[key] = toHex(tokenValue(token));
+  variant.colors = colors;
+  const terminal: TerminalPalette = { ...(variant.terminal ?? {}) };
+  terminal.background = toHex(tokenValue("terminal-background"));
+  terminal.foreground = toHex(tokenValue("terminal-foreground"));
+  terminal.cursor = toHex(tokenValue("terminal-cursor"));
+  terminal.cursorAccent = toHex(tokenValue("terminal-cursor-accent"));
+  terminal.selection = toHex(tokenValue("terminal-selection"));
+  terminal.ansi = ANSI_NAMES.map((n) => toHex(tokenValue(`terminal-ansi-${n}`))) as unknown as TerminalPalette["ansi"];
+  variant.terminal = terminal;
+  variant.editor = {
+    ...(variant.editor ?? {}),
+    background: toHex(tokenValue("editor-background")),
+    foreground: toHex(tokenValue("editor-foreground")),
+  };
+  return JSON.stringify(theme, null, 2);
 }
 
 function dump(): Record<string, string> {
@@ -822,7 +1021,10 @@ function dump(): Record<string, string> {
 
 function set(patchState: Partial<typeof state>): void {
   Object.assign(state, patchState);
-  if (patchState.themeId !== undefined || patchState.mode !== undefined) state.tune = loadTune(tuneKey());
+  if (patchState.themeId !== undefined || patchState.mode !== undefined) {
+    state.tune = loadTune(tuneKey());
+    state.tokens = loadTokens(tuneKey());
+  }
   const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, terminal: state.terminal, editor: state.editor });
   history.replaceState(null, "", `?${q}`);
   render();

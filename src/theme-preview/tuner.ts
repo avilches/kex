@@ -23,26 +23,43 @@ const SURFACES = [
   "terminal-background",
 ];
 
-const STORE_KEY = "kex-theme-preview-tune";
+const TUNE_KEY = "kex-theme-preview-tune";
+const TOKENS_KEY = "kex-theme-preview-tokens";
 
-type Store = Record<string, Tune>;
-
-function readStore(): Store {
+function readStore(key: string): Record<string, unknown> {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}") as Store;
+    return JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, unknown>;
   } catch {
     return {};
   }
 }
 
 export function loadTune(key: string): Tune {
-  return { ...DEFAULT_TUNE, ...(readStore()[key] ?? {}) };
+  return { ...DEFAULT_TUNE, ...((readStore(TUNE_KEY)[key] as Partial<Tune>) ?? {}) };
 }
 
 export function saveTune(key: string, tune: Tune): void {
-  const store = readStore();
+  const store = readStore(TUNE_KEY);
   store[key] = tune;
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  localStorage.setItem(TUNE_KEY, JSON.stringify(store));
+}
+
+export function changedTune(tune: Tune): Partial<Tune> {
+  const out: Partial<Tune> = {};
+  for (const key of Object.keys(DEFAULT_TUNE) as (keyof Tune)[]) {
+    if (tune[key] !== DEFAULT_TUNE[key]) out[key] = tune[key];
+  }
+  return out;
+}
+
+export function loadTokens(key: string): Record<string, string> {
+  return (readStore(TOKENS_KEY)[key] as Record<string, string> | undefined) ?? {};
+}
+
+export function saveTokens(key: string, tokens: Record<string, string>): void {
+  const store = readStore(TOKENS_KEY);
+  store[key] = tokens;
+  localStorage.setItem(TOKENS_KEY, JSON.stringify(store));
 }
 
 // The two row alphas are what the explorer uses for normal and ignored names
@@ -59,6 +76,11 @@ export function applyTune(tune: Tune): void {
     if (!hex.startsWith("#")) continue;
     root.setProperty(`--${name}`, shiftHsl(hex, tune.bgLightness, tune.bgHue));
   }
+}
+
+export function applyTokens(tokens: Record<string, string>): void {
+  const root = document.documentElement.style;
+  for (const [name, value] of Object.entries(tokens)) root.setProperty(`--${name}`, value);
 }
 
 function luminance({ r, g, b }: Rgb): number {
@@ -98,14 +120,22 @@ export function readTune(tune: Tune): TuneReadout {
   };
 }
 
-export function tuneSnapshot(themeId: string, themeName: string, mode: string, tune: Tune, read: TuneReadout): string {
+export function tuneSnapshot(
+  themeId: string,
+  themeName: string,
+  mode: string,
+  tune: Tune,
+  read: TuneReadout,
+  tokens: Record<string, string>,
+): string {
   return JSON.stringify(
     {
       kind: "kex-theme-tune",
       theme: themeId,
       themeName,
       mode,
-      tune,
+      tune: changedTune(tune),
+      tokens,
       resolved: {
         surface: read.surface,
         normal: read.normal,
