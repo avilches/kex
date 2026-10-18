@@ -159,6 +159,8 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_opencode_plugin_status` | Query whether the OpenCode plugin is installed and current |
 | `agent_setup_omp` | Atomically install the Kex extension into `~/.omp/agent/extensions/kex-agent-status.ts` (idempotent; no-op when the file already matches, the same source is installed for Pi by `agent_setup_pi` with its own `agent` name) |
 | `agent_omp_extension_status` | Query whether the OMP extension is installed and current |
+| `agent_sync_integrations(agents)` | Rewrites the OpenCode, OMP or Pi file of each named agent to this build's script, only when the file exists and is Kex's own; returns the agents whose file is gone or foreign so the frontend stops tracking them. Never creates a file |
+| `agent_remove_integration(agent)` | Deletes the OpenCode, OMP or Pi integration file when it starts with Kex's marker; any other name or a foreign file is an error |
 | `agent_setup_pi` | Atomically install the Kex extension into `~/.pi/agent/extensions/kex-agent-status.ts` (idempotent), stamped with `agent: pi` |
 | `agent_pi_extension_status` | Query whether the Pi extension is installed and current |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` - one entry per tab that had a running agent session at last close |
