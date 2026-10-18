@@ -134,33 +134,43 @@ const FILES: { name: string; code: GitStatusCode | "" }[] = [
   { name: "renamed.tsx", code: "R" },
 ];
 
-function gitRows(): HTMLElement {
+const EXPLORER_ROWS: { name: string; folder?: boolean; ignored?: boolean; selected?: boolean }[] = [
+  { name: "src", folder: true },
+  { name: "docs", folder: true },
+  { name: "README.md" },
+  { name: "package.json" },
+  { name: "node_modules", folder: true, ignored: true },
+  { name: "dist", folder: true, ignored: true },
+  { name: "HANDOFF-2026-06-25-20-30-terminal-links.md", ignored: true },
+  { name: "break-remote.sh", ignored: true, selected: true },
+];
+
+function explorerRows(): HTMLElement {
   const box = h("div", { class: "flex flex-col gap-px" });
-  for (const f of FILES) {
-    const color = f.code ? gitStatusHexColor(f.code, state.scheme, state.mode) : null;
-    const row = h(
-      "div",
-      { class: "flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px]", "data-file": f.name, "data-hex": color ? toHex(color) : "" },
-      h("span", { style: color ? `color:${color}` : "", class: f.code === "D" ? "line-through" : "" }, f.name),
-      h("span", { class: "ml-auto text-[10px] font-semibold", style: color ? `color:${color}` : "" }, f.code),
-      h("span", { class: "font-mono text-[10px] text-muted-foreground" }, color ? toHex(color) : "-"),
+  const normalHex = `${toHex("var(--foreground)")}d9`;
+  const ignoredHex = `${toHex("var(--muted-foreground)")}d9`;
+  for (const f of EXPLORER_ROWS) {
+    const rowState = f.selected
+      ? "bg-accent text-foreground"
+      : f.ignored
+        ? "text-muted-foreground/85"
+        : "text-foreground/85";
+    const hex = f.selected ? toHex("var(--foreground)") : f.ignored ? ignoredHex : normalHex;
+    box.append(
+      h(
+        "div",
+        {
+          class: `group flex h-6 w-full min-w-0 items-center gap-1.5 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70 ${rowState}`,
+          "data-file": f.name,
+          "data-state": f.selected ? "ignored-selected" : f.ignored ? "ignored" : "normal",
+          "data-hex": hex,
+        },
+        h("span", { class: "w-3 shrink-0 text-center text-[10px] text-muted-foreground" }, f.folder ? "▸" : ""),
+        h("span", { class: "truncate" }, f.folder ? `${f.name}/` : f.name),
+        h("span", { class: "ml-auto shrink-0 pl-2 font-mono text-[10px] text-muted-foreground" }, hex),
+      ),
     );
-    box.append(row);
   }
-  const ignoredDim = `${toHex("var(--muted-foreground)")}d9`;
-  box.append(
-    h(
-      "div",
-      {
-        class: "flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px] text-muted-foreground/85",
-        "data-file": "node_modules",
-        "data-hex": ignoredDim,
-      },
-      h("span", {}, "node_modules/"),
-      h("span", { class: "ml-auto text-[10px] font-semibold" }, "ignored"),
-      h("span", { class: "font-mono text-[10px] text-muted-foreground" }, ignoredDim),
-    ),
-  );
   return box;
 }
 
@@ -266,8 +276,8 @@ function sidebar(): HTMLElement {
       h("span", { class: "rounded px-2 py-0.5 opacity-70" }, "History"),
       h("span", { class: "rounded px-2 py-0.5 opacity-70" }, "Notes"),
     ),
-    h("div", { class: "mb-1 text-[10px] opacity-60" }, `Explorer (${state.scheme})`),
-    gitRows(),
+    h("div", { class: "mb-1 text-[10px] opacity-60" }, "Explorer: normal, ignored, ignored selected"),
+    explorerRows(),
     h("div", { class: "mb-1 mt-2 text-[10px] opacity-60" }, "Source Control"),
     scm,
     h("div", { class: "mb-1 mt-2 text-[10px] opacity-60" }, "Git History"),
