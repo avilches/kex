@@ -36,6 +36,7 @@ export type AgentSignal = {
   prompt?: string;
   agentId?: string;
   agentType?: string;
+  agentDescription?: string;
   backgroundSubagents?: BackgroundSubagent[];
 };
 

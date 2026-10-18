@@ -207,7 +207,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
   `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
-  (`agent_setup_omp`, marker `kex-agent-status-v3`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
+  (`agent_setup_omp`, marker `kex-agent-status-v4`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
   assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
   inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the
@@ -495,6 +495,10 @@ At startup every workspace except the active one starts hibernated, unless the s
 ### Command palette: tabs, workspaces and the full catalog
 
 The palette searches tabs and workspaces as well as actions. With an empty box it lists the 8 most recently used tabs (hibernated workspaces last); typing ranks by tab title and note first, then workspace name, then cwd, worktree and branch, then the running command or agent. Each tab row shows a spinner while its agent works and a note icon when it has a note, and selecting a row shows the note rendered, with the directory and branch, in a side panel. Choosing a tab of a hibernated workspace wakes it first. Every shortcut and every Settings section has a row (a test fails if one is missing); a Settings row opens the window on that section. Tab recency is kept in `localStorage` (`kex-tab-use`), not in the workspace JSON. Not present upstream.
+
+### Instruction files: AGENTS.md merged into CLAUDE.md
+
+Upstream ships its agent instructions as `AGENTS.md` at the repo root. The fork merged that file into `CLAUDE.md` (which also imports `.memory/MEMORY.md`) and deleted the root `AGENTS.md`. opencode treats a root `AGENTS.md` as the project instructions and then ignores `CLAUDE.md`, so keeping both meant opencode never saw the fork's own rules or its memory index. The trade-off is that upstream syncs which touch `AGENTS.md` cannot be applied verbatim: checking that file out from upstream would reintroduce it and silence `CLAUDE.md` again. Port the upstream edits into `CLAUDE.md` by hand instead. Because opencode does not expand `@`-imports, the paths `CLAUDE.md` imports are also listed in the `instructions` array of `opencode.json`.
 
 ---
 

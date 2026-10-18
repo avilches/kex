@@ -8,7 +8,8 @@ import {
 } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
-import { normalizeActions, type Action } from "@/modules/actions";
+import { normalizeActions } from "@/modules/actions/lib/actions";
+import type { Action } from "@/modules/actions/lib/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {

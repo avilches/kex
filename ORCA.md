@@ -137,19 +137,13 @@ table and title are fallbacks for when the hook hasn't spoken yet.
 
 ## 2. How Kex does it today (confirmed against code, not docs)
 
-**The existing docs are stale.** `docs/AGENT_SESSION_RESTORE.md`,
-`docs/NOTIFICATIONS.md`, and `AGENTS.md` describe an older ("v4") design
-where the Claude Code hooks emit `OSC 777;kex;...` and Kex parses it from the
-PTY byte stream. That parser still exists and still has tests, but nothing
-active emits that sequence anymore. See:
-
-```
-2145a981 feat(ipc): migrate all hook events from OSC to Unix socket
-ed14289f feat(ipc): use Unix socket IPC for SessionStart and SessionEnd hook events
-```
-
-The current mechanism is marked `kex-session-v5` inside the hook script
-itself.
+The Claude Code hooks forward their JSON over a Unix socket (channel 2,
+below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
+through the PTY stream instead; once the socket migration (`2145a981`,
+`ed14289f`) left nothing emitting it, that parser was deleted from
+`agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
+channel. The current mechanism is marked `kex-session-v5` inside the hook
+script itself.
 
 ### 2.1 OSC still in use
 
@@ -163,11 +157,9 @@ itself.
   has no Kex hooks installed. If the detector is armed, this triggers a
   generic "needs attention" with no `session_id`/`transcript_path`
   (`agent_detect.rs`, `generic_attention`).
-- **OSC 777;kex;...** is the legacy unified protocol (`handle_kex_unified`,
-  `agent_detect.rs`), format
-  `OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;extra...]`.
-  Dead as an input today (see TASK-733), though `mod.rs::is_old_notify`
-  already detects and cleans up even older "old-style notify" installs.
+- Any other **OSC 777** triggers the same generic "needs attention" as `OSC 9`
+  when the detector is armed. `mod.rs::is_old_notify` still detects and cleans
+  up the even older "old-style notify" hook installs.
 
 All OSC parsing happens in `AgentDetector::process`
 (`src-tauri/src/modules/pty/agent_detect.rs`), a byte-level state machine fed
@@ -253,10 +245,9 @@ change that avoids total loss from a single corrupted write.
 ### 2.4 Foreground/liveness detection
 
 No process-table polling drives agent state. It's purely reactive to PTY
-bytes: `AgentDetector` arms on `OSC 133;C;<cmd>` matching `claude`/`codex`
-(or auto-arms if a hook event arrives without having seen `133;C`, covering
-tmux/old-bash cases), and disarms on `OSC 133;D` or PTY close. `Stop` does
-**not** disarm (Claude is still running, it just finished a turn).
+bytes: `AgentDetector` arms on `OSC 133;C;<cmd>` matching `claude`/`codex`, and
+disarms on `OSC 133;D` or PTY close. Turn-level state (`Stop` and the rest) is
+not tracked in Rust; it comes from the socket channel.
 
 There is a `pgrep`/`CreateToolhelp32Snapshot`-based check
 (`pty_has_foreground_process` in `src-tauri/src/modules/pty/mod.rs`), but
@@ -303,7 +294,7 @@ speculative/undocumented ones.
 | 2 | No retry/spool on failed IPC send (also covers the startup race) | TASK-730 |
 | 3 | No session restore path on native Windows (Unix-only transport) | TASK-731 |
 | 4 | Socket permissions / auth not hardened | TASK-732 |
-| 5 | Legacy OSC 777 parser: keep-and-document or delete | TASK-733 |
+| 5 | Legacy OSC 777 parser: deleted once nothing emitted it | TASK-733 |
 | 6 | Unbounded debug logs in /tmp | TASK-734 |
 | 7 | Corrupt `agent-sessions.json` loses all restore state silently | TASK-735 (high priority, data loss) |
 
@@ -314,7 +305,7 @@ Kex side, in the order the data actually flows:
 2. `src-tauri/src/modules/pty/ipc.rs` (socket listener, `#![cfg(unix)]`)
 3. `src-tauri/src/modules/agent/session_store.rs` (persistence + restore plan)
 4. `src-tauri/src/modules/agent/mod.rs` (settings.json install/status)
-5. `src-tauri/src/modules/pty/agent_detect.rs` (OSC state machine, legacy 777 path)
+5. `src-tauri/src/modules/pty/agent_detect.rs` (OSC state machine)
 6. `src/modules/agents/lib/route.ts` + `notify.ts` (notification routing)
 7. `src/modules/terminal/lib/useTerminalSession.ts` (resume command injection)
 

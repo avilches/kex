@@ -243,7 +243,7 @@ function EntryRowImpl(props: EntryRowProps) {
               isSelected
                 ? "bg-accent text-foreground"
                 : gitignored
-                  ? "text-muted-foreground"
+                  ? "text-muted-foreground/85"
                   : "text-foreground/85",
               isDragging && "opacity-50",
               isCutSource && "opacity-50",

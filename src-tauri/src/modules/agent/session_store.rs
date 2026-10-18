@@ -353,7 +353,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
 }
 
 /// Write or update a tab entry in agent-sessions.json.
-/// Called from the PTY reader (OSC 777 path) or the IPC socket (v5 path) on SessionStart/UserPromptSubmit.
+/// Called from the IPC socket listener (`pty/ipc.rs`) on `SessionStart`.
 ///
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
 /// is print-mode (`-p` / `--print`), the session is not persisted.
