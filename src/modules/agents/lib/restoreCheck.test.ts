@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import {
   describeSilentResume,
+  expectsSessionReport,
   hasResumed,
 } from "@/modules/agents/lib/restoreCheck";
 
@@ -20,6 +21,19 @@ describe("describeSilentResume", () => {
     expect(msg).toContain("tab-a");
     expect(msg).toContain("claude");
     expect(msg).toContain("claude --resume 'x'");
+  });
+});
+
+describe("expectsSessionReport", () => {
+  it("is false for OpenCode, which stays silent until its first event", () => {
+    expect(expectsSessionReport("opencode")).toBe(false);
+    expect(expectsSessionReport("OpenCode")).toBe(false);
+  });
+
+  it("is true for the agents that report on launch", () => {
+    for (const agent of ["claude", "omp", "pi", "codex"]) {
+      expect(expectsSessionReport(agent)).toBe(true);
+    }
   });
 });
 
