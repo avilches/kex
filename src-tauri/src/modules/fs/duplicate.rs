@@ -93,7 +93,19 @@ fn copy_inner(
     if cancel.load(Ordering::Acquire) {
         return Err(CopyError::Cancelled);
     }
-    if src.is_dir() {
+    let meta = std::fs::symlink_metadata(src)?;
+    if meta.file_type().is_symlink() {
+        if let Err(e) = crate::modules::fs::copy_symlink(src, dst) {
+            if toplevel && e.kind() == std::io::ErrorKind::AlreadyExists {
+                return Err(CopyError::DestExists);
+            }
+            return Err(CopyError::Io(e.to_string()));
+        }
+        *copied += meta.len();
+        on_bytes(*copied);
+        return Ok(());
+    }
+    if meta.is_dir() {
         // create_dir already fails with AlreadyExists if dst exists; map that
         // to DestExists at the top level so cleanup is skipped.
         if let Err(e) = std::fs::create_dir(dst) {
@@ -156,10 +168,16 @@ fn copy_inner(
 }
 
 fn cleanup(dst: &Path) {
-    if dst.is_dir() {
-        let _ = std::fs::remove_dir_all(dst);
-    } else if dst.exists() {
-        let _ = std::fs::remove_file(dst);
+    // symlink_metadata so a dangling or directory symlink is removed as a link,
+    // never recursed into.
+    match std::fs::symlink_metadata(dst) {
+        Ok(m) if m.is_dir() => {
+            let _ = std::fs::remove_dir_all(dst);
+        }
+        Ok(_) => {
+            let _ = std::fs::remove_file(dst);
+        }
+        Err(_) => {}
     }
 }
 
@@ -175,7 +193,7 @@ pub async fn fs_duplicate(
     let src = resolve_path(&source, &workspace);
     let dst = resolve_path(&dest, &workspace);
 
-    if !src.exists() {
+    if std::fs::symlink_metadata(&src).is_err() {
         return Err(format!("not found: {}", src.display()));
     }
     if dst.exists() {
@@ -323,13 +341,17 @@ mod tests {
     use std::sync::Arc;
 
     fn count_bytes(p: &std::path::Path) -> u64 {
-        if p.is_dir() {
+        let meta = std::fs::symlink_metadata(p).unwrap();
+        if meta.file_type().is_symlink() {
+            return meta.len();
+        }
+        if meta.is_dir() {
             std::fs::read_dir(p)
                 .unwrap()
                 .map(|e| count_bytes(&e.unwrap().path()))
                 .sum()
         } else {
-            std::fs::metadata(p).unwrap().len()
+            meta.len()
         }
     }
 
@@ -363,6 +385,70 @@ mod tests {
 
         assert_eq!(std::fs::read(dst.join("inner/y.txt")).unwrap(), b"y");
         assert_eq!(std::fs::read(dst.join("x.txt")).unwrap(), b"xx");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_top_level_symlink_is_copied_as_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.txt");
+        std::fs::write(&target, b"x").unwrap();
+        let src = dir.path().join("link");
+        std::os::unix::fs::symlink("target.txt", &src).unwrap();
+        let dst = dir.path().join("link copy");
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        copy_job(&src, &dst, 0, &cancel, &mut |_| {}).expect("copy");
+
+        assert!(std::fs::symlink_metadata(&dst).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_link(&dst).unwrap(), std::path::Path::new("target.txt"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_dangling_symlink_destination_is_reported_and_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.txt");
+        std::fs::write(&target, b"x").unwrap();
+        let src = dir.path().join("link");
+        std::os::unix::fs::symlink("target.txt", &src).unwrap();
+        // Dangling: dst.exists() is false, so the caller would have proceeded.
+        let dst = dir.path().join("dst");
+        std::os::unix::fs::symlink("nowhere", &dst).unwrap();
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let err = copy_job(&src, &dst, 0, &cancel, &mut |_| {}).unwrap_err();
+        assert!(matches!(err, CopyError::DestExists), "got {err:?}");
+        // The pre-existing link must survive.
+        assert_eq!(
+            std::fs::read_link(&dst).unwrap(),
+            std::path::Path::new("nowhere")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copies_a_dir_preserving_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("real.txt"), b"real").unwrap();
+        std::os::unix::fs::symlink("real.txt", src.join("link.txt")).unwrap();
+        // Would recurse forever if followed.
+        std::os::unix::fs::symlink(&src, src.join("self")).unwrap();
+        let dst = dir.path().join("src copy");
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let total = count_bytes(&src);
+        copy_job(&src, &dst, total, &cancel, &mut |_p| {}).expect("copy");
+
+        let link = dst.join("link.txt");
+        assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_link(&link).unwrap(), std::path::Path::new("real.txt"));
+        assert!(std::fs::symlink_metadata(dst.join("self"))
+            .unwrap()
+            .file_type()
+            .is_symlink());
     }
 
     #[test]

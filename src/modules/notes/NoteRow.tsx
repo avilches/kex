@@ -84,7 +84,7 @@ export function NoteRow(props: NoteRowProps) {
           ref={setNodeRef}
           style={{ transform: CSS.Transform.toString(transform), transition }}
           {...attributes}
-          {...(props.sortable ? listeners : {})}
+          {...(props.sortable && !props.editing ? listeners : {})}
           className={cn(
             "cursor-pointer rounded px-2 py-1.5 hover:bg-accent",
             isDragging && "opacity-60",

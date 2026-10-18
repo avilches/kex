@@ -92,7 +92,11 @@ pub fn fs_trash(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), Str
 }
 
 fn copy_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
-    if src.is_dir() {
+    let meta = std::fs::symlink_metadata(src)?;
+    if meta.file_type().is_symlink() {
+        return crate::modules::fs::copy_symlink(src, dst);
+    }
+    if meta.is_dir() {
         std::fs::create_dir(dst)?;
         for entry in std::fs::read_dir(src)? {
             let entry = entry?;
@@ -230,6 +234,55 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("already exists"), "got: {err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_moves_a_top_level_symlink_as_a_symlink() {
+        let src = tempfile::tempdir().unwrap();
+        let dest = tempfile::tempdir().unwrap();
+        std::fs::write(src.path().join("target.txt"), b"x").unwrap();
+        std::os::unix::fs::symlink("target.txt", src.path().join("link")).unwrap();
+
+        fs_copy(
+            vec![s(src.path().join("link"))],
+            s(dest.path().to_path_buf()),
+            None,
+        )
+        .expect("copy");
+
+        let out = dest.path().join("link");
+        assert!(std::fs::symlink_metadata(&out).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_link(&out).unwrap(), std::path::Path::new("target.txt"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_preserves_symlinks_instead_of_following_them() {
+        let src = tempfile::tempdir().unwrap();
+        let dest = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(src.path().join("d")).unwrap();
+        std::fs::write(src.path().join("d/real.txt"), b"real").unwrap();
+        std::os::unix::fs::symlink("real.txt", src.path().join("d/link.txt")).unwrap();
+        // A dangling link must not abort the whole copy.
+        std::os::unix::fs::symlink("missing.txt", src.path().join("d/broken")).unwrap();
+        // A link back to its own directory would recurse forever if followed.
+        std::os::unix::fs::symlink(src.path().join("d"), src.path().join("d/self")).unwrap();
+
+        fs_copy(vec![s(src.path().join("d"))], s(dest.path().to_path_buf()), None)
+            .expect("copy");
+
+        let link = dest.path().join("d/link.txt");
+        assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_link(&link).unwrap(), std::path::Path::new("real.txt"));
+        assert!(std::fs::symlink_metadata(dest.path().join("d/broken"))
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert!(std::fs::symlink_metadata(dest.path().join("d/self"))
+            .unwrap()
+            .file_type()
+            .is_symlink());
     }
 
     #[test]
