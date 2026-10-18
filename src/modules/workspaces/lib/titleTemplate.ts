@@ -140,28 +140,38 @@ export function hasTitleVariables(template: string): boolean {
   return /[{}]/.test(template);
 }
 
+// Values by name for any template; a title uses TitleVars, a command any names it likes.
+export type TemplateVars = Readonly<Record<string, string | undefined>>;
+
 // Only strings count, so `constructor` and the like never resolve through Object.prototype.
-function lookup(vars: TitleVars, name: string): string | undefined {
+function lookup(vars: TemplateVars, name: string): string | undefined {
   const value: unknown = (vars as Record<string, unknown>)[name];
   return typeof value === "string" ? value : undefined;
 }
 
-function render(nodes: Node[], vars: TitleVars): string {
+type Format = (value: string) => string;
+const verbatim: Format = (value) => value;
+
+function render(nodes: Node[], vars: TemplateVars, format: Format): string {
   return nodes
     .map((n) => {
       if (n.kind === "text") return n.text;
       if (n.kind === "vars") {
         if (n.v.some((a) => "name" in a && lookup(vars, a.name) === undefined)) return n.raw;
         for (const a of n.v) {
-          const value = "name" in a ? (lookup(vars, a.name) as string) : render(a.nodes, vars);
-          if (value.trim()) return value;
+          if ("name" in a) {
+            const value = lookup(vars, a.name) as string;
+            if (value.trim()) return format(value);
+          } else if (render(a.nodes, vars, verbatim).trim()) {
+            return render(a.nodes, vars, format);
+          }
         }
         return "";
       }
       const values = n.names.map((name) => lookup(vars, name));
       if (values.some((v) => v === undefined)) return n.raw;
       const any = values.some((v) => (v as string).trim() !== "");
-      return any !== n.negate ? render(n.body, vars) : "";
+      return any !== n.negate ? render(n.body, vars, format) : "";
     })
     .join("");
 }
@@ -169,7 +179,45 @@ function render(nodes: Node[], vars: TitleVars): string {
 // Returns "" when nothing readable is left so callers fall back to the default title.
 export function expandTitle(template: string, vars: TitleVars): string {
   if (!hasTitleVariables(template)) return template;
-  return render(parse(template, false), vars).replace(/\s+/g, " ").trim();
+  return render(parse(template, false), vars, verbatim).replace(/\s+/g, " ").trim();
+}
+
+// The same grammar for text where whitespace matters (commands): nothing is collapsed or
+// trimmed and an empty result stays empty. `format` shapes each value as it is written
+// (quoting); whether a value is empty is always decided on the raw one.
+export function renderTemplate(template: string, vars: TemplateVars, format: Format = verbatim): string {
+  if (!hasTitleVariables(template)) return template;
+  return render(parse(template, false), vars, format);
+}
+
+function missing(nodes: Node[], vars: TemplateVars, out: string[]): void {
+  for (const n of nodes) {
+    if (n.kind === "vars") {
+      if (n.v.some((a) => "name" in a && lookup(vars, a.name) === undefined)) continue;
+      const filled = n.v.some((a) =>
+        "name" in a ? (lookup(vars, a.name) as string).trim() !== "" : render(a.nodes, vars, verbatim).trim() !== "",
+      );
+      if (filled) continue;
+      for (const a of n.v) {
+        if ("name" in a) out.push(a.name);
+        else missing(a.nodes, vars, out);
+      }
+    } else if (n.kind === "cond") {
+      const values = n.names.map((name) => lookup(vars, name));
+      if (values.some((v) => v === undefined)) continue;
+      const any = values.some((v) => (v as string).trim() !== "");
+      if (any !== n.negate) missing(n.body, vars, out);
+    }
+  }
+}
+
+// The variables a template needs and has no value for: a plain variable or a `{a|b}` group
+// whose alternatives are all empty. A `{?a text}` part is optional, so its absence is not
+// a lack, and names that are not variables of the scope stay literal and are not counted.
+export function missingTemplateVariables(template: string, vars: TemplateVars): string[] {
+  const out: string[] = [];
+  missing(parse(template, false), vars, out);
+  return [...new Set(out)];
 }
 
 // What is being titled; decides which variables are worth offering.
