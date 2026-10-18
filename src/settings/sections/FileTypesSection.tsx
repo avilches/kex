@@ -96,8 +96,7 @@ export function FileTypesSection({
       setFilterText(focusExt);
     }
     onFocusConsumed?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusExt, editorViewByExt]);
+  }, [focusExt, editorViewByExt, onFocusConsumed]);
 
   const allEntries = sortedEntries(editorViewByExt);
   const filter = filterText.trim().toLowerCase();
