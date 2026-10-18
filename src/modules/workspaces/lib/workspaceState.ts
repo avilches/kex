@@ -51,8 +51,13 @@ function sanitizeActions(w: Workspace): Pick<Workspace, "actions" | "activeActio
   return { actions, activeAction: active };
 }
 
+// `scripts` and `activeScript` belong to the former Script model: a saved workspace may still
+// carry them, and they are dropped here so they are neither kept in memory nor written back.
+const OLD_SCRIPT_FIELDS = ["scripts", "activeScript"] as const;
+
 export function sanitizeWorkspace(w: Workspace): Workspace {
   const { actions: _actions, activeAction: _activeAction, ...rest } = w;
+  for (const field of OLD_SCRIPT_FIELDS) delete (rest as Record<string, unknown>)[field];
   return {
     ...rest,
     ...sanitizeActions(w),
