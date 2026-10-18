@@ -22,7 +22,8 @@ vi.mock("@/modules/external-editors", () => ({
 vi.mock("@/modules/settings/preferences", () => ({
   usePreferencesStore: (sel: (s: { actions: Action[] }) => unknown) => sel({ actions }),
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+const toastError = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a) } }));
 
 import { ActionsSection } from "./ActionsSection";
 
@@ -39,6 +40,7 @@ const buttons = (c: HTMLElement) => [...c.querySelectorAll("button")];
 describe("ActionsSection", () => {
   beforeEach(() => {
     change.mockClear();
+    toastError.mockClear();
     scan.mockClear();
     actions = [];
     detected = [
@@ -72,6 +74,28 @@ describe("ActionsSection", () => {
     const offered = buttons(container).filter((b) => b.title && b.title.includes("{"));
     expect(offered.some((b) => b.textContent?.includes("PyCharm"))).toBe(false);
     expect(offered.some((b) => b.textContent?.includes("Zed"))).toBe(true);
+    unmount();
+  });
+
+  it("keeps the row being typed, and reports the error, when the write fails", async () => {
+    change.mockRejectedValueOnce(new Error("disk full"));
+    const { container, unmount } = mount();
+    const add = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Action"))!;
+    act(() => void add.click());
+    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => command.focus());
+    act(() => {
+      setter.call(command, "pnpm dev");
+      command.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => void command.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    await act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    expect(toastError).toHaveBeenCalled();
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    expect((container.querySelector("input[aria-label='Command']") as HTMLInputElement).value).toBe("pnpm dev");
     unmount();
   });
 

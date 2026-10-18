@@ -135,8 +135,3 @@ export function currentSuggestionKey(action: Action, suggestions: readonly AppSu
   const exact = ofApp.find((s) => s.defaultCommand === action.command);
   return (exact ?? ofApp[0])?.key ?? CUSTOM_APP_SUGGESTION.key;
 }
-
-// A row with no command is a form the user abandoned; it goes when the editor closes.
-export function dropEmptyActions(list: readonly Action[]): string[] {
-  return list.filter((a) => !a.command.trim()).map((a) => a.id);
-}

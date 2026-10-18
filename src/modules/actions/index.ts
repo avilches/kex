@@ -13,7 +13,8 @@ export {
 export type { Action } from "./lib/types";
 export { ActionIcon } from "./ActionIcon";
 export { ActionsEditor } from "./ActionsEditor";
-export { dropEmptyActions } from "./lib/actionForm";
+export { globalActions } from "./lib/globalActionsBinding";
+export { unlinkRemovedActions } from "./lib/actionStateStore";
 export { useActionContext, type ActionContext } from "./lib/useActionContext";
 export {
   CUSTOM_APP_SUGGESTION,

@@ -7,14 +7,16 @@ import { newActionId } from "@/lib/ids";
 import {
   ActionIcon,
   ActionsEditor,
-  dropEmptyActions,
+  addAction,
+  globalActions,
+  removeAction,
+  reorderActions,
   suggestionsFromDetected,
+  unlinkRemovedActions,
+  updateAction,
   type Action,
   type AppSuggestion,
 } from "@/modules/actions";
-import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
-import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
-import { addAction, removeAction, reorderActions, updateAction } from "@/modules/actions/lib/actions";
 import { useExternalEditors } from "@/modules/external-editors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SectionHeader } from "../components/SectionHeader";
@@ -25,12 +27,20 @@ function report(err: unknown) {
 }
 
 // Edits go through the serialized global store, so a change made while another is still
-// being written starts from the list that write carries, and a failed write is undone.
-function edit(fn: (list: Action[]) => Action[]) {
-  globalActions
+// being written starts from the list that write carries, and a failed write is undone. The
+// promise rejects on a failed write, so the editor can keep the row it was typing.
+function edit(fn: (list: Action[]) => Action[]): Promise<void> {
+  return globalActions
     .change(fn)
     .then(({ before, after }) => unlinkRemovedActions(before, after))
-    .catch(report);
+    .catch((err: unknown) => {
+      report(err);
+      throw err;
+    });
+}
+
+function editQuietly(fn: (list: Action[]) => Action[]) {
+  edit(fn).catch(() => {});
 }
 
 function newActionFromSuggestion(s: AppSuggestion): Action {
@@ -55,19 +65,6 @@ export function ActionsSection() {
       scan();
     }
   }, [detectedEditors.length, isScanning, scan]);
-
-  // Rows with no command are drafts that were never saved, so there is nothing to clean on close.
-  const actionsRef = useRef(actions);
-  useEffect(() => {
-    actionsRef.current = actions;
-  }, [actions]);
-  useEffect(
-    () => () => {
-      const empty = new Set(dropEmptyActions(actionsRef.current));
-      if (empty.size > 0) edit((list) => list.filter((a) => !empty.has(a.id)));
-    },
-    [],
-  );
 
   const suggestions = suggestionsFromDetected(detectedEditors);
   const used = new Set(actions.map((a) => a.appId).filter(Boolean));
@@ -94,9 +91,9 @@ export function ActionsSection() {
         context={null}
         emptyHint="No global actions yet. Add one, or start from an app detected on this computer below."
         onAdd={(action) => edit((list) => addAction(list, action))}
-        onUpdate={(id, next) => edit((list) => updateAction(list, id, next))}
-        onRemove={(id) => edit((list) => removeAction(list, id))}
-        onReorder={(from, to) => edit((list) => reorderActions(list, from, to))}
+        onUpdate={(id, next) => editQuietly((list) => updateAction(list, id, next))}
+        onRemove={(id) => editQuietly((list) => removeAction(list, id))}
+        onReorder={(from, to) => editQuietly((list) => reorderActions(list, from, to))}
       />
 
       {offered.length > 0 && (
@@ -110,7 +107,7 @@ export function ActionsSection() {
                 key={s.key}
                 type="button"
                 title={s.defaultCommand}
-                onClick={() => edit((list) => addAction(list, newActionFromSuggestion(s)))}
+                onClick={() => editQuietly((list) => addAction(list, newActionFromSuggestion(s)))}
                 className="flex h-7 items-center gap-1.5 rounded border border-border px-2 text-[12px] text-foreground transition-colors hover:bg-muted/60"
               >
                 <ActionIcon action={{ appId: s.appId, runInTerminal: false }} size={13} />

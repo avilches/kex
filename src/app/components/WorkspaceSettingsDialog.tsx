@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import {
   ActionsEditor,
-  dropEmptyActions,
   suggestionsFromDetected,
   useActionContext,
   type Action,
@@ -62,9 +61,6 @@ export function WorkspaceSettingsDialog(props: Props) {
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
   function handleClose() {
-    if (ws) {
-      for (const id of dropEmptyActions(ws.actions ?? [])) props.onRemoveAction(ws.id, id);
-    }
     closeSettings();
   }
 

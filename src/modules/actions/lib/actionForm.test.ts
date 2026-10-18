@@ -6,7 +6,6 @@ import {
   commandVariableDocs,
   commitCommand,
   currentSuggestionKey,
-  dropEmptyActions,
   withKind,
   withSuggestion,
 } from "./actionForm";
@@ -192,11 +191,5 @@ describe("currentSuggestionKey", () => {
   it("is the custom app when the action has no app", () => {
     const custom: Action = { id: "a", name: "x", runInTerminal: false, command: "x", ownButton: false };
     expect(currentSuggestionKey(custom, [zed])).toBe("custom");
-  });
-});
-
-describe("dropEmptyActions", () => {
-  it("returns the ids of the rows with no command", () => {
-    expect(dropEmptyActions([script, { ...app, command: " " }])).toEqual(["ac-2"]);
   });
 });
