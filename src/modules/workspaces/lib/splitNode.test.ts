@@ -293,6 +293,12 @@ describe("moveTabBetweenPanes", () => {
     const pane: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
     expect(moveTabBetweenPanes(pane, "unknown", "p1")).toBe(pane);
   });
+
+  test("returns same tree and keeps the tab if target pane does not exist", () => {
+    const tab1 = { id: "tab1", kind: "terminal" as const };
+    const pane: PaneNode = { kind: "pane", id: "p1", tabs: [tab1], activeTabId: "tab1" };
+    expect(moveTabBetweenPanes(pane, "tab1", "missing")).toBe(pane);
+  });
 });
 
 describe("moveTabBetweenPanes with targetIndex", () => {

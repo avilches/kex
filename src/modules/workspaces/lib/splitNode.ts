@@ -105,6 +105,7 @@ export function moveTabBetweenPanes(
   const sourceResult = findTabPane(tree, tabId);
   if (!sourceResult) return tree;
   if (sourceResult.pane.id === targetPaneId) return tree;
+  if (!findPane(tree, targetPaneId)) return tree;
 
   const { pane: sourcePane, tab } = sourceResult;
 
