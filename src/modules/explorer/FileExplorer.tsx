@@ -935,7 +935,7 @@ export const FileExplorer = memo(
         },
         refresh: (path: string) => tree.refresh(path),
       }),
-      [entryPaths, scrollEntryIntoView, selectedPath],
+      [entryPaths, scrollEntryIntoView, selectedPath, closeSearch, tree.refresh],
     );
 
     if (!rootPath) {
