@@ -184,6 +184,17 @@ describe("useActionRunner", () => {
     expect(getScriptRunningSnapshot().get("tab-old")).toBe("waiting");
   });
 
+  it("stop leaves alone a tab the user reused after the script ended", () => {
+    linkActionTab(script.id, "tab-old");
+    const { deps, result, write } = setup(ws(), { "tab-old": termTab("tab-old") });
+    deps.terminalHandles.current.set("tab-old", { write });
+    deps.scriptCommandSeen.current.add("tab-old");
+    act(() => result.current.stopAction(script));
+    expect(write).not.toHaveBeenCalled();
+    expect(deps.revealTab).not.toHaveBeenCalled();
+    expect(deps.activateTab).not.toHaveBeenCalled();
+  });
+
   it("stop does nothing when the Action has no tab", () => {
     const { result, write } = setup(ws());
     act(() => result.current.stopAction(script));

@@ -120,8 +120,8 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
  * tab never keeps it from running. An app is spawned and needs no tab.
  */
 export function planActionRun(action: Action, ctx: RunContext): RunPlan {
-  if (action.command.trim() === "") return blocked(action, "it has no command");
   if (ctx.hibernated) return { kind: "blocked", reason: "", silent: true };
+  if (action.command.trim() === "") return blocked(action, "it has no command");
   return action.runInTerminal ? planScript(action, ctx) : planApp(action, ctx);
 }
 
@@ -129,13 +129,18 @@ export type StopPlan =
   | { kind: "none" }
   | { kind: "stop"; tabId: string; mark: ScriptState | false };
 
-/** Stop only means something for a script that is running in a tab that still exists. */
+/**
+ * Stop only means something for a script that is running in a tab that still exists. The
+ * running mark is what proves it: once the script ended the mark is gone, and whatever the
+ * user started in that tab since (vim, another dev server) is not ours to interrupt.
+ */
 export function planActionStop(link: {
   tabId: string;
   exists: boolean;
+  running: boolean;
   commandSeen: boolean;
 } | null): StopPlan {
-  if (!link?.exists) return { kind: "none" };
+  if (!link?.exists || !link.running) return { kind: "none" };
   return { kind: "stop", tabId: link.tabId, mark: planScriptStop(link.commandSeen) };
 }
 

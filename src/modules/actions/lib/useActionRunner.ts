@@ -230,7 +230,12 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       const tabId = getActionTab(action.id);
       const plan = planActionStop(
         tabId
-          ? { tabId, exists: !!findTabGlobal(tabId), commandSeen: scriptCommandSeen.current.has(tabId) }
+          ? {
+              tabId,
+              exists: !!findTabGlobal(tabId),
+              running: !!getScriptRunningSnapshot().get(tabId),
+              commandSeen: scriptCommandSeen.current.has(tabId),
+            }
           : null,
       );
       if (plan.kind === "none") return;

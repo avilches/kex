@@ -98,6 +98,14 @@ describe("planActionRun, scripts", () => {
     expect(planActionRun(script(), ctx({ hibernated: true }))).toEqual({ kind: "blocked", reason: "", silent: true });
   });
 
+  it("is silent while the workspace sleeps even when the command is empty", () => {
+    expect(planActionRun(script({ command: " " }), ctx({ hibernated: true }))).toEqual({
+      kind: "blocked",
+      reason: "",
+      silent: true,
+    });
+  });
+
   it("refuses an empty command by name", () => {
     expect(planActionRun(script({ command: "  " }), ctx())).toEqual({
       kind: "blocked",
@@ -220,25 +228,24 @@ describe("planActionRun, apps", () => {
 });
 
 describe("planActionStop", () => {
+  const live = { tabId: "t", exists: true, running: true, commandSeen: true };
+
   it("does nothing without a tab to stop", () => {
     expect(planActionStop(null)).toEqual({ kind: "none" });
-    expect(planActionStop({ tabId: "t", exists: false, commandSeen: true })).toEqual({ kind: "none" });
+    expect(planActionStop({ ...live, exists: false })).toEqual({ kind: "none" });
+  });
+
+  it("does nothing when the Action is not running, so a tab reused by something else is left alone", () => {
+    expect(planActionStop({ ...live, running: false })).toEqual({ kind: "none" });
+    expect(planActionStop({ ...live, running: false, commandSeen: false })).toEqual({ kind: "none" });
   });
 
   it("waits for the shell to confirm when the command was seen", () => {
-    expect(planActionStop({ tabId: "t", exists: true, commandSeen: true })).toEqual({
-      kind: "stop",
-      tabId: "t",
-      mark: "waiting",
-    });
+    expect(planActionStop(live)).toEqual({ kind: "stop", tabId: "t", mark: "waiting" });
   });
 
   it("clears the mark at once when no command was ever seen", () => {
-    expect(planActionStop({ tabId: "t", exists: true, commandSeen: false })).toEqual({
-      kind: "stop",
-      tabId: "t",
-      mark: false,
-    });
+    expect(planActionStop({ ...live, commandSeen: false })).toEqual({ kind: "stop", tabId: "t", mark: false });
   });
 });
 
