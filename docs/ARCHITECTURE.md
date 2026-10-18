@@ -78,7 +78,7 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 **Workspace/Pane/Tab model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of tabs. Tabs are never unmounted when you switch between them - each PTY keeps receiving output in the background. Switching to a tab that has been running a command shows you the complete, up-to-date buffer instantly.
 
-A workspace that reaches zero tabs folds away with its last tab, whatever the path: the tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab to another workspace, and bulk closes such as Close All Tabs. The fold is a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`) that closes the empty workspace on committed state, so batched closes inside one tick are covered too, and the active workspace selection is reused from `closeWorkspace`. Two exceptions keep the workspace with an empty sole pane, which renders a welcome screen with quick actions (new terminal, open file): the window's only workspace (folding it would close the window), and a workspace holding scripts or Actions with a command, whose deletion the close confirmation dialog still protects. A workspace is also removed by an explicit close action (the dedicated `workspace.close` shortcut, the `tab.close` shortcut on an empty workspace, or the sidebar close button), routed through `requestCloseWorkspace`. The `tab.close` shortcut is contextual (it closes the focused tab or pane first, falling back to the workspace only when the pane is empty), whereas `workspace.close` always targets the active workspace. The close action reuses the hibernate dialog in `close` mode (`useCloseWorkspaceFlow`, `HibernateDialog`). The dialog opens only when something would be lost: the workspace has scripts or Actions with a command (it says how many will be deleted), documents with unsaved changes (each with its own Save button, plus Save all above two), agents or scripts still running, or terminals with a live foreground process (`collectRunningTerminals` + `leafHasForegroundProcess`, de-duplicated against agents and scripts). Otherwise the workspace closes directly, even when it has terminals. Confirming kills every terminal and discards any unsaved buffer without per-tab prompts, so the flow does not go through `closeTabs`. A hibernated workspace has no mounted editors, so its dialog lists the unsaved documents without Save buttons. When a Save fails (file changed on disk, file deleted, write error) the row shows the reason and offers "Go to tab", which closes the dialog and focuses the tab where the conflict overlay or the deleted-file screen already lives; while closing it also offers "Discard". The confirm button stays disabled until every failed document is fixed or discarded (`isBlockedByFailures`); hibernating has no Discard, so it requires the fix. `useDocument.save()` refuses to write a deleted file (`DELETED_SAVE_ERROR`); only `recreate` does. On unmount, an editor whose final autosave write fails, whose file was deleted or that is in conflict carries its buffer in memory (`unflushedBuffers`, process lifetime only) so hibernating does not lose it while Kex stays open. Hibernating on request saves every dirty document of the workspace first (`saveWorkspaceDocs`) whatever the `editorAutoSave` preference says, so the in-memory carry is only a fallback for a save that failed, and that document opens the dialog. The `warnOnCloseTabWithRunningProcess` preference no longer affects this path; it only governs closing a single terminal tab. Closing the last workspace quits the app. Panes inside a split still collapse when their last tab is closed - only the sole pane of a workspace stays empty.
+A workspace that reaches zero tabs folds away with its last tab, whatever the path: the tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab to another workspace, and bulk closes such as Close All Tabs. The fold is a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`) that closes the empty workspace on committed state, so batched closes inside one tick are covered too, and the active workspace selection is reused from `closeWorkspace`. Two exceptions keep the workspace with an empty sole pane, which renders a welcome screen with quick actions (new terminal, open file): the window's only workspace (folding it would close the window), and a workspace holding Actions with a command, whose deletion the close confirmation dialog still protects. A workspace is also removed by an explicit close action (the dedicated `workspace.close` shortcut, the `tab.close` shortcut on an empty workspace, or the sidebar close button), routed through `requestCloseWorkspace`. The `tab.close` shortcut is contextual (it closes the focused tab or pane first, falling back to the workspace only when the pane is empty), whereas `workspace.close` always targets the active workspace. The close action reuses the hibernate dialog in `close` mode (`useCloseWorkspaceFlow`, `HibernateDialog`). The dialog opens only when something would be lost: the workspace has Actions with a command (it says how many will be deleted), documents with unsaved changes (each with its own Save button, plus Save all above two), agents or scripts still running, or terminals with a live foreground process (`collectRunningTerminals` + `leafHasForegroundProcess`, de-duplicated against agents and scripts). Otherwise the workspace closes directly, even when it has terminals. Confirming kills every terminal and discards any unsaved buffer without per-tab prompts, so the flow does not go through `closeTabs`. A hibernated workspace has no mounted editors, so its dialog lists the unsaved documents without Save buttons. When a Save fails (file changed on disk, file deleted, write error) the row shows the reason and offers "Go to tab", which closes the dialog and focuses the tab where the conflict overlay or the deleted-file screen already lives; while closing it also offers "Discard". The confirm button stays disabled until every failed document is fixed or discarded (`isBlockedByFailures`); hibernating has no Discard, so it requires the fix. `useDocument.save()` refuses to write a deleted file (`DELETED_SAVE_ERROR`); only `recreate` does. On unmount, an editor whose final autosave write fails, whose file was deleted or that is in conflict carries its buffer in memory (`unflushedBuffers`, process lifetime only) so hibernating does not lose it while Kex stays open. Hibernating on request saves every dirty document of the workspace first (`saveWorkspaceDocs`) whatever the `editorAutoSave` preference says, so the in-memory carry is only a fallback for a save that failed, and that document opens the dialog. The `warnOnCloseTabWithRunningProcess` preference no longer affects this path; it only governs closing a single terminal tab. Closing the last workspace quits the app. Panes inside a split still collapse when their last tab is closed - only the sole pane of a workspace stays empty.
 
 **Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Kex spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
@@ -242,41 +242,29 @@ Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Te
 - **Per-window sidebar chrome**: whether the sidebar is `open`, its `width` (a react-resizable-panels percentage), and its `side` (`"left"` / `"right"`). Held as React state by `useSidebarState(label)` (`modules/workspaces/lib/useSidebarState.ts`), seeded from the restored `WindowEntry.sidebar` and persisted per window through the lightweight `window_save_sidebar` command (debounced, index-only write). It is a property of the window, shared by all of that window's workspace tabs. Validation/defaults live in `sidebarState.ts` (`open=true`, `width=20`, `side="left"`; an invalid `side` falls back to `"left"`; `width` clamped 12..70). The active view (`"explorer"` / `"git"` / `"history"` / `"notes"`) is not part of this state: it lives per workspace in `Workspace.sidebar.view`.
 - **Per-workspace explorer state**: `explorerRootMode` / `fsRoot` and `showHidden` (show dot-files), each remembered per workspace because every workspace points at a different project. They ride inside the workspace body via the existing `saveWorkspaceState` / `sanitizeWorkspace` path; no dedicated IPC. `showHidden` moved here from a former global preference.
 
-### 3.11 External tools
+### 3.11 App detection
 
-The header bar exposes an "Open in editor" button that opens the active file (or workspace root) in an external editor or terminal. The system is composed of a Rust detection backend, a frontend catalog, and a settings UI.
+Kex finds the editors, IDEs and tools installed on the machine so that app Actions (see 3.12) can start from them. It is made of a Rust detection backend and a frontend catalog; the launch itself is `action_spawn` (see IPC.md), driven by an Action, not by this module.
 
 **Catalog.** Both the Rust backend (`src-tauri/src/modules/editors/catalog.rs`) and the TypeScript frontend (`src/modules/external-editors/catalog.ts`) maintain a parallel list of known tools. Each entry carries:
-- A stable `id` (used as the icon filename key and in preferences)
+- A stable `id` (used as the icon filename key and as `Action.appId`)
 - A macOS bundle ID for `mdfind` detection
 - A CLI binary name for `which`/`where` PATH lookup
-- `args_before_path`: arguments injected between the binary and the target path at launch time (e.g. `--working-directory` for Ghostty/Alacritty, `--directory` for Kitty)
+- `args_before_path`: arguments injected between the binary and the target path at launch time
 - `macos_app_name`: JetBrains `open -na <App>.app` fallback
 
-The frontend catalog additionally carries `group` and `type` metadata used by the settings UI. Groups: `VS Code`, `JetBrains`, `Text Editors`, `Terminals`, `Other IDEs`. Target type:
-- `"file"`: the tool receives the path of the currently open file (VS Code family, text editors)
-- `"workspace"`: the tool receives the workspace root directory (JetBrains, terminals, Xcode)
+The frontend catalog additionally carries `group` and `type` metadata: the target type (`"file"` for the VS Code family and text editors, `"workspace"` for JetBrains and Xcode) decides which variable an app suggestion ends with (`{path}` or `{workspace}`).
 
 **Detection (Rust).** `detect_all()` in `detect.rs` iterates the catalog and resolves each entry per platform:
-- **macOS**: `mdfind kMDItemCFBundleIdentifier == "<id>"` locates the `.app`; on failure, falls back to `which`. Resolution order: `open -b` for open-only editors (BBEdit, CotEditor, TextMate, CodeRunner), Zed CLI inside the bundle, JetBrains Toolbox script or `open -na`, then general case (PATH binary with `args_before_path`, or `open -a`).
+- **macOS**: `mdfind kMDItemCFBundleIdentifier == "<id>"` locates the `.app`; on failure, falls back to `which`. Resolution order: `open -b` for open-only editors (BBEdit, CotEditor, CodeRunner), Zed CLI inside the bundle, JetBrains Toolbox script or `open -na`, then general case (PATH binary with `args_before_path`, or `open -a`).
 - **Linux/Windows**: Toolbox script or `which`/`where` binary lookup.
-- The result is a `DetectedEditor` with the resolved binary and `args_before_path` ready for process spawn.
+- The result is a `DetectedEditor` with the resolved binary and `args_before_path`. `runEditorScan` (`useExternalEditors.ts`) runs a scan at startup and from the Scan button of Settings > Actions, keeping the `enabled` flags the user set, and stores the result in `detectedEditors` (`settings-tools.json`).
 
-**Header button.** `OpenInEditorButton` (`src/modules/external-editors/OpenInEditorButton.tsx`) shows the preferred editor and a dropdown of all enabled editors. It receives both the panel-specific `target` (a file path) and the `workspaceRoot`. At click time `resolveEffectiveTarget` picks:
-- `workspaceRoot` if the editor's type is `"workspace"` (resolved from the catalog or from `CustomEditor.targetKind`)
-- `target` otherwise (the current open file)
-
-The button label shows the filename for file-type editors and the workspace root folder name for workspace-type editors, so the user always sees what will be opened.
-
-**Custom tools.** The old per-editor custom tools (`customEditors`) can no longer be created: they are replaced by app Actions, which carry their own command template. The preferences `customEditors`, `preferredFileEditorId`, `preferredWorkspaceEditorId` and `textEditorMode` stay in `settings-tools.json` only because `OpenInEditorButton` still reads them until the Header ActionsBar replaces it.
-
-**Settings UI.** The old `ExternalEditorsSection` is gone. Detected tools are managed from Settings > Actions (`ActionsSection`), which offers them as one-click suggestions and has a Scan button. Disabling a detected tool is no longer possible from the UI; `detectedEditors[].enabled` is still honored by the suggestions.
-
-**Icons.** `EditorIcon` (`src/modules/external-editors/EditorIcon.tsx`) tries `/assets/editors/<id>.svg` first, then `/assets/editors/<id>.png`, then falls back to a generic document-code icon from HugeIcons.
+**Suggestions and icons.** `appSuggestions.ts` turns the detected list into starting points for app Actions (name, icon, an editable command). `EditorIcon` (`src/modules/external-editors/EditorIcon.tsx`) tries `/assets/editors/<id>.svg`, then `.png`, then a generic document-code icon; `ActionIcon` picks it for any Action with an `appId`. Custom apps have no catalog entry and show the generic icon. There is no Header button and no editor-specific preference any more: which file or folder an app receives is whatever its command template says.
 
 ### 3.12 Actions
 
-An **Action** is a saved command template that Kex runs against the current context. It is meant to replace both the workspace Scripts and the "Open in" external editors (the old model stays in place until the tasks that migrate its consumers land, so both exist side by side for now). The type lives in `src/modules/actions/lib/types.ts`:
+An **Action** is a saved command template that Kex runs against the current context. It replaced the former workspace Scripts, the Run button and the "Open in" external editor button; none of those exist any more, and nothing was migrated: old scripts and custom editors are simply gone. The type lives in `src/modules/actions/lib/types.ts`:
 
 | Field | Meaning |
 |---|---|
@@ -285,7 +273,7 @@ An **Action** is a saved command template that Kex runs against the current cont
 | `runInTerminal` | `true`: a script, typed into a terminal and stoppable. `false`: an app, spawned in the background, no stop |
 | `command` | template, expanded at run time (variables such as `{cwd}`, `{workspace}`, `{file}`) |
 | `appId` | detected app it came from, for its icon and default command |
-| `cwdMode` / `cwd` | scripts only; same `workspace` / `context` / `fixed` semantics as `Script`, `cwd` only with `fixed` |
+| `cwdMode` / `cwd` | scripts only; `workspace` (default), `context` or `fixed`, with `cwd` only for `fixed` |
 | `ownButton` | own split-button in the Header, or grouped in a shared menu |
 
 **Two scopes, same shape.** Workspace Actions (`Workspace.actions`, with `Workspace.activeAction` for the one F12 runs) are saved with the rest of the workspace JSON and are meant for scripts (`npm run dev` belongs to a project). Global Actions (`Preferences.actions`, key `actions` in `settings-tools.json`, written by `setGlobalActions`) are meant for apps and are available in every workspace. Actions carry no tab id: which terminal a script runs in is runtime state, never persisted.
@@ -305,6 +293,12 @@ No Action is bound to a tab in the data. Which tab a script last ran in is a run
 Running state is per Action: `useActionStates()` (`useActionStates.ts`, `useSyncExternalStore` over the links and the per-tab script marks of `terminalEphemeralStore`) returns `running` or `waiting` per Action id, with an idle Action absent and the same map reference while nothing visible changed. `workspace.run` (F12) calls `toggleActiveAction`: it picks the active Action (`pickRunnableAction` skips Actions with an empty command and falls back to the first one with a command) and runs it, or stops it when it is already running; a workspace with no Actions still falls back to the old Scripts until they are removed.
 
 **Editing Actions** (`actions/ActionsEditor.tsx`, `ActionRow.tsx`; pure rules in `actions/lib/actionForm.ts`). One editor serves both scopes: the Actions tab of the workspace dialog (`WorkspaceSettingsDialog`, opened by the `workspace.runScripts` palette entry, now titled "Configure workspace actions") and Settings > Actions (`settings/sections/ActionsSection.tsx`, section id `actions`). Each row has a Script or App chooser (`RadioGroup`), for an app a picker over `suggestionsFromDetected` plus a custom app (picking fills the command and the icon through `appId`, keeps a name the user typed, and editing the command afterwards never drops the `appId`), a name, the command with a collapsible list of its variables (`commandVariableDocs`: cwd, dir, branch, repo, workspace, file, path, host) that inserts at the caret and shows the live value of the focused tab, for scripts the folder choice with its `scriptCwdProblem` error, and the "Own button in the header" checkbox. `actionProblems` separates problems that block (an unsplittable command, a bad fixed folder) from notes about the current context (`missingVariables`, `unsafeVariables`), which never stop saving. A new row is a draft held in the editor and reaches the store only once it has a command, because `addAction` refuses an empty one; closing the editor forgets the drafts. Workspace rows have a Make Global button (`promoteWorkspaceAction`). The name box always shows the saved name and never saves an empty one; an Action never takes its internal id as a name, and an unnamed one is labelled by its command. The command box keeps what is typed apart from what is saved (`commandDraft`, `commitCommand`): an empty draft is flagged "Command is required" and never saved, so the stored Action keeps its last valid command, and once the box loses focus it shows the stored command again; the draft is saved on blur, when a variable is inserted and when the row unmounts, so closing the dialog or Settings does not lose it. Choosing the custom app only lets go of the app and keeps the command. `currentSuggestionKey` tells the file variant of an app from its workspace variant by the command they start from. A new row keeps its place, and its focus, under the same key until the store shows an Action with its id; if the write fails the row stays and can be saved again. Settings edits go through `globalActions.change(fn)`, which runs the pure edit on the latest list inside the same write queue as `add`, normalizes the result, skips the write when nothing changed, and on a failed write restores the list unless a later edit already built on it. Removing or retyping a global Action calls `unlinkRemovedActions` with the before and after lists it returns. `change` can report a failure for an edit whose own write succeeded, when an earlier write it was queued behind failed: the list shown goes back and the user sees one extra error. That is accepted as rare. The legacy `Workspace.scripts` can no longer be created or edited from the UI, while `RunButton`, F12 and `scriptsToDelete` still read them; that is expected until the Header ActionsBar replaces them. Closing a workspace counts its Actions with a command in `scriptsToDelete`, so the close dialog warns about them and `isBlankWorkspace` keeps a workspace that holds any.
+
+**The Header bar** (`actions/ActionsBar.tsx`, model in `actions/lib/actionsBar.ts`, data hook `lib/useActionsBar.ts`). The Header shows the workspace Actions first and then the global ones, each in the user's order. The pure `buildActionsBarModel` splits them into own buttons (`ownButton`, scripts and apps mixed, in order), a Scripts menu and an Apps menu, and marks each item with its run state (`running`, `waiting` or idle), whether it is the active one (`activeAction`, the one F12 runs) and a `disabledReason`. `actionAvailability` computes that reason with the same checks the runner uses (`commandProblem`, `missingVariables`, and for scripts `unsafeVariables`) and words it as what is missing: "needs an open file", "needs a workspace root", "needs a git branch". A script that is running is never disabled, so it can always be stopped. Below `COMPACT_WIDTH` (720 px, `isCompactBar`) the own buttons fold into the two menus so the bar never pushes the search box and the window controls out. With no Actions at all the bar is a single "Actions" button that opens the Actions tab of the workspace dialog.
+
+A script has two hit areas with their own hover: the name and the play or stop zone (`ScriptControl`, green for run, red for stop, a spinner while stopping). Clicking the name brings the script's tab into view when it has one (`focusActionTab`) and runs the script otherwise; the play or stop zone always starts or stops. The same two zones repeat in every row of the Scripts menu. An app is a single button (or row) with its icon that launches it; apps have no stop. The context (`useActionContext`) is memoized by content, so the bar re-renders only when a value an Action can read changes.
+
+Closing or hibernating a workspace asks about the scripts that are running by looking up the Action each terminal belongs to (`liveScripts` and `scriptActionOf`, over the workspace's Actions and the global ones), since the link from a script to its tab lives in memory and not in the workspace.
 
 ---
 
@@ -446,7 +440,7 @@ The preview pane renders local dev servers in a native child webview. It does no
 
 `Workspace.hibernated` marks a workspace whose tabs are not mounted: its terminals have no PTY and
 its editors are unmounted. The tabs stay in the persisted `paneTree` on purpose, so waking the
-workspace restores the same layout and tabs. Limitations: scripts launched from the RunButton are
+workspace restores the same layout and tabs. Limitations: scripts launched from an Action are
 not relaunched on wake, unsaved editor edits are discarded, and an agent that cannot be resumed
 follows the existing restore error path. Rendering details are in `docs/WORKSPACES.md`.
 
@@ -462,18 +456,18 @@ last close, whatever it closed. The closed stack (in memory, capped at 10) holds
   dropped (unless a workspace entry restores it first, see below). If it is hibernated, the entry is skipped but kept,
   so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be reopened.
 - A workspace entry (`closeWorkspace`) is a snapshot of the whole `Workspace` (pane tree, tabs, title, color, icon,
-  group, scripts, hibernation) plus its index in the bar. Undo puts it back at that index and selects it. It is
+  group, actions, hibernation) plus its index in the bar. Undo puts it back at that index and selects it. It is
   skipped when a workspace with that id is already open.
 
 A workspace that folds away because its last tab closed (`emptyWorkspaceToClose`) is the common way to lose one by
 accident. `closeTab` flags the entry `lastOfWorkspace` when it empties the workspace, and `captureClosedWorkspace`
 folds that tab back into the snapshot, so one undo returns the workspace with its tab instead of an empty shell.
 `clearStaleFolds` drops the flag as soon as the workspace holds a tab again, so a later close never folds an older
-tab by mistake. An empty workspace with no scripts is not recorded. Tabs closed before the workspace stay as tab
+tab by mistake. An empty workspace with no actions is not recorded. Tabs closed before the workspace stay as tab
 entries below it and reopen into the restored workspace on the following undos.
 
 A restored workspace gets fresh tab ids (`reviveWorkspace`): the old ones carry marks that outlive the close
-(abandoned editor buffers, agent records), and scripts are re-pointed to the new ids. Editors come back clean,
+(abandoned editor buffers, agent records). Editors come back clean,
 floating browsers docked. A hibernated workspace keeps its terminal ids, because its stored agent sessions are
 indexed by them and the wake-up looks them up. `tab.reopenClosed` is enabled while the active workspace is
 hibernated, since it acts on the stack and not on that workspace. Resetting the workspaces (`resetWorkspaces`)
@@ -582,19 +576,16 @@ src/
     ├── explorer/                  - File tree, fuzzy search, icons, inline rename, internal clipboard copy/cut/paste (copy reuses the duplicate background task, cut uses `fs_rename`/`git_mv`), background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
     ├── source-control/            - Git stage/commit/push panel. Supports a List/Tree view toggle (persisted as `scmViewMode` in settings); Tree mode keeps the Staged Changes / Changes roots and renders each as a directory tree with compacted single-child chains (explorer-style icons and spacing), built by the pure `scmTree.ts`.
     ├── git-history/               - Commit graph, per-file diffs
-    ├── header/                    - Top bar, inline search, and the RunButton (0/1/2+ script variants).
-    │                                `RunButton` (in `src/app/components/RunButton.tsx`) reads the script
-    │                                running state from `terminalEphemeralStore.scriptRunning`
-    │                                (`useSyncExternalStore`) and renders as a muted "Run" placeholder (0 scripts),
-    │                                a simple toggle (1 script), or a split selector+play/stop button (2+ scripts).
+    ├── header/                    - Top bar: workspace title, inline search, the Actions bar and window controls.
     ├── workspaces/                - Workspace/Pane/Tab model; useWorkspaces (source of truth),
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/TabContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
-    │                                Workspace carries: color (accent color, hex or null), scripts (array of
-    │                                Script entries with command, name, optional tabId, `cwdMode`
+    │                                Workspace carries: color (accent color, hex or null), actions
+    │                                (the workspace-scoped Actions, see 3.12) with `activeAction`, and
+    │                                `scriptPaneId` (the pane scripts open in). A script Action has `cwdMode`
     │                                (`workspace` default | `context` | `fixed`) and `cwd` used only in `fixed` mode;
-    │                                the folder is resolved by `lib/scriptCwd.ts`, and an
-    │                                script tab, new or already open and idle, gets a `cd` to it before the command).
+    │                                the folder is resolved by `lib/scriptCwd.ts`, and a
+    │                                script tab, new or already open and idle, gets a `cd` to it before the command.
     │                                The typed line groups the whole command behind the cd: `cd -- X && { cmd\n\n}`
     │                                (posix) or `Set-Location -LiteralPath 'X'; if ($?) { cmd\n\n}` (PowerShell;
     │                                the closing brace is on its own line, after a blank one, so neither a
@@ -618,12 +609,12 @@ src/
     │                                gets PowerShell syntax and the cd fails), and the frontend does not know
     │                                the user's shell, so fish before 4.1 (no `{ }` group) gets a syntax error
     │                                and the script does not run in a reused tab with a folder),
-    │                                activeScript (selected script id), and groupId (optional id of a
+    │                                groupId (optional id of a
     │                                window-level WorkspaceGroup). See WORKSPACES.md for render
     │                                tree details.
     │                                `terminalEphemeralStore` has a second section, `scriptRunning` (Map<tabId,
     │                                ScriptState>), tracking which terminal tabs are running a script command.
-    │                                Set by `runWorkspaceConfig` in App.tsx; cleared by OSC 133;D
+    │                                Set by the Action runner (`useActionRunner`); cleared by OSC 133;D
     │                                (`onRunningCommand` with cmd=null). Never persisted.
     ├── shortcuts/                 : Global keymap registry, useGlobalShortcuts. One `editor.cycleView`
     │                                (Cmd+Shift+V) serves every editor view: on an `editor` tab over a .md/.html
@@ -665,8 +656,8 @@ src/
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`
     │                                tab, so it opens in Live Preview.
     ├── workspace/                 - Local + WSL environment switching
-    ├── actions/                   - Action type (saved command templates) and its pure list operations
-    ├── external-editors/          - Detection and launch of external editors (`OpenInEditorButton`)
+    ├── actions/                   - Actions: saved command templates (scripts and apps), run engine, Header bar, editor
+    ├── external-editors/          - Detection and catalog of installed editors and apps, their icons (feeds app Actions)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
     └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, tiered ranking, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
