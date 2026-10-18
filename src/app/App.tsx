@@ -3351,7 +3351,10 @@ export default function App() {
         return !(target as HTMLElement | null)?.closest?.(".xterm");
       }
       if (id === "file.rename") {
-        return sidebarRef.current?.isExplorerFocused() ?? false;
+        if (sidebarRef.current?.isExplorerFocused()) return true;
+        return !!(document.activeElement as HTMLElement | null)?.closest?.(
+          "[data-scm-panel]",
+        );
       }
 
       return false;
@@ -3811,6 +3814,7 @@ export default function App() {
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
+                        onFocusOnExplorer={tabCallbacks.onFocusOnExplorer}
                         onOpenWorkspaceProperties={() =>
                           useWorkspaceSettingsStore
                             .getState()
@@ -3923,6 +3927,7 @@ export default function App() {
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
+                        onFocusOnExplorer={tabCallbacks.onFocusOnExplorer}
                         onOpenWorkspaceProperties={() =>
                           useWorkspaceSettingsStore
                             .getState()

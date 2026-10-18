@@ -37,6 +37,7 @@ import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
+import { tabFilePath } from "./lib/tabPath";
 
 type Props = {
   tab: Tab;
@@ -75,9 +76,12 @@ export function TabContextMenuItems({
   const { targets, moveTab } = useWorkspaceMove();
   const startRename = useTabRenameStore((s) => s.startRename);
   const otherTargets = targets.filter((t) => t.id !== workspaceId);
-  const { onSaveTab } = useSidebarTabMenu();
+  const { onSaveTab, onRevealInExplorer } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
+  const focusFilePath = tabFilePath(tab);
+  const focusTarget =
+    focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
   const runOnStart =
     tab.kind === "terminal" && onUpdateTab ? (
       <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
@@ -165,6 +169,16 @@ export function TabContextMenuItems({
                 />
               </ContextMenuSubContent>
             </ContextMenuSub>
+          )}
+          {focusTarget && (
+            <ContextMenuItem
+              disabled={isAutofocusTab(tab) && (tab.autofocus ?? false)}
+              onSelect={() => onRevealInExplorer(focusTarget)}
+            >
+              <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
+              Focus on Sidebar
+              <Shortcut id="tab.focusOnExplorer" />
+            </ContextMenuItem>
           )}
           {isAutofocusTab(tab) && autofocusMode !== "always" && (
             <ContextMenuItem

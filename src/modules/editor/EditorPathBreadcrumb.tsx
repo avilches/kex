@@ -105,6 +105,7 @@ export function EditorPathBreadcrumb({
           onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
           onRevealInTerminal={onRevealInTerminal}
           onAddToGitignore={onAddToGitignore}
+          onFocusOnExplorer={onFocusOnExplorer}
         >
           {trigger}
         </DirSegmentContextMenu>
