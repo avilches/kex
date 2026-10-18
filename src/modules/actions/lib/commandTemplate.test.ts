@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   commandProblem,
+  unsafeVariables,
   commandVariablesUsed,
   expandCommandArgv,
   expandCommandShell,
@@ -131,15 +132,13 @@ describe("expandCommandArgv", () => {
 
 describe("expandCommandShell", () => {
   it("quotes each value for posix and leaves the rest of the command alone", () => {
-    expect(expandCommandShell("npm run dev -- --root {cwd}", { cwd: "/a b/it's" }, "posix")).toBe(
-      `npm run dev -- --root '/a b/it'\\''s'`,
+    expect(expandCommandShell("npm run dev -- --root {cwd}", { cwd: "/a b/c" }, "posix")).toBe(
+      "npm run dev -- --root '/a b/c'",
     );
   });
 
-  it("quotes for PowerShell by doubling single quotes, curly ones included", () => {
-    expect(expandCommandShell("code {cwd}", { cwd: "C:\\a b\\it's \u2019" }, "powershell")).toBe(
-      "code 'C:\\a b\\it''s \u2019\u2019'",
-    );
+  it("quotes a PowerShell value that has spaces and backslashes", () => {
+    expect(expandCommandShell("code {cwd}", { cwd: "C:\\a b\\c" }, "powershell")).toBe("code 'C:\\a b\\c'");
   });
 
   it("strips control characters from values for PowerShell too", () => {
@@ -180,10 +179,6 @@ const hasShell = (name: string) => spawnSync(name, ["-c", "exit 0"]).status === 
 
 const NASTY = [
   "/tmp/a b/c",
-  `/tmp/it's`,
-  `/tmp/say "hi"`,
-  "/tmp/$HOME/$(echo pwned)",
-  "/tmp/`echo pwned`",
   "/tmp/semi;colon&pipe",
   "/tmp/-leading dash",
   "/tmp/~tilde",
@@ -207,13 +202,43 @@ for (const shell of ["bash", "zsh"]) {
       expect(res.stdout.toString().split("\0").slice(0, -1)).toEqual(["/tmp/ab" + "c[31mde", "tail"]);
     });
 
-    it("a bare $(...) in a value does not run", () => {
+    it("refuses a $(...) value even when the command is a plain bare argument", () => {
+      expect(() => expandCommandShell("printf '%s' {cwd}", { cwd: "$(touch PWNED)" }, "posix")).toThrow(
+        /\{cwd\} cannot be used in a script/,
+      );
+    });
+
+    // Arithmetic and subscript contexts re-evaluate the expanded text, so even a
+    // single-quoted $(...) runs there. Each template is shown to be dangerous and refused.
+    const REEVALUATING = [
+      "(( {cwd} ))",
+      "(( 1 + {cwd} ))",
+      "for ((i=0;i<{cwd};i++)); do :; done",
+      "x=(a b); echo ${x[{cwd}]}",
+      "a[{cwd}]=1",
+      "x=abcdef; echo ${x:{cwd}}",
+      "x=abcdef; echo ${x:0:{cwd}}",
+      "declare -A a; a[{cwd}]=1",
+      "x=(a b); (( x[{cwd}] ))",
+    ];
+    for (const command of REEVALUATING) {
+      it(`refuses the value for ${JSON.stringify(command)}, a context that re-evaluates quoted text`, () => {
+        const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+        try {
+          expect(() => expandCommandShell(command, { cwd: INJECTION }, "posix")).toThrow(/cannot be used in a script/);
+          spawnSync(shell, ["-c", command.replace("{cwd}", `'${INJECTION}'`)], { cwd: dir });
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+    }
+
+    it("at least one re-evaluating template really runs the quoted text (canary for the premise)", () => {
       const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
       try {
-        const line = expandCommandShell("printf '%s' {cwd}", { cwd: "$(touch PWNED)" }, "posix");
-        const res = spawnSync(shell, ["-c", line], { cwd: dir });
-        expect(res.stdout.toString()).toBe("$(touch PWNED)");
-        expect(existsSync(join(dir, "PWNED"))).toBe(false);
+        spawnSync(shell, ["-c", `(( '${INJECTION}' ))`], { cwd: dir });
+        spawnSync(shell, ["-c", `a['${INJECTION}']=1`], { cwd: dir });
+        expect(existsSync(join(dir, "PWNED"))).toBe(true);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
@@ -351,30 +376,49 @@ for (const shell of ["bash", "zsh"]) {
   });
 }
 
-describe("second line of defense on values", () => {
-  it("refuses a risky value when the command has double quotes, a backtick or $(", () => {
-    for (const command of [`echo "x" {cwd}`, "echo `date` {cwd}", "echo $(date) {cwd}"]) {
-      for (const value of [INJECTION, "a`b", 'a"b', "a'b", "a\\b"]) {
-        expect(() => expandCommandShell(command, { cwd: value }, "posix")).toThrow(/cannot be inserted safely/);
+describe("unsafe values are refused whatever the command looks like", () => {
+  it("refuses $, a backtick, a quote or a backslash in any written value, for posix", () => {
+    for (const command of [`echo "x" {cwd}`, "echo {cwd}", "(( {cwd} ))", "a[{cwd}]=1"]) {
+      for (const value of [INJECTION, "a$b", "a`b", 'a"b', "a'b", "a\\b"]) {
+        expect(() => expandCommandShell(command, { cwd: value }, "posix")).toThrow(
+          /\{cwd\} cannot be used in a script right now/,
+        );
       }
     }
   });
 
-  it("lets plain values through, and any value when the command has no such construct", () => {
-    expect(expandCommandShell(`echo "x" {cwd}`, { cwd: "/a b/c" }, "posix")).toBe(`echo "x" '/a b/c'`);
-    expect(expandCommandShell("echo {cwd}", { cwd: INJECTION }, "posix")).toBe(`echo '${INJECTION}'`);
+  it("lets plain values through", () => {
+    expect(expandCommandShell(`echo "x" {cwd}`, { cwd: "/a b/c-d_e.f" }, "posix")).toBe(`echo "x" '/a b/c-d_e.f'`);
+    expect(expandCommandShell("echo {cwd}", { cwd: "/tmp/semi;colon&pipe" }, "posix")).toBe(
+      "echo '/tmp/semi;colon&pipe'",
+    );
+  });
+
+  it("names every offending variable and lets the UI ask beforehand", () => {
+    const vars = { cwd: "/ok", path: "/a'b", dir: "x$y" };
+    expect(unsafeVariables("e {cwd} {path} {dir}", vars, "posix")).toEqual(["path", "dir"]);
+    expect(commandProblem("e {cwd} {path}", "posix", vars)).toMatch(/\{path\} cannot be used in a script/);
+    expect(commandProblem("e {cwd}", "posix", vars)).toBeNull();
+    expect(commandProblem("e {path}", "posix")).toBeNull();
+  });
+
+  it("an unsafe value that is not written (a fallback not taken) is not reported", () => {
+    expect(unsafeVariables("e {cwd|path}", { cwd: "/ok", path: "a'b" }, "posix")).toEqual([]);
+  });
+
+  it("does not touch argv mode, where there is no shell", () => {
+    expect(expandCommandArgv("app {cwd}", { cwd: INJECTION })).toEqual(["app", INJECTION]);
   });
 
   it("only looks at the values that are written", () => {
     expect(expandCommandShell(`echo "x" {path|cwd}`, { path: "", cwd: "/ok" }, "posix")).toBe(`echo "x" '/ok'`);
   });
 
-  it("applies to PowerShell, where a backslash is harmless", () => {
-    expect(() => expandCommandShell('Write-Host "x" {cwd}', { cwd: "a$b" }, "powershell")).toThrow(/safely/);
-    expect(() => expandCommandShell('Write-Host "x" {cwd}', { cwd: "it\u2019s" }, "powershell")).toThrow(/safely/);
-    expect(expandCommandShell('Write-Host "x" {cwd}', { cwd: "C:\\a b" }, "powershell")).toBe(
-      "Write-Host \"x\" 'C:\\a b'",
-    );
+  it("applies to PowerShell for $, backtick and every quote, but a backslash is harmless", () => {
+    for (const value of ["a$b", "a`b", 'a"b', "a'b", "it\u2019s", "\u201cx\u201d"]) {
+      expect(() => expandCommandShell("ls {cwd}", { cwd: value }, "powershell")).toThrow(/cannot be used/);
+    }
+    expect(expandCommandShell("ls {cwd}", { cwd: "C:\\a b" }, "powershell")).toBe("ls 'C:\\a b'");
   });
 
   it("strips C1 controls and the Unicode line separators from values", () => {

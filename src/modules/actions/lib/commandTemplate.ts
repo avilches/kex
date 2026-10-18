@@ -61,8 +61,15 @@ function quotedProblem(command: string, shell: CommandShell, isKnown = knownTitl
 // Why a command cannot be launched as it is typed, or null when it can. Without a shell
 // the command is an app's (split into arguments); with one it is a script, whose own
 // quotes are the shell's business except around a variable.
-export function commandProblem(command: string, shell?: CommandShell): string | null {
-  if (shell) return command.trim() === "" ? "the command is empty" : quotedProblem(command, shell);
+// With the current values of a script, a value that is unsafe to write is reported too.
+export function commandProblem(command: string, shell?: CommandShell, vars?: TemplateVars): string | null {
+  if (shell) {
+    if (command.trim() === "") return "the command is empty";
+    const quoted = quotedProblem(command, shell, vars ? (n) => typeof vars[n] === "string" : undefined);
+    if (quoted || !vars) return quoted;
+    const unsafe = unsafeVariables(command, vars, shell);
+    return unsafe.length > 0 ? unsafeMessage(unsafe) : null;
+  }
   try {
     return splitArgv(command).length === 0 ? "the command is empty" : null;
   } catch (e) {
@@ -97,50 +104,57 @@ function stripControl(value: string): string {
   return out;
 }
 
-// Where a quoting mistake could turn a value into code: a double quote, a backtick or a
-// $( anywhere in the command means some value might end up inside an expansion context.
-const EXPANSION_CONTEXT = {
-  posix: /["`]|\$\(/,
-  powershell: /["`\u201c\u201d\u201e]|\$\(/,
-};
-// What such a value must not hold. PowerShell does not treat a backslash specially.
-const DANGEROUS_VALUE = {
+// What a value written into a script must not hold, whatever the command looks like.
+// Quoting protects an argument, but arithmetic and subscript contexts re-evaluate the
+// expanded text (`(( {cwd} ))`, `a[{cwd}]=1`, `${x:0:{cwd}}`), where a `$(...)` in a
+// single-quoted value still runs. A path with these characters is rare and refusing it is
+// safer than guessing which contexts the command has. PowerShell treats a backslash as an
+// ordinary character; it was not available to test, so the rest is as strict as posix.
+const UNSAFE_VALUE = {
   posix: /[$`"'\\]/,
   powershell: /[$`"'\u2018\u2019\u201a\u201b\u201c\u201d\u201e]/,
 };
 
-function quoteFor(command: string, shell: CommandShell): (value: string) => string {
-  const guarded = EXPANSION_CONTEXT[shell].test(command);
-  const quote =
-    shell === "powershell"
-      ? (v: string) => `'${v.replace(POWERSHELL_QUOTES, (q) => q + q)}'`
-      : (v: string) => quoteShellArg(v, false);
-  return (value) => {
-    const clean = stripControl(value);
-    if (guarded && DANGEROUS_VALUE[shell].test(clean)) {
-      throw new Error(
-        "a value holds $, a backtick, a backslash or a quote and the command has double quotes, a backtick or $(...), so it cannot be inserted safely",
-      );
-    }
-    return quote(clean);
-  };
+const unsafeMessage = (names: string[]) =>
+  `${names.map((n) => `{${n}}`).join(", ")} cannot be used in a script right now: its value contains $, a backtick, a quote or a backslash`;
+
+// The variables the command would write whose current value is unsafe for a script. Lets
+// the UI say why an Action cannot run in this context (the value, not the command, is the
+// problem), next to missingVariables.
+export function unsafeVariables(command: string, vars: TemplateVars, shell: CommandShell): string[] {
+  const bad = new Set<string>();
+  renderTemplate(command, vars, (v) => {
+    if (UNSAFE_VALUE[shell].test(stripControl(v))) bad.add(v);
+    return "";
+  });
+  if (bad.size === 0) return [];
+  return [...titleVariablesUsed(command)].filter((n) => typeof vars[n] === "string" && bad.has(vars[n] as string));
+}
+
+function quoteFor(shell: CommandShell): (value: string) => string {
+  return shell === "powershell"
+    ? (v) => `'${stripControl(v).replace(POWERSHELL_QUOTES, (q) => q + q)}'`
+    : (v) => quoteShellArg(stripControl(v), false);
 }
 
 // For a script typed into a terminal: the text is kept exactly as written (line breaks and
 // spacing included) and each value is quoted for the shell, so the user writes {cwd}
-// bare. A variable inside the user's own quotes, a heredoc or after an escape is refused
-// (it would be quoted twice and, in double quotes, a $(...) in the value would run). The
-// scan can be fooled, so as a second line of defense, when the command has a double quote,
-// a backtick or $( anywhere, a written value holding $, a backtick, a quote or (posix) a
-// backslash is refused too instead of guessing; plain values stay allowed. A value
-// starting with a dash is still an option to the program: the command itself must put
-// `--` before it when needed. Run it only once missingVariables is empty: an empty value
-// writes nothing, and the argument it stood for silently disappears.
+// bare. Two layers keep a value from becoming code. A variable inside the user's own
+// quotes, a heredoc or after an escape is refused (it would be quoted twice and, in
+// double quotes, a $(...) in the value would run); the scan can be fooled, and quoting
+// does not help in arithmetic or subscripts, so every written value holding $, a
+// backtick, a quote or (posix) a backslash is refused too, unconditionally (see
+// unsafeVariables). A value starting with a dash is still an option to the program: the
+// command itself must put `--` before it when needed. Run it only once missingVariables
+// is empty: an empty value writes nothing, and the argument it stood for silently
+// disappears.
 export function expandCommandShell(command: string, vars: TemplateVars, shell: CommandShell): string {
   const known = (name: string) => typeof vars[name] === "string";
   const problem = quotedProblem(command, shell, known);
   if (problem) throw new Error(problem);
-  return renderTemplate(command, vars, quoteFor(command, shell));
+  const unsafe = unsafeVariables(command, vars, shell);
+  if (unsafe.length > 0) throw new Error(unsafeMessage(unsafe));
+  return renderTemplate(command, vars, quoteFor(shell));
 }
 
 export function commandVariablesUsed(command: string): Set<string> {
