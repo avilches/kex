@@ -8,6 +8,7 @@ export const TITLE_VARIABLES = [
   "workspace",
   "cmd",
   "file",
+  "path",
   "agent",
   "model",
   "host",
@@ -216,6 +217,7 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   { name: "model", description: "Model the agent answered with last, as the agent reports it", example: "claude-sonnet-4-6", group: "terminal" },
   { name: "session", description: "Title of that agent's session", example: "Fix login bug", group: "terminal" },
   { name: "file", description: "Name of the file", example: "index.ts", group: "file" },
+  { name: "path", description: "Full path of the file", example: "~/code/kex/src/index.ts", group: "file" },
   { name: "url", description: "Address of the page", example: "https://example.com/docs", group: "browser" },
   { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace" },
 ];
