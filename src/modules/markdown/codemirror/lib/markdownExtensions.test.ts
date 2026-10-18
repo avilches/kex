@@ -291,7 +291,7 @@ describe("buildLivePreviewExtensions", () => {
       .map((style) => style.textContent ?? "")
       .join("\n");
     const generalForegroundRuleIndex = rawCss.indexOf("cm-lp-heading, ");
-    const linkTextRuleIndex = rawCss.indexOf("var(--primary, #3b82f6) !important");
+    const linkTextRuleIndex = rawCss.indexOf("var(--link, #3b82f6) !important");
     expect(generalForegroundRuleIndex).toBeGreaterThanOrEqual(0);
     expect(linkTextRuleIndex).toBeGreaterThan(generalForegroundRuleIndex);
     view.destroy();

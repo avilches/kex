@@ -119,11 +119,11 @@ cautionary examples above.
 | Notification/agent jump | `src/app/App.tsx` : `notifications.jumpToLast` shortcut handler and `onActivateAgent` (used by the notification bell and agent list) both call `requestLeafFocus` explicitly after `onActivateTabStable`, wrapped in a `setTimeout(..., 50)` to run after the tab has mounted |
 | Workspace switch | `src/app/App.tsx`: the `prevWorkspaceIdRef` effect (`requestAnimationFrame(() => requestLeafFocus(tabId))`) |
 | OS window regains focus (Cmd+Tab back, modal window closing) | `src/app/App.tsx`: the `getCurrentWindow().onFocusChanged` effect |
-| Chrome (dropdown/dialog/context menu) closes | `src/app/App.tsx` : `restoreLeafFocus`, wired as `onRestoreFocus` into `RunButton.tsx`, `OpenInEditorButton.tsx`, and `WorkspaceBar.tsx`'s workspace context menu (`onCloseAutoFocus`) |
+| Chrome (dropdown/dialog/context menu) closes | `src/app/App.tsx` : `restoreLeafFocus`, wired as `onRestoreFocus` into `ActionsBar.tsx` (its Scripts and Apps menus) and `WorkspaceBar.tsx`'s workspace context menu (`onCloseAutoFocus`) |
 | Tab-close confirmation queue finishes (dirty editor / running-process dialog, or no dialog at all) | `src/app/App.tsx` : `focusActiveTab`, passed as `focusActiveTab` into `useTabCloseGuards` (`src/app/hooks/useTabCloseGuards.ts`), called in the `finally` block of its close queue |
 | Notification bell closes | `src/app/App.tsx`: the `bellOpen`/`bellWasOpen` effect |
 | Click the already-active workspace in the WorkspaceBar | `src/app/components/WorkspaceBar.tsx`: `onClick={() => { if (active) onRestoreFocus(); ... }}` |
-| Run/stop a script | `src/app/App.tsx` : `runWorkspaceConfig`, `stopWorkspaceConfig` (every branch that keeps or moves focus calls `requestLeafFocus`) |
+| Run/stop a script | `src/modules/actions/lib/useActionRunner.ts` : `runAction`, `stopAction` (every branch that keeps or moves focus calls `requestLeafFocus`) |
 | Open folder in terminal | `src/app/App.tsx` : `openFolderInTerminal` (`setTimeout(() => requestLeafFocus(tabId), 80)` after creating the tab, so the leaf exists by the time focus is requested) |
 | New workspace from folder | `src/app/App.tsx` : `newWorkspaceFromFolder` (same `setTimeout(..., 80)` pattern, on the fresh workspace's first tab) |
 | Insert a history command into the session | `src/app/App.tsx` : `insertHistoryCommand` (writes the command, then `requestLeafFocus(activeTabId)`) |
@@ -199,7 +199,7 @@ all of it:
 
 ## 5. Script execution focus rules
 
-`runWorkspaceConfig` and `stopWorkspaceConfig` (`src/app/App.tsx`) are symmetric: both implement the
+`runAction` and `stopAction` (`useActionRunner` in `src/modules/actions/lib/`) are symmetric: both implement the
 same rule, and the same three cases, for run and stop alike. The rule: **a pane shows exactly one tab,
 so you cannot reveal a tab in the user's own pane without also stealing their focus.** This drives
 three cases:
@@ -276,7 +276,7 @@ hot-reloaded session.
 - [ ] Running a script whose tab is in a different workspace: full jump, focus lands on the script's
       tab.
 - [ ] Stopping a script exercises the same three cases as running one.
-- [ ] Opening then closing a chrome interruption (RunButton dropdown, OpenInEditorButton dropdown,
+- [ ] Opening then closing a chrome interruption (Actions bar menus,
       WorkspaceBar workspace context menu, notification bell) restores focus to the active tab.
 - [ ] Cmd+Tab away and back (OS focus regain) restores focus to the active tab.
 - [ ] Escape, the toggle shortcut, and clicking the terminal of the already-focused tab all close
@@ -300,11 +300,10 @@ hot-reloaded session.
 | `src/modules/workspaces/PaneView.tsx` | `handleActivate` (tab click -> `requestLeafFocus`) |
 | `src/modules/workspaces/lib/useWorkspaces.ts` | `activateTab` vs `revealTab` |
 | `src/modules/workspaces/lib/types.ts` | `Tab.scratchpadEnabled?: boolean` (the `terminal` tab variant) |
-| `src/app/App.tsx` | `restoreLeafFocus`, `leaveActivePaneScratchpad`, `focusActiveTab`, the workspace-switch effect (`prevWorkspaceIdRef`), the sentinel effect (`prevActiveLeafRef`), `onFocusChanged`, the bell-close effect, `onActivateTabStable`, `onActivateAgent`, `runWorkspaceConfig`/`stopWorkspaceConfig`, `openFolderInTerminal`, `newWorkspaceFromFolder`, `insertHistoryCommand`, `onExplorerSearchClose` |
+| `src/app/App.tsx` | `restoreLeafFocus`, `leaveActivePaneScratchpad`, `focusActiveTab`, the workspace-switch effect (`prevWorkspaceIdRef`), the sentinel effect (`prevActiveLeafRef`), `onFocusChanged`, the bell-close effect, `onActivateTabStable`, `onActivateAgent`, `openFolderInTerminal`, `newWorkspaceFromFolder`, `insertHistoryCommand`, `onExplorerSearchClose` |
 | `src/app/hooks/useTabCloseGuards.ts` | Calls `focusActiveTab` after its close queue (dirty-editor/running-process confirmation) finishes |
 | `src/app/components/WorkspaceBar.tsx` | Click-active-workspace restores focus; workspace context menu `onCloseAutoFocus` |
-| `src/app/components/RunButton.tsx` | Dropdown `onCloseAutoFocus` -> `onRestoreFocus` |
-| `src/modules/external-editors/OpenInEditorButton.tsx` | Dropdown `onCloseAutoFocus` -> `onRestoreFocus` |
+| `src/modules/actions/ActionsBar.tsx` | Menu `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/terminal/lib/rendererPool.ts` | `scheduleUnhide` calls `adapter.focusLeaf` (`requestLeafFocus`) after a slot rebind or GPU retry, only when the leaf is the focused one |
 | `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` |
 | `src/modules/settings/store.ts` | Preference key/default: `scratchpadEnterSends` (default `true`) |

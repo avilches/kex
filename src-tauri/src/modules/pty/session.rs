@@ -11,23 +11,11 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::agent_detect::{AgentDetector, Transition};
 use super::da_filter::DaFilter;
 use super::shell_init;
-use crate::modules::agent::{live_model, session_store};
+use crate::modules::agent::session_store;
 use crate::modules::workspace::WorkspaceEnv;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
-const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
 const SHELL_READY_EVENT: &str = "kex:shell-ready";
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AgentSessionMetaPayload<'a> {
-    tab_id: &'a str,
-    session_id: &'a str,
-    cwd_launch: &'a str,
-    session_title: &'a str,
-    model: &'a str,
-    launch_known: bool,
-}
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -250,87 +238,6 @@ pub fn spawn(
                                 let _ =
                                     app_reader.emit(SHELL_READY_EVENT, ShellReadyPayload { id });
                                 return;
-                            }
-                            // Events that carry session data - update store + emit meta to frontend
-                            let session_data = match &t {
-                                Transition::SessionStart {
-                                    tab_id,
-                                    agent,
-                                    session_id,
-                                    transcript_path,
-                                    cwd,
-                                    session_title,
-                                    model,
-                                    ..
-                                } => Some((
-                                    tab_id.clone(),
-                                    agent.clone(),
-                                    session_id.clone(),
-                                    transcript_path.clone(),
-                                    cwd.clone(),
-                                    session_title.clone(),
-                                    model.clone(),
-                                )),
-                                Transition::UserPromptSubmit {
-                                    tab_id,
-                                    agent,
-                                    session_id,
-                                    transcript_path,
-                                    cwd,
-                                    ..
-                                } => Some((
-                                    tab_id.clone(),
-                                    agent.clone(),
-                                    session_id.clone(),
-                                    transcript_path.clone(),
-                                    cwd.clone(),
-                                    String::new(),
-                                    String::new(),
-                                )),
-                                _ => None,
-                            };
-                            if let Some((
-                                tab_id,
-                                agent,
-                                session_id,
-                                transcript_path,
-                                cwd,
-                                session_title,
-                                model,
-                            )) = session_data
-                            {
-                                let launch_known = session_store::record_session(
-                                    &tab_id,
-                                    &agent,
-                                    &session_id,
-                                    &transcript_path,
-                                    &cwd,
-                                    true,
-                                );
-                                let _ = app_reader.emit(
-                                    AGENT_SESSION_META_EVENT,
-                                    AgentSessionMetaPayload {
-                                        tab_id: &tab_id,
-                                        session_id: &session_id,
-                                        cwd_launch: &cwd,
-                                        session_title: &session_title,
-                                        model: &model,
-                                        launch_known,
-                                    },
-                                );
-                                // SessionStart has no frontend handler - skip emitting to kex:agent-signal
-                                if matches!(t, Transition::SessionStart { .. }) {
-                                    return;
-                                }
-                                // UserPromptSubmit continues to emit below
-                            }
-                            if let Transition::Stop {
-                                tab_id,
-                                transcript_path,
-                                ..
-                            } = &t
-                            {
-                                live_model::emit_live_model(&app_reader, tab_id, transcript_path);
                             }
                             // Stash launch command for record_session (called on SessionStart IPC).
                             if let Transition::Started { ref cmd_string, .. } = t {

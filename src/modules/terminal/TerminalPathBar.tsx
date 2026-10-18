@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { buildCwdBreadcrumb } from "@/modules/workspaces/pathbar/cwdBreadcrumb";
 import { PathBreadcrumb } from "@/modules/workspaces/pathbar/PathBreadcrumb";
 import { DirSegmentContextMenu } from "@/modules/workspaces/pathbar/DirSegmentContextMenu";
+import type { RevealAction } from "@/modules/workspaces/pathbar/segmentMenuItems";
 import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
@@ -24,7 +25,7 @@ type Props = {
   home: string | null;
   workspaceRoot: string | null;
   gitRootPath: string | null;
-  onReveal?: (path: string) => void;
+  onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -37,7 +38,7 @@ export function TerminalPathBar({
   home,
   workspaceRoot,
   gitRootPath,
-  onReveal,
+  onFocusOnExplorer,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -56,7 +57,7 @@ export function TerminalPathBar({
         <PathBreadcrumb
           grow={false}
           segments={segments}
-          onRevealPath={(p) => onReveal?.(p)}
+          onRevealPath={(p) => onFocusOnExplorer?.(p)}
           renderSegment={(seg, trigger) => (
             <DirSegmentContextMenu
               path={seg.fullPath}
@@ -66,6 +67,7 @@ export function TerminalPathBar({
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onRevealInTerminal={onRevealInTerminal}
               onAddToGitignore={onAddToGitignore}
+              onFocusOnExplorer={onFocusOnExplorer}
             >
               {trigger}
             </DirSegmentContextMenu>

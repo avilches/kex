@@ -1,4 +1,4 @@
-// kex-opencode-v2
+// kex-opencode-v3
 // Kex (app.betauer.kex) status reporter for OpenCode. OpenCode loads plugins from
 // ~/.config/opencode/plugins/ automatically; this one turns the session lifecycle into the
 // frames Claude Code's hooks emit on Kex's per-terminal socket, so a closed tab can be resumed
@@ -14,6 +14,8 @@ export const KexSessionPlugin = async ({ client }) => {
   const reported = new Set()
   const parents = new Map()
   const lookups = new Map()
+  // Subagent sessions shown under the tab, until their own turn ends.
+  const children = new Set()
   const working = new Set()
   // Turns that started while their session was still being registered, and the ones among
   // them that ended before registration finished (OpenCode does not await plugin handlers).
@@ -92,7 +94,32 @@ export const KexSessionPlugin = async ({ client }) => {
     return true
   }
 
+  // A subagent is a child session: it appears under the tab of its parent while it runs.
+  const subagentFrame = (parent, id, info, name) => ({
+    ...base(parent),
+    hook_event_name: name,
+    agent_id: id,
+    agent_type: typeof info?.agent === "string" ? info.agent : "",
+    // OpenCode titles a child session "<task description> (@<agent> subagent)".
+    description: info ? String(info.title || "").replace(/\s*\(@[^)]*subagent\)\s*$/, "") || id : "",
+  })
+
+  const childStarted = async (id, info) => {
+    const parent = info?.parentID || info?.parent_id
+    if (!parent || children.has(id) || !reported.has(parent)) return
+    children.add(id)
+    await send(subagentFrame(parent, id, info, "SubagentStart"))
+  }
+
+  const childEnded = async (id) => {
+    if (!children.delete(id)) return false
+    const parent = parents.get(id)
+    if (parent) await send(subagentFrame(parent, id, null, "SubagentStop"))
+    return true
+  }
+
   const stop = async (id) => {
+    if (await childEnded(id)) return
     if (pending.has(id)) {
       endedEarly.add(id)
       return
@@ -122,7 +149,9 @@ export const KexSessionPlugin = async ({ client }) => {
       if (type === "session.created") {
         const info = props.info || props.session || props
         const id = info?.id || info?.sessionID || props.sessionID
-        if (id) await enter(id, info)
+        if (!id) return
+        if (await enter(id, info)) return
+        await childStarted(id, info)
         return
       }
 
@@ -161,6 +190,7 @@ export const KexSessionPlugin = async ({ client }) => {
       }
 
       if (type === "session.error") {
+        if (await childEnded(id)) return
         if (!reported.has(id)) return
         const error = props.error
         // Esc raises an aborted error and then goes idle: that is the user ending the turn.

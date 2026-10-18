@@ -1,6 +1,4 @@
-import { withReadableText } from "./readableColors";
 import { terminalNoteSurface, variantNoteSurface } from "./noteSurface";
-import { getBuiltinTheme } from "./themes";
 import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
 const COLOR_VAR: Record<keyof ThemeColors, string> = {
@@ -32,6 +30,7 @@ const COLOR_VAR: Record<keyof ThemeColors, string> = {
   sidebarRing: "--sidebar-ring",
   radius: "--radius",
   tabFocusIndicator: "--tab-focus-indicator",
+  link: "--link",
 };
 
 const ANSI_VARS: readonly string[] = [
@@ -87,8 +86,7 @@ export function applyTheme(
   const terminal = terminalOverride ?? variant.terminal;
   for (const v of ALL_VARS) root.style.removeProperty(v);
   if (colors) {
-    const isBuiltin = getBuiltinTheme(theme.id) === theme;
-    writeColors(root, isBuiltin ? withReadableText(colors) : colors);
+    writeColors(root, colors);
   }
   if (terminal) writeTerminal(root, terminal);
   const editor = editorOverride ?? variant.editor;

@@ -25,6 +25,7 @@ const COLOR_KEYS: readonly (keyof ThemeColors)[] = [
   "sidebarAccent", "sidebarAccentForeground",
   "sidebarBorder", "sidebarRing",
   "tabFocusIndicator",
+  "link",
   "radius",
 ];
 

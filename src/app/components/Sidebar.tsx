@@ -5,6 +5,7 @@ import {
   revealForWorkspace,
   type RevealRequest,
 } from "@/modules/explorer";
+import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import {
   GitHistoryPane,
   type GitHistorySearchHandle,
@@ -99,6 +100,7 @@ export type SidebarProps = {
   }, pin: boolean) => void;
   onOpenGitGraph?: () => void;
   onNavigateToWorktree?: (path: string) => void;
+  onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
   // GitHistoryPane props
   repoRoot: string;
   onOpenCommitFile: (input: CommitFileDiffOpenInput) => void;
@@ -212,6 +214,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onOpenDiff={props.onOpenDiff}
               onOpenFile={props.onOpenFile}
               onNavigateToWorktree={props.onNavigateToWorktree}
+              onFocusOnExplorer={props.onFocusOnExplorer}
               workspaceCwd={props.workspaceCwd}
             />
           </div>

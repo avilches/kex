@@ -96,8 +96,17 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
       target.focus();
     }, [target]);
 
-    // Target switched (terminal ↔ editor) or removed → drop highlights.
-    useEffect(() => clearTarget, [clearTarget]);
+    // Target switched (terminal ↔ editor) or removed → drop highlights and any
+    // pending debounced search, which would otherwise land on the old target.
+    useEffect(() => {
+      return () => {
+        clearTarget();
+        if (debounceRef.current !== null) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+      };
+    }, [clearTarget]);
 
     // Cleanup debounce timer on unmount.
     useEffect(() => {

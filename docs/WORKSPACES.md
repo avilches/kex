@@ -25,15 +25,16 @@ Workspace           - a named environment (local or WSL distro)
 
 **Workspace fields.** A `Workspace` carries additional configuration:
 - `color?: string | null` - optional workspace accent color (hex string or null)
-- `scripts?: Script[]` - list of saved scripts (command, name, `cwdMode` of `workspace` | `context` | `fixed`, `cwd` used only in `fixed` mode, optional tabId)
-- `activeScript?: string` - id of the currently selected script in the Run button
+- `actions?: Action[]` - the workspace-scoped Actions (name, command template, `runInTerminal`, and for scripts `cwdMode` of `workspace` | `context` | `fixed` with `cwd` used only in `fixed` mode); the global ones live in `settings-tools.json`. See ARCHITECTURE 3.12
+- `activeAction?: string` - id of the Action that `workspace.run` (F12) runs and stops
+- `scriptPaneId?: string` - the pane scripts open their tabs in; cleared at startup when that pane no longer exists
 - `explorerRootMode: "workspace" | "filesystem"` - which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
 **Script running state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
 - `runningCommands` (`Map<tabId, string>`) - foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
-- `scriptRunning` (`Map<tabId, ScriptState>`) - tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
+- `scriptRunning` (`Map<tabId, ScriptState>`) - tracks which terminal tabs are currently executing a script command. Set by the Action runner (`useActionRunner`) the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `useActionStates` reads it (with the Action-to-tab links) via `useSyncExternalStore` so the Header's Actions bar shows the stop control while a script runs.
 
-`runWorkspaceConfig`/`stopWorkspaceConfig` move focus to the script's tab (full activation) when it lives in a *different* workspace, or when its target pane is the user's own current pane (a pane shows exactly one tab, so revealing without stealing focus is impossible there). Otherwise, when the script's tab is in the current workspace but a different pane, they call `revealTab` (makes the tab active in its own pane, `activePaneId` untouched) and restore `requestLeafFocus` on the user's own leaf, so running or stopping a script never steals focus or closes the user's open scratchpad.
+Running, stopping and focusing a script Action (`runAction`, `stopAction`, `focusActionTab` in `useActionRunner`) move focus to the script's tab (full activation) when it lives in a *different* workspace, or when its target pane is the user's own current pane (a pane shows exactly one tab, so revealing without stealing focus is impossible there). Otherwise, when the script's tab is in the current workspace but a different pane, they call `revealTab` (makes the tab active in its own pane, `activePaneId` untouched) and restore `requestLeafFocus` on the user's own leaf, so running or stopping a script never steals focus or closes the user's open scratchpad.
 
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
@@ -247,7 +248,7 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
   `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
-  blocks the shortcuts that need tabs, the Sidebar, the explorer or the zen layout (`blockedWhileHibernated`), `tab.close` (Cmd+W, also from the native menu through `handleCloseActiveTab`) included: a sleeping workspace closes only with `workspace.close`. The native menu (`sync_menu` greys out the tab and Sidebar items, and the dispatcher ignores them anyway: `menuBlockedWhileHibernated`) and the command palette (`createCommandItems` disables the same actions with the reason "Workspace hibernated": `commandBlockedWhileHibernated`) follow the same rule. `runWorkspaceConfig` does nothing,
+  blocks the shortcuts that need tabs, the Sidebar, the explorer or the zen layout (`blockedWhileHibernated`), `tab.close` (Cmd+W, also from the native menu through `handleCloseActiveTab`) included: a sleeping workspace closes only with `workspace.close`. The native menu (`sync_menu` greys out the tab and Sidebar items, and the dispatcher ignores them anyway: `menuBlockedWhileHibernated`) and the command palette (`createCommandItems` disables the same actions with the reason "Workspace hibernated": `commandBlockedWhileHibernated`) follow the same rule. Running an Action does nothing (`planActionRun` blocks it silently) and the Header's Actions bar shows every Action as unavailable with the reason "workspace is hibernated", except a script that was already running, which can still be stopped,
   `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is dimmed and inert.
 
 #### Hibernate and wake flow
@@ -261,7 +262,7 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
 1. With autosave on, `flushDirtyEditors` runs and two animation frames pass so the dirty flags
    reach the workspace state.
 2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: busy tabs (agents still
-   working and RunButton scripts in `running` or `waiting`), unsaved documents and commands without
+   working and script Actions in `running` or `waiting`), unsaved documents and commands without
    "Run on start". An agent only counts as coming back when it has a stored session (`hasResumed`);
    a busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a command. If the review is empty the
    workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
@@ -279,7 +280,7 @@ runs in capture phase, before the Radix modal); Escape is not a registered short
 commands store and the script state map, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
 empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
-(script: the same stop the RunButton sends, without moving focus; disabled as "Stopping" while
+(script: the same stop the Header's stop button sends, without moving focus; disabled as "Stopping" while
 `waiting`). Closing a workspace (hibernated or awake) abandons its carried buffers (`abandonUnflushedBuffers`: an awake workspace's editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are refused) and clears its
 hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see ARCHITECTURE 5.7a). Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).

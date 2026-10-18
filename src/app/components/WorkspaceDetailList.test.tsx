@@ -233,7 +233,7 @@ describe("WorkspaceDetailList subagents", () => {
     unmount();
   });
 
-  it("is not interactive: no button, no hover surface, and the block hover belongs to the wrapper", () => {
+  it("activates the parent tab on click, has no hover surface of its own, and the block hover belongs to the wrapper", () => {
     const { container, rows, onActivate, unmount } = mount({ terminals: "all" });
     act(() =>
       useAgentStore
@@ -241,10 +241,10 @@ describe("WorkspaceDetailList subagents", () => {
         .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
     );
     const sub = subagentButtons(container)[0];
-    expect(sub.tagName).toBe("DIV");
+    expect(sub.tagName).toBe("BUTTON");
     expect(sub.className).not.toContain("hover:bg");
     act(() => sub.click());
-    expect(onActivate).not.toHaveBeenCalled();
+    expect(onActivate).toHaveBeenCalledWith("t-work");
     const block = wrap(rows()[0]).parentElement as HTMLElement;
     expect(block.className).toContain("hover:bg-foreground");
     expect(block.contains(sub)).toBe(true);

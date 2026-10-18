@@ -362,7 +362,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ### F1 El plugin global carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OpenCode integration"
-- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v2` en la primera linea)
+- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v3` en la primera linea)
 - [ ] Lanzar `opencode --print-logs` desde un terminal de Kex y crear una sesion nueva: en el log no debe aparecer ningun error del plugin (la carga del directorio global es automatica en 1.19.x)
 - [ ] Reiniciar: el campanazo ya no muestra el boton OpenCode (status via `agent_opencode_plugin_status`)
 
@@ -398,7 +398,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ### G1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OMP integration"
-- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v1` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v4` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
 - [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
 
@@ -419,7 +419,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 
 - [ ] Lanzar `omp` fresco en Kex y reanudar una sesion previa con `omp --resume <prefijo-de-id>`
 - [ ] Esperado: el evento `before_agent_start` con el id completo actualiza la entrada del tab (mismo `session_id`; `same_process` no aplica porque omp no comunica el origen, pero la sustitucion del record es indolora: mismo id y cwd)
-- [ ] Nota: no midas aqui el estado de atencion en vivo del TUI reanudado antes del primer prompt; omp no da evento de sesion al arrancar/resume, Kex solo graba al primer turno
+- [ ] Nota: no midas aqui el estado de atencion en vivo del TUI reanudado antes del primer prompt; OMP y Pi emiten `session_start` al arrancar, asi que Kex ya graba la sesion antes del primer prompt
 
 ### G5 Una sesion que nunca (se) abre fichero
 
@@ -435,7 +435,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install Pi integration"
-- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v1` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
+- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v4` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
 - [ ] Lanzar `pi` desde un terminal de Kex: sin errores de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton Pi (status via `agent_pi_extension_status`)
 
@@ -453,8 +453,65 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H4 Una sesion de Pi sin ningun turno
 
 - [ ] Lanzar `pi` en un tab y cerrarlo sin escribir ningun prompt
-- [ ] Esperado: `agent-sessions.json` sin entrada para ese tab y ningun `.jsonl` nuevo bajo `~/.pi/agent/sessions/` (Pi si deja un directorio de grupo vacio, medido en pi 1.3.0); al reabrir Kex no se restaura nada
+- [ ] Esperado: ningun `.jsonl` nuevo bajo `~/.pi/agent/sessions/` (Pi si deja un directorio de grupo vacio, medido en pi 1.3.0). `agent-sessions.json` si tiene una entrada para el tab (la sesion se registra al arrancar), pero sin fichero: al reabrir Kex no se restaura nada
 - [ ] Y: con `pi -p "hola"` (modo no interactivo) tampoco se graba nada
+
+## Bloque I - Integraciones: instalar, actualizar, quitar
+
+### I1 Kex mantiene al dia lo que instalaste
+
+- [ ] Instalar OMP, Pi y OpenCode desde Settings > General. Cerrar Kex y editar a mano la primera linea de uno de los ficheros (por ejemplo `// kex-agent-status-v1`)
+- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v4` sin pulsar nada
+- [ ] Borrar a mano `~/.pi/agent/extensions/kex-agent-status.ts` y reabrir Kex: el fichero NO reaparece y la fila de Pi dice "Not installed"
+- [ ] Poner en ese mismo sitio un fichero propio (`export default () => {}`) y reabrir Kex: no se toca
+
+### I2 Quitar
+
+- [ ] Settings > General > OMP integration > Remove: el fichero desaparece, la fila pasa a "Not installed" y la campana vuelve a ofrecer "Install OMP integration"
+- [ ] Reabrir Kex: no se reinstala solo
+- [ ] Repetir con un fichero propio en la ruta: Remove falla con el mensaje de error y no lo borra
+
+### I3 OMP no pierde el agente
+
+- [ ] Lanzar `omp`, escribir un mensaje y esperar la respuesta: el icono del tab sigue sin tachar y "Run on Start" muestra el comando
+- [ ] `omp --resume '<id>'` desde un tab: lo mismo, y el tab no deja de ser un tab de agente al terminar el primer mensaje
+- [ ] Salir de `omp` con `/exit` o Ctrl+D: el icono desaparece (la salida real si se detecta)
+- [ ] Lo mismo con `pi`: escribir un mensaje, salir con Ctrl+D y comprobar que el icono desaparece (Pi dibuja `A B C` sin `D`, y sin esto se quedaba el tab marcado como agente)
+- [ ] `/new` dentro de `omp` y de `pi`: el tab sigue con su comando de arranque en "Run on Start" y sin tachar
+
+### I4 Hibernacion
+
+- [ ] Con un tab de OMP y otro de Pi en un workspace, hibernarlo y despertarlo
+- [ ] Esperado: al reanudarse, el icono del agente aparece antes de escribir ningun mensaje y el menu contextual ofrece "Open Transcript Folder"
+
+### I5 Menu del tab
+
+- [ ] Tab de OMP o Pi: el bloque del agente (icono, modelo, transcript) lleva "Run on Start" dentro
+- [ ] Tab de OpenCode: no hay bloque de agente, pero "Run on Start" sigue disponible
+- [ ] Tab de terminal sin agente: "Run on Start" sigue ahi
+
+## Bloque J - Subagentes
+
+### J1 OMP
+
+- [ ] En un tab de `omp`, pedir: "usa la herramienta task para lanzar dos subagentes en paralelo con las descripciones Contar archivos y Saludar"
+- [ ] Esperado: en la lista anidada del WorkspaceBar aparecen dos filas hijas del tab, cada una con su nombre, mientras corren, y desaparecen al terminar
+- [ ] El tab sigue con spinner mientras haya subagentes corriendo y solo pasa a atencion cuando el ultimo termina
+- [ ] "Run on Start" y el icono del tab siguen mostrando la sesion principal, no la de un subagente
+
+### J2 OpenCode
+
+- [ ] En un tab de `opencode`, pedir lo mismo con la herramienta task
+- [ ] Esperado: una fila hija por subagente con la descripcion que se le dio (sin el sufijo `(@general subagent)`), que desaparece al terminar
+- [ ] Un subagente que falla cierra su fila y no marca error en el tab
+
+### J3 Pi
+
+- [ ] Pedir a `pi` que lance un subagente: responde que no tiene herramienta para ello. No aparece ninguna fila
+
+### J4 Permisos desde un subagente
+
+- [ ] En OMP u OpenCode con una herramienta en modo "ask", pedir un subagente que la use: el tab pasa a atencion aunque la pregunta la haga el subagente
 
 ---
 

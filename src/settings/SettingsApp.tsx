@@ -12,7 +12,7 @@ import { type JSX, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
-import { ExternalEditorsSection } from "./sections/ExternalEditorsSection";
+import { ActionsSection } from "./sections/ActionsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileTypesSection } from "./sections/FileTypesSection";
@@ -26,7 +26,7 @@ const COMPONENTS: Record<SettingsSection, () => JSX.Element> = {
   general: GeneralSection,
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
-  "external-editors": ExternalEditorsSection,
+  actions: ActionsSection,
   editor: EditorSection,
   filetypes: FileTypesSection,
   appearance: AppearanceSection,
@@ -97,9 +97,21 @@ export function SettingsApp() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        void getCurrentWebviewWindow().close();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Let an open dialog/popover consume Escape first (Radix closes it), and
+      // never close the window out from under a field being edited.
+      if (
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      void getCurrentWebviewWindow().close();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);

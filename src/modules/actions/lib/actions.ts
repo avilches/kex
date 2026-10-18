@@ -16,7 +16,12 @@ export function updateAction(
   id: string,
   patch: Partial<Omit<Action, "id">>,
 ): Action[] {
-  return list.map((a) => (a.id === id ? (normalizeAction({ ...a, ...patch, id: a.id }) ?? a) : a));
+  return list.map((a) => {
+    if (a.id !== id) return a;
+    // A name cleared in a form keeps the one it had: an unnamed action is labelled by its command.
+    const named = "name" in patch && !patch.name?.trim() ? { ...patch, name: a.name } : patch;
+    return normalizeAction({ ...a, ...named, id: a.id }) ?? a;
+  });
 }
 
 export function removeAction(list: readonly Action[], id: string): Action[] {
@@ -40,11 +45,12 @@ export function normalizeAction(raw: unknown): Action | null {
   if (typeof r.command !== "string" || !r.command.trim()) return null;
   const name = typeof r.name === "string" ? r.name.trim() : "";
   const runInTerminal = r.runInTerminal === true;
+  const command = r.command.trim();
   const action: Action = {
     id: r.id,
-    name: name || r.id,
+    name: name || command,
     runInTerminal,
-    command: r.command.trim(),
+    command,
     ownButton: r.ownButton === true,
   };
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;

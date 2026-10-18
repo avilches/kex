@@ -87,6 +87,23 @@ describe("sanitizeWorkspace", () => {
     expect(out).not.toHaveProperty("activeAction");
   });
 
+  it("drops the scripts and the active script of an old saved workspace, with no migration", () => {
+    const w = {
+      id: "w1",
+      title: "W",
+      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+      activePaneId: "p1",
+      scripts: [{ id: "sc-1", name: "dev", command: "pnpm dev", tabId: "tab-1" }],
+      activeScript: "sc-1",
+      scriptPaneId: "p1",
+    } as unknown as Workspace;
+    const out = sanitizeWorkspace(w);
+    expect(out).not.toHaveProperty("scripts");
+    expect(out).not.toHaveProperty("activeScript");
+    expect(out).not.toHaveProperty("actions");
+    expect(out.scriptPaneId).toBe("p1");
+  });
+
   it("keeps two markdown tabs open on the same path", () => {
     const w: Workspace = {
       id: "ws-1",

@@ -80,7 +80,7 @@ describe("undo close workspace", () => {
       color: "#ff0000",
       icon: "rocket",
       groupId: "g1",
-      scripts: [{ id: "s1", name: "dev", command: "pnpm dev", tabId: "b2" }],
+      actions: [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }],
     });
     view = mount([makeWs("a", [term("a1")]), rich]);
 
@@ -94,7 +94,7 @@ describe("undo close workspace", () => {
     const restored = view.h.workspaces[1]!;
     expect(restored).toMatchObject({ id: "b", title: "Backend", color: "#ff0000", icon: "rocket", groupId: "g1" });
     expect(tabIds(restored)).toHaveLength(2);
-    expect(restored.scripts?.[0]?.tabId).toBe(tabIds(restored)[1]);
+    expect(restored.actions?.map((a) => a.id)).toEqual(["ac-1"]);
   });
 
   it("returns tabs closed earlier into the restored workspace on later undos", async () => {

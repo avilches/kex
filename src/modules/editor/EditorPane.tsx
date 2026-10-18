@@ -48,7 +48,7 @@ import {
   whitespaceCompartment,
   wrapCompartment,
 } from "./lib/extensions";
-import { resolveEditorView } from "./lib/editorViewSettings";
+import { extOf, resolveEditorView } from "./lib/editorViewSettings";
 import { resolveLanguage, type LanguageResult } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { useDocument } from "./lib/useDocument";
@@ -485,7 +485,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       );
     }
     if (doc.status === "binary" || doc.status === "toolarge") {
-      const ext = path.split(".").pop()?.toLowerCase() ?? "";
+      const ext = extOf(path);
       const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico"].includes(ext);
       const isVideo = ["mp4", "webm", "ogg", "mov"].includes(ext);
       const isAudio = ["mp3", "wav", "flac", "aac", "m4a"].includes(ext);

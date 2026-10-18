@@ -26,7 +26,9 @@ import { allPanes, focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
-import { scriptsToDelete, type Tab, type Workspace } from "@/modules/workspaces/lib/types";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { scriptActionOf } from "@/modules/actions/lib/actionStateStore";
+import { actionsToDelete, type Tab, type Workspace } from "@/modules/workspaces/lib/types";
 
 // Same icon and title the tab bar shows: a custom tab icon wins over the agent's.
 function TabLabel({ tab, command }: { tab: Tab; command?: string }) {
@@ -75,6 +77,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const scriptStates = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
+  const globalActionList = usePreferencesStore((s) => s.actions);
   const review = useMemo(
     () =>
       workspace
@@ -82,9 +85,10 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
             scriptState: (id) => scriptStates.get(id),
+            actionOf: (id) => scriptActionOf(id, [workspace.actions ?? [], globalActionList]),
           })
         : null,
-    [workspace, sessions, commands, scriptStates],
+    [workspace, sessions, commands, scriptStates, globalActionList],
   );
 
   const closing = mode === "close";
@@ -107,7 +111,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
     });
   };
   const blockedByFailure = isBlockedByFailures(review?.docs ?? [], failures, discarded);
-  const deletedScripts = workspace ? scriptsToDelete(workspace) : 0;
+  const deletedScripts = workspace ? actionsToDelete(workspace) : 0;
   // A hibernated workspace has no mounted editors, so there is nothing to save through.
   const canSave = !workspace?.hibernated;
   const agents = review?.busy.filter((b) => b.kind === "agent") ?? [];
@@ -303,7 +307,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         )}
         {closing && deletedScripts > 0 && (
           <p className="text-[12px] text-muted-foreground">
-            {deletedScripts === 1 ? "1 script" : `${deletedScripts} scripts`} will be deleted.
+            {deletedScripts === 1 ? "1 action" : `${deletedScripts} actions`} will be deleted.
           </p>
         )}
         {!closing && review && review.commands.length > 0 && (

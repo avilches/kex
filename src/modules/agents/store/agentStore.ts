@@ -36,7 +36,12 @@ type AgentStoreState = {
   start: (tabId: string, workspaceId: string, agent: string) => void;
   startIdle: (tabId: string, workspaceId: string, agent: string) => void;
   setStatus: (tabId: string, status: AgentStatus) => void;
-  subagentStarted: (tabId: string, agentId: string, agentType: string) => void;
+  subagentStarted: (
+    tabId: string,
+    agentId: string,
+    agentType: string,
+    description?: string,
+  ) => void;
   subagentStopped: (tabId: string, agentId: string) => void;
   reconcileSubagents: (tabId: string, list: BackgroundSubagent[]) => void;
   forgetSubagents: (tabId: string) => void;
@@ -132,7 +137,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  subagentStarted: (tabId, agentId, agentType) =>
+  subagentStarted: (tabId, agentId, agentType, description) =>
     set((s) => {
       const prev = s.sessions[tabId];
       if (!prev || agentId in prev.subagents) return s;
@@ -143,7 +148,11 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             ...prev,
             subagents: {
               ...prev.subagents,
-              [agentId]: { agentType, startedAt: Date.now() },
+              [agentId]: {
+                agentType,
+                ...(description ? { description } : {}),
+                startedAt: Date.now(),
+              },
             },
           },
         },

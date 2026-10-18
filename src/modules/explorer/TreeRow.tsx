@@ -6,17 +6,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { pathDirname } from "@/lib/pathUtils";
-import { KEY_SEP } from "@/lib/platform";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { cn } from "@/lib/utils";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { GitColorScheme } from "@/modules/settings/store";
-import {
-  getBindingTokens,
-  SHORTCUTS_BY_ID,
-  type ShortcutId,
-} from "@/modules/shortcuts/shortcuts";
+import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
@@ -54,19 +48,6 @@ import { useTheme } from "@/modules/theme/ThemeProvider";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
-
-function ShortcutHint({ id }: { id: ShortcutId }) {
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const binding =
-    userShortcuts[id]?.[0] ?? SHORTCUTS_BY_ID.get(id)?.defaultBindings[0];
-  const tokens = getBindingTokens(binding);
-  if (tokens.length === 0) return null;
-  return (
-    <span className="ml-auto pl-3 text-[11px] tracking-wide text-muted-foreground">
-      {tokens.join(KEY_SEP)}
-    </span>
-  );
-}
 
 export type RowActions = {
   toggle: (path: string) => void;
@@ -262,7 +243,7 @@ function EntryRowImpl(props: EntryRowProps) {
               isSelected
                 ? "bg-accent text-foreground"
                 : gitignored
-                  ? "text-muted-foreground/70"
+                  ? "text-muted-foreground/85"
                   : "text-foreground/85",
               isDragging && "opacity-50",
               isCutSource && "opacity-50",
@@ -427,7 +408,7 @@ function EntryRowImpl(props: EntryRowProps) {
           onSelect={() => actions.beginRename(path)}
         >
           <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
-          Rename
+          {isDir ? "Rename Folder" : "Rename File"}
           <ShortcutHint id="file.rename" />
         </ContextMenuItem>
         <ContextMenuItem

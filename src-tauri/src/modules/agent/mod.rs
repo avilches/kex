@@ -43,7 +43,7 @@ const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 // integrations ship as static scripts instead of merged settings. The OpenCode status greps
 // the installed file for a version marker; the OMP and Pi statuses compare the whole file with
 // the script stamped for that runtime, so an outdated or wrongly stamped copy counts as not installed.
-const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v2";
+const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v3";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
 const AGENT_EXTENSION_TEMPLATE: &str = include_str!("plugins/kex-agent-status.ts");
 
@@ -290,6 +290,9 @@ fn write_agent_file(
     if std::fs::read_to_string(&path).is_ok_and(|current| current == script) {
         return Ok(());
     }
+    // A link (a dotfiles repo is the usual reason) is written through, not replaced by a
+    // regular file that would leave the repo's copy stale.
+    let path = std::fs::canonicalize(&path).unwrap_or(path);
     let dir = path
         .parent()
         .ok_or_else(|| format!("{label} path has no parent"))?;
@@ -338,6 +341,136 @@ fn pi_omp_extension_path(dot_dir: &str) -> Result<std::path::PathBuf, String> {
                 .join("kex-agent-status.ts")
         })
         .ok_or_else(|| "could not resolve home dir".to_string())
+}
+
+/// What Kex writes for one integration and how to recognise a file of its own.
+struct IntegrationTarget {
+    path: std::path::PathBuf,
+    script: String,
+    label: &'static str,
+    tmp_ext: &'static str,
+    owned_marker: &'static str,
+}
+
+/// The only names the frontend may ask for: anything else is rejected at the boundary.
+fn integration_target(agent: &str) -> Result<IntegrationTarget, String> {
+    match agent {
+        "opencode" => Ok(IntegrationTarget {
+            path: opencode_plugin_path()?,
+            script: OPENCODE_PLUGIN_SCRIPT.to_string(),
+            label: "opencode plugin",
+            tmp_ext: "js.kex-tmp",
+            owned_marker: "// kex-opencode-v",
+        }),
+        "omp" => Ok(IntegrationTarget {
+            path: omp_extension_path()?,
+            script: agent_extension_script("omp"),
+            label: "omp extension",
+            tmp_ext: "ts.kex-tmp",
+            owned_marker: "// kex-agent-status-v",
+        }),
+        "pi" => Ok(IntegrationTarget {
+            path: pi_extension_path()?,
+            script: agent_extension_script("pi"),
+            label: "pi extension",
+            tmp_ext: "ts.kex-tmp",
+            owned_marker: "// kex-agent-status-v",
+        }),
+        other => Err(format!("unknown integration: {other}")),
+    }
+}
+
+fn is_kex_owned(content: &str, marker: &str) -> bool {
+    content.trim_start_matches('\u{feff}').starts_with(marker)
+}
+
+/// The number at the end of the first line (`// kex-agent-status-v2` is 2).
+fn marker_version(content: &str) -> Option<u32> {
+    let first = content.trim_start_matches('\u{feff}').lines().next()?;
+    let digits: String = first
+        .chars()
+        .rev()
+        .take_while(|c| c.is_ascii_digit())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    digits.parse().ok()
+}
+
+#[derive(Debug, PartialEq)]
+enum SyncOutcome {
+    Updated,
+    /// The file is not there: nothing is recreated and the agent stays tracked.
+    Gone,
+    /// A file with the same name that Kex did not write: left untouched.
+    Foreign,
+}
+
+fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
+    let current = match std::fs::read_to_string(&target.path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(SyncOutcome::Gone),
+        Err(e) => return Err(format!("read {}: {e}", target.path.display())),
+    };
+    if !is_kex_owned(&current, target.owned_marker) {
+        return Ok(SyncOutcome::Foreign);
+    }
+    // An older build starting after a newer one must not turn the file back.
+    if let (Some(on_disk), Some(shipped)) =
+        (marker_version(&current), marker_version(&target.script))
+    {
+        if on_disk > shipped {
+            return Ok(SyncOutcome::Updated);
+        }
+    }
+    write_agent_file(
+        target.path.clone(),
+        &target.script,
+        target.label,
+        target.tmp_ext,
+    )?;
+    Ok(SyncOutcome::Updated)
+}
+
+/// Brings the integrations the user installed up to the version this build ships, so an app
+/// update reaches the agent without pressing Reinstall. It only rewrites files that still
+/// exist and are Kex's own, and returns the agents whose file is not Kex's any more, which
+/// the caller stops tracking. A missing file is not reported: a dotfiles link or a synced
+/// folder can be absent for a moment, and the sync never creates a file anyway.
+#[tauri::command]
+pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
+    let mut dropped = Vec::new();
+    for agent in agents {
+        match integration_target(&agent).and_then(|t| sync_integration(&t)) {
+            Ok(SyncOutcome::Updated | SyncOutcome::Gone) => {}
+            Ok(SyncOutcome::Foreign) => dropped.push(agent),
+            Err(e) => log::warn!("[agent] sync {agent} failed: {e}"),
+        }
+    }
+    dropped
+}
+
+/// Deletes the integration file, but only when it is Kex's own: a same-named file the user
+/// wrote by hand is left alone.
+#[tauri::command]
+pub fn agent_remove_integration(agent: String) -> Result<(), String> {
+    remove_integration(&integration_target(&agent)?)
+}
+
+fn remove_integration(target: &IntegrationTarget) -> Result<(), String> {
+    let content = match std::fs::read_to_string(&target.path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("read {}: {e}", target.path.display())),
+    };
+    if !is_kex_owned(&content, target.owned_marker) {
+        return Err(format!(
+            "{} is not a Kex file, leaving it alone",
+            target.path.display()
+        ));
+    }
+    std::fs::remove_file(&target.path).map_err(|e| format!("remove {}: {e}", target.path.display()))
 }
 
 #[tauri::command]
@@ -624,6 +757,182 @@ mod tests {
         assert!(!omp.contains("__KEX_AGENT__") && !pi.contains("__KEX_AGENT__"));
         assert!(omp.starts_with("// kex-agent-status-v"));
         assert!(pi.starts_with("// kex-agent-status-v"));
+    }
+
+    #[test]
+    fn only_known_integrations_resolve_to_a_target() {
+        assert!(integration_target("omp").is_ok());
+        assert!(integration_target("pi").is_ok());
+        assert!(integration_target("opencode").is_ok());
+        assert!(integration_target("../../etc/passwd").is_err());
+        assert!(integration_target("").is_err());
+        assert!(integration_target("claude").is_err());
+    }
+
+    #[test]
+    fn the_omp_and_pi_targets_point_at_different_folders_with_their_own_stamp() {
+        let omp = integration_target("omp").unwrap();
+        let pi = integration_target("pi").unwrap();
+        assert_ne!(omp.path, pi.path);
+        assert!(omp.path.to_string_lossy().contains(".omp"));
+        assert!(pi.path.to_string_lossy().contains(".pi"));
+        assert!(omp.script.contains("const agent = \"omp\";"));
+        assert!(pi.script.contains("const agent = \"pi\";"));
+    }
+
+    #[test]
+    fn a_file_is_kex_owned_only_when_it_starts_with_the_marker() {
+        assert!(is_kex_owned(
+            "// kex-agent-status-v2\nrest",
+            "// kex-agent-status-v"
+        ));
+        assert!(is_kex_owned(
+            "// kex-agent-status-v1\nrest",
+            "// kex-agent-status-v"
+        ));
+        assert!(!is_kex_owned(
+            "export default function () {}",
+            "// kex-agent-status-v"
+        ));
+        assert!(!is_kex_owned(
+            "// my own notes\n// kex-agent-status-v1",
+            "// kex-agent-status-v"
+        ));
+        assert!(is_kex_owned(OPENCODE_PLUGIN_SCRIPT, "// kex-opencode-v"));
+        assert!(is_kex_owned(
+            &agent_extension_script("omp"),
+            "// kex-agent-status-v"
+        ));
+    }
+
+    fn target_in(dir: &std::path::Path, script: &str) -> IntegrationTarget {
+        IntegrationTarget {
+            path: dir.join("kex-agent-status.ts"),
+            script: script.to_string(),
+            label: "test extension",
+            tmp_ext: "ts.kex-tmp",
+            owned_marker: "// kex-agent-status-v",
+        }
+    }
+
+    #[test]
+    fn sync_updates_an_outdated_kex_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+        std::fs::write(&target.path, "// kex-agent-status-v1\nold").unwrap();
+        assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Updated);
+        assert_eq!(
+            std::fs::read_to_string(&target.path).unwrap(),
+            "// kex-agent-status-v2\nnew"
+        );
+    }
+
+    #[test]
+    fn sync_never_recreates_a_file_the_user_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+        assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Gone);
+        assert!(!target.path.exists());
+    }
+
+    #[test]
+    fn sync_leaves_a_file_kex_did_not_write_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+        std::fs::write(&target.path, "export default () => {}").unwrap();
+        assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Foreign);
+        assert_eq!(
+            std::fs::read_to_string(&target.path).unwrap(),
+            "export default () => {}"
+        );
+    }
+
+    #[test]
+    fn sync_never_turns_a_newer_file_back_to_an_older_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nbuild");
+        std::fs::write(&target.path, "// kex-agent-status-v3\nfrom a newer Kex").unwrap();
+        assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Updated);
+        assert_eq!(
+            std::fs::read_to_string(&target.path).unwrap(),
+            "// kex-agent-status-v3\nfrom a newer Kex"
+        );
+    }
+
+    #[test]
+    fn remove_deletes_a_kex_file_and_refuses_a_foreign_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+        std::fs::write(&target.path, "// kex-agent-status-v2\nnew").unwrap();
+        remove_integration(&target).unwrap();
+        assert!(!target.path.exists());
+
+        std::fs::write(&target.path, "export default () => {}").unwrap();
+        assert!(remove_integration(&target).is_err());
+        assert!(target.path.exists());
+    }
+
+    #[test]
+    fn remove_of_a_missing_file_is_not_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+        assert!(remove_integration(&target).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_synced_symlink_is_written_through_and_stays_a_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("dotfiles").join("ext.ts");
+        std::fs::create_dir_all(real.parent().unwrap()).unwrap();
+        std::fs::write(&real, "// kex-agent-status-v1\nold").unwrap();
+        let link_dir = dir.path().join("agent");
+        std::fs::create_dir_all(&link_dir).unwrap();
+        let link = link_dir.join("kex-agent-status.ts");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let target = IntegrationTarget {
+            path: link.clone(),
+            script: "// kex-agent-status-v2\nnew".to_string(),
+            label: "test",
+            tmp_ext: "ts.kex-tmp",
+            owned_marker: "// kex-agent-status-v",
+        };
+        assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Updated);
+        assert!(std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(
+            std::fs::read_to_string(&real).unwrap(),
+            "// kex-agent-status-v2\nnew"
+        );
+    }
+
+    #[test]
+    fn a_marker_with_a_byte_order_mark_still_counts_as_kex() {
+        assert!(is_kex_owned(
+            "\u{feff}// kex-agent-status-v2\nx",
+            "// kex-agent-status-v"
+        ));
+        assert_eq!(marker_version("// kex-agent-status-v12\nx"), Some(12));
+        assert_eq!(marker_version("no marker"), None);
+    }
+
+    #[test]
+    fn a_synced_file_is_rewritten_to_the_current_script() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("ext").join("kex-agent-status.ts");
+        let script = agent_extension_script("pi");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "// kex-agent-status-v1\nold").unwrap();
+        write_agent_file(file.clone(), &script, "pi extension", "ts.kex-tmp").unwrap();
+        assert!(agent_file_matches(file.clone(), &script));
+        let before = std::fs::metadata(&file).unwrap().modified().unwrap();
+        write_agent_file(file.clone(), &script, "pi extension", "ts.kex-tmp").unwrap();
+        assert_eq!(
+            std::fs::metadata(&file).unwrap().modified().unwrap(),
+            before
+        );
     }
 
     #[test]

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { expandTitle, hasTitleVariables, titleVariablesUsed } from "./titleTemplate";
+import {
+  expandTitle,
+  hasTitleVariables,
+  missingTemplateVariables,
+  renderTemplate,
+  titleVariablesUsed,
+} from "./titleTemplate";
 
 describe("expandTitle", () => {
   it("returns a title without braces untouched, whitespace included", () => {
@@ -183,5 +189,31 @@ describe("titleVariablesUsed / hasTitleVariables", () => {
   it("detects braces", () => {
     expect(hasTitleVariables("plain")).toBe(false);
     expect(hasTitleVariables("a {dir}")).toBe(true);
+  });
+});
+
+describe("renderTemplate", () => {
+  it("keeps whitespace and an empty result, unlike expandTitle", () => {
+    expect(renderTemplate("  a   {dir}\n", { dir: "x" })).toBe("  a   x\n");
+    expect(renderTemplate("{dir}", { dir: "" })).toBe("");
+    expect(expandTitle("  a   {dir}\n", { dir: "x" })).toBe("a x");
+  });
+
+  it("formats the value that is written but decides emptiness on the raw one", () => {
+    const wrap = (v: string) => `<${v}>`;
+    expect(renderTemplate("{a|b}", { a: "", b: "z" }, wrap)).toBe("<z>");
+    expect(renderTemplate("{a|{b} {c}}", { a: "", b: "1", c: "2" }, wrap)).toBe("<1> <2>");
+    expect(renderTemplate("{a|{b}}", { a: "", b: "" }, wrap)).toBe("");
+  });
+});
+
+describe("missingTemplateVariables", () => {
+  it("lists plain and grouped variables that all lack a value, once each", () => {
+    expect(missingTemplateVariables("{a} {a} {b|c}", { a: "", b: "", c: " " })).toEqual(["a", "b", "c"]);
+  });
+
+  it("skips optional parts, filled groups and unknown names", () => {
+    const vars = { a: "1", b: "", c: "", d: "", e: "" };
+    expect(missingTemplateVariables("{a}{?b x {c}}{!b y {d}} {e|a} {nope}", vars)).toEqual(["d"]);
   });
 });

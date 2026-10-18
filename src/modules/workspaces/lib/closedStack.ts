@@ -8,7 +8,7 @@ import type {
   Tab,
   Workspace,
 } from "./types";
-import { scriptsToDelete } from "./types";
+import { actionsToDelete } from "./types";
 
 export const CLOSED_STACK_CAP = 10;
 
@@ -64,7 +64,7 @@ export function captureClosedWorkspace(
     if (top?.kind === "tab" && top.workspaceId === ws.id && top.lastOfWorkspace) {
       snapshot = withTab(ws, top);
       below = entries.slice(1);
-    } else if (scriptsToDelete(ws) === 0) {
+    } else if (actionsToDelete(ws) === 0) {
       return entries;
     }
   }
@@ -137,11 +137,7 @@ export function reviveWorkspace(
     };
   };
   const paneTree = reviveTree(ws.paneTree);
-  const scripts = ws.scripts?.map((s) => ({
-    ...s,
-    tabId: s.tabId ? idMap.get(s.tabId) : undefined,
-  }));
-  return { workspace: { ...ws, paneTree, ...(scripts ? { scripts } : {}) }, idMap };
+  return { workspace: { ...ws, paneTree }, idMap };
 }
 
 // Puts a restored workspace back at the position it had, clamped to the list.

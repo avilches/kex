@@ -8,10 +8,14 @@ import {
 } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
-import { normalizeActions, type Action } from "@/modules/actions";
-import type { CustomEditor } from "@/modules/external-editors/types";
+import { normalizeActions } from "@/modules/actions/lib/actions";
+import type { Action } from "@/modules/actions/lib/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
+import {
+  parseInstalledIntegrations,
+  type IntegrationAgent,
+} from "@/modules/agents/lib/integrations";
 import {
   parseAutoHibernate,
   type AutoHibernate,
@@ -36,7 +40,6 @@ export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
 export type DiffViewMode = "unified" | "split";
 
-export type TextEditorMode = "file-only" | "workspace-and-files";
 
 
 export type CursorStyle = "bar" | "block" | "underline";
@@ -189,6 +192,7 @@ export type Preferences = {
   lastWslDistro: string | null;
   zoomLevel: number;
   agentNotifications: boolean;
+  installedIntegrations: IntegrationAgent[];
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
@@ -204,10 +208,6 @@ export type Preferences = {
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
-  textEditorMode: TextEditorMode;
-  preferredFileEditorId: string | null;
-  preferredWorkspaceEditorId: string | null;
-  customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   // Global Actions, available in every workspace. Each workspace has its own on top.
   actions: Action[];
@@ -262,6 +262,7 @@ const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
 const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
+const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -315,10 +316,6 @@ const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
 const KEY_SHORTCUTS = "shortcuts";
 
 // Tools store keys
-const KEY_TEXT_EDITOR_MODE = "textEditorMode";
-const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
-const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
-const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
 const KEY_ACTIONS = "actions";
 
@@ -460,6 +457,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   lastWslDistro: null,
   zoomLevel: DEFAULT_ZOOM,
   agentNotifications: true,
+  installedIntegrations: [],
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
@@ -475,10 +473,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   scratchpadEnterSends: true,
-  textEditorMode: "workspace-and-files",
-  preferredFileEditorId: null,
-  preferredWorkspaceEditorId: null,
-  customEditors: [],
   detectedEditors: [],
   actions: [],
   randomWorkspaceColor: true,
@@ -538,11 +532,6 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
   if (value === "home") return "home";
   if (value === "workspace") return "workspace";
   return "context";
-}
-
-export function parseTextEditorMode(value: unknown): TextEditorMode {
-  if (value === "file-only") return "file-only";
-  return "workspace-and-files";
 }
 
 // Builds a per-store writer: persists the key, flushes it to disk, then
@@ -708,6 +697,7 @@ export async function loadPreferences(): Promise<Preferences> {
     agentNotifications:
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
+    installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -775,17 +765,6 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadEnterSends:
       getTerminal<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
-    textEditorMode: parseTextEditorMode(getTools<string>(KEY_TEXT_EDITOR_MODE)),
-    preferredFileEditorId:
-      getTools<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredFileEditorId,
-    preferredWorkspaceEditorId:
-      getTools<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredWorkspaceEditorId,
-    customEditors: (() => {
-      const v = getTools<CustomEditor[]>(KEY_CUSTOM_EDITORS);
-      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
-    })(),
     detectedEditors: (() => {
       const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
@@ -1133,22 +1112,6 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
   await writeTerminalPref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
-export async function setPreferredFileEditorId(value: string | null): Promise<void> {
-  await writeToolsPref(KEY_PREFERRED_FILE_EDITOR_ID, value);
-}
-
-export async function setPreferredWorkspaceEditorId(value: string | null): Promise<void> {
-  await writeToolsPref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
-}
-
-export async function setTextEditorMode(value: TextEditorMode): Promise<void> {
-  await writeToolsPref(KEY_TEXT_EDITOR_MODE, value);
-}
-
-export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
-  await writeToolsPref(KEY_CUSTOM_EDITORS, value);
-}
-
 export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
@@ -1305,6 +1268,22 @@ export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
 
+// Read, change and write the list in one step, one at a time: two rows (or two windows) that
+// install different agents at once must both end up in it, which a list captured at render
+// time would not guarantee.
+let integrationsQueue: Promise<unknown> = Promise.resolve();
+
+export function updateInstalledIntegrations(
+  change: (current: IntegrationAgent[]) => IntegrationAgent[],
+): Promise<void> {
+  const run = integrationsQueue.then(async () => {
+    const current = parseInstalledIntegrations(await store.get<unknown>(KEY_INSTALLED_INTEGRATIONS));
+    await writePref(KEY_INSTALLED_INTEGRATIONS, parseInstalledIntegrations(change(current)));
+  });
+  integrationsQueue = run.catch(() => undefined);
+  return run;
+}
+
 
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
@@ -1340,6 +1319,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
+  [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
@@ -1399,10 +1379,6 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
 };
 
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
-  [KEY_TEXT_EDITOR_MODE]: "textEditorMode",
-  [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
-  [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
-  [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_ACTIONS]: "actions",
 };

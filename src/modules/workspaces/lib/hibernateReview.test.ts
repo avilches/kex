@@ -15,10 +15,12 @@ const live = (
   agents: Record<string, { agent: string; status: "working" | "attention" | "idle"; resumable?: boolean }> = {},
   commands: Record<string, string> = {},
   scripts: Record<string, "running" | "waiting"> = {},
+  actions: Record<string, { name: string; command: string }> = {},
 ): HibernateLive => ({
   agentOf: (id) => (agents[id] ? { resumable: true, ...agents[id] } : undefined),
   runningCommand: (id) => commands[id],
   scriptState: (id) => scripts[id],
+  actionOf: (id) => actions[id],
 });
 
 describe("hibernateReview agents", () => {
@@ -134,27 +136,28 @@ describe("hibernateReview commands", () => {
     expect(isReviewEmpty(hibernateReview(ws([term("t1")]), live()))).toBe(true);
   });
 
-  it("skips an idle RunButton script terminal even with a command running", () => {
-    const w = ws([term("t1")], { scripts: [{ id: "s1", name: "dev", command: "npm run dev", tabId: "t1" }] });
-    expect(isReviewEmpty(hibernateReview(w, live({}, { t1: "npm run dev" })))).toBe(true);
+  const dev = { t1: { name: "dev", command: "npm run dev" } };
+
+  it("skips an idle script Action terminal even with a command running", () => {
+    expect(isReviewEmpty(hibernateReview(ws([term("t1")]), live({}, { t1: "npm run dev" }, {}, dev)))).toBe(true);
   });
 
   it("lists a running script as busy under its script name, without Run on start", () => {
-    const w = ws([term("t1", { title: "tab" })], { scripts: [{ id: "s1", name: "dev", command: "npm run dev", tabId: "t1" }] });
-    const r = hibernateReview(w, live({}, {}, { t1: "running" }));
+    const r = hibernateReview(ws([term("t1", { title: "tab" })]), live({}, {}, { t1: "running" }, dev));
     expect(r.busy).toEqual([{ tabId: "t1", kind: "script", name: "dev", command: "npm run dev", stopping: false, runOnStart: false }]);
   });
 
   it("falls back to the script command when its name is empty", () => {
-    const w = ws([term("t1")], { scripts: [{ id: "s1", name: "  ", command: "npm run dev", tabId: "t1" }] });
-    const r = hibernateReview(w, live({}, {}, { t1: "running" }));
+    const r = hibernateReview(
+      ws([term("t1")]),
+      live({}, {}, { t1: "running" }, { t1: { name: "  ", command: "npm run dev" } }),
+    );
     expect(r.busy[0]).toMatchObject({ name: "npm run dev", command: "npm run dev" });
     expect(r.commands).toEqual([]);
   });
 
   it("marks a script whose stop was requested as stopping", () => {
-    const w = ws([term("t1")], { scripts: [{ id: "s1", name: "dev", command: "npm run dev", tabId: "t1" }] });
-    const r = hibernateReview(w, live({}, {}, { t1: "waiting" }));
+    const r = hibernateReview(ws([term("t1")]), live({}, {}, { t1: "waiting" }, dev));
     expect(r.busy[0]).toMatchObject({ kind: "script", stopping: true });
   });
 });

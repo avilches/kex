@@ -12,6 +12,7 @@ import {
 } from "@/modules/actions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
+import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
 import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -36,7 +37,7 @@ import {
   updatePane,
 } from "./splitNode";
 import { attachTab, workspaceForTab, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
-import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
 import type { SidebarView } from "./sidebarState";
@@ -191,6 +192,10 @@ export function applyWorkspaceActions(
   });
 }
 
+function workspaceActions(workspaces: readonly Workspace[], workspaceId: string): Action[] {
+  return workspaces.find((w) => w.id === workspaceId)?.actions ?? [];
+}
+
 export function applySetActiveAction(
   workspaces: Workspace[],
   workspaceId: string,
@@ -317,8 +322,8 @@ export function workspaceTabCount(ws: Workspace): number {
 
 // A workspace left with no tabs folds away with its last tab only when it holds
 // nothing at all: an empty chip with no name, color, icon, workspace root or
-// scripts has nothing to keep. The window's only workspace survives (the window
-// would close with it), and so does any customized one; those that hold scripts
+// actions has nothing to keep. The window's only workspace survives (the window
+// would close with it), and so does any customized one; those that hold actions
 // stay protected by the close-workspace confirmation dialog.
 export function isBlankWorkspace(ws: Workspace): boolean {
   return (
@@ -327,8 +332,18 @@ export function isBlankWorkspace(ws: Workspace): boolean {
     !ws.color &&
     !ws.icon &&
     !ws.workspaceRoot &&
-    !ws.scripts?.length
+    !ws.actions?.length
   );
+}
+
+export function applyDropDeadScriptPanes(workspaces: Workspace[]): Workspace[] {
+  let changed = false;
+  const next = workspaces.map((w) => {
+    if (!w.scriptPaneId || allPanes(w.paneTree).some((p) => p.id === w.scriptPaneId)) return w;
+    changed = true;
+    return { ...w, scriptPaneId: undefined };
+  });
+  return changed ? next : workspaces;
 }
 
 export function emptyWorkspaceToClose(workspaces: Workspace[]): Workspace | null {
@@ -554,7 +569,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // path (tab close, shell exit, move to another workspace, bulk closes): the
   // fold is decided on committed state, so batched closes in one tick see the
   // updated workspace too. Never leaves the window empty; workspaces with
-  // customized ones (name, color, icon, root, scripts) are exempt.
+  // customized ones (name, color, icon, root, actions) are exempt.
   useEffect(() => {
     const fold = emptyWorkspaceToClose(workspaces);
     if (fold) closeWorkspace(fold.id);
@@ -973,116 +988,38 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyWorkspaceGroup(prev, workspaceId, groupId));
   }, []);
 
-  const addScript = useCallback((workspaceId: string, config: Script) => {
-    setWorkspaces((prev) =>
-      prev.map((w) =>
-        w.id === workspaceId
-          ? { ...w, scripts: [...(w.scripts ?? []), config] }
-          : w,
-      ),
-    );
-  }, []);
-
-  const updateScript = useCallback(
-    (workspaceId: string, configId: string, patch: Partial<Omit<Script, "id">>) => {
-      setWorkspaces((prev) =>
-        prev.map((w) =>
-          w.id !== workspaceId
-            ? w
-            : {
-                ...w,
-                scripts: (w.scripts ?? []).map((c) =>
-                  c.id === configId ? { ...c, ...patch } : c,
-                ),
-              },
-        ),
-      );
-    },
-    [],
-  );
-
-  const removeScript = useCallback((workspaceId: string, configId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) =>
-        w.id !== workspaceId
-          ? w
-          : {
-              ...w,
-              scripts: (w.scripts ?? []).filter((c) => c.id !== configId),
-              activeScript:
-                w.activeScript === configId ? undefined : w.activeScript,
-            },
-      ),
-    );
-  }, []);
-
-  const reorderScripts = useCallback((workspaceId: string, fromId: string, toId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => {
-        if (w.id !== workspaceId) return w;
-        const configs = w.scripts ?? [];
-        const from = configs.findIndex((c) => c.id === fromId);
-        const to = configs.findIndex((c) => c.id === toId);
-        if (from === -1 || to === -1 || from === to) return w;
-        const next = [...configs];
-        const [item] = next.splice(from, 1);
-        next.splice(to, 0, item!);
-        return { ...w, scripts: next };
-      }),
-    );
-  }, []);
-
-  const setActiveScript = useCallback((workspaceId: string, configId: string | null) => {
-    setWorkspaces((prev) =>
-      prev.map((w) =>
-        w.id === workspaceId
-          ? { ...w, activeScript: configId ?? undefined }
-          : w,
-      ),
-    );
-  }, []);
-
   const setScriptPaneId = useCallback((workspaceId: string, paneId: string) => {
     setWorkspaces((prev) =>
       prev.map((w) => w.id === workspaceId ? { ...w, scriptPaneId: paneId } : w),
     );
   }, []);
 
-  const validateScriptTabs = useCallback(
-    (workspaceId: string, livingTabIds: Set<string>) => {
-      setWorkspaces((prev) =>
-        prev.map((w) => {
-          if (w.id !== workspaceId) return w;
-          const configs = w.scripts ?? [];
-          const cleaned = configs.map((c) =>
-            c.tabId && !livingTabIds.has(c.tabId)
-              ? { ...c, tabId: undefined }
-              : c,
-          );
-          const paneStillLive = w.scriptPaneId ? allPanes(w.paneTree).some((p) => p.id === w.scriptPaneId) : true;
-          const scriptPaneId = paneStillLive ? w.scriptPaneId : undefined;
-          if (cleaned.every((c, i) => c === configs[i]) && scriptPaneId === w.scriptPaneId) return w;
-          return { ...w, scripts: cleaned, scriptPaneId };
-        }),
-      );
-    },
-    [],
-  );
+  // The runtime link of a script to its tab is not saved, so only the pane of the scripts can
+  // be left pointing at a pane that no longer exists.
+  const dropDeadScriptPanes = useCallback(() => {
+    setWorkspaces((prev) => applyDropDeadScriptPanes(prev));
+  }, []);
 
   const addWorkspaceAction = useCallback((workspaceId: string, action: Action) => {
     setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
   }, []);
 
+  // The runtime link of an Action is dropped here, not by watching the lists: a promotion
+  // also takes an Action out of the workspace, and that one keeps running as a global Action.
+  // It happens outside the state updater, which has to stay pure.
   const updateWorkspaceAction = useCallback(
     (workspaceId: string, actionId: string, patch: Partial<Omit<Action, "id">>) => {
-      setWorkspaces((prev) =>
-        applyWorkspaceActions(prev, workspaceId, (list) => updateAction(list, actionId, patch)),
-      );
+      const change = (list: Action[]) => updateAction(list, actionId, patch);
+      const before = workspaceActions(workspacesRef.current, workspaceId);
+      unlinkRemovedActions(before, change(before));
+      setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, change));
     },
     [],
   );
 
   const removeWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    const before = workspaceActions(workspacesRef.current, workspaceId);
+    unlinkRemovedActions(before, removeAction(before, actionId));
     setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => removeAction(list, actionId)));
   }, []);
 
@@ -1234,13 +1171,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceIcon,
     setWorkspaceDetailExpanded,
     setWorkspaceGroup,
-    addScript,
-    updateScript,
-    removeScript,
-    reorderScripts,
-    setActiveScript,
     setScriptPaneId,
-    validateScriptTabs,
+    dropDeadScriptPanes,
     addWorkspaceAction,
     updateWorkspaceAction,
     removeWorkspaceAction,

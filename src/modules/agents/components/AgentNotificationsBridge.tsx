@@ -206,7 +206,11 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       // busy; its completion opens a new turn whose own Stop raises the dot.
       // Read the state fresh: ensureSession and the reconcile below changed it.
       ensureSession(tabId, ctx, sig.agent ?? "claude");
-      useAgentStore.getState().reconcileSubagents(tabId, sig.backgroundSubagents ?? []);
+      // Only Claude lists its running subagents on a Stop. OMP and OpenCode report each one
+      // as it starts and ends, so without a list the ones tracked so far are kept.
+      if (sig.agent === null || sig.agent === "claude" || sig.backgroundSubagents) {
+        useAgentStore.getState().reconcileSubagents(tabId, sig.backgroundSubagents ?? []);
+      }
       const session = useAgentStore.getState().sessions[tabId];
       if (!session) return;
       const outcome = stopOutcome(
@@ -220,7 +224,7 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "SubagentStart": {
       if (!sig.agentId) return;
       ensureSession(tabId, ctx, sig.agent ?? "claude");
-      store.subagentStarted(tabId, sig.agentId, sig.agentType ?? "");
+      store.subagentStarted(tabId, sig.agentId, sig.agentType ?? "", sig.agentDescription);
       return;
     }
     case "SubagentStop": {

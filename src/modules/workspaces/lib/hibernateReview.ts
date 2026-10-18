@@ -9,6 +9,8 @@ export type HibernateLive = {
   agentOf: (tabId: string) => { agent: string; status: AgentStatus; resumable: boolean } | undefined;
   runningCommand: (tabId: string) => string | undefined;
   scriptState: (tabId: string) => ScriptState | undefined;
+  /** The script Action whose last run was in this tab, if any. */
+  actionOf: (tabId: string) => { name: string; command: string } | undefined;
 };
 
 export function liveAgent(
@@ -54,7 +56,6 @@ function comesBack(tab: Extract<Tab, { kind: "terminal" }>, isAgent: boolean): b
 }
 
 export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateReview {
-  const scriptByTab = new Map((ws.scripts ?? []).flatMap((s) => (s.tabId ? [[s.tabId, s] as const] : [])));
   const review: HibernateReview = { busy: [], docs: [], commands: [] };
 
   for (const tab of allPanes(ws.paneTree).flatMap((p) => p.tabs)) {
@@ -76,7 +77,7 @@ export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateRe
       });
       continue;
     }
-    const script = scriptByTab.get(tab.id);
+    const script = live.actionOf(tab.id);
     if (script) {
       const state = live.scriptState(tab.id);
       if (state) {

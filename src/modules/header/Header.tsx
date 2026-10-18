@@ -2,11 +2,11 @@ import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
-import { OpenInEditorButton, type OpenInEditorTarget } from "@/modules/external-editors";
-import type { Tab, Script, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import { ActionsBar, type BarController } from "@/modules/actions";
+import { isCompactBar } from "@/modules/actions/lib/actionsBar";
+import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import { DevBranchBadge } from "./DevBranchBadge";
 import { WorkspaceTitle } from "./WorkspaceTitle";
-import { RunButton } from "@/app/components/RunButton";
 import {
   CommandIcon,
   Settings01Icon,
@@ -29,23 +29,13 @@ type Props = {
   onOpenSettings: () => void;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
-  openInEditorTarget: OpenInEditorTarget | null;
-  workspaceRoot: string | null;
-  onOpenExternalEditorSettings: () => void;
-  onSetWorkspaceRoot: () => void;
-  scripts: Script[];
-  activeScript: string | undefined;
-  onSelectScript: (configId: string) => void;
-  onRunScript: (config: Script) => void;
-  onStopConfig: (config: Script) => void;
-  onOpenRunSettings: () => void;
+  actionsController: BarController;
+  onOpenActionsSettings: () => void;
   activeWorkspace: Workspace | null;
   activeTab: Tab | null;
   groups: WorkspaceGroup[];
   onRestoreFocus: () => void;
 };
-
-const COMPACT_WIDTH = 720;
 
 export function Header({
   onToggleSidebar,
@@ -55,16 +45,8 @@ export function Header({
   onOpenSettings,
   searchTarget,
   searchRef,
-  openInEditorTarget,
-  workspaceRoot,
-  onOpenExternalEditorSettings,
-  onSetWorkspaceRoot,
-  scripts,
-  activeScript,
-  onSelectScript,
-  onRunScript,
-  onStopConfig,
-  onOpenRunSettings,
+  actionsController,
+  onOpenActionsSettings,
   activeWorkspace,
   activeTab,
   groups,
@@ -78,7 +60,7 @@ export function Header({
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0;
-      setCompact(w < COMPACT_WIDTH);
+      setCompact(isCompactBar(w));
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -146,25 +128,12 @@ export function Header({
 
       <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} groups={groups} />
 
-      <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-
       <DevBranchBadge />
 
-      <RunButton
-        scripts={scripts}
-        activeScript={activeScript}
-        onSelectConfig={onSelectScript}
-        onRun={onRunScript}
-        onStop={onStopConfig}
-        onOpenScripts={onOpenRunSettings}
-        onRestoreFocus={onRestoreFocus}
-      />
-
-      <OpenInEditorButton
-        target={openInEditorTarget}
-        workspaceRoot={workspaceRoot}
-        onOpenSettings={onOpenExternalEditorSettings}
-        onSetWorkspaceRoot={onSetWorkspaceRoot}
+      <ActionsBar
+        workspace={activeWorkspace}
+        controller={actionsController}
+        onConfigure={onOpenActionsSettings}
         onRestoreFocus={onRestoreFocus}
       />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />

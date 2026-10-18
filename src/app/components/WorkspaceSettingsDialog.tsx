@@ -1,36 +1,7 @@
-import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
-import {
-  Cancel01Icon,
-  DragDropVerticalIcon,
-  FolderOpenIcon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, FolderOpenIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { newScriptId } from "@/lib/ids";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
+import {
+  ActionsEditor,
+  suggestionsFromDetected,
+  useActionContext,
+  type Action,
+} from "@/modules/actions";
+import { useExternalEditors } from "@/modules/external-editors";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
@@ -47,7 +25,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE } from "@/modules/workspaces/lib/workspaceIcon";
 import { useIconSearch } from "@/modules/workspaces/lib/useIconCatalog";
-import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
+import type { Workspace } from "@/modules/workspaces/lib/types";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
 import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
@@ -70,10 +48,11 @@ type Props = {
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
   onSetWorkspaceRoot: (id: string, path: string | undefined) => void;
-  onAddScript: (id: string, config: Script) => void;
-  onUpdateScript: (id: string, configId: string, patch: Partial<Script>) => void;
-  onRemoveScript: (id: string, configId: string) => void;
-  onReorderScripts: (id: string, fromId: string, toId: string) => void;
+  onAddAction: (id: string, action: Action) => void;
+  onUpdateAction: (id: string, actionId: string, patch: Partial<Omit<Action, "id">>) => void;
+  onRemoveAction: (id: string, actionId: string) => void;
+  onReorderActions: (id: string, fromId: string, toId: string) => void;
+  onPromoteAction: (id: string, actionId: string) => void;
   onRestoreFocus: () => void;
 };
 
@@ -82,13 +61,6 @@ export function WorkspaceSettingsDialog(props: Props) {
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
   function handleClose() {
-    if (ws) {
-      for (const sc of ws.scripts ?? []) {
-        if (!sc.command.trim()) {
-          props.onRemoveScript(ws.id, sc.id);
-        }
-      }
-    }
     closeSettings();
   }
 
@@ -321,7 +293,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
     <div className="flex min-h-[380px] flex-col gap-0 py-1">
       {/* Section bar */}
       <div className="mb-4 flex gap-0 border-b border-border">
-        {(["properties", "scripts"] as const).map((section) => (
+        {(["properties", "actions"] as const).map((section) => (
           <button
             key={section}
             type="button"
@@ -333,7 +305,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {section === "properties" ? "Properties" : "Scripts"}
+            {section === "properties" ? "Properties" : "Actions"}
           </button>
         ))}
       </div>
@@ -466,200 +438,51 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
         </div>
       )}
 
-      {activeSection === "scripts" && (
-        <ScriptSection
+      {activeSection === "actions" && (
+        <WorkspaceActions
           ws={ws}
-          onAddScript={props.onAddScript}
-          onUpdateScript={props.onUpdateScript}
-          onRemoveScript={props.onRemoveScript}
-          onReorderScripts={props.onReorderScripts}
+          onAdd={props.onAddAction}
+          onUpdate={props.onUpdateAction}
+          onRemove={props.onRemoveAction}
+          onReorder={props.onReorderActions}
+          onPromote={props.onPromoteAction}
         />
       )}
     </div>
   );
 }
 
-type ScriptRowHandle = { focusCommand: () => void };
-
-const ScriptRow = forwardRef<
-  ScriptRowHandle,
-  {
-    config: Script;
-    onUpdate: (patch: Partial<Omit<Script, "id">>) => void;
-    onRemove: () => void;
-  }
->(function ScriptRow({ config, onUpdate, onRemove }, ref) {
-  const [commandDirty, setCommandDirty] = useState(false);
-  const [commandValue, setCommandValue] = useState(config.command);
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: config.id,
-  });
-  const cwdMode: ScriptCwdMode = config.cwdMode ?? "workspace";
-  const commandRef = useRef<HTMLInputElement>(null);
-
-  useImperativeHandle(ref, () => ({
-    focusCommand: () => {
-      commandRef.current?.focus();
-      commandRef.current?.select();
-    },
-  }));
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2"
-    >
-      <div className="flex items-center gap-1.5">
-        <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
-          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
-        </span>
-        <input
-          ref={commandRef}
-          className={cn(
-            "h-8 flex-[3_3_0%] min-w-0 rounded-md border bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1",
-            commandDirty && !commandValue ? "border-destructive" : "border-border/60",
-          )}
-          placeholder="Command (e.g. pnpm dev)"
-          spellCheck={false}
-          defaultValue={config.command}
-          onBlur={(e) => {
-            setCommandDirty(true);
-            setCommandValue(e.target.value);
-            onUpdate({ command: e.target.value });
-          }}
-        />
-        <input
-          className="h-8 flex-[1_1_0%] min-w-0 rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-          placeholder="Name"
-          spellCheck={false}
-          defaultValue={config.name}
-          onBlur={(e) => onUpdate({ name: e.target.value })}
-        />
-        <button
-          type="button"
-          title="Remove"
-          onClick={onRemove}
-          className="size-[22px] shrink-0 flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-        </button>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          Run in
-        </span>
-        <Select
-          value={cwdMode}
-          onValueChange={(v) => onUpdate({ cwdMode: v as ScriptCwdMode })}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Run in"
-            className="h-8 w-60 text-[12px]"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="workspace" className="text-[12px]">
-              Workspace root folder
-            </SelectItem>
-            <SelectItem value="context" className="text-[12px]">
-              Last folder from terminal or editor
-            </SelectItem>
-            <SelectItem value="fixed" className="text-[12px]">
-              Fixed folder
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {cwdMode === "fixed" && (
-        <>
-          <input
-            className="h-8 w-full rounded border border-border bg-transparent px-2.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            aria-label="Fixed folder path"
-            placeholder="Absolute path"
-            spellCheck={false}
-            defaultValue={config.cwd ?? ""}
-            onBlur={(e) => onUpdate({ cwd: e.target.value.trim() || undefined })}
-          />
-          {config.cwd && scriptCwdProblem(config.cwd) && (
-            <div className="text-[11px] text-destructive">
-              {scriptCwdProblem(config.cwd)}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-});
-
-function ScriptSection({
+function WorkspaceActions({
   ws,
-  onAddScript,
-  onUpdateScript,
-  onRemoveScript,
-  onReorderScripts,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onReorder,
+  onPromote,
 }: {
   ws: Workspace;
-  onAddScript: Props["onAddScript"];
-  onUpdateScript: Props["onUpdateScript"];
-  onRemoveScript: Props["onRemoveScript"];
-  onReorderScripts: Props["onReorderScripts"];
+  onAdd: Props["onAddAction"];
+  onUpdate: Props["onUpdateAction"];
+  onRemove: Props["onRemoveAction"];
+  onReorder: Props["onReorderActions"];
+  onPromote: Props["onPromoteAction"];
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-  );
-  const configs = ws.scripts ?? [];
-  const configRefs = useRef<Map<string, ScriptRowHandle>>(new Map());
-
-  function handleAdd() {
-    const firstMissingCommand = configs.find((c) => !c.command.trim());
-    if (firstMissingCommand) {
-      configRefs.current.get(firstMissingCommand.id)?.focusCommand();
-      return;
-    }
-    onAddScript(ws.id, { id: newScriptId(), name: "", command: "" });
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      onReorderScripts(ws.id, String(active.id), String(over.id));
-    }
-  }
-
+  const { detectedEditors } = useExternalEditors();
+  const context = useActionContext(ws);
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" className="h-7 w-fit gap-1.5 px-2 text-[12px]" onClick={handleAdd}>
-          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-          Add Script
-        </Button>
-      </div>
-
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={configs.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-0.5">
-            {configs.map((cfg) => (
-              <ScriptRow
-                key={cfg.id}
-                ref={(handle) => {
-                  if (handle) configRefs.current.set(cfg.id, handle);
-                  else configRefs.current.delete(cfg.id);
-                }}
-                config={cfg}
-                onUpdate={(patch) => onUpdateScript(ws.id, cfg.id, patch)}
-                onRemove={() => onRemoveScript(ws.id, cfg.id)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {configs.length === 0 && (
-        <p className="text-[11px] text-muted-foreground">No scripts yet.</p>
-      )}
-    </div>
+    <ActionsEditor
+      actions={ws.actions ?? []}
+      suggestions={suggestionsFromDetected(detectedEditors)}
+      context={context}
+      emptyHint="No actions in this workspace yet. Scripts run in a terminal; apps open in the background."
+      onAdd={(action) => onAdd(ws.id, action)}
+      onUpdate={(id, next) => {
+        const { id: _id, ...patch } = next;
+        onUpdate(ws.id, id, patch);
+      }}
+      onRemove={(id) => onRemove(ws.id, id)}
+      onReorder={(from, to) => onReorder(ws.id, from, to)}
+      onMakeGlobal={(id) => onPromote(ws.id, id)}
+    />
   );
 }

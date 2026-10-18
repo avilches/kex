@@ -1,5 +1,6 @@
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
+import { toast } from "sonner";
 import { native } from "@/lib/native";
 import type { Workspace } from "@/modules/workspaces";
 import { allPanes } from "@/modules/workspaces";
@@ -71,7 +72,7 @@ export function useWorkspaceSwitcher({
         ),
       );
       if (dirty) {
-        window.alert(
+        toast.error(
           "Save or close unsaved editor tabs before switching workspace.",
         );
         return;
@@ -85,7 +86,9 @@ export function useWorkspaceSwitcher({
           nextHome = (await homeDir()).replace(/\\/g, "/");
         }
       } catch (e) {
-        window.alert(String(e));
+        toast.error("Could not switch workspace", {
+          description: e instanceof Error ? e.message : String(e),
+        });
         return;
       }
 

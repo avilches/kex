@@ -207,7 +207,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
   `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
-  (`agent_setup_omp`, marker `kex-agent-status-v1`, shared with Pi), which translates `before_agent_start`/`agent_start` (plus one
+  (`agent_setup_omp`, marker `kex-agent-status-v4`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
   assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
   inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the
@@ -404,16 +404,16 @@ Upstream Terax keeps a workspace whose last tab closed, as an empty chip in the 
 - **Rule**: a workspace that reaches zero tabs is closed by a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it (tab close, shell exit, moving or dragging the last tab to another workspace, bulk closes such as Close All Tabs). Two exceptions keep it with its empty pane: the window's only workspace, and one holding scripts with a command, whose deletion the close confirmation dialog still protects.
 - **WorkspaceBar**: an empty workspace shows no chevron for its nested tab list but stays expanded: `applyCloseTab` resets `detailExpanded` to true when it empties the sole pane, so a tab opened into the workspace appears in the nested list without a toggle.
 
-### Scripts and Run button (F12)
+### Actions: scripts and apps in the Header
 
-Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell commands (with a folder mode: workspace root by default, last folder from the focused terminal or editor, or a fixed folder) and execute them from the header bar with one click or F12. Not present in upstream Terax.
+Kex replaces the upstream "Open in editor" button and its own earlier Scripts and Run button with one entity, the **Action**: a saved command template that is either a script (typed into a terminal, can be stopped) or an app (spawned in the background). Not present in upstream Terax. Architecture and details are in `ARCHITECTURE.md` 3.11 (app detection) and 3.12 (Actions).
 
-- **Header Run button** (`src/app/components/RunButton.tsx`): renders in three modes based on the number of saved scripts in the active workspace. Zero scripts: a muted placeholder that opens Workspace Settings on the scripts tab. One script: a simple play/stop toggle. Two or more scripts: a split button with a dropdown script selector on the left and a play/stop icon on the right.
-- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the script's saved `tabId` still refers to a live terminal tab, navigates to it and, if idle, types a `cd` to the resolved folder before the command, grouped so the whole command depends on it (`cd -- X && { cmd }`, or `Set-Location` plus `if ($?) { }` on native Windows workspaces); otherwise splits the active pane downward, creates a new terminal tab in the folder resolved by `cwdMode` (`modules/workspaces/lib/scriptCwd.ts`), saves the new tab id on the script, and writes the same `cd -- X && { cmd }` line, so a folder that no longer exists runs nothing. Uses a 150ms + retry loop to wait for the terminal handle to register.
-- **Stop** (`stopWorkspaceConfig` in `App.tsx`): sends Ctrl+C (`\x03`) to the terminal handle.
-- **isRunning state** (`scriptRunning` in `terminalEphemeralStore`): a `Map<tabId, ScriptState>` (outside the workspaces React tree, `useSyncExternalStore`) set on run and cleared when OSC 133;D fires for that tab. Manual commands typed by the user do not touch this map.
-- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
-- **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
+- **Model**: `Action` in `src/modules/actions/lib/types.ts`, in two scopes: workspace Actions (`Workspace.actions`, with `activeAction` for F12) and global Actions (`actions` in `settings-tools.json`). A "Make Global" button in the workspace dialog moves one to the other.
+- **Templates**: the command uses the title variables (`{cwd}`, `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{file}`, `{path}`, `{host}`), expanded from raw values by `commandTemplate.ts`. An app command is split into arguments before substitution and spawned without a shell (`action_spawn`); a script command is quoted for the target shell and typed into a terminal, and a value with `$`, quotes, a backtick or a backslash is refused for scripts.
+- **Header**: an `ActionsBar` replaces the Run and Open in buttons. Actions with their own button show in the user's order; the rest group in a Scripts menu (with stop) and an Apps menu (launch only). The name and the play or stop zone have separate hovers, and an Action whose template needs a value that is empty right now is disabled with the reason.
+- **Apps**: the detected editors (30 known tools) are offered as suggestions when creating an app Action, with their icon and a default command; two Actions can share one app (`pycharm {cwd}` and `pycharm {workspace}`).
+- **Removed**: `Script`, `Workspace.scripts` and `activeScript`, `RunButton`, `OpenInEditorButton`, `editor_open`, custom editors, and the preferences `textEditorMode`, `preferredFileEditorId`, `preferredWorkspaceEditorId` and `customEditors`. No migration: old scripts and custom editors are gone.
+- **F12** (`workspace.run`): runs or stops the active Action of the workspace.
 
 ### Markdown editing: Live Preview is the only engine
 
@@ -495,6 +495,10 @@ At startup every workspace except the active one starts hibernated, unless the s
 ### Command palette: tabs, workspaces and the full catalog
 
 The palette searches tabs and workspaces as well as actions. With an empty box it lists the 8 most recently used tabs (hibernated workspaces last); typing shows one list of tabs, workspaces, actions and settings ordered by match score, so the best match is the first row whatever it is; for tabs the title beats the note, the workspace name, the cwd, worktree or branch, and the running command or agent, in that order. A row the user keeps choosing for some typed text climbs for that text (a launcher-style memory), and weak scattered matches are dropped. Each tab row shows a spinner while its agent works and a note icon when it has a note, and selecting a row shows the note rendered, with the directory and branch, in a side panel. Choosing a tab of a hibernated workspace wakes it first. Every shortcut and every Settings section has a row (a test fails if one is missing); a Settings row opens the window on that section. Tab recency is kept in `localStorage` (`kex-tab-use`), not in the workspace JSON. Not present upstream.
+
+### Instruction files: AGENTS.md merged into CLAUDE.md
+
+Upstream ships its agent instructions as `AGENTS.md` at the repo root. The fork merged that file into `CLAUDE.md` (which also imports `.memory/MEMORY.md`) and deleted the root `AGENTS.md`. opencode treats a root `AGENTS.md` as the project instructions and then ignores `CLAUDE.md`, so keeping both meant opencode never saw the fork's own rules or its memory index. The trade-off is that upstream syncs which touch `AGENTS.md` cannot be applied verbatim: checking that file out from upstream would reintroduce it and silence `CLAUDE.md` again. Port the upstream edits into `CLAUDE.md` by hand instead. Because opencode does not expand `@`-imports, the paths `CLAUDE.md` imports are also listed in the `instructions` array of `opencode.json`.
 
 ---
 

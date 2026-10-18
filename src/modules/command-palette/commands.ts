@@ -97,7 +97,7 @@ export type CommandPaletteActionContext = {
   hasActiveTerminal: boolean;
   hibernated: boolean;
   openWorkspaceProperties: () => void;
-  openRunScriptConfiguration: () => void;
+  openActionsConfiguration: () => void;
   shortcutHandlers: ShortcutHandlers;
   isShortcutAvailable: (id: ShortcutId) => boolean;
   openSettingsSection: (section: SettingsSection) => void;
@@ -327,11 +327,11 @@ export function createCommandItems(
     },
     {
       id: "workspace.runScripts",
-      title: "Run script configuration",
+      title: "Configure workspace actions",
       group: "General",
-      keywords: ["run", "script", "scripts", "configure", "configuration", "commands"],
+      keywords: ["run", "script", "scripts", "actions", "action", "app", "configure", "configuration", "commands"],
       icon: PlayIcon,
-      run: ctx.openRunScriptConfiguration,
+      run: ctx.openActionsConfiguration,
     },
     {
       id: "tab.note.remove",

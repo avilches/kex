@@ -50,10 +50,12 @@ describe("MarkdownPreviewPane", () => {
     expect(container.querySelector(".cm-lp-link-text")?.textContent).toBe("site");
   });
 
-  it("shows the frontmatter as a code block", () => {
+  it("shows the frontmatter as plain lines, one line per source line", () => {
     const container = renderPane("---\ntitle: Foo\n---\n\nbody\n");
-    expect(container.textContent).toContain("title: Foo");
-    expect(container.querySelector(".cm-lp-codeblock")).not.toBeNull();
+    const lines = Array.from(container.querySelectorAll(".cm-line"));
+    expect(lines.map((l) => l.textContent)).toEqual(["---", "title: Foo", "---", "", "body", ""]);
+    expect(lines.slice(0, 3).every((l) => l.classList.contains("cm-lp-frontmatter"))).toBe(true);
+    expect(lines[3].classList.contains("cm-lp-frontmatter")).toBe(false);
   });
 
   it("opens a link with a plain click", () => {

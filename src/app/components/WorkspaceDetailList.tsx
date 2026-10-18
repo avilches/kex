@@ -54,29 +54,33 @@ function SubagentRow({
   agent,
   row,
   tone,
+  onSelect,
 }: {
   agent: string | undefined;
   row: SubagentRowData;
   tone: SubagentTone;
+  onSelect: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       data-subagent-row=""
       title={row.label}
+      onClick={onSelect}
       className={cn(
-        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-[11.5px] select-none",
+        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-left text-[11px] select-none",
         SUBAGENT_TONE[tone],
       )}
     >
       {agent && (
         <span className="flex size-3.5 shrink-0 items-center justify-center">
-          <AgentIcon agent={agent} size={12} />
+          <AgentIcon agent={agent} size={11} />
         </span>
       )}
       <span className="min-w-0 truncate">{row.label}</span>
       <span aria-hidden className="flex-1" />
-      <Spinner size={11} />
-    </div>
+      <Spinner size={10} />
+    </button>
   );
 }
 
@@ -97,15 +101,17 @@ function SubagentGroup({
   agent,
   rows,
   tone,
+  onSelect,
 }: {
   agent: string | undefined;
   rows: SubagentRowData[];
   tone: SubagentTone;
+  onSelect: () => void;
 }) {
   return (
     <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((sub) => (
-        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} />
+        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} onSelect={onSelect} />
       ))}
     </div>
   );
@@ -288,7 +294,7 @@ function DetailTabRow({
                 }
               }}
               className={cn(
-                "relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                "relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[12px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
@@ -315,9 +321,9 @@ function DetailTabRow({
               )}
               <span className="flex size-3.5 shrink-0 items-center justify-center">
                 {agent && !tab.icon ? (
-                  <AgentIcon agent={agent} size={12} />
+                  <AgentIcon agent={agent} size={13} />
                 ) : tab.kind === "browser" && tab.floating ? (
-                  <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
+                  <HugeiconsIcon icon={LinkSquare02Icon} size={13} strokeWidth={1.75} className="opacity-60" />
                 ) : (
                   tabIcon(tab, info?.isRunning, !focused)
                 )}
@@ -334,7 +340,7 @@ function DetailTabRow({
                 {title}
               </span>
               {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-                <span className="shrink-0 text-[8px] text-primary">●</span>
+                <span className="shrink-0 text-[9px] text-primary">●</span>
               )}
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
@@ -373,7 +379,7 @@ function DetailTabRow({
           onPointerLeave={() => onNoteHover(tab.id, false)}
           onClick={() => onNoteToggle(tab.id)}
         >
-          <HugeiconsIcon icon={StickyNote03Icon} size={12} strokeWidth={2} />
+          <HugeiconsIcon icon={StickyNote03Icon} size={13} strokeWidth={2} />
         </button>
       )}
       {showAutofocus && (
@@ -384,7 +390,7 @@ function DetailTabRow({
             hasNote ? "right-[46px]" : "right-[26px]",
           )}
         >
-          <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
+          <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
         </span>
       )}
       {isLocked ? (
@@ -411,7 +417,7 @@ function DetailTabRow({
             className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
             onClick={() => onClose(tab.id)}
           >
-            <span className="text-[13px] leading-none">×</span>
+            <span className="text-[14px] leading-none">×</span>
           </button>
         </>
       )}
@@ -556,6 +562,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
                 agent={sessions[row.tabId]?.agent}
                 rows={subs}
                 tone={!grouped ? "plain" : chipColor !== null ? "chip-color" : "chip"}
+                onSelect={() => onActivate(row.tabId)}
               />
             )}
           </div>

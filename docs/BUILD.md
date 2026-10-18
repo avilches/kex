@@ -31,26 +31,41 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app|markdown&terminal=auto|<theme id>&editor=auto|<editor theme id>`.
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&terminal=auto|<theme id>&editor=auto|<editor theme id>`.
   `terminal` mirrors the "Terminal theme" preference: the terminal panes use that theme's palette
   while the rest of the page keeps `theme`. `editor` mirrors the "Editor theme" preference the same way
   (`auto` is the app theme's own pairing, an id sets the editor background and text color like Settings does).
-  A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
-  lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
-- A third view, `markdown`, puts Rich (the Live Preview editor) and Preview (the read-only view) side by
-  side on `src/theme-preview/live-preview-demo.md`. Both documents have the same number of lines (Preview
-  turns the frontmatter into a yaml fence of the same height), so line n of one is line n of the other:
-  `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
-  computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
+  A user theme can be pasted as JSON in the textarea (validated with `validateTheme`).
+- The theme selector is a row of one button per theme, each with a dot of the theme's `primary`.
+  `ArrowLeft` / `ArrowRight` cycle themes and `ArrowUp` / `ArrowDown` switch dark / light, so a theme can be
+  stepped through without opening anything. The two git color schemes (vs code / jetbrains) stay as buttons.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
-  two approximations of the real window (WorkspaceBar, Sidebar, Header, a terminal pane and an editor
-  pane side by side, status strip): one with the terminal focused, one with the editor focused. An
-  unfocused pane is drawn like `PaneView` does: a black overlay at the theme's
-  `inactivePaneDim[kind]` opacity (each pane prints its `data-dim`), and only the focused pane's
-  tab gets the `tab-focus-indicator` bar. Terminal panes show prompt, command output in ANSI colors,
-  a selection and the cursor (filled when focused, hollow when not); editor panes are a real
-  CodeMirror with the theme's paired editor theme, a selection and the active line.
+  two approximations of the real window: the WorkspaceBar (group header, workspace chips, one expanded
+  with its tab list and a focused tab, one hibernated), an Explorer Sidebar and a Source Control sidebar
+  side by side, the Header, the tab bar with agent chips, the terminal and editor panes, and below them
+  the Live Preview pair. The Explorer uses the real Catppuccin file and folder icons
+  (`iconResolver.ts`) and the same row classes as `TreeRow.tsx` (normal, gitignored, selected). The
+  Source Control panel mirrors `SourceControlPanel.tsx` (commit box with the "to commit" hint, staged
+  line, Commit / Push, the changed header, the changes list with file icons and status letters), so
+  switching the git color scheme changes those letters. Panes are at least 360 px wide (what their text
+  needs), so when the frame is narrow they wrap onto more rows instead of clipping text. An unfocused
+  pane is drawn like `PaneView` does: a black overlay at the theme's `inactivePaneDim[kind]` opacity
+  (each pane prints its `data-dim`), and only the focused pane's tab gets the `tab-focus-indicator`
+  bar. Terminal panes show prompt, command output in ANSI colors, a selection and the cursor (filled when
+  focused, hollow when not); editor panes are a real CodeMirror with the theme's paired editor theme, a
+  selection and the active line.
+- The Live Preview pair (Rich, the Live Preview editor, and Preview, the read-only view) sits under the
+  panes on `src/theme-preview/live-preview-demo.md`. Both get the same text (Preview shows the frontmatter
+  as the same monospace lines as Rich, not as a fence), so line n of one is line n of the other:
+  `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
+  computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
+- The tuner adjusts the background lightness and hue, and the alpha of the normal and the ignored explorer
+  rows (what `text-foreground/85` and `text-muted-foreground/85` resolve to). The two alphas feed CSS vars
+  the rows read, so the explorer follows live; the readout prints the composited hex and the WCAG ratio
+  against the sidebar. Values are saved per theme and mode in `localStorage` and survive a reload.
+  "Export changes (copy)" puts a JSON snapshot (`theme`, `mode`, the four values and the resolved hexes)
+  on the clipboard, which is the shape to hand back so the value can be baked into the theme.
 - Colors are verifiable without screenshots (Dark Reader rewrites backgrounds in screenshots): each
   swatch prints its hex as text and carries `data-token` / `data-hex`, and
   `window.kexThemePreview.dump()` returns every token plus the git status colors as a
@@ -93,6 +108,8 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 |---|---|
 | `bundle/macos/Kex.app` | App bundle, drag to `/Applications` |
 | `bundle/dmg/Kex_<ver>_aarch64.dmg` | Installer DMG |
+
+**Web inspector:** the `tauri` crate is built with the `devtools` feature, so release builds also show "Inspect Element" in the right-click menu. It adds nothing at runtime until it is opened. On macOS it relies on a private WebKit API, which only matters for a Mac App Store submission (Kex does not ship there).
 
 **Gatekeeper:** first launch of an unsigned build requires right-click > Open to bypass the "unidentified developer" warning.
 

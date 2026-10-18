@@ -17,6 +17,7 @@ import { writeClipboardText } from "@/lib/clipboard";
 import { native } from "@/lib/native";
 import { IS_MAC } from "@/lib/platform";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
+import { showsAgentMenu } from "./lib/agentMenu";
 import { parentDir } from "./lib/transcriptPath";
 
 const REVEAL_TRANSCRIPT_LABEL = IS_MAC
@@ -99,13 +100,28 @@ function agentTitle(agent: string): string {
   return agent.charAt(0).toUpperCase() + agent.slice(1);
 }
 
-export function TabAgentMenuItems({ tabId }: { tabId: string }) {
+// The agent block of the tab menu. `children` render inside it, after the session actions:
+// Run on Start belongs to the agent, so it sits with it instead of with the generic tab items.
+export function TabAgentMenuItems({
+  tabId,
+  children,
+}: {
+  tabId: string;
+  children?: ReactNode;
+}) {
   const session = useAgentStore((s) => s.sessions[tabId]);
   const { onRevealInExplorer } = useSidebarTabMenu();
   const meta = session?.meta;
   const transcriptPath = meta?.transcriptPath;
   const transcriptExists = useFileExists(transcriptPath);
-  if (!session) return null;
+  if (!session || !showsAgentMenu(session)) {
+    return children ? (
+      <>
+        {children}
+        <ContextMenuSeparator />
+      </>
+    ) : null;
+  }
   const sessionId = meta?.sessionId;
   const hasTranscript = !!transcriptPath && transcriptExists !== false;
 
@@ -147,6 +163,7 @@ export function TabAgentMenuItems({ tabId }: { tabId: string }) {
           Transcript not created yet
         </ContextMenuItem>
       )}
+      {children}
       <ContextMenuSeparator />
     </>
   );
