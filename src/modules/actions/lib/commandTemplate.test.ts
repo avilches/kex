@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   commandProblem,
@@ -30,12 +33,22 @@ describe("splitArgv", () => {
     expect(splitArgv(String.raw`'a\b "c" $d'`)).toEqual([String.raw`a\b "c" $d`]);
   });
 
-  it("escapes only quote, backslash, dollar and backtick inside double quotes", () => {
-    expect(splitArgv(String.raw`"a \" \\ \$ \x"`)).toEqual([String.raw`a " \ $ \x`]);
+  it("keeps every backslash, inside quotes or not, so Windows paths survive", () => {
+    const command = '\\\\server\\share C:\\tools\\x.exe "C:\\Program Files\\x" "C:\\dir\\"';
+    expect(splitArgv(command)).toEqual([
+      "\\\\server\\share",
+      "C:\\tools\\x.exe",
+      "C:\\Program Files\\x",
+      "C:\\dir\\",
+    ]);
   });
 
-  it("escapes a space or a quote outside quotes and leaves other backslashes alone", () => {
-    expect(splitArgv(String.raw`a\ b C:\tools\x.exe \'q`)).toEqual(["a b", String.raw`C:\tools\x.exe`, "'q"]);
+  it("a backslash before a space does not escape it: the argument splits and both backslashes stay", () => {
+    expect(splitArgv("C:\\Program\\ Files\\x")).toEqual(["C:\\Program\\", "Files\\x"]);
+  });
+
+  it("puts a quote in an argument by wrapping it in the other kind", () => {
+    expect(splitArgv(`'say "hi"' "it's"`)).toEqual([`say "hi"`, "it's"]);
   });
 
   it("returns nothing for a blank command", () => {
@@ -56,6 +69,23 @@ describe("commandProblem", () => {
   it("explains an empty command and an unterminated quote", () => {
     expect(commandProblem("  ")).toMatch(/empty/);
     expect(commandProblem(`a "b`)).toMatch(/unterminated/);
+  });
+
+  it("for a script, refuses a variable inside the user's own quotes and names it", () => {
+    expect(commandProblem(`printf "{cwd}"`, "posix")).toMatch(/\{cwd\} sits inside quotes/);
+    expect(commandProblem(`echo '{path}' {cwd}`, "posix")).toMatch(/\{path\}/);
+    expect(commandProblem("echo x\n  cd \"a {?dir {dir}}\"", "powershell")).toMatch(/\{dir\}/);
+  });
+
+  it("for a script, accepts bare variables and quotes that hold no variable or a literal brace", () => {
+    expect(commandProblem(`printf "%s" {cwd} 'a b' "{{cwd}}"`, "posix")).toBeNull();
+    expect(commandProblem(`echo "\${HOME}" "{ x; }" {cwd}`, "posix")).toBeNull();
+    expect(commandProblem(`echo \\"{cwd}`, "posix")).toBeNull();
+    expect(commandProblem("echo `\"{cwd}", "powershell")).toBeNull();
+  });
+
+  it("for a script, an apostrophe in a comment is not an unterminated quote", () => {
+    expect(commandProblem("echo hi # don't\n", "posix")).toBeNull();
   });
 });
 
@@ -112,6 +142,15 @@ describe("expandCommandShell", () => {
     );
   });
 
+  it("strips control characters from values for PowerShell too", () => {
+    expect(expandCommandShell("code {cwd}", { cwd: "C:\\a\r\nb\x1b" }, "powershell")).toBe("code 'C:\\ab'");
+  });
+
+  it("refuses a variable inside the command's own quotes, for either shell", () => {
+    expect(() => expandCommandShell(`echo "{cwd}"`, { cwd: "/x" }, "posix")).toThrow(/\{cwd\} sits inside quotes/);
+    expect(() => expandCommandShell(`echo '{cwd}'`, { cwd: "/x" }, "powershell")).toThrow(/inside quotes/);
+  });
+
   it("preserves whitespace and line breaks outside the variables", () => {
     const cmd = "echo   {dir}\n\n  ls  -la\n";
     expect(expandCommandShell(cmd, { dir: "x" }, "posix")).toBe("echo   'x'\n\n  ls  -la\n");
@@ -147,7 +186,6 @@ const NASTY = [
   "/tmp/`echo pwned`",
   "/tmp/semi;colon&pipe",
   "/tmp/-leading dash",
-  "/tmp/new\nline",
   "/tmp/~tilde",
   "/tmp/glob*?[x]",
 ];
@@ -162,6 +200,37 @@ for (const shell of ["bash", "zsh"]) {
         expect(res.stdout.toString().split("\0").slice(0, -1)).toEqual([value, "tail"]);
       });
     }
+
+    it("drops control characters from a value, a newline included, so it cannot end the line", () => {
+      const line = expandCommandShell(`printf '%s\\0' {cwd} tail`, { cwd: "/tmp/a\nb\tc\x1b[31m\x7fd\0e" }, "posix");
+      const res = spawnSync(shell, ["-c", line]);
+      expect(res.stdout.toString().split("\0").slice(0, -1)).toEqual(["/tmp/ab" + "c[31mde", "tail"]);
+    });
+
+    it("a bare $(...) in a value does not run", () => {
+      const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+      try {
+        const line = expandCommandShell("printf '%s' {cwd}", { cwd: "$(touch PWNED)" }, "posix");
+        const res = spawnSync(shell, ["-c", line], { cwd: dir });
+        expect(res.stdout.toString()).toBe("$(touch PWNED)");
+        expect(existsSync(join(dir, "PWNED"))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("the same $(...) in the user's double quotes would run, which is why Kex refuses that command", () => {
+      const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+      try {
+        const command = `printf '%s' "{cwd}"`;
+        expect(() => expandCommandShell(command, { cwd: "$(touch PWNED)" }, "posix")).toThrow(/inside quotes/);
+        const unsafe = command.replace("{cwd}", "$(touch PWNED)");
+        spawnSync(shell, ["-c", unsafe], { cwd: dir });
+        expect(existsSync(join(dir, "PWNED"))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
 
     it("keeps a multi-line command working", () => {
       const line = expandCommandShell("a={cwd}\nprintf '%s' \"$a\"\n", { cwd: "/x y" }, "posix");

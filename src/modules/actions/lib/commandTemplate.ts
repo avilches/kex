@@ -16,33 +16,23 @@ const UNTERMINATED = "unterminated quote";
 
 const isSpace = (ch: string) => /\s/.test(ch);
 
-// Splits like a POSIX shell would, with none of its expansions. Unquoted, a backslash
-// escapes whitespace, a quote or another backslash and is otherwise literal, so a Windows
-// path such as C:\tools\x.exe survives; inside double quotes it escapes only " \ $ and `.
+// Splits like a POSIX shell would, with none of its expansions, except that a backslash is
+// always literal. Commands hold Windows paths (C:\tools\x.exe, \\server\share, "C:\dir\")
+// as often as POSIX ones, and no escape rule keeps both intact. The price is that a quote
+// cannot be escaped: to put a " in an argument wrap it in '...' and the other way round,
+// and a space in a path needs quotes, never a backslash.
 export function splitArgv(command: string): string[] {
   const args: string[] = [];
   let current = "";
   let inToken = false;
   let quote: '"' | "'" | null = null;
-  for (let i = 0; i < command.length; i++) {
-    const ch = command.charAt(i);
-    const next = command.charAt(i + 1);
-    if (quote === "'") {
-      if (ch === "'") quote = null;
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) quote = null;
       else current += ch;
-    } else if (quote === '"') {
-      if (ch === '"') quote = null;
-      else if (ch === "\\" && next !== "" && '"\\$`'.includes(next)) {
-        current += next;
-        i++;
-      } else current += ch;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       inToken = true;
-    } else if (ch === "\\" && next !== "" && (isSpace(next) || "\"'\\".includes(next))) {
-      current += next;
-      inToken = true;
-      i++;
     } else if (isSpace(ch)) {
       if (inToken) args.push(current);
       current = "";
@@ -57,8 +47,54 @@ export function splitArgv(command: string): string[] {
   return args;
 }
 
-// Why a command cannot be launched as it is typed, or null when it can.
-export function commandProblem(command: string): string | null {
+// Names of the variables written inside quotes of the command's own. In a script the value
+// is quoted by Kex, so one placed inside the user's quotes would be quoted a second time
+// and, inside double quotes, a $(...) in the value would run.
+export function quotedVariables(command: string, shell: CommandShell): string[] {
+  const escapeChar = shell === "powershell" ? "`" : "\\";
+  const found: string[] = [];
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command.charAt(i);
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (ch === escapeChar) {
+      i++;
+    } else if (quote === '"') {
+      if (ch === '"') quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    }
+    if (!quote || ch !== "{") continue;
+    if (command.charAt(i + 1) === "{") {
+      i++;
+      continue;
+    }
+    let depth = 0;
+    let j = i;
+    for (; j < command.length; j++) {
+      if (command.charAt(j) === "{") depth++;
+      else if (command.charAt(j) === "}" && --depth === 0) break;
+    }
+    if (depth !== 0) continue;
+    for (const name of titleVariablesUsed(command.slice(i, j + 1))) found.push(name);
+    i = j;
+  }
+  return [...new Set(found)];
+}
+
+function quotedProblem(command: string, shell: CommandShell): string | null {
+  const quoted = quotedVariables(command, shell);
+  if (quoted.length === 0) return null;
+  const names = quoted.map((n) => `{${n}}`).join(", ");
+  return `${names} sits inside quotes: write it without quotes, Kex quotes the value itself`;
+}
+
+// Why a command cannot be launched as it is typed, or null when it can. Without a shell
+// the command is an app's (split into arguments); with one it is a script, whose own
+// quotes are the shell's business except around a variable.
+export function commandProblem(command: string, shell?: CommandShell): string | null {
+  if (shell) return command.trim() === "" ? "the command is empty" : quotedProblem(command, shell);
   try {
     return splitArgv(command).length === 0 ? "the command is empty" : null;
   } catch (e) {
@@ -79,16 +115,33 @@ export function expandCommandArgv(command: string, vars: TemplateVars): string[]
 // PowerShell reads U+2018, U+2019, U+201A and U+201B as a single quote too.
 const POWERSHELL_QUOTES = /['‘’‚‛]/g;
 
+// The line is typed into a terminal, where a control character (a newline would end the
+// command, ESC or ^C act on the terminal) is never part of a name worth keeping.
+function stripControl(value: string): string {
+  let out = "";
+  for (const ch of value) {
+    const code = ch.charCodeAt(0);
+    if (code > 0x1f && code !== 0x7f) out += ch;
+  }
+  return out;
+}
+
 function quoteFor(shell: CommandShell): (value: string) => string {
   return shell === "powershell"
-    ? (value) => `'${value.replace(POWERSHELL_QUOTES, (q) => q + q)}'`
-    : (value) => quoteShellArg(value, false);
+    ? (value) => `'${stripControl(value).replace(POWERSHELL_QUOTES, (q) => q + q)}'`
+    : (value) => quoteShellArg(stripControl(value), false);
 }
 
 // For a script typed into a terminal: the text is kept exactly as written (line breaks and
 // spacing included) and each value is quoted for the shell, so the user writes {cwd}
-// bare, never inside quotes of their own, which would be quoted a second time.
+// bare. A variable inside the user's own quotes is refused (it would be quoted twice and,
+// in double quotes, a $(...) in the value would run). A value starting with a dash is
+// still an option to the program: the command itself must put `--` before it when needed.
+// Run it only once missingVariables is empty: an empty value writes nothing, and the
+// argument it stood for silently disappears.
 export function expandCommandShell(command: string, vars: TemplateVars, shell: CommandShell): string {
+  const problem = quotedProblem(command, shell);
+  if (problem) throw new Error(problem);
   return renderTemplate(command, vars, quoteFor(shell));
 }
 
