@@ -10,12 +10,12 @@ import { buildCommandVars } from "./commandVars";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { CommandShell } from "./commandTemplate";
 
-export type ActionContext = { vars: Record<string, string>; shell: CommandShell };
+export type ActionContext = { vars: Record<string, string>; shell: CommandShell; hibernated: boolean };
 
 // The values an Action would see if it ran right now from this workspace, the same ones the
 // runner builds. Settings has no workspace, so its editor passes none and gets no values.
 export function useActionContext(
-  ws: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot"> | null,
+  ws: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "hibernated"> | null,
 ): ActionContext | null {
   const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
@@ -24,9 +24,10 @@ export function useActionContext(
   // The focused tab owns the folder: a command that ends in it can have changed the branch.
   const info = useDirGit(dir, focused?.id);
   const vars = ws ? buildCommandVars(focused, ws, info, sys.host) : null;
-  const key = vars ? JSON.stringify([vars, envKind]) : null;
+  const hibernated = !!ws?.hibernated;
+  const key = vars ? JSON.stringify([vars, envKind, hibernated]) : null;
   return useMemo(
-    () => (vars ? { vars, shell: scriptShellFor(IS_WINDOWS, envKind) } : null),
+    () => (vars ? { vars, shell: scriptShellFor(IS_WINDOWS, envKind), hibernated } : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   );

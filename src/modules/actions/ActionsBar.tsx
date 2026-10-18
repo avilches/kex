@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown01Icon, ComputerTerminal01Icon, FlashIcon, PlayIcon, StopIcon, Tick02Icon, AppWindowMacIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -174,25 +175,40 @@ export function EmptyActionsButton({ onConfigure }: { onConfigure: () => void })
 
 
 type BarProps = {
-  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
-  compact: boolean;
+  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction" | "hibernated"> | null;
   controller: BarController;
   onConfigure: () => void;
   onRestoreFocus: () => void;
 };
 
 // The Header's actions: own buttons in the user's order, then a menu of scripts and a menu
-// of apps. With no Actions at all, a single button that opens the editor.
-export function ActionsBar({ workspace, compact, controller, onConfigure, onRestoreFocus }: BarProps) {
-  const model = useActionsBarModel({ workspace, compact });
-  if (model.empty) return <EmptyActionsButton onConfigure={onConfigure} />;
+// of apps. The bar takes all the room between the title and the search box and measures it:
+// as it shrinks, the last own buttons fold into the menus instead of pushing the rest out.
+// With no Actions at all, a single button that opens the editor.
+export function ActionsBar({ workspace, controller, onConfigure, onRestoreFocus }: BarProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => setRoom(entries[0]?.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const model = useActionsBarModel({ workspace, room });
   return (
-    <>
-      {model.buttons.map((item) => (
-        <OwnButton key={item.id} item={item} {...controller} />
-      ))}
-      <GroupMenu label="Scripts" icon={ComputerTerminal01Icon} items={model.scripts} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
-      <GroupMenu label="Apps" icon={AppWindowMacIcon} items={model.apps} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
-    </>
+    <div ref={ref} data-tauri-drag-region className="flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
+      {model.empty ? (
+        <EmptyActionsButton onConfigure={onConfigure} />
+      ) : (
+        <>
+          {model.buttons.map((item) => (
+            <OwnButton key={item.id} item={item} {...controller} />
+          ))}
+          <GroupMenu label="Scripts" icon={ComputerTerminal01Icon} items={model.scripts} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
+          <GroupMenu label="Apps" icon={AppWindowMacIcon} items={model.apps} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
+        </>
+      )}
+    </div>
   );
 }

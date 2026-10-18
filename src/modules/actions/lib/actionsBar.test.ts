@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   actionAvailability,
   buildActionsBarModel,
+  BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
   isCompactBar,
+  MENUS_RESERVE,
+  ownButtonsThatFit,
+  ownButtonWidth,
 } from "./actionsBar";
 import type { Action } from "./types";
 
@@ -72,6 +76,14 @@ describe("actionAvailability", () => {
     expect(actionAvailability(app({ command: 'code "{cwd}' }), ctx)).toMatch(/quote/i);
   });
 
+  it("reports a hibernated workspace instead of doing nothing, ahead of every other reason", () => {
+    const asleep = { ...ctx, hibernated: true };
+    expect(actionAvailability(app(), asleep)).toBe("workspace is hibernated");
+    expect(actionAvailability(script(), asleep)).toBe("workspace is hibernated");
+    expect(actionAvailability(app({ command: "code {path}" }), asleep)).toBe("workspace is hibernated");
+    expect(actionAvailability(app({ command: "  " }), asleep)).toBe("it has no command");
+  });
+
   it("has no context outside a workspace: everything with a variable waits", () => {
     expect(actionAvailability(app(), null)).toBe("needs a workspace");
     expect(actionAvailability(app({ command: "open ." }), null)).toBeNull();
@@ -85,6 +97,41 @@ describe("isCompactBar", () => {
   });
 });
 
+describe("ownButtonWidth", () => {
+  it("grows with the name up to the label cap and adds the run zone of a script", () => {
+    const short = ownButtonWidth(app({ name: "Zed" }));
+    const long = ownButtonWidth(app({ name: "x".repeat(60) }));
+    const capped = ownButtonWidth(app({ name: "x".repeat(200) }));
+    expect(long).toBeGreaterThan(short);
+    expect(capped).toBe(long);
+    expect(ownButtonWidth(script({ name: "Zed" }))).toBeGreaterThan(short);
+  });
+});
+
+describe("ownButtonsThatFit", () => {
+  const four = [script({ id: "a" }), app({ id: "b" }), script({ id: "c" }), app({ id: "d" })];
+  const total = four.reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0);
+
+  it("keeps every button when there is room", () => {
+    expect(ownButtonsThatFit(four, total + MENUS_RESERVE)).toBe(4);
+  });
+
+  it("folds the last ones first as the room shrinks, keeping the order of the others", () => {
+    const widths = four.map((a) => ownButtonWidth(a) + BAR_GAP);
+    const room = (n: number) => widths.slice(0, n).reduce((a, b) => a + b, 0) + MENUS_RESERVE;
+    expect(ownButtonsThatFit(four, room(3))).toBe(3);
+    expect(ownButtonsThatFit(four, room(2))).toBe(2);
+    expect(ownButtonsThatFit(four, room(1))).toBe(1);
+    expect(ownButtonsThatFit(four, room(1) - 1)).toBe(0);
+  });
+
+  it("never reports a negative or fractional count", () => {
+    expect(ownButtonsThatFit(four, -50)).toBe(0);
+    expect(ownButtonsThatFit([], 500)).toBe(0);
+    expect(Number.isInteger(ownButtonsThatFit(four, 333.7))).toBe(true);
+  });
+});
+
 describe("buildActionsBarModel", () => {
   const actions = [
     script({ id: "s1", name: "dev", ownButton: true }),
@@ -95,18 +142,25 @@ describe("buildActionsBarModel", () => {
   ];
 
   it("keeps own buttons in user order, scripts and apps mixed", () => {
-    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, compact: false });
+    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1", "s3"]);
     expect(m.scripts.map((b) => b.id)).toEqual(["s2"]);
     expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
     expect(m.empty).toBe(false);
   });
 
-  it("moves own buttons into their menus when compact", () => {
-    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, compact: true });
+  it("moves every own button into its menu when none fits", () => {
+    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
     expect(m.scripts.map((b) => b.id)).toEqual(["s1", "s2", "s3"]);
     expect(m.apps.map((b) => b.id)).toEqual(["a1", "a2"]);
+  });
+
+  it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
+    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
+    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1"]);
+    expect(m.scripts.map((b) => b.id)).toEqual(["s2", "s3"]);
+    expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
   });
 
   it("carries the run state, the active mark and the disabled reason", () => {
@@ -115,7 +169,6 @@ describe("buildActionsBarModel", () => {
       context: ctx,
       states: new Map([["s1", "running"]]),
       activeId: "s1",
-      compact: false,
     });
     const [s, a] = m.buttons;
     expect(s).toMatchObject({ state: "running", active: true, disabledReason: null, stoppable: true });
@@ -128,13 +181,22 @@ describe("buildActionsBarModel", () => {
       context: ctx,
       states: new Map([["s1", "running"]]),
       activeId: undefined,
-      compact: false,
     });
     expect(m.buttons[0]).toMatchObject({ state: "running", disabledReason: null, stoppable: true });
   });
 
+  it("marks every Action of a hibernated workspace unavailable but lets a running script be stopped", () => {
+    const m = buildActionsBarModel({
+      actions: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true }), app({ id: "a1", ownButton: true })],
+      context: { ...ctx, hibernated: true },
+      states: new Map([["s1", "running"]]),
+      activeId: undefined,
+    });
+    expect(m.buttons.map((b) => b.disabledReason)).toEqual([null, "workspace is hibernated", "workspace is hibernated"]);
+  });
+
   it("reports empty only when there are no Actions at all", () => {
-    expect(buildActionsBarModel({ actions: [], context: ctx, states: new Map(), activeId: undefined, compact: false }).empty).toBe(true);
+    expect(buildActionsBarModel({ actions: [], context: ctx, states: new Map(), activeId: undefined }).empty).toBe(true);
   });
 
   it("labels an unnamed Action", () => {
@@ -143,7 +205,6 @@ describe("buildActionsBarModel", () => {
       context: ctx,
       states: new Map(),
       activeId: undefined,
-      compact: false,
     });
     expect(m.buttons[0]?.name).toBe("Action");
   });

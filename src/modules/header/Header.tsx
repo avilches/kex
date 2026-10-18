@@ -128,13 +128,10 @@ export function Header({
 
       <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} groups={groups} />
 
-      <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-
       <DevBranchBadge />
 
       <ActionsBar
         workspace={activeWorkspace}
-        compact={compact}
         controller={actionsController}
         onConfigure={onOpenActionsSettings}
         onRestoreFocus={onRestoreFocus}
