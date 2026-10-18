@@ -99,7 +99,7 @@ describe("createGlobalActions", () => {
     expect((await p).id).toBe("fresh-0");
   });
 
-  it("goes back to the preferences store once its echo has caught up", async () => {
+  it("goes back to the preferences store once it reports anything after the writes", async () => {
     const h = harness();
     const p = h.store.add(act("a"));
     await h.finish(0);
@@ -109,5 +109,27 @@ describe("createGlobalActions", () => {
     expect(h.store.get().map((a) => a.id)).toEqual(["a"]);
     h.echo([act("a"), act("other-window")]);
     expect(h.store.get().map((a) => a.id)).toEqual(["a", "other-window"]);
+  });
+
+  it("another window's change that differs from what was written is not overwritten by the next add", async () => {
+    const h = harness();
+    const first = h.store.add(act("a"));
+    await h.finish(0);
+    await first;
+    h.echo([act("a"), act("x")]);
+    const second = h.store.add(act("b"));
+    await h.finish(1);
+    await second;
+    expect(h.writes[h.writes.length - 1]!.map((a) => a.id)).toEqual(["a", "x", "b"]);
+  });
+
+  it("after a failed write the store is the truth when the disk differs", async () => {
+    const h = harness({ failOn: 1 });
+    const result = h.store.add(act("a"));
+    const settled = expect(result).rejects.toThrow("disk full");
+    await h.finish(0);
+    await settled;
+    h.echo([act("x")]);
+    expect(h.store.get().map((a) => a.id)).toEqual(["x"]);
   });
 });

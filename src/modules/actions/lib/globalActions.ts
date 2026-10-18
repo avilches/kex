@@ -8,8 +8,6 @@ type Deps = {
   makeId: () => string;
 };
 
-const sameList = (a: readonly Action[], b: readonly Action[]) => JSON.stringify(a) === JSON.stringify(b);
-
 // Synchronous source of truth for the global Actions while writes are in flight. The
 // preferences store only follows a write after it reaches disk and comes back as an event,
 // so two changes made in quick succession would otherwise both start from the same stale
@@ -18,12 +16,14 @@ const sameList = (a: readonly Action[], b: readonly Action[]) => JSON.stringify(
 export function createGlobalActions({ read, write, makeId }: Deps) {
   let current: Action[] | null = null;
   let pending = 0;
+  // What the preferences store showed when the current burst of writes began. Any later
+  // change to it, whether our own echo or another window, makes the store the truth again.
+  let base: Action[] | null = null;
   let chain: Promise<void> = Promise.resolve();
 
-  // Once nothing is in flight and the preferences store shows what was written, reads go back
-  // to it, so edits made from another window show up again.
+  // The copy only lives while writes are in flight and until the store reports anything new.
   function sync(): void {
-    if (pending === 0 && current && sameList(current, read())) current = null;
+    if (pending === 0 && current && read() !== base) current = null;
   }
 
   const get = (): Action[] => {
@@ -37,6 +37,7 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     const next = adoptAction(get(), clean, makeId);
     const stored = next[next.length - 1];
     if (!stored) return Promise.reject(new Error("Invalid action"));
+    if (pending === 0) base = read();
     current = next;
     pending++;
     const run = chain.then(() => write(current ?? next));
