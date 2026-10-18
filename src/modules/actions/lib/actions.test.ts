@@ -40,6 +40,21 @@ describe("addAction / updateAction / removeAction", () => {
   it("removes by id", () => {
     expect(removeAction([act("a"), act("b")], "a").map((a) => a.id)).toEqual(["b"]);
   });
+
+  it("keeps in memory exactly what normalize would persist", () => {
+    const [added] = addAction([], act("a", { name: " A ", command: " ls " }));
+    expect(added).toEqual(act("a", { name: "A", command: "ls" }));
+    const [app] = updateAction([act("a", { cwdMode: "fixed", cwd: "/x" })], "a", { runInTerminal: false });
+    expect(app).not.toHaveProperty("cwdMode");
+    expect(app).not.toHaveProperty("cwd");
+  });
+
+  it("refuses an add or an update that would leave an empty command", () => {
+    const list = [act("a")];
+    expect(addAction(list, act("b", { command: "  " }))).toBe(list);
+    const updated = updateAction(list, "a", { command: "   " });
+    expect(updated[0]).toEqual(list[0]);
+  });
 });
 
 describe("reorderActions", () => {
@@ -96,21 +111,24 @@ describe("normalizeActions", () => {
 
 describe("promoteToGlobal", () => {
   it("moves the action and keeps its id", () => {
-    const r = promoteToGlobal([act("a"), act("b")], [act("g")], "a");
+    const r = promoteToGlobal([act("a"), act("b")], [act("g")], "a", () => "unused");
     expect(r.workspace.map((a) => a.id)).toEqual(["b"]);
     expect(r.global.map((a) => a.id)).toEqual(["g", "a"]);
   });
 
-  it("never duplicates: an id already global stays single", () => {
-    const r = promoteToGlobal([act("a")], [act("a", { name: "old" })], "a");
+  it("an id already taken in the global list gets a fresh id, so neither version is lost", () => {
+    const r = promoteToGlobal([act("a", { name: "mine" })], [act("a", { name: "old" })], "a", () => "fresh");
     expect(r.workspace).toEqual([]);
-    expect(r.global).toHaveLength(1);
+    expect(r.global.map((a) => [a.id, a.name])).toEqual([
+      ["a", "old"],
+      ["fresh", "mine"],
+    ]);
   });
 
   it("is a no-op for an unknown id", () => {
     const w = [act("a")];
     const g = [act("g")];
-    const r = promoteToGlobal(w, g, "zz");
+    const r = promoteToGlobal(w, g, "zz", () => "unused");
     expect(r.workspace).toBe(w);
     expect(r.global).toBe(g);
   });

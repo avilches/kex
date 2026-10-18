@@ -3,9 +3,12 @@ import type { Action } from "./types";
 
 const CWD_MODES: readonly ScriptCwdMode[] = ["workspace", "context", "fixed"];
 
+// Add and update keep memory equal to what normalizeActions would persist: an action that
+// would end up invalid (an empty command) is refused and the list keeps its previous value.
 export function addAction(list: readonly Action[], action: Action): Action[] {
-  if (list.some((a) => a.id === action.id)) return list as Action[];
-  return [...list, action];
+  const clean = normalizeAction(action);
+  if (!clean || list.some((a) => a.id === clean.id)) return list as Action[];
+  return [...list, clean];
 }
 
 export function updateAction(
@@ -13,7 +16,7 @@ export function updateAction(
   id: string,
   patch: Partial<Omit<Action, "id">>,
 ): Action[] {
-  return list.map((a) => (a.id === id ? { ...a, ...patch, id: a.id } : a));
+  return list.map((a) => (a.id === id ? (normalizeAction({ ...a, ...patch, id: a.id }) ?? a) : a));
 }
 
 export function removeAction(list: readonly Action[], id: string): Action[] {
@@ -30,7 +33,7 @@ export function reorderActions(list: readonly Action[], fromId: string, toId: st
   return next;
 }
 
-function normalizeOne(raw: unknown): Action | null {
+export function normalizeAction(raw: unknown): Action | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.id !== "string" || !r.id) return null;
@@ -59,7 +62,7 @@ export function normalizeActions(raw: unknown): Action[] {
   const seen = new Set<string>();
   const out: Action[] = [];
   for (const entry of raw) {
-    const action = normalizeOne(entry);
+    const action = normalizeAction(entry);
     if (!action || seen.has(action.id)) continue;
     seen.add(action.id);
     out.push(action);
@@ -67,18 +70,23 @@ export function normalizeActions(raw: unknown): Action[] {
   return out;
 }
 
-// Moves, never copies: the action leaves the workspace and keeps its id in the global list.
+// Adds an action to a list it does not belong to. When its id is already taken there, it gets
+// a fresh one, so neither version is lost.
+export function adoptAction(list: readonly Action[], action: Action, makeId: () => string): Action[] {
+  const taken = list.some((a) => a.id === action.id);
+  return [...list, taken ? { ...action, id: makeId() } : action];
+}
+
+// Moves, never copies: the action leaves the workspace and joins the global list.
 export function promoteToGlobal(
   workspace: readonly Action[],
   global: readonly Action[],
   id: string,
+  makeId: () => string,
 ): { workspace: Action[]; global: Action[] } {
   const action = workspace.find((a) => a.id === id);
   if (!action) return { workspace: workspace as Action[], global: global as Action[] };
-  return {
-    workspace: removeAction(workspace, id),
-    global: global.some((a) => a.id === id) ? (global as Action[]) : [...global, action],
-  };
+  return { workspace: removeAction(workspace, id), global: adoptAction(global, action, makeId) };
 }
 
 export type HeaderPartition = {

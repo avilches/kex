@@ -1,5 +1,7 @@
 export {
   addAction,
+  adoptAction,
+  normalizeAction,
   normalizeActions,
   partitionForHeader,
   promoteToGlobal,
