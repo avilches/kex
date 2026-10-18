@@ -73,7 +73,7 @@ describe("commandProblem", () => {
 
   it("for a script, refuses a variable inside the user's own quotes and names it", () => {
     expect(commandProblem(`printf "{cwd}"`, "posix")).toMatch(/\{cwd\} sits inside quotes/);
-    expect(commandProblem(`echo '{path}' {cwd}`, "posix")).toMatch(/\{path\}/);
+    expect(commandProblem(`echo '{file}' {cwd}`, "posix")).toMatch(/\{file\}/);
     expect(commandProblem("echo x\n  cd \"a {?dir {dir}}\"", "powershell")).toMatch(/\{dir\}/);
   });
 
@@ -236,6 +236,107 @@ for (const shell of ["bash", "zsh"]) {
       const line = expandCommandShell("a={cwd}\nprintf '%s' \"$a\"\n", { cwd: "/x y" }, "posix");
       const res = spawnSync(shell, ["-c", line]);
       expect(res.stdout.toString()).toBe("/x y");
+    });
+  });
+}
+
+const INJECTION = "$(touch PWNED)";
+
+describe("quote detector: cases that used to slip through", () => {
+  const flagged: [string, string, "posix" | "powershell"][] = [
+    ["nested quotes in a command substitution", `echo "$(echo "{cwd}")"`, "posix"],
+    ["nested quotes in a PowerShell subexpression", `Write-Host "$(Get-Item "{cwd}")"`, "powershell"],
+    ["a backslash before the brace inside double quotes", `echo "\\{cwd}"`, "posix"],
+    ["a backslash before the brace outside quotes", `echo \\{cwd}`, "posix"],
+    ["a backtick before the brace in PowerShell double quotes", "Write-Host \"`{cwd}\"", "powershell"],
+    ["PowerShell smart double quotes", "Write-Host \u201c{cwd}\u201d", "powershell"],
+    ["PowerShell smart single quotes", "Write-Host \u2018{cwd}\u2019", "powershell"],
+    ["a bash ANSI-C string", `echo $'x {cwd} y'`, "posix"],
+    ["a heredoc body", "cat <<EOF\nroot: {cwd}\nEOF\n", "posix"],
+    ["a group in single quotes that holds a known variable", `jq '{a: {cwd}}'`, "posix"],
+  ];
+  for (const [name, command, shell] of flagged) {
+    it(`flags ${name}`, () => {
+      expect(commandProblem(command, shell)).toMatch(/\{\w+\}/);
+      expect(() => expandCommandShell(command, { cwd: "/x" }, shell)).toThrow();
+    });
+  }
+
+  it("lets a variable stand bare inside a substitution that has its own quotes", () => {
+    expect(commandProblem(`echo "$(echo {cwd})"`, "posix")).toBeNull();
+  });
+
+  it("does not flag braces that are not known variables", () => {
+    expect(commandProblem(`awk '{print}' {cwd}`, "posix")).toBeNull();
+    expect(commandProblem(`jq '{a}' {cwd}`, "posix")).toBeNull();
+    expect(expandCommandShell(`awk '{print}' {cwd}`, { cwd: "/x" }, "posix")).toBe(`awk '{print}' '/x'`);
+  });
+
+  it("is not thrown off by apostrophes in comments and heredoc bodies", () => {
+    expect(commandProblem("# don't\necho {cwd}", "posix")).toBeNull();
+    expect(commandProblem("echo hi # don't\necho {cwd}", "posix")).toBeNull();
+    expect(commandProblem("cat <<EOF\nit's here\nEOF\necho {cwd}", "posix")).toBeNull();
+    expect(commandProblem("cat <<'EOF'\ndon't\nEOF\necho {cwd}", "posix")).toBeNull();
+    expect(commandProblem("# it's\nls {cwd}", "powershell")).toBeNull();
+    expect(commandProblem("<# it's #> ls {cwd}", "powershell")).toBeNull();
+  });
+});
+
+describe("second line of defense on values", () => {
+  it("refuses a risky value when the command has double quotes, a backtick or $(", () => {
+    for (const command of [`echo "x" {cwd}`, "echo `date` {cwd}", "echo $(date) {cwd}"]) {
+      for (const value of [INJECTION, "a`b", 'a"b', "a'b", "a\\b"]) {
+        expect(() => expandCommandShell(command, { cwd: value }, "posix")).toThrow(/cannot be inserted safely/);
+      }
+    }
+  });
+
+  it("lets plain values through, and any value when the command has no such construct", () => {
+    expect(expandCommandShell(`echo "x" {cwd}`, { cwd: "/a b/c" }, "posix")).toBe(`echo "x" '/a b/c'`);
+    expect(expandCommandShell("echo {cwd}", { cwd: INJECTION }, "posix")).toBe(`echo '${INJECTION}'`);
+  });
+
+  it("only looks at the values that are written", () => {
+    expect(expandCommandShell(`echo "x" {path|cwd}`, { path: "", cwd: "/ok" }, "posix")).toBe(`echo "x" '/ok'`);
+  });
+
+  it("applies to PowerShell, where a backslash is harmless", () => {
+    expect(() => expandCommandShell('Write-Host "x" {cwd}', { cwd: "a$b" }, "powershell")).toThrow(/safely/);
+    expect(() => expandCommandShell('Write-Host "x" {cwd}', { cwd: "it\u2019s" }, "powershell")).toThrow(/safely/);
+    expect(expandCommandShell('Write-Host "x" {cwd}', { cwd: "C:\\a b" }, "powershell")).toBe(
+      "Write-Host \"x\" 'C:\\a b'",
+    );
+  });
+
+  it("strips C1 controls and the Unicode line separators from values", () => {
+    expect(expandCommandShell("ls {cwd}", { cwd: "a\u0085b\u009fc\u2028d\u2029e" }, "posix")).toBe("ls 'abcde'");
+    expect(expandCommandShell("ls {cwd}", { cwd: "a\u2028b" }, "powershell")).toBe("ls 'ab'");
+  });
+});
+
+for (const shell of ["bash", "zsh"]) {
+  describe.skipIf(!hasShell(shell))(`injection canary run by ${shell}`, () => {
+    const cases: [string, string][] = [
+      ["nested quotes", `printf '%s' "$(printf '%s' "{cwd}")"`],
+      ["a backslash before the brace", `printf '%s' "\\{cwd}"`],
+      ["an ANSI-C string", `printf '%s' $'{cwd}'`],
+    ];
+    for (const [name, command] of cases) {
+      it(`${name}: the text would run as written, and Kex refuses it`, () => {
+        const dir = mkdtempSync(join(tmpdir(), "kex-cmd-"));
+        try {
+          expect(() => expandCommandShell(command, { cwd: INJECTION }, "posix")).toThrow();
+          spawnSync(shell, ["-c", command.replace("{cwd}", `'${INJECTION}'`)], { cwd: dir });
+          if (!name.includes("ANSI")) expect(existsSync(join(dir, "PWNED"))).toBe(true);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+    }
+
+    it("a command with double quotes and a safe value runs normally", () => {
+      const line = expandCommandShell(`printf '%s|%s' "a b" {cwd}`, { cwd: "/x y" }, "posix");
+      expect(spawnSync(shell, ["-c", line]).stdout.toString()).toBe("a b|/x y");
     });
   });
 }

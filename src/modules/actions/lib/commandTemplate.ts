@@ -1,7 +1,9 @@
 import { quoteShellArg } from "@/lib/shellQuote";
+import { quotedVariables } from "@/modules/actions/lib/quotedVariables";
 import {
   missingTemplateVariables,
   renderTemplate,
+  TITLE_VARIABLES,
   titleVariablesUsed,
   type TemplateVars,
 } from "@/modules/workspaces/lib/titleTemplate";
@@ -47,47 +49,13 @@ export function splitArgv(command: string): string[] {
   return args;
 }
 
-// Names of the variables written inside quotes of the command's own. In a script the value
-// is quoted by Kex, so one placed inside the user's quotes would be quoted a second time
-// and, inside double quotes, a $(...) in the value would run.
-export function quotedVariables(command: string, shell: CommandShell): string[] {
-  const escapeChar = shell === "powershell" ? "`" : "\\";
-  const found: string[] = [];
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < command.length; i++) {
-    const ch = command.charAt(i);
-    if (quote === "'") {
-      if (ch === "'") quote = null;
-    } else if (ch === escapeChar) {
-      i++;
-    } else if (quote === '"') {
-      if (ch === '"') quote = null;
-    } else if (ch === '"' || ch === "'") {
-      quote = ch;
-    }
-    if (!quote || ch !== "{") continue;
-    if (command.charAt(i + 1) === "{") {
-      i++;
-      continue;
-    }
-    let depth = 0;
-    let j = i;
-    for (; j < command.length; j++) {
-      if (command.charAt(j) === "{") depth++;
-      else if (command.charAt(j) === "}" && --depth === 0) break;
-    }
-    if (depth !== 0) continue;
-    for (const name of titleVariablesUsed(command.slice(i, j + 1))) found.push(name);
-    i = j;
-  }
-  return [...new Set(found)];
-}
+const knownTitleVariable = (name: string) => (TITLE_VARIABLES as readonly string[]).includes(name);
 
-function quotedProblem(command: string, shell: CommandShell): string | null {
-  const quoted = quotedVariables(command, shell);
+function quotedProblem(command: string, shell: CommandShell, isKnown = knownTitleVariable): string | null {
+  const quoted = quotedVariables(command, shell, isKnown);
   if (quoted.length === 0) return null;
   const names = quoted.map((n) => `{${n}}`).join(", ");
-  return `${names} sits inside quotes: write it without quotes, Kex quotes the value itself`;
+  return `${names} sits inside quotes, a heredoc or after an escape: write it bare, Kex quotes the value itself`;
 }
 
 // Why a command cannot be launched as it is typed, or null when it can. Without a shell
@@ -116,33 +84,63 @@ export function expandCommandArgv(command: string, vars: TemplateVars): string[]
 const POWERSHELL_QUOTES = /['‘’‚‛]/g;
 
 // The line is typed into a terminal, where a control character (a newline would end the
-// command, ESC or ^C act on the terminal) is never part of a name worth keeping.
+// command, ESC or ^C act on the terminal) is never part of a name worth keeping. C0, DEL, C1
+// (some terminals read them as escape sequences) and the Unicode line and paragraph
+// separators (which PowerShell reads as line breaks) go.
 function stripControl(value: string): string {
   let out = "";
   for (const ch of value) {
     const code = ch.charCodeAt(0);
-    if (code > 0x1f && code !== 0x7f) out += ch;
+    const control = code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+    if (!control) out += ch;
   }
   return out;
 }
 
-function quoteFor(shell: CommandShell): (value: string) => string {
-  return shell === "powershell"
-    ? (value) => `'${stripControl(value).replace(POWERSHELL_QUOTES, (q) => q + q)}'`
-    : (value) => quoteShellArg(stripControl(value), false);
+// Where a quoting mistake could turn a value into code: a double quote, a backtick or a
+// $( anywhere in the command means some value might end up inside an expansion context.
+const EXPANSION_CONTEXT = {
+  posix: /["`]|\$\(/,
+  powershell: /["`\u201c\u201d\u201e]|\$\(/,
+};
+// What such a value must not hold. PowerShell does not treat a backslash specially.
+const DANGEROUS_VALUE = {
+  posix: /[$`"'\\]/,
+  powershell: /[$`"'\u2018\u2019\u201a\u201b\u201c\u201d\u201e]/,
+};
+
+function quoteFor(command: string, shell: CommandShell): (value: string) => string {
+  const guarded = EXPANSION_CONTEXT[shell].test(command);
+  const quote =
+    shell === "powershell"
+      ? (v: string) => `'${v.replace(POWERSHELL_QUOTES, (q) => q + q)}'`
+      : (v: string) => quoteShellArg(v, false);
+  return (value) => {
+    const clean = stripControl(value);
+    if (guarded && DANGEROUS_VALUE[shell].test(clean)) {
+      throw new Error(
+        "a value holds $, a backtick, a backslash or a quote and the command has double quotes, a backtick or $(...), so it cannot be inserted safely",
+      );
+    }
+    return quote(clean);
+  };
 }
 
 // For a script typed into a terminal: the text is kept exactly as written (line breaks and
 // spacing included) and each value is quoted for the shell, so the user writes {cwd}
-// bare. A variable inside the user's own quotes is refused (it would be quoted twice and,
-// in double quotes, a $(...) in the value would run). A value starting with a dash is
-// still an option to the program: the command itself must put `--` before it when needed.
-// Run it only once missingVariables is empty: an empty value writes nothing, and the
-// argument it stood for silently disappears.
+// bare. A variable inside the user's own quotes, a heredoc or after an escape is refused
+// (it would be quoted twice and, in double quotes, a $(...) in the value would run). The
+// scan can be fooled, so as a second line of defense, when the command has a double quote,
+// a backtick or $( anywhere, a written value holding $, a backtick, a quote or (posix) a
+// backslash is refused too instead of guessing; plain values stay allowed. A value
+// starting with a dash is still an option to the program: the command itself must put
+// `--` before it when needed. Run it only once missingVariables is empty: an empty value
+// writes nothing, and the argument it stood for silently disappears.
 export function expandCommandShell(command: string, vars: TemplateVars, shell: CommandShell): string {
-  const problem = quotedProblem(command, shell);
+  const known = (name: string) => typeof vars[name] === "string";
+  const problem = quotedProblem(command, shell, known);
   if (problem) throw new Error(problem);
-  return renderTemplate(command, vars, quoteFor(shell));
+  return renderTemplate(command, vars, quoteFor(command, shell));
 }
 
 export function commandVariablesUsed(command: string): Set<string> {
