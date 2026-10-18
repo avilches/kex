@@ -22,3 +22,5 @@ export {
   suggestionsFromDetected,
   type AppSuggestion,
 } from "./lib/appSuggestions";
+export { ActionsBar } from "./ActionsBar";
+export type { BarController } from "./lib/useActionsBar";
