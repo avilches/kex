@@ -11,9 +11,14 @@ Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un 
 1. Arrancar `pnpm dev` (en un worktree, con `--port <libre>` si el 1420 esta ocupado) y abrir
    `http://localhost:<puerto>/theme-preview.html?theme=<id>&mode=light|dark&view=swatches|app`.
    `view=swatches` lista cada superficie y cada token con su hex; `view=app` monta una
-   aproximacion de la aplicacion (WorkspaceBar, Sidebar, Header, terminal y editor) dos veces,
-   con el foco en cada panel. Ambas vistas son estaticas: todos los estados (con foco y sin foco)
-   estan a la vez en pantalla, sin hacer clic en nada.
+   aproximacion de la aplicacion (WorkspaceBar con tabs de ejemplo, Sidebar de Explorer y de
+   Source Control, Header, terminal, editor y el par de Live Preview) dos veces, con el foco en
+   cada panel. Ambas vistas son estaticas: todos los estados (con foco y sin foco) estan a la vez
+   en pantalla, sin hacer clic en nada.
+   El tema se cambia con un boton por tema o con las flechas (izquierda/derecha recorren los temas,
+   arriba/abajo cambian de modo). El tuner ajusta el tono y la claridad del fondo y el alfa del
+   texto normal y del ignorado, con el hex y el ratio ya compuestos: sirve para buscar un valor a
+   ojo y "Export changes (copy)" copia un JSON con ese valor para hornearlo en el tema.
 2. Editar `src/modules/theme/themes/*.ts`; Vite recarga la pagina solo. Leer el resultado con
    `window.kexThemePreview.dump()` (hex de todos los tokens y de los colores de git) o con los
    atributos `data-hex`, nunca con una captura: Dark Reader falsea los colores en Chrome.
