@@ -384,7 +384,7 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
   return h(
     "div",
     {
-      class: "min-w-0 flex-1 overflow-hidden rounded-md border border-border",
+      class: "min-w-[370px] flex-1 overflow-hidden rounded-md border border-border",
       "data-pane": kind, "data-focused": String(focused), "data-dim": String(dim),
     },
     strip, body,
@@ -395,14 +395,14 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
 function appFrame(focus: PaneKind): HTMLElement {
   return h(
     "div",
-    { class: "flex h-[520px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app", "data-focus": focus },
+    { class: "flex min-h-[520px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app", "data-focus": focus },
     workspaceBar(),
-    h("div", { class: "overflow-auto" }, sidebar()),
+    h("div", { class: "max-h-[520px] overflow-auto" }, sidebar()),
     h(
       "div",
       { class: "flex min-w-0 flex-1 flex-col gap-2 p-2" },
       header(),
-      h("div", { class: "flex min-h-0 flex-1 gap-2" }, pane("terminal", focus === "terminal"), pane("editor", focus === "editor")),
+      h("div", { class: "flex min-h-0 flex-1 flex-wrap gap-2" }, pane("terminal", focus === "terminal"), pane("editor", focus === "editor")),
       h("div", { class: "flex items-center gap-3 rounded bg-card px-2 py-1 text-[11px] text-muted-foreground" }, h("span", {}, "main"), h("span", {}, "2 changed")),
     ),
   );
@@ -505,7 +505,7 @@ function markdownView(): HTMLElement {
   const preview = pane("Preview", markdownDemo, buildStaticPreviewExtensions(identity));
   markdownViews.rich = rich.view;
   markdownViews.preview = preview.view;
-  return h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2", "data-editor-theme": id }, rich.node, preview.node);
+  return h("div", { class: "grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] gap-3", "data-editor-theme": id }, rich.node, preview.node);
 }
 
 function allThemes(): Theme[] {
