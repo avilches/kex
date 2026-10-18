@@ -37,9 +37,29 @@ se pagó una vez.
 **1. La paleta original se respeta; los colores atenuados son nuestros.**
 - Los valores de la paleta oficial (fondo, texto, colores de acento, los 16 ANSI, el fondo de
   editor y de terminal si el original los distingue) se copian tal cual, sin retocarlos "porque
-  quedan mejor". `withReadableText` (`readableColors.ts`) solo sube el contraste, al aplicar el tema
-  y solo en los temas incluidos, de los tokens de texto tenue (`mutedForeground`,
-  `primaryForeground`, `sidebarPrimaryForeground`), hasta 4.5:1 y conservando el tono.
+  quedan mejor". Los ficheros de tema guardan esos valores; lo que aplica la app sale de
+  `withReadableTheme` (`readableColors.ts`), que `themes/index.ts` pasa por cada tema incluido al
+  registrarlo (los temas del usuario no se tocan). Solo sube contraste, conservando el tono, y los
+  suelos son: 4.5:1 para `foreground`, `*Foreground` sobre su superficie, `destructive` sobre
+  `background` y `sidebar`, `link` sobre el fondo del editor y el texto del terminal (y sobre su
+  seleccion); 3:1 para `tabFocusIndicator` sobre `background` y `sidebar`. Si el texto de un boton
+  no llega ni con blanco o negro puros (`primaryForeground`/`sidebarPrimaryForeground`), cede el
+  fondo (`primary`/`sidebarPrimary`), que se oscurece lo justo. `link` y `tabFocusIndicator`
+  se derivan de `primary` si el tema no los define: el texto sobre `primary` y `primary` como
+  texto sobre el fondo piden direcciones opuestas, por eso son tokens aparte.
+- **Excepciones decididas (se quedan con el valor de la paleta):** los tonos ANSI de color (1-6 y
+  9-14) de los temas oscuros, que bajan de 4.5:1 (peor caso, rojo de Gruvbox 2.69); xterm no los
+  corrige en oscuro y TASK-785 decide ese contraste. Solo se separa del fondo `black`, `white` y
+  `bright-white` (minimo 1.5:1, sin ser iguales al fondo) y `bright-black` (minimo 3:1).
+- Los colores de git (`gitStatusColor.ts`) son tablas por esquema y modo, no por tema: cada tabla
+  llega a 4.5:1 sobre el sidebar de todos los temas incluidos de su modo, y
+  `themes/contrast.test.ts` lo fija. Si se anade un tema con un sidebar mas claro (en oscuro) o mas
+  oscuro (en claro) que los existentes, el test dira que tabla hay que mover.
+- Los tokens de sintaxis de los temas de editor (`editor/lib/themes.ts`) pasan por `readableSpec`:
+  4.5:1 sobre su fondo y sobre el fondo del editor de cada tema de app que los empareja. Los temas de
+  paquetes upstream (`@uiw/codemirror-theme-*`) se reconstruyen desde sus datos para ello.
+- El H6 del Live Preview es un encabezado atenuado a proposito (`H6_TEXT_SHARE` en
+  `markdownExtensions.ts`, 75% del texto); se mantiene en 3:1 o mas en todos los temas, no en 4.5.
 - Los tokens que la paleta original no define (`muted`, `secondary`, `accent`, `border`, `input`,
   `ring`, `card`, `popover`, `sidebar*`) los derivamos nosotros mezclando su fondo y su texto, y se
   eligen mirando `theme-preview.html` (vistas `swatches` y `app`), no a ojo en el código: el texto de

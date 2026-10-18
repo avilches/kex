@@ -38,14 +38,16 @@ token. It is dev only and not part of `pnpm build`.
   A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
   lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
 - A third view, `markdown`, puts Rich (the Live Preview editor) and Preview (the read-only view) side by
-  side on `src/theme-preview/live-preview-demo.md`. Both documents have the same number of lines (Preview
-  turns the frontmatter into a yaml fence of the same height), so line n of one is line n of the other:
+  side on `src/theme-preview/live-preview-demo.md`. Both panes get the same text (Preview shows
+  the frontmatter as the same monospace lines as Rich, not as a fence), so line n of one is line n of the other:
   `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
   computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
   two approximations of the real window (WorkspaceBar, Sidebar, Header, a terminal pane and an editor
-  pane side by side, status strip): one with the terminal focused, one with the editor focused. An
+  pane side by side, status strip): one with the terminal focused, one with the editor focused. Panes
+  are at least 370 px wide (what their text needs), so when the frame is narrower than ~750 px (the
+  window is under ~1000 px) the two panes wrap onto two rows instead of clipping text. An
   unfocused pane is drawn like `PaneView` does: a black overlay at the theme's
   `inactivePaneDim[kind]` opacity (each pane prints its `data-dim`), and only the focused pane's
   tab gets the `tab-focus-indicator` bar. Terminal panes show prompt, command output in ANSI colors,

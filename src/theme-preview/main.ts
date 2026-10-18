@@ -12,7 +12,6 @@ import {
   buildLivePreviewExtensions,
   buildStaticPreviewExtensions,
 } from "@/modules/markdown/codemirror/lib/markdownExtensions";
-import { frontmatterAsCodeBlock } from "@/modules/markdown/lib/frontmatter";
 import {
   EDITOR_THEME_LABELS,
   EDITOR_THEMES,
@@ -55,7 +54,7 @@ const TOKENS = [
   "accent-foreground", "destructive", "border", "input", "ring", "sidebar",
   "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
   "sidebar-accent", "sidebar-accent-foreground", "sidebar-border",
-  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "note-editor-background", "note-editor-foreground", "note-terminal-background", "note-terminal-foreground", "terminal-background",
+  "sidebar-ring", "tab-focus-indicator", "link", "editor-background", "editor-foreground", "note-editor-background", "note-editor-foreground", "note-terminal-background", "note-terminal-foreground", "terminal-background",
   "terminal-foreground", "terminal-cursor", "terminal-cursor-accent",
   "terminal-selection", ...ANSI_NAMES.map((n) => `terminal-ansi-${n}`),
 ];
@@ -398,7 +397,7 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
   return h(
     "div",
     {
-      class: "min-w-0 flex-1 overflow-hidden rounded-md border border-border",
+      class: "min-w-[370px] flex-1 overflow-hidden rounded-md border border-border",
       "data-pane": kind, "data-focused": String(focused), "data-dim": String(dim),
     },
     strip, body,
@@ -409,14 +408,14 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
 function appFrame(focus: PaneKind): HTMLElement {
   return h(
     "div",
-    { class: "flex h-[520px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app", "data-focus": focus },
+    { class: "flex min-h-[520px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app", "data-focus": focus },
     workspaceBar(),
-    h("div", { class: "overflow-auto" }, sidebar()),
+    h("div", { class: "max-h-[520px] overflow-auto" }, sidebar()),
     h(
       "div",
       { class: "flex min-w-0 flex-1 flex-col gap-2 p-2" },
       header(),
-      h("div", { class: "flex min-h-0 flex-1 gap-2" }, pane("terminal", focus === "terminal"), pane("editor", focus === "editor")),
+      h("div", { class: "flex min-h-0 flex-1 flex-wrap gap-2" }, pane("terminal", focus === "terminal"), pane("editor", focus === "editor")),
       h("div", { class: "flex items-center gap-3 rounded bg-card px-2 py-1 text-[11px] text-muted-foreground" }, h("span", {}, "main"), h("span", {}, "2 changed")),
     ),
   );
@@ -516,7 +515,7 @@ function markdownView(): HTMLElement {
     return { view, node: h("div", { class: "flex min-w-0 flex-col gap-1" }, h("div", { class: "text-[11px] text-muted-foreground" }, label), host) };
   };
   const rich = pane("Rich", markdownDemo, buildLivePreviewExtensions(identity));
-  const preview = pane("Preview", frontmatterAsCodeBlock(markdownDemo), buildStaticPreviewExtensions(identity));
+  const preview = pane("Preview", markdownDemo, buildStaticPreviewExtensions(identity));
   markdownViews.rich = rich.view;
   markdownViews.preview = preview.view;
   return h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2", "data-editor-theme": id }, rich.node, preview.node);
@@ -585,7 +584,7 @@ function render(): void {
       "div",
       { class: "flex min-w-[380px] flex-1 flex-col gap-3" },
       header(), tabBar(),
-      h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2" }, pane("terminal", true), pane("terminal", false), pane("editor", true), pane("editor", false)),
+      h("div", { class: "grid grid-cols-[repeat(auto-fit,minmax(370px,1fr))] gap-3" }, pane("terminal", true), pane("terminal", false), pane("editor", true), pane("editor", false)),
     ),
   );
   const buttons = h(

@@ -1,3 +1,4 @@
+import { withReadableTheme } from "../readableColors";
 import { DEFAULT_THEME_ID, type Theme } from "../types";
 import { caffeine } from "./caffeine";
 import { catppuccin } from "./catppuccin";
@@ -17,6 +18,8 @@ import { kexDefault } from "./kex-default";
 import { tide } from "./tide";
 import { tokyoNight } from "./tokyo-night";
 
+// What the app applies: palettes as written in the theme files, with the text
+// and accent tokens that miss their contrast floor nudged (readableColors.ts).
 const BUILTIN: Theme[] = [
   kexDefault,
   jetbrainsClassic,
@@ -34,7 +37,7 @@ const BUILTIN: Theme[] = [
   tide,
   sage,
   caffeine,
-];
+].map(withReadableTheme);
 
 // Palettes that carry only a terminal. They stay out of BUILTIN so they never
 // show up as app themes; the terminal catalog adds them back.

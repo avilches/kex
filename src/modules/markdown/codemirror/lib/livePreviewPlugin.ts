@@ -339,6 +339,7 @@ type LineTraits = {
   quoteIndent?: number;
   list?: number;
   heading?: number;
+  frontmatter?: boolean;
 };
 
 const lineDecoCache = new Map<string, Decoration>();
@@ -346,7 +347,7 @@ const lineDecoCache = new Map<string, Decoration>();
 // Depths reach the stylesheet as custom properties: one bar per quote level,
 // one indent step per list level below the first.
 function lineDecoration(t: LineTraits): Decoration {
-  const flags = [t.code, t.plain, t.codeFirst, t.codeLast, t.fence].map((b) => (b ? 1 : 0)).join("");
+  const flags = [t.code, t.plain, t.codeFirst, t.codeLast, t.fence, t.frontmatter].map((b) => (b ? 1 : 0)).join("");
   const key = `${flags}|${t.quote ?? 0}|${t.quoteIndent ?? 0}|${t.list ?? 0}|${t.heading ?? 0}`;
   let deco = lineDecoCache.get(key);
   if (!deco) {
@@ -369,6 +370,7 @@ function lineDecoration(t: LineTraits): Decoration {
       styles.push(`--lp-list-depth: ${t.list}`);
     }
     if (t.heading) classes.push("cm-lp-heading-line", `cm-lp-hl${t.heading}`);
+    if (t.frontmatter) classes.push("cm-lp-frontmatter");
     deco = Decoration.line({
       class: classes.join(" "),
       ...(styles.length > 0 ? { attributes: { style: styles.join("; ") } } : {}),
@@ -493,6 +495,7 @@ function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => st
       t.quoteIndent = Math.min(indent, t.quoteIndent ?? indent);
     }
     for (const { from: start, level } of plan.headingLines) traitsOf(start).heading = level;
+    for (const start of plan.frontmatterLines) traitsOf(start).frontmatter = true;
     // plan.tables is rendered by tableField: block widgets cannot come from a plugin.
   }
   for (const [pos, traits] of lineTraits) decorations.push({ from: pos, to: pos, deco: lineDecoration(traits) });

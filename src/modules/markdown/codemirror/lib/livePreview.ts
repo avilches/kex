@@ -52,6 +52,8 @@ export type LivePreviewPlan = {
   listLines: LineDepthSpec[];
   headingLines: HeadingLineSpec[];
   codeHeaders: CodeHeaderSpec[];
+  // Line starts of the frontmatter lines inside the range.
+  frontmatterLines: number[];
 };
 
 export type LivePreviewInput = {
@@ -127,10 +129,13 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
   const definitions = linkDefinitions(tree, doc, frontmatterEnd);
 
   // Frontmatter is never parsed as markdown (see the frontmatterEnd check inside
-  // enter() below, which skips it entirely); it still needs its own monospace
-  // styling, which nothing else in this function would otherwise apply.
+  // enter() below, which skips it entirely). Its lines get a line decoration, not
+  // a mark: the background then spans the whole width as one continuous block.
+  const frontmatterLines: number[] = [];
   if (frontmatterEnd > from) {
-    marks.push({ from: Math.max(from, 0), to: Math.min(to, frontmatterEnd), className: "cm-lp-frontmatter" });
+    const first = doc.lineAt(Math.max(from, 0)).number;
+    const last = doc.lineAt(Math.max(Math.min(to, frontmatterEnd) - 1, from)).number;
+    for (let n = first; n <= last; n++) frontmatterLines.push(doc.line(n).from);
   }
 
   tree.iterate({
@@ -391,6 +396,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
     listLines: [...listDepth].map(([lineFrom, depth]) => ({ from: lineFrom, depth })),
     headingLines,
     codeHeaders,
+    frontmatterLines,
   };
 }
 

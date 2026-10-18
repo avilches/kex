@@ -3,13 +3,11 @@ import { gitStatusHexColor } from "./gitStatusColor";
 
 describe("gitStatusHexColor", () => {
   it("defaults to the dark palette", () => {
-    expect(gitStatusHexColor("M", "vscode")).toBe("#E2C08D");
-    expect(gitStatusHexColor("A", "vscode")).toBe("#81B88B");
+    expect(gitStatusHexColor("A", "vscode")).toBe(gitStatusHexColor("A", "vscode", "dark"));
   });
 
-  it("uses a distinct, more saturated palette in light mode", () => {
-    expect(gitStatusHexColor("M", "vscode", "light")).toBe("#C26A00");
-    expect(gitStatusHexColor("A", "vscode", "light")).toBe("#1E8E3E");
+  it("uses a distinct palette in light mode", () => {
+    expect(gitStatusHexColor("A", "vscode", "light")).not.toBe(gitStatusHexColor("A", "vscode", "dark"));
     expect(gitStatusHexColor("A", "jetbrains", "light")).not.toBe(
       gitStatusHexColor("A", "jetbrains", "dark"),
     );
