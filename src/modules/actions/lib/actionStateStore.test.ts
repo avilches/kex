@@ -8,6 +8,7 @@ import {
   getActionTabsSnapshot,
   linkActionTab,
   sameStates,
+  scriptActionOf,
   unlinkActionTab,
   unlinkTab,
 } from "./actionStateStore";
@@ -140,5 +141,21 @@ describe("unlinkRemovedActions", () => {
     unlinkRemovedActions([a], []);
     expect(getScriptRunningSnapshot().get("t1")).toBe("running");
     unlinkActionTab("b");
+  });
+});
+
+describe("scriptActionOf", () => {
+  const dev = { id: "a1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false };
+  const app = { id: "a2", name: "Zed", runInTerminal: false, command: "zed .", ownButton: false };
+  const links = new Map([["a1", "t1"], ["a2", "t2"]]);
+
+  it("finds the script that ran in a tab in any of the lists", () => {
+    expect(scriptActionOf("t1", [[], [dev]], links)).toEqual({ name: "dev", command: "pnpm dev" });
+  });
+
+  it("ignores apps, unknown tabs and links to Actions no longer listed", () => {
+    expect(scriptActionOf("t2", [[app]], links)).toBeUndefined();
+    expect(scriptActionOf("t9", [[dev]], links)).toBeUndefined();
+    expect(scriptActionOf("t1", [[]], links)).toBeUndefined();
   });
 });

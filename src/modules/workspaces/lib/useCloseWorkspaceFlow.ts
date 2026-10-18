@@ -2,8 +2,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { hibernateReview, liveAgent, type HibernateLive } from "./hibernateReview";
-import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
-import { scriptsToDelete, type Workspace } from "./types";
+import { liveScripts } from "./liveScripts";
+import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
+import { actionsToDelete, type Workspace } from "./types";
 
 export type RunningProcess = { tabId: string; label: string };
 export type PendingClose = { id: string; processes: RunningProcess[] };
@@ -26,7 +27,7 @@ export function needsCloseConfirmation(
 ): boolean {
   const review = hibernateReview(ws, live);
   return (
-    scriptsToDelete(ws) > 0 ||
+    actionsToDelete(ws) > 0 ||
     review.busy.length > 0 ||
     review.docs.length > 0 ||
     closeProcesses(ws, live, processes).length > 0
@@ -38,7 +39,7 @@ export type CloseFlowDeps = {
   autosaveEnabled: () => boolean;
   flushDirtyEditors: () => Promise<void>;
   settle: () => Promise<void>;
-  live: () => HibernateLive;
+  live: (ws: Workspace) => HibernateLive;
   collectProcesses: (ws: Workspace) => Promise<RunningProcess[]>;
   close: (workspaceId: string) => Promise<void>;
   setPending: (pending: PendingClose | null) => void;
@@ -66,7 +67,7 @@ export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
     }
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return;
-    const live = d.live();
+    const live = d.live(ws);
     const processes = closeProcesses(ws, live, await d.collectProcesses(ws));
     if (!needsCloseConfirmation(ws, live, processes)) {
       await perform(workspaceId);
@@ -100,14 +101,13 @@ export function useCloseWorkspaceFlow(deps: HookDeps) {
         autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
         flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
         settle: nextFrames,
-        live: () => {
+        live: (ws) => {
           const sessions = useAgentStore.getState().sessions;
           const commands = getRunningCommandsSnapshot();
-          const scripts = getScriptRunningSnapshot();
           return {
             agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
-            scriptState: (id) => scripts.get(id),
+            ...liveScripts(ws),
           };
         },
         collectProcesses: (ws) => depsRef.current.collectProcesses(ws),

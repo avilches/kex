@@ -7,7 +7,8 @@ import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
-import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
+import { liveScripts } from "./liveScripts";
+import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
 import type { TabHibernation, Workspace } from "./types";
 
 export type HibernateFlowDeps = {
@@ -18,7 +19,7 @@ export type HibernateFlowDeps = {
   isActive: (workspaceId: string) => boolean;
   // Lets the dirty flags written by the flush reach the workspace state.
   settle: () => Promise<void>;
-  live: () => HibernateLive;
+  live: (ws: Workspace) => HibernateLive;
   finishAgent: (tabId: string) => void;
   destroyFloats: (workspaceId: string) => Promise<void>;
   // Title, agent and restore command of every terminal tab, read while the PTYs are still alive.
@@ -63,7 +64,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
 
   // The review was empty when it was taken; the user may have edited a document, or activated
   // the workspace of an unattended hibernation, since.
-  const stillEmpty = (ws: Workspace) => isReviewEmpty(hibernateReview(ws, d.live()));
+  const stillEmpty = (ws: Workspace) => isReviewEmpty(hibernateReview(ws, d.live(ws)));
 
   async function request(workspaceId: string): Promise<void> {
     const first = d.getWorkspace(workspaceId);
@@ -74,7 +75,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     await d.settle();
     const ws = d.getWorkspace(workspaceId);
     if (!ws || ws.hibernated || !hasTabs(ws)) return;
-    if (isReviewEmpty(hibernateReview(ws, d.live()))) {
+    if (isReviewEmpty(hibernateReview(ws, d.live(ws)))) {
       await perform(workspaceId, stillEmpty);
       return;
     }
@@ -93,7 +94,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     await d.settle();
     const ws = d.getWorkspace(workspaceId);
     if (!ws || ws.hibernated || !hasTabs(ws) || d.isActive(workspaceId)) return false;
-    const live = d.live();
+    const live = d.live(ws);
     if (!isReviewEmpty(hibernateReview(ws, live))) return false;
     if (terminalTabs(ws).some((t) => live.agentOf(t.id)?.status === "attention")) return false;
     return perform(workspaceId, (current) => !d.isActive(workspaceId) && stillEmpty(current));
@@ -139,14 +140,13 @@ export function useHibernateFlow(deps: HookDeps) {
         saveWorkspaceDocs: (id) => depsRef.current.saveWorkspaceDocs(id),
         isActive: (id) => depsRef.current.isActive(id),
         settle: nextFrames,
-        live: () => {
+        live: (ws) => {
           const sessions = useAgentStore.getState().sessions;
           const commands = getRunningCommandsSnapshot();
-          const scripts = getScriptRunningSnapshot();
           return {
             agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
-            scriptState: (id) => scripts.get(id),
+            ...liveScripts(ws),
           };
         },
         finishAgent: (id) => useAgentStore.getState().finish(id),

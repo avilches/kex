@@ -20,7 +20,7 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     saveWorkspaceDocs: async () => true,
     isActive: () => false,
     settle: async () => void calls.push("settle"),
-    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
+    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined, actionOf: () => undefined }),
     finishAgent: (id) => void calls.push(`finish:${id}`),
     destroyFloats: async () => void calls.push("floats"),
     snapshotTabs: async () => ({}),
@@ -63,7 +63,7 @@ describe("createHibernateFlow", () => {
 
   it("opens the dialog instead when a command would be lost", async () => {
     const { flow, calls } = setup(ws([term("t1")]), {
-      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined }),
+      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined, actionOf: () => undefined }),
     });
     await flow.request("w1");
     expect(calls).toContain("pending:w1");
@@ -142,7 +142,7 @@ describe("createHibernateFlow", () => {
   });
 
   describe("requestAuto", () => {
-    const busy = { agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined };
+    const busy = { agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined, actionOf: () => undefined };
 
     it("hibernates when nothing would be lost", async () => {
       const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
@@ -182,6 +182,7 @@ describe("createHibernateFlow", () => {
           agentOf: () => ({ agent: "claude", status: "attention", resumable: true }),
           runningCommand: () => undefined,
           scriptState: () => undefined,
+          actionOf: () => undefined,
         }),
       });
       expect(await flow.requestAuto("w1")).toBe(false);

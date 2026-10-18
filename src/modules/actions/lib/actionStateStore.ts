@@ -85,6 +85,21 @@ export function actionForTab(tabId: string, from: ReadonlyMap<string, string> = 
   return undefined;
 }
 
+/** Name and command of the script Action that last ran in this tab, looked up in the given lists. */
+export function scriptActionOf(
+  tabId: string,
+  lists: readonly (readonly Action[])[],
+  from: ReadonlyMap<string, string> = tabs,
+): { name: string; command: string } | undefined {
+  const id = actionForTab(tabId, from);
+  if (!id) return undefined;
+  for (const list of lists) {
+    const action = list.find((a) => a.id === id);
+    if (action?.runInTerminal) return { name: action.name, command: action.command };
+  }
+  return undefined;
+}
+
 /**
  * Running state of every Action, derived from where each one runs and the per-tab script
  * marks. An Action whose tab is gone or has no mark is idle and absent from the result.

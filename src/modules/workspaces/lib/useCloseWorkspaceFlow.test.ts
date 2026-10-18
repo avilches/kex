@@ -20,7 +20,7 @@ function setup(workspace: Workspace | undefined, processes: RunningProcess[] = [
     autosaveEnabled: () => false,
     flushDirtyEditors: async () => void calls.push("flush"),
     settle: async () => void calls.push("settle"),
-    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
+    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined, actionOf: () => undefined }),
     collectProcesses: async () => processes,
     close: async (id) => void calls.push(`close:${id}`),
     setPending: (p) => void calls.push(`pending:${p ? p.id : "null"}`),
@@ -43,17 +43,17 @@ describe("createCloseWorkspaceFlow", () => {
     expect(calls).toContain("close:w1");
   });
 
-  it("asks when the workspace has scripts to delete", async () => {
-    const scripts = [{ id: "s1", name: "dev", command: "pnpm dev" }] as Workspace["scripts"];
-    const { flow, calls } = setup(ws([], { scripts }));
+  it("asks when the workspace has actions to delete", async () => {
+    const actions = [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }];
+    const { flow, calls } = setup(ws([], { actions }));
     await flow.request("w1");
     expect(calls).toContain("pending:w1");
     expect(calls).not.toContain("close:w1");
   });
 
-  it("ignores scripts with an empty command", async () => {
-    const scripts = [{ id: "s1", name: "dev", command: "  " }] as Workspace["scripts"];
-    const { flow, calls } = setup(ws([], { scripts }));
+  it("ignores actions with an empty command", async () => {
+    const actions = [{ ...{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }, command: "  " }];
+    const { flow, calls } = setup(ws([], { actions }));
     await flow.request("w1");
     expect(calls).toContain("close:w1");
   });
@@ -74,10 +74,14 @@ describe("createCloseWorkspaceFlow", () => {
   });
 
   it("does not list a process twice when the tab is a running script", async () => {
-    const scripts = [{ id: "s1", name: "dev", command: "pnpm dev", tabId: "t1" }] as Workspace["scripts"];
     let pending: PendingClose | null = null;
-    const { flow } = setup(ws([term("t1")], { scripts }), [{ tabId: "t1", label: "pnpm" }], {
-      live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => "running" }),
+    const { flow } = setup(ws([term("t1")]), [{ tabId: "t1", label: "pnpm" }], {
+      live: () => ({
+        agentOf: () => undefined,
+        runningCommand: () => undefined,
+        scriptState: () => "running",
+        actionOf: () => ({ name: "dev", command: "pnpm dev" }),
+      }),
       setPending: (p) => void (pending = p),
     });
     await flow.request("w1");
