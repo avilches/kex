@@ -33,12 +33,19 @@ import {
   openWithDefaultApp,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { CopyAbsolutePathItem, CopyRelativeTextItem } from "@/modules/explorer/lib/copyPathItems";
+import {
+  CopyAbsolutePathItem,
+  CopyRelativePathItem,
+  CopyRelativeTextItem,
+} from "@/modules/explorer/lib/copyPathItems";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
 } from "@/modules/explorer/lib/menuItemClass";
+import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
+import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -54,6 +61,9 @@ import {
   ArrowDown01Icon,
   ArrowRight01Icon,
   CheckmarkCircle01Icon,
+  Copy02Icon,
+  CrosshairIcon,
+  Delete02Icon,
   File01Icon,
   LinkSquare02Icon,
   FileDiffIcon,
@@ -63,6 +73,7 @@ import {
   GitBranchIcon,
   ListViewIcon,
   MinusSignIcon,
+  PencilEdit01Icon,
   PlusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
@@ -122,6 +133,7 @@ type Props = {
   }, pin: boolean) => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
   onNavigateToWorktree?: (path: string) => void;
+  onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
   workspaceCwd?: string | null;
 };
 
@@ -212,6 +224,7 @@ export const SourceControlPanel = memo(
       onOpenDiff,
       onOpenFile,
       onNavigateToWorktree,
+      onFocusOnExplorer,
       workspaceCwd,
     }: Props,
     ref,
@@ -229,6 +242,7 @@ export const SourceControlPanel = memo(
   const [stagedCollapsed, setStagedCollapsed] = useState(false);
   const [changesCollapsed, setChangesCollapsed] = useState(false);
   const scmViewMode = usePreferencesStore((s) => s.scmViewMode);
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const [treeCollapsed, setTreeCollapsed] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -612,6 +626,21 @@ export const SourceControlPanel = memo(
         handleRefresh();
         return;
       }
+      if (
+        onFocusOnExplorer &&
+        matchesShortcut(event.nativeEvent, "file.rename", userShortcuts)
+      ) {
+        const entry = focusedEntry();
+        const root = scm.repo?.repoRoot ?? null;
+        if (entry && root) {
+          event.preventDefault();
+          onFocusOnExplorer(
+            joinPath(root.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/")),
+            "rename",
+          );
+        }
+        return;
+      }
       switch (event.key) {
         case "ArrowDown":
           event.preventDefault();
@@ -693,7 +722,7 @@ export const SourceControlPanel = memo(
         }
       }
     },
-    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm, treeCollapsed, toggleTreeDir],
+    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, onFocusOnExplorer, rowKeyToIndex, rows, scm, treeCollapsed, toggleTreeDir, userShortcuts],
   );
 
   const [cloneOpen, setCloneOpen] = useState(false);
@@ -1263,6 +1292,7 @@ export const SourceControlPanel = memo(
                   tabIndex={0}
                   role="listbox"
                   aria-label="Changed files"
+                  data-scm-panel
                   aria-activedescendant={
                     focusedRowKey ? `scm-row-${focusedRowKey}` : undefined
                   }
@@ -1319,6 +1349,7 @@ export const SourceControlPanel = memo(
                               onUnstageAll={scm.unstageAllEntries}
                               onDiscardAll={scm.requestDiscardAll}
                               onOpenFile={onOpenFile}
+                              onFocusOnExplorer={onFocusOnExplorer}
                             />
                           </div>
                         );
@@ -1454,6 +1485,7 @@ type RowRendererProps = {
   onUnstageAll: () => Promise<void>;
   onDiscardAll: () => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
+  onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
 };
 
 const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
@@ -1597,80 +1629,123 @@ function TreeDirRow({
   row,
   focused,
   actionBusy,
+  repoRoot,
   treeCollapsed,
   onFocusRow,
   onToggleTreeDir,
   onStageFolder,
   onUnstageFolder,
   onDiscardFolder,
+  onFocusOnExplorer,
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "tree-dir" }>;
 }) {
   const node = row.node;
   const collapsed = treeCollapsed.has(row.collapseKey);
+  const absolutePath = repoRoot
+    ? joinPath(repoRoot.replace(/\\/g, "/"), node.fullPath.replace(/\\/g, "/"))
+    : null;
   return (
-    <div
-      id={`scm-row-${row.key}`}
-      role="button"
-      tabIndex={-1}
-      data-focused={focused || undefined}
-      onMouseDown={() => onFocusRow(row.key)}
-      onClick={() => onToggleTreeDir(row.collapseKey)}
-      style={{ paddingLeft: 6 + row.depth * 12 }}
-      className={cn(
-        "group flex h-6 select-none items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
-        focused ? "bg-accent/60" : "hover:bg-accent/30",
-      )}
-    >
-      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
-        <HugeiconsIcon
-          icon={ArrowRight01Icon}
-          size={12}
-          strokeWidth={2.25}
-          className={cn("transition-transform", !collapsed && "rotate-90")}
-        />
-      </span>
-      {(() => {
-        const folderLeaf = node.name.split("/").pop() ?? node.name;
-        return (
-          <img src={folderIconUrl(folderLeaf, !collapsed)} alt="" className="size-4 shrink-0" />
-        );
-      })()}
-      <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
-        {node.name}
-      </span>
-      <div
-        className="hidden shrink-0 items-center gap-0.5 group-hover:flex"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {row.section === "staged" ? (
-          <IconActionButton
-            label="Unstage folder"
-            disabled={actionBusy !== null}
-            onClick={() => onUnstageFolder(node)}
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          id={`scm-row-${row.key}`}
+          role="button"
+          tabIndex={-1}
+          data-focused={focused || undefined}
+          onMouseDown={() => onFocusRow(row.key)}
+          onClick={() => onToggleTreeDir(row.collapseKey)}
+          style={{ paddingLeft: 6 + row.depth * 12 }}
+          className={cn(
+            "group flex h-6 select-none items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
+            focused ? "bg-accent/60" : "hover:bg-accent/30",
+          )}
+        >
+          <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={12}
+              strokeWidth={2.25}
+              className={cn("transition-transform", !collapsed && "rotate-90")}
+            />
+          </span>
+          {(() => {
+            const folderLeaf = node.name.split("/").pop() ?? node.name;
+            return (
+              <img src={folderIconUrl(folderLeaf, !collapsed)} alt="" className="size-4 shrink-0" />
+            );
+          })()}
+          <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
+            {node.name}
+          </span>
+          <div
+            className="hidden shrink-0 items-center gap-0.5 group-hover:flex"
+            onClick={(e) => e.stopPropagation()}
           >
-            <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
-          </IconActionButton>
-        ) : (
-          <>
-            <IconActionButton
-              label="Discard folder changes"
-              disabled={actionBusy !== null}
-              onClick={() => onDiscardFolder(node)}
-            >
-              <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
-            </IconActionButton>
-            <IconActionButton
-              label="Stage folder"
-              disabled={actionBusy !== null}
-              onClick={() => onStageFolder(node)}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
-            </IconActionButton>
-          </>
-        )}
-      </div>
-    </div>
+            {row.section === "staged" ? (
+              <IconActionButton
+                label="Unstage folder"
+                disabled={actionBusy !== null}
+                onClick={() => onUnstageFolder(node)}
+              >
+                <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
+              </IconActionButton>
+            ) : (
+              <>
+                <IconActionButton
+                  label="Discard folder changes"
+                  disabled={actionBusy !== null}
+                  onClick={() => onDiscardFolder(node)}
+                >
+                  <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+                </IconActionButton>
+                <IconActionButton
+                  label="Stage folder"
+                  disabled={actionBusy !== null}
+                  onClick={() => onStageFolder(node)}
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
+                </IconActionButton>
+              </>
+            )}
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      {absolutePath ? (
+        <ContextMenuContent className={COMPACT_CONTENT}>
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => void revealInFinder(absolutePath)}
+          >
+            <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+            {IS_MAC ? "Reveal in Finder" : "Reveal in File Manager"}
+          </ContextMenuItem>
+          {onFocusOnExplorer ? (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => onFocusOnExplorer(absolutePath)}
+              >
+                <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
+                Focus on Sidebar
+              </ContextMenuItem>
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => onFocusOnExplorer(absolutePath, "rename")}
+              >
+                <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+                Rename Folder
+                <ShortcutHint id="file.rename" />
+              </ContextMenuItem>
+            </>
+          ) : null}
+          <ContextMenuSeparator />
+          <CopyRelativePathItem path={absolutePath} workspaceRoot={repoRoot} />
+          <CopyAbsolutePathItem path={absolutePath} />
+        </ContextMenuContent>
+      ) : null}
+    </ContextMenu>
   );
 }
 
@@ -1686,6 +1761,7 @@ const EntryRow = memo(function EntryRow({
   onUnstageEntry,
   onDiscardEntry,
   onOpenFile,
+  onFocusOnExplorer,
 }: RowRendererProps & {
   row: Extract<
     RowDescriptor,
@@ -1876,6 +1952,26 @@ const EntryRow = memo(function EntryRow({
           </ContextMenuItem>
         ) : null}
         <ContextMenuSeparator />
+        {!isDeleted && absolutePath && onFocusOnExplorer ? (
+          <>
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => onFocusOnExplorer(absolutePath, "rename")}
+            >
+              <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+              Rename File
+              <ShortcutHint id="file.rename" />
+            </ContextMenuItem>
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => onFocusOnExplorer(absolutePath, "duplicate")}
+            >
+              <HugeiconsIcon icon={Copy02Icon} size={14} strokeWidth={2} />
+              Duplicate
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        ) : null}
         {isStaged ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -1908,6 +2004,19 @@ const EntryRow = memo(function EntryRow({
         <ContextMenuSeparator />
         <CopyRelativeTextItem text={entry.path.replace(/\\/g, "/")} />
         {absolutePath ? <CopyAbsolutePathItem path={absolutePath} /> : null}
+        {!isDeleted && absolutePath && onFocusOnExplorer ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              variant="destructive"
+              onSelect={() => onFocusOnExplorer(absolutePath, "delete")}
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
+              Delete
+            </ContextMenuItem>
+          </>
+        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   );
