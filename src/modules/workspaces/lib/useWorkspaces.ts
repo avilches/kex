@@ -332,7 +332,8 @@ export function isBlankWorkspace(ws: Workspace): boolean {
     !ws.color &&
     !ws.icon &&
     !ws.workspaceRoot &&
-    !ws.scripts?.length
+    !ws.scripts?.length &&
+    !ws.actions?.length
   );
 }
 

@@ -132,11 +132,13 @@ export type Workspace = {
   lastActiveAt?: number;
 };
 
-// Scripts with a command: the ones a workspace close would delete. The
+// Scripts and Actions with a command: the ones a workspace close would delete. The
 // close-workspace dialog warns about them, and the fold-on-empty rule spares
 // a workspace that still has any.
 export function scriptsToDelete(ws: Workspace): number {
-  return ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
+  const scripts = ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
+  const actions = ws.actions?.filter((a) => a.command.trim()).length ?? 0;
+  return scripts + actions;
 }
 
 export type ClosedTabEntry = {
