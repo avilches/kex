@@ -274,6 +274,28 @@ The button label shows the filename for file-type editors and the workspace root
 
 **Icons.** `EditorIcon` (`src/modules/external-editors/EditorIcon.tsx`) tries `/assets/editors/<id>.svg` first, then `/assets/editors/<id>.png`, then falls back to a generic document-code icon from HugeIcons.
 
+### 3.12 Actions
+
+An **Action** is a saved command template that Kex runs against the current context. It is meant to replace both the workspace Scripts and the "Open in" external editors (the old model stays in place until the tasks that migrate its consumers land, so both exist side by side for now). The type lives in `src/modules/actions/lib/types.ts`:
+
+| Field | Meaning |
+|---|---|
+| `id` | `newActionId()`, prefix `ac-` |
+| `name` | label shown in the Header and menus |
+| `runInTerminal` | `true`: a script, typed into a terminal and stoppable. `false`: an app, spawned in the background, no stop |
+| `command` | template, expanded at run time (variables such as `{cwd}`, `{workspace}`, `{file}`) |
+| `appId` | detected app it came from, for its icon and default command |
+| `cwdMode` / `cwd` | scripts only; same `workspace` / `context` / `fixed` semantics as `Script`, `cwd` only with `fixed` |
+| `ownButton` | own split-button in the Header, or grouped in a shared menu |
+
+**Two scopes, same shape.** Workspace Actions (`Workspace.actions`, with `Workspace.activeAction` for the one F12 runs) are saved with the rest of the workspace JSON and are meant for scripts (`npm run dev` belongs to a project). Global Actions (`Preferences.actions`, key `actions` in `settings-tools.json`, written by `setGlobalActions`) are meant for apps and are available in every workspace. Actions carry no tab id: which terminal a script runs in is runtime state, never persisted.
+
+**Pure core** (`src/modules/actions/lib/actions.ts`, no I/O): `addAction` (ignores a repeated id), `updateAction` (never changes the id), `removeAction`, `reorderActions`, `normalizeActions`, `promoteToGlobal` and `partitionForHeader`. `normalizeActions` runs on every read from disk (`sanitizeWorkspace` for the workspace scope, `loadPreferences` and `setGlobalActions` for the global one): it trims, drops entries that are malformed, have an empty command or repeat an id, falls back to the id when the name is blank, and strips `cwdMode` / `cwd` from apps and `cwd` from any mode other than `fixed`. `addAction` and `updateAction` run the same normalization, so memory never differs from what is persisted: an add or update that would leave an empty command is refused and the list keeps its previous value. `promoteToGlobal` moves an Action out of the workspace list into the global list keeping its id, or giving it a fresh one when that id is already taken there (`adoptAction`), so neither version is lost. `partitionForHeader` splits a list into `ownButtons` (in the user's order) and the grouped `scripts` and `apps`, which the Header shows as two menus because only scripts have a stop control.
+
+**Global list writes.** The preferences store only follows a write after it reaches disk and comes back as an event, so two quick changes would both start from the same stale list. `createGlobalActions` (`actions/lib/globalActions.ts`, bound to the preferences store in `globalActionsBinding.ts`) keeps a synchronous copy of the list while writes are in flight, serializes the writes (each one carries the latest list), and takes an Action back out and rejects when its write fails. The copy lives only while writes are in flight and until the preferences store reports any change after them (its echo or another window's edit), at which point the store is the truth again, so a later change never starts from a stale list.
+
+**Mutations.** `useWorkspaces` exposes `addWorkspaceAction`, `updateWorkspaceAction`, `removeWorkspaceAction`, `reorderWorkspaceActions`, `setActiveWorkspaceAction` and `promoteWorkspaceAction`, thin wrappers over the pure `applyWorkspaceActions`, `applySetActiveAction` and `takeWorkspaceAction`. Removing the active Action clears `activeAction`, and `setActiveWorkspaceAction` ignores an id that is not in the list. Promoting is two steps so an Action added in the same tick can still be promoted: the state updater only takes it out of the workspace and queues it (keyed by workspace and Action, so a repeated updater run is harmless), and an effect hands the queue to `globalActions.add`. If that write fails, the Action is put back at the end of its workspace list and a toast says so (if the workspace was closed in the meantime there is nothing to put it back into and the Action is lost).
+
 ---
 
 ## 4. Technical decisions with user-visible effects
@@ -631,6 +653,7 @@ src/
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`
     │                                tab, so it opens in Live Preview.
     ├── workspace/                 - Local + WSL environment switching
+    ├── actions/                   - Action type (saved command templates) and its pure list operations
     ├── external-editors/          - Detection and launch of external editors (`OpenInEditorButton`)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog

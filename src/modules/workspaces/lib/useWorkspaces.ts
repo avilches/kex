@@ -3,7 +3,16 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  addAction,
+  removeAction,
+  reorderActions,
+  updateAction,
+  type Action,
+} from "@/modules/actions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
+import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
@@ -167,6 +176,45 @@ export function applyWorkspaceGroup(
   return workspaces.map((w) =>
     w.id === workspaceId ? { ...w, groupId: groupId ?? undefined } : w,
   );
+}
+
+export function applyWorkspaceActions(
+  workspaces: Workspace[],
+  workspaceId: string,
+  change: (actions: Action[]) => Action[],
+): Workspace[] {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) return w;
+    const actions = change(w.actions ?? []);
+    const keepActive = actions.some((a) => a.id === w.activeAction);
+    return { ...w, actions, activeAction: keepActive ? w.activeAction : undefined };
+  });
+}
+
+export function applySetActiveAction(
+  workspaces: Workspace[],
+  workspaceId: string,
+  actionId: string | null,
+): Workspace[] {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) return w;
+    const exists = actionId !== null && (w.actions ?? []).some((a) => a.id === actionId);
+    return { ...w, activeAction: exists ? actionId : undefined };
+  });
+}
+
+// Removes an action from its workspace and hands it back, for a promotion to the global list.
+export function takeWorkspaceAction(
+  workspaces: Workspace[],
+  workspaceId: string,
+  actionId: string,
+): { workspaces: Workspace[]; action: Action | null } {
+  const action = workspaces.find((w) => w.id === workspaceId)?.actions?.find((a) => a.id === actionId);
+  if (!action) return { workspaces, action: null };
+  return {
+    workspaces: applyWorkspaceActions(workspaces, workspaceId, (list) => removeAction(list, actionId)),
+    action,
+  };
 }
 
 // Where a freshly opened tab lands. An explicit index (drag/reorder) wins;
@@ -1021,6 +1069,58 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const addWorkspaceAction = useCallback((workspaceId: string, action: Action) => {
+    setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
+  }, []);
+
+  const updateWorkspaceAction = useCallback(
+    (workspaceId: string, actionId: string, patch: Partial<Omit<Action, "id">>) => {
+      setWorkspaces((prev) =>
+        applyWorkspaceActions(prev, workspaceId, (list) => updateAction(list, actionId, patch)),
+      );
+    },
+    [],
+  );
+
+  const removeWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => removeAction(list, actionId)));
+  }, []);
+
+  const reorderWorkspaceActions = useCallback((workspaceId: string, fromId: string, toId: string) => {
+    setWorkspaces((prev) =>
+      applyWorkspaceActions(prev, workspaceId, (list) => reorderActions(list, fromId, toId)),
+    );
+  }, []);
+
+  const setActiveWorkspaceAction = useCallback((workspaceId: string, actionId: string | null) => {
+    setWorkspaces((prev) => applySetActiveAction(prev, workspaceId, actionId));
+  }, []);
+
+  // Two steps so an action added in the same tick can still be promoted: the updater only
+  // takes the action out and queues it (a Map keyed by workspace and action, so a repeated
+  // updater run is harmless), and the effect below writes the global list outside any updater.
+  const promotionsRef = useRef(new Map<string, { workspaceId: string; action: Action }>());
+  const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    setWorkspaces((prev) => {
+      const taken = takeWorkspaceAction(prev, workspaceId, actionId);
+      if (taken.action) promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action });
+      return taken.workspaces;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (promotionsRef.current.size === 0) return;
+    const queue = [...promotionsRef.current.values()];
+    promotionsRef.current.clear();
+    for (const { workspaceId, action } of queue) {
+      globalActions.add(action).catch((err: unknown) => {
+        console.error("Could not save the global action", err);
+        toast.error(`Could not make "${action.name}" global; it stays in the workspace`);
+        setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
+      });
+    }
+  }, [workspaces]);
+
   const setAgentTitles = useCallback((titles: ReadonlyMap<string, string>) => {
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
   }, []);
@@ -1141,6 +1241,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setActiveScript,
     setScriptPaneId,
     validateScriptTabs,
+    addWorkspaceAction,
+    updateWorkspaceAction,
+    removeWorkspaceAction,
+    reorderWorkspaceActions,
+    setActiveWorkspaceAction,
+    promoteWorkspaceAction,
     setTerminalRunningCommand,
     toggleOverlayPreview,
     toggleSplitPreview,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Tab, Script, SplitNode, PaneNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { addAction, removeAction, type Action } from "@/modules/actions";
+import { applyCloseTab, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -652,5 +653,43 @@ describe("runOnce", () => {
     const inFlight = new Map<string, Promise<void>>();
     await expect(runOnce(inFlight, "w1", async () => { throw new Error("x"); })).rejects.toThrow("x");
     expect(inFlight.size).toBe(0);
+  });
+});
+
+describe("workspace actions", () => {
+  const action = (id: string): Action => ({ id, name: id, runInTerminal: true, command: `run ${id}`, ownButton: false });
+
+  it("changes the list of the matching workspace only", () => {
+    const out = applyWorkspaceActions([ws(), ws({ id: "w2" })], "w1", (list) => addAction(list, action("a")));
+    expect(out[0].actions?.map((a) => a.id)).toEqual(["a"]);
+    expect(out[1].actions).toBeUndefined();
+  });
+
+  it("clears the active action when it leaves the list", () => {
+    const start = [ws({ actions: [action("a"), action("b")], activeAction: "a" })];
+    const out = applyWorkspaceActions(start, "w1", (list) => removeAction(list, "a"));
+    expect(out[0].activeAction).toBeUndefined();
+    expect(out[0].actions?.map((a) => a.id)).toEqual(["b"]);
+  });
+
+  it("sets and clears the active action, ignoring one that does not exist", () => {
+    const start = [ws({ actions: [action("a")] })];
+    expect(applySetActiveAction(start, "w1", "a")[0].activeAction).toBe("a");
+    expect(applySetActiveAction(start, "w1", "zz")[0].activeAction).toBeUndefined();
+    expect(applySetActiveAction([ws({ actions: [action("a")], activeAction: "a" })], "w1", null)[0].activeAction).toBeUndefined();
+  });
+
+  it("takes an action out of its workspace and clears it as the active one", () => {
+    const start = [ws({ actions: [action("a"), action("b")], activeAction: "a" })];
+    const out = takeWorkspaceAction(start, "w1", "a");
+    expect(out.action?.id).toBe("a");
+    expect(out.workspaces[0].actions?.map((x) => x.id)).toEqual(["b"]);
+    expect(out.workspaces[0].activeAction).toBeUndefined();
+  });
+
+  it("takes nothing for an unknown action or workspace", () => {
+    const start = [ws({ actions: [action("a")] })];
+    expect(takeWorkspaceAction(start, "w1", "zz")).toEqual({ workspaces: start, action: null });
+    expect(takeWorkspaceAction(start, "nope", "a")).toEqual({ workspaces: start, action: null });
   });
 });

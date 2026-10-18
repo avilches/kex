@@ -1,5 +1,6 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
+import type { Action } from "@/modules/actions";
 import type { AutofocusMode } from "@/modules/settings/store";
 import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
@@ -115,6 +116,9 @@ export type Workspace = {
   scripts?: Script[];
   activeScript?: string;
   scriptPaneId?: string;
+  // Workspace-scoped Actions (the global ones live in settings-tools.json) and the one F12 runs.
+  actions?: Action[];
+  activeAction?: string;
   // The nested tab list under this workspace in the WorkspaceBar is open.
   detailExpanded?: boolean;
   // The workspace keeps its pane tree and tabs in the JSON but mounts none of
