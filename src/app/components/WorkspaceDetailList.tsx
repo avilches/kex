@@ -54,17 +54,21 @@ function SubagentRow({
   agent,
   row,
   tone,
+  onSelect,
 }: {
   agent: string | undefined;
   row: SubagentRowData;
   tone: SubagentTone;
+  onSelect: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       data-subagent-row=""
       title={row.label}
+      onClick={onSelect}
       className={cn(
-        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-[11.5px] select-none",
+        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-left text-[11.5px] select-none",
         SUBAGENT_TONE[tone],
       )}
     >
@@ -76,7 +80,7 @@ function SubagentRow({
       <span className="min-w-0 truncate">{row.label}</span>
       <span aria-hidden className="flex-1" />
       <Spinner size={11} />
-    </div>
+    </button>
   );
 }
 
@@ -97,15 +101,17 @@ function SubagentGroup({
   agent,
   rows,
   tone,
+  onSelect,
 }: {
   agent: string | undefined;
   rows: SubagentRowData[];
   tone: SubagentTone;
+  onSelect: () => void;
 }) {
   return (
     <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((sub) => (
-        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} />
+        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} onSelect={onSelect} />
       ))}
     </div>
   );
@@ -556,6 +562,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
                 agent={sessions[row.tabId]?.agent}
                 rows={subs}
                 tone={!grouped ? "plain" : chipColor !== null ? "chip-color" : "chip"}
+                onSelect={() => onActivate(row.tabId)}
               />
             )}
           </div>
