@@ -12,6 +12,7 @@ import {
 } from "@/modules/actions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
+import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
 import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -189,6 +190,10 @@ export function applyWorkspaceActions(
     const keepActive = actions.some((a) => a.id === w.activeAction);
     return { ...w, actions, activeAction: keepActive ? w.activeAction : undefined };
   });
+}
+
+function workspaceActions(workspaces: readonly Workspace[], workspaceId: string): Action[] {
+  return workspaces.find((w) => w.id === workspaceId)?.actions ?? [];
 }
 
 export function applySetActiveAction(
@@ -1073,16 +1078,22 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
   }, []);
 
+  // The runtime link of an Action is dropped here, not by watching the lists: a promotion
+  // also takes an Action out of the workspace, and that one keeps running as a global Action.
+  // It happens outside the state updater, which has to stay pure.
   const updateWorkspaceAction = useCallback(
     (workspaceId: string, actionId: string, patch: Partial<Omit<Action, "id">>) => {
-      setWorkspaces((prev) =>
-        applyWorkspaceActions(prev, workspaceId, (list) => updateAction(list, actionId, patch)),
-      );
+      const change = (list: Action[]) => updateAction(list, actionId, patch);
+      const before = workspaceActions(workspacesRef.current, workspaceId);
+      unlinkRemovedActions(before, change(before));
+      setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, change));
     },
     [],
   );
 
   const removeWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+    const before = workspaceActions(workspacesRef.current, workspaceId);
+    unlinkRemovedActions(before, removeAction(before, actionId));
     setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => removeAction(list, actionId)));
   }, []);
 

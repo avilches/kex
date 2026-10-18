@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from "react";
-import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import {
+  clearScriptRunningEntry,
+  type ScriptState,
+} from "@/modules/workspaces/lib/terminalEphemeralStore";
+import type { Action } from "./types";
 
 // Which tab each script Action last ran in. Runtime only: nothing here is persisted, so a
 // restart starts with no links and the first run opens a tab.
@@ -47,6 +51,32 @@ export function unlinkTab(tabId: string): void {
     }
   }
   if (changed) notify();
+}
+
+/**
+ * Actions whose runtime link must go after a change of the list: deleted ones, and ones that
+ * switched between script and app (a script's tab means nothing to an app, and the other way).
+ */
+export function actionsToUnlink(before: readonly Action[], after: readonly Action[]): string[] {
+  const now = new Map(after.map((a) => [a.id, a]));
+  return before
+    .filter((a) => {
+      const next = now.get(a.id);
+      return !next || next.runInTerminal !== a.runInTerminal;
+    })
+    .map((a) => a.id);
+}
+
+/**
+ * Forgets where the removed or retyped Actions ran, and clears the running mark of a tab no
+ * other Action runs in, so a deleted Action does not leave a mark that nothing can stop.
+ */
+export function unlinkRemovedActions(before: readonly Action[], after: readonly Action[]): void {
+  for (const id of actionsToUnlink(before, after)) {
+    const tabId = tabs.get(id);
+    unlinkActionTab(id);
+    if (tabId && !actionForTab(tabId)) clearScriptRunningEntry(tabId);
+  }
 }
 
 /** The Action whose last run was in this tab. */

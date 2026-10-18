@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   actionForTab,
+  actionsToUnlink,
+  unlinkRemovedActions,
   actionStates,
   getActionTab,
   getActionTabsSnapshot,
@@ -10,7 +12,11 @@ import {
   unlinkTab,
 } from "./actionStateStore";
 import { getActionStatesSnapshot } from "./useActionStates";
-import { clearScriptRunningEntry, setScriptRunning } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import {
+  clearScriptRunningEntry,
+  getScriptRunningSnapshot,
+  setScriptRunning,
+} from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 afterEach(() => {
   for (const id of ["a", "b"]) unlinkActionTab(id);
@@ -78,5 +84,61 @@ describe("useActionStates snapshot", () => {
     expect(getActionStatesSnapshot().get("a")).toBe("waiting");
     clearScriptRunningEntry("t1");
     expect(getActionStatesSnapshot().size).toBe(0);
+  });
+});
+
+describe("actionsToUnlink", () => {
+  const a = { id: "a", name: "A", runInTerminal: true, command: "x", ownButton: true };
+  const b = { ...a, id: "b" };
+
+  it("lists Actions that disappeared", () => {
+    expect(actionsToUnlink([a, b], [b])).toEqual(["a"]);
+    expect(actionsToUnlink([a], [])).toEqual(["a"]);
+  });
+
+  it("lists Actions that switched between script and app", () => {
+    expect(actionsToUnlink([a], [{ ...a, runInTerminal: false }])).toEqual(["a"]);
+  });
+
+  it("ignores edits that keep the Action what it was", () => {
+    expect(actionsToUnlink([a], [{ ...a, name: "Renamed", command: "y" }])).toEqual([]);
+    expect(actionsToUnlink([a], [a, b])).toEqual([]);
+  });
+});
+
+describe("unlinkRemovedActions", () => {
+  const a = { id: "a", name: "A", runInTerminal: true, command: "x", ownButton: true };
+
+  it("drops the link and the running mark of a deleted Action, so nothing stays stuck", () => {
+    linkActionTab("a", "t1");
+    setScriptRunning("t1", "running");
+    unlinkRemovedActions([a], []);
+    expect(getActionTab("a")).toBeUndefined();
+    expect(getScriptRunningSnapshot().has("t1")).toBe(false);
+  });
+
+  it("drops the link when the Action stops being a script", () => {
+    linkActionTab("a", "t1");
+    setScriptRunning("t1", "running");
+    unlinkRemovedActions([a], [{ ...a, runInTerminal: false }]);
+    expect(getActionTab("a")).toBeUndefined();
+    expect(getScriptRunningSnapshot().has("t1")).toBe(false);
+  });
+
+  it("leaves a still existing Action alone", () => {
+    linkActionTab("a", "t1");
+    setScriptRunning("t1", "running");
+    unlinkRemovedActions([a], [{ ...a, name: "B" }]);
+    expect(getActionTab("a")).toBe("t1");
+    expect(getScriptRunningSnapshot().get("t1")).toBe("running");
+  });
+
+  it("keeps the mark when another Action still runs in the same tab", () => {
+    linkActionTab("a", "t1");
+    linkActionTab("b", "t1");
+    setScriptRunning("t1", "running");
+    unlinkRemovedActions([a], []);
+    expect(getScriptRunningSnapshot().get("t1")).toBe("running");
+    unlinkActionTab("b");
   });
 });
