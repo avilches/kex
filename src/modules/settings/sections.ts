@@ -24,7 +24,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: "general", label: "General", icon: Settings01Icon },
   { id: "workspaces", label: "Workspaces", icon: Layers01Icon },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon },
-  { id: "external-editors", label: "Tools", icon: DocumentCodeIcon },
+  { id: "actions", label: "Actions", icon: DocumentCodeIcon },
   { id: "editor", label: "Editor", icon: SourceCodeIcon },
   { id: "filetypes", label: "File Types", icon: File02Icon },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon },

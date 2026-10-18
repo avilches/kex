@@ -12,7 +12,7 @@ import { type JSX, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
-import { ExternalEditorsSection } from "./sections/ExternalEditorsSection";
+import { ActionsSection } from "./sections/ActionsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileTypesSection } from "./sections/FileTypesSection";
@@ -26,7 +26,7 @@ const COMPONENTS: Record<SettingsSection, () => JSX.Element> = {
   general: GeneralSection,
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
-  "external-editors": ExternalEditorsSection,
+  actions: ActionsSection,
   editor: EditorSection,
   filetypes: FileTypesSection,
   appearance: AppearanceSection,

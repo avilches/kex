@@ -3632,7 +3632,7 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const onOpenExternalEditorSettings = useCallback(() => {
-    void openSettingsWindow("external-editors");
+    void openSettingsWindow("actions");
   }, []);
 
   const sidebarRepoRoot =
