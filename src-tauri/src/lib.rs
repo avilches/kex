@@ -965,6 +965,8 @@ pub fn run() {
             agent::agent_setup_opencode,
             agent::agent_opencode_plugin_status,
             agent::agent_setup_omp,
+            agent::agent_sync_integrations,
+            agent::agent_remove_integration,
             agent::agent_setup_pi,
             agent::agent_omp_extension_status,
             agent::agent_pi_extension_status,

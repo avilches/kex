@@ -12,6 +12,10 @@ import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
+  parseInstalledIntegrations,
+  type IntegrationAgent,
+} from "@/modules/agents/lib/integrations";
+import {
   parseAutoHibernate,
   type AutoHibernate,
 } from "@/modules/workspaces/lib/autoHibernate";
@@ -188,6 +192,7 @@ export type Preferences = {
   lastWslDistro: string | null;
   zoomLevel: number;
   agentNotifications: boolean;
+  installedIntegrations: IntegrationAgent[];
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
@@ -259,6 +264,7 @@ const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
 const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
+const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -456,6 +462,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   lastWslDistro: null,
   zoomLevel: DEFAULT_ZOOM,
   agentNotifications: true,
+  installedIntegrations: [],
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
@@ -703,6 +710,7 @@ export async function loadPreferences(): Promise<Preferences> {
     agentNotifications:
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
+    installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -1295,6 +1303,22 @@ export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
 
+// Read, change and write the list in one step, one at a time: two rows (or two windows) that
+// install different agents at once must both end up in it, which a list captured at render
+// time would not guarantee.
+let integrationsQueue: Promise<unknown> = Promise.resolve();
+
+export function updateInstalledIntegrations(
+  change: (current: IntegrationAgent[]) => IntegrationAgent[],
+): Promise<void> {
+  const run = integrationsQueue.then(async () => {
+    const current = parseInstalledIntegrations(await store.get<unknown>(KEY_INSTALLED_INTEGRATIONS));
+    await writePref(KEY_INSTALLED_INTEGRATIONS, parseInstalledIntegrations(change(current)));
+  });
+  integrationsQueue = run.catch(() => undefined);
+  return run;
+}
+
 
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
@@ -1330,6 +1354,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
+  [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",

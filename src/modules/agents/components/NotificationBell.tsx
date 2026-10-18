@@ -1,6 +1,7 @@
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import ompLogoUrl from "@/modules/agents/assets/omp-color.svg";
+import { useIntegration, type IntegrationState } from "@/modules/agents/lib/useIntegration";
+import type { IntegrationAgent } from "@/modules/agents/lib/integrations";
 import {
   Popover,
   PopoverContent,
@@ -10,7 +11,6 @@ import {
   Cancel01Icon,
   Notification01Icon,
   Notification03Icon,
-  PuzzleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -96,12 +96,10 @@ export function NotificationBell({ onActivate }: Props) {
   const open = useBellStore((s) => s.open);
   const setOpen = useBellStore((s) => s.setOpen);
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
-  const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
-  const [ompReady, setOmpReady] = useState<boolean | null>(null);
-  const [piReady, setPiReady] = useState<boolean | null>(null);
-  const [installing, setInstalling] = useState<
-    "claude" | "opencode" | "omp" | "pi" | null
-  >(null);
+  const [installing, setInstalling] = useState<"claude" | null>(null);
+  const opencode = useIntegration("opencode");
+  const omp = useIntegration("omp");
+  const pi = useIntegration("pi");
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -137,15 +135,6 @@ export function NotificationBell({ onActivate }: Props) {
     invoke<boolean>("agent_claude_hooks_status")
       .then(setHooksReady)
       .catch(() => setHooksReady(null));
-    invoke<boolean>("agent_opencode_plugin_status")
-      .then(setOpencodeReady)
-      .catch(() => setOpencodeReady(null));
-    invoke<boolean>("agent_omp_extension_status")
-      .then(setOmpReady)
-      .catch(() => setOmpReady(null));
-    invoke<boolean>("agent_pi_extension_status")
-      .then(setPiReady)
-      .catch(() => setPiReady(null));
   }, []);
 
   useEffect(() => {
@@ -154,12 +143,18 @@ export function NotificationBell({ onActivate }: Props) {
 
   // Opening (by click or by the global shortcut) marks notifications read and
   // re-checks the hooks status.
+  const refreshOpencode = opencode.refresh;
+  const refreshOmp = omp.refresh;
+  const refreshPi = pi.refresh;
   useEffect(() => {
     if (open) {
       markAllRead();
       refreshHooks();
+      refreshOpencode();
+      refreshOmp();
+      refreshPi();
     }
-  }, [open, markAllRead, refreshHooks]);
+  }, [open, markAllRead, refreshHooks, refreshOpencode, refreshOmp, refreshPi]);
 
   const enableClaudeHooks = async () => {
     setInstalling("claude");
@@ -170,45 +165,6 @@ export function NotificationBell({ onActivate }: Props) {
     } catch (e) {
       console.error("[kex] agent_enable_claude_hooks failed:", e);
       setHooksReady(false);
-    } finally {
-      setInstalling(null);
-    }
-  };
-
-  const setupOpencode = async () => {
-    setInstalling("opencode");
-    try {
-      await invoke("agent_setup_opencode");
-      setOpencodeReady(true);
-    } catch (e) {
-      console.error("[kex] agent_setup_opencode failed:", e);
-      setOpencodeReady(false);
-    } finally {
-      setInstalling(null);
-    }
-  };
-
-  const setupOmp = async () => {
-    setInstalling("omp");
-    try {
-      await invoke("agent_setup_omp");
-      setOmpReady(true);
-    } catch (e) {
-      console.error("[kex] agent_setup_omp failed:", e);
-      setOmpReady(false);
-    } finally {
-      setInstalling(null);
-    }
-  };
-
-  const setupPi = async () => {
-    setInstalling("pi");
-    try {
-      await invoke("agent_setup_pi");
-      setPiReady(true);
-    } catch (e) {
-      console.error("[kex] agent_setup_pi failed:", e);
-      setPiReady(false);
     } finally {
       setInstalling(null);
     }
@@ -325,102 +281,50 @@ export function NotificationBell({ onActivate }: Props) {
           </div>
         ) : null}
 
-        {!opencodeReady ? (
-          <div className="border-t border-border/60 p-1">
-            <button
-              type="button"
-              onClick={setupOpencode}
-              disabled={installing !== null}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
-            >
-              {installing === "opencode" ? (
-                <Spinner size={16} className="text-current" />
-              ) : (
-                <HugeiconsIcon icon={PuzzleIcon} size={14} strokeWidth={1.75} />
-              )}
-              <span className="text-left">
-                <span className="block font-medium">
-                  {installing === "opencode"
-                    ? "Installing..."
-                    : "Install OpenCode integration"}
-                </span>
-                <span className="block text-[11px]">
-                  Session restore on close
-                </span>
-              </span>
-            </button>
-            {opencodeReady === false && installing === null ? (
-              <p className="px-2 pt-1 text-[11px] text-destructive">
-                Could not write the OpenCode plugin.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!ompReady ? (
-          <div className="border-t border-border/60 p-1">
-            <button
-              type="button"
-              onClick={setupOmp}
-              disabled={installing !== null}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
-            >
-              {installing === "omp" ? (
-                <Spinner size={16} className="text-current" />
-              ) : (
-                <img src={ompLogoUrl} alt="" width={14} height={14} style={{ width: 14, height: 14 }} />
-              )}
-              <span className="text-left">
-                <span className="block font-medium">
-                  {installing === "omp"
-                    ? "Installing..."
-                    : "Install OMP integration"}
-                </span>
-                <span className="block text-[11px]">
-                  Session restore on close
-                </span>
-              </span>
-            </button>
-            {ompReady === false && installing === null ? (
-              <p className="px-2 pt-1 text-[11px] text-destructive">
-                Could not write the OMP extension.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!piReady ? (
-          <div className="border-t border-border/60 p-1">
-            <button
-              type="button"
-              onClick={setupPi}
-              disabled={installing !== null}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
-            >
-              {installing === "pi" ? (
-                <Spinner size={16} className="text-current" />
-              ) : (
-                <AgentIcon agent="pi" size={14} />
-              )}
-              <span className="text-left">
-                <span className="block font-medium">
-                  {installing === "pi"
-                    ? "Installing..."
-                    : "Install Pi integration"}
-                </span>
-                <span className="block text-[11px]">
-                  Session restore on close
-                </span>
-              </span>
-            </button>
-            {piReady === false && installing === null ? (
-              <p className="px-2 pt-1 text-[11px] text-destructive">
-                Could not write the Pi extension.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        <BellIntegrationRow agent="opencode" name="OpenCode" state={opencode} />
+        <BellIntegrationRow agent="omp" name="OMP" state={omp} />
+        <BellIntegrationRow agent="pi" name="Pi" state={pi} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Offered only while the integration is missing: once installed, Settings owns reinstall and remove.
+export function BellIntegrationRow({
+  agent,
+  name,
+  state,
+}: {
+  agent: IntegrationAgent;
+  name: string;
+  state: IntegrationState;
+}) {
+  if (state.ready) return null;
+  return (
+    <div className="border-t border-border/60 p-1">
+      <button
+        type="button"
+        onClick={() => void state.install()}
+        disabled={state.busy}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+      >
+        {state.busy ? (
+          <Spinner size={16} className="text-current" />
+        ) : (
+          <AgentIcon agent={agent} size={14} />
+        )}
+        <span className="text-left">
+          <span className="block font-medium">
+            {state.busy ? "Installing..." : `Install ${name} integration`}
+          </span>
+          <span className="block text-[11px]">Session restore on close</span>
+        </span>
+      </button>
+      {state.failed && !state.busy ? (
+        <p className="px-2 pt-1 text-[11px] text-destructive">
+          Could not write the {name} integration.
+        </p>
+      ) : null}
+    </div>
   );
 }
