@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { writeClipboardText } from "@/lib/clipboard";
 import { formatBytes } from "@/lib/formatBytes";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUpdater } from "./useUpdater";
 
 type DistroKey = "arch" | "debian" | "fedora";
@@ -37,6 +37,13 @@ export function UpdaterDialog() {
   const { status, install, dismiss } = useUpdater();
   const [copied, setCopied] = useState(false);
   const [distro, setDistro] = useState<DistroKey>("arch");
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    },
+    [],
+  );
   const manualVersion =
     status.kind === "manual-available" ? status.info.version : "";
   const activeCommand = distroCommand(distro, manualVersion);
@@ -57,7 +64,8 @@ export function UpdaterDialog() {
   const copyCommand = async () => {
     if (!(await writeClipboardText(activeCommand))) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 1500);
   };
   const progress =
     downloading && status.contentLength
