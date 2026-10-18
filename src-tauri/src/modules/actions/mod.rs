@@ -22,7 +22,9 @@ fn is_absolute(s: &str) -> bool {
 /// relative path with separators is refused because it would resolve against Kex's
 /// own working directory.
 pub fn validate_spawn(argv: &[String], cwd: Option<&str>) -> Result<SpawnPlan, String> {
-    let (program, args) = argv.split_first().ok_or("Nothing to run: the command is empty")?;
+    let (program, args) = argv
+        .split_first()
+        .ok_or("Nothing to run: the command is empty")?;
     if program.trim().is_empty() {
         return Err("Nothing to run: the program name is empty".into());
     }
@@ -34,7 +36,9 @@ pub fn validate_spawn(argv: &[String], cwd: Option<&str>) -> Result<SpawnPlan, S
             return Err(format!("Program not found: {program}"));
         }
     } else if program.contains('/') || program.contains('\\') {
-        return Err(format!("Program must be an absolute path or a bare name: {program}"));
+        return Err(format!(
+            "Program must be an absolute path or a bare name: {program}"
+        ));
     }
     let cwd = match cwd {
         None => None,
@@ -52,12 +56,19 @@ pub fn validate_spawn(argv: &[String], cwd: Option<&str>) -> Result<SpawnPlan, S
             Some(path)
         }
     };
-    Ok(SpawnPlan { program: program.clone(), args: args.to_vec(), cwd })
+    Ok(SpawnPlan {
+        program: program.clone(),
+        args: args.to_vec(),
+        cwd,
+    })
 }
 
 fn spawn_detached(plan: &SpawnPlan) -> Result<u32, String> {
     let mut cmd = Command::new(&plan.program);
-    cmd.args(&plan.args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.args(&plan.args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     if let Some(dir) = &plan.cwd {
         cmd.current_dir(dir);
     }
@@ -72,7 +83,9 @@ fn spawn_detached(plan: &SpawnPlan) -> Result<u32, String> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to launch {}: {e}", plan.program))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to launch {}: {e}", plan.program))?;
     let pid = child.id();
     // Reaped on its own thread: a finished child must not stay a zombie until Kex exits.
     std::thread::spawn(move || {
@@ -143,7 +156,11 @@ mod tests {
 
     #[test]
     fn accepts_a_bare_name_and_keeps_arguments_with_spaces_whole() {
-        let plan = validate_spawn(&argv(&["code", "--flag", "/my folder/a b.txt"]), Some(&tmp())).unwrap();
+        let plan = validate_spawn(
+            &argv(&["code", "--flag", "/my folder/a b.txt"]),
+            Some(&tmp()),
+        )
+        .unwrap();
         assert_eq!(plan.program, "code");
         assert_eq!(plan.args, vec!["--flag", "/my folder/a b.txt"]);
         assert_eq!(plan.cwd, Some(PathBuf::from(tmp())));
@@ -164,7 +181,11 @@ mod tests {
         // A reaped pid no longer exists; a zombie would still answer kill(pid, 0).
         let alive = unsafe { libc::kill(pid, 0) } == 0;
         assert!(!alive, "child {pid} was not reaped");
-        let missing = SpawnPlan { program: "kex-definitely-not-a-binary".into(), args: vec![], cwd: None };
+        let missing = SpawnPlan {
+            program: "kex-definitely-not-a-binary".into(),
+            args: vec![],
+            cwd: None,
+        };
         assert!(spawn_detached(&missing).is_err());
     }
 }

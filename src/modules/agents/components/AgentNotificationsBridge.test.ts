@@ -109,6 +109,29 @@ describe("handleSignal with background subagents", () => {
     expect(session().status).toBe("attention");
   });
 
+  test("a Stop from an agent that does not list its subagents keeps the ones it reported", () => {
+    handleSignal(sig("UserPromptSubmit", { agent: "omp" }), ctx());
+    handleSignal(sig("SubagentStart", { agent: "omp", agentId: "Saludar", agentType: "task", agentDescription: "Saludar" }), ctx());
+    handleSignal(sig("Stop", { agent: "omp" }), ctx());
+    expect(Object.keys(session().subagents)).toEqual(["Saludar"]);
+    expect(session().status).toBe("working");
+    expect(routeAgentNotification).not.toHaveBeenCalled();
+    handleSignal(sig("SubagentStop", { agent: "omp", agentId: "Saludar" }), ctx());
+    expect(session().subagents).toEqual({});
+  });
+
+  test("a subagent description reaches the row label", () => {
+    handleSignal(sig("SubagentStart", { agent: "omp", agentId: "a1", agentType: "task", agentDescription: "Contar archivos" }), ctx());
+    expect(session().subagents.a1.description).toBe("Contar archivos");
+  });
+
+  test("Claude still reconciles against the list its Stop carries", () => {
+    handleSignal(sig("UserPromptSubmit", { agent: "claude" }), ctx());
+    handleSignal(sig("SubagentStart", { agent: "claude", agentId: "ghost", agentType: "Explore" }), ctx());
+    handleSignal(sig("Stop", { agent: "claude" }), ctx());
+    expect(session().subagents).toEqual({});
+  });
+
   test("a SubagentStart before any session creates it", () => {
     handleSignal(sig("SubagentStart", { agentId: "a1", agentType: "Explore" }), ctx());
     expect(Object.keys(session().subagents)).toEqual(["a1"]);

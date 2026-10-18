@@ -1,5 +1,5 @@
-pub mod agent;
 pub mod actions;
+pub mod agent;
 pub mod editors;
 pub mod float_browser;
 pub mod fs;

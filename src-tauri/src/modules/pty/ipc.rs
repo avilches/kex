@@ -193,6 +193,7 @@ struct Payload {
     // SubagentStart / SubagentStop
     agent_id: Option<String>,
     agent_type: Option<String>,
+    agent_description: Option<String>,
     // StopFailure
     error_message: Option<String>,
     // PermissionRequest
@@ -224,6 +225,7 @@ fn parse_payload(json: &str) -> Option<Payload> {
         background_subagents: parse_background_subagents(&v),
         agent_id: v["agent_id"].as_str().map(str::to_string),
         agent_type: v["agent_type"].as_str().map(str::to_string),
+        agent_description: v["description"].as_str().map(str::to_string),
         error_message: v["error_message"].as_str().map(str::to_string),
         tool_name: v["tool_name"].as_str().map(str::to_string),
         is_final: v["final"].as_bool().unwrap_or(false),
@@ -588,6 +590,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             let mut sig = agent_signal(pty_id, &p.event, p.agent.as_deref());
             sig["agentId"] = agent_id.into();
             sig["agentType"] = agent_type.into();
+            sig["agentDescription"] = p.agent_description.as_deref().unwrap_or("").into();
             let _ = app.emit(AGENT_EVENT, sig);
         }
         "MessageDisplay" => {
@@ -923,6 +926,15 @@ mod tests {
         assert_eq!(p.event, "SubagentStart");
         assert_eq!(p.agent_id.as_deref(), Some("a1"));
         assert_eq!(p.agent_type.as_deref(), Some("general-purpose"));
+    }
+
+    #[test]
+    fn parse_subagent_start_reads_the_description_when_the_agent_sends_one() {
+        let json = r#"{"hook_event_name":"SubagentStart","session_id":"s","transcript_path":"","cwd":"","agent_id":"a1","agent_type":"task","description":"Contar archivos"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.agent_description.as_deref(), Some("Contar archivos"));
+        let bare = r#"{"hook_event_name":"SubagentStart","session_id":"s","transcript_path":"","cwd":"","agent_id":"a1"}"#;
+        assert_eq!(parse_payload(bare).unwrap().agent_description, None);
     }
 
     #[test]

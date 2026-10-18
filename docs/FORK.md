@@ -207,7 +207,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
   `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
-  (`agent_setup_omp`, marker `kex-agent-status-v3`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
+  (`agent_setup_omp`, marker `kex-agent-status-v4`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
   assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
   inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the

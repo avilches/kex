@@ -362,7 +362,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ### F1 El plugin global carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OpenCode integration"
-- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v2` en la primera linea)
+- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v3` en la primera linea)
 - [ ] Lanzar `opencode --print-logs` desde un terminal de Kex y crear una sesion nueva: en el log no debe aparecer ningun error del plugin (la carga del directorio global es automatica en 1.19.x)
 - [ ] Reiniciar: el campanazo ya no muestra el boton OpenCode (status via `agent_opencode_plugin_status`)
 
@@ -398,7 +398,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ### G1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OMP integration"
-- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v3` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v4` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
 - [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
 
@@ -435,7 +435,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install Pi integration"
-- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v3` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
+- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v4` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
 - [ ] Lanzar `pi` desde un terminal de Kex: sin errores de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton Pi (status via `agent_pi_extension_status`)
 
@@ -461,7 +461,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### I1 Kex mantiene al dia lo que instalaste
 
 - [ ] Instalar OMP, Pi y OpenCode desde Settings > General. Cerrar Kex y editar a mano la primera linea de uno de los ficheros (por ejemplo `// kex-agent-status-v1`)
-- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v3` sin pulsar nada
+- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v4` sin pulsar nada
 - [ ] Borrar a mano `~/.pi/agent/extensions/kex-agent-status.ts` y reabrir Kex: el fichero NO reaparece y la fila de Pi dice "Not installed"
 - [ ] Poner en ese mismo sitio un fichero propio (`export default () => {}`) y reabrir Kex: no se toca
 
@@ -489,6 +489,29 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 - [ ] Tab de OMP o Pi: el bloque del agente (icono, modelo, transcript) lleva "Run on Start" dentro
 - [ ] Tab de OpenCode: no hay bloque de agente, pero "Run on Start" sigue disponible
 - [ ] Tab de terminal sin agente: "Run on Start" sigue ahi
+
+## Bloque J - Subagentes
+
+### J1 OMP
+
+- [ ] En un tab de `omp`, pedir: "usa la herramienta task para lanzar dos subagentes en paralelo con las descripciones Contar archivos y Saludar"
+- [ ] Esperado: en la lista anidada del WorkspaceBar aparecen dos filas hijas del tab, cada una con su nombre, mientras corren, y desaparecen al terminar
+- [ ] El tab sigue con spinner mientras haya subagentes corriendo y solo pasa a atencion cuando el ultimo termina
+- [ ] "Run on Start" y el icono del tab siguen mostrando la sesion principal, no la de un subagente
+
+### J2 OpenCode
+
+- [ ] En un tab de `opencode`, pedir lo mismo con la herramienta task
+- [ ] Esperado: una fila hija por subagente con la descripcion que se le dio (sin el sufijo `(@general subagent)`), que desaparece al terminar
+- [ ] Un subagente que falla cierra su fila y no marca error en el tab
+
+### J3 Pi
+
+- [ ] Pedir a `pi` que lance un subagente: responde que no tiene herramienta para ello. No aparece ninguna fila
+
+### J4 Permisos desde un subagente
+
+- [ ] En OMP u OpenCode con una herramienta en modo "ask", pedir un subagente que la use: el tab pasa a atencion aunque la pregunta la haga el subagente
 
 ---
 

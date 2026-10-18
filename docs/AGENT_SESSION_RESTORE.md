@@ -122,7 +122,7 @@ destroyed before the PTYs finish shutting down, so a single store file is suffic
 
 OpenCode has no hook commands; its extension surface is plugins (JS modules its own process loads from
 `~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, marker
-`kex-opencode-v2`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
+`kex-opencode-v3`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
 `KEX_TAB_ID` are present in the plugin host's environment it translates the session lifecycle into the frames Claude
 Code's hooks emit, sent directly on the socket:
 
@@ -138,8 +138,11 @@ Code's hooks emit, sent directly on the socket:
 - `PermissionRequest` on `permission.asked` (the permission is the tool name) and `question.asked`. A subagent that
   asks sends it on behalf of its parent session.
 - `StopFailure` on any other `session.error`, carrying the message; the turn then sends no `Stop`.
+- `SubagentStart` when a child session (one with a `parentID`) is created under a session the tab already shows, and
+  `SubagentStop` when that child goes idle or fails. The row label is the child's title without OpenCode's
+  `(@<agent> subagent)` suffix, and the type is the child's agent. A child never ends the turn of its parent.
 
-Subagent sessions (those with a `parentID`) are never reported. `session.created` carries the parent; for a session that
+Subagent sessions (those with a `parentID`) are never reported as the tab's session. `session.created` carries the parent; for a session that
 already existed, the plugin asks the OpenCode client once (`client.session.get`) and treats the session as a subagent
 when the lookup fails. OpenCode does not await plugin handlers, so the plugin claims a session before its first send and
 remembers a turn that ends while the registration is still in flight. Frames are best-effort: no spooling, a 2 s send
@@ -157,7 +160,7 @@ The OSC/`AgentDetector` layer still detects plain `opencode` invocations like an
 
 OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
 `~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships one
-source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v3`, embedded with
+source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v4`, embedded with
 `include_str!`). `agent_setup_omp` and `agent_setup_pi` stamp the runtime name into the template's `agent` constant and
 write the result atomically into the matching folder, so one file reports `agent: omp` and the other `agent: pi`. Their
 status commands compare the whole installed file with the script stamped for that runtime, so an outdated copy, or one
@@ -171,6 +174,12 @@ Claude Code's hooks emit.
   instead, which is handled the same way; `before_agent_start` and `agent_start` report it too if it was missed and add
   `UserPromptSubmit`. One `SessionStart` per session id. The first one is sent with `source: "startup"` and any later one
   with `source: "resume"`, so a `/new` inside the TUI keeps the tab's launch command.
+- OMP runs subagents through its `task` tool, in the same process, each in its own session whose header names the
+  parent (`parentSession`). The extension listens on `pi.events` for `task:subagent:lifecycle` (`started`, then
+  `completed`, `failed` or `aborted`, with the subagent `id`) and sends `SubagentStart` and `SubagentStop` with
+  `agent_id`, `agent_type` and `description`, under the session the tab shows. A subagent's own session is never
+  reported as the tab's session, its prompts and turn ends are ignored, and an approval it asks for raises attention on
+  the parent. Pi has no subagents (its tools are read, bash, edit and write), so the channel never fires there.
 - A run started with `-p` or `--print` (before any `--`) sends nothing at all: a one-shot answer is not a session to
   restore.
 - Because the session is reported at startup, a tab where the agent was opened and closed without a prompt records a
