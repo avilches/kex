@@ -127,12 +127,16 @@ describe("TabAgentMenuItems", () => {
     expect(screen.queryByText("Transcript not created yet")).toBeNull();
   });
 
-  it("shows no agent block for OpenCode but keeps the extra items", () => {
+  it("shows OpenCode's block with its session id and no transcript actions", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "opencode");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "ses_abc" });
     open(noop, <div>Run on Start</div>);
-    expect(screen.queryByText("Opencode")).toBeNull();
-    expect(screen.queryByText("OpenCode")).toBeNull();
+    expect(screen.getByText("OpenCode")).toBeTruthy();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();
+    expect(screen.queryByText("Open Transcript Folder")).toBeNull();
     expect(screen.getByText("Run on Start")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Copy Session ID"));
+    expect(writeClipboardText).toHaveBeenCalledWith("ses_abc");
   });
 });

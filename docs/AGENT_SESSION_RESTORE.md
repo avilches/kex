@@ -149,7 +149,8 @@ remembers a turn that ends while the registration is still in flight. Frames are
 cap, silent failure. The plugin host is born in the launch directory and never moves.
 
 OpenCode keeps its history in a SQLite database (`~/.local/share/opencode/opencode.db`), not in a per-session file, so
-the frames carry no transcript path and the tab's "Reveal Transcript" menu entry stays on "Transcript not created yet".
+the frames carry no transcript path and the tab menu's OpenCode block has no transcript actions: it offers "Copy Session ID"
+and "Run on Start" only.
 A restored tab has the same record as any other: it is keyed by the tab's old session id, never pruned (the provider
 row's policy is `ResumeAnyway`) and `opencode --session '<id>'` runs in the same launch directory.
 
@@ -756,7 +757,8 @@ Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toast is fi
 - **Resume command that never reports a session.** `watchResume` runs after the command is written to the PTY and, 30 s
   later (`RESUME_CHECK_MS`), toasts if `sessions[tabId].meta.sessionId` is still empty (it is filled by `SessionStart`
   via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never
-  opened is not a failure.
+  opened is not a failure. OpenCode is exempt (`expectsSessionReport`): its plugin only names a session on its first
+  event, so a restored tab nobody has typed in is silent by design, and the id is already in the resume command.
 
 Each toast is also written to `Kex.log` (`user-data/logs-dev/Kex.log`) as a `WARN` line starting with
 `[agent-session]`, so the log can be searched for it after the toast is gone.

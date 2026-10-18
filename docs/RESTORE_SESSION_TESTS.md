@@ -372,7 +372,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 - [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "opencode"`, `session_id` tipo `ses_...`, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "opencode"` (grabada por OSC 133;C)
 - [ ] El icono del tab aparece sin la strike de "launch unknown"
 - [ ] Mientras OpenCode trabaja el tab muestra el spinner y al terminar el turno pasa a atencion una sola vez; una peticion de permiso (`bash` en modo `ask`) muestra la atencion
-- [ ] Menu contextual del tab: "Transcript not created yet" (OpenCode guarda el historial en SQLite, no en un fichero por sesion)
+- [ ] Menu contextual del tab: bloque OpenCode con "Copy Session ID" y "Run on Start", sin acciones de transcript (OpenCode guarda el historial en SQLite, no en un fichero por sesion)
 
 ### F3 Restore del tab cerrado
 
@@ -487,7 +487,8 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### I5 Menu del tab
 
 - [ ] Tab de OMP o Pi: el bloque del agente (icono, modelo, transcript) lleva "Run on Start" dentro
-- [ ] Tab de OpenCode: no hay bloque de agente, pero "Run on Start" sigue disponible
+- [ ] Tab de OpenCode: bloque de agente con "Copy Session ID" y "Run on Start" dentro, sin acciones de transcript
+- [ ] Restaurar un tab de OpenCode sin escribir nada en el: en dev no sale el aviso "did not report a session"
 - [ ] Tab de terminal sin agente: "Run on Start" sigue ahi
 
 ## Bloque J - Subagentes

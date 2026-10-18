@@ -9,6 +9,7 @@ import { isHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import {
   RESUME_CHECK_MS,
   describeSilentResume,
+  expectsSessionReport,
   hasResumed,
 } from "@/modules/agents/lib/restoreCheck";
 
@@ -156,7 +157,7 @@ export async function detachAgentSession(tabId: string): Promise<void> {
 const resumeWatches = new Map<string, ReturnType<typeof setTimeout>>();
 
 export function watchResume(plan: RestorePlan): void {
-  if (!import.meta.env.DEV) return;
+  if (!import.meta.env.DEV || !expectsSessionReport(plan.agent)) return;
   clearTimeout(resumeWatches.get(plan.tabId));
   resumeWatches.set(
     plan.tabId,
