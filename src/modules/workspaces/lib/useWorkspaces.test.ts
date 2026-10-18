@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Tab, Script, SplitNode, PaneNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
 import { addAction, removeAction, type Action } from "@/modules/actions";
-import { applyCloseTab, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, applyPromoteAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -679,19 +679,17 @@ describe("workspace actions", () => {
     expect(applySetActiveAction([ws({ actions: [action("a")], activeAction: "a" })], "w1", null)[0].activeAction).toBeUndefined();
   });
 
-  it("promotes an action to the global list and out of the workspace", () => {
+  it("takes an action out of its workspace and clears it as the active one", () => {
     const start = [ws({ actions: [action("a"), action("b")], activeAction: "a" })];
-    const out = applyPromoteAction(start, "w1", "a", [action("g")]);
-    expect(out.workspaces[0].actions?.map((a) => a.id)).toEqual(["b"]);
+    const out = takeWorkspaceAction(start, "w1", "a");
+    expect(out.action?.id).toBe("a");
+    expect(out.workspaces[0].actions?.map((x) => x.id)).toEqual(["b"]);
     expect(out.workspaces[0].activeAction).toBeUndefined();
-    expect(out.global.map((a) => a.id)).toEqual(["g", "a"]);
   });
 
-  it("promoting an unknown action changes nothing", () => {
+  it("takes nothing for an unknown action or workspace", () => {
     const start = [ws({ actions: [action("a")] })];
-    const global = [action("g")];
-    const out = applyPromoteAction(start, "w1", "zz", global);
-    expect(out.workspaces).toBe(start);
-    expect(out.global).toBe(global);
+    expect(takeWorkspaceAction(start, "w1", "zz")).toEqual({ workspaces: start, action: null });
+    expect(takeWorkspaceAction(start, "nope", "a")).toEqual({ workspaces: start, action: null });
   });
 });

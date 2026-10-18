@@ -5,14 +5,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import {
   addAction,
-  promoteToGlobal,
   removeAction,
   reorderActions,
   updateAction,
   type Action,
 } from "@/modules/actions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setGlobalActions } from "@/modules/settings/store";
+import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
+import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
@@ -203,19 +203,17 @@ export function applySetActiveAction(
   });
 }
 
-// The caller persists `global`; the workspace side is plain state.
-export function applyPromoteAction(
+// Removes an action from its workspace and hands it back, for a promotion to the global list.
+export function takeWorkspaceAction(
   workspaces: Workspace[],
   workspaceId: string,
   actionId: string,
-  global: Action[],
-): { workspaces: Workspace[]; global: Action[] } {
-  const source = workspaces.find((w) => w.id === workspaceId)?.actions ?? [];
-  const moved = promoteToGlobal(source, global, actionId);
-  if (moved.workspace === source) return { workspaces, global };
+): { workspaces: Workspace[]; action: Action | null } {
+  const action = workspaces.find((w) => w.id === workspaceId)?.actions?.find((a) => a.id === actionId);
+  if (!action) return { workspaces, action: null };
   return {
-    workspaces: applyWorkspaceActions(workspaces, workspaceId, () => moved.workspace),
-    global: moved.global,
+    workspaces: applyWorkspaceActions(workspaces, workspaceId, (list) => removeAction(list, actionId)),
+    action,
   };
 }
 
@@ -1098,15 +1096,30 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applySetActiveAction(prev, workspaceId, actionId));
   }, []);
 
-  // The move is computed from the committed state so the global list is written once, outside
-  // any state updater (an updater can run twice and must not have side effects).
+  // Two steps so an action added in the same tick can still be promoted: the updater only
+  // takes the action out and queues it (a Map keyed by workspace and action, so a repeated
+  // updater run is harmless), and the effect below writes the global list outside any updater.
+  const promotionsRef = useRef(new Map<string, { workspaceId: string; action: Action }>());
   const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
-    const global = usePreferencesStore.getState().actions;
-    const moved = applyPromoteAction(workspacesRef.current, workspaceId, actionId, global);
-    if (moved.workspaces === workspacesRef.current) return;
-    setWorkspaces((prev) => applyPromoteAction(prev, workspaceId, actionId, global).workspaces);
-    void setGlobalActions(moved.global);
+    setWorkspaces((prev) => {
+      const taken = takeWorkspaceAction(prev, workspaceId, actionId);
+      if (taken.action) promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action });
+      return taken.workspaces;
+    });
   }, []);
+
+  useEffect(() => {
+    if (promotionsRef.current.size === 0) return;
+    const queue = [...promotionsRef.current.values()];
+    promotionsRef.current.clear();
+    for (const { workspaceId, action } of queue) {
+      globalActions.add(action).catch((err: unknown) => {
+        console.error("Could not save the global action", err);
+        toast.error(`Could not make "${action.name}" global; it stays in the workspace`);
+        setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
+      });
+    }
+  }, [workspaces]);
 
   const setAgentTitles = useCallback((titles: ReadonlyMap<string, string>) => {
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
