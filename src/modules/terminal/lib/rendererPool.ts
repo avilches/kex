@@ -1,5 +1,6 @@
 import { writeClipboardText } from "@/lib/clipboard";
 import { resolveMonoFontFamily } from "@/lib/fonts";
+import { IS_MAC } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type {
   CursorInactiveStyle,
@@ -1055,10 +1056,6 @@ export function disposeLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (slot) disposeSlot(slot);
 }
-
-const IS_MAC =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(navigator.userAgent);
 
 function isTerminalCopy(e: KeyboardEvent): boolean {
   return (
