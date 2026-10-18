@@ -22,6 +22,8 @@ const itemTextIndent = (depth: string): string =>
 // `--lp-quote-depth * 16px`; and the flat band behind code, as a layer too.
 const QUOTE_BARS =
   "repeating-linear-gradient(to right, color-mix(in srgb, var(--muted-foreground) 70%, transparent) 0 3px, transparent 3px 16px)";
+// H6 is a dimmed heading on purpose; the share keeps it at 3:1 or more on every built-in theme (themes/contrast.test.ts).
+export const H6_TEXT_SHARE = 0.75;
 const CODE_BG = "color-mix(in srgb, var(--editor-foreground) 6%, transparent)";
 const CODE_BAND = `linear-gradient(${CODE_BG}, ${CODE_BG})`;
 

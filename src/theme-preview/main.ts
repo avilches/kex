@@ -12,7 +12,6 @@ import {
   buildLivePreviewExtensions,
   buildStaticPreviewExtensions,
 } from "@/modules/markdown/codemirror/lib/markdownExtensions";
-import { frontmatterAsCodeBlock } from "@/modules/markdown/lib/frontmatter";
 import {
   EDITOR_THEME_LABELS,
   EDITOR_THEMES,
@@ -503,7 +502,7 @@ function markdownView(): HTMLElement {
     return { view, node: h("div", { class: "flex min-w-0 flex-col gap-1" }, h("div", { class: "text-[11px] text-muted-foreground" }, label), host) };
   };
   const rich = pane("Rich", markdownDemo, buildLivePreviewExtensions(identity));
-  const preview = pane("Preview", frontmatterAsCodeBlock(markdownDemo), buildStaticPreviewExtensions(identity));
+  const preview = pane("Preview", markdownDemo, buildStaticPreviewExtensions(identity));
   markdownViews.rich = rich.view;
   markdownViews.preview = preview.view;
   return h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2", "data-editor-theme": id }, rich.node, preview.node);

@@ -38,8 +38,8 @@ token. It is dev only and not part of `pnpm build`.
   A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
   lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
 - A third view, `markdown`, puts Rich (the Live Preview editor) and Preview (the read-only view) side by
-  side on `src/theme-preview/live-preview-demo.md`. Both documents have the same number of lines (Preview
-  turns the frontmatter into a yaml fence of the same height), so line n of one is line n of the other:
+  side on `src/theme-preview/live-preview-demo.md`. Both panes get the same text (Preview shows
+  the frontmatter as the same monospace lines as Rich, not as a fence), so line n of one is line n of the other:
   `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
   computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists

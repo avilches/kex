@@ -5,9 +5,7 @@ import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreview
 import { buildStaticPreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
 import { useWikiLinkExtension } from "@/modules/markdown/codemirror/lib/useWikiLinkExtension";
 import { scrollToTopLine, topLineOf } from "@/modules/markdown/codemirror/lib/viewPosition";
-import { frontmatterAsCodeBlock } from "@/modules/markdown/lib/frontmatter";
 import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
-import { previewToSourceLine, sourceToPreviewLine } from "@/modules/markdown/lib/viewPosition";
 
 type Props = {
   content: string;
@@ -20,7 +18,7 @@ type Props = {
 };
 
 export type MarkdownPreviewPaneHandle = {
-  // Source line (not Preview line) at the top of the viewport.
+  // 1-based source line at the top of the viewport.
   getTopLine(): number | null;
 };
 
@@ -31,18 +29,16 @@ export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(
   const themeExt = useEditorThemeExt();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const wikiExtension = useWikiLinkExtension(cmRef, wikiLinks);
-  const contentRef = useRef(content);
-  contentRef.current = content;
   const initialTopLineRef = useRef(initialTopLine);
   useEffect(() => {
     const view = cmRef.current?.view;
     const line = initialTopLineRef.current;
-    if (view && line) scrollToTopLine(view, sourceToPreviewLine(contentRef.current, line));
+    if (view && line) scrollToTopLine(view, line);
   }, []);
   useImperativeHandle(ref, () => ({
     getTopLine: () => {
       const view = cmRef.current?.view;
-      return view ? previewToSourceLine(contentRef.current, topLineOf(view)) : null;
+      return view ? topLineOf(view) : null;
     },
   }));
   const pathRef = useRef(path);
@@ -52,12 +48,11 @@ export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(
     () => [...buildStaticPreviewExtensions(resolveImageSrc), wikiExtension],
     [resolveImageSrc, wikiExtension],
   );
-  const value = useMemo(() => frontmatterAsCodeBlock(content), [content]);
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[var(--editor-background)] text-[var(--editor-foreground)]">
       <CodeMirror
         ref={cmRef}
-        value={value}
+        value={content}
         theme={themeExt}
         editable={false}
         height="100%"

@@ -86,6 +86,7 @@ describe("planLivePreview", () => {
       listLines: [],
       headingLines: [],
       codeHeaders: [],
+      frontmatterLines: [],
     });
   });
 
@@ -697,15 +698,14 @@ describe("planLivePreview", () => {
     expect(planTables({ tree, doc, activeLines: new Set([2]), frontmatterEnd: 0 })).toEqual([]);
   });
 
-  it("styles the frontmatter block as monospace, never as markdown", () => {
+  it("marks every frontmatter line for a line decoration, never parsing it as markdown", () => {
     const text = "---\ntitle: **not bold**\n---\n# Real Title\n";
     const fmEnd = "---\ntitle: **not bold**\n---\n".length;
     const result = plan(text, [], fmEnd);
-    expect(result.marks).toContainEqual({ from: 0, to: fmEnd, className: "cm-lp-frontmatter" });
-    const contentMarks = result.marks.filter((m) => m.className !== "cm-lp-frontmatter");
-    expect(contentMarks.every((m) => m.from >= fmEnd)).toBe(true);
+    expect(result.frontmatterLines).toEqual([0, 4, 24]);
+    expect(result.marks.every((m) => m.from >= fmEnd)).toBe(true);
     expect(result.hides.every((h) => h.from >= fmEnd)).toBe(true);
-    expect(contentMarks).toContainEqual({
+    expect(result.marks).toContainEqual({
       from: fmEnd,
       to: fmEnd + "# Real Title".length,
       className: "cm-lp-heading cm-lp-h1",
