@@ -102,13 +102,13 @@ describe("opencode plugin", () => {
     expect(kinds().filter((k) => k === "Stop")).toHaveLength(1);
   });
 
-  it("never reports a subagent session, created or resumed", async () => {
+  it("never makes a subagent the session of the tab, created or resumed", async () => {
     const event = await load({ ses_resumed_child: { parentID: "ses_a" } });
     await event({ event: created("ses_a") });
     await event({ event: created("ses_child", { parentID: "ses_a" }) });
     await event({ event: status("ses_child", "busy") });
     await event({ event: status("ses_resumed_child", "busy") });
-    expect(kinds()).toEqual(["SessionStart"]);
+    expect(kinds().filter((k) => k === "SessionStart" || k === "UserPromptSubmit")).toEqual(["SessionStart"]);
     expect(sent.every((f) => f.session_id === "ses_a")).toBe(true);
   });
 
@@ -167,5 +167,68 @@ describe("opencode plugin", () => {
     await event({ event: { type: "message.part.delta", properties: { sessionID: "ses_a" } } });
     await event({ event: { type: "message.updated", properties: { sessionID: "ses_a" } } });
     expect(sent).toEqual([]);
+  });
+
+  it("shows a subagent session as a row under the tab and removes it when it ends", async () => {
+    const event = await load();
+    await event({ event: created("ses_a") });
+    await event({ event: status("ses_a", "busy") });
+    await event({
+      event: created("ses_child", { parentID: "ses_a", title: "Saludar usuario (@general subagent)", agent: "general" }),
+    });
+    await event({ event: status("ses_child", "busy") });
+    await event({ event: idle("ses_child") });
+    const subs = sent.filter((f) => String(f.hook_event_name).startsWith("Subagent"));
+    expect(subs.map((f) => f.hook_event_name)).toEqual(["SubagentStart", "SubagentStop"]);
+    expect(subs[0]).toMatchObject({
+      session_id: "ses_a",
+      agent_id: "ses_child",
+      agent_type: "general",
+      description: "Saludar usuario",
+    });
+    expect(subs[1]).toMatchObject({ session_id: "ses_a", agent_id: "ses_child" });
+  });
+
+  it("a subagent that ends never ends the turn of the main session", async () => {
+    const event = await load();
+    await event({ event: created("ses_a") });
+    await event({ event: status("ses_a", "busy") });
+    await event({ event: created("ses_child", { parentID: "ses_a", title: "x (@general subagent)", agent: "general" }) });
+    await event({ event: status("ses_child", "idle") });
+    expect(kinds()).not.toContain("Stop");
+    await event({ event: idle("ses_a") });
+    expect(kinds().filter((k) => k === "Stop")).toHaveLength(1);
+  });
+
+  it("a failing subagent closes its row and is not reported as a failure of the tab", async () => {
+    const event = await load();
+    await event({ event: created("ses_a") });
+    await event({ event: created("ses_child", { parentID: "ses_a", title: "x (@general subagent)", agent: "general" }) });
+    await event({
+      event: { type: "session.error", properties: { sessionID: "ses_child", error: { name: "ApiError" } } },
+    });
+    expect(kinds()).toEqual(["SessionStart", "SubagentStart", "SubagentStop"]);
+  });
+
+  it("does not report a subagent whose parent the tab never showed", async () => {
+    const event = await load();
+    await event({ event: created("ses_child", { parentID: "ses_unknown", title: "x (@general subagent)" }) });
+    expect(sent).toEqual([]);
+  });
+
+  it("reports one row per subagent for parallel subagents", async () => {
+    const event = await load();
+    await event({ event: created("ses_a") });
+    await event({ event: created("ses_c1", { parentID: "ses_a", title: "uno (@general subagent)", agent: "general" }) });
+    await event({ event: created("ses_c2", { parentID: "ses_a", title: "dos (@general subagent)", agent: "general" }) });
+    await event({ event: idle("ses_c2") });
+    await event({ event: idle("ses_c1") });
+    const subs = sent.filter((f) => String(f.hook_event_name).startsWith("Subagent"));
+    expect(subs.map((f) => `${f.hook_event_name}:${f.agent_id}`)).toEqual([
+      "SubagentStart:ses_c1",
+      "SubagentStart:ses_c2",
+      "SubagentStop:ses_c2",
+      "SubagentStop:ses_c1",
+    ]);
   });
 });
