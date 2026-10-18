@@ -149,6 +149,8 @@ The extension computes nothing about sessions itself: it translates the runtime'
 Claude Code's hooks emit.
 
 - `before_agent_start` and `agent_start` become `SessionStart` once per session id plus `UserPromptSubmit`.
+- Every frame carries `transcript_path`, the runtime's session file (`ctx.sessionManager.getSessionFile()`), which feeds the
+  tab's "Reveal Transcript" menu and the live model read (`live_model` also understands their `{type:"message"}` entries).
 - `message_end` caches the assistant text.
 - `tool_approval_requested` (OMP only) becomes `PermissionRequest`. Pi has no approval flow, so it never raises
   attention from a permission prompt.

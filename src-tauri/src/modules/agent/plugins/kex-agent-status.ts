@@ -55,7 +55,7 @@ function send(frame: KexFrame): void {
 // runtime fires several lifecycle events for the same session.
 const seenSessions = new Set<string>();
 
-function reportSession(agent: string, sessionId: unknown, cwd: string): void {
+function reportSession(agent: string, sessionId: unknown, cwd: string, file: string): void {
   if (typeof sessionId !== "string" || !sessionId || seenSessions.has(sessionId)) return;
   seenSessions.add(sessionId);
   send({
@@ -63,13 +63,18 @@ function reportSession(agent: string, sessionId: unknown, cwd: string): void {
     agent,
     session_id: sessionId,
     cwd,
+    transcript_path: file,
   });
 }
 
-function sessionCoords(ctx: unknown, cwd: string): [unknown, string] {
-  const manager = (ctx as { sessionManager?: { getSessionId?: () => unknown } } | null)?.sessionManager;
-  const id = manager?.getSessionId?.();
-  return [id, cwd];
+// The session file path is what the tab's Reveal Transcript menu and the live model
+// read need; the runtime only exposes it through the session manager.
+function sessionCoords(ctx: unknown, cwd: string): [unknown, string, string] {
+  const manager = (ctx as {
+    sessionManager?: { getSessionId?: () => unknown; getSessionFile?: () => unknown };
+  } | null)?.sessionManager;
+  const file = manager?.getSessionFile?.();
+  return [manager?.getSessionId?.(), cwd, typeof file === "string" ? file : ""];
 }
 
 let lastAssistantMessage = "";
@@ -89,13 +94,14 @@ export default function (pi: KexRuntime): void {
   pi.on("before_agent_start", (event, ctx) => {
     lastAssistantMessage = "";
     agentEndReported = false;
-    const [id, dir] = sessionCoords(ctx, cwd);
-    reportSession(agent, id, dir);
+    const [id, dir, file] = sessionCoords(ctx, cwd);
+    reportSession(agent, id, dir, file);
     send({
       hook_event_name: "UserPromptSubmit",
       agent,
       session_id: typeof id === "string" ? id : "",
       cwd: dir,
+      transcript_path: file,
       prompt: typeof (event as { prompt?: unknown })?.prompt === "string" ? String((event as { prompt?: unknown }).prompt) : "",
     });
   });
@@ -103,24 +109,26 @@ export default function (pi: KexRuntime): void {
   pi.on("agent_start", (_event, ctx) => {
     lastAssistantMessage = "";
     agentEndReported = false;
-    const [id, dir] = sessionCoords(ctx, cwd);
-    reportSession(agent, id, dir);
+    const [id, dir, file] = sessionCoords(ctx, cwd);
+    reportSession(agent, id, dir, file);
     send({
       hook_event_name: "UserPromptSubmit",
       agent,
       session_id: typeof id === "string" ? id : "",
       cwd: dir,
+      transcript_path: file,
     });
   });
 
   pi.on("tool_approval_requested", (event, ctx) => {
-    const [id, dir] = sessionCoords(ctx, cwd);
-    reportSession(agent, id, dir);
+    const [id, dir, file] = sessionCoords(ctx, cwd);
+    reportSession(agent, id, dir, file);
     send({
       hook_event_name: "PermissionRequest",
       agent,
       session_id: typeof id === "string" ? id : "",
       cwd: dir,
+      transcript_path: file,
       tool_name: String((event as { toolName?: unknown })?.toolName || ""),
     });
   });
@@ -129,8 +137,8 @@ export default function (pi: KexRuntime): void {
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (message?.role !== "assistant") return;
     lastAssistantMessage = extractAssistantText(message.content);
-    const [id, dir] = sessionCoords(ctx, cwd);
-    reportSession(agent, id, dir);
+    const [id, dir, file] = sessionCoords(ctx, cwd);
+    reportSession(agent, id, dir, file);
   });
 
   pi.on("agent_settled", (_event, ctx) => {
@@ -148,13 +156,14 @@ export default function (pi: KexRuntime): void {
   function postAgentEnd(ctx: unknown): void {
     if (agentEndReported) return;
     agentEndReported = true;
-    const [id, dir] = sessionCoords(ctx, cwd);
-    reportSession(agent, id, dir);
+    const [id, dir, file] = sessionCoords(ctx, cwd);
+    reportSession(agent, id, dir, file);
     send({
       hook_event_name: "Stop",
       agent,
       session_id: typeof id === "string" ? id : "",
       cwd: dir,
+      transcript_path: file,
       last_assistant_message: lastAssistantMessage,
     });
   }

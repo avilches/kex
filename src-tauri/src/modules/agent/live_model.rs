@@ -10,10 +10,14 @@ const TAIL_BYTES: u64 = 256 * 1024;
 
 /// Model of the newest main-thread assistant message in a JSONL transcript. Subagent turns
 /// (`isSidechain`) and Claude Code's own placeholder messages do not say what the user runs.
+/// OMP and Pi write `{type:"message", message:{role:"assistant", model}}` instead of Claude's
+/// `{type:"assistant", message:{model}}`.
 pub fn last_assistant_model(jsonl: &str) -> Option<String> {
     jsonl.lines().rev().find_map(|line| {
         let v: serde_json::Value = serde_json::from_str(line).ok()?;
-        if v["type"] != "assistant" || v["isSidechain"] == true {
+        let is_assistant = v["type"] == "assistant"
+            || (v["type"] == "message" && v["message"]["role"] == "assistant");
+        if !is_assistant || v["isSidechain"] == true {
             return None;
         }
         let model = v["message"]["model"].as_str()?;
@@ -75,6 +79,24 @@ mod tests {
         assert_eq!(
             last_assistant_model(&t).as_deref(),
             Some("claude-sonnet-4-6")
+        );
+    }
+
+    #[test]
+    fn reads_the_model_from_omp_and_pi_message_entries() {
+        let entry = |model: &str| {
+            format!(
+                r#"{{"type":"message","id":"x","message":{{"role":"assistant","model":"{model}"}}}}"#
+            )
+        };
+        let t = [
+            entry("aws/claude-sonnet-5-5"),
+            r#"{"type":"message","message":{"role":"user","model":"ignored"}}"#.into(),
+        ]
+        .join("\n");
+        assert_eq!(
+            last_assistant_model(&t).as_deref(),
+            Some("aws/claude-sonnet-5-5")
         );
     }
 
