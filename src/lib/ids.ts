@@ -10,7 +10,5 @@ export const newPaneId      = () => `pane-${nid()}`;
 export const newSplitId     = () => `sp-${nid()}`;
 export const newTabId       = () => `tab-${nid()}`;
 export const newThemeId     = () => `th-${nid()}`;
-export const newScriptId    = () => `sc-${nid()}`;
-export const newEditorId    = () => `ed-${nid()}`;
 export const newActionId    = () => `ac-${nid()}`;
 export const newGroupId     = () => `grp-${nid()}`;

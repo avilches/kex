@@ -51,17 +51,3 @@ export function useExternalEditors() {
   }, []);
   return { detectedEditors, isScanning, scan };
 }
-
-/** Fire-and-forget: launches the editor; returns an error string on failure. */
-export async function openWithEditor(
-  binary: string,
-  argsBeforePath: string[],
-  path: string,
-): Promise<string | null> {
-  try {
-    await native.actionSpawn([binary, ...argsBeforePath, path]);
-    return null;
-  } catch (e) {
-    return String(e);
-  }
-}

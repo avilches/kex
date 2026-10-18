@@ -9,7 +9,6 @@ import {
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { normalizeActions, type Action } from "@/modules/actions";
-import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
@@ -40,7 +39,6 @@ export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
 export type DiffViewMode = "unified" | "split";
 
-export type TextEditorMode = "file-only" | "workspace-and-files";
 
 
 export type CursorStyle = "bar" | "block" | "underline";
@@ -209,10 +207,6 @@ export type Preferences = {
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
-  textEditorMode: TextEditorMode;
-  preferredFileEditorId: string | null;
-  preferredWorkspaceEditorId: string | null;
-  customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   // Global Actions, available in every workspace. Each workspace has its own on top.
   actions: Action[];
@@ -321,10 +315,6 @@ const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
 const KEY_SHORTCUTS = "shortcuts";
 
 // Tools store keys
-const KEY_TEXT_EDITOR_MODE = "textEditorMode";
-const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
-const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
-const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
 const KEY_ACTIONS = "actions";
 
@@ -482,10 +472,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   scratchpadEnterSends: true,
-  textEditorMode: "workspace-and-files",
-  preferredFileEditorId: null,
-  preferredWorkspaceEditorId: null,
-  customEditors: [],
   detectedEditors: [],
   actions: [],
   randomWorkspaceColor: true,
@@ -545,11 +531,6 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
   if (value === "home") return "home";
   if (value === "workspace") return "workspace";
   return "context";
-}
-
-export function parseTextEditorMode(value: unknown): TextEditorMode {
-  if (value === "file-only") return "file-only";
-  return "workspace-and-files";
 }
 
 // Builds a per-store writer: persists the key, flushes it to disk, then
@@ -783,17 +764,6 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadEnterSends:
       getTerminal<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
-    textEditorMode: parseTextEditorMode(getTools<string>(KEY_TEXT_EDITOR_MODE)),
-    preferredFileEditorId:
-      getTools<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredFileEditorId,
-    preferredWorkspaceEditorId:
-      getTools<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredWorkspaceEditorId,
-    customEditors: (() => {
-      const v = getTools<CustomEditor[]>(KEY_CUSTOM_EDITORS);
-      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
-    })(),
     detectedEditors: (() => {
       const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
@@ -1141,22 +1111,6 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
   await writeTerminalPref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
-export async function setPreferredFileEditorId(value: string | null): Promise<void> {
-  await writeToolsPref(KEY_PREFERRED_FILE_EDITOR_ID, value);
-}
-
-export async function setPreferredWorkspaceEditorId(value: string | null): Promise<void> {
-  await writeToolsPref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
-}
-
-export async function setTextEditorMode(value: TextEditorMode): Promise<void> {
-  await writeToolsPref(KEY_TEXT_EDITOR_MODE, value);
-}
-
-export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
-  await writeToolsPref(KEY_CUSTOM_EDITORS, value);
-}
-
 export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
@@ -1424,10 +1378,6 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
 };
 
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
-  [KEY_TEXT_EDITOR_MODE]: "textEditorMode",
-  [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
-  [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
-  [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_ACTIONS]: "actions",
 };
