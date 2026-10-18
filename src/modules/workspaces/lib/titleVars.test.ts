@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tabTitle } from "./tabTitle";
-import { expandTabTitle, expandWorkspaceTitle, tabTitleVars } from "./titleVars";
+import { expandTabTitle, expandWorkspaceTitle, tabRawValues, tabTitleVars } from "./titleVars";
 import type { Tab } from "./types";
 
 const terminal = (o: Partial<{ cwd: string; title: string }> = {}): Tab => ({
@@ -104,5 +104,46 @@ describe("{workspace}", () => {
   it("names the workspace root in a workspace title whatever the focused tab", () => {
     const browser: Tab = { id: "b", kind: "browser", url: "http://x" };
     expect(expandWorkspaceTitle({ title: "{workspace}", workspaceRoot: "/w/root" }, browser, "")).toBe("/w/root");
+  });
+});
+
+describe("{path}", () => {
+  it("is the full file path with home as ~, empty for a tab without a file", () => {
+    expect(tabTitleVars(editor("/Users/me/code/a.ts"), { home: "/Users/me" })).toMatchObject({
+      path: "~/code/a.ts",
+      file: "a.ts",
+    });
+    expect(tabTitleVars(terminal({ cwd: "/a" })).path).toBe("");
+  });
+
+  it("expands in a title and leaves {file} as the name", () => {
+    expect(expandTabTitle(editor("/p/q/a.ts", "{path} | {file}"))).toBe("/p/q/a.ts | a.ts");
+  });
+});
+
+describe("tabRawValues", () => {
+  it("keeps paths untouched: no ~ and no collapsed spaces", () => {
+    const raw = tabRawValues(editor("/Users/me/my  code/a.ts"), {
+      home: "/Users/me",
+      workspaceRoot: "/Users/me/ws",
+    });
+    expect(raw).toEqual({
+      cwd: "/Users/me/my  code",
+      dir: "my  code",
+      file: "a.ts",
+      path: "/Users/me/my  code/a.ts",
+      workspace: "/Users/me/ws",
+    });
+  });
+
+  it("uses empty strings for what is missing and honors fallbackDir", () => {
+    const browser: Tab = { id: "b", kind: "browser", url: "http://x" };
+    expect(tabRawValues(browser, { fallbackDir: "/w/root" })).toEqual({
+      cwd: "/w/root",
+      dir: "root",
+      file: "",
+      path: "",
+      workspace: "",
+    });
   });
 });

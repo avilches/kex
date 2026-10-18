@@ -54,12 +54,28 @@ export function tabTitleVars(tab: Tab | null, src: TitleSources = {}): TitleVars
     workspace: src.workspaceRoot ? withTilde(src.workspaceRoot, src.home) : "",
     cmd: (src.runningCommand ?? "").trim().replace(/\s+/g, " "),
     file: file ? base(file) : "",
+    path: file ? withTilde(file, src.home) : "",
     agent: src.agent ?? "",
     model: (src.model ?? "").trim(),
     host: src.host ?? "",
     osc: (src.osc ?? "").trim(),
     session: (src.session ?? "").trim(),
     url: tab?.kind === "browser" ? tab.url : "",
+  };
+}
+
+export type RawValues = Record<"cwd" | "dir" | "file" | "path" | "workspace", string>;
+
+// The location values with nothing done to them (no `~`, no trimming), for building commands.
+export function tabRawValues(tab: Tab | null, src: TitleSources = {}): RawValues {
+  const dir = (tab && tabDir(tab)) || src.fallbackDir;
+  const file = tab ? tabFilePath(tab) : null;
+  return {
+    cwd: dir ?? "",
+    dir: base(dir),
+    file: file ? base(file) : "",
+    path: file ?? "",
+    workspace: src.workspaceRoot ?? "",
   };
 }
 

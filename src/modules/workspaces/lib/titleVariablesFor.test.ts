@@ -45,6 +45,13 @@ describe("titleVariablesFor", () => {
     expect(titleVariablesFor(titleSubjectForTab("git-diff")).map((v) => v.name)).toContain("file");
     expect(titleVariablesFor(titleSubjectForTab("git-commit-file")).map((v) => v.name)).toContain("file");
   });
+
+  test("{path} goes with {file}: file kinds and workspaces only", () => {
+    expect(titleVariablesFor("editor").map((v) => v.name)).toContain("path");
+    expect(titleVariablesFor("workspace").map((v) => v.name)).toContain("path");
+    expect(titleVariablesFor("terminal").map((v) => v.name)).not.toContain("path");
+    expect(titleVariablesFor("browser").map((v) => v.name)).not.toContain("path");
+  });
 });
 
 describe("insertToken", () => {
