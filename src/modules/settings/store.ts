@@ -8,6 +8,7 @@ import {
 } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { normalizeActions, type Action } from "@/modules/actions";
 import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
@@ -208,6 +209,8 @@ export type Preferences = {
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
+  // Global Actions, available in every workspace. Each workspace has its own on top.
+  actions: Action[];
   randomWorkspaceColor: boolean;
   workspaceDetailTerminalsEnabled: boolean;
   workspaceDetailTerminals: TerminalDetail;
@@ -317,6 +320,7 @@ const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
 const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
+const KEY_ACTIONS = "actions";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -476,6 +480,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
+  actions: [],
   randomWorkspaceColor: true,
   workspaceDetailTerminalsEnabled: true,
   workspaceDetailTerminals: "all",
@@ -785,6 +790,7 @@ export async function loadPreferences(): Promise<Preferences> {
       const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
     })(),
+    actions: normalizeActions(getTools<unknown>(KEY_ACTIONS)),
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
@@ -1147,6 +1153,10 @@ export async function setDetectedEditors(value: DetectedEditor[]): Promise<void>
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
 
+export async function setGlobalActions(value: Action[]): Promise<void> {
+  await writeToolsPref(KEY_ACTIONS, normalizeActions(value));
+}
+
 export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
@@ -1394,6 +1404,7 @@ const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
+  [KEY_ACTIONS]: "actions",
 };
 
 const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
