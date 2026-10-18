@@ -1,0 +1,132 @@
+import { describe, expect, it } from "vitest";
+import {
+  addAction,
+  normalizeActions,
+  partitionForHeader,
+  promoteToGlobal,
+  removeAction,
+  reorderActions,
+  updateAction,
+} from "./actions";
+import type { Action } from "./types";
+
+const act = (id: string, o: Partial<Action> = {}): Action => ({
+  id,
+  name: id,
+  runInTerminal: true,
+  command: `run ${id}`,
+  ownButton: false,
+  ...o,
+});
+
+describe("addAction / updateAction / removeAction", () => {
+  it("appends without mutating", () => {
+    const list = [act("a")];
+    expect(addAction(list, act("b")).map((a) => a.id)).toEqual(["a", "b"]);
+    expect(list).toHaveLength(1);
+  });
+
+  it("ignores an id that already exists", () => {
+    const list = [act("a")];
+    expect(addAction(list, act("a", { name: "other" }))).toBe(list);
+  });
+
+  it("patches by id and never changes the id", () => {
+    const out = updateAction([act("a"), act("b")], "a", { name: "X", id: "zzz" } as Partial<Action>);
+    expect(out.map((a) => a.id)).toEqual(["a", "b"]);
+    expect(out[0]!.name).toBe("X");
+  });
+
+  it("removes by id", () => {
+    expect(removeAction([act("a"), act("b")], "a").map((a) => a.id)).toEqual(["b"]);
+  });
+});
+
+describe("reorderActions", () => {
+  it("moves one action to the place of another", () => {
+    const list = [act("a"), act("b"), act("c")];
+    expect(reorderActions(list, "a", "c").map((a) => a.id)).toEqual(["b", "c", "a"]);
+    expect(reorderActions(list, "c", "a").map((a) => a.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("returns the same list for unknown ids or a no-op", () => {
+    const list = [act("a"), act("b")];
+    expect(reorderActions(list, "a", "zz")).toBe(list);
+    expect(reorderActions(list, "a", "a")).toBe(list);
+  });
+});
+
+describe("normalizeActions", () => {
+  it("trims, drops empty commands and keeps the order", () => {
+    const out = normalizeActions([act("a", { name: " A ", command: "  ls  " }), act("b", { command: "   " })]);
+    expect(out).toEqual([act("a", { name: "A", command: "ls" })]);
+  });
+
+  it("drops duplicated ids keeping the first", () => {
+    const out = normalizeActions([act("a"), act("a", { name: "dup" })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.name).toBe("a");
+  });
+
+  it("apps never carry a cwd mode or folder", () => {
+    const [app] = normalizeActions([act("a", { runInTerminal: false, cwdMode: "fixed", cwd: "/x" })]);
+    expect(app).not.toHaveProperty("cwdMode");
+    expect(app).not.toHaveProperty("cwd");
+  });
+
+  it("a folder only survives with the fixed mode", () => {
+    const [s] = normalizeActions([act("a", { cwdMode: "workspace", cwd: "/x" })]);
+    expect(s).toHaveProperty("cwdMode", "workspace");
+    expect(s).not.toHaveProperty("cwd");
+    const [f] = normalizeActions([act("b", { cwdMode: "fixed", cwd: "/x" })]);
+    expect(f).toHaveProperty("cwd", "/x");
+  });
+
+  it("falls back to the id when the name is blank and rejects non-arrays", () => {
+    expect(normalizeActions([act("a", { name: " " })])[0]!.name).toBe("a");
+    expect(normalizeActions(undefined)).toEqual([]);
+    expect(normalizeActions("x" as unknown)).toEqual([]);
+  });
+
+  it("drops malformed entries", () => {
+    const out = normalizeActions([null, 3, { id: "a" }, { id: 7, command: "x" }, { id: "b", command: "x" }]);
+    expect(out).toEqual([{ id: "b", name: "b", runInTerminal: false, command: "x", ownButton: false }]);
+  });
+});
+
+describe("promoteToGlobal", () => {
+  it("moves the action and keeps its id", () => {
+    const r = promoteToGlobal([act("a"), act("b")], [act("g")], "a");
+    expect(r.workspace.map((a) => a.id)).toEqual(["b"]);
+    expect(r.global.map((a) => a.id)).toEqual(["g", "a"]);
+  });
+
+  it("never duplicates: an id already global stays single", () => {
+    const r = promoteToGlobal([act("a")], [act("a", { name: "old" })], "a");
+    expect(r.workspace).toEqual([]);
+    expect(r.global).toHaveLength(1);
+  });
+
+  it("is a no-op for an unknown id", () => {
+    const w = [act("a")];
+    const g = [act("g")];
+    const r = promoteToGlobal(w, g, "zz");
+    expect(r.workspace).toBe(w);
+    expect(r.global).toBe(g);
+  });
+});
+
+describe("partitionForHeader", () => {
+  it("keeps own-button actions in user order and groups the rest by kind", () => {
+    const list = [
+      act("s1"),
+      act("a1", { runInTerminal: false, ownButton: true }),
+      act("s2", { ownButton: true }),
+      act("a2", { runInTerminal: false }),
+    ];
+    const p = partitionForHeader(list);
+    expect(p.ownButtons.map((a) => a.id)).toEqual(["a1", "s2"]);
+    expect(p.scripts.map((a) => a.id)).toEqual(["s1"]);
+    expect(p.apps.map((a) => a.id)).toEqual(["a2"]);
+  });
+});
