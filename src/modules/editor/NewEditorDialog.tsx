@@ -53,17 +53,17 @@ export function NewEditorDialog({
       setError("Name is required");
       return;
     }
-    if (trimmed.includes("..")) {
-      setError("Path must be relative");
+    if (trimmed.split(/[\\/]/).includes("..")) {
+      setError("Path cannot contain '..'");
       return;
     }
     if (!rootPath) {
       setError("No workspace root");
       return;
     }
-    const path = trimmed.startsWith("/")
-      ? trimmed
-      : pathJoin(rootPath, trimmed);
+    const isAbsolute =
+      trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed);
+    const path = isAbsolute ? trimmed : pathJoin(rootPath, trimmed);
     try {
       await invoke("fs_create_file", { path, workspace: currentWorkspaceEnv() });
       onCreated(path);
