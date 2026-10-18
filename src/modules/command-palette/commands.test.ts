@@ -39,7 +39,7 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     hasActiveTerminal: true,
     hibernated: false,
     openWorkspaceProperties: fn(),
-    openRunScriptConfiguration: fn(),
+    openActionsConfiguration: fn(),
     shortcutHandlers: {},
     isShortcutAvailable: () => true,
     openSettingsSection: fn(),

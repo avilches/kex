@@ -303,7 +303,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         )}
         {closing && deletedScripts > 0 && (
           <p className="text-[12px] text-muted-foreground">
-            {deletedScripts === 1 ? "1 script" : `${deletedScripts} scripts`} will be deleted.
+            {deletedScripts === 1 ? "1 action" : `${deletedScripts} actions`} will be deleted.
           </p>
         )}
         {!closing && review && review.commands.length > 0 && (

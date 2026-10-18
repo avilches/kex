@@ -9,7 +9,7 @@ export type SettingsSection =
   | "appearance"
   | "themes"
   | "shortcuts"
-  | "external-editors"
+  | "actions"
   | "about";
 
 export async function openSettingsWindow(section?: SettingsSection): Promise<void> {

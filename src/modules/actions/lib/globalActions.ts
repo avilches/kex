@@ -1,4 +1,4 @@
-import { adoptAction, normalizeAction, removeAction } from "./actions";
+import { adoptAction, normalizeAction, normalizeActions, removeAction } from "./actions";
 import type { Action } from "./types";
 
 type Deps = {
@@ -58,5 +58,42 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     );
   }
 
-  return { get, add };
+  // Any edit of the list (rename, remove, reorder) goes through the same queue as add, so
+  // an edit made while a write is in flight starts from the list that write carries. A
+  // failed write puts the list back as it was before this edit, unless a later edit has
+  // already built on it, in which case that one decides what is shown.
+  function change(
+    fn: (list: Action[]) => Action[],
+  ): Promise<{ before: Action[]; after: Action[] }> {
+    const before = get();
+    const after = normalizeActions(fn(before));
+    if (sameActions(before, after)) return Promise.resolve({ before, after: before });
+    if (pending === 0) base = read();
+    current = after;
+    pending++;
+    const mine = after;
+    const run = chain.then(() => write(current ?? mine));
+    chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run.then(
+      () => {
+        pending--;
+        return { before, after: mine };
+      },
+      (err: unknown) => {
+        pending--;
+        if (current === mine) current = before;
+        throw err;
+      },
+    );
+  }
+
+  return { get, add, change };
+}
+
+// By content: normalizing rebuilds every object, so identity would never match.
+function sameActions(a: readonly Action[], b: readonly Action[]): boolean {
+  return a.length === b.length && a.every((x, i) => JSON.stringify(x) === JSON.stringify(b[i]));
 }

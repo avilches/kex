@@ -245,6 +245,7 @@ describe("emptyWorkspaceToClose", () => {
   it.each([
     ["scripts with a command", { scripts: [withScripts("pnpm test")] }],
     ["scripts with a blank command", { scripts: [withScripts("   ")] }],
+    ["an Action", { actions: [{ id: "ac-1", name: "Dev", runInTerminal: false, command: "code {cwd}", ownButton: false }] }],
     ["a title", { title: "Backend" }],
     ["a color", { color: "#ff0000" }],
     ["an icon", { icon: "rocket" }],

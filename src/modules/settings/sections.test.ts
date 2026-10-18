@@ -7,7 +7,7 @@ describe("SETTINGS_SECTIONS", () => {
       "general",
       "workspaces",
       "terminal",
-      "external-editors",
+      "actions",
       "editor",
       "filetypes",
       "appearance",
@@ -17,7 +17,7 @@ describe("SETTINGS_SECTIONS", () => {
     ]);
   });
 
-  it("labels external-editors as Tools", () => {
-    expect(SETTINGS_SECTIONS.find((s) => s.id === "external-editors")?.label).toBe("Tools");
+  it("labels actions as Actions", () => {
+    expect(SETTINGS_SECTIONS.find((s) => s.id === "actions")?.label).toBe("Actions");
   });
 });

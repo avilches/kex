@@ -97,15 +97,28 @@ describe("normalizeActions", () => {
     expect(f).toHaveProperty("cwd", "/x");
   });
 
-  it("falls back to the id when the name is blank and rejects non-arrays", () => {
-    expect(normalizeActions([act("a", { name: " " })])[0]!.name).toBe("a");
+  it("falls back to the command, never the id, when the name is blank", () => {
+    expect(normalizeActions([act("ac-9f3", { name: " ", command: "pnpm dev" })])[0]!.name).toBe("pnpm dev");
+  });
+
+  it("rejects non-arrays", () => {
     expect(normalizeActions(undefined)).toEqual([]);
     expect(normalizeActions("x" as unknown)).toEqual([]);
   });
 
+  it("clearing the name of a saved action keeps the name it had", () => {
+    const out = updateAction([act("a", { name: "Dev server" })], "a", { name: "  " });
+    expect(out[0]!.name).toBe("Dev server");
+  });
+
+  it("clearing the name of an action that never had one keeps the command as its label", () => {
+    const out = updateAction([act("a", { name: "pnpm dev", command: "pnpm dev" })], "a", { name: "" });
+    expect(out[0]!.name).toBe("pnpm dev");
+  });
+
   it("drops malformed entries", () => {
     const out = normalizeActions([null, 3, { id: "a" }, { id: 7, command: "x" }, { id: "b", command: "x" }]);
-    expect(out).toEqual([{ id: "b", name: "b", runInTerminal: false, command: "x", ownButton: false }]);
+    expect(out).toEqual([{ id: "b", name: "x", runInTerminal: false, command: "x", ownButton: false }]);
   });
 });
 

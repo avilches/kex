@@ -330,10 +330,12 @@ export default function App() {
     setWorkspaceDetailExpanded,
     setWorkspaceGroup,
     setWorkspaceGitConfig,
-    addScript,
     updateScript,
-    removeScript,
-    reorderScripts,
+    addWorkspaceAction,
+    updateWorkspaceAction,
+    removeWorkspaceAction,
+    reorderWorkspaceActions,
+    promoteWorkspaceAction,
     setActiveScript,
     validateScriptTabs,
     setScriptPaneId,
@@ -3592,10 +3594,10 @@ export default function App() {
               useWorkspaceSettingsStore
                 .getState()
                 .openSettings(activeWorkspaceId),
-            openRunScriptConfiguration: () =>
+            openActionsConfiguration: () =>
               useWorkspaceSettingsStore
                 .getState()
-                .openSettings(activeWorkspaceId, "scripts"),
+                .openSettings(activeWorkspaceId, "actions"),
             shortcutHandlers,
             isShortcutAvailable: (id) => !paletteShortcutUnavailable(id, shortcutContext),
             openSettingsSection: (section) => void openSettingsWindow(section),
@@ -3646,7 +3648,7 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const onOpenExternalEditorSettings = useCallback(() => {
-    void openSettingsWindow("external-editors");
+    void openSettingsWindow("actions");
   }, []);
 
   const sidebarRepoRoot =
@@ -3710,7 +3712,7 @@ export default function App() {
             onOpenRunSettings={() =>
               useWorkspaceSettingsStore
                 .getState()
-                .openSettings(activeWorkspaceId, "scripts")
+                .openSettings(activeWorkspaceId, "actions")
             }
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
@@ -4005,10 +4007,11 @@ export default function App() {
               if (path !== undefined) setWorkspaceRoot(id, path);
               else clearWorkspaceRoot(id);
             }}
-            onAddScript={addScript}
-            onUpdateScript={updateScript}
-            onRemoveScript={removeScript}
-            onReorderScripts={reorderScripts}
+            onAddAction={addWorkspaceAction}
+            onUpdateAction={updateWorkspaceAction}
+            onRemoveAction={removeWorkspaceAction}
+            onReorderActions={reorderWorkspaceActions}
+            onPromoteAction={promoteWorkspaceAction}
             onRestoreFocus={restoreLeafFocus}
           />
 
