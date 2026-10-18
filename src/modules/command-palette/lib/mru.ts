@@ -46,5 +46,5 @@ export function mruSnapshot(): MruMap {
 }
 
 export function mruRank(snapshot: MruMap, id: string): number {
-  return Object.hasOwn(snapshot, id) ? snapshot[id] : 0;
+  return Object.prototype.hasOwnProperty.call(snapshot, id) ? snapshot[id] : 0;
 }
