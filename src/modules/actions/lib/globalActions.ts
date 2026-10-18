@@ -35,7 +35,8 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     const clean = normalizeAction(action);
     if (!clean) return Promise.reject(new Error("Invalid action"));
     const next = adoptAction(get(), clean, makeId);
-    const stored = next[next.length - 1]!;
+    const stored = next[next.length - 1];
+    if (!stored) return Promise.reject(new Error("Invalid action"));
     current = next;
     pending++;
     const run = chain.then(() => write(current ?? next));
