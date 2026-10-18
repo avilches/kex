@@ -78,6 +78,10 @@ export function TabContextMenuItems({
   const { onSaveTab } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
+  const runOnStart =
+    tab.kind === "terminal" && onUpdateTab ? (
+      <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
+    ) : null;
 
   return (
     <>
@@ -180,9 +184,6 @@ export function TabContextMenuItems({
               <Shortcut id="tab.toggleAutofocus" />
             </ContextMenuItem>
           )}
-          {tab.kind === "terminal" && onUpdateTab && (
-            <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
-          )}
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
@@ -216,7 +217,7 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <TabAgentMenuItems tabId={tab.id} />
+      <TabAgentMenuItems tabId={tab.id}>{runOnStart}</TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>

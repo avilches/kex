@@ -49,6 +49,18 @@ describe("AgentIcon", () => {
     expect(root.querySelector("img")).toBeNull();
   });
 
+  it("draws OpenCode as an inline svg with two tones of the text color", () => {
+    const root = render(<AgentIcon agent="opencode" size={14} />);
+    const svg = root.querySelector("svg");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 240 300");
+    expect(root.querySelector("img")).toBeNull();
+    const paths = Array.from(root.querySelectorAll("path"));
+    expect(paths).toHaveLength(2);
+    expect(paths.some((p) => p.getAttribute("opacity") === "0.45")).toBe(true);
+    expect(paths.every((p) => !p.getAttribute("fill"))).toBe(true);
+  });
+
   it("keeps drawing the other known agents as images", () => {
     const root = render(<AgentIcon agent="omp" size={14} />);
     expect(root.querySelector("img")).not.toBeNull();
