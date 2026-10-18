@@ -387,6 +387,6 @@ export const native = {
     }),
   editorScan: (): Promise<DetectedEditor[]> =>
     invoke<DetectedEditor[]>("editor_scan"),
-  editorOpen: (binary: string, argsBeforePath: string[], path: string): Promise<void> =>
-    invoke<void>("editor_open", { binary, argsBeforePath, path }),
+  actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
+    invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
 };

@@ -59,7 +59,7 @@ export async function openWithEditor(
   path: string,
 ): Promise<string | null> {
   try {
-    await native.editorOpen(binary, argsBeforePath, path);
+    await native.actionSpawn([binary, ...argsBeforePath, path]);
     return null;
   } catch (e) {
     return String(e);
