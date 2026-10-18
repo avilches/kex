@@ -23,7 +23,7 @@ const NONE: readonly Action[] = [];
 // The workspace's Actions come first, then the global ones, each in the user's own order.
 export function useActionsBarModel({ workspace, compact }: Input): BarModel {
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
-  const context = useActionContext(workspace, "actions-bar");
+  const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
   const actions = useMemo(() => [...local, ...global], [local, global]);
