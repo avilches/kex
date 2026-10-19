@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown01Icon, ComputerTerminal01Icon, FlashIcon, PlayIcon, StopIcon, Tick02Icon, AppWindowMacIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ComputerTerminal01Icon, PlayIcon, PlusSignIcon, StopIcon, Tick02Icon, AppWindowMacIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
@@ -129,13 +129,14 @@ type MenuProps = {
   label: string;
   icon: typeof PlayIcon;
   items: BarItem[];
+  globalItems: BarItem[];
   onRestoreFocus: () => void;
   onConfigure: () => void;
 } & Handlers;
 
-export function GroupMenu({ label, icon, items, onRestoreFocus, onConfigure, ...h }: MenuProps) {
-  if (items.length === 0) return null;
-  const busy = items.some((i) => i.state !== "idle");
+export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onConfigure, ...h }: MenuProps) {
+  if (items.length === 0 && globalItems.length === 0) return null;
+  const busy = items.some((i) => i.state !== "idle") || globalItems.some((i) => i.state !== "idle");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -146,6 +147,7 @@ export function GroupMenu({ label, icon, items, onRestoreFocus, onConfigure, ...
         >
           <HugeiconsIcon icon={icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
           <span>{label}</span>
+          <span className="text-[10px] text-muted-foreground/60">{items.length + globalItems.length}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
         </button>
       </DropdownMenuTrigger>
@@ -160,6 +162,15 @@ export function GroupMenu({ label, icon, items, onRestoreFocus, onConfigure, ...
         {items.map((item) => (
           <MenuRow key={item.id} item={item} {...h} />
         ))}
+        {globalItems.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global</DropdownMenuLabel>
+            {globalItems.map((item) => (
+              <MenuRow key={item.id} item={item} {...h} />
+            ))}
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onConfigure} className="text-muted-foreground">
           Configure Actions
@@ -169,16 +180,22 @@ export function GroupMenu({ label, icon, items, onRestoreFocus, onConfigure, ...
   );
 }
 
-export function EmptyActionsButton({ onConfigure }: { onConfigure: () => void }) {
+// With no Actions at all the bar shows the dashed add button; once there are Actions it
+// hides and comes back when the pointer crosses the bar, so the bar keeps its room for
+// buttons while the entry point stays one hover away.
+export function EmptyActionsButton({ onConfigure, reveal }: { onConfigure: () => void; reveal: "always" | "hover" }) {
   return (
     <button
       type="button"
       title="Add an action: run a command or open an app"
       onClick={onConfigure}
-      className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className={cn(
+        "flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        reveal === "hover" && "hidden group-hover/ap:flex",
+      )}
     >
-      <HugeiconsIcon icon={FlashIcon} size={13} strokeWidth={2} />
-      <span>Actions</span>
+      <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
+      <span>+ Action</span>
     </button>
   );
 }
@@ -192,9 +209,9 @@ type BarProps = {
 };
 
 // The Header's actions: own buttons in the user's order, then a menu of scripts and a menu
-// of apps. The bar takes all the room between the title and the search box and measures it:
-// as it shrinks, the last own buttons fold into the menus instead of pushing the rest out.
-// With no Actions at all, a single button that opens the editor.
+// of apps, each with the global Actions in a Global section and a dimmed row count. The
+// bar takes all the room between the title and the search box and measures it: as it
+// shrinks, the last own buttons fold into the menus instead of pushing the rest out.
 export function ActionsBar({ workspace, controller, onConfigure, onRestoreFocus }: BarProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<number | undefined>(undefined);
@@ -207,18 +224,29 @@ export function ActionsBar({ workspace, controller, onConfigure, onRestoreFocus 
   }, []);
   const model = useActionsBarModel({ workspace, room });
   return (
-    <div ref={ref} data-tauri-drag-region className="flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
-      {model.empty ? (
-        <EmptyActionsButton onConfigure={onConfigure} />
-      ) : (
-        <>
-          {model.buttons.map((item) => (
-            <OwnButton key={item.id} item={item} {...controller} />
-          ))}
-          <GroupMenu label="Scripts" icon={ComputerTerminal01Icon} items={model.scripts} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
-          <GroupMenu label="Apps" icon={AppWindowMacIcon} items={model.apps} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...controller} />
-        </>
-      )}
+    <div ref={ref} data-tauri-drag-region className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
+      {model.buttons.map((item) => (
+        <OwnButton key={item.id} item={item} {...controller} />
+      ))}
+      <GroupMenu
+        label="Scripts"
+        icon={ComputerTerminal01Icon}
+        items={model.scripts}
+        globalItems={model.scriptsGlobal}
+        onRestoreFocus={onRestoreFocus}
+        onConfigure={onConfigure}
+        {...controller}
+      />
+      <GroupMenu
+        label="Apps"
+        icon={AppWindowMacIcon}
+        items={model.apps}
+        globalItems={model.appsGlobal}
+        onRestoreFocus={onRestoreFocus}
+        onConfigure={onConfigure}
+        {...controller}
+      />
+      <EmptyActionsButton onConfigure={onConfigure} reveal={model.empty ? "always" : "hover"} />
     </div>
   );
 }

@@ -21,19 +21,17 @@ type Input = {
 
 const NONE: readonly Action[] = [];
 
-// The workspace's Actions come first, then the global ones, each in the user's own order.
 export function useActionsBarModel({ workspace, room }: Input): BarModel {
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
   const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
-  const actions = useMemo(() => [...local, ...global], [local, global]);
   const ownButtonsShown = useMemo(
-    () => (room === undefined ? undefined : ownButtonsThatFit(actions.filter((a) => a.ownButton), room)),
-    [actions, room],
+    () => (room === undefined ? undefined : ownButtonsThatFit([...local, ...global].filter((a) => a.ownButton), room)),
+    [local, global, room],
   );
   return useMemo(
-    () => buildActionsBarModel({ actions, context, states, activeId: workspace?.activeAction, ownButtonsShown }),
-    [actions, context, states, workspace?.activeAction, ownButtonsShown],
+    () => buildActionsBarModel({ local, global, context, states, activeId: workspace?.activeAction, ownButtonsShown }),
+    [local, global, context, states, workspace?.activeAction, ownButtonsShown],
   );
 }

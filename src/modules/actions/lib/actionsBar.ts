@@ -101,11 +101,15 @@ export type BarModel = {
   buttons: BarItem[];
   scripts: BarItem[];
   apps: BarItem[];
+  /** The global Actions of the workspace scope live in Settings and run everywhere. */
+  scriptsGlobal: BarItem[];
+  appsGlobal: BarItem[];
   empty: boolean;
 };
 
 type BuildInput = {
-  actions: readonly Action[];
+  local: readonly Action[];
+  global?: readonly Action[];
   context: BarContext | null;
   states: ReadonlyMap<string, ScriptState>;
   activeId: string | undefined;
@@ -113,10 +117,10 @@ type BuildInput = {
   ownButtonsShown?: number;
 };
 
-// Own buttons first in the user's order (scripts and apps mixed), then the two grouped
-// menus. A running script is never disabled whatever its variables are now: it has to stay
-// stoppable.
-export function buildActionsBarModel({ actions, context, states, activeId, ownButtonsShown }: BuildInput): BarModel {
+// Own buttons first in the user's order (workspace Actions, then global, scripts and apps
+// mixed), then the two grouped menus. A running script is never disabled whatever its
+// variables are now: it has to stay stoppable.
+export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown }: BuildInput): BarModel {
   const toItem = (action: Action): BarItem => {
     const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
@@ -131,12 +135,16 @@ export function buildActionsBarModel({ actions, context, states, activeId, ownBu
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
-  const model: BarModel = { buttons: [], scripts: [], apps: [], empty: actions.length === 0 };
-  for (const action of actions) {
+  const model: BarModel = { buttons: [], scripts: [], apps: [], scriptsGlobal: [], appsGlobal: [], empty: local.length + global.length === 0 };
+  for (const [position, action] of [...local, ...global].entries()) {
     const item = toItem(action);
-    if (action.ownButton && model.buttons.length < limit) model.buttons.push(item);
-    else if (action.runInTerminal) model.scripts.push(item);
-    else model.apps.push(item);
+    const isGlobal = position >= local.length;
+    if (action.ownButton && model.buttons.length < limit) {
+      model.buttons.push(item);
+      continue;
+    }
+    if (isGlobal) (action.runInTerminal ? model.scriptsGlobal : model.appsGlobal).push(item);
+    else (action.runInTerminal ? model.scripts : model.apps).push(item);
   }
   return model;
 }

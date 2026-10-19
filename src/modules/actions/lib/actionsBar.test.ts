@@ -185,8 +185,9 @@ describe("buildActionsBarModel", () => {
     script({ id: "s3", name: "build", ownButton: true }),
   ];
 
+
   it("keeps own buttons in user order, scripts and apps mixed", () => {
-    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1", "s3"]);
     expect(m.scripts.map((b) => b.id)).toEqual(["s2"]);
     expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
@@ -194,14 +195,14 @@ describe("buildActionsBarModel", () => {
   });
 
   it("moves every own button into its menu when none fits", () => {
-    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
     expect(m.scripts.map((b) => b.id)).toEqual(["s1", "s2", "s3"]);
     expect(m.apps.map((b) => b.id)).toEqual(["a1", "a2"]);
   });
 
   it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
-    const m = buildActionsBarModel({ actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1"]);
     expect(m.scripts.map((b) => b.id)).toEqual(["s2", "s3"]);
     expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
@@ -209,7 +210,7 @@ describe("buildActionsBarModel", () => {
 
   it("carries the run state, the active mark and the disabled reason", () => {
     const m = buildActionsBarModel({
-      actions: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {path}", ownButton: true })],
+      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {path}", ownButton: true })],
       context: ctx,
       states: new Map([["s1", "running"]]),
       activeId: "s1",
@@ -221,7 +222,7 @@ describe("buildActionsBarModel", () => {
 
   it("never lets a running script be disabled: it must stay stoppable", () => {
     const m = buildActionsBarModel({
-      actions: [script({ id: "s1", command: "make {branch}", ownButton: true })],
+      local: [script({ id: "s1", command: "make {branch}", ownButton: true })],
       context: ctx,
       states: new Map([["s1", "running"]]),
       activeId: undefined,
@@ -231,7 +232,7 @@ describe("buildActionsBarModel", () => {
 
   it("marks every Action of a hibernated workspace unavailable but lets a running script be stopped", () => {
     const m = buildActionsBarModel({
-      actions: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true }), app({ id: "a1", ownButton: true })],
+      local: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true }), app({ id: "a1", ownButton: true })],
       context: { ...ctx, hibernated: true },
       states: new Map([["s1", "running"]]),
       activeId: undefined,
@@ -240,12 +241,40 @@ describe("buildActionsBarModel", () => {
   });
 
   it("reports empty only when there are no Actions at all", () => {
-    expect(buildActionsBarModel({ actions: [], context: ctx, states: new Map(), activeId: undefined }).empty).toBe(true);
+    expect(buildActionsBarModel({ local: [], context: ctx, states: new Map(), activeId: undefined }).empty).toBe(true);
+  });
+
+  it("keeps the global Actions apart in their own menu sections", () => {
+    const m = buildActionsBarModel({
+      local: [script({ id: "s1", name: "dev" })],
+      global: [script({ id: "s2", name: "top" }), app({ id: "a1", name: "Zed" })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(m.scripts.map((b) => b.id)).toEqual(["s1"]);
+    expect(m.scriptsGlobal.map((b) => b.id)).toEqual(["s2"]);
+    expect(m.apps).toEqual([]);
+    expect(m.appsGlobal.map((b) => b.id)).toEqual(["a1"]);
+    expect(m.empty).toBe(false);
+  });
+
+  it("an own button of either scope still competes for the same bar room", () => {
+    const m = buildActionsBarModel({
+      local: [script({ id: "s1", ownButton: true })],
+      global: [app({ id: "a1", ownButton: true })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+      ownButtonsShown: 1,
+    });
+    expect(m.buttons.map((b) => b.id)).toEqual(["s1"]);
+    expect(m.appsGlobal.map((b) => b.id)).toEqual(["a1"]);
   });
 
   it("labels an unnamed Action", () => {
     const m = buildActionsBarModel({
-      actions: [app({ name: "  ", ownButton: true })],
+      local: [app({ name: "  ", ownButton: true })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
