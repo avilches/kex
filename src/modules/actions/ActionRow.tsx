@@ -184,7 +184,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
                 <HugeiconsIcon icon={Globe02Icon} size={12} strokeWidth={2} />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 p-3">
+            <PopoverContent align="end" className="pointer-events-auto w-64 p-3">
               <p className="text-[12px] leading-snug text-muted-foreground">
                 Actions of one workspace stay in it. A global Action moves to Settings and every workspace can run it.
               </p>

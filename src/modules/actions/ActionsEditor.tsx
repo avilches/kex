@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
 import { AddApplicationMenu } from "./AddApplicationMenu";
-import { CUSTOM_APP_SUGGESTION, type AppSuggestion } from "./lib/appSuggestions";
+import type { AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
 
@@ -76,6 +76,8 @@ export function ActionsEditor({
   const rows = useRef<Map<string, ActionRowHandle>>(new Map());
   // Drafts already handed to the store, which has not echoed them back yet.
   const handedOver = useRef<Set<string>>(new Set());
+  // Drafts the user confirmed removing; their unmount flush must not re-add them.
+  const removing = useRef<Set<string>>(new Set());
   const saved = new Set(actions.map((a) => a.id));
   // A draft stays rendered, under the same key, until the store shows an action with its id,
   // so the row keeps its DOM node and its focus while the write is on its way.
@@ -91,7 +93,9 @@ export function ActionsEditor({
     // With the kind fixed on creation, only a pending empty draft of the same kind is reused.
     const pending = drafts.find((d) => !d.command.trim() && d.runInTerminal === fresh().runInTerminal);
     if (pending) return void rows.current.get(pending.id)?.focusCommand();
-    setDrafts((d) => [...d, fresh()]);
+    const created = fresh();
+    setDrafts((d) => [...d, created]);
+    requestAnimationFrame(() => rows.current.get(created.id)?.focusCommand());
   };
 
   const addCommand = () => addDraft(blankScript);
@@ -102,6 +106,7 @@ export function ActionsEditor({
   };
 
   const change = (current: Action, next: Action) => {
+    if (removing.current.has(current.id)) return;
     if (saved.has(current.id)) {
       onUpdate(current.id, next);
       return;
@@ -121,6 +126,7 @@ export function ActionsEditor({
   });
 
   const remove = (action: Action) => {
+    removing.current.add(action.id);
     if (saved.has(action.id)) onRemove(action.id);
     else setDrafts((d) => d.filter((x) => x.id !== action.id));
   };
@@ -136,7 +142,7 @@ export function ActionsEditor({
           <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} />
           Add Command
         </Button>
-        <AddApplicationMenu suggestions={suggestions.length > 0 ? suggestions : [CUSTOM_APP_SUGGESTION]} onPick={addApplication} />
+        <AddApplicationMenu suggestions={suggestions} onPick={addApplication} />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>

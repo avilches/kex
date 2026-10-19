@@ -207,6 +207,36 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
+  it("a rejected draft does not resurrect when the user confirms removing it", async () => {
+    const onAdd = vi.fn().mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(undefined);
+    const { container, unmount } = mount([], { onAdd });
+    click(commandButton(container));
+    typeField(commandField(container), "pnpm test");
+    await act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    click(container.querySelector("button[aria-label='Remove action']"));
+    click(dialogButton("Delete"));
+    await act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
+    unmount();
+  });
+
+  it("the custom app row exists even with no detected app, exactly once", () => {
+    const { container, onAdd, unmount } = mount([], { suggestions: [] });
+    click(applicationButton(container));
+    const custom = [...document.querySelectorAll("[role='option']")].filter((o) => o.textContent?.includes("Custom app"));
+    expect(custom).toHaveLength(1);
+    click(custom[0] as HTMLElement);
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(commandField(container)).not.toBeNull();
+    unmount();
+  });
+
   it("removing a saved action reaches the store after the confirmation", () => {
     const { container, onRemove, unmount } = mount([saved]);
     click(container.querySelector("button[aria-label='Remove action']"));
