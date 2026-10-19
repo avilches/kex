@@ -131,6 +131,9 @@ El popover se abre con la campana o con el shortcut `notifications.toggle` (Cmd+
 | Finished / idle | icono del panel | título del panel | ninguno |
 | Restored, sin error | `✦` | `agentname · dirname` | spinner blanco |
 | Restore error | `⚠` | `agentname · dirname` (rojo) | punto rojo estático |
+| Interrumpido (estaba `working` al cerrar Kex) | `✦` | `agentname · dirname` | punto rojo estático hasta la siguiente actividad del agente |
+
+El snapshot de `agent-sessions.json` guarda `"interrupted"` en `notification` cuando la sesión está `working` (o ya marcada). Al restaurar, `applyStagedSnapshot` llama a `markInterrupted`; `setStatus` limpia la marca.
 
 `dirname` es el último segmento de `panel.cwd`.
 
