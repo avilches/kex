@@ -30,6 +30,23 @@ Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos
 
 Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.tsx` en `src/modules/actions/` (Checkbox y Select en un formulario).
 
+## Patrones que se repiten
+
+- **Tarjetas plegables**: las filas de configuracion que abren un formulario van plegadas a
+  una linea (resumen) y se despliegan una a la vez con click, como archivos de extension en
+  `FileTypesSection` y tarjetas de Action en `ActionRow`/`ActionsEditor`. Un borrador aun no
+  guardado siempre permanece desplegado.
+- **Borrado con confirmacion**: cualquier removida de una fila guardada (tarjeta de Action en
+  `ActionRow`, entrada de extension en `FileTypesSection`) abre `AlertDialog` y solo llega al
+  store con el boton destructivo confirmado.
+- **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el
+  body y el contenido de un Popover se portal a body, quedando muerto para el raton (el
+  teclado sigue). En el codebase esta regla esta resuelta con `pointer-events-auto` en el
+  className del `PopoverContent` afectado: referencia viva `AddApplicationMenu.tsx`. Aplicarla
+  a todo popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
+- **Conteo apagado en triggers**: los menus agrupados de `ActionsBar` muestran un numero
+  apagado junto al label del trigger con las filas que contienen (workspace + global).
+
 ## Estilo de inputs en Settings
 
 Todos los `<input>` nativos en pantallas de settings deben usar este patron exacto:
