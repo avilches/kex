@@ -7,7 +7,7 @@ import type {
 /** What an agent tab shows that a restart would otherwise lose. */
 export type AgentSnapshot = {
   title: string;
-  notification: NotificationKind | "";
+  notification: NotificationKind | "interrupted" | "";
 };
 
 export function snapshotKey(s: AgentSnapshot): string {
@@ -17,7 +17,9 @@ export function snapshotKey(s: AgentSnapshot): string {
 /**
  * The name the tab shows (the title the agent sent, else the session title) and
  * the notification still waiting for the user: an unread bell entry, else the
- * attention dot the session carries.
+ * attention dot the session carries. A session that is working (or was already
+ * marked interrupted by a previous restore) is stored as "interrupted", so the
+ * next restore can show that the work was cut.
  */
 export function agentSnapshot(
   session: AgentSession,
@@ -25,11 +27,14 @@ export function agentSnapshot(
   notifications: AgentNotification[],
 ): AgentSnapshot {
   const unread = notifications.find((n) => n.tabId === session.tabId && !n.read);
-  const notification: AgentSnapshot["notification"] = unread
-    ? unread.kind
-    : session.status === "attention"
-      ? "attention"
-      : "";
+  const notification: AgentSnapshot["notification"] =
+    session.status === "working" || session.interrupted
+      ? "interrupted"
+      : unread
+        ? unread.kind
+        : session.status === "attention"
+          ? "attention"
+          : "";
   return {
     title: oscTitle ?? session.meta?.sessionTitle ?? "",
     notification,

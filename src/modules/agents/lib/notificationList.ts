@@ -60,6 +60,10 @@ export function buildAgentEntries(
       visual = "error";
       at = session.lastActivityAt;
       pending = true;
+    } else if (session?.interrupted) {
+      visual = "error";
+      at = session.lastActivityAt;
+      pending = false;
     } else if (session?.status === "attention") {
       visual = "attention";
       at = session.attentionSince ?? session.lastActivityAt;

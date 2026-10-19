@@ -1,12 +1,13 @@
 import type { AgentStatus } from "@/modules/agents/lib/types";
 
-export type TabStatusIndicator = "restoring" | "restore-failed" | "working" | "attention" | null;
+export type TabStatusIndicator = "restoring" | "restore-failed" | "interrupted" | "working" | "attention" | null;
 
 type Input = {
   restoreBusy: boolean;
   restorePending: boolean;
   hasAgent: boolean;
   isRestoreError: boolean;
+  interrupted?: boolean;
   status: AgentStatus | undefined;
 };
 
@@ -16,6 +17,7 @@ export function tabStatusIndicator(i: Input): TabStatusIndicator {
   if (i.restoreBusy) return "restoring";
   if (i.restorePending || (i.hasAgent && i.isRestoreError)) return "restore-failed";
   if (!i.hasAgent) return null;
+  if (i.interrupted) return "interrupted";
   if (i.status === "working") return "working";
   if (i.status === "attention") return "attention";
   return null;

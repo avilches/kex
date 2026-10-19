@@ -62,7 +62,8 @@ pub struct SessionRecord {
     /// it before the agent sends a new one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Kind of the unread notification the tab had (attention, finished or error).
+    /// Kind of the unread notification the tab had (attention, finished or error), or
+    /// "interrupted" when the agent was working when Kex closed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notification: Option<String>,
     pub updated_at: u64,
@@ -502,7 +503,7 @@ fn record_session_at_path_with(
 }
 
 const MAX_TITLE_CHARS: usize = 200;
-const NOTIFICATION_KINDS: [&str; 3] = ["attention", "finished", "error"];
+const NOTIFICATION_KINDS: [&str; 4] = ["attention", "finished", "error", "interrupted"];
 
 /// Stores the tab name and the pending notification of an already recorded session. An empty
 /// `title` keeps the stored one (the title also goes empty while the app is closing, which
@@ -1758,6 +1759,17 @@ mod tests {
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.title.as_deref(), Some("fixing the build"));
         assert_eq!(rec.notification, None);
+    }
+
+    #[test]
+    fn set_snapshot_stores_the_interrupted_marker() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+
+        set_snapshot_at_path(&path, "tab-1", "abc", "t", "interrupted");
+
+        assert_eq!(read_store(&path).tabs["tab-1"].notification.as_deref(), Some("interrupted"));
     }
 
     #[test]

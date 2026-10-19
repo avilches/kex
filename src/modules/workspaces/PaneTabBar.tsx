@@ -219,12 +219,13 @@ function DraggableTab({
     restorePending,
     hasAgent,
     isRestoreError,
+    interrupted: agentSession?.interrupted,
     status: agentSession?.status,
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (
       <Spinner size={13} />
-    ) : indicatorKind === "restore-failed" ? (
+    ) : indicatorKind === "restore-failed" || indicatorKind === "interrupted" ? (
       <span className="inline-block size-[6px] rounded-full bg-destructive" />
     ) : indicatorKind === "working" ? (
       <Spinner size={11} />

@@ -47,6 +47,7 @@ type AgentStoreState = {
   forgetSubagents: (tabId: string) => void;
   finish: (tabId: string) => void;
   startRestored: (tabId: string, workspaceId: string, agent: string) => void;
+  markInterrupted: (tabId: string) => void;
   setRestoreError: (
     tabId: string,
     workspaceId: string,
@@ -132,9 +133,17 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             lastActivityAt: now,
             attentionSince: status === "attention" ? now : null,
             restored: false,
+            interrupted: false,
           },
         },
       };
+    }),
+
+  markInterrupted: (tabId) =>
+    set((s) => {
+      const prev = s.sessions[tabId];
+      if (!prev || prev.interrupted) return s;
+      return { sessions: { ...s.sessions, [tabId]: { ...prev, interrupted: true } } };
     }),
 
   subagentStarted: (tabId, agentId, agentType, description) =>
