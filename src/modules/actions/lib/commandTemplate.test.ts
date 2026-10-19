@@ -75,7 +75,7 @@ describe("commandProblem", () => {
   it("for a script, refuses a variable inside the user's own quotes and names it", () => {
     expect(commandProblem(`printf "{cwd}"`, "posix")).toMatch(/\{cwd\} sits inside quotes/);
     expect(commandProblem(`echo '{file}' {cwd}`, "posix")).toMatch(/\{file\}/);
-    expect(commandProblem("echo x\n  cd \"a {?dir {dir}}\"", "powershell")).toMatch(/\{dir\}/);
+    expect(commandProblem("echo x\n  cd \"a {dir? {dir}}\"", "powershell")).toMatch(/\{dir\}/);
   });
 
   it("for a script, accepts bare variables and quotes that hold no variable or a literal brace", () => {
@@ -109,8 +109,8 @@ describe("expandCommandArgv", () => {
   });
 
   it("needs quotes around a group that holds spaces and supports the title syntax in it", () => {
-    expect(expandCommandArgv(`run "{?branch on {branch}}"`, { branch: "main" })).toEqual(["run", " on main"]);
-    expect(expandCommandArgv(`run "{?branch on {branch}}"`, { branch: "" })).toEqual(["run", ""]);
+    expect(expandCommandArgv(`run "{branch? on {branch}}"`, { branch: "main" })).toEqual(["run", " on main"]);
+    expect(expandCommandArgv(`run "{branch? on {branch}}"`, { branch: "" })).toEqual(["run", ""]);
   });
 
   it("falls back across variables like a title does", () => {
@@ -161,7 +161,7 @@ describe("expandCommandShell", () => {
 
   it("decides emptiness on the raw value, not on the quoted one", () => {
     expect(expandCommandShell("a {path|cwd}", { path: "", cwd: "/w" }, "posix")).toBe("a '/w'");
-    expect(expandCommandShell("a{?path  --f {path}}", { path: "" }, "posix")).toBe("a");
+    expect(expandCommandShell("a{path?  --f {path}}", { path: "" }, "posix")).toBe("a");
   });
 
   it("an empty value writes nothing, since the action is disabled before getting here", () => {
@@ -456,7 +456,7 @@ for (const shell of ["bash", "zsh"]) {
 
 describe("commandVariablesUsed and missingVariables", () => {
   it("lists every variable the template names, groups and conditions included", () => {
-    expect([...commandVariablesUsed("a {path|cwd} {?branch b {dir}} {!repo x}")].sort()).toEqual([
+    expect([...commandVariablesUsed("a {path|cwd} {branch? b {dir}} {repo?{:}x}")].sort()).toEqual([
       "branch",
       "cwd",
       "dir",
@@ -476,7 +476,7 @@ describe("commandVariablesUsed and missingVariables", () => {
   });
 
   it("an optional part does not make the action unavailable", () => {
-    expect(missingVariables("e {cwd}{?branch  --b {branch}}", { cwd: "/w", branch: "" })).toEqual([]);
+    expect(missingVariables("e {cwd}{branch?  --b {branch}}", { cwd: "/w", branch: "" })).toEqual([]);
   });
 
   it("ignores names that are not variables of the scope", () => {

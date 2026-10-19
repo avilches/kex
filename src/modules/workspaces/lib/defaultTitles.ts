@@ -17,12 +17,12 @@ export type TitleDefaults = Record<TitleDefaultKind, string>;
 // title and the branch. A terminal tab always has its folder (it is set when the tab is
 // created, OSC 7 only follows later `cd`s), so the folder is never empty.
 export const FACTORY_TITLE_DEFAULTS: TitleDefaults = {
-  terminal: "{?cmd|osc {cmd|osc} · {dir}}{!cmd|osc {dir}{?branch · {branch}}}",
-  agent: "{osc|session|{agent}}{?branch · {branch}}",
+  terminal: "{cmd|osc?{cmd|osc} · {dir}{:}{dir}{branch? · {branch}}}",
+  agent: "{osc|session|{agent}}{branch? · {branch}}",
   editor: "{file}",
   diff: "{file}",
   browser: "{url}",
-  gitHistory: "Git History{?dir · {dir}}",
+  gitHistory: "Git History{dir? · {dir}}",
   workspace: "{dir}",
 };
 
