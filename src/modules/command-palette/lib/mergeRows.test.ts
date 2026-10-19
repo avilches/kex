@@ -170,6 +170,19 @@ describe("mergeRows", () => {
     expect(keys(mergeRows(input({ term: "kex", tabs })))).toEqual(["tab:title", "tab:workspace", "tab:branch", "tab:process"]);
   });
 
+  it("keeps a tab found by process, branch or location above actions that only match scattered letters", () => {
+    const commands = [cmd("full", "Toggle full pane"), cmd("git", "Toggle Git panel")];
+    for (const field of [{ process: "top" }, { branch: "top-fix" }, { cwd: "/work/top" }, { worktree: "top" }]) {
+      const rows = mergeRows(input({ term: "top", commands, tabs: [tab("t", field)] }));
+      expect(keys(rows)[0]).toBe("tab:t");
+    }
+  });
+
+  it("still ranks an action that contains the typed text above a tab found by process", () => {
+    const rows = mergeRows(input({ term: "top", commands: [cmd("bar", "Top bar")], tabs: [tab("t", { process: "top" })] }));
+    expect(keys(rows)).toEqual(["cmd:bar", "tab:t"]);
+  });
+
   it("breaks ties by recency with awake workspaces first", () => {
     const tabs = [
       tab("sleepy", { title: "build", hibernated: true, lastUsedAt: 99 }),
