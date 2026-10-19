@@ -2,21 +2,27 @@ import {
   createShellIntegrationState,
   registerCwdHandler,
 } from "@/modules/terminal/lib/osc-handlers";
+import { blockRulersFromVars } from "@/modules/theme/terminalHighlight";
 import type { IDecoration, IMarker, Terminal } from "@xterm/xterm";
 import { blockIndexAt, computeRange, type LineRange } from "./blockRange";
 import {
   type BlockMode,
   initialModeState,
-  modeOf,
   type ModeState,
+  modeOf,
   reduceMode,
 } from "./modeMachine";
 import { readRangeText } from "./readBlock";
 import type { BlockMeta } from "./types";
 
-const OK_RULER = "#5fb3b3";
-const FAIL_RULER = "#e5706b";
 const MAX_BLOCKS = 1000;
+
+function currentRulers() {
+  const el = typeof document !== "undefined" ? document.documentElement : null;
+  if (!el) return blockRulersFromVars(() => "");
+  const style = getComputedStyle(el);
+  return blockRulersFromVars((name) => style.getPropertyValue(name));
+}
 
 type Entry = {
   id: string;
@@ -202,12 +208,17 @@ export class BlockDecorations {
     this.clearSearch();
     try {
       const buf = this.term.buffer.active;
-      this.term.scrollToLine(Math.max(0, m.line - Math.floor(this.term.rows / 2)));
-      const marker = this.term.registerMarker(m.line - (buf.baseY + buf.cursorY));
+      this.term.scrollToLine(
+        Math.max(0, m.line - Math.floor(this.term.rows / 2)),
+      );
+      const marker = this.term.registerMarker(
+        m.line - (buf.baseY + buf.cursorY),
+      );
       if (!marker) return;
       this.searchMarker = marker;
       this.searchDeco =
-        this.term.registerDecoration({ marker, x: m.col, width: m.len }) ?? null;
+        this.term.registerDecoration({ marker, x: m.col, width: m.len }) ??
+        null;
       this.searchDeco?.onRender((el) => el.classList.add("bt-match"));
     } catch {}
   }
@@ -312,7 +323,8 @@ export class BlockDecorations {
   }
 
   selectBlockAt(clientY: number): void {
-    const screen = this.term.element?.querySelector<HTMLElement>(".xterm-screen");
+    const screen =
+      this.term.element?.querySelector<HTMLElement>(".xterm-screen");
     if (!screen || this.term.rows === 0) return;
     const rect = screen.getBoundingClientRect();
     const cellHeight = rect.height / this.term.rows;
@@ -482,7 +494,7 @@ export class BlockDecorations {
       this.term.registerDecoration({
         marker: endMarker,
         width: 1,
-        overviewRulerOptions: { color: ok ? OK_RULER : FAIL_RULER },
+        overviewRulerOptions: { color: currentRulers()[ok ? "ok" : "fail"] },
       }) ?? null;
     this.entries.push({
       id: lb.id,

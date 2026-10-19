@@ -4,6 +4,7 @@ import { KEY_SEP } from "@/lib/platform";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
+import { searchHighlightFromVars } from "@/modules/theme/terminalHighlight";
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -17,12 +18,10 @@ import {
   useState,
 } from "react";
 
-const TERM_DECORATIONS = {
-  matchBackground: "#515c6a",
-  activeMatchBackground: "#d18616",
-  matchOverviewRuler: "#d18616",
-  activeMatchColorOverviewRuler: "#d18616",
-};
+function termDecorations() {
+  const style = getComputedStyle(document.documentElement);
+  return searchHighlightFromVars((name) => style.getPropertyValue(name));
+}
 
 export type SearchTarget =
   | { kind: "terminal"; addon: SearchAddon; focus: () => void }
@@ -125,7 +124,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
         if (next) {
           target.addon.findNext(next, {
             incremental: true,
-            decorations: TERM_DECORATIONS,
+            decorations: termDecorations(),
           });
         } else {
           target.addon.clearDecorations();
@@ -138,7 +137,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
     const findDirection = (forward: boolean) => {
       if (!target || !q) return;
       if (target.kind === "terminal") {
-        const opts = { decorations: TERM_DECORATIONS };
+        const opts = { decorations: termDecorations() };
         if (forward) target.addon.findNext(q, opts);
         else target.addon.findPrevious(q, opts);
       } else if (target.kind === "editor") {
@@ -169,7 +168,8 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
               onChange={(e) => {
                 const next = e.target.value;
                 setQ(next);
-                if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+                if (debounceRef.current !== null)
+                  clearTimeout(debounceRef.current);
                 debounceRef.current = setTimeout(() => {
                   debounceRef.current = null;
                   applyIncremental(next);
