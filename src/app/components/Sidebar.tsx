@@ -2,8 +2,8 @@ import { cn } from "@/lib/utils";
 import {
   FileExplorer,
   type FileExplorerHandle,
-  revealForWorkspace,
   type RevealRequest,
+  revealForWorkspace,
 } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import {
@@ -11,11 +11,11 @@ import {
   type GitHistorySearchHandle,
 } from "@/modules/git-history/GitHistoryPane";
 import { NotesView } from "@/modules/notes";
-import { SourceControlPanel } from "@/modules/source-control";
 import type {
   SourceControlPanelHandle,
   SourceControlSummary,
 } from "@/modules/source-control";
+import { SourceControlPanel } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 import type { ExplorerSnapshot } from "@/modules/workspaces/lib/sidebarSnapshot";
 import {
@@ -91,13 +91,16 @@ export type SidebarProps = {
   gitWorkspaceId: string | null;
   savedCommitMessage: string;
   onCommitMessagePersist: (workspaceId: string, message: string) => void;
-  onOpenDiff: (input: {
-    path: string;
-    repoRoot: string;
-    mode: "+" | "-";
-    originalPath: string | null;
-    title?: string;
-  }, pin: boolean) => void;
+  onOpenDiff: (
+    input: {
+      path: string;
+      repoRoot: string;
+      mode: "+" | "-";
+      originalPath: string | null;
+      title?: string;
+    },
+    pin: boolean,
+  ) => void;
   onOpenGitGraph?: () => void;
   onNavigateToWorktree?: (path: string) => void;
   onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
@@ -133,11 +136,17 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
     return (
       <div className="flex h-full flex-col bg-sidebar">
         {/* View strip */}
-        <div className="flex h-8 shrink-0 items-center border-b border-border/60">
+        <div
+          className="flex h-8 shrink-0 items-center border-b border-border/60"
+          role="tablist"
+          aria-label="Sidebar views"
+        >
           {views.map((tab) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={view === tab.id}
               onClick={() => props.onChangeView(tab.id)}
               className={cn(
                 "relative h-full px-3 text-[11px] font-medium transition-colors",
@@ -184,7 +193,10 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
               workspaceRootExists={props.workspaceRootExists}
-              revealRequest={revealForWorkspace(props.revealRequest, props.workspaceId)}
+              revealRequest={revealForWorkspace(
+                props.revealRequest,
+                props.workspaceId,
+              )}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}
               onPathDeleted={props.onPathDeleted}
@@ -232,7 +244,11 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                   onClick={props.onOpenGitGraph}
                   className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  <HugeiconsIcon icon={GitCommitIcon} size={14} strokeWidth={1.85} />
+                  <HugeiconsIcon
+                    icon={GitCommitIcon}
+                    size={14}
+                    strokeWidth={1.85}
+                  />
                 </button>
               </div>
             ) : null}

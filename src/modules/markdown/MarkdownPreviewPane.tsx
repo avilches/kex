@@ -1,5 +1,6 @@
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { CM_MARKDOWN_PREVIEW_SETUP } from "@/lib/codemirrorSetup";
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { buildStaticPreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
@@ -57,16 +58,7 @@ export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(
         editable={false}
         height="100%"
         className="min-h-0 flex-1 overflow-auto"
-        basicSetup={{
-          lineNumbers: false,
-          foldGutter: false,
-          highlightActiveLineGutter: false,
-          highlightActiveLine: false,
-          bracketMatching: false,
-          closeBrackets: false,
-          autocompletion: false,
-          drawSelection: false,
-        }}
+        basicSetup={CM_MARKDOWN_PREVIEW_SETUP}
         extensions={extensions}
       />
     </div>

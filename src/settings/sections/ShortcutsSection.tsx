@@ -1,26 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setShortcuts } from "@/modules/settings/store";
-import {
-  bindingsEqual,
-  getBindingTokens,
-  SHORTCUTS,
-  SHORTCUT_GROUPS,
-  type KeyBinding,
-  type Shortcut,
-  type ShortcutId,
-} from "@/modules/shortcuts/shortcuts";
-import {
-  ArrowTurnBackwardIcon,
-  CancelCircleIcon,
-  Refresh01Icon,
-  Search01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState, useMemo } from "react";
-import { SectionHeader } from "../components/SectionHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +8,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setShortcuts } from "@/modules/settings/store";
+import {
+  bindingsEqual,
+  getBindingTokens,
+  type KeyBinding,
+  SHORTCUT_GROUPS,
+  SHORTCUTS,
+  type Shortcut,
+  type ShortcutId,
+} from "@/modules/shortcuts/shortcuts";
+import {
+  ArrowTurnBackwardIcon,
+  CancelCircleIcon,
+  Refresh01Icon,
+  Search01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SectionHeader } from "../components/SectionHeader";
 
 export function ShortcutsSection() {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const [search, setSearch] = useState("");
   const [recordingId, setRecordingId] = useState<ShortcutId | null>(null);
-  const [recordingConflict, setRecordingConflict] = useState<{ binding: KeyBinding; with: Shortcut } | null>(null);
+  const [recordingConflict, setRecordingConflict] = useState<{
+    binding: KeyBinding;
+    with: Shortcut;
+  } | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const startRecording = (id: ShortcutId) => {
@@ -58,7 +61,7 @@ export function ShortcutsSection() {
     return base.filter(
       (s) =>
         s.label.toLowerCase().includes(lower) ||
-        s.group.toLowerCase().includes(lower)
+        s.group.toLowerCase().includes(lower),
     );
   }, [search]);
 
@@ -223,9 +226,11 @@ function ShortcutRow({
           />
         ) : (
           <>
-            <div
+            <button
+              type="button"
+              title="Change shortcut"
               onClick={onStartRecording}
-              className="flex min-w-[100px] items-center justify-end gap-1"
+              className="flex min-w-[100px] cursor-pointer items-center justify-end gap-1 text-left"
             >
               {hasBindings ? (
                 <KbdGroup>
@@ -243,7 +248,7 @@ function ShortcutRow({
                   Unassigned
                 </span>
               )}
-            </div>
+            </button>
 
             <div className="flex items-center gap-1">
               {!hasBindings && isModified ? (
@@ -270,7 +275,8 @@ function findConflict(
 ): Shortcut | null {
   for (const s of SHORTCUTS) {
     if (s.id === currentId) continue;
-    const bindings = s.id in userShortcuts ? userShortcuts[s.id] : s.defaultBindings;
+    const bindings =
+      s.id in userShortcuts ? userShortcuts[s.id] : s.defaultBindings;
     if (bindings.some((b) => bindingsEqual(b, binding))) return s;
   }
   return null;
@@ -344,9 +350,10 @@ function Recorder({
 
       // On macOS, Option transforms alpha keys (e.g. Option+B → "∫"), so use
       // e.code to recover the actual key name when alt is held.
-      const key = (e.altKey && /^Key[A-Z]$/.test(e.code))
-        ? e.code.slice(3).toLowerCase()
-        : e.key;
+      const key =
+        e.altKey && /^Key[A-Z]$/.test(e.code)
+          ? e.code.slice(3).toLowerCase()
+          : e.key;
       const binding: KeyBinding = {
         key,
         ctrl: e.ctrlKey,
@@ -366,7 +373,8 @@ function Recorder({
     };
 
     window.addEventListener("keydown", onDown, { capture: true });
-    return () => window.removeEventListener("keydown", onDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onDown, { capture: true });
   }, [currentId, userShortcuts, onConflict, onRecord, onCancel]);
 
   if (conflict) {
@@ -378,7 +386,10 @@ function Recorder({
         <div className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-[11px] ring-1 ring-destructive/50">
           <KbdGroup>
             {getBindingTokens(conflict.binding).map((t, i) => (
-              <Kbd key={i} className="border-destructive/60 text-destructive bg-destructive/10">
+              <Kbd
+                key={i}
+                className="border-destructive/60 text-destructive bg-destructive/10"
+              >
                 {t}
               </Kbd>
             ))}
@@ -392,7 +403,10 @@ function Recorder({
   }
 
   return (
-    <div ref={containerRef} className="flex items-center gap-2 rounded bg-accent/50 px-2 py-1 text-[11px] ring-1 ring-accent">
+    <div
+      ref={containerRef}
+      className="flex items-center gap-2 rounded bg-accent/50 px-2 py-1 text-[11px] ring-1 ring-accent"
+    >
       <span className="animate-pulse font-medium">Recording...</span>
       <span className="text-muted-foreground">(Esc to cancel)</span>
     </div>

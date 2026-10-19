@@ -1,5 +1,12 @@
 import { terminalNoteSurface, variantNoteSurface } from "./noteSurface";
-import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
+import { blockRulerColors, searchHighlightColors } from "./terminalHighlight";
+import type {
+  EditorSurface,
+  TerminalPalette,
+  Theme,
+  ThemeColors,
+  ThemeMode,
+} from "./types";
 
 const COLOR_VAR: Record<keyof ThemeColors, string> = {
   background: "--background",
@@ -65,6 +72,12 @@ const ALL_VARS: readonly string[] = [
   "--terminal-cursor",
   "--terminal-cursor-accent",
   "--terminal-selection",
+  "--terminal-search-match",
+  "--terminal-search-active",
+  "--terminal-search-match-ruler",
+  "--terminal-search-active-ruler",
+  "--terminal-block-ruler-ok",
+  "--terminal-block-ruler-fail",
   ...ANSI_VARS,
 ];
 
@@ -77,7 +90,8 @@ export function applyTheme(
   editorOverride?: EditorSurface,
 ): void {
   const root = document.documentElement;
-  const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
+  const variant =
+    theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
   if (!variant) {
     clearTheme();
     return;
@@ -92,16 +106,47 @@ export function applyTheme(
   const editor = editorOverride ?? variant.editor;
   if (editor) writeEditor(root, editor);
   const editorNote = variantNoteSurface(variant, editorOverride);
-  const editorBg = editorNote?.background ?? editor?.background ?? colors?.background;
-  const editorFg = editorNote?.foreground ?? editor?.foreground ?? colors?.foreground;
+  const editorBg =
+    editorNote?.background ?? editor?.background ?? colors?.background;
+  const editorFg =
+    editorNote?.foreground ?? editor?.foreground ?? colors?.foreground;
   if (editorBg) root.style.setProperty("--note-editor-background", editorBg);
   if (editorFg) root.style.setProperty("--note-editor-foreground", editorFg);
   const terminalNote = terminalNoteSurface(variant, terminalOverride);
-  const terminalBg = terminalNote?.background ?? terminal?.background ?? colors?.background;
-  const terminalFg = terminalNote?.foreground ?? terminal?.foreground ?? colors?.foreground;
-  if (terminalBg) root.style.setProperty("--note-terminal-background", terminalBg);
-  if (terminalFg) root.style.setProperty("--note-terminal-foreground", terminalFg);
+  const terminalBg =
+    terminalNote?.background ?? terminal?.background ?? colors?.background;
+  const terminalFg =
+    terminalNote?.foreground ?? terminal?.foreground ?? colors?.foreground;
+  if (terminalBg)
+    root.style.setProperty("--note-terminal-background", terminalBg);
+  if (terminalFg)
+    root.style.setProperty("--note-terminal-foreground", terminalFg);
+  writeTerminalHighlight(root, colors, terminal);
   lastApplied = theme.id;
+}
+
+function writeTerminalHighlight(
+  root: HTMLElement,
+  colors: ThemeColors | undefined,
+  terminal: TerminalPalette | undefined,
+): void {
+  const search = searchHighlightColors(colors, terminal);
+  root.style.setProperty("--terminal-search-match", search.matchBackground);
+  root.style.setProperty(
+    "--terminal-search-active",
+    search.activeMatchBackground,
+  );
+  root.style.setProperty(
+    "--terminal-search-match-ruler",
+    search.matchOverviewRuler,
+  );
+  root.style.setProperty(
+    "--terminal-search-active-ruler",
+    search.activeMatchColorOverviewRuler,
+  );
+  const rulers = blockRulerColors(colors, terminal);
+  root.style.setProperty("--terminal-block-ruler-ok", rulers.ok);
+  root.style.setProperty("--terminal-block-ruler-fail", rulers.fail);
 }
 
 function clearTheme(): void {
@@ -124,10 +169,13 @@ function writeEditor(root: HTMLElement, e: EditorSurface): void {
 }
 
 function writeTerminal(root: HTMLElement, t: TerminalPalette): void {
-  if (t.background) root.style.setProperty("--terminal-background", t.background);
-  if (t.foreground) root.style.setProperty("--terminal-foreground", t.foreground);
+  if (t.background)
+    root.style.setProperty("--terminal-background", t.background);
+  if (t.foreground)
+    root.style.setProperty("--terminal-foreground", t.foreground);
   if (t.cursor) root.style.setProperty("--terminal-cursor", t.cursor);
-  if (t.cursorAccent) root.style.setProperty("--terminal-cursor-accent", t.cursorAccent);
+  if (t.cursorAccent)
+    root.style.setProperty("--terminal-cursor-accent", t.cursorAccent);
   if (t.selection) root.style.setProperty("--terminal-selection", t.selection);
   if (t.ansi) {
     for (let i = 0; i < ANSI_VARS.length && i < t.ansi.length; i++) {

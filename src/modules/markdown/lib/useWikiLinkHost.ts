@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { native } from "@/lib/native";
 import { relativePath } from "@/modules/explorer/lib/contextActions";
+import { markdownIndex, markdownIndexAdd, reloadMarkdownIndex } from "@/modules/markdown/lib/mdIndex";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { newWikiNotePath, resolveWikiTarget, wikiBoundary } from "@/modules/markdown/lib/wikiLinks";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 
-// The markdown files under that boundary, listed once per boundary, so a
-// `[[Note]]` resolves without an IO round-trip on every redraw. A click on a
-// name that is not in the list re-lists once (the note may have been created
-// after the tab opened) and, if it is still missing, creates an empty note
-// relative to the current one, as Obsidian does.
+// The markdown files under that boundary are indexed once per root and shared
+// by every surface (mdIndex), so a `[[Note]]` resolves without an IO
+// round-trip on every redraw. A click on a name that is not in the list
+// re-indexes once (the note may have been created after the tab opened) and,
+// if it is still missing, creates an empty note relative to the current one,
+// as Obsidian does. The host's identity only changes with root, currentPath
+// and files; onOpenFile and isFileOpen are read through refs so an app-level
+// rerender cannot reconfigure the editor facet and rebuild decorations.
 export type WikiNoteInfo = { path: string; relativePath: string; isOpen: boolean };
 
 // The editor host plus what its right-click menu needs: the note a name
@@ -29,16 +33,23 @@ export function useWikiLinkHost(
   const root = wikiBoundary(workspaceRoot, currentPath);
   const [files, setFiles] = useState<string[]>([]);
 
+  const rootRef = useRef(root);
+  rootRef.current = root;
+  const onOpenFileRef = useRef(onOpenFile);
+  onOpenFileRef.current = onOpenFile;
+  const isFileOpenRef = useRef(isFileOpen);
+  isFileOpenRef.current = isFileOpen;
+
   const list = useCallback(async (): Promise<string[]> => {
-    try {
-      const res = await native.glob({ pattern: "**/*.md", root, maxResults: 2000 });
-      const next = res.hits.map((h) => h.path);
-      setFiles(next);
-      return next;
-    } catch (err) {
-      console.error("wiki link index failed", err);
-      return [];
-    }
+    const fresh = await markdownIndex(root);
+    if (rootRef.current === root) setFiles(fresh);
+    return fresh;
+  }, [root]);
+
+  const refresh = useCallback(async (): Promise<string[]> => {
+    const fresh = await reloadMarkdownIndex(root);
+    if (rootRef.current === root) setFiles(fresh);
+    return fresh;
   }, [root]);
 
   useEffect(() => {
@@ -46,7 +57,7 @@ export function useWikiLinkHost(
   }, [list]);
 
   return useMemo(() => {
-    if (!onOpenFile) return undefined;
+    if (!onOpenFileRef.current) return undefined;
 
     const create = async (target: string): Promise<void> => {
       const note = newWikiNotePath(target, currentPath, root);
@@ -61,8 +72,9 @@ export function useWikiLinkHost(
       try {
         await native.createDir(note.path.replace(/\/[^/]*$/, "")).catch(() => undefined);
         await native.createFile(note.path);
-        setFiles((prev) => [...prev, note.path]);
-        onOpenFile(note.path);
+        markdownIndexAdd(root, note.path);
+        setFiles((prev) => (prev.includes(note.path) ? prev : [...prev, note.path]));
+        onOpenFileRef.current?.(note.path);
       } catch (err) {
         toast.error(`Could not create "${target}"`, { description: String(err) });
       }
@@ -72,19 +84,22 @@ export function useWikiLinkHost(
       infoFor: (target) => {
         const path = resolveWikiTarget(target, root, files);
         if (path === null) return null;
-        return { path, relativePath: relativePath(root, path), isOpen: isFileOpen?.(path) ?? false };
+        return { path, relativePath: relativePath(root, path), isOpen: isFileOpenRef.current?.(path) ?? false };
       },
-      openPath: onOpenFile,
+      openPath: (path) => onOpenFileRef.current?.(path),
       resolve: (target) => resolveWikiTarget(target, root, files),
       open: (target) => {
         const known = resolveWikiTarget(target, root, files);
-        if (known) return onOpenFile(known);
-        void list().then((fresh) => {
+        if (known) {
+          onOpenFileRef.current?.(known);
+          return;
+        }
+        void refresh().then((fresh) => {
           const found = resolveWikiTarget(target, root, fresh);
-          if (found) onOpenFile(found);
+          if (found) onOpenFileRef.current?.(found);
           else void create(target);
         });
       },
     };
-  }, [root, workspaceRoot, currentPath, onOpenFile, isFileOpen, files, list]);
+  }, [root, workspaceRoot, currentPath, files, list, refresh]);
 }

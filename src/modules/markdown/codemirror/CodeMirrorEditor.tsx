@@ -1,3 +1,4 @@
+import { CM_MARKDOWN_SETUP } from "@/lib/codemirrorSetup";
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import {
   buildLiveDecorationExtensions,
@@ -50,6 +51,11 @@ type Props = {
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
   function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition, maxHeight, themeMode }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const stableOnChange = useCallback((next: string) => {
+      onChangeRef.current(next);
+    }, []);
     const themeExt = useEditorThemeExt(themeMode);
     const pathRef = useRef(path);
     pathRef.current = path;
@@ -132,22 +138,12 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
       <CodeMirror
         ref={cmRef}
         value={value}
-        // @uiw/react-codemirror calls this with (value, ViewUpdate); forward
-        // only the string so onChange matches its declared Props signature.
-        onChange={(next) => onChange(next)}
+        onChange={stableOnChange}
         theme={themeExt}
         height={maxHeight ? undefined : "100%"}
         maxHeight={maxHeight}
         className={maxHeight ? "w-full overflow-auto" : "h-full w-full overflow-auto"}
-        basicSetup={{
-          lineNumbers: false,
-          foldGutter: false,
-          highlightActiveLineGutter: false,
-          highlightActiveLine: false,
-          bracketMatching: false,
-          closeBrackets: false,
-          autocompletion: false,
-        }}
+        basicSetup={CM_MARKDOWN_SETUP}
         extensions={extensions}
       />
     );

@@ -17,6 +17,7 @@ import {
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { cn } from "@/lib/utils";
+import { INPUT_CLASS } from "@/settings/components/inputClass";
 import {
   commandOnEnable,
   commitRunOnStartEdit,
@@ -34,8 +35,10 @@ type Props = {
   onUpdateTab: (tabId: string, updater: (p: Tab) => Tab) => void;
 };
 
-const INPUT_CLASS =
-  "h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary";
+const MENU_INPUT_CLASS = cn(
+  INPUT_CLASS,
+  "h-6 border-border/60 bg-background/50 px-1.5 text-[11px] focus:border-primary",
+);
 
 export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
   const agentSession = useAgentStore((s) => s.sessions[tab.id] ?? null);
@@ -124,7 +127,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
           if (e.key === "Enter") e.currentTarget.blur();
           e.stopPropagation();
         }}
-        className={cn(INPUT_CLASS, "font-mono disabled:cursor-not-allowed disabled:opacity-50")}
+        className={cn(MENU_INPUT_CLASS, "font-mono disabled:cursor-not-allowed disabled:opacity-50")}
       />
     );
 

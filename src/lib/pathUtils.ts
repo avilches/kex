@@ -1,3 +1,17 @@
+export function toForwardSlashes(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+// Canonical form for workspace root paths: forward slashes, at most one
+// trailing separator, and Windows drive roots ("C:/") kept as-is.
+export function normalizeRootPath(path: string): string {
+  const p = toForwardSlashes(path);
+  if (p.length > 1 && !/^[A-Za-z]:\/$/.test(p)) {
+    return p.replace(/\/$/, "");
+  }
+  return p;
+}
+
 function normalizeSeparators(path: string): string {
   return path.replace(/\\/g, "/");
 }

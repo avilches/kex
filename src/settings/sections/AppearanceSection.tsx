@@ -1,3 +1,4 @@
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -23,8 +24,8 @@ import {
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
-import { SectionHeader } from "../components/SectionHeader";
 import { INPUT_CLASS } from "../components/inputClass";
+import { SectionHeader } from "../components/SectionHeader";
 import { TitleTemplatesBlock } from "../components/TitleTemplatesBlock";
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
@@ -66,7 +67,11 @@ export function AppearanceSection() {
   const uiFont = usePreferencesStore((s) => s.uiFont);
   const hydrated = usePreferencesStore((s) => s.hydrated);
 
-  const isCustom = uiFont !== "" && !UI_FONT_PRESETS.some((p) => p.value === uiFont && p.value !== "__custom__");
+  const isCustom =
+    uiFont !== "" &&
+    !UI_FONT_PRESETS.some(
+      (p) => p.value === uiFont && p.value !== "__custom__",
+    );
   const [showCustomInput, setShowCustomInput] = useState(isCustom);
   const [customValue, setCustomValue] = useState(isCustom ? uiFont : "");
 
@@ -111,37 +116,44 @@ export function AppearanceSection() {
                 value={toSelectValue(selectedPreset)}
                 onValueChange={(v) => handlePresetChange(fromSelectValue(v))}
               >
-                <SelectTrigger size="sm" className="h-8 w-full min-w-0 text-[12.5px]">
+                <SelectTrigger
+                  size="sm"
+                  className="h-8 w-full min-w-0 text-[12.5px]"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {UI_FONT_PRESETS.map((p) => (
-                    <SelectItem key={p.value} value={toSelectValue(p.value)} className="text-[12.5px]">
+                    <SelectItem
+                      key={p.value}
+                      value={toSelectValue(p.value)}
+                      className="text-[12.5px]"
+                    >
                       {p.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-3">
               <span className="text-[12.5px] font-medium">Zoom</span>
-              <div className="flex items-center gap-1.5">
+              <RadioGroup
+                value={String(zoomLevel)}
+                onValueChange={(v) => void setZoomLevel(Number(v))}
+                className="flex items-center gap-2"
+              >
                 {ZOOM_LEVELS.map((z) => (
-                  <button
-                    key={z}
-                    type="button"
-                    onClick={() => void setZoomLevel(z)}
-                    className={cn(
-                      "rounded border px-2 py-1 tabular-nums text-[11.5px] font-medium transition-colors",
-                      zoomLevel === z
-                        ? "border-foreground/60 ring-1 ring-foreground/20"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground",
-                    )}
-                  >
-                    {Math.round(z * 100)}%
-                  </button>
+                  <div key={z} className="flex items-center gap-1.5">
+                    <RadioGroupItem value={String(z)} id={`zoom-${z}`} />
+                    <label
+                      htmlFor={`zoom-${z}`}
+                      className="cursor-pointer text-[12px] tabular-nums"
+                    >
+                      {Math.round(z * 100)}%
+                    </label>
+                  </div>
                 ))}
-              </div>
+              </RadioGroup>
             </div>
           </div>
           {showCustomInput && (
@@ -154,7 +166,6 @@ export function AppearanceSection() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.currentTarget.blur();
-                  handleCustomCommit(customValue);
                 }
               }}
               className={INPUT_CLASS}
@@ -166,24 +177,24 @@ export function AppearanceSection() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2">
           <span className="text-[12.5px] font-medium">Loading indicator</span>
-          <div className="flex items-center gap-1.5">
+          <RadioGroup
+            value={spinnerStyle}
+            onValueChange={(v) => void setSpinnerStyle(v as SpinnerStyle)}
+            className="flex items-center gap-2"
+          >
             {SPINNER_STYLES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => void setSpinnerStyle(s)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded border px-2 py-1 transition-colors",
-                  spinnerStyle === s
-                    ? "border-foreground/60 ring-1 ring-foreground/20"
-                    : "border-border/60 hover:border-border",
-                )}
-              >
-                <Spinner size={12} style={s} />
-                <span className="text-[11.5px] font-medium">{SPINNER_STYLE_LABELS[s]}</span>
-              </button>
+              <div key={s} className="flex items-center gap-1.5">
+                <RadioGroupItem value={s} id={`spinner-${s}`} />
+                <label
+                  htmlFor={`spinner-${s}`}
+                  className="flex cursor-pointer items-center gap-1.5 text-[11.5px] font-medium"
+                >
+                  <Spinner size={12} style={s} />
+                  {SPINNER_STYLE_LABELS[s]}
+                </label>
+              </div>
             ))}
-          </div>
+          </RadioGroup>
         </div>
       </div>
 
@@ -191,12 +202,17 @@ export function AppearanceSection() {
         <FieldLabel>Explorer</FieldLabel>
         <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
           <span className="text-[12.5px] font-medium">Git file colors</span>
-          <div className="grid grid-cols-2 gap-2">
+          <RadioGroup
+            value={gitColorScheme}
+            onValueChange={(v) =>
+              void setExplorerGitColorScheme(v as "vscode" | "jetbrains")
+            }
+            className="grid grid-cols-2 gap-2"
+          >
             {(["vscode", "jetbrains"] as const).map((s) => (
-              <button
+              <label
                 key={s}
-                type="button"
-                onClick={() => void setExplorerGitColorScheme(s)}
+                htmlFor={`git-colors-${s}`}
                 className={cn(
                   "flex flex-col gap-2 rounded-lg border p-2.5 text-left transition-all",
                   gitColorScheme === s
@@ -204,13 +220,14 @@ export function AppearanceSection() {
                     : "border-border/60 hover:border-border",
                 )}
               >
-                <span className="text-[12px] font-medium">
+                <span className="flex items-center gap-2 text-[12px] font-medium">
+                  <RadioGroupItem value={s} id={`git-colors-${s}`} />
                   {s === "vscode" ? "VS Code" : "JetBrains"}
                 </span>
                 <GitColorPreview scheme={s} />
-              </button>
+              </label>
             ))}
-          </div>
+          </RadioGroup>
         </div>
       </div>
 
@@ -241,8 +258,9 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
         const kind = "kind" in entry ? entry.kind : undefined;
         const isIgnored = kind === "ignored";
         const isClean = kind === "clean";
-        const color =
-          entry.label ? gitStatusHexColor(entry.label, scheme, resolvedMode) ?? undefined : undefined;
+        const color = entry.label
+          ? (gitStatusHexColor(entry.label, scheme, resolvedMode) ?? undefined)
+          : undefined;
         const iconUrl = fileIconUrl(entry.name);
         return (
           <div key={entry.name} className="flex items-center gap-1.5">
@@ -250,7 +268,10 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
               <img
                 src={iconUrl}
                 alt=""
-                className={cn("size-4 shrink-0", (isIgnored || isClean) && "opacity-50")}
+                className={cn(
+                  "size-4 shrink-0",
+                  (isIgnored || isClean) && "opacity-50",
+                )}
               />
             ) : (
               <span className="size-4 shrink-0" />
@@ -258,11 +279,17 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
             <span
               className={cn(
                 "text-[12px]",
-                isIgnored ? "text-muted-foreground/70" : isClean ? "text-foreground/85" : "",
+                isIgnored
+                  ? "text-muted-foreground/70"
+                  : isClean
+                    ? "text-foreground/85"
+                    : "",
               )}
               style={{
                 ...(color ? { color } : {}),
-                ...(entry.label === "D" ? { textDecoration: "line-through" } : {}),
+                ...(entry.label === "D"
+                  ? { textDecoration: "line-through" }
+                  : {}),
               }}
             >
               {entry.name}
@@ -270,7 +297,11 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
             <span
               className={cn(
                 "ml-auto pl-2 text-[10px] font-semibold tabular-nums",
-                isIgnored ? "text-muted-foreground/50" : isClean ? "text-foreground/40" : "",
+                isIgnored
+                  ? "text-muted-foreground/50"
+                  : isClean
+                    ? "text-foreground/40"
+                    : "",
               )}
               style={color ? { color } : undefined}
             >

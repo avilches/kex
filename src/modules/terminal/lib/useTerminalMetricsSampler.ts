@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import type { SplitNode } from "@/modules/workspaces/lib/types";
-import { setMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
+import { setMetricsBatch, type TabMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { ptyIdForTab } from "./useTerminalSession";
 import { visibleTerminalTabs } from "./visibleTerminals";
 
@@ -36,16 +36,16 @@ export function useTerminalMetricsSampler(paneTree: SplitNode | null): void {
           ptyIds: pairs.map((x) => x.ptyId),
         });
         if (cancelled) return;
+        const batch: (readonly [string, TabMetrics])[] = [];
         for (const m of res) {
           const tabId = byPty.get(m.pty_id);
           if (!tabId) continue;
-          setMetrics(tabId, {
-            pid: m.pid,
-            cpuPercent: m.cpu_percent,
-            memBytes: m.mem_bytes,
-            shellName: m.shell_name,
-          });
+          batch.push([
+            tabId,
+            { pid: m.pid, cpuPercent: m.cpu_percent, memBytes: m.mem_bytes, shellName: m.shell_name },
+          ]);
         }
+        setMetricsBatch(batch);
       } catch {
         // Sampling is best-effort; ignore transient invoke failures.
       }

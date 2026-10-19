@@ -1,4 +1,5 @@
 import { EDITOR_PREVIEW_SAMPLE } from "@/modules/theme/editorThemePreview";
+import { CM_THEME_PREVIEW_SETUP } from "@/lib/codemirrorSetup";
 import { EDITOR_THEME_EXT } from "@/modules/editor/lib/themes";
 import type { EditorThemeId } from "@/modules/settings/store";
 import { javascript } from "@codemirror/lang-javascript";
@@ -46,12 +47,7 @@ export default function EditorThemePreview({
         readOnly
         selection={SELECTION}
         editable={false}
-        basicSetup={{
-          lineNumbers: true,
-          foldGutter: false,
-          highlightActiveLine: false,
-          highlightActiveLineGutter: false,
-        }}
+        basicSetup={CM_THEME_PREVIEW_SETUP}
       />
     </div>
   );
