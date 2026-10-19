@@ -1,10 +1,11 @@
 import type { Workspace } from "./types";
 
-export const AUTO_HIBERNATE_MODES = ["off", "30m", "4h", "2d"] as const;
+export const AUTO_HIBERNATE_MODES = ["off", "1m", "30m", "4h", "2d"] as const;
 export type AutoHibernate = (typeof AUTO_HIBERNATE_MODES)[number];
 
 export const AUTO_HIBERNATE_LABELS: Record<AutoHibernate, string> = {
   off: "Never",
+  "1m": "1 minute",
   "30m": "30 minutes",
   "4h": "4 hours",
   "2d": "2 days",
@@ -12,13 +13,23 @@ export const AUTO_HIBERNATE_LABELS: Record<AutoHibernate, string> = {
 
 const MINUTE = 60_000;
 const DELAY_MS: Record<Exclude<AutoHibernate, "off">, number> = {
+  "1m": MINUTE,
   "30m": 30 * MINUTE,
   "4h": 240 * MINUTE,
   "2d": 2880 * MINUTE,
 };
 
-export function parseAutoHibernate(value: unknown): AutoHibernate {
-  return AUTO_HIBERNATE_MODES.find((m) => m === value) ?? "4h";
+// "1m" exists only for the dev build. A value persisted there falls back to the
+// default in production so nobody hibernates every minute without knowing why.
+export function autoHibernateModes(dev: boolean): readonly AutoHibernate[] {
+  return dev ? AUTO_HIBERNATE_MODES : AUTO_HIBERNATE_MODES.filter((m) => m !== "1m");
+}
+
+export function parseAutoHibernate(
+  value: unknown,
+  modes: readonly AutoHibernate[] = autoHibernateModes(import.meta.env?.DEV ?? false),
+): AutoHibernate {
+  return modes.find((m) => m === value) ?? "4h";
 }
 
 export function autoHibernateDelayMs(mode: AutoHibernate): number | null {

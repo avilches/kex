@@ -3,8 +3,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  autoHibernateModes,
   AUTO_HIBERNATE_LABELS,
-  AUTO_HIBERNATE_MODES,
   type AutoHibernate,
 } from "@/modules/workspaces/lib/autoHibernate";
 import {
@@ -26,6 +26,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
   const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
+  const modes = autoHibernateModes(import.meta.env.DEV);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
@@ -57,7 +58,7 @@ export function WorkspacesSection() {
             value={autoHibernate}
             onValueChange={(v) => void setAutoHibernate(v as AutoHibernate)}
           >
-            {AUTO_HIBERNATE_MODES.map((mode) => (
+            {modes.map((mode) => (
               <div key={mode} className="flex items-center gap-2">
                 <RadioGroupItem value={mode} id={`auto-hibernate-${mode}`} />
                 <label htmlFor={`auto-hibernate-${mode}`} className="cursor-pointer text-[12px]">

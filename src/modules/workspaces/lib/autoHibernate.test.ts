@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoHibernateCandidates,
   autoHibernateDelayMs,
+  autoHibernateModes,
   autoHibernateTick,
   hibernatedIds,
   parseAutoHibernate,
@@ -22,7 +23,14 @@ describe("parseAutoHibernate", () => {
     expect(parseAutoHibernate("1h")).toBe("4h");
     expect(parseAutoHibernate("off")).toBe("off");
   });
+  it("keeps 1m only in dev", () => {
+    expect(autoHibernateModes(true)).toContain("1m");
+    expect(autoHibernateModes(false)).not.toContain("1m");
+    expect(parseAutoHibernate("1m", autoHibernateModes(true))).toBe("1m");
+    expect(parseAutoHibernate("1m", autoHibernateModes(false))).toBe("4h");
+  });
   it("maps modes to delays", () => {
+    expect(autoHibernateDelayMs("1m")).toBe(MIN);
     expect(autoHibernateDelayMs("30m")).toBe(30 * MIN);
     expect(autoHibernateDelayMs("4h")).toBe(240 * MIN);
     expect(autoHibernateDelayMs("2d")).toBe(2880 * MIN);
