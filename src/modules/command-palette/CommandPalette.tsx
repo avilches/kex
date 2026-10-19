@@ -250,7 +250,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      className="top-1/2 w-[min(620px,calc(100vw-32px))] sm:max-w-[min(620px,calc(100vw-32px))] -translate-y-1/2"
+      className="top-1/2 w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
         shouldFilter={false}
@@ -266,7 +266,10 @@ export function CommandPalette({
           placeholder={placeholder}
           autoFocus
         />
-        <ScrollArea ref={listRef} className="max-h-[420px]">
+        <ScrollArea
+          ref={listRef}
+          className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
+        >
           <CommandList className="max-h-none overflow-visible pr-3">
             {inThemes ? (
               <CommandGroup heading="Themes">

@@ -63,7 +63,7 @@ export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }
           />
         </span>
       ) : null}
-      <span className="ml-auto flex max-w-40 shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+      <span className="ml-auto flex max-w-56 shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
         <WorkspaceMark
           id={entry.workspaceId}
           color={entry.workspaceColor}
