@@ -77,11 +77,13 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
     const expanded = !compact || openInCompact;
 
     const focus = useCallback(() => {
-      pendingFocusRef.current = true;
-      if (compact) setOpenInCompact(true);
-      else inputRef.current?.focus();
-      if (inputRef.current) pendingFocusRef.current = false;
-    }, [compact]);
+      if (compact && !openInCompact) {
+        pendingFocusRef.current = true;
+        setOpenInCompact(true);
+        return;
+      }
+      inputRef.current?.focus();
+    }, [compact, openInCompact]);
 
     useImperativeHandle(ref, () => ({ focus }), [focus]);
 

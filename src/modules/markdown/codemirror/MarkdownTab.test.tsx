@@ -284,6 +284,23 @@ describe("Live Preview MarkdownTab", () => {
       expect(container.contains(document.activeElement)).toBe(true);
     });
 
+    it("focuses the preview pane when the focused prop turns true while already in Preview", async () => {
+      const { rerender } = await setup();
+      click("Preview");
+      const pane = () =>
+        screen.getByTestId("preview-pane").closest('[tabindex="-1"]') as HTMLElement;
+      act(() => {
+        pane().blur();
+      });
+      expect(document.activeElement).not.toBe(pane());
+      act(() => {
+        rerender(
+          <MarkdownTab tabId={`tab-modes-${tabSeq}`} path={PATH} visible focused callbacks={callbacks} />,
+        );
+      });
+      expect(document.activeElement).toBe(pane());
+    });
+
     it("the outline handle toggles the Outline and is a no-op in Preview", async () => {
       await setup();
       act(() => handle()?.toggleOutline());
