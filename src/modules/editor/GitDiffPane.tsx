@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { CM_DIFF_SETUP } from "@/lib/codemirrorSetup";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GitDiffPathBar } from "./GitDiffPathBar";
 import { GitDiffSplitView } from "./GitDiffSplitView";
@@ -481,16 +482,7 @@ export function GitDiffPane({ source, chipLabel, active, onNavigateDiff }: Props
             editable={false}
             height="100%"
             className="h-full"
-            basicSetup={{
-              lineNumbers: false,
-              foldGutter: false,
-              highlightActiveLine: false,
-              highlightActiveLineGutter: false,
-              bracketMatching: false,
-              closeBrackets: false,
-              autocompletion: false,
-              searchKeymap: true,
-            }}
+            basicSetup={CM_DIFF_SETUP}
           />
         )}
       </div>
