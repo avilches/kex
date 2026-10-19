@@ -19,6 +19,9 @@ Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un 
    arriba/abajo cambian de modo). El tuner ajusta el tono y la claridad del fondo y el alfa del
    texto normal y del ignorado, con el hex y el ratio ya compuestos: sirve para buscar un valor a
    ojo y "Export changes (copy)" copia un JSON con ese valor para hornearlo en el tema.
+   "Save to disk" escribe los valores cambiados en `src/modules/theme/themes/<id>.ts` (solo funciona con
+   `pnpm dev`) editando solo las lineas que cambian, y recarga la pagina con el tema tal cual quedo en
+   disco, listo para revisar el `git diff` y commitear.
 2. Editar `src/modules/theme/themes/*.ts`; Vite recarga la pagina solo. Leer el resultado con
    `window.kexThemePreview.dump()` (hex de todos los tokens y de los colores de git) o con los
    atributos `data-hex`, nunca con una captura: Dark Reader falsea los colores en Chrome.

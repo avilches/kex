@@ -50,6 +50,7 @@ import { toHex, tokenValue } from "./color";
 import {
   applyTokens,
   applyTune,
+  clearOverrides,
   DEFAULT_TUNE,
   loadTokens,
   loadTune,
@@ -890,6 +891,53 @@ function tunerPanel(): HTMLElement {
   const copyFull = smallButton("Export full theme (copy)");
   copyFull.onclick = () => void copy(fullThemeJson, false);
 
+  const saveStatus = h("span", { class: "text-[11px] text-muted-foreground" });
+  const saveBtn = smallButton("Save to disk");
+  saveBtn.title = "Write these values into src/modules/theme/themes/<id>.ts (pnpm dev only)";
+  const restore = (tune: Tune, tokens: Record<string, string>) => {
+    state.tune = tune;
+    state.tokens = tokens;
+    saveTune(tuneKey(), tune);
+    saveTokens(tuneKey(), tokens);
+    refresh();
+  };
+  saveBtn.onclick = async () => {
+    const changes = effectiveChanges();
+    if (Object.keys(changes).length === 0) {
+      saveStatus.textContent = "Nothing changed since the theme loaded.";
+      return;
+    }
+    // Writing the file makes Vite reload this page right away, which kills this
+    // handler before it can react to the response, so drop the overrides now:
+    // the theme on disk already carries them and a stale tune would just be
+    // reapplied on top on reload. They are restored if the write fails.
+    const previous = { tune: state.tune, tokens: state.tokens };
+    saveBtn.disabled = true;
+    clearOverrides(tuneKey());
+    state.tune = { ...DEFAULT_TUNE };
+    state.tokens = {};
+    saveStatus.textContent = "Writing...";
+    try {
+      const res = await fetch("/__kex-theme-write", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: state.themeId, mode: state.mode, tokens: changes }),
+      });
+      const json = (await res.json()) as { file?: string; replaced?: string[]; inserted?: string[]; missing?: string[]; error?: string };
+      if (!res.ok) {
+        restore(previous.tune, previous.tokens);
+        saveBtn.disabled = false;
+        saveStatus.textContent = `Not written: ${json.error ?? res.statusText}`;
+        return;
+      }
+      saveStatus.textContent = `Wrote ${json.file}: ${json.replaced?.length ?? 0} changed, ${json.inserted?.length ?? 0} added, ${json.missing?.length ?? 0} skipped.`;
+    } catch (error) {
+      restore(previous.tune, previous.tokens);
+      saveBtn.disabled = false;
+      saveStatus.textContent = `Not written: ${String(error)}. Is the page served by pnpm dev?`;
+    }
+  };
+
   paintReadout();
   syncAll();
   exportArea.value = snapshot();
@@ -902,7 +950,8 @@ function tunerPanel(): HTMLElement {
       addSlider("Normal text alpha", "normalAlpha", 0.5, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       addSlider("Ignored text alpha", "ignoredAlpha", 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       readout,
-      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, copyStatus),
+      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, saveBtn, copyStatus),
+      saveStatus,
       exportArea,
       tokenDetails,
     ),
@@ -942,6 +991,22 @@ function changedTokens(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(state.tokens)) {
     if (baseline[name]?.toLowerCase() !== value.toLowerCase()) out[name] = value;
+  }
+  return out;
+}
+
+// Tokens whose on-screen value differs from what the theme declares, which is
+// what "Save to disk" writes: every UI color the tone sliders moved or that was
+// overridden by hand, plus the terminal and editor tokens only when they were
+// overridden by hand (they alias the UI colors in CSS, so they would otherwise
+// look changed on their own).
+function effectiveChanges(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const token of TOKENS) {
+    const current = toHex(tokenValue(token));
+    if (!baseline[token] || current.toLowerCase() === baseline[token].toLowerCase()) continue;
+    const explicit = token in state.tokens;
+    if (token in COLOR_TOKEN || explicit) out[token] = current;
   }
   return out;
 }
