@@ -24,7 +24,10 @@ type Props = {
   suggestions: readonly AppSuggestion[];
   context: ActionContext | null;
   emptyHint: string;
-  /** May return a promise: when it rejects the row stays, as a draft that can be saved again. */
+  /**
+   * May return a promise: when it rejects, a command draft the user was typing keeps its row
+   * and can be saved again. A picked app preset has no row and shows the host's toast instead.
+   */
   onAdd: (action: Action) => void | Promise<unknown>;
   onUpdate: (id: string, next: Action) => void;
   onRemove: (id: string) => void;
@@ -78,7 +81,8 @@ export function ActionsEditor({
   const visible = [...actions, ...drafts.filter((d) => !saved.has(d.id))];
 
   const addDraft = (fresh: () => Action) => {
-    const pending = drafts.find((d) => !d.command.trim());
+    // With the kind fixed on creation, only a pending empty draft of the same kind is reused.
+    const pending = drafts.find((d) => !d.command.trim() && d.runInTerminal === fresh().runInTerminal);
     if (pending) return void rows.current.get(pending.id)?.focusCommand();
     setDrafts((d) => [...d, fresh()]);
   };

@@ -28,7 +28,7 @@ Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos
 - **Checkboxes**: `Checkbox` de `@/components/ui/checkbox` con `id` y `<label htmlFor={...}>` asociado.
 - **Switches**: `Switch` de `@/components/ui/switch` (para toggles on/off dentro de `SettingRow`).
 
-Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.tsx` en `src/modules/actions/` (RadioGroup, Checkbox y Select en un formulario).
+Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.tsx` en `src/modules/actions/` (Checkbox y Select en un formulario).
 
 ## Estilo de inputs en Settings
 

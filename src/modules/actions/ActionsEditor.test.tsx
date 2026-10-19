@@ -127,6 +127,18 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
+  it("an empty draft is only reused by an add button of the same kind", () => {
+    const { container, onAdd, unmount } = mount([]);
+    click(commandButton(container));
+    click(applicationButton(container));
+    click([...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.includes("Custom app"))!);
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(2);
+    const appDraft = [...container.querySelectorAll("input[aria-label='Command']")].pop() as HTMLInputElement;
+    type(appDraft, "code {path}");
+    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
+    unmount();
+  });
+
   it("an app preset goes straight to the store with its appId and command", () => {
     const { container, onAdd, unmount } = mount([]);
     click(applicationButton(container));
@@ -189,7 +201,7 @@ describe("ActionsEditor", () => {
       n.textContent?.includes("every workspace"),
     );
     expect(content).toBeDefined();
-    const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Make global" && b.textContent !== undefined);
+    const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Make global");
     click(confirm);
     expect(onMakeGlobal).toHaveBeenCalledWith("ac-1");
     unmount();
