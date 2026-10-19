@@ -41,7 +41,7 @@ describe("resolveAgentTabTitle - persisted agentTitle fills the wake window", ()
 
   it("the persisted title also wins over the session title while no OSC has arrived", () => {
     const info = resolveAgentTabTitle(woken("fixing the parser"), null, undefined, session("initial"));
-    expect(info.displayTitle).toBe("fixing the parser · me");
+    expect(info.displayTitle).toBe("fixing the parser");
   });
 
   it("a tab with nothing persisted keeps the folder default", () => {

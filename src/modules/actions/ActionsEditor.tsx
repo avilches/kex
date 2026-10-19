@@ -72,6 +72,7 @@ export function ActionsEditor({
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [drafts, setDrafts] = useState<Action[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
   const rows = useRef<Map<string, ActionRowHandle>>(new Map());
   // Drafts already handed to the store, which has not echoed them back yet.
   const handedOver = useRef<Set<string>>(new Set());
@@ -79,6 +80,12 @@ export function ActionsEditor({
   // A draft stays rendered, under the same key, until the store shows an action with its id,
   // so the row keeps its DOM node and its focus while the write is on its way.
   const visible = [...actions, ...drafts.filter((d) => !saved.has(d.id))];
+
+  const draftIds = new Set(drafts.map((d) => d.id));
+
+  const toggleRow = (id: string) => {
+    setOpenId((open) => (open === id ? null : id));
+  };
 
   const addDraft = (fresh: () => Action) => {
     // With the kind fixed on creation, only a pending empty draft of the same kind is reused.
@@ -135,21 +142,26 @@ export function ActionsEditor({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
         <SortableContext items={visible.map((a) => a.id)} strategy={verticalListSortingStrategy}>
           <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto pr-0.5">
-            {visible.map((action) => (
-              <ActionRow
-                key={action.id}
-                ref={(handle) => {
-                  if (handle) rows.current.set(action.id, handle);
-                  else rows.current.delete(action.id);
-                }}
-                action={action}
-                context={context}
-                saved={saved.has(action.id)}
-                onMakeGlobal={onMakeGlobal && saved.has(action.id) ? () => onMakeGlobal(action.id) : undefined}
-                onChange={(next) => change(action, next)}
-                onRemove={() => remove(action)}
-              />
-            ))}
+            {visible.map((action) => {
+    const isDraft = draftIds.has(action.id);
+    return (
+      <ActionRow
+        key={action.id}
+        ref={(handle) => {
+          if (handle) rows.current.set(action.id, handle);
+          else rows.current.delete(action.id);
+        }}
+        action={action}
+        context={context}
+        saved={saved.has(action.id)}
+        expanded={isDraft || openId === action.id}
+        onToggleExpand={() => toggleRow(action.id)}
+        onMakeGlobal={onMakeGlobal && saved.has(action.id) ? () => onMakeGlobal(action.id) : undefined}
+        onChange={(next) => change(action, next)}
+        onRemove={() => remove(action)}
+      />
+    );
+  })}
           </div>
         </SortableContext>
       </DndContext>

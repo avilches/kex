@@ -9,9 +9,10 @@ import type { Action } from "./lib/types";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const saved: Action = { id: "ac-1", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false };
+const savedApp: Action = { id: "ac-2", name: "Zed", runInTerminal: false, command: "zed {path}", ownButton: false };
 
-const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed (workspace)", iconId: "zed", defaultCommand: "zed {workspace}" };
-const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit (path)", iconId: "bbedit", defaultCommand: "bbedit {path}" };
+const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
+const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {path}", iconId: "bbedit", defaultCommand: "bbedit {path}" };
 
 function mount(actions: Action[], extra: Partial<Parameters<typeof ActionsEditor>[0]> = {}) {
   const handlers = {
@@ -51,15 +52,25 @@ const commandButton = (c: HTMLElement) =>
   [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Command"));
 const applicationButton = (c: HTMLElement) =>
   [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Application"));
+const expand = (c: HTMLElement) => {
+  const toggle = c.querySelector("button[aria-label='Expand action']");
+  if (toggle) click(toggle);
+};
+const commandField = (root: HTMLElement | Document) => root.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement;
 
-function type(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-  act(() => input.focus());
+function typeField(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")!.set!;
+  act(() => field.focus());
   act(() => {
-    setter.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setter.call(field, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  act(() => void input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+  act(() => void field.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+}
+
+function dialogButton(text: string) {
+  return [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
 describe("ActionsEditor", () => {
@@ -71,35 +82,49 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("lists the saved actions and hides the hint", () => {
+  it("lists saved actions folded to their header, and expands on demand", () => {
     const { container, unmount } = mount([saved]);
     expect(container.textContent).not.toContain("No actions yet.");
-    expect((container.querySelector("input[aria-label='Command']") as HTMLInputElement).value).toBe("pnpm dev");
+    expect(container.textContent).toContain("Dev");
+    expect(commandField(container)).toBeNull();
+    expand(container);
+    expect(commandField(container).value).toBe("pnpm dev");
+    unmount();
+  });
+
+  it("only one row is open at a time", () => {
+    const { container, unmount } = mount([savedApp, saved]);
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
+    const lastExpand = () => {
+      const list = [...container.querySelectorAll("button[aria-label='Expand action']")];
+      return list[list.length - 1] as HTMLElement;
+    };
+    click(lastExpand());
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
+    expect(container.textContent).toContain("Run in");
+    click(lastExpand());
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Run in");
     unmount();
   });
 
   it("Add Command starts a script row draft that reaches the store once it has a command", () => {
     const { container, onAdd, unmount } = mount([]);
     click(commandButton(container));
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    expect(commandField(container)).not.toBeNull();
     expect(onAdd).not.toHaveBeenCalled();
-    type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "pnpm test");
+    typeField(commandField(container), "pnpm test");
     expect(onAdd).toHaveBeenCalledTimes(1);
     expect(onAdd.mock.calls[0]![0]).toMatchObject({ command: "pnpm test", runInTerminal: true });
     unmount();
   });
 
-  it("a draft keeps its row, and its focus, until the store shows it, and is handed over once", () => {
-    const { container, onAdd, rerender, unmount } = mountWithRerender([]);
+  it("a draft keeps its row until the store has not echoed it, while pending", () => {
+    const { container, onAdd, unmount } = mountWithRerender([]);
     click(commandButton(container));
-    const before = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    type(before, "pnpm test");
-    const after = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    expect(after).toBe(before);
-    expect(onAdd).toHaveBeenCalledTimes(1);
-    const added = onAdd.mock.calls[0]![0] as Action;
-    rerender([added]);
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    const before = commandField(container);
+    typeField(before, "pnpm test");
+    expect(commandField(container)).toBe(before);
     expect(onAdd).toHaveBeenCalledTimes(1);
     unmount();
   });
@@ -108,13 +133,12 @@ describe("ActionsEditor", () => {
     const onAdd = vi.fn().mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(undefined);
     const { container, unmount } = mount([], { onAdd });
     click(commandButton(container));
-    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    type(command, "pnpm test");
+    typeField(commandField(container), "pnpm test");
     await act(async () => {
       await new Promise<void>((r) => setTimeout(r, 0));
     });
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
-    type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "pnpm build");
+    expect(commandField(container)).not.toBeNull();
+    typeField(commandField(container), "pnpm build");
     expect(onAdd).toHaveBeenCalledTimes(2);
     unmount();
   });
@@ -123,7 +147,8 @@ describe("ActionsEditor", () => {
     const { container, unmount } = mount([]);
     click(commandButton(container));
     click(commandButton(container));
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    expect(commandField(container)).not.toBeNull();
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
     unmount();
   });
 
@@ -132,9 +157,10 @@ describe("ActionsEditor", () => {
     click(commandButton(container));
     click(applicationButton(container));
     click([...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.includes("Custom app"))!);
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(2);
-    const appDraft = [...container.querySelectorAll("input[aria-label='Command']")].pop() as HTMLInputElement;
-    type(appDraft, "code {path}");
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(2);
+    const [scriptDraft, appDraft] = [...container.querySelectorAll("textarea[aria-label='Command']")] as HTMLTextAreaElement[];
+    expect(scriptDraft).not.toBe(appDraft);
+    typeField(appDraft, "code {path}");
     expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
     unmount();
   });
@@ -142,15 +168,15 @@ describe("ActionsEditor", () => {
   it("an app preset goes straight to the store with its appId and command", () => {
     const { container, onAdd, unmount } = mount([]);
     click(applicationButton(container));
-    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Zed (workspace)")));
+    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Zed{workspace}")));
     expect(onAdd).toHaveBeenCalledTimes(1);
     expect(onAdd.mock.calls[0]![0]).toMatchObject({
-      name: "Zed (workspace)",
+      name: "Zed {workspace}",
       runInTerminal: false,
       command: "zed {workspace}",
       appId: "zed",
     });
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(0);
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
     unmount();
   });
 
@@ -159,25 +185,33 @@ describe("ActionsEditor", () => {
     click(applicationButton(container));
     click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Custom app")));
     expect(onAdd).not.toHaveBeenCalled();
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
-    type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "code {path}");
+    expect(commandField(container)).not.toBeNull();
+    typeField(commandField(container), "code {path}");
     expect(onAdd).toHaveBeenCalledTimes(1);
     expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
     unmount();
   });
 
-  it("removing a draft never reaches the store", () => {
+  it("removing asks for confirmation, and a draft never reaches the store", () => {
     const { container, onRemove, unmount } = mount([]);
     click(commandButton(container));
     click(container.querySelector("button[aria-label='Remove action']"));
+    expect(dialogButton("Delete")).not.toBeNull();
+    click(dialogButton("Cancel"));
+    expect(commandField(container)).not.toBeNull();
     expect(onRemove).not.toHaveBeenCalled();
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(0);
+    click(container.querySelector("button[aria-label='Remove action']"));
+    click(dialogButton("Delete"));
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
     unmount();
   });
 
-  it("removing a saved action asks the store", () => {
+  it("removing a saved action reaches the store after the confirmation", () => {
     const { container, onRemove, unmount } = mount([saved]);
     click(container.querySelector("button[aria-label='Remove action']"));
+    expect(onRemove).not.toHaveBeenCalled();
+    click(dialogButton("Delete"));
     expect(onRemove).toHaveBeenCalledWith("ac-1");
     unmount();
   });
@@ -207,20 +241,23 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("the name box follows the stored name when it changes from outside", () => {
+  it("the name field follows the stored name when it changes from outside", () => {
     const first = mount([saved]);
+    expand(first.container);
     const name = first.container.querySelector("input[aria-label='Action name']") as HTMLInputElement;
     expect(name.value).toBe("Dev");
     first.unmount();
     const renamed = mount([{ ...saved, name: "Dev server" }]);
+    expand(renamed.container);
     expect((renamed.container.querySelector("input[aria-label='Action name']") as HTMLInputElement).value).toBe("Dev server");
     renamed.unmount();
   });
 
   it("clearing the name saves nothing and shows the stored name again", () => {
     const { container, onUpdate, unmount } = mount([saved]);
+    expand(container);
     const input = container.querySelector("input[aria-label='Action name']") as HTMLInputElement;
-    type(input, "");
+    typeField(input, "");
     expect(onUpdate).not.toHaveBeenCalled();
     expect((container.querySelector("input[aria-label='Action name']") as HTMLInputElement).value).toBe("Dev");
     unmount();
@@ -228,35 +265,39 @@ describe("ActionsEditor", () => {
 
   it("a renamed action is saved with the new name", () => {
     const { container, onUpdate, unmount } = mount([saved]);
-    type(container.querySelector("input[aria-label='Action name']") as HTMLInputElement, "Server");
+    expand(container);
+    typeField(container.querySelector("input[aria-label='Action name']") as HTMLInputElement, "Server");
     expect(onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ name: "Server" }));
     unmount();
   });
 
-  it("clearing the command flags it as required and saves nothing", () => {
+  it("the command is a three-row textarea that flags an empty value and saves nothing", () => {
     const { container, onUpdate, unmount } = mount([saved]);
-    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    act(() => command.focus());
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    expand(container);
+    const field = commandField(container) as HTMLTextAreaElement;
+    expect(field.getAttribute("rows")).toBe("3");
+    act(() => field.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     act(() => {
-      setter.call(command, "");
-      command.dispatchEvent(new Event("input", { bubbles: true }));
+      setter.call(field, "");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(container.textContent).toContain("Command is required");
-    act(() => void command.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    act(() => void field.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
     expect(onUpdate).not.toHaveBeenCalled();
-    expect((container.querySelector("input[aria-label='Command']") as HTMLInputElement).value).toBe("pnpm dev");
+    expect((container.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement).value).toBe("pnpm dev");
     unmount();
   });
 
   it("saves a command still being typed when the editor goes away", () => {
     const { container, onUpdate, unmount } = mount([saved]);
-    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    act(() => command.focus());
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    expand(container);
+    const field = commandField(container) as HTMLTextAreaElement;
+    act(() => field.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     act(() => {
-      setter.call(command, "pnpm build");
-      command.dispatchEvent(new Event("input", { bubbles: true }));
+      setter.call(field, "pnpm build");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(onUpdate).not.toHaveBeenCalled();
     unmount();
@@ -265,10 +306,25 @@ describe("ActionsEditor", () => {
 
   it("a script shows the folder choice and an app does not", () => {
     const script = mount([saved]);
+    expand(script.container);
     expect(script.container.textContent).toContain("Run in");
     script.unmount();
-    const app = mount([{ id: "ac-2", name: "Zed", runInTerminal: false, command: "zed {path}", ownButton: false }]);
+    const app = mount([savedApp]);
+    expand(app.container);
     expect(app.container.textContent).not.toContain("Run in");
     app.unmount();
+  });
+
+  it("the own-button flag sits next to the name and collapses to a chip", () => {
+    const { container, onUpdate, unmount } = mount([saved]);
+    expand(container);
+    const checkbox = container.querySelector<HTMLButtonElement>("button[role='checkbox']") as HTMLButtonElement;
+    expect(checkbox.getAttribute("aria-checked")).toBe("false");
+    click(checkbox);
+    expect(onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ ownButton: true }));
+    unmount();
+    const ownTrue = mount([{ ...saved, ownButton: true }]);
+    expect(ownTrue.container.textContent).toContain("Header");
+    ownTrue.unmount();
   });
 });

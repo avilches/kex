@@ -46,7 +46,7 @@ export function insertToken(into: InputValue, token: string): { value: string; c
 }
 
 export function insertTitleVariable(
-  input: HTMLInputElement,
+  input: HTMLInputElement | HTMLTextAreaElement,
   token: string,
 ): { value: string; caret: number } {
   const start = input.selectionStart ?? input.value.length;

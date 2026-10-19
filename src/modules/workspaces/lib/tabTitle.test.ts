@@ -9,7 +9,7 @@ const terminal = (overrides: Partial<{ cwd: string; title: string }> = {}): Tab 
   ...overrides,
 });
 
-describe("tabTitle - terminal factory default: what is running, then the folder and branch", () => {
+describe("tabTitle - terminal factory default: what is running then the folder, or where an idle shell is", () => {
   const t = terminal({ cwd: "/home/me/kex" });
   const inRepo = { git: { branch: "main", repoRoot: "/home/me/kex" } };
 
@@ -19,7 +19,7 @@ describe("tabTitle - terminal factory default: what is running, then the folder 
   });
 
   it("a running command is followed by the folder, plus the branch inside a repository", () => {
-    expect(tabTitle(t, "cargo build", undefined, inRepo)).toBe("cargo build · kex · main");
+    expect(tabTitle(t, "cargo build", undefined, inRepo)).toBe("cargo build · kex");
     expect(tabTitle(t, "cargo build", undefined)).toBe("cargo build · kex");
   });
 
@@ -28,7 +28,7 @@ describe("tabTitle - terminal factory default: what is running, then the folder 
   });
 
   it("the title the program sets is used when no command is running", () => {
-    expect(tabTitle(t, null, "vim notes.md", inRepo)).toBe("vim notes.md · kex · main");
+    expect(tabTitle(t, null, "vim notes.md", inRepo)).toBe("vim notes.md · kex");
     expect(tabTitle(t, null, "", inRepo)).toBe("kex · main");
   });
 
@@ -100,29 +100,29 @@ describe("tabTitle - agent terminals", () => {
 
   const inRepo = { git: { branch: "main", repoRoot: "/home/me" } };
 
-  it("oscTitle wins over the session title, followed by the folder", () => {
-    expect(tabTitle(t, null, "live status", { ...agent, session: "initial" })).toBe("live status · me");
+  it("oscTitle wins over the session title", () => {
+    expect(tabTitle(t, null, "live status", { ...agent, session: "initial" })).toBe("live status");
   });
 
   it("the session title wins when oscTitle is absent", () => {
-    expect(tabTitle(t, null, undefined, { ...agent, session: "initial" })).toBe("initial · me");
+    expect(tabTitle(t, null, undefined, { ...agent, session: "initial" })).toBe("initial");
   });
 
-  it("falls back to agent and folder when neither title is present", () => {
-    expect(tabTitle(t, null, undefined, agent)).toBe("claude · me");
+  it("falls back to the agent name when neither title is present", () => {
+    expect(tabTitle(t, null, undefined, agent)).toBe("claude");
   });
 
-  it("adds the branch to the folder inside a repository", () => {
-    expect(tabTitle(t, null, "live status", { ...agent, ...inRepo })).toBe("live status · me · main");
-    expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · me · main");
+  it("adds the branch, not the folder, inside a repository", () => {
+    expect(tabTitle(t, null, "live status", { ...agent, ...inRepo })).toBe("live status · main");
+    expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · main");
   });
 
-  it("shows the folder at the root of the disk too", () => {
-    expect(tabTitle(terminal({ cwd: "/" }), null, "live status", agent)).toBe("live status · /");
+  it("never shows the folder, even at the root of the disk", () => {
+    expect(tabTitle(terminal({ cwd: "/" }), null, "live status", agent)).toBe("live status");
   });
 
   it("ignores the running command, which is literally the agent binary", () => {
-    expect(tabTitle(t, "claude --resume", undefined, agent)).toBe("claude · me");
+    expect(tabTitle(t, "claude --resume", undefined, agent)).toBe("claude");
   });
 
   it("a manual rename still wins", () => {

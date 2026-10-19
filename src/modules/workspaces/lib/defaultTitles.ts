@@ -11,13 +11,14 @@ export type TitleDefaultKind =
 
 export type TitleDefaults = Record<TitleDefaultKind, string>;
 
-// What a tab or workspace shows until the user renames it. Terminals and agents say what is
-// going on, then where: the folder and, inside a repository, its branch. A terminal tab always
-// has its folder (it is set when the tab is created, OSC 7 only follows later `cd`s), so
-// "where" is never empty and the separator needs no guard.
+// What a tab or workspace shows until the user renames it. An idle terminal says where it is:
+// the folder and, inside a repository, its branch. Once something runs (a command or an OSC
+// title) it says what plus the folder only, since the title is already long. An agent shows its
+// title and the branch. A terminal tab always has its folder (it is set when the tab is
+// created, OSC 7 only follows later `cd`s), so the folder is never empty.
 export const FACTORY_TITLE_DEFAULTS: TitleDefaults = {
-  terminal: "{?cmd|osc {cmd|osc} · }{dir}{?branch · {branch}}",
-  agent: "{osc|session|{agent}} · {dir}{?branch · {branch}}",
+  terminal: "{?cmd|osc {cmd|osc} · {dir}}{!cmd|osc {dir}{?branch · {branch}}}",
+  agent: "{osc|session|{agent}}{?branch · {branch}}",
   editor: "{file}",
   diff: "{file}",
   browser: "{url}",
