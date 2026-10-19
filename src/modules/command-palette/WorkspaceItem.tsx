@@ -2,6 +2,7 @@ import { CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Layers01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { RowTag } from "./RowTag";
 import type { WorkspaceEntry } from "./lib/tabEntries";
 
 export function WorkspaceItem({ entry, onRun }: { entry: WorkspaceEntry; onRun: () => void }) {
@@ -11,6 +12,7 @@ export function WorkspaceItem({ entry, onRun }: { entry: WorkspaceEntry; onRun: 
       onSelect={onRun}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
+      <RowTag kind="Workspace" />
       <HugeiconsIcon
         icon={Layers01Icon}
         size={14}

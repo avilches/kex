@@ -226,7 +226,7 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 ### 3.9 Command palette
 
-`Cmd+K` / `Ctrl+K` opens the command palette. It supports multiple modes (file finder, command runner, content search) distinguished by a prefix character. Fuzzy matching. Results are ranked by recency (MRU).
+`Cmd+K` / `Ctrl+K` opens the command palette. It supports multiple modes (file finder, command runner, content search) distinguished by a prefix character. Fuzzy matching. Results are ranked by recency (MRU). Every row starts with a tag saying what choosing it does (`RowTag`: Tab, Workspace, Action, Setting), so a tab, a workspace and an action no longer read alike. A tab row carries the same leading icon as its pane tab strip (`TabBarIcon` in `workspaces/lib/tabBarIcon.tsx`, shared by `PaneTabBar` so the two cannot drift), and a second line with the directory and branch (`tabRowDetail`, `command-palette/lib/rowDetail.ts`) only when the title does not already name them and the tab is not ambiguous; that pure helper is what decides, not the row. The dialog is `min(860px, 100vw - 32px)` wide. The side panel shows only the note (rendered read-only), which is also the only case where `hasPreview` turns it on: the directory and branch live in the row now.
 
 ### 3.10 Settings
 
@@ -660,7 +660,7 @@ src/
     ├── external-editors/          - Detection and catalog of installed editors and apps, their icons (feeds app Actions)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
-    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
+    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab locator line, note-only preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 
 ### Tab kinds (tagged union)

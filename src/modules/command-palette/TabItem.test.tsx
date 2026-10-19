@@ -21,6 +21,9 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   branch: "",
   process: "",
   indicator: null,
+  tab: { id: "tab-1", kind: "terminal" },
+  agentSession: undefined,
+  running: false,
   lastUsedAt: 0,
   workspaceActiveAt: 0,
   order: 0,
@@ -42,6 +45,11 @@ describe("TabItem", () => {
     row(entry());
     expect(screen.getByText("zsh")).toBeTruthy();
     expect(screen.getByText("Work")).toBeTruthy();
+  });
+
+  it("labels the row as a Tab", () => {
+    row(entry());
+    expect(screen.getByText("Tab")).toBeTruthy();
   });
 
   it("shows a spinner only while the agent works", () => {
@@ -66,7 +74,7 @@ describe("TabItem", () => {
   });
 
   it("falls back to the kind label when the title is empty", () => {
-    row(entry({ kind: "browser", title: "", cwd: "" }));
+    row(entry({ kind: "browser", title: "", cwd: "", tab: { id: "tab-1", kind: "browser", url: "" } }));
     expect(screen.getByText("Browser")).toBeTruthy();
   });
 
@@ -81,7 +89,15 @@ describe("TabItem", () => {
   });
 
   it("shows the url without protocol under an ambiguous browser title", () => {
-    row(entry({ kind: "browser", cwd: "", detail: "https://example.com/docs" }), true);
+    row(
+      entry({
+        kind: "browser",
+        cwd: "",
+        detail: "https://example.com/docs",
+        tab: { id: "tab-1", kind: "browser", url: "https://example.com/docs" },
+      }),
+      true,
+    );
     expect(screen.getByText("example.com/docs")).toBeTruthy();
   });
 });

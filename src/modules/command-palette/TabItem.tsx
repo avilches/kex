@@ -1,27 +1,12 @@
 import { CommandItem } from "@/components/ui/command";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import {
-  File02Icon,
-  FileEditIcon,
-  Globe02Icon,
-  SleepingIcon,
-  SourceCodeIcon,
-  StickyNote03Icon,
-  TerminalIcon,
-} from "@hugeicons/core-free-icons";
+import { SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { RowTag } from "./RowTag";
+import { tabRowDetail } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
-
-const KIND_ICON: Record<TabEntry["kind"], typeof TerminalIcon> = {
-  terminal: TerminalIcon,
-  editor: FileEditIcon,
-  markdown: File02Icon,
-  browser: Globe02Icon,
-  "git-diff": SourceCodeIcon,
-  "git-history": SourceCodeIcon,
-  "git-commit-file": SourceCodeIcon,
-};
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
   terminal: "Terminal",
@@ -33,11 +18,6 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
   "git-commit-file": "Git commit file",
 };
 
-function shortDetail(entry: TabEntry): string {
-  if (entry.kind === "browser") return entry.detail.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
-  return entry.detail.split(/[\\/]/).filter(Boolean).slice(-2).join("/");
-}
-
 export function TabItem({
   entry,
   ambiguous,
@@ -47,23 +27,24 @@ export function TabItem({
   ambiguous: boolean;
   onRun: () => void;
 }) {
+  const detail = tabRowDetail(entry, ambiguous);
   return (
     <CommandItem
       value={`tab:${entry.tabId}`}
       onSelect={onRun}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
-      <HugeiconsIcon
-        icon={KIND_ICON[entry.kind]}
-        size={14}
-        strokeWidth={1.75}
-        className="shrink-0 text-muted-foreground"
-      />
-      <span className="min-w-0 flex-1 truncate">
-        {entry.title || KIND_LABEL[entry.kind]}
-        {ambiguous && entry.detail ? (
-          <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-            {shortDetail(entry)}
+      <RowTag kind="Tab" />
+      <span className="shrink-0 text-muted-foreground">
+        <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate">{entry.title || KIND_LABEL[entry.kind]}</span>
+        {detail ? (
+          <span className="flex min-w-0 items-center gap-1.5 truncate text-[10.5px] font-normal text-muted-foreground">
+            {detail.location ? <span className="truncate">{detail.location}</span> : null}
+            {detail.location && detail.branch ? <span className="opacity-50">·</span> : null}
+            {detail.branch ? <span className="truncate">{detail.branch}</span> : null}
           </span>
         ) : null}
       </span>

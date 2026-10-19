@@ -1,3 +1,4 @@
+import type { AgentSession } from "@/modules/agents/lib/types";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
@@ -5,9 +6,11 @@ import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
 export type TabSources = {
   displayTitle(tab: Tab): string;
+  workspaceTitle(ws: Workspace): string;
   git(dir: string | undefined): { branch: string; repoRoot: string };
   runningCommand(tabId: string): string | null;
   agentOf(tabId: string): string | undefined;
+  agentSessionOf(tabId: string): AgentSession | undefined;
   visualOf(tabId: string): AgentEntryVisual | null;
   lastUsed(tabId: string): number;
   workspaceActiveAt(workspaceId: string): number;
@@ -28,6 +31,10 @@ export type TabEntry = {
   branch: string;
   process: string;
   indicator: AgentEntryVisual | null;
+  // The live tab and its agent session, so the row can draw the exact icon of the tab bar.
+  tab: Tab;
+  agentSession: AgentSession | undefined;
+  running: boolean;
   lastUsedAt: number;
   workspaceActiveAt: number;
   order: number;
@@ -78,6 +85,9 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           branch: git.branch,
           process: processOf(tab, src),
           indicator: src.visualOf(tab.id),
+          tab,
+          agentSession: src.agentSessionOf(tab.id),
+          running: !!src.runningCommand(tab.id),
           lastUsedAt: src.lastUsed(tab.id),
           workspaceActiveAt,
           order: order++,
@@ -94,7 +104,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
     const newestTab = tabs.reduce((max, t) => Math.max(max, src.lastUsed(t.id)), 0);
     return {
       workspaceId: ws.id,
-      title: ws.title,
+      title: src.workspaceTitle(ws),
       color: ws.color ?? null,
       hibernated: !!ws.hibernated,
       tabCount: tabs.length,

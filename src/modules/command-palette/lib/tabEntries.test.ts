@@ -31,9 +31,11 @@ const term = (id: string, extra: Partial<Extract<Tab, { kind: "terminal" }>> = {
 
 const sources = (over: Partial<TabSources> = {}): TabSources => ({
   displayTitle: (t) => t.title ?? t.id,
+  workspaceTitle: (ws) => ws.title,
   git: () => ({ branch: "", repoRoot: "" }),
   runningCommand: () => null,
   agentOf: () => undefined,
+  agentSessionOf: () => undefined,
   visualOf: () => null,
   lastUsed: () => 0,
   workspaceActiveAt: () => 0,
@@ -134,6 +136,22 @@ describe("buildTabEntries", () => {
     );
     expect([e.lastUsedAt, e.indicator, e.workspaceActiveAt]).toEqual([50, "working", 70]);
   });
+
+  it("carries the live tab, its agent session and whether it is running", () => {
+    const t = term("tab-1");
+    const [e] = buildTabEntries(
+      [workspace("ws-1", "One", [t])],
+      sources({ runningCommand: () => "pnpm dev", agentSessionOf: () => ({ agent: "claude" }) as never }),
+    );
+    expect(e.tab).toBe(t);
+    expect(e.running).toBe(true);
+    expect(e.agentSession?.agent).toBe("claude");
+  });
+
+  it("marks a tab with no running command as not running", () => {
+    const [e] = buildTabEntries([workspace("ws-1", "One", [term("tab-1")])], sources());
+    expect(e.running).toBe(false);
+  });
 });
 
 describe("buildWorkspaceEntries", () => {
@@ -150,6 +168,12 @@ describe("buildWorkspaceEntries", () => {
     const list = [workspace("ws-1", "One", [term("tab-1")])];
     const [w] = buildWorkspaceEntries(list, sources({ workspaceActiveAt: () => 40 }));
     expect(w.lastUsedAt).toBe(40);
+  });
+
+  it("resolves the title through the sources instead of showing the raw template", () => {
+    const list = [workspace("ws-1", "{host}: {cwd}", [term("tab-1")])];
+    const [w] = buildWorkspaceEntries(list, sources({ workspaceTitle: () => "avilches: ~/Kex" }));
+    expect(w.title).toBe("avilches: ~/Kex");
   });
 });
 

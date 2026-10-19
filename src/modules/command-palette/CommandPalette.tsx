@@ -261,7 +261,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      className="top-1/2 w-[min(860px,calc(100vw-32px))] -translate-y-1/2"
+      className="top-1/2 w-[min(860px,calc(100vw-32px))] sm:max-w-[min(860px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
         shouldFilter={false}
