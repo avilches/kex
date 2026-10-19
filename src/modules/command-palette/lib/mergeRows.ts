@@ -26,6 +26,9 @@ export type MergeInput = {
 // points: they sit below every fuzzy hit, one step per field class.
 const TIER_STEP = 1000;
 const SUBSTRING_BASE = -TIER_STEP;
+// An action whose letters only match scattered ("Toggle full pane" for "top") must not push a tab
+// found by its process, branch or location down the list: it drops below every tab tier.
+const SCATTERED_PENALTY = 5 * TIER_STEP;
 
 type Scored = { row: MergedRow; points: number; recency: TabEntry | null };
 
@@ -86,8 +89,9 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   const scored: Scored[] = [];
   const blobs = buildSearchBlobs(commands);
   commands.forEach((item, i) => {
-    const p = commandPoints(blobs[i], q);
-    if (p === null) return;
+    const fuzzy = commandPoints(blobs[i], q);
+    if (fuzzy === null) return;
+    const p = blobs[i].some((f) => f.toLowerCase().includes(q)) ? fuzzy : fuzzy - SCATTERED_PENALTY;
     const key = commandRowKey(item.id);
     scored.push({ row: { kind: "command", key, item }, points: p + learnedBoost(learned, q, key), recency: null });
   });
