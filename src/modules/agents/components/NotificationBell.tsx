@@ -125,9 +125,6 @@ export function NotificationBell({ onActivate }: Props) {
     () => buildAgentEntries(sessions, notifications, tabLocations),
     [sessions, notifications, tabLocations],
   );
-  const activeCount = entries.filter(
-    (e) => e.visual === "attention" || e.visual === "working",
-  ).length;
   // One entry per agent, so each pending entry counts once (no double-counting).
   const badge = entries.filter((e) => e.pending).length;
 
@@ -208,11 +205,6 @@ export function NotificationBell({ onActivate }: Props) {
           <span className="flex gap-1 text-[13px] text-foreground">
             Notifications
           </span>
-          {activeCount > 0 ? (
-            <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-              {activeCount} active
-            </span>
-          ) : null}
         </div>
 
         {empty ? (
