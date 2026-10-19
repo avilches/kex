@@ -1,4 +1,5 @@
 import { writeClipboardText } from "@/lib/clipboard";
+import { isImeComposing } from "@/lib/imeEnter";
 import { resolveMonoFontFamily } from "@/lib/fonts";
 import { IS_MAC } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -273,9 +274,7 @@ function createSlot(): Slot {
     // Raw keydown events - including the Enter that commits a candidate -
     // must NOT be forwarded to the PTY; xterm will receive the final
     // composed string through its own compositionend handler instead.
-    // keyCode 229 ("Process") is what Chromium reports for every key
-    // pressed inside an active IME session when isComposing is not yet set.
-    if (event.isComposing || event.keyCode === 229) return false;
+    if (isImeComposing(event)) return false;
 
     const leafId = slot.currentLeafId;
     if (leafId === null) return false;

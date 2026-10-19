@@ -1,4 +1,5 @@
 import { Spinner } from "@/components/ui/spinner";
+import { isImeComposing } from "@/lib/imeEnter";
 import {
   closestCenter,
   defaultDropAnimationSideEffects,
@@ -665,7 +666,7 @@ function SortableWorkspaceItem({
           placeholder={shownTitle || ws.kind}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !isImeComposing(e.nativeEvent)) {
               e.preventDefault();
               handleSave();
             } else if (e.key === "Escape") {
@@ -871,7 +872,7 @@ function SortableGroupHeader({
           defaultValue={label}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !isImeComposing(e.nativeEvent)) {
               e.preventDefault();
               handleSave();
             } else if (e.key === "Escape") {
