@@ -65,17 +65,17 @@ describe("ActionsSection", () => {
   it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
     openApplications(container);
-    const item = options().find((o) => o.textContent?.includes("PyCharm (workspace)"));
+    const item = options().find((o) => o.textContent?.includes("PyCharm{workspace}"));
     act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ name: "PyCharm (workspace)", appId: "pycharm", runInTerminal: false, ownButton: false });
+    expect(next[0]).toMatchObject({ name: "PyCharm {workspace}", appId: "pycharm", runInTerminal: false, ownButton: false });
     unmount();
   });
 
   it("keeps offering every app, so two actions can share one", () => {
-    actions = [{ id: "ac-1", name: "PyCharm (path)", runInTerminal: false, command: "pycharm {path}", appId: "pycharm", ownButton: false }];
+    actions = [{ id: "ac-1", name: "PyCharm {path}", runInTerminal: false, command: "pycharm {path}", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
     openApplications(container);
     expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);
@@ -88,8 +88,8 @@ describe("ActionsSection", () => {
     const { container, unmount } = mount();
     const add = buttons(container).find((b) => b.textContent?.includes("Add Command"))!;
     act(() => void add.click());
-    const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    const command = container.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     act(() => command.focus());
     act(() => {
       setter.call(command, "pnpm dev");
@@ -100,8 +100,8 @@ describe("ActionsSection", () => {
       await new Promise<void>((r) => setTimeout(r, 0));
     });
     expect(toastError).toHaveBeenCalled();
-    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
-    expect((container.querySelector("input[aria-label='Command']") as HTMLInputElement).value).toBe("pnpm dev");
+    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
+    expect((container.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement).value).toBe("pnpm dev");
     unmount();
   });
 

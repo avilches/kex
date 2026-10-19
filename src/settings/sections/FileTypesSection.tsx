@@ -1,6 +1,17 @@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   CODE_DEFAULTS,
   clampColumnRuler,
   clampIndentSize,
@@ -255,14 +266,31 @@ function ExtensionRow({
           </button>
         )}
         {!isCatchAll && (
-          <button
-            type="button"
-            title="Remove"
-            onClick={() => void deleteEditorViewEntry(entryKey)}
-            className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={11} />
-          </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                title="Remove"
+                className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={11} />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="w-[360px] rounded-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-base">Remove {extLabel(entryKey)} settings?</AlertDialogTitle>
+                <AlertDialogDescription className="text-[12px]">
+                  The per-extension view settings are removed and those files fall back to the defaults.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={() => void deleteEditorViewEntry(entryKey)}>
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
       {expanded && (

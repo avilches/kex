@@ -13,11 +13,14 @@ import { native } from "@/lib/native";
 import { normalizeRootPath, toForwardSlashes } from "@/lib/pathUtils";
 import {
   ActionsEditor,
+  ActionIcon,
   suggestionsFromDetected,
   useActionContext,
   type Action,
 } from "@/modules/actions";
 import { useExternalEditors } from "@/modules/external-editors";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
@@ -481,20 +484,53 @@ function WorkspaceActions({
 }) {
   const { detectedEditors } = useExternalEditors();
   const context = useActionContext(ws);
+  const globalActions = usePreferencesStore((s) => s.actions) ?? [];
   return (
-    <ActionsEditor
-      actions={ws.actions ?? []}
-      suggestions={suggestionsFromDetected(detectedEditors)}
-      context={context}
-      emptyHint="No actions in this workspace yet. Scripts run in a terminal; apps open in the background."
-      onAdd={(action) => onAdd(ws.id, action)}
-      onUpdate={(id, next) => {
-        const { id: _id, ...patch } = next;
-        onUpdate(ws.id, id, patch);
-      }}
-      onRemove={(id) => onRemove(ws.id, id)}
-      onReorder={(from, to) => onReorder(ws.id, from, to)}
-      onMakeGlobal={(id) => onPromote(ws.id, id)}
-    />
+    <div className="flex flex-col gap-2">
+      {globalActions.length > 0 && <GlobalActionsHint actions={globalActions} />}
+      <ActionsEditor
+        actions={ws.actions ?? []}
+        suggestions={suggestionsFromDetected(detectedEditors)}
+        context={context}
+        emptyHint="No actions in this workspace yet. Scripts run in a terminal; apps open in the background."
+        onAdd={(action) => onAdd(ws.id, action)}
+        onUpdate={(id, next) => {
+          const { id: _id, ...patch } = next;
+          onUpdate(ws.id, id, patch);
+        }}
+        onRemove={(id) => onRemove(ws.id, id)}
+        onReorder={(from, to) => onReorder(ws.id, from, to)}
+        onMakeGlobal={(id) => onPromote(ws.id, id)}
+      />
+    </div>
+  );
+}
+
+// The global Actions of this workspace live in Settings; the pill keeps them visible here,
+// scripts grouped before the apps, and hands the user to the right section when clicked.
+function GlobalActionsHint({ actions }: { actions: readonly Action[] }) {
+  const scripts = actions.filter((a) => a.runInTerminal);
+  const apps = actions.filter((a) => !a.runInTerminal);
+  return (
+    <button
+      type="button"
+      title={`${actions.length} global actions in Settings: ${actions.map((a) => a.name || "Action").join(", ")}`}
+      onClick={() => void openSettingsWindow("actions")}
+      className="flex h-7 w-fit shrink-0 items-center gap-1.5 rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      {scripts.map((a) => (
+        <span key={a.id} className="flex size-4 shrink-0 items-center justify-center">
+          <ActionIcon action={a} size={12} />
+        </span>
+      ))}
+      {apps.map((a) => (
+        <span key={a.id} className="flex size-4 shrink-0 items-center justify-center">
+          <ActionIcon action={a} size={12} />
+        </span>
+      ))}
+      <span>
+        {actions.length} global {actions.length === 1 ? "action" : "actions"}
+      </span>
+    </button>
   );
 }
