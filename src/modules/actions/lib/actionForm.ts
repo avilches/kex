@@ -4,7 +4,6 @@ import {
   type TitleVariableGroup,
 } from "@/modules/workspaces/lib/titleTemplate";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import { CUSTOM_APP_SUGGESTION, type AppSuggestion } from "./appSuggestions";
 import {
   commandProblem,
   missingVariables,
@@ -32,40 +31,13 @@ export function commandVariableDocs(): CommandVariableDoc[] {
   });
 }
 
+// A script row is a terminal command pointed at a folder; an app row is a background
+// program. The kind is chosen on creation by the add buttons and never switched later.
 export const CWD_MODE_LABELS: Record<ScriptCwdMode, string> = {
   workspace: "Workspace root folder",
   context: "Last folder from terminal or editor",
   fixed: "Fixed folder",
 };
-
-// Switching kind keeps what the user wrote. A script gains the folder choice it did not
-// have; an app loses it, since an app is launched from the folder of its own command.
-export function withKind(action: Action, runInTerminal: boolean): Action {
-  if (action.runInTerminal === runInTerminal) return action;
-  if (!runInTerminal) {
-    const { cwdMode: _mode, cwd: _cwd, ...rest } = action;
-    return { ...rest, runInTerminal };
-  }
-  return { ...action, runInTerminal, cwdMode: action.cwdMode ?? "workspace" };
-}
-
-// Picking a suggestion fills the name, the icon (through appId) and the command. A name
-// the user already typed is theirs and stays.
-export function withSuggestion(action: Action, suggestion: AppSuggestion): Action {
-  // The custom app has no command of its own: it only lets go of the app, so choosing it
-  // never empties a command the store would refuse to save.
-  const next: Action = {
-    ...action,
-    runInTerminal: false,
-    command: suggestion.defaultCommand || action.command,
-    name: action.name.trim() ? action.name : suggestion.name,
-  };
-  delete next.cwdMode;
-  delete next.cwd;
-  if (suggestion.appId) next.appId = suggestion.appId;
-  else delete next.appId;
-  return next;
-}
 
 export type ActionProblem = { kind: "command" | "cwd" | "context"; message: string };
 
@@ -125,13 +97,4 @@ export function commandDraft(input: { draft: string; stored: string; focused: bo
 export function commitCommand(stored: string, draft: string): { save: string | null } {
   const next = draft.trim();
   return { save: next && next !== stored ? next : null };
-}
-
-// The suggestion a saved app Action corresponds to. An app can have two (Zed opens a file or
-// a folder), told apart by the command they start from; an edited command falls back to the
-// first one of the app.
-export function currentSuggestionKey(action: Action, suggestions: readonly AppSuggestion[]): string {
-  const ofApp = suggestions.filter((s) => s.appId && s.appId === action.appId);
-  const exact = ofApp.find((s) => s.defaultCommand === action.command);
-  return (exact ?? ofApp[0])?.key ?? CUSTOM_APP_SUGGESTION.key;
 }

@@ -1,4 +1,4 @@
-import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   closestCenter,
@@ -13,7 +13,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
-import type { AppSuggestion } from "./lib/appSuggestions";
+import { AddApplicationMenu } from "./AddApplicationMenu";
+import { CUSTOM_APP_SUGGESTION, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
 
@@ -31,13 +32,30 @@ type Props = {
   onMakeGlobal?: (id: string) => void;
 };
 
-function blankAction(): Action {
+// The kind is chosen once, on creation, and a saved row cannot switch it afterwards.
+function blankScript(): Action {
   return { id: newActionId(), name: "", runInTerminal: true, command: "", cwdMode: "workspace", ownButton: false };
 }
 
-// One editor for both scopes. A new row is a draft until its command is filled in, because
-// an Action with no command is not valid and the stores refuse it; closing the editor
-// forgets the drafts, as the old Scripts tab dropped its empty rows.
+function blankApp(): Action {
+  return { id: newActionId(), name: "", runInTerminal: false, command: "", ownButton: false };
+}
+
+function actionFromSuggestion(s: AppSuggestion): Action {
+  return {
+    id: newActionId(),
+    name: s.name,
+    runInTerminal: false,
+    command: s.defaultCommand,
+    ...(s.appId ? { appId: s.appId } : {}),
+    ownButton: false,
+  };
+}
+
+// One editor for both scopes. A new command row is a draft until its command is filled in,
+// because an Action with no command is not valid and the stores refuse it; closing the
+// editor forgets the drafts, as the old Scripts tab dropped its empty rows. An app preset
+// arrives with a command, so it is handed straight to the store.
 export function ActionsEditor({
   actions,
   suggestions,
@@ -59,10 +77,17 @@ export function ActionsEditor({
   // so the row keeps its DOM node and its focus while the write is on its way.
   const visible = [...actions, ...drafts.filter((d) => !saved.has(d.id))];
 
-  const addRow = () => {
+  const addDraft = (fresh: () => Action) => {
     const pending = drafts.find((d) => !d.command.trim());
     if (pending) return void rows.current.get(pending.id)?.focusCommand();
-    setDrafts((d) => [...d, blankAction()]);
+    setDrafts((d) => [...d, fresh()]);
+  };
+
+  const addCommand = () => addDraft(blankScript);
+
+  const addApplication = (s: AppSuggestion) => {
+    if (!s.defaultCommand.trim()) return addDraft(blankApp);
+    Promise.resolve(onAdd(actionFromSuggestion(s))).catch(() => {});
   };
 
   const change = (current: Action, next: Action) => {
@@ -95,11 +120,12 @@ export function ActionsEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" className="h-7 w-fit gap-1.5 px-2 text-[12px]" onClick={addRow}>
-          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-          Add Action
+      <div className="flex justify-end gap-1">
+        <Button variant="ghost" size="sm" className="h-7 w-fit gap-1.5 px-2 text-[12px]" onClick={addCommand}>
+          <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} />
+          Add Command
         </Button>
+        <AddApplicationMenu suggestions={suggestions.length > 0 ? suggestions : [CUSTOM_APP_SUGGESTION]} onPick={addApplication} />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
@@ -113,7 +139,6 @@ export function ActionsEditor({
                   else rows.current.delete(action.id);
                 }}
                 action={action}
-                suggestions={suggestions}
                 context={context}
                 saved={saved.has(action.id)}
                 onMakeGlobal={onMakeGlobal && saved.has(action.id) ? () => onMakeGlobal(action.id) : undefined}
@@ -126,6 +151,10 @@ export function ActionsEditor({
       </DndContext>
 
       {visible.length === 0 && <p className="text-[11px] text-muted-foreground">{emptyHint}</p>}
+      <p className="text-[11px] text-muted-foreground">
+        Command examples: <span className="font-mono">pnpm dev</span> for a script,{" "}
+        <span className="font-mono">pycharm {"{workspace}"}</span> for an app.
+      </p>
     </div>
   );
 }

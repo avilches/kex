@@ -11,8 +11,13 @@ import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -31,12 +36,7 @@ import {
   commandDraft,
   commandVariableDocs,
   commitCommand,
-  currentSuggestionKey,
-  withKind,
-  withSuggestion,
 } from "./lib/actionForm";
-import type { AppSuggestion } from "./lib/appSuggestions";
-import { CUSTOM_APP_SUGGESTION } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
 
@@ -44,7 +44,6 @@ export type ActionRowHandle = { focusCommand: () => void };
 
 type Props = {
   action: Action;
-  suggestions: readonly AppSuggestion[];
   context: ActionContext | null;
   /** False while the row is a draft the store has not accepted yet. */
   saved: boolean;
@@ -58,12 +57,13 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, suggestions, context, saved, onMakeGlobal, onChange, onRemove },
+  { action, context, saved, onMakeGlobal, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
   const commandRef = useRef<HTMLInputElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
+  const [globalOpen, setGlobalOpen] = useState(false);
   const [draft, setDraft] = useState(action.command);
   const [commandFocused, setCommandFocused] = useState(false);
   const [name, setName] = useState(action.name);
@@ -74,7 +74,6 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
-  const kindId = `${action.id}-kind`;
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, onChange });
@@ -94,21 +93,6 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
 
   // Closing the dialog or Settings while a command is still being typed must not lose it.
   useEffect(() => () => saveCommand(pending.current.draft), []);
-
-  const change = (next: Action) => {
-    onChange(next);
-    setDraft(next.command);
-    setName(next.name);
-  };
-
-  const pickSuggestion = (key: string) => {
-    const picked = key === CUSTOM_APP_SUGGESTION.key
-      ? CUSTOM_APP_SUGGESTION
-      : suggestions.find((s) => s.key === key);
-    if (picked) change(withSuggestion(action, picked));
-  };
-
-  const currentKey = currentSuggestionKey(action, suggestions);
 
   return (
     <div
@@ -140,43 +124,33 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
           }}
         />
         {onMakeGlobal && (
-          <button type="button" title="Make global: move to Settings" aria-label="Make global" onClick={onMakeGlobal} className={SMALL_BUTTON}>
-            <HugeiconsIcon icon={Globe02Icon} size={12} strokeWidth={2} />
-          </button>
+          <Popover open={globalOpen} onOpenChange={setGlobalOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" title="Make global" aria-label="Make global" className={SMALL_BUTTON}>
+                <HugeiconsIcon icon={Globe02Icon} size={12} strokeWidth={2} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-3">
+              <p className="text-[12px] leading-snug text-muted-foreground">
+                Actions of one workspace stay in it. A global Action moves to Settings and every workspace can run it.
+              </p>
+              <Button
+                size="sm"
+                className="mt-2 h-7 w-full text-[12px]"
+                onClick={() => {
+                  setGlobalOpen(false);
+                  onMakeGlobal();
+                }}
+              >
+                Make global
+              </Button>
+            </PopoverContent>
+          </Popover>
         )}
         <button type="button" title="Remove" aria-label="Remove action" onClick={onRemove} className={cn(SMALL_BUTTON, "hover:text-destructive")}>
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
         </button>
       </div>
-
-      <RadioGroup
-        className="flex w-auto gap-4 pl-1"
-        value={action.runInTerminal ? "script" : "app"}
-        onValueChange={(v) => change(withKind(action, v === "script"))}
-      >
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="script" id={`${kindId}-script`} />
-          <label htmlFor={`${kindId}-script`} className="cursor-pointer text-[12px]">Script (runs in a terminal)</label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="app" id={`${kindId}-app`} />
-          <label htmlFor={`${kindId}-app`} className="cursor-pointer text-[12px]">App (opens in the background)</label>
-        </div>
-      </RadioGroup>
-
-      {!action.runInTerminal && (
-        <Select value={currentKey} onValueChange={pickSuggestion}>
-          <SelectTrigger size="sm" aria-label="App" className="h-8 w-full text-[12px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {suggestions.map((s) => (
-              <SelectItem key={s.key} value={s.key} className="text-[12px]">{s.name}</SelectItem>
-            ))}
-            <SelectItem value={CUSTOM_APP_SUGGESTION.key} className="text-[12px]">{CUSTOM_APP_SUGGESTION.name}</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
 
       <div className="flex flex-col gap-1">
         <input
@@ -184,7 +158,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
           className={cn(INPUT_CLASS, "font-mono", (command.required || blocking.some((p) => p.kind === "command")) && "border-destructive")}
           aria-label="Command"
           aria-invalid={command.required}
-          placeholder={action.runInTerminal ? "Command (e.g. pnpm dev)" : "Command (e.g. pycharm {workspace})"}
+          placeholder="Command"
           spellCheck={false}
           value={command.shown}
           onFocus={() => {

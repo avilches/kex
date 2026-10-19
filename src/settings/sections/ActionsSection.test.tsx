@@ -36,6 +36,11 @@ function mount() {
 }
 
 const buttons = (c: HTMLElement) => [...c.querySelectorAll("button")];
+const options = () => [...document.querySelectorAll("[cmdk-item]")];
+
+function openApplications(c: HTMLElement) {
+  act(() => void buttons(c).find((b) => b.textContent?.includes("Add Application"))!.click());
+}
 
 describe("ActionsSection", () => {
   beforeEach(() => {
@@ -49,38 +54,39 @@ describe("ActionsSection", () => {
     ];
   });
 
-  it("creates nothing by itself: detected apps are only offered", () => {
+  it("creates nothing by itself and does not keep the chip section", () => {
     const { container, unmount } = mount();
     expect(change).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Detected on this computer");
-    expect(container.textContent).toContain("PyCharm");
+    expect(container.textContent).not.toContain("Detected on this computer");
+    expect(container.querySelector("button[aria-label='Make global']")).toBeNull();
     unmount();
   });
 
-  it("adds a detected app as an app Action through the serialized store", () => {
+  it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
-    const pycharm = buttons(container).find((b) => b.textContent?.includes("PyCharm"))!;
-    act(() => void pycharm.click());
+    openApplications(container);
+    const item = options().find((o) => o.textContent?.includes("PyCharm (workspace)"));
+    act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ name: "PyCharm", appId: "pycharm", runInTerminal: false, ownButton: false });
+    expect(next[0]).toMatchObject({ name: "PyCharm (workspace)", appId: "pycharm", runInTerminal: false, ownButton: false });
     unmount();
   });
 
-  it("stops offering an app that already has an Action", () => {
-    actions = [{ id: "ac-1", name: "PyCharm", runInTerminal: false, command: "pycharm {workspace}", appId: "pycharm", ownButton: false }];
+  it("keeps offering every app, so two actions can share one", () => {
+    actions = [{ id: "ac-1", name: "PyCharm (path)", runInTerminal: false, command: "pycharm {path}", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
-    const offered = buttons(container).filter((b) => b.title && b.title.includes("{"));
-    expect(offered.some((b) => b.textContent?.includes("PyCharm"))).toBe(false);
-    expect(offered.some((b) => b.textContent?.includes("Zed"))).toBe(true);
+    openApplications(container);
+    expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);
+    expect(options().some((o) => o.textContent?.includes("Zed"))).toBe(true);
     unmount();
   });
 
   it("keeps the row being typed, and reports the error, when the write fails", async () => {
     change.mockRejectedValueOnce(new Error("disk full"));
     const { container, unmount } = mount();
-    const add = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Action"))!;
+    const add = buttons(container).find((b) => b.textContent?.includes("Add Command"))!;
     act(() => void add.click());
     const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
@@ -103,13 +109,6 @@ describe("ActionsSection", () => {
     const { container, unmount } = mount();
     act(() => void buttons(container).find((b) => b.textContent?.includes("Scan"))!.click());
     expect(scan).toHaveBeenCalled();
-    unmount();
-  });
-
-  it("has no Make Global button, since these are already global", () => {
-    actions = [{ id: "ac-1", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false }];
-    const { container, unmount } = mount();
-    expect(container.querySelector("button[aria-label='Make global']")).toBeNull();
     unmount();
   });
 });

@@ -3,15 +3,19 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { ActionsEditor } from "./ActionsEditor";
+import type { AppSuggestion } from "./lib/appSuggestions";
 import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const saved: Action = { id: "ac-1", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false };
 
+const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed (workspace)", iconId: "zed", defaultCommand: "zed {workspace}" };
+const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit (path)", iconId: "bbedit", defaultCommand: "bbedit {path}" };
+
 function mount(actions: Action[], extra: Partial<Parameters<typeof ActionsEditor>[0]> = {}) {
   const handlers = {
-    onAdd: vi.fn(),
+    onAdd: vi.fn().mockResolvedValue(undefined),
     onUpdate: vi.fn(),
     onRemove: vi.fn(),
     onReorder: vi.fn(),
@@ -19,13 +23,20 @@ function mount(actions: Action[], extra: Partial<Parameters<typeof ActionsEditor
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  const props = { actions, suggestions: [], context: null, emptyHint: "No actions yet.", ...handlers, ...extra };
+  const props = {
+    actions,
+    suggestions: [zed, bbedit],
+    context: null,
+    emptyHint: "No actions yet.",
+    ...handlers,
+    ...extra,
+  };
   act(() => root.render(createElement(ActionsEditor, props)));
   return { container, ...handlers, unmount: () => act(() => root.unmount()) };
 }
 
 function mountWithRerender(actions: Action[]) {
-  const handlers = { onAdd: vi.fn(), onUpdate: vi.fn(), onRemove: vi.fn(), onReorder: vi.fn() };
+  const handlers = { onAdd: vi.fn().mockResolvedValue(undefined), onUpdate: vi.fn(), onRemove: vi.fn(), onReorder: vi.fn() };
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -35,9 +46,11 @@ function mountWithRerender(actions: Action[]) {
   return { container, ...handlers, rerender: render, unmount: () => act(() => root.unmount()) };
 }
 
-const click = (el: Element | null | undefined) => act(() => void (el as HTMLElement).click());
-const addButton = (c: HTMLElement) =>
-  [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Action"));
+const click = (el: Element | null | undefined) => act(() => void (el as HTMLElement)!.click());
+const commandButton = (c: HTMLElement) =>
+  [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Command"));
+const applicationButton = (c: HTMLElement) =>
+  [...c.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Application"));
 
 function type(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
@@ -50,9 +63,11 @@ function type(input: HTMLInputElement, value: string) {
 }
 
 describe("ActionsEditor", () => {
-  it("shows the hint when there are no actions", () => {
+  it("shows the hint and the command examples when there are no actions", () => {
     const { container, unmount } = mount([]);
     expect(container.textContent).toContain("No actions yet.");
+    expect(container.textContent).toContain("Command examples:");
+    expect(container.textContent).toContain("pnpm dev");
     unmount();
   });
 
@@ -63,9 +78,9 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("a new row is a draft that reaches the store only once it has a command", () => {
+  it("Add Command starts a script row draft that reaches the store once it has a command", () => {
     const { container, onAdd, unmount } = mount([]);
-    click(addButton(container));
+    click(commandButton(container));
     expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
     expect(onAdd).not.toHaveBeenCalled();
     type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "pnpm test");
@@ -76,7 +91,7 @@ describe("ActionsEditor", () => {
 
   it("a draft keeps its row, and its focus, until the store shows it, and is handed over once", () => {
     const { container, onAdd, rerender, unmount } = mountWithRerender([]);
-    click(addButton(container));
+    click(commandButton(container));
     const before = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
     type(before, "pnpm test");
     const after = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
@@ -92,7 +107,7 @@ describe("ActionsEditor", () => {
   it("a rejected add leaves the row in place so it can be saved again", async () => {
     const onAdd = vi.fn().mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(undefined);
     const { container, unmount } = mount([], { onAdd });
-    click(addButton(container));
+    click(commandButton(container));
     const command = container.querySelector("input[aria-label='Command']") as HTMLInputElement;
     type(command, "pnpm test");
     await act(async () => {
@@ -104,17 +119,44 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("Add Action does not pile up empty drafts", () => {
+  it("Add Command does not pile up empty drafts", () => {
     const { container, unmount } = mount([]);
-    click(addButton(container));
-    click(addButton(container));
+    click(commandButton(container));
+    click(commandButton(container));
     expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    unmount();
+  });
+
+  it("an app preset goes straight to the store with its appId and command", () => {
+    const { container, onAdd, unmount } = mount([]);
+    click(applicationButton(container));
+    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Zed (workspace)")));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd.mock.calls[0]![0]).toMatchObject({
+      name: "Zed (workspace)",
+      runInTerminal: false,
+      command: "zed {workspace}",
+      appId: "zed",
+    });
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(0);
+    unmount();
+  });
+
+  it("the custom application starts an empty app draft instead of the store", () => {
+    const { container, onAdd, unmount } = mount([]);
+    click(applicationButton(container));
+    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Custom app")));
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(1);
+    type(container.querySelector("input[aria-label='Command']") as HTMLInputElement, "code {path}");
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
     unmount();
   });
 
   it("removing a draft never reaches the store", () => {
     const { container, onRemove, unmount } = mount([]);
-    click(addButton(container));
+    click(commandButton(container));
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(onRemove).not.toHaveBeenCalled();
     expect(container.querySelectorAll("input[aria-label='Command']")).toHaveLength(0);
@@ -131,7 +173,7 @@ describe("ActionsEditor", () => {
   it("offers Make global only on saved rows and only when the host passes it", () => {
     const withGlobal = mount([saved], { onMakeGlobal: vi.fn() });
     expect(withGlobal.container.querySelector("button[aria-label='Make global']")).not.toBeNull();
-    click(addButton(withGlobal.container));
+    click(commandButton(withGlobal.container));
     expect(withGlobal.container.querySelectorAll("button[aria-label='Make global']")).toHaveLength(1);
     withGlobal.unmount();
     const without = mount([saved]);
@@ -139,10 +181,16 @@ describe("ActionsEditor", () => {
     without.unmount();
   });
 
-  it("Make global passes the id of the row", () => {
+  it("Make global explains itself and confirms from its popover", () => {
     const onMakeGlobal = vi.fn();
     const { container, unmount } = mount([saved], { onMakeGlobal });
     click(container.querySelector("button[aria-label='Make global']"));
+    const content = [...document.querySelectorAll("[role='dialog'], [data-state='open']")].find((n) =>
+      n.textContent?.includes("every workspace"),
+    );
+    expect(content).toBeDefined();
+    const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Make global" && b.textContent !== undefined);
+    click(confirm);
     expect(onMakeGlobal).toHaveBeenCalledWith("ac-1");
     unmount();
   });

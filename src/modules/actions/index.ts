@@ -18,7 +18,6 @@ export { unlinkRemovedActions } from "./lib/actionStateStore";
 export { useActionContext, type ActionContext } from "./lib/useActionContext";
 export {
   CUSTOM_APP_SUGGESTION,
-  suggestionFor,
   suggestionsFromDetected,
   type AppSuggestion,
 } from "./lib/appSuggestions";
