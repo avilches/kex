@@ -4,7 +4,7 @@ export type RowTagKind = "Tab" | "Workspace" | "Action" | "Setting";
 
 export function RowTag({ kind }: { kind: RowTagKind }) {
   return (
-    <span className="w-16 shrink-0 text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
+    <span className="w-16 shrink-0 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
       {kind}
     </span>
   );
