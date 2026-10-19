@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { normalizeRootPath } from "@/lib/pathUtils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -133,7 +134,7 @@ export function applyWorkspaceRoot(
   workspaceId: string,
   path: string,
 ): Workspace[] {
-  const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
+  const normalized = normalizeRootPath(path);
   return workspaces.map((w) =>
     w.id === workspaceId
       ? { ...w, workspaceRoot: normalized, explorerRootMode: "workspace" }

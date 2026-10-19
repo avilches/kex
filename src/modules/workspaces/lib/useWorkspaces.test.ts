@@ -44,6 +44,21 @@ describe("applyWorkspaceRoot", () => {
     const out = applyWorkspaceRoot([ws()], "w1", "/some/dir/");
     expect(out[0].workspaceRoot).toBe("/some/dir");
   });
+
+  it("normalizes backslash Windows paths to forward slashes", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "C:\\Users\\dev\\project");
+    expect(out[0].workspaceRoot).toBe("C:/Users/dev/project");
+  });
+
+  it("strips a trailing backslash from a Windows path", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "C:\\Users\\dev\\project\\");
+    expect(out[0].workspaceRoot).toBe("C:/Users/dev/project");
+  });
+
+  it("keeps a Windows drive root", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "C:\\");
+    expect(out[0].workspaceRoot).toBe("C:/");
+  });
 });
 
 describe("applyFsRoot", () => {
