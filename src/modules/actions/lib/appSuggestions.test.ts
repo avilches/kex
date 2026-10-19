@@ -11,16 +11,24 @@ const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?:
 });
 
 describe("suggestionsFromDetected", () => {
-  it("offers one entry per app and preset variable", () => {
-    const list = suggestionsFromDetected([ed("pycharm", "pycharm")]);
-    expect(list.map((s) => s.key)).toEqual(["pycharm:path", "pycharm:workspace", "pycharm:cwd"]);
-    expect(list[1]).toMatchObject({
-      appId: "pycharm",
-      name: "PyCharm (workspace)",
-      iconId: "pycharm",
-      defaultCommand: "pycharm {workspace}",
+  it("offers one entry per app and preset variable, alphabetically", () => {
+    const list = suggestionsFromDetected([ed("pycharm", "pycharm"), ed("bbedit", "bbedit")]);
+    expect(list.map((s) => s.key)).toEqual([
+      "bbedit:path",
+      "bbedit:workspace",
+      "bbedit:cwd",
+      "pycharm:path",
+      "pycharm:workspace",
+      "pycharm:cwd",
+    ]);
+    expect(list[0]).toMatchObject({
+      appId: "bbedit",
+      name: "BBEdit {path}",
+      iconId: "bbedit",
+      defaultCommand: "bbedit {path}",
     });
-    expect(list[2]!.defaultCommand).toBe("pycharm {cwd}");
+    expect(list[1]!.defaultCommand).toBe("bbedit {workspace}");
+    expect(list[2]!.defaultCommand).toBe("bbedit {cwd}");
   });
 
   it("quotes binaries and arguments that hold spaces", () => {
@@ -29,8 +37,7 @@ describe("suggestionsFromDetected", () => {
       "open -na 'PyCharm CE.app' --args {workspace}",
     );
     const [v] = suggestionsFromDetected([ed("vscode", "/Applications/Visual Studio Code.app/bin/code")]);
-    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {path}");
-  });
+    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {path}");  });
 
   it("keeps braces and quotes in a path literal", () => {
     const [a] = suggestionsFromDetected([ed("vscode", "/a/{x}/code")]);
@@ -52,7 +59,7 @@ describe("suggestionsFromDetected", () => {
 
   it("falls back to the detected name for an app outside the catalog", () => {
     const [s] = suggestionsFromDetected([ed("mystery", "mystery")]);
-    expect(s).toMatchObject({ name: "mystery (path)", defaultCommand: "mystery {path}" });
+    expect(s).toMatchObject({ name: "mystery {path}", defaultCommand: "mystery {path}" });
   });
 });
 

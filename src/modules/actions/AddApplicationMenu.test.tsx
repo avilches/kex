@@ -9,9 +9,9 @@ import type { AppSuggestion } from "./lib/appSuggestions";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const suggestions: AppSuggestion[] = [
-  { key: "zed:path", appId: "zed", name: "Zed (path)", iconId: "zed", defaultCommand: "zed {path}" },
-  { key: "zed:workspace", appId: "zed", name: "Zed (workspace)", iconId: "zed", defaultCommand: "zed {workspace}" },
-  { key: "bbedit:path", appId: "bbedit", name: "BBEdit (path)", iconId: "bbedit", defaultCommand: "bbedit {path}" },
+  { key: "zed:path", appId: "zed", name: "Zed {path}", iconId: "zed", defaultCommand: "zed {path}" },
+  { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" },
+  { key: "bbedit:path", appId: "bbedit", name: "BBEdit {path}", iconId: "bbedit", defaultCommand: "bbedit {path}" },
 ];
 
 function mount() {
@@ -37,9 +37,9 @@ describe("AddApplicationMenu", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
-      "Zed (path)zed {path}",
-      "Zed (workspace)zed {workspace}",
-      "BBEdit (path)bbedit {path}",
+      "BBEdit{path}",
+      "Zed{path}",
+      "Zed{workspace}",
       "Custom appwrite the command yourself",
     ]);
     view.unmount();
@@ -54,14 +54,14 @@ describe("AddApplicationMenu", () => {
       setter.call(search, "workspace");
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(view.options().map((o) => o.textContent)).toEqual(["Zed (workspace)zed {workspace}"]);
+    expect(view.options().map((o) => o.textContent)).toEqual(["Zed{workspace}"]);
     view.unmount();
   });
 
   it("picking a preset hands it over and closes the menu", () => {
     const view = mount();
     click(view.trigger);
-    click(view.options().find((o) => o.textContent?.includes("Zed (workspace)"))!);
+    click(view.options().find((o) => o.textContent?.includes("Zed{workspace}"))!);
     expect(view.onPick).toHaveBeenCalledTimes(1);
     expect(view.onPick).toHaveBeenCalledWith(suggestions[1]);
     expect(view.options()).toHaveLength(0);

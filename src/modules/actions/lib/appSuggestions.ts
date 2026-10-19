@@ -1,5 +1,6 @@
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
+import { splitActionName } from "./actionName";
 
 export type AppSuggestion = {
   /** Unique within a list: the app id, plus the variable the preset points at. */
@@ -41,16 +42,27 @@ function commandFor(editor: DetectedEditor, target: string): string {
 // with different templates instead of the editor guessing which target fits.
 const VARIANTS = ["path", "workspace", "cwd"] as const;
 
+// Alphabetical by app, and within one app the three presets in their variant order, so
+// the combo reads like a list of names and the variants of one app stay together.
+export function compareByName(a: AppSuggestion, b: AppSuggestion): number {
+  const rank = (s: AppSuggestion) => VARIANTS.indexOf(s.key.slice(s.key.lastIndexOf(":") + 1) as (typeof VARIANTS)[number]);
+  const main = (s: AppSuggestion) => splitActionName(s.name).main;
+  return main(a).localeCompare(main(b)) || rank(a) - rank(b);
+}
+
 /** One entry per enabled detected app and preset variable, followed by nothing else. */
 export function suggestionsFromDetected(detected: readonly DetectedEditor[]): AppSuggestion[] {
-  return detected.filter((e) => e.enabled !== false).flatMap((editor) => {
-    const name = KNOWN.get(editor.id)?.name ?? editor.name;
-    return VARIANTS.map((target) => ({
-      key: `${editor.id}:${target}`,
-      appId: editor.id,
-      name: `${name} (${target})`,
-      iconId: editor.id,
-      defaultCommand: commandFor(editor, `{${target}}`),
-    }));
-  });
+  return detected
+    .filter((e) => e.enabled !== false)
+    .flatMap((editor) => {
+      const name = KNOWN.get(editor.id)?.name ?? editor.name;
+      return VARIANTS.map((target) => ({
+        key: `${editor.id}:${target}`,
+        appId: editor.id,
+        name: `${name} {${target}}`,
+        iconId: editor.id,
+        defaultCommand: commandFor(editor, `{${target}}`),
+      }));
+    })
+    .sort(compareByName);
 }

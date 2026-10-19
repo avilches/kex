@@ -12,15 +12,16 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ActionIcon } from "./ActionIcon";
-import { CUSTOM_APP_SUGGESTION, type AppSuggestion } from "./lib/appSuggestions";
+import { splitActionName } from "./lib/actionName";
+import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
 
 type Props = {
   suggestions: readonly AppSuggestion[];
   onPick: (suggestion: AppSuggestion) => void;
 };
 
-// The second add button: a searchable combo over the detected apps, one entry per preset,
-// every entry carrying its app icon. Custom app starts an empty app row instead.
+// The second add button: a searchable combo over the detected apps, one alphabetical entry
+// per preset, every entry carrying its app icon. Custom app starts an empty app row instead.
 export function AddApplicationMenu({ suggestions, onPick }: Props) {
   const [open, setOpen] = useState(false);
   const pick = (suggestion: AppSuggestion) => {
@@ -36,27 +37,34 @@ export function AddApplicationMenu({ suggestions, onPick }: Props) {
           <HugeiconsIcon icon={ChevronDownIcon} size={10} strokeWidth={2} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[320px] p-0">
+      <PopoverContent align="end" className="pointer-events-auto w-[360px] p-0">
         <Command>
           <CommandInput placeholder="Search applications..." />
           <CommandList className="max-h-64">
             <CommandEmpty>No application found.</CommandEmpty>
             <CommandGroup>
-              {suggestions.map((s) => (
-                <CommandItem
-                  key={s.key}
-                  value={s.key}
-                  keywords={[s.name, s.defaultCommand]}
-                  onSelect={() => pick(s)}
-                  className="text-[12px]"
-                >
-                  <span className="flex size-5 shrink-0 items-center justify-center">
-                    <ActionIcon action={{ appId: s.appId, runInTerminal: false }} size={13} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                  <span className="shrink-0 max-w-[130px] truncate font-mono text-[11px] text-muted-foreground">{s.defaultCommand}</span>
-                </CommandItem>
-              ))}
+              {[...suggestions].sort(compareByName).map((s) => {
+                const { main, variable } = splitActionName(s.name);
+                return (
+                  <CommandItem
+                    key={s.key}
+                    value={s.key}
+                    keywords={[s.name, s.defaultCommand]}
+                    onSelect={() => pick(s)}
+                    className="text-[12px]"
+                  >
+                    <span className="flex size-5 shrink-0 items-center justify-center">
+                      <ActionIcon action={{ appId: s.appId, runInTerminal: false }} size={13} />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="truncate">{main}</span>
+                      {variable && (
+                        <span className="truncate font-mono text-[10.5px] text-muted-foreground">{variable}</span>
+                      )}
+                    </span>
+                  </CommandItem>
+                );
+              })}
               <CommandItem
                 value={CUSTOM_APP_SUGGESTION.key}
                 onSelect={() => pick(CUSTOM_APP_SUGGESTION)}
