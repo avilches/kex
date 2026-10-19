@@ -1,4 +1,10 @@
-import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -13,16 +19,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
+import { NumericField } from "@/settings/components/NumericField";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Command as CommandPrimitive } from "cmdk";
-import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+  DocumentCodeIcon,
+  EyeIcon,
+  LayoutTwoColumnIcon,
+  MoreHorizontalIcon,
+  Search01Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Command as CommandPrimitive } from "cmdk";
+import { useState } from "react";
+import { EditorPathBreadcrumb } from "./EditorPathBreadcrumb";
 import {
   clampColumnRuler,
   clampIndentSize,
@@ -31,12 +43,8 @@ import {
   EDITOR_INDENT_MIN,
   type EditorViewSettings,
 } from "./lib/editorViewSettings";
-import { EditorPathBreadcrumb } from "./EditorPathBreadcrumb";
 import { LANGUAGES } from "./lib/languageDefinitions";
 import { resolveDisplayName } from "./lib/languageResolver";
-import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useState } from "react";
 
 export type EditorGlobalToggleKey =
   | "autoSave"
@@ -117,7 +125,9 @@ export function EditorPathBar({
   trailing,
 }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const toggleLabel = view ? getShortcutLabel("editor.cycleView", userShortcuts) : null;
+  const toggleLabel = view
+    ? getShortcutLabel("editor.cycleView", userShortcuts)
+    : null;
   const showToggles = !!viewToggles;
   const onToggleSplit = view?.onToggleSplit;
   const v = viewToggles?.value;
@@ -130,7 +140,9 @@ export function EditorPathBar({
   // toggles can be flipped in one pass.
   const keepOpen = (e: Event) => e.preventDefault();
   const [langOpen, setLangOpen] = useState(false);
-  const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
+  const selectableLanguages = LANGUAGES.filter(
+    (l) => l.userSelectable !== false,
+  );
 
   // Language picker entries. The active one (override, or the by-extension auto
   // language when none) is pinned first with a check; the auto-detected language
@@ -212,11 +224,12 @@ export function EditorPathBar({
                 title="Change language mode"
               >
                 {overrideLanguage
-                  ? (selectableLanguages.find((l) =>
-                      l.extensions[0] === overrideLanguage ||
-                      l.extensions.includes(overrideLanguage)
+                  ? (selectableLanguages.find(
+                      (l) =>
+                        l.extensions[0] === overrideLanguage ||
+                        l.extensions.includes(overrideLanguage),
                     )?.name ?? overrideLanguage)
-                  : (currentLanguageName || "Auto")}
+                  : currentLanguageName || "Auto"}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-0" align="end">
@@ -249,7 +262,10 @@ export function EditorPathBar({
                         <span>
                           {e.label}
                           {e.isAuto && (
-                            <span className="text-muted-foreground"> (auto)</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              (auto)
+                            </span>
                           )}
                         </span>
                         {e.active && (
@@ -321,19 +337,14 @@ export function EditorPathBar({
               </DropdownMenuCheckboxItem>
               <div className="flex items-center justify-between gap-2 px-2.5 py-1">
                 <span className="text-[12px]">Indent size</span>
-                <input
-                  type="number"
+                <NumericField
+                  value={v.indentSize}
                   min={EDITOR_INDENT_MIN}
                   max={EDITOR_INDENT_MAX}
-                  value={v.indentSize}
-                  onFocus={(e) => e.currentTarget.select()}
+                  clamp={clampIndentSize}
+                  onCommit={(n) => set({ indentSize: n })}
+                  className="h-6"
                   onKeyDown={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const n = Number.parseInt(e.target.value, 10);
-                    if (Number.isNaN(n)) return;
-                    set({ indentSize: clampIndentSize(n) });
-                  }}
-                  className="h-6 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
                 />
               </div>
               <div className="flex items-center justify-between gap-2 px-2.5 py-1">
@@ -342,19 +353,14 @@ export function EditorPathBar({
                   <span className="text-[11px] text-muted-foreground">
                     {v.columnRuler === 0 ? "off" : "col"}
                   </span>
-                  <input
-                    type="number"
+                  <NumericField
+                    value={v.columnRuler}
                     min={0}
                     max={EDITOR_COLUMN_RULER_MAX}
-                    value={v.columnRuler}
-                    onFocus={(e) => e.currentTarget.select()}
+                    clamp={clampColumnRuler}
+                    onCommit={(n) => set({ columnRuler: n })}
+                    className="h-6"
                     onKeyDown={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const n = Number.parseInt(e.target.value, 10);
-                      if (Number.isNaN(n)) return;
-                      set({ columnRuler: clampColumnRuler(n) });
-                    }}
-                    className="h-6 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
                   />
                 </div>
               </div>
@@ -365,7 +371,9 @@ export function EditorPathBar({
                     className="text-[12px] text-muted-foreground"
                     onSelect={() => viewToggles.onViewInSettings?.()}
                   >
-                    {viewToggles.ext ? `View ${viewToggles.ext} Settings` : "View file type Settings"}
+                    {viewToggles.ext
+                      ? `View ${viewToggles.ext} Settings`
+                      : "View file type Settings"}
                   </DropdownMenuItem>
                 </>
               )}
@@ -402,7 +410,11 @@ export function EditorPathBar({
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <HugeiconsIcon icon={LayoutTwoColumnIcon} size={13} strokeWidth={2} />
+            <HugeiconsIcon
+              icon={LayoutTwoColumnIcon}
+              size={13}
+              strokeWidth={2}
+            />
           </button>
         )}
         {view && (
@@ -411,8 +423,12 @@ export function EditorPathBar({
             onClick={view.onToggleOverlay}
             title={
               view.mode === "raw"
-                ? toggleLabel ? `Preview (${toggleLabel})` : "Preview"
-                : toggleLabel ? `Edit (${toggleLabel})` : "Edit"
+                ? toggleLabel
+                  ? `Preview (${toggleLabel})`
+                  : "Preview"
+                : toggleLabel
+                  ? `Edit (${toggleLabel})`
+                  : "Edit"
             }
             className={cn(
               "flex size-[22px] items-center justify-center rounded transition-colors",

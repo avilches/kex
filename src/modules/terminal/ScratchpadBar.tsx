@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ENTER_KEY } from "@/lib/platform";
+import { isImeComposing } from "@/lib/imeEnter";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
@@ -162,6 +163,7 @@ export function ScratchpadBar({ leafId }: Props) {
     }
     const isEnter = e.key === "Enter";
     if (!isEnter) return;
+    if (isImeComposing(e.nativeEvent)) return;
     const shouldSend = enterSends ? !e.shiftKey : e.shiftKey;
     if (shouldSend) {
       e.preventDefault();

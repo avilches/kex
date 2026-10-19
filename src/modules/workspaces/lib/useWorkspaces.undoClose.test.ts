@@ -18,13 +18,54 @@ vi.mock("@/modules/settings/preferences", () => ({
   },
 }));
 
+import {
+  previewResumeCmd,
+  seedRestorePlan,
+  type RestorePlan,
+} from "@/modules/agents/lib/agentSessionRestore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import type { AgentNotification, AgentSession } from "@/modules/agents/lib/types";
 import { useWorkspaces } from "./useWorkspaces";
 import { allPanes } from "./splitNode";
 import type { Tab, Workspace } from "./types";
 
 type Hook = ReturnType<typeof useWorkspaces>;
 
-const term = (id: string): Tab => ({ id, kind: "terminal" });
+const term = (id: string, restoreOnRestart?: boolean): Tab => ({ id, kind: "terminal", restoreOnRestart });
+const editor = (id: string): Tab => ({ id, kind: "editor", path: `/tmp/${id}`, dirty: false, preview: false });
+
+const planFor = (tabId: string): RestorePlan => ({
+  tabId,
+  agent: "claude",
+  resumeCmd: `claude --resume ${tabId}`,
+  attemptedCmd: "",
+  cwdLaunch: "/tmp/project",
+  errorReason: "",
+});
+
+const session = (tabId: string, status: "attention" | "idle" = "attention"): AgentSession => ({
+  tabId,
+  workspaceId: "b",
+  agent: "claude",
+  status,
+  startedAt: 1,
+  lastActivityAt: 2,
+  attentionSince: status === "attention" ? 3 : null,
+  restored: false,
+  restoreError: false,
+  subagents: {},
+});
+
+const attentionNote = (tabId: string): AgentNotification => ({
+  id: `n-${tabId}`,
+  source: "terminal",
+  tabId,
+  workspaceId: "b",
+  agent: "claude",
+  kind: "attention",
+  at: 1,
+  read: false,
+});
 const makeWs = (id: string, tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
   id,
   title: "",
@@ -53,7 +94,11 @@ function mount(initialWorkspaces: Workspace[]) {
 
 describe("undo close workspace", () => {
   let view: ReturnType<typeof mount> | undefined;
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(previewResumeCmd).mockResolvedValue(null);
+    useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
+  });
   afterEach(() => view?.unmount());
 
   it("brings back a workspace that folded away with its last tab, in its position and selected", async () => {
@@ -137,5 +182,112 @@ describe("undo close workspace", () => {
     const restored = view.h.workspaces[1]!;
     expect(restored.hibernated).toBe(true);
     expect(tabIds(restored)).toEqual(["b1"]);
+  });
+
+  it("moves the agent session and its resume plan to the reopened tab's new id", async () => {
+    const plan = planFor("b1");
+    vi.mocked(previewResumeCmd).mockResolvedValue(plan);
+    useAgentStore.setState({
+      sessions: { b1: session("b1") },
+      notifications: [attentionNote("b1")],
+      closedSessions: {},
+    });
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1"), editor("b2")])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+
+    const restored = view.h.workspaces[1]!;
+    const newId = tabIds(restored).find((id) => id !== "b2")!;
+    expect(newId).not.toBe("b1");
+
+    expect(previewResumeCmd).toHaveBeenCalledWith("b1");
+    expect(seedRestorePlan).toHaveBeenCalledWith(newId, plan);
+
+    const store = useAgentStore.getState();
+    expect(store.closedSessions).toEqual({});
+    expect(store.sessions[newId]).toMatchObject({
+      tabId: newId,
+      workspaceId: "b",
+      status: "attention",
+      attentionSince: 3,
+    });
+    expect(store.notifications).toEqual([
+      expect.objectContaining({ tabId: newId, workspaceId: "b", kind: "attention" }),
+    ]);
+  });
+
+  it("seeds a plan and moves each session to the new id of every terminal of a reopened workspace", async () => {
+    vi.mocked(previewResumeCmd).mockImplementation(async (tabId) => planFor(tabId));
+    useAgentStore.setState({
+      sessions: { b1: session("b1"), b2: session("b2", "idle") },
+      notifications: [attentionNote("b1")],
+      closedSessions: {},
+    });
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1"), term("b2")])]);
+
+    act(() => view!.h.closeWorkspace("b"));
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+
+    const restored = view.h.workspaces[1]!;
+    const [newB1, newB2] = tabIds(restored);
+    expect(newB1).not.toBe("b1");
+    expect(newB2).not.toBe("b2");
+
+    expect(previewResumeCmd).toHaveBeenCalledWith("b1");
+    expect(previewResumeCmd).toHaveBeenCalledWith("b2");
+    expect(seedRestorePlan).toHaveBeenCalledWith(newB1, expect.objectContaining({ tabId: "b1" }));
+    expect(seedRestorePlan).toHaveBeenCalledWith(newB2, expect.objectContaining({ tabId: "b2" }));
+
+    const store = useAgentStore.getState();
+    expect(store.closedSessions).toEqual({});
+    expect(store.sessions[newB1!]).toMatchObject({ tabId: newB1, status: "attention", attentionSince: 3 });
+    expect(store.notifications).toEqual([
+      expect.objectContaining({ tabId: newB1, workspaceId: "b" }),
+    ]);
+  });
+
+  it("does not fetch or seed a resume plan for a terminal with Run on start off", async () => {
+    vi.mocked(previewResumeCmd).mockImplementation(async (tabId) => planFor(tabId));
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1", false), term("b2")])]);
+
+    act(() => view!.h.closeWorkspace("b"));
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+
+    const restored = view.h.workspaces[1]!;
+    const [newB1, newB2] = tabIds(restored);
+    expect(previewResumeCmd).toHaveBeenCalledTimes(1);
+    expect(previewResumeCmd).toHaveBeenCalledWith("b2");
+    expect(seedRestorePlan).toHaveBeenCalledTimes(1);
+    expect(seedRestorePlan).toHaveBeenCalledWith(newB2, expect.objectContaining({ tabId: "b2" }));
+    expect(seedRestorePlan).not.toHaveBeenCalledWith(newB1, expect.anything());
+  });
+
+  it("keeps hibernated terminal ids and does not touch their stored sessions", async () => {
+    useAgentStore.setState({
+      sessions: { b1: session("b1") },
+      notifications: [attentionNote("b1")],
+      closedSessions: {},
+    });
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1")], { hibernated: true })]);
+
+    act(() => view!.h.closeWorkspace("b"));
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+
+    expect(tabIds(view.h.workspaces[1])).toEqual(["b1"]);
+    expect(previewResumeCmd).not.toHaveBeenCalled();
+    expect(seedRestorePlan).not.toHaveBeenCalled();
+
+    const store = useAgentStore.getState();
+    expect(store.sessions.b1).toMatchObject({ tabId: "b1", status: "attention" });
+    expect(store.notifications).toEqual([expect.objectContaining({ tabId: "b1" })]);
   });
 });

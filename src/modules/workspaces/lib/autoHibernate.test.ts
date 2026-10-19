@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   autoHibernateCandidates,
-  autoHibernateTick,
   autoHibernateDelayMs,
+  autoHibernateModes,
+  autoHibernateTick,
   hibernatedIds,
   parseAutoHibernate,
   seedActivity,
@@ -12,7 +13,8 @@ import {
 } from "./autoHibernate";
 import type { Workspace } from "./types";
 
-const ws = (id: string, over: Partial<Workspace> = {}) => ({ id, ...over }) as Workspace;
+const ws = (id: string, over: Partial<Workspace> = {}) =>
+  ({ id, ...over }) as Workspace;
 const MIN = 60_000;
 
 describe("parseAutoHibernate", () => {
@@ -21,7 +23,14 @@ describe("parseAutoHibernate", () => {
     expect(parseAutoHibernate("1h")).toBe("4h");
     expect(parseAutoHibernate("off")).toBe("off");
   });
+  it("keeps 1m only in dev", () => {
+    expect(autoHibernateModes(true)).toContain("1m");
+    expect(autoHibernateModes(false)).not.toContain("1m");
+    expect(parseAutoHibernate("1m", autoHibernateModes(true))).toBe("1m");
+    expect(parseAutoHibernate("1m", autoHibernateModes(false))).toBe("4h");
+  });
   it("maps modes to delays", () => {
+    expect(autoHibernateDelayMs("1m")).toBe(MIN);
     expect(autoHibernateDelayMs("30m")).toBe(30 * MIN);
     expect(autoHibernateDelayMs("4h")).toBe(240 * MIN);
     expect(autoHibernateDelayMs("2d")).toBe(2880 * MIN);
@@ -31,14 +40,27 @@ describe("parseAutoHibernate", () => {
 
 describe("touchActivity", () => {
   it("renews a workspace with a busy agent even when it is not the active one", () => {
-    const seen = new Map([["a", 1], ["b", 1]]);
-    touchActivity(seen, [ws("a"), ws("b")], null, 100, new Set(), new Set(["b"]));
+    const seen = new Map([
+      ["a", 1],
+      ["b", 1],
+    ]);
+    touchActivity(
+      seen,
+      [ws("a"), ws("b")],
+      null,
+      100,
+      new Set(),
+      new Set(["b"]),
+    );
     expect(seen.get("a")).toBe(1);
     expect(seen.get("b")).toBe(100);
   });
 
   it("stamps the active workspace and first sightings, and forgets removed ones", () => {
-    const seen = new Map([["a", 1], ["gone", 2]]);
+    const seen = new Map([
+      ["a", 1],
+      ["gone", 2],
+    ]);
     touchActivity(seen, [ws("a"), ws("b"), ws("c")], "b", 100, new Set());
     expect(seen.get("a")).toBe(1);
     expect(seen.get("b")).toBe(100);
@@ -58,20 +80,34 @@ describe("touchActivity", () => {
   });
   it("does not renew an active workspace that is hibernated", () => {
     const stamps = new Map([["h", 1]]);
-    touchActivity(stamps, [ws("h", { hibernated: true })], "h", 100, new Set(["h"]));
+    touchActivity(
+      stamps,
+      [ws("h", { hibernated: true })],
+      "h",
+      100,
+      new Set(["h"]),
+    );
     expect(stamps.get("h")).toBe(1);
   });
 });
 
 describe("autoHibernateCandidates", () => {
-  const seen = new Map([["a", 0], ["b", 0], ["c", 0]]);
+  const seen = new Map([
+    ["a", 0],
+    ["b", 0],
+    ["c", 0],
+  ]);
   const all = [ws("a"), ws("b"), ws("c", { hibernated: true })];
 
   it("picks idle workspaces, never the active or hibernated ones", () => {
-    expect(autoHibernateCandidates(all, "a", seen, "30m", 30 * MIN)).toEqual(["b"]);
+    expect(autoHibernateCandidates(all, "a", seen, "30m", 30 * MIN)).toEqual([
+      "b",
+    ]);
   });
   it("waits for the delay", () => {
-    expect(autoHibernateCandidates(all, "a", seen, "30m", 30 * MIN - 1)).toEqual([]);
+    expect(
+      autoHibernateCandidates(all, "a", seen, "30m", 30 * MIN - 1),
+    ).toEqual([]);
   });
   it("is silent when off", () => {
     expect(autoHibernateCandidates(all, "a", seen, "off", 1e12)).toEqual([]);
@@ -87,7 +123,9 @@ describe("persisted activity", () => {
     const list = [ws("a"), ws("b", { lastActiveAt: 0 })];
     const stamps = seedActivity(list, 4 * 60 * MIN);
     touchActivity(stamps, list, "a", 4 * 60 * MIN, new Set());
-    expect(autoHibernateCandidates(list, "a", stamps, "4h", 4 * 60 * MIN)).toEqual(["b"]);
+    expect(
+      autoHibernateCandidates(list, "a", stamps, "4h", 4 * 60 * MIN),
+    ).toEqual(["b"]);
   });
   it("stamps a workspace without a saved stamp with now, so it is not due", () => {
     const list = [ws("a"), ws("b")];
@@ -101,7 +139,9 @@ describe("persisted activity", () => {
     const stamps = seedActivity(list, 1e12);
     touchActivity(stamps, list, "a", 1e12, new Set());
     expect(stamps.get("a")).toBe(1e12);
-    expect(autoHibernateCandidates(list, "a", stamps, "30m", 1e12)).toEqual(["b"]);
+    expect(autoHibernateCandidates(list, "a", stamps, "30m", 1e12)).toEqual([
+      "b",
+    ]);
   });
   it("keeps a hibernated workspace out of the candidates", () => {
     const list = [ws("a"), ws("h", { hibernated: true, lastActiveAt: 0 })];
@@ -111,7 +151,9 @@ describe("persisted activity", () => {
   });
   it("returns none when the mode is off", () => {
     const list = [ws("a"), ws("b", { lastActiveAt: 0 })];
-    expect(autoHibernateCandidates(list, "a", seedActivity(list, 1e12), "off", 1e12)).toEqual([]);
+    expect(
+      autoHibernateCandidates(list, "a", seedActivity(list, 1e12), "off", 1e12),
+    ).toEqual([]);
   });
   it("merges live stamps into the bodies to persist without touching the others", () => {
     const a = ws("a");
@@ -143,8 +185,17 @@ describe("stamp validation", () => {
 describe("stampSwitch", () => {
   it("stamps the workspace left and the one entered, except hibernated ones", () => {
     const stamps = new Map<string, number>();
-    stampSwitch(stamps, [ws("a"), ws("b"), ws("h", { hibernated: true })], "a", "b", 50);
-    expect([...stamps].sort()).toEqual([["a", 50], ["b", 50]]);
+    stampSwitch(
+      stamps,
+      [ws("a"), ws("b"), ws("h", { hibernated: true })],
+      "a",
+      "b",
+      50,
+    );
+    expect([...stamps].sort()).toEqual([
+      ["a", 50],
+      ["b", 50],
+    ]);
     stampSwitch(stamps, [ws("a"), ws("h", { hibernated: true })], "a", "h", 60);
     expect(stamps.get("h")).toBeUndefined();
     expect(stamps.get("a")).toBe(60);
@@ -152,7 +203,13 @@ describe("stampSwitch", () => {
 });
 
 describe("autoHibernateTick", () => {
-  const run = (list: Workspace[], stamps: Map<string, number>, seen: Set<string>, now: number, over = {}) => {
+  const run = (
+    list: Workspace[],
+    stamps: Map<string, number>,
+    seen: Set<string>,
+    now: number,
+    over = {},
+  ) => {
     const requested: string[] = [];
     const saved: number[] = [];
     const promise = autoHibernateTick({
@@ -176,7 +233,12 @@ describe("autoHibernateTick", () => {
     const list = [ws("a", { lastActiveAt: 0 }), ws("b", { lastActiveAt: 0 })];
     const now = 5 * 60 * MIN;
     const stamps = seedActivity(list, now);
-    const { requested, saved } = await run(list, stamps, hibernatedIds(list), now);
+    const { requested, saved } = await run(
+      list,
+      stamps,
+      hibernatedIds(list),
+      now,
+    );
     expect(stamps.get("a")).toBe(now);
     expect(requested).toEqual(["b"]);
     expect(saved).toEqual([now]);
@@ -184,7 +246,9 @@ describe("autoHibernateTick", () => {
   it("renews and saves but requests nothing while a previous run is busy", async () => {
     const list = [ws("a"), ws("b", { lastActiveAt: 0 })];
     const stamps = seedActivity(list, 1e12);
-    const { requested, saved } = await run(list, stamps, new Set(), 1e12, { busy: true });
+    const { requested, saved } = await run(list, stamps, new Set(), 1e12, {
+      busy: true,
+    });
     expect(requested).toEqual([]);
     expect(saved).toHaveLength(1);
   });
@@ -198,5 +262,73 @@ describe("autoHibernateTick", () => {
     const second = withActivity(list, stamps)[1];
     expect(second).toEqual(first);
     expect(withActivity(list, stamps)[0]!.lastActiveAt).toBe(61_000);
+  });
+});
+
+describe("tick persistence with mode off", () => {
+  const steady = [ws("a", { lastActiveAt: 0 }), ws("b", { lastActiveAt: 0 })];
+  const now = 5 * 60 * MIN;
+  const prepared = () => {
+    const stamps = seedActivity(steady, now);
+    return { stamps, seen: hibernatedIds(steady) };
+  };
+  const runOff = async (
+    list: Workspace[],
+    stamps: Map<string, number>,
+    seen: Set<string>,
+    at: number,
+    mode: "off" | "30m",
+  ) => {
+    const saved: number[] = [];
+    const requested: string[] = [];
+    await autoHibernateTick({
+      workspaces: list,
+      activeId: "a",
+      stamps,
+      hibernatedSeen: seen,
+      mode,
+      now: at,
+      save: () => saved.push(at),
+      request: async (id) => {
+        requested.push(id);
+        return true;
+      },
+    });
+    return { saved, requested };
+  };
+
+  it("writes nothing while the workspace set and sleep states stand still", async () => {
+    const { stamps, seen } = prepared();
+    const one = await runOff(steady, stamps, seen, now, "off");
+    const two = await runOff(steady, stamps, seen, now + MIN, "off");
+    expect(one.saved).toEqual([]);
+    expect(two.saved).toEqual([]);
+  });
+
+  it("writes when a workspace appears and when one crosses the sleep boundary", async () => {
+    const { stamps, seen } = prepared();
+    const appeared = await runOff(
+      [...steady, ws("c")],
+      stamps,
+      seen,
+      now,
+      "off",
+    );
+    expect(appeared.saved).toEqual([now]);
+    const snoozed = [
+      ws("a", { lastActiveAt: 0 }),
+      ws("b", { hibernated: true }),
+    ];
+    const transition = await runOff(snoozed, stamps, seen, now + MIN, "off");
+    expect(transition.saved).toEqual([now + MIN]);
+  });
+
+  it("keeps saving each tick when the mode is on", async () => {
+    const { stamps, seen } = prepared();
+    const one = await runOff(steady, stamps, seen, now, "30m");
+    const two = await runOff(steady, stamps, seen, now + MIN, "30m");
+    expect(one.saved).toEqual([now]);
+    expect(two.saved).toEqual([now + MIN]);
+    expect(one.requested).toContain("b");
   });
 });

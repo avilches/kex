@@ -25,6 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { CLONE_URL_LABEL, isSafeGitCloneUrl } from "@/modules/source-control/cloneUrl";
 import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -735,7 +736,16 @@ export const SourceControlPanel = memo(
   const cloneInputRef = useRef<HTMLInputElement>(null);
   const cloneBgHandleRef = useRef<number | null>(null);
   const clonePollRef = useRef<number | null>(null);
+  const clonePollBusyRef = useRef(false);
+  const cloneLogOffsetRef = useRef(0);
   const cloneCancelledRef = useRef(false);
+
+  const stopClonePolling = useCallback(() => {
+    if (clonePollRef.current !== null) {
+      window.clearInterval(clonePollRef.current);
+      clonePollRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!cloneRunning) { setCloneElapsed(0); return; }
@@ -745,9 +755,13 @@ export const SourceControlPanel = memo(
 
   useEffect(() => {
     return () => {
-      if (clonePollRef.current !== null) window.clearInterval(clonePollRef.current);
+      stopClonePolling();
+      const handle = cloneBgHandleRef.current;
+      if (handle !== null) {
+        void invoke("shell_bg_kill", { handle }).catch(() => {});
+      }
     };
-  }, []);
+  }, [stopClonePolling]);
 
   const handleGitInit = useCallback(async () => {
     if (!workspaceCwd) return;
@@ -772,6 +786,11 @@ export const SourceControlPanel = memo(
     if (!url || !workspaceCwd) return;
     setCloneError(null);
 
+    if (!isSafeGitCloneUrl(url)) {
+      setCloneError(`${CLONE_URL_LABEL}. The URL is passed to a shell.`);
+      return;
+    }
+
     try {
       const entries = await invoke<{ name: string }[]>("fs_read_dir", {
         path: workspaceCwd,
@@ -788,6 +807,7 @@ export const SourceControlPanel = memo(
 
     setCloneRunning(true);
     cloneCancelledRef.current = false;
+    cloneLogOffsetRef.current = 0;
 
     let handle: number;
     try {
@@ -803,43 +823,55 @@ export const SourceControlPanel = memo(
       return;
     }
 
-    type BgLogsResult = { bytes: string; exited: boolean; exit_code: number | null };
-    clonePollRef.current = window.setInterval(async () => {
-      if (cloneCancelledRef.current) return;
+    type BgLogsResult = {
+      bytes: string;
+      next_offset: number;
+      dropped: number;
+      exited: boolean;
+      exit_code: number | null;
+    };
+    const finishClone = (bytes: string, exitCode: number | null, failed: boolean) => {
+      stopClonePolling();
+      cloneBgHandleRef.current = null;
+      cloneLogOffsetRef.current = 0;
+      setCloneRunning(false);
+      if (!failed) {
+        setCloneOpen(false);
+        setCloneUrl("");
+        void scm.refresh();
+      } else {
+        const lines = bytes.trim().split("\n").filter(Boolean);
+        setCloneError(lines.slice(-3).join("\n") || `Clone failed (exit ${exitCode ?? "?"})`);
+      }
+    };
+    const tick = async () => {
+      if (cloneCancelledRef.current || clonePollBusyRef.current) return;
+      clonePollBusyRef.current = true;
       try {
-        const result = await invoke<BgLogsResult>("shell_bg_logs", { handle, since_offset: 0 });
-        if (!result.exited || cloneCancelledRef.current) return;
-        window.clearInterval(clonePollRef.current!);
-        clonePollRef.current = null;
-        cloneBgHandleRef.current = null;
-        setCloneRunning(false);
-        if (result.exit_code === 0) {
-          setCloneOpen(false);
-          setCloneUrl("");
-          void scm.refresh();
-        } else {
-          const lines = result.bytes.trim().split("\n").filter(Boolean);
-          setCloneError(lines.slice(-3).join("\n") || `Clone failed (exit ${result.exit_code ?? "?"})`);
-        }
+        const result = await invoke<BgLogsResult>("shell_bg_logs", {
+          handle,
+          sinceOffset: cloneLogOffsetRef.current,
+        });
+        if (cloneCancelledRef.current) return;
+        cloneLogOffsetRef.current = result.dropped > 0 ? 0 : result.next_offset;
+        if (!result.exited) return;
+        finishClone(result.bytes, result.exit_code, result.exit_code !== 0);
       } catch (e) {
         if (cloneCancelledRef.current) return;
-        window.clearInterval(clonePollRef.current!);
-        clonePollRef.current = null;
-        cloneBgHandleRef.current = null;
-        setCloneRunning(false);
-        setCloneError(typeof e === "string" ? e : "Clone failed");
+        finishClone(typeof e === "string" ? e : "Clone failed", null, true);
+      } finally {
+        clonePollBusyRef.current = false;
       }
-    }, 500);
-  }, [cloneUrl, workspaceCwd, scm]);
+    };
+    clonePollRef.current = window.setInterval(tick, 500);
+  }, [cloneUrl, workspaceCwd, scm, stopClonePolling]);
 
   const handleCancelClone = useCallback(async () => {
     cloneCancelledRef.current = true;
-    if (clonePollRef.current !== null) {
-      window.clearInterval(clonePollRef.current);
-      clonePollRef.current = null;
-    }
+    stopClonePolling();
     const handle = cloneBgHandleRef.current;
     cloneBgHandleRef.current = null;
+    cloneLogOffsetRef.current = 0;
     setCloneRunning(false);
     setCloneOpen(false);
     setCloneUrl("");
@@ -847,7 +879,7 @@ export const SourceControlPanel = memo(
     if (handle !== null) {
       try { await invoke("shell_bg_kill", { handle }); } catch { /* best effort */ }
     }
-  }, []);
+  }, [stopClonePolling]);
 
   if (!open) return null;
 
@@ -1064,7 +1096,10 @@ export const SourceControlPanel = memo(
                         type="button"
                         title="Clear"
                         className="absolute right-1 top-1/2 flex size-[22px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                        onClick={() => void handleCancelClone()}
+                        onClick={() => {
+                          setCloneUrl("");
+                          setCloneError(null);
+                        }}
                       >
                         <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
                       </button>

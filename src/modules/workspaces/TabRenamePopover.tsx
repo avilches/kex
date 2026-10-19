@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { isImeComposing } from "@/lib/imeEnter";
 import { clearTitleDraft, setTitleDraft } from "./lib/titleDraftStore";
 import { titleSubjectForTab } from "./lib/titleVariablesFor";
 import type { Tab } from "./lib/types";
@@ -105,7 +106,7 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
           onChange={(e) => setTitleDraft(tabId, e.target.value)}
           placeholder={placeholder}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !isImeComposing(e.nativeEvent)) {
               e.preventDefault();
               handleSave();
             }

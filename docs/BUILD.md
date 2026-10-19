@@ -63,9 +63,21 @@ token. It is dev only and not part of `pnpm build`.
 - The tuner adjusts the background lightness and hue, and the alpha of the normal and the ignored explorer
   rows (what `text-foreground/85` and `text-muted-foreground/85` resolve to). The two alphas feed CSS vars
   the rows read, so the explorer follows live; the readout prints the composited hex and the WCAG ratio
-  against the sidebar. Values are saved per theme and mode in `localStorage` and survive a reload.
-  "Export changes (copy)" puts a JSON snapshot (`theme`, `mode`, the four values and the resolved hexes)
-  on the clipboard, which is the shape to hand back so the value can be baked into the theme.
+  against the sidebar. Each control has its own "reset", and "Reset all" clears the sliders and the token
+  overrides. Values are saved per theme and mode in `localStorage` and survive a reload.
+- Every token can be overridden by hand (open the "Any token" disclosure): a color picker plus a hex field
+  per token, which covers the buttons too (`primary`, `secondary`, `accent`, `destructive` and their
+  `-foreground` pairs) and the terminal palette. "reset" on a row drops that one override.
+- "Export changes (copy)" puts only what differs from the theme on the clipboard: the slider values that
+  moved and the tokens that were overridden, plus the resolved hexes. That is the shape to hand back so the
+  value can be baked into the theme. "Export full theme (copy)" writes the whole theme with the on-screen
+  values baked in, which is also valid input for the custom-theme box.
+- "Save to disk" writes the changed values straight into `src/modules/theme/themes/<id>.ts`: it posts to a
+  dev-only Vite endpoint (`POST /__kex-theme-write`, `scripts/theme-write-plugin.ts`) that edits only the
+  lines whose value changed, so `git diff` stays small and the rest of the file is untouched. It then drops
+  the local overrides and Vite reloads the page, which now shows exactly what is on disk. It needs `pnpm dev`
+  (a production build has no server); the surface tone sliders only shift the UI colors, so a save from those
+  alone never adds editor or terminal fields.
 - Colors are verifiable without screenshots (Dark Reader rewrites backgrounds in screenshots): each
   swatch prints its hex as text and carries `data-token` / `data-hex`, and
   `window.kexThemePreview.dump()` returns every token plus the git status colors as a

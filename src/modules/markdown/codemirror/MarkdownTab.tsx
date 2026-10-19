@@ -193,7 +193,7 @@ export function MarkdownTab(props: Props): JSX.Element {
   }, [props.tabId]);
 
   useEffect(() => {
-    if (props.focused) editorRef.current?.focus();
+    if (props.focused) focusRef.current();
   }, [props.focused]);
 
   // Switching to Preview unmounts the focused editor; without this the focus

@@ -1,4 +1,5 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { CM_EDITOR_SETUP } from "@/lib/codemirrorSetup";
 import { redo, undo } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
 import {
@@ -121,15 +122,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     reloadRef.current = reload;
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
     const onReadyRef = useRef(onReady);
     onReadyRef.current = onReady;
     const onReadyFiredRef = useRef(false);
     const cmRef = useRef<ReactCodeMirrorRef>(null);
 
     const handleChange = useCallback((value: string) => {
-      onChange(value);
+      onChangeRef.current(value);
       onContentChangeRef.current?.(value);
-    }, [onChange]);
+    }, []);
 
     // Fire onReady once when the file content first loads from disk.
     useEffect(() => {
@@ -559,17 +562,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           extensions={extensions}
           height="100%"
           className="flex-1 min-h-0 overflow-hidden"
-          basicSetup={{
-            lineNumbers: false,
-            highlightActiveLineGutter: false,
-            foldGutter: false,
-            bracketMatching: false,
-            closeBrackets: false,
-            autocompletion: false,
-            highlightActiveLine: false,
-            highlightSelectionMatches: true,
-            searchKeymap: true,
-          }}
+          basicSetup={CM_EDITOR_SETUP}
         />
         {conflict && !hideConflictOverlay && (
           <ReloadConflictOverlay

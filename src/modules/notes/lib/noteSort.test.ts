@@ -57,6 +57,22 @@ describe("sortNotes", () => {
       "docs/y.md", "docs/x.md",
     ]);
   });
+  it("modified: ties on mtime fall back to relPath asc", () => {
+    const x = n("b.md", { mtime: 500 });
+    const y = n("a.md", { mtime: 500 });
+    const z = n("c.md", { mtime: 500 });
+    expect(sortNotes([x, y, z], "modified", undefined).map((r) => r.relPath)).toEqual([
+      "a.md", "b.md", "c.md",
+    ]);
+  });
+  it("created: ties on created fall back to relPath asc", () => {
+    const x = n("b.md", { created: 500 });
+    const y = n("a.md", { created: 500 });
+    const z = n("c.md", { created: 500 });
+    expect(sortNotes([x, y, z], "created", undefined).map((r) => r.relPath)).toEqual([
+      "a.md", "b.md", "c.md",
+    ]);
+  });
   it("does not mutate the input", () => {
     const input = [a, b, c];
     sortNotes(input, "title", undefined);
@@ -93,6 +109,19 @@ describe("groupNotesByDate", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].bucket).toBe("Today");
     expect(groups[0].notes).toHaveLength(2);
+  });
+
+  it("does not merge non-adjacent buckets of the same name", () => {
+    const notes = [
+      n("h1.md", { mtime: at(2026, 6, 6) }),
+      n("a.md", { mtime: at(2026, 6, 5) }),
+      n("h2.md", { mtime: at(2026, 6, 6) }),
+    ];
+    const groups = groupNotesByDate(notes, "modified", now);
+    expect(groups.map((g) => g.bucket)).toEqual(["Today", "Yesterday", "Today"]);
+    expect(groups.map((g) => g.notes.map((x) => x.relPath))).toEqual([
+      ["h1.md"], ["a.md"], ["h2.md"],
+    ]);
   });
 });
 

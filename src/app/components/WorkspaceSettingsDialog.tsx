@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
+import { normalizeRootPath, toForwardSlashes } from "@/lib/pathUtils";
 import {
   ActionsEditor,
   suggestionsFromDetected,
@@ -30,6 +31,7 @@ import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
 import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
+import { INPUT_CLASS } from "@/settings/components/inputClass";
 
 function WorkspaceHeading({ ws }: { ws: Workspace | undefined }) {
   const shown = useWorkspaceTitle({
@@ -159,7 +161,7 @@ function IconPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search icon..."
-            className="h-8 w-28 rounded border border-border bg-transparent py-0 pl-2.5 pr-6 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className={cn(INPUT_CLASS, "w-28 pr-6")}
           />
           {wsIcon != null && (
             <button
@@ -276,15 +278,19 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
       setCwdValid(null);
       return;
     }
+    let stale = false;
     const t = setTimeout(async () => {
       try {
         const stat = await native.fsStat(cwdValue);
-        setCwdValid(stat.kind === "dir");
+        if (!stale) setCwdValid(stat.kind === "dir");
       } catch {
-        setCwdValid(false);
+        if (!stale) setCwdValid(false);
       }
     }, 400);
-    return () => clearTimeout(t);
+    return () => {
+      stale = true;
+      clearTimeout(t);
+    };
   }, [cwdValue]);
 
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
@@ -314,10 +320,11 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
         <div className="flex flex-col gap-5">
           {/* Name: full width */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Name</label>
+            <label htmlFor="workspace-title" className="text-xs font-medium">Name</label>
             <input
+              id="workspace-title"
               ref={nameInputRef}
-              className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className={INPUT_CLASS}
               placeholder="Name (empty uses the default title)"
               spellCheck={false}
               value={titleValue}
@@ -351,22 +358,26 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
           {/* Working Directory */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Workspace Root</label>
+            <label htmlFor="workspace-root" className="text-xs font-medium">Workspace Root</label>
             <div className="flex items-center gap-1">
               <input
+                id="workspace-root"
                 ref={cwdInputRef}
                 className={cn(
-                  "h-8 flex-1 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring",
-                  cwdValid === false ? "border-destructive" : "border-border",
+                  INPUT_CLASS,
+                  "flex-1",
+                  cwdValid === false && "border-destructive",
                 )}
                 spellCheck={false}
                 value={cwdValue}
                 onChange={(e) => setCwdValue(e.target.value)}
                 onBlur={() => {
-                  if (!cwdValue) {
+                  const normalized = normalizeRootPath(cwdValue);
+                  if (normalized !== cwdValue) setCwdValue(normalized);
+                  if (!normalized) {
                     props.onSetWorkspaceRoot(ws.id, undefined);
                   } else if (cwdValid !== false) {
-                    props.onSetWorkspaceRoot(ws.id, cwdValue);
+                    props.onSetWorkspaceRoot(ws.id, normalized);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -397,9 +408,10 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                     defaultPath: cwdValue || undefined,
                   });
                   if (typeof selected === "string") {
-                    setCwdValue(selected);
+                    const normalized = toForwardSlashes(selected);
+                    setCwdValue(normalized);
                     setCwdValid(null);
-                    props.onSetWorkspaceRoot(ws.id, selected);
+                    props.onSetWorkspaceRoot(ws.id, normalized);
                   }
                 }}
                 className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
@@ -417,7 +429,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
           {/* Color */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Color</label>
+            <span className="text-xs font-medium">Color</span>
             <ColorPicker
               wsId={ws.id}
               wsColor={ws.color}
@@ -428,7 +440,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
           {/* Icon */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Icon</label>
+            <span className="text-xs font-medium">Icon</span>
             <IconPicker
               wsId={ws.id}
               wsIcon={ws.icon}

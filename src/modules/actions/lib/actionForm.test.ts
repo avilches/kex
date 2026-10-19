@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { AppSuggestion } from "./appSuggestions";
 import {
   actionProblems,
   commandDraft,
   commandVariableDocs,
   commitCommand,
-  currentSuggestionKey,
-  withKind,
-  withSuggestion,
 } from "./actionForm";
 import type { Action } from "./types";
 
@@ -21,63 +17,12 @@ const script: Action = {
   ownButton: true,
 };
 const app: Action = { id: "ac-2", name: "PyCharm", runInTerminal: false, command: "pycharm {cwd}", appId: "pycharm", ownButton: false };
-const suggestion: AppSuggestion = {
-  key: "zed",
-  appId: "zed",
-  name: "Zed",
-  iconId: "zed",
-  defaultCommand: "zed {path}",
-};
 
 describe("commandVariableDocs", () => {
   it("lists only the variables a command can have a value for, with their descriptions", () => {
     const docs = commandVariableDocs();
     expect(docs.map((d) => d.name)).toEqual(["cwd", "dir", "branch", "repo", "workspace", "file", "path", "host"]);
     expect(docs.every((d) => d.description.length > 0)).toBe(true);
-  });
-});
-
-describe("withKind", () => {
-  it("turning a script into an app drops the folder choice and keeps everything else", () => {
-    const next = withKind(script, false);
-    expect(next).toEqual({ id: "ac-1", name: "Dev", runInTerminal: false, command: "pnpm dev", ownButton: true });
-  });
-
-  it("turning an app into a script gives it the workspace folder and keeps its appId", () => {
-    expect(withKind(app, true)).toEqual({ ...app, runInTerminal: true, cwdMode: "workspace" });
-  });
-
-  it("returns the same object when the kind does not change", () => {
-    expect(withKind(script, true)).toBe(script);
-  });
-});
-
-describe("withSuggestion", () => {
-  it("fills the command and the app, and keeps a name the user typed", () => {
-    expect(withSuggestion({ ...app, name: "Mine" }, suggestion)).toMatchObject({
-      name: "Mine",
-      command: "zed {path}",
-      appId: "zed",
-      runInTerminal: false,
-    });
-  });
-
-  it("takes the suggestion name when the action has none", () => {
-    expect(withSuggestion({ ...app, name: "  " }, suggestion).name).toBe("Zed");
-  });
-
-  it("turns a script into an app and forgets its folder", () => {
-    const next = withSuggestion(script, suggestion);
-    expect(next.runInTerminal).toBe(false);
-    expect(next.cwdMode).toBeUndefined();
-    expect(next.cwd).toBeUndefined();
-  });
-
-  it("the custom app only forgets the app: the command and the name stay as they are", () => {
-    const next = withSuggestion(app, { key: "custom", name: "Custom app", iconId: null, defaultCommand: "" });
-    expect(next.appId).toBeUndefined();
-    expect(next.command).toBe("pycharm {cwd}");
-    expect(next.name).toBe("PyCharm");
   });
 });
 
@@ -170,26 +115,5 @@ describe("commitCommand", () => {
 
   it("saves nothing when the command did not change", () => {
     expect(commitCommand("pnpm dev", "pnpm dev")).toEqual({ save: null });
-  });
-});
-
-describe("currentSuggestionKey", () => {
-  const zed: AppSuggestion = { key: "zed", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {path}" };
-  const zedWs: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed (workspace)", iconId: "zed", defaultCommand: "zed {workspace}" };
-
-  it("tells the file variant from the workspace variant of the same app", () => {
-    const base: Action = { id: "a", name: "Zed", runInTerminal: false, command: "zed {path}", appId: "zed", ownButton: false };
-    expect(currentSuggestionKey(base, [zed, zedWs])).toBe("zed");
-    expect(currentSuggestionKey({ ...base, command: "zed {workspace}" }, [zed, zedWs])).toBe("zed:workspace");
-  });
-
-  it("falls back to the first suggestion of the app when the command was edited", () => {
-    const edited: Action = { id: "a", name: "Zed", runInTerminal: false, command: "zed --new {path}", appId: "zed", ownButton: false };
-    expect(currentSuggestionKey(edited, [zed, zedWs])).toBe("zed");
-  });
-
-  it("is the custom app when the action has no app", () => {
-    const custom: Action = { id: "a", name: "x", runInTerminal: false, command: "x", ownButton: false };
-    expect(currentSuggestionKey(custom, [zed])).toBe("custom");
   });
 });

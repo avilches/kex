@@ -1,38 +1,54 @@
-import { Spinner } from "@/components/ui/spinner";
-import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
-import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { TabBarIcon } from "./lib/tabBarIcon";
-import { type Tab, isAutofocusTab } from "./lib/types";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import type React from "react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
-import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
-import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
-import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
-import { tabStatusIndicator } from "./lib/tabStatusIndicator";
-import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { PopoverAnchor } from "@/components/ui/popover";
-import { useTabRenameStore } from "./lib/tabRenameStore";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CrosshairIcon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { Spinner } from "@/components/ui/spinner";
 import type { GitStatusSnapshot } from "@/lib/native";
+import { cn } from "@/lib/utils";
+import {
+  buildGitStatusMap,
+  type GitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { GitColorScheme } from "@/modules/settings/store";
-import { buildGitStatusMap, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
-import { tabGitColor } from "./lib/tabGitColor";
-import { useTabTooltip } from "./lib/useTabTooltip";
+import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
+import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
 import { useTheme } from "@/modules/theme/ThemeProvider";
+import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
+import {
+  CrosshairIcon,
+  LockKeyIcon,
+  StickyNote03Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import type React from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
+import { TabBarIcon } from "./lib/tabBarIcon";
+import { tabTopLineColor } from "./lib/tabColor";
+import { tabGitColor } from "./lib/tabGitColor";
+import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
+import { useTabRenameStore } from "./lib/tabRenameStore";
+import { tabStatusIndicator } from "./lib/tabStatusIndicator";
+import {
+  getRunningCommand,
+  subscribeToRunningCommands,
+} from "./lib/terminalEphemeralStore";
+import { isAutofocusTab, type Tab } from "./lib/types";
+import { useAgentTabTitle } from "./lib/useAgentTabTitle";
+import { useTabTooltip } from "./lib/useTabTooltip";
+import { useWorkspaceColor } from "./lib/workspaceColorContext";
 import { NewTabMenuButton } from "./NewTabMenuButton";
 import { TabContextMenuItems } from "./TabContextMenuItems";
-import { tabTopLineColor } from "./lib/tabColor";
-import { useWorkspaceColor } from "./lib/workspaceColorContext";
 import { TabRenamePopover } from "./TabRenamePopover";
 
 type Props = {
@@ -58,7 +74,15 @@ type Props = {
   gitColorScheme?: GitColorScheme;
 };
 
-function TabNoteButton({ open, onToggle, onHover }: { open: boolean; onToggle: () => void; onHover?: (hovering: boolean) => void }) {
+function TabNoteButton({
+  open,
+  onToggle,
+  onHover,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onHover?: (hovering: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -121,23 +145,36 @@ function DraggableTab({
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: tab.id });
-  const wrappedListeners = useMemo(() => ({
-    ...listeners,
-    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      // Scroll tab into view before dnd-kit captures the element rect.
-      e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
-      listeners?.onPointerDown?.(e as React.PointerEvent);
-    },
-  }), [listeners]);
-  const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${tab.id}:before`, disabled: !isWorkspaceActive });
-  const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${tab.id}:after`, disabled: !isWorkspaceActive });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    isDragging: isThisDragging,
+  } = useDraggable({ id: tab.id });
+  const wrappedListeners = useMemo(
+    () => ({
+      ...listeners,
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+        // Scroll tab into view before dnd-kit captures the element rect.
+        e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+        listeners?.onPointerDown?.(e as React.PointerEvent);
+      },
+    }),
+    [listeners],
+  );
+  const { setNodeRef: setBeforeRef } = useDroppable({
+    id: `tab-insert:${tab.id}:before`,
+    disabled: !isWorkspaceActive,
+  });
+  const { setNodeRef: setAfterRef } = useDroppable({
+    id: `tab-insert:${tab.id}:after`,
+    disabled: !isWorkspaceActive,
+  });
   const active = tab.id === activeTabId;
   // Every tab can be locked, no exception.
   const isLocked = tab.locked ?? false;
-  const runningCommand = useSyncExternalStore(
-    subscribeToRunningCommands,
-    () => (tab.kind === "terminal" ? getRunningCommand(tab.id) : null),
+  const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
+    tab.kind === "terminal" ? getRunningCommand(tab.id) : null,
   );
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
@@ -151,7 +188,8 @@ function DraggableTab({
   const topLine = tabTopLineColor(tab.color, workspaceColor);
   const { resolvedMode } = useTheme();
   const tabColor = useMemo(
-    () => tabGitColor(tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode),
+    () =>
+      tabGitColor(tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode),
     [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode],
   );
 
@@ -162,13 +200,15 @@ function DraggableTab({
   const displayTitle = isDescription
     ? agentTitle
     : agentTitle.length > 28
-      ? '...' + agentTitle.slice(-27)
+      ? "..." + agentTitle.slice(-27)
       : agentTitle;
 
   const anyRenaming = useTabRenameStore((s) => s.renamingTabId !== null);
-  const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
-  const lockFlashToken =
-    lockFlashSnap.tabId === tab.id ? lockFlashSnap.seq : 0;
+  const lockFlashSnap = useSyncExternalStore(
+    subscribeLockFlash,
+    getLockFlashSnapshot,
+  );
+  const lockFlashToken = lockFlashSnap.tabId === tab.id ? lockFlashSnap.seq : 0;
 
   const tooltip = useTabTooltip(tab, agentSession);
 
@@ -209,8 +249,15 @@ function DraggableTab({
         // session, not the tab strip.
         else if (e.button === 0) e.preventDefault();
       }}
-      onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(tab.id); } }}
-      onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
+      onAuxClick={(e) => {
+        if (e.button === 1) {
+          e.stopPropagation();
+          onClose(tab.id);
+        }
+      }}
+      onContextMenu={(e) => {
+        if (anyRenaming) e.preventDefault();
+      }}
       {...wrappedListeners}
       className={cn(
         "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[12px] transition-colors",
@@ -232,8 +279,14 @@ function DraggableTab({
       )}
     >
       {/* Droppable half-zones - coordinates-based, no pointer events needed */}
-      <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
-      <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
+      <div
+        ref={setBeforeRef}
+        className="pointer-events-none absolute inset-y-0 left-0 w-1/2"
+      />
+      <div
+        ref={setAfterRef}
+        className="pointer-events-none absolute inset-y-0 right-0 w-1/2"
+      />
 
       {insertionBefore && (
         <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
@@ -259,15 +312,32 @@ function DraggableTab({
           style={topLine !== null ? { backgroundColor: topLine } : undefined}
         />
       )}
-      <span className={cn("shrink-0", hasAgent && !tab.icon ? "opacity-100" : "opacity-70")}>
-        <TabBarIcon tab={tab} agentSession={agentSession} running={!!runningCommand} />
+      <span
+        className={cn(
+          "shrink-0",
+          hasAgent && !tab.icon ? "opacity-100" : "opacity-70",
+        )}
+      >
+        <TabBarIcon
+          tab={tab}
+          agentSession={agentSession}
+          running={!!runningCommand}
+        />
       </span>
       <span
         className={cn(
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-          !isDescription && tab.kind === "terminal" && !!runningCommand && "text-center",
+          !isDescription &&
+            tab.kind === "terminal" &&
+            !!runningCommand &&
+            "text-center",
           isRestoreError && "text-destructive/70",
-          (tab.kind === "editor" || tab.kind === "markdown" || tab.kind === "git-diff" || tab.kind === "git-commit-file") && tab.preview && "italic",
+          (tab.kind === "editor" ||
+            tab.kind === "markdown" ||
+            tab.kind === "git-diff" ||
+            tab.kind === "git-commit-file") &&
+            tab.preview &&
+            "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
@@ -286,7 +356,11 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
-      {isLocked && statusIndicator && <span className="ml-0.5 flex shrink-0 items-center">{statusIndicator}</span>}
+      {isLocked && statusIndicator && (
+        <span className="ml-0.5 flex shrink-0 items-center">
+          {statusIndicator}
+        </span>
+      )}
       {isAutofocusTab(tab) && tab.autofocus && autofocusMode !== "always" && (
         <span
           className="ml-0.5 shrink-0 text-muted-foreground"
@@ -305,6 +379,7 @@ function DraggableTab({
             onUpdateTab?.(tab.id, (p) => ({ ...p, locked: false }));
           }}
           title="Unlock tab"
+          aria-label="Unlock tab"
         >
           <FlashOverlay token={lockFlashToken} />
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
@@ -325,6 +400,7 @@ function DraggableTab({
               onClose(tab.id);
             }}
             title="Close tab"
+            aria-label="Close tab"
           >
             <span className="text-[14px] leading-none">×</span>
           </button>
@@ -344,9 +420,7 @@ function DraggableTab({
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <PopoverAnchor asChild>
-            {tabDiv}
-          </PopoverAnchor>
+          <PopoverAnchor asChild>{tabDiv}</PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <TabContextMenuItems
@@ -367,8 +441,32 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, gitStatus, gitColorScheme }: Props) {
-  const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
+export function PaneTabBar({
+  tabs,
+  activeTabId,
+  paneFocused,
+  workspaceId,
+  isWorkspaceActive,
+  onActivate,
+  onClose,
+  onNewTerminal,
+  onCloseOtherTabs,
+  onCloseAllTabs,
+  onSplitTerminalRight,
+  onSplitTerminalDown,
+  onNewBrowser,
+  onSplitBrowserRight,
+  onSplitBrowserDown,
+  onRenameTab,
+  onUpdateTab,
+  onNoteHover,
+  gitStatus,
+  gitColorScheme,
+}: Props) {
+  const gitStatusMap = useMemo(
+    () => (gitStatus ? buildGitStatusMap(gitStatus) : null),
+    [gitStatus],
+  );
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
@@ -383,12 +481,19 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
     isRenamingRef.current = renamingTabId !== null;
   }, [renamingTabId]);
 
-  useEffect(() => { activeTabIdRef.current = activeTabId; });
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  });
 
-  const scrollTabIntoView = (tabId: string, behavior: ScrollBehavior = 'smooth') => {
+  const scrollTabIntoView = (
+    tabId: string,
+    behavior: ScrollBehavior = "smooth",
+  ) => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const tab = container.querySelector<HTMLElement>(`[data-tab-id="${tabId}"]`);
+    const tab = container.querySelector<HTMLElement>(
+      `[data-tab-id="${tabId}"]`,
+    );
     if (!tab) return;
     const cr = container.getBoundingClientRect();
     const tr = tab.getBoundingClientRect();
@@ -399,7 +504,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
     }
   };
 
-  const scrollActiveIntoView = (behavior: ScrollBehavior = 'auto') => {
+  const scrollActiveIntoView = (behavior: ScrollBehavior = "auto") => {
     const id = activeTabIdRef.current;
     if (!id) return;
     scrollTabIntoView(id, behavior);
@@ -408,7 +513,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   // Scroll active tab into view when it changes (unless user is browsing with wheel)
   useEffect(() => {
     if (userScrolledRef.current) return;
-    scrollActiveIntoView('auto');
+    scrollActiveIntoView("auto");
   }, [activeTabId]);
 
   // Wheel scroll: translate vertical delta to horizontal; snap-back managed by focus/mouse-leave logic
@@ -418,7 +523,8 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isRenamingRef.current) return;
-      const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      const delta =
+        Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       container.scrollLeft += delta;
       userScrolledRef.current = true;
       // Edge case: scroll via trackpad while pointer was already outside
@@ -426,13 +532,13 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
         mouseLeaveTimerRef.current = setTimeout(() => {
           mouseLeaveTimerRef.current = null;
           userScrolledRef.current = false;
-          scrollActiveIntoView('smooth');
+          scrollActiveIntoView("smooth");
         }, 5000);
       }
     };
-    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
-      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener("wheel", handleWheel);
       if (mouseLeaveTimerRef.current) clearTimeout(mouseLeaveTimerRef.current);
     };
   }, []);
@@ -441,7 +547,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(() => scrollActiveIntoView('auto'));
+    const observer = new ResizeObserver(() => scrollActiveIntoView("auto"));
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
@@ -453,7 +559,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
       clearTimeout(mouseLeaveTimerRef.current);
       mouseLeaveTimerRef.current = null;
     }
-    scrollActiveIntoView('auto');
+    scrollActiveIntoView("auto");
   }, [tabs.length]);
 
   useDndMonitor({
@@ -467,14 +573,24 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
       const parts = overId.split(":");
       const refTabId = parts[1];
       const side = parts[2];
-      if (!refTabId || !side) { setInsertionIndex(null); return; }
+      if (!refTabId || !side) {
+        setInsertionIndex(null);
+        return;
+      }
       const idx = tabs.findIndex((p) => p.id === refTabId);
-      if (idx === -1) { setInsertionIndex(null); return; }
+      if (idx === -1) {
+        setInsertionIndex(null);
+        return;
+      }
       const insertionIdx = side === "before" ? idx : idx + 1;
       setInsertionIndex(insertionIdx);
     },
-    onDragEnd() { setInsertionIndex(null); },
-    onDragCancel() { setInsertionIndex(null); },
+    onDragEnd() {
+      setInsertionIndex(null);
+    },
+    onDragCancel() {
+      setInsertionIndex(null);
+    },
   });
 
   // react-resizable-panels registers a document-level capture pointerdown listener
@@ -483,96 +599,114 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   // Tabs at the top of a bottom pane become intermittently unclickable.
   // onPointerUp is not suppressed by that preventDefault(), so we use it here as
   // a fallback. onClick on each tab still works for all other cases.
-  const pointerStartRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  const pointerStartRef = useRef<{ id: number; x: number; y: number } | null>(
+    null,
+  );
 
   return (
     <div
       className={cn(
         "flex h-8 shrink-0 items-center bg-card/60",
-        tabBarStyle === "connected" ? "border-t border-border/60" : "border-b border-border/60 px-1",
+        tabBarStyle === "connected"
+          ? "border-t border-border/60"
+          : "border-b border-border/60 px-1",
       )}
     >
-    <div
-      ref={scrollContainerRef}
-      className={cn(
-        "flex min-w-0 flex-1 items-center self-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        tabBarStyle === "connected" ? "gap-0" : "gap-0.5",
-      )}
-      onMouseEnter={() => {
-        mouseInsideRef.current = true;
-        if (mouseLeaveTimerRef.current) {
-          clearTimeout(mouseLeaveTimerRef.current);
-          mouseLeaveTimerRef.current = null;
-        }
-      }}
-      onMouseLeave={() => {
-        mouseInsideRef.current = false;
-        if (!userScrolledRef.current) return;
-        if (mouseLeaveTimerRef.current) clearTimeout(mouseLeaveTimerRef.current);
-        mouseLeaveTimerRef.current = setTimeout(() => {
-          mouseLeaveTimerRef.current = null;
-          userScrolledRef.current = false;
-          scrollActiveIntoView('smooth');
-        }, 5000);
-      }}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        pointerStartRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      }}
-      onPointerUp={(e) => {
-        const start = pointerStartRef.current;
-        if (!start || start.id !== e.pointerId) return;
-        pointerStartRef.current = null;
-        if ((e.target as HTMLElement).closest("button")) return;
-        const tabEl = (e.target as HTMLElement).closest("[data-tab-id]");
-        if (!tabEl) return;
-        const tabId = tabEl.getAttribute("data-tab-id");
-        if (!tabId) return;
-        const dx = Math.abs(e.clientX - start.x);
-        const dy = Math.abs(e.clientY - start.y);
-        if (dx < 6 && dy < 6) onActivate(tabId);
-      }}
-    >
-      {tabs.map((p, i) => (
-        <DraggableTab
-          key={p.id}
-          tab={p}
-          activeTabId={activeTabId}
-          paneFocused={paneFocused}
-          workspaceId={workspaceId}
-          isWorkspaceActive={isWorkspaceActive}
-          insertionBefore={insertionIndex === 0 && i === 0}
-          insertionAfter={insertionIndex !== null && insertionIndex > 0 && i === insertionIndex - 1}
-          tabsCount={tabs.length}
-          onActivate={onActivate}
-          onClose={onClose}
-          onCloseOtherTabs={onCloseOtherTabs}
-          onCloseAllTabs={onCloseAllTabs}
-          onRenameTab={onRenameTab}
-          onUpdateTab={onUpdateTab}
-          onNoteHover={onNoteHover}
-          gitStatusMap={gitStatusMap}
-          gitStatus={gitStatus}
-          gitColorScheme={gitColorScheme}
+      <div
+        ref={scrollContainerRef}
+        className={cn(
+          "flex min-w-0 flex-1 items-center self-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          tabBarStyle === "connected" ? "gap-0" : "gap-0.5",
+        )}
+        onMouseEnter={() => {
+          mouseInsideRef.current = true;
+          if (mouseLeaveTimerRef.current) {
+            clearTimeout(mouseLeaveTimerRef.current);
+            mouseLeaveTimerRef.current = null;
+          }
+        }}
+        onMouseLeave={() => {
+          mouseInsideRef.current = false;
+          if (!userScrolledRef.current) return;
+          if (mouseLeaveTimerRef.current)
+            clearTimeout(mouseLeaveTimerRef.current);
+          mouseLeaveTimerRef.current = setTimeout(() => {
+            mouseLeaveTimerRef.current = null;
+            userScrolledRef.current = false;
+            scrollActiveIntoView("smooth");
+          }, 5000);
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          pointerStartRef.current = {
+            id: e.pointerId,
+            x: e.clientX,
+            y: e.clientY,
+          };
+        }}
+        onPointerUp={(e) => {
+          const start = pointerStartRef.current;
+          if (!start || start.id !== e.pointerId) return;
+          pointerStartRef.current = null;
+          if ((e.target as HTMLElement).closest("button")) return;
+          const tabEl = (e.target as HTMLElement).closest("[data-tab-id]");
+          if (!tabEl) return;
+          const tabId = tabEl.getAttribute("data-tab-id");
+          if (!tabId) return;
+          const dx = Math.abs(e.clientX - start.x);
+          const dy = Math.abs(e.clientY - start.y);
+          if (dx < 6 && dy < 6) onActivate(tabId);
+        }}
+      >
+        {tabs.map((p, i) => (
+          <DraggableTab
+            key={p.id}
+            tab={p}
+            activeTabId={activeTabId}
+            paneFocused={paneFocused}
+            workspaceId={workspaceId}
+            isWorkspaceActive={isWorkspaceActive}
+            insertionBefore={insertionIndex === 0 && i === 0}
+            insertionAfter={
+              insertionIndex !== null &&
+              insertionIndex > 0 &&
+              i === insertionIndex - 1
+            }
+            tabsCount={tabs.length}
+            onActivate={onActivate}
+            onClose={onClose}
+            onCloseOtherTabs={onCloseOtherTabs}
+            onCloseAllTabs={onCloseAllTabs}
+            onRenameTab={onRenameTab}
+            onUpdateTab={onUpdateTab}
+            onNoteHover={onNoteHover}
+            gitStatusMap={gitStatusMap}
+            gitStatus={gitStatus}
+            gitColorScheme={gitColorScheme}
+          />
+        ))}
+        <div
+          className={cn(
+            "flex-1 self-stretch",
+            tabBarStyle === "connected" && "border-b border-border/40",
+          )}
         />
-      ))}
-      <div className={cn("flex-1 self-stretch", tabBarStyle === "connected" && "border-b border-border/40")} />
-    </div>
-    <div
-      className={cn(
-        "flex shrink-0 items-center self-stretch",
-        tabBarStyle === "connected" && "border-b border-border/40",
-      )}
-    >
-      <NewTabMenuButton
-        onNewTerminal={onNewTerminal}
-        onSplitTerminalRight={onSplitTerminalRight}
-        onSplitTerminalDown={onSplitTerminalDown}
-        onNewBrowser={onNewBrowser}
-        onSplitBrowserRight={onSplitBrowserRight}
-        onSplitBrowserDown={onSplitBrowserDown}
-      />
-    </div>
+      </div>
+      <div
+        className={cn(
+          "flex shrink-0 items-center self-stretch",
+          tabBarStyle === "connected" && "border-b border-border/40",
+        )}
+      >
+        <NewTabMenuButton
+          onNewTerminal={onNewTerminal}
+          onSplitTerminalRight={onSplitTerminalRight}
+          onSplitTerminalDown={onSplitTerminalDown}
+          onNewBrowser={onNewBrowser}
+          onSplitBrowserRight={onSplitBrowserRight}
+          onSplitBrowserDown={onSplitBrowserDown}
+        />
+      </div>
     </div>
   );
 }
