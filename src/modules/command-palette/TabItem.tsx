@@ -1,11 +1,12 @@
 import { CommandItem } from "@/components/ui/command";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { RowTag } from "./RowTag";
-import { tabRowDetail } from "./lib/rowDetail";
+import { tabLocation } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
@@ -18,16 +19,9 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
   "git-commit-file": "Git commit file",
 };
 
-export function TabItem({
-  entry,
-  ambiguous,
-  onRun,
-}: {
-  entry: TabEntry;
-  ambiguous: boolean;
-  onRun: () => void;
-}) {
-  const detail = tabRowDetail(entry, ambiguous);
+export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }) {
+  const location = tabLocation(entry);
+  const note = entry.note?.replace(/\s+/g, " ").trim();
   return (
     <CommandItem
       value={`tab:${entry.tabId}`}
@@ -35,17 +29,16 @@ export function TabItem({
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
       <RowTag kind="Tab" />
-      <span className="shrink-0 text-muted-foreground">
+      <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
         <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate">{entry.title || KIND_LABEL[entry.kind]}</span>
-        {detail ? (
-          <span className="flex min-w-0 items-center gap-1.5 truncate text-[10.5px] font-normal text-muted-foreground">
-            {detail.location ? <span className="truncate">{detail.location}</span> : null}
-            {detail.location && detail.branch ? <span className="opacity-50">·</span> : null}
-            {detail.branch ? <span className="truncate">{detail.branch}</span> : null}
-          </span>
+        {location ? (
+          <span className="truncate text-[10.5px] font-normal text-muted-foreground/80">{location}</span>
+        ) : null}
+        {note ? (
+          <span className="truncate text-[10.5px] font-normal text-muted-foreground/60">{note}</span>
         ) : null}
       </span>
       {entry.indicator === "working" ? (
@@ -60,16 +53,6 @@ export function TabItem({
           )}
         />
       ) : null}
-      {entry.note !== null ? (
-        <span role="img" aria-label="Has a note" className="shrink-0">
-          <HugeiconsIcon
-            icon={StickyNote03Icon}
-            size={12}
-            strokeWidth={1.75}
-            className="text-muted-foreground"
-          />
-        </span>
-      ) : null}
       {entry.hibernated ? (
         <span role="img" aria-label="Workspace is hibernated" className="shrink-0">
           <HugeiconsIcon
@@ -80,8 +63,14 @@ export function TabItem({
           />
         </span>
       ) : null}
-      <span className="ml-auto max-w-40 shrink-0 truncate text-[11px] font-normal text-muted-foreground">
-        {entry.workspaceTitle}
+      <span className="ml-auto flex max-w-40 shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+        <WorkspaceMark
+          id={entry.workspaceId}
+          color={entry.workspaceColor}
+          icon={entry.workspaceIcon ?? undefined}
+          size={12}
+        />
+        <span className="truncate">{entry.workspaceTitle}</span>
       </span>
     </CommandItem>
   );

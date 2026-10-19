@@ -32,9 +32,8 @@ import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
 import { mergeRows } from "./lib/mergeRows";
-import { duplicateTitleIds, type TabEntry, type WorkspaceEntry } from "./lib/tabEntries";
+import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
-import { hasPreview, TabPreview } from "./TabPreview";
 import type { PaletteItem } from "./types";
 import { MergedList } from "./MergedList";
 
@@ -108,16 +107,6 @@ export function CommandPalette({
         : [],
     [inCommands, commandItems, tabEntries, workspaceEntries, parsed.term, activeTabId, learned, mru],
   );
-  const ambiguous = useMemo(() => duplicateTitleIds(tabEntries), [tabEntries]);
-  const selectedTab = useMemo(
-    () =>
-      value.startsWith("tab:")
-        ? tabEntries.find((t) => t.tabId === value.slice("tab:".length))
-        : undefined,
-    [value, tabEntries],
-  );
-  const showPreview = !!selectedTab && hasPreview(selectedTab);
-
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
   const listRef = useRef<HTMLDivElement>(null);
@@ -261,7 +250,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      className="top-1/2 w-[min(860px,calc(100vw-32px))] sm:max-w-[min(860px,calc(100vw-32px))] -translate-y-1/2"
+      className="top-1/2 w-[min(560px,calc(100vw-32px))] sm:max-w-[min(560px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
         shouldFilter={false}
@@ -277,8 +266,7 @@ export function CommandPalette({
           placeholder={placeholder}
           autoFocus
         />
-        <div className="flex min-h-0">
-        <ScrollArea ref={listRef} className="max-h-[420px] min-w-0 flex-1">
+        <ScrollArea ref={listRef} className="max-h-[420px]">
           <CommandList className="max-h-none overflow-visible pr-3">
             {inThemes ? (
               <CommandGroup heading="Themes">
@@ -321,7 +309,6 @@ export function CommandPalette({
                 <MergedList
                   rows={merged}
                   typing={parsed.term.length > 0}
-                  ambiguous={ambiguous}
                   userShortcuts={userShortcuts}
                   onRunCommand={runCommand}
                   onRunTab={(entry) => {
@@ -423,8 +410,6 @@ export function CommandPalette({
             )}
           </CommandList>
         </ScrollArea>
-        {showPreview && selectedTab ? <TabPreview entry={selectedTab} /> : null}
-        </div>
       </Command>
     </CommandDialog>
   );

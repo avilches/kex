@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PaneNode, Tab, Workspace } from "@/modules/workspaces/lib/types";
-import {
-  type TabSources,
-  buildTabEntries,
-  buildWorkspaceEntries,
-  duplicateTitleIds,
-  worktreeName,
-} from "./tabEntries";
+import { type TabSources, buildTabEntries, buildWorkspaceEntries, worktreeName } from "./tabEntries";
 
 const pane = (id: string, tabs: Tab[]): PaneNode => ({
   kind: "pane",
@@ -117,15 +111,30 @@ describe("buildTabEntries", () => {
     expect(e.title).toBe("");
   });
 
-  it("keeps the url of a browser tab and the cwd of everything else as detail", () => {
+  it("keeps the url of a browser tab and the absolute path of everything else as detail", () => {
     const list = [
       workspace("ws-1", "One", [
         { id: "tab-1", kind: "browser", url: "https://example.com/docs" },
         term("tab-2", { cwd: "/p/Kex" }),
+        { id: "tab-3", kind: "editor", path: "/p/Kex/src/foo.ts", dirty: false, preview: false },
       ]),
     ];
     const entries = buildTabEntries(list, sources());
-    expect(entries.map((e) => e.detail)).toEqual(["https://example.com/docs", "/p/Kex"]);
+    expect(entries.map((e) => e.detail)).toEqual([
+      "https://example.com/docs",
+      "/p/Kex",
+      "/p/Kex/src/foo.ts",
+    ]);
+  });
+
+  it("resolves the workspace title and carries its color and icon in every tab row", () => {
+    const list = [
+      workspace("ws-1", "{host}: {cwd}", [term("tab-1")], { color: "#8b5cf6", icon: "code" }),
+    ];
+    const [e] = buildTabEntries(list, sources({ workspaceTitle: () => "avilches: ~/Kex" }));
+    expect(e.workspaceTitle).toBe("avilches: ~/Kex");
+    expect(e.workspaceColor).toBe("#8b5cf6");
+    expect(e.workspaceIcon).toBe("code");
   });
 
   it("carries last use, indicator and workspace activity", () => {
@@ -175,15 +184,10 @@ describe("buildWorkspaceEntries", () => {
     const [w] = buildWorkspaceEntries(list, sources({ workspaceTitle: () => "avilches: ~/Kex" }));
     expect(w.title).toBe("avilches: ~/Kex");
   });
-});
 
-describe("duplicateTitleIds", () => {
-  it("flags tabs sharing title and workspace", () => {
-    const list = [
-      workspace("ws-1", "One", [term("tab-1", { title: "zsh" }), term("tab-2", { title: "zsh" })]),
-      workspace("ws-2", "Two", [term("tab-3", { title: "zsh" })]),
-    ];
-    const ids = duplicateTitleIds(buildTabEntries(list, sources()));
-    expect([...ids].sort()).toEqual(["tab-1", "tab-2"]);
+  it("carries the workspace icon", () => {
+    const list = [workspace("ws-1", "One", [term("tab-1")], { icon: "code" })];
+    const [w] = buildWorkspaceEntries(list, sources());
+    expect(w.icon).toBe("code");
   });
 });

@@ -16,6 +16,8 @@ const tab: TabEntry = {
   tabId: "t1",
   workspaceId: "w",
   workspaceTitle: "Work",
+  workspaceColor: null,
+  workspaceIcon: null,
   hibernated: false,
   kind: "terminal",
   title: "my tab",
@@ -41,7 +43,6 @@ function mount(rows: MergedRow[], typing: boolean) {
         <MergedList
           rows={rows}
           typing={typing}
-          ambiguous={new Set()}
           userShortcuts={{} as never}
           onRunCommand={vi.fn()}
           onRunTab={vi.fn()}
@@ -83,6 +84,12 @@ describe("MergedList", () => {
       t.findIndex((x) => x.includes("Appearance settings")),
     );
     expect(screen.getByText("Recent tabs")).toBeTruthy();
-    expect(screen.getByText("General")).toBeTruthy();
+  });
+
+  it("names an action group after what the actions act on, so it never reads as a row kind", () => {
+    mount(rows, false);
+    expect(screen.getByText("General actions")).toBeTruthy();
+    expect(screen.getByText("Settings actions")).toBeTruthy();
+    expect(screen.queryByText("General")).toBeNull();
   });
 });

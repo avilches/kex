@@ -11,6 +11,8 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   tabId: "tab-1",
   workspaceId: "ws-1",
   workspaceTitle: "Work",
+  workspaceColor: null,
+  workspaceIcon: null,
   hibernated: false,
   kind: "terminal",
   title: "zsh",
@@ -30,11 +32,11 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   ...over,
 });
 
-function row(e: TabEntry, ambiguous = false) {
+function row(e: TabEntry) {
   return render(
     <Command>
       <CommandList>
-        <TabItem entry={e} ambiguous={ambiguous} onRun={vi.fn()} />
+        <TabItem entry={e} onRun={vi.fn()} />
       </CommandList>
     </Command>,
   );
@@ -60,14 +62,6 @@ describe("TabItem", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("shows the note icon only when the tab has a note", () => {
-    row(entry({ note: "hi" }));
-    expect(screen.getByLabelText("Has a note")).toBeTruthy();
-    cleanup();
-    row(entry({ note: null }));
-    expect(screen.queryByLabelText("Has a note")).toBeNull();
-  });
-
   it("never shows an autofocus marker", () => {
     row(entry({ note: "hi" }));
     expect(screen.queryByLabelText(/autofocus/i)).toBeNull();
@@ -83,12 +77,12 @@ describe("TabItem", () => {
     expect(screen.getByLabelText("Workspace is hibernated")).toBeTruthy();
   });
 
-  it("shows the short cwd under an ambiguous title", () => {
-    row(entry({ cwd: "/p/Kex/src", detail: "/p/Kex/src" }), true);
-    expect(screen.getByText("Kex/src")).toBeTruthy();
+  it("shows the absolute path on the second line", () => {
+    row(entry({ detail: "/p/Kex/src" }));
+    expect(screen.getByText("/p/Kex/src")).toBeTruthy();
   });
 
-  it("shows the url without protocol under an ambiguous browser title", () => {
+  it("shows the url without protocol for a browser tab", () => {
     row(
       entry({
         kind: "browser",
@@ -96,8 +90,12 @@ describe("TabItem", () => {
         detail: "https://example.com/docs",
         tab: { id: "tab-1", kind: "browser", url: "https://example.com/docs" },
       }),
-      true,
     );
     expect(screen.getByText("example.com/docs")).toBeTruthy();
+  });
+
+  it("shows the note as a third line when the tab has one", () => {
+    row(entry({ note: "## Todo\n\nbuy milk" }));
+    expect(screen.getByText("## Todo buy milk")).toBeTruthy();
   });
 });

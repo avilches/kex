@@ -1,6 +1,7 @@
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
+import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
@@ -20,12 +21,15 @@ export type TabEntry = {
   tabId: string;
   workspaceId: string;
   workspaceTitle: string;
+  workspaceColor: string | null;
+  workspaceIcon: string | null;
   hibernated: boolean;
   kind: Tab["kind"];
   title: string;
   note: string | null;
   cwd: string;
-  // What tells two same-titled tabs apart: the url of a browser tab, the cwd of the rest.
+  // The absolute path the row shows on its second line: the url of a browser tab, the file
+  // if the tab holds one, the folder otherwise.
   detail: string;
   worktree: string;
   branch: string;
@@ -44,6 +48,7 @@ export type WorkspaceEntry = {
   workspaceId: string;
   title: string;
   color: string | null;
+  icon: string | null;
   hibernated: boolean;
   tabCount: number;
   lastUsedAt: number;
@@ -67,6 +72,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
   let order = 0;
   for (const ws of workspaces) {
     const workspaceActiveAt = src.workspaceActiveAt(ws.id);
+    const workspaceTitle = src.workspaceTitle(ws);
     for (const pane of allPanes(ws.paneTree)) {
       for (const tab of pane.tabs) {
         const cwd = tabDir(tab) ?? "";
@@ -74,13 +80,15 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
         out.push({
           tabId: tab.id,
           workspaceId: ws.id,
-          workspaceTitle: ws.title,
+          workspaceTitle,
+          workspaceColor: ws.color ?? null,
+          workspaceIcon: ws.icon ?? null,
           hibernated: !!ws.hibernated,
           kind: tab.kind,
           title: src.displayTitle(tab),
           note: tab.note?.trim() ? tab.note : null,
           cwd,
-          detail: tab.kind === "browser" ? tab.url : cwd,
+          detail: tab.kind === "browser" ? tab.url : (tabFilePath(tab) ?? cwd),
           worktree: worktreeName(git.repoRoot) || worktreeName(cwd),
           branch: git.branch,
           process: processOf(tab, src),
@@ -106,6 +114,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
       workspaceId: ws.id,
       title: src.workspaceTitle(ws),
       color: ws.color ?? null,
+      icon: ws.icon ?? null,
       hibernated: !!ws.hibernated,
       tabCount: tabs.length,
       lastUsedAt: newestTab || src.workspaceActiveAt(ws.id),
@@ -113,15 +122,3 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
   });
 }
 
-export function duplicateTitleIds(entries: readonly TabEntry[]): Set<string> {
-  const groups = new Map<string, string[]>();
-  for (const e of entries) {
-    const key = `${e.workspaceId}\u0000${e.title}`;
-    const ids = groups.get(key);
-    if (ids) ids.push(e.tabId);
-    else groups.set(key, [e.tabId]);
-  }
-  const dup = new Set<string>();
-  for (const ids of groups.values()) if (ids.length > 1) for (const id of ids) dup.add(id);
-  return dup;
-}

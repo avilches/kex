@@ -11,7 +11,6 @@ import { WorkspaceItem } from "./WorkspaceItem";
 type Props = {
   rows: MergedRow[];
   typing: boolean;
-  ambiguous: ReadonlySet<string>;
   userShortcuts: Record<ShortcutId, KeyBinding[]>;
   onRunCommand: (item: PaletteItem) => void;
   onRunTab: (entry: TabEntry) => void;
@@ -24,7 +23,7 @@ function shortcutLabel(id: ShortcutId | undefined, user: Record<ShortcutId, KeyB
 
 function Row({ row, p }: { row: MergedRow; p: Props }) {
   if (row.kind === "tab") {
-    return <TabItem entry={row.entry} ambiguous={p.ambiguous.has(row.entry.tabId)} onRun={() => p.onRunTab(row.entry)} />;
+    return <TabItem entry={row.entry} onRun={() => p.onRunTab(row.entry)} />;
   }
   if (row.kind === "workspace") {
     return <WorkspaceItem entry={row.entry} onRun={() => p.onRunWorkspace(row.entry)} />;
@@ -65,7 +64,7 @@ export function MergedList(p: Props) {
         const inGroup = actions.filter((r) => r.item.group === group);
         if (inGroup.length === 0) return null;
         return (
-          <CommandGroup key={group} heading={group}>
+          <CommandGroup key={group} heading={`${group} actions`}>
             {inGroup.map((row) => (
               <Row key={row.key} row={row} p={p} />
             ))}
