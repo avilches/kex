@@ -85,7 +85,7 @@ describe("tabTitle - other kinds", () => {
   });
 
   it("editors and diffs have their own default", () => {
-    const defaults = resolveTitleDefaults({ editor: "{file}{?dir · {dir}}", diff: "diff {file}" });
+    const defaults = resolveTitleDefaults({ editor: "{file}{dir? · {dir}}", diff: "diff {file}" });
     const diff: Tab = { id: "d", kind: "git-diff", path: "a/b.ts", repoRoot: "/r" } as Tab;
     expect(tabTitle(editor, null, undefined, { defaults })).toBe("foo.ts · src");
     expect(tabTitle(diff, null, undefined, { defaults })).toBe("diff b.ts");
@@ -133,7 +133,7 @@ describe("tabTitle - agent terminals", () => {
 
 describe("tabTitle - configurable defaults", () => {
   it("uses the terminal default the user chose", () => {
-    const defaults = resolveTitleDefaults({ terminal: "{dir}{?branch · {branch}}" });
+    const defaults = resolveTitleDefaults({ terminal: "{dir}{branch? · {branch}}" });
     const git = { branch: "main", repoRoot: "/home/me/kex" };
     const t = terminal({ cwd: "/home/me/kex" });
     expect(tabTitle(t, "ls", undefined, { defaults, git })).toBe("kex · main");

@@ -80,7 +80,7 @@ export function commandProblem(command: string, shell?: CommandShell, vars?: Tem
 // For an app launched without a shell: the command is split first and the variables are
 // substituted inside each argument afterwards, so a value with spaces or quotes can
 // neither split into several arguments nor add one. A group with spaces in it
-// ("{?branch on {branch}}") needs quotes around it to stay one argument. An argument
+// ("{branch? on {branch}}") needs quotes around it to stay one argument. An argument
 // whose variable is empty stays as an empty argument; the caller decides beforehand,
 // with missingVariables, whether the command is available at all.
 export function expandCommandArgv(command: string, vars: TemplateVars): string[] {
