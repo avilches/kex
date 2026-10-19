@@ -9,8 +9,11 @@ export type Tune = {
 
 export const DEFAULT_TUNE: Tune = { bgLightness: 0, bgHue: 0, normalAlpha: 0.85, ignoredAlpha: 0.85 };
 
-// Surfaces the tone sliders move together, so the whole page shifts and the
-// explorer/source-control sidebar follows. Text tokens are left alone.
+// UI surfaces the tone sliders move together, so the whole window shifts and
+// the explorer/source-control sidebar follows. Text tokens are left alone, and
+// so are the editor and terminal backgrounds: those have their own palettes,
+// and shifting them would write extra fields on save. Override those by hand
+// with the token picker if you want them moved.
 const SURFACES = [
   "background",
   "card",
@@ -19,8 +22,6 @@ const SURFACES = [
   "muted",
   "secondary",
   "accent",
-  "editor-background",
-  "terminal-background",
 ];
 
 const TUNE_KEY = "kex-theme-preview-tune";
@@ -75,6 +76,14 @@ export function applyTune(tune: Tune): void {
     const hex = toHex(tokenValue(name));
     if (!hex.startsWith("#")) continue;
     root.setProperty(`--${name}`, shiftHsl(hex, tune.bgLightness, tune.bgHue));
+  }
+}
+
+export function clearOverrides(key: string): void {
+  for (const storeKey of [TUNE_KEY, TOKENS_KEY]) {
+    const store = readStore(storeKey);
+    delete store[key];
+    localStorage.setItem(storeKey, JSON.stringify(store));
   }
 }
 

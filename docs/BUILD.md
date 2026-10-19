@@ -72,6 +72,12 @@ token. It is dev only and not part of `pnpm build`.
   moved and the tokens that were overridden, plus the resolved hexes. That is the shape to hand back so the
   value can be baked into the theme. "Export full theme (copy)" writes the whole theme with the on-screen
   values baked in, which is also valid input for the custom-theme box.
+- "Save to disk" writes the changed values straight into `src/modules/theme/themes/<id>.ts`: it posts to a
+  dev-only Vite endpoint (`POST /__kex-theme-write`, `scripts/theme-write-plugin.ts`) that edits only the
+  lines whose value changed, so `git diff` stays small and the rest of the file is untouched. It then drops
+  the local overrides and Vite reloads the page, which now shows exactly what is on disk. It needs `pnpm dev`
+  (a production build has no server); the surface tone sliders only shift the UI colors, so a save from those
+  alone never adds editor or terminal fields.
 - Colors are verifiable without screenshots (Dark Reader rewrites backgrounds in screenshots): each
   swatch prints its hex as text and carries `data-token` / `data-hex`, and
   `window.kexThemePreview.dump()` returns every token plus the git status colors as a
