@@ -63,6 +63,7 @@ export type AgentSession = {
   restored: boolean;
   restoreError: boolean;
   restoreErrorReason?: string;
+  interrupted?: boolean;
   subagents: Record<string, SubagentRecord>;
   meta?: AgentSessionMeta;
 };

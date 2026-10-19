@@ -55,7 +55,7 @@ export async function loadRestorePlans(): Promise<void> {
 
 type StagedSnapshot = {
   title: string | null;
-  notification: NotificationKind | null;
+  notification: NotificationKind | "interrupted" | null;
   stagedAt: number;
 };
 const stagedSnapshots = new Map<string, StagedSnapshot>();
@@ -65,8 +65,8 @@ const stagedSnapshots = new Map<string, StagedSnapshot>();
 // different one and must not inherit the old name and notification.
 export const STAGED_SNAPSHOT_TTL_MS = 90_000;
 
-function isNotificationKind(v: string | null | undefined): v is NotificationKind {
-  return v === "attention" || v === "finished" || v === "error";
+function isNotificationKind(v: string | null | undefined): v is NotificationKind | "interrupted" {
+  return v === "attention" || v === "finished" || v === "error" || v === "interrupted";
 }
 
 // The name and notification the tab had when Kex closed. They are applied when the
@@ -102,6 +102,10 @@ export function applyStagedSnapshot(tabId: string): boolean {
   const session = store.sessions[tabId];
   if (staged.title) setOscTitle(tabId, staged.title);
   if (!staged.notification || !session) return true;
+  if (staged.notification === "interrupted") {
+    store.markInterrupted(tabId);
+    return true;
+  }
   // The bell entry honors the same switch as every other notification; the dot does not.
   if (usePreferencesStore.getState().agentNotifications) {
     store.pushNotification({

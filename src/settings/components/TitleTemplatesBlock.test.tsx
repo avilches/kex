@@ -109,8 +109,8 @@ describe("TitleTemplatesBlock", () => {
     const cells = [...container.querySelectorAll("td:first-child")].map((c) => c.textContent);
     expect(cells).toContain("{branch}");
     expect(cells).toContain("{a|b|c}");
-    expect(cells).toContain("{?a|b text}");
-    expect(cells).toContain("{!a|b text}");
+    expect(cells).toContain("{a|b?text}");
+    expect(cells).toContain("{a|b?then{:}else}");
     expect(new Set(cells).size).toBe(cells.length);
     unmount();
   });
@@ -125,10 +125,10 @@ describe("TitleTemplatesBlock", () => {
   it("saves a trimmed template on blur and shows it trimmed", () => {
     const { container, unmount } = mount();
     const input = field(container, "terminal");
-    type(input, "  {dir}{?branch · {branch}}  ");
+    type(input, "  {dir}{branch? · {branch}}  ");
     blur(input);
-    expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateTerminal", "{dir}{?branch · {branch}}");
-    expect(input.value).toBe("{dir}{?branch · {branch}}");
+    expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateTerminal", "{dir}{branch? · {branch}}");
+    expect(input.value).toBe("{dir}{branch? · {branch}}");
     unmount();
   });
 

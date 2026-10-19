@@ -49,7 +49,7 @@ describe("a title follows what is being typed", () => {
   it("a tab shows the expansion of the draft and goes back when it is cleared", () => {
     const { container, unmount } = render(() => useAgentTabTitle(tab)?.displayTitle ?? "");
     expect(container.textContent).toBe("saved");
-    act(() => setTitleDraft("tab-1", "{dir}{?cwd  in {cwd}}"));
+    act(() => setTitleDraft("tab-1", "{dir}{cwd?  in {cwd}}"));
     expect(container.textContent).toBe("kex in /srv/code/kex");
     act(() => setTitleDraft("tab-1", "{di"));
     expect(container.textContent).toBe("{di");

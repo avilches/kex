@@ -14,6 +14,11 @@ describe("tabStatusIndicator", () => {
     expect(tabStatusIndicator({ ...none, hasAgent: true, status: "idle" })).toBeNull();
   });
 
+  it("marks a session whose work was cut by a restart, over the spinner", () => {
+    expect(tabStatusIndicator({ ...none, hasAgent: true, interrupted: true, status: "working" })).toBe("interrupted");
+    expect(tabStatusIndicator({ ...none, hasAgent: true, interrupted: true, status: "idle" })).toBe("interrupted");
+  });
+
   it("marks a failed agent restore", () => {
     expect(tabStatusIndicator({ ...none, hasAgent: true, isRestoreError: true, status: "working" })).toBe("restore-failed");
   });

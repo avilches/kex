@@ -11,10 +11,10 @@ describe("git demand of title templates", () => {
   });
 
   it("asks for git when branch or repo appears anywhere in the template", () => {
-    expect(templateNeedsGit("{dir}{?branch · {branch}}")).toBe(true);
+    expect(templateNeedsGit("{dir}{branch? · {branch}}")).toBe(true);
     expect(templateNeedsGit("{cmd|{repo}}")).toBe(true);
-    expect(templateNeedsGit("{?repo x}")).toBe(true);
-    expect(templateNeedsGit("{!cmd|branch x}")).toBe(true);
+    expect(templateNeedsGit("{repo? x}")).toBe(true);
+    expect(templateNeedsGit("{cmd|branch?{:}x}")).toBe(true);
   });
 
   it("does not ask for git when the words are only literal text", () => {

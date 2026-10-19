@@ -25,7 +25,7 @@ export type TitleVariable = (typeof TITLE_VARIABLES)[number];
 export type TitleVars = Partial<Record<TitleVariable, string>>;
 
 // A template is parsed into text, variable groups ({a|b|c}) and conditionals
-// ({?var text}). An alternative of a group is a bare variable name or, when it has
+// ({var?then{:}else}). An alternative of a group is a bare variable name or, when it has
 // anything else in it, a template of its own ({osc|{agent} - {dir}}). `raw` is the
 // source slice, re-emitted verbatim when the group names something that is not a
 // variable of the scope.
@@ -33,13 +33,14 @@ type Alt = { name: string } | { nodes: Node[] };
 type Node =
   | { kind: "text"; text: string }
   | { kind: "vars"; v: Alt[]; raw: string }
-  | { kind: "cond"; names: string[]; negate: boolean; body: Node[]; raw: string };
+  | { kind: "cond"; names: string[]; yes: Node[]; otherwise: Node[]; raw: string };
 
 const BARE = /^[a-z]+$/;
-const COND = /^([?!])([a-z]+(?:\|[a-z]+)*)([\s\S]*)$/;
+const COND = /^([a-z]+(?:\|[a-z]+)*)\?([\s\S]*)$/;
+const ELSE = "{:}";
 
 // `{{` and `}}` are literal braces at the top level only: inside a group every brace
-// opens or closes, so `{?a {b}}` ends with two closers, not an escape.
+// opens or closes, so `{a?{b}}` ends with two closers, not an escape.
 const MAX_DEPTH = 16;
 
 // A brace that does not open a readable group stays text and scanning resumes right after
@@ -82,11 +83,12 @@ function parse(src: string, nested: boolean, level = 0): Node[] {
     }
     flush();
     if (cond) {
+      const at = elseAt(cond[2]);
       nodes.push({
         kind: "cond",
-        names: cond[2].split("|"),
-        negate: cond[1] === "!",
-        body: parse(cond[3], true, level + 1),
+        names: cond[1].split("|"),
+        yes: parse(cond[2].slice(0, at), true, level + 1),
+        otherwise: parse(cond[2].slice(at + ELSE.length), true, level + 1),
         raw,
       });
     } else {
@@ -99,6 +101,18 @@ function parse(src: string, nested: boolean, level = 0): Node[] {
   }
   flush();
   return nodes;
+}
+
+// Index of the `{:}` that belongs to this conditional, not to one nested inside its text;
+// without one the whole body is the "then" and the else is empty.
+function elseAt(body: string): number {
+  let depth = 0;
+  for (let i = 0; i < body.length; i++) {
+    if (depth === 0 && body.startsWith(ELSE, i)) return i;
+    if (body[i] === "{") depth++;
+    else if (body[i] === "}") depth--;
+  }
+  return body.length;
 }
 
 function splitAlternatives(inner: string): string[] {
@@ -126,7 +140,8 @@ function collect(nodes: Node[], into: Set<string>) {
       }
     } else if (n.kind === "cond") {
       for (const name of n.names) into.add(name);
-      collect(n.body, into);
+      collect(n.yes, into);
+      collect(n.otherwise, into);
     }
   }
 }
@@ -172,7 +187,7 @@ function render(nodes: Node[], vars: TemplateVars, format: Format): string {
       const values = n.names.map((name) => lookup(vars, name));
       if (values.some((v) => v === undefined)) return n.raw;
       const any = values.some((v) => (v as string).trim() !== "");
-      return any !== n.negate ? render(n.body, vars, format) : "";
+      return render(any ? n.yes : n.otherwise, vars, format);
     })
     .join("");
 }
@@ -207,13 +222,13 @@ function missing(nodes: Node[], vars: TemplateVars, out: string[]): void {
       const values = n.names.map((name) => lookup(vars, name));
       if (values.some((v) => v === undefined)) continue;
       const any = values.some((v) => (v as string).trim() !== "");
-      if (any !== n.negate) missing(n.body, vars, out);
+      missing(any ? n.yes : n.otherwise, vars, out);
     }
   }
 }
 
 // The variables a template needs and has no value for: a plain variable or a `{a|b}` group
-// whose alternatives are all empty. A `{?a text}` part is optional, so its absence is not
+// whose alternatives are all empty. A `{a?text}` part is optional, so its absence is not
 // a lack, and names that are not variables of the scope stay literal and are not counted.
 export function missingTemplateVariables(template: string, vars: TemplateVars): string[] {
   const out: string[] = [];

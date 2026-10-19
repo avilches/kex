@@ -50,6 +50,11 @@ describe("agentSnapshot", () => {
     expect(agentSnapshot(session(), undefined, [notif({ tabId: "t2" })]).notification).toBe("");
   });
 
+  it("stores a working or already interrupted session as interrupted, over any notification", () => {
+    expect(agentSnapshot(session({ status: "working" }), undefined, [notif()]).notification).toBe("interrupted");
+    expect(agentSnapshot(session({ interrupted: true }), undefined, []).notification).toBe("interrupted");
+  });
+
   it("falls back to attention when only the session dot is raised", () => {
     expect(agentSnapshot(session({ status: "attention" }), undefined, []).notification).toBe("attention");
   });

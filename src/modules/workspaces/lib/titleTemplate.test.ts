@@ -73,67 +73,78 @@ describe("template alternatives", () => {
   });
 });
 
-describe("conditional {?var text}", () => {
+describe("conditional {var? text}", () => {
   it("renders the text only when the variable is not empty", () => {
-    const t = "{dir}{?branch · {branch}}";
+    const t = "{dir}{branch? · {branch}}";
     expect(expandTitle(t, { dir: "kex", branch: "main" })).toBe("kex · main");
     expect(expandTitle(t, { dir: "kex", branch: "" })).toBe("kex");
   });
 
   it("drops the leading space of the text once the title is trimmed", () => {
-    expect(expandTitle("{?agent [{agent}]}", { agent: "claude" })).toBe("[claude]");
+    expect(expandTitle("{agent? [{agent}]}", { agent: "claude" })).toBe("[claude]");
   });
 
   it("supports a fallback inside the text", () => {
-    expect(expandTitle("{?repo {repo|dir}}", { repo: "r", dir: "d" })).toBe("r");
+    expect(expandTitle("{repo? {repo|dir}}", { repo: "r", dir: "d" })).toBe("r");
   });
 
   it("stays literal when the variable is unknown or the group is not closed", () => {
-    expect(expandTitle("{?nope x}", { dir: "d" })).toBe("{?nope x}");
-    expect(expandTitle("{?dir x", { dir: "d" })).toBe("{?dir x");
+    expect(expandTitle("{nope? x}", { dir: "d" })).toBe("{nope? x}");
+    expect(expandTitle("{dir? x", { dir: "d" })).toBe("{dir? x");
   });
 
   it("nests", () => {
-    expect(expandTitle("{?cwd x{?dir y}}", { cwd: "c", dir: "d" })).toBe("x y");
-    expect(expandTitle("{?cwd x{?dir y}}", { cwd: "c", dir: "" })).toBe("x");
+    expect(expandTitle("{cwd? x{dir? y}}", { cwd: "c", dir: "d" })).toBe("x y");
+    expect(expandTitle("{cwd? x{dir? y}}", { cwd: "c", dir: "" })).toBe("x");
   });
 });
 
-describe("conditional on several variables {?a|b text}", () => {
+describe("conditional on several variables {a|b?text}", () => {
   it("shows the text when any of them has a value", () => {
-    const t = "{?cmd|osc [{cmd|osc}]}";
+    const t = "{cmd|osc? [{cmd|osc}]}";
     expect(expandTitle(t, { cmd: "ls", osc: "" })).toBe("[ls]");
     expect(expandTitle(t, { cmd: "", osc: "vim" })).toBe("[vim]");
     expect(expandTitle(t, { cmd: "", osc: "" })).toBe("");
   });
 
   it("stays literal when any of the names is not a variable of the scope", () => {
-    expect(expandTitle("{?cmd|nope x}", { cmd: "ls" })).toBe("{?cmd|nope x}");
+    expect(expandTitle("{cmd|nope? x}", { cmd: "ls" })).toBe("{cmd|nope? x}");
   });
 
   it("counts a blank value as no value", () => {
-    expect(expandTitle("{?cmd|osc x}", { cmd: " ", osc: "  " })).toBe("");
+    expect(expandTitle("{cmd|osc? x}", { cmd: " ", osc: "  " })).toBe("");
   });
 });
 
-describe("negated conditional {!a|b text}", () => {
-  it("shows the text only when none of them has a value", () => {
-    const t = "{?branch on {branch}}{!branch in {dir}}";
+describe("else branch {a|b?then{:}else}", () => {
+  it("shows the else only when none of them has a value", () => {
+    const t = "{branch?on {branch}{:}in {dir}}";
     expect(expandTitle(t, { branch: "main", dir: "kex" })).toBe("on main");
     expect(expandTitle(t, { branch: "", dir: "kex" })).toBe("in kex");
   });
 
   it("with several names it needs all of them empty", () => {
-    expect(expandTitle("{!cmd|osc idle}", { cmd: "", osc: "" })).toBe("idle");
-    expect(expandTitle("{!cmd|osc idle}", { cmd: "ls", osc: "" })).toBe("");
+    expect(expandTitle("{cmd|osc?{:}idle}", { cmd: "", osc: "" })).toBe("idle");
+    expect(expandTitle("{cmd|osc?{:}idle}", { cmd: "ls", osc: "" })).toBe("");
+  });
+
+  it("a nested else belongs to the inner conditional", () => {
+    const t = "{agent?[{session?x{:}y}]{:}none}";
+    expect(expandTitle(t, { agent: "1", session: "1" })).toBe("[x]");
+    expect(expandTitle(t, { agent: "1", session: "" })).toBe("[y]");
+    expect(expandTitle(t, { agent: "", session: "1" })).toBe("none");
+  });
+
+  it("a {:} outside any conditional is plain text", () => {
+    expect(expandTitle("a{:}b", { dir: "d" })).toBe("a{:}b");
   });
 
   it("stays literal for an unknown variable", () => {
-    expect(expandTitle("{!nope x}", { dir: "d" })).toBe("{!nope x}");
+    expect(expandTitle("{nope?a{:}b}", { dir: "d" })).toBe("{nope?a{:}b}");
   });
 
   it("is reported as used by every name it reads", () => {
-    expect([...titleVariablesUsed("{!branch|dir x {repo}}")].sort()).toEqual(["branch", "dir", "repo"]);
+    expect([...titleVariablesUsed("{branch|dir?{:}x {repo}}")].sort()).toEqual(["branch", "dir", "repo"]);
   });
 });
 
@@ -141,13 +152,13 @@ describe("hostile and malformed templates", () => {
   it("does not resolve inherited object properties as variables", () => {
     expect(expandTitle("{constructor}", { dir: "d" })).toBe("{constructor}");
     expect(expandTitle("{constructor|dir}", { dir: "d" })).toBe("{constructor|dir}");
-    expect(expandTitle("{?constructor x}", { dir: "d" })).toBe("{?constructor x}");
+    expect(expandTitle("{constructor? x}", { dir: "d" })).toBe("{constructor? x}");
   });
 
   it("survives absurd nesting without throwing", () => {
     const deep = `${"{osc|".repeat(20000)}x${"}".repeat(20000)}`;
     expect(() => expandTitle(deep, { osc: "", dir: "d" })).not.toThrow();
-    const deepCond = `${"{?dir ".repeat(20000)}x${"}".repeat(20000)}`;
+    const deepCond = `${"{dir? ".repeat(20000)}x${"}".repeat(20000)}`;
     expect(() => expandTitle(deepCond, { dir: "d" })).not.toThrow();
   });
 
@@ -166,7 +177,7 @@ describe("hostile and malformed templates", () => {
   });
 
   it("treats a blank value as empty for conditionals and fallbacks alike", () => {
-    expect(expandTitle("{?dir x}", { dir: "  " })).toBe("");
+    expect(expandTitle("{dir? x}", { dir: "  " })).toBe("");
     expect(expandTitle("{dir|file}", { dir: "  ", file: "f" })).toBe("f");
   });
 });
@@ -177,7 +188,7 @@ describe("titleVariablesUsed / hasTitleVariables", () => {
   });
 
   it("lists names inside fallbacks and conditionals", () => {
-    expect([...titleVariablesUsed("{cmd|osc}{?branch · {repo|dir}}")].sort()).toEqual([
+    expect([...titleVariablesUsed("{cmd|osc}{branch? · {repo|dir}}")].sort()).toEqual([
       "branch",
       "cmd",
       "dir",
@@ -214,6 +225,6 @@ describe("missingTemplateVariables", () => {
 
   it("skips optional parts, filled groups and unknown names", () => {
     const vars = { a: "1", b: "", c: "", d: "", e: "" };
-    expect(missingTemplateVariables("{a}{?b x {c}}{!b y {d}} {e|a} {nope}", vars)).toEqual(["d"]);
+    expect(missingTemplateVariables("{a}{b?x {c}{:}y {d}} {e|a} {nope}", vars)).toEqual(["d"]);
   });
 });
