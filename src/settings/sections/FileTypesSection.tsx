@@ -1,14 +1,5 @@
 import { Switch } from "@/components/ui/switch";
-import {
-  Add01Icon,
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  Cancel01Icon,
-  Refresh01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState } from "react";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import { cn } from "@/lib/utils";
 import {
   CODE_DEFAULTS,
   clampColumnRuler,
@@ -19,12 +10,24 @@ import {
   type EditorViewMap,
   type EditorViewSettings,
 } from "@/modules/editor/lib/editorViewSettings";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   addEditorViewEntries,
   deleteEditorViewEntry,
   patchEditorViewEntry,
   resetEditorViewEntry,
 } from "@/modules/settings/store";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Refresh01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
+import { INPUT_CLASS } from "../components/inputClass";
+import { NumericField } from "../components/NumericField";
 import { SectionHeader } from "../components/SectionHeader";
 
 const EXT_VALID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
@@ -33,7 +36,9 @@ function isValidExt(e: string): boolean {
   return EXT_VALID_RE.test(e);
 }
 
-function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>][] {
+function sortedEntries(
+  map: EditorViewMap,
+): [string, Partial<EditorViewSettings>][] {
   return Object.entries(map).sort(([a], [b]) => {
     if (a === "*") return 1;
     if (b === "*") return -1;
@@ -41,7 +46,9 @@ function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>
   });
 }
 
-function effectiveSettings(partial: Partial<EditorViewSettings>): EditorViewSettings {
+function effectiveSettings(
+  partial: Partial<EditorViewSettings>,
+): EditorViewSettings {
   return { ...CODE_DEFAULTS, ...partial };
 }
 
@@ -100,20 +107,26 @@ export function FileTypesSection({
 
   const allEntries = sortedEntries(editorViewByExt);
   const filter = filterText.trim().toLowerCase();
-  const filteredEntries = filter === ""
-    ? allEntries
-    : allEntries.filter(([key]) => key === "*" || key.startsWith(filter));
+  const filteredEntries =
+    filter === ""
+      ? allEntries
+      : allEntries.filter(([key]) => key === "*" || key.startsWith(filter));
 
   function handleCommit() {
     const raw = filterText.trim().toLowerCase();
     if (!raw) return;
 
-    const tokens = raw.split(",").map((t) => t.trim()).filter(Boolean);
+    const tokens = raw
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     if (tokens.length === 0) return;
 
     const invalid = tokens.filter((t) => !isValidExt(t));
     if (invalid.length > 0) {
-      setAddError(`Invalid: ${invalid.map((t) => `"${t}"`).join(", ")}. Use letters, digits, - or .`);
+      setAddError(
+        `Invalid: ${invalid.map((t) => `"${t}"`).join(", ")}. Use letters, digits, - or .`,
+      );
       return;
     }
 
@@ -151,7 +164,7 @@ export function FileTypesSection({
               if (e.key === "Enter") handleCommit();
             }}
             placeholder="Filter or add: ts, tsx, go ..."
-            className="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-[12px] outline-none placeholder:text-muted-foreground/50 focus:border-ring"
+            className={cn(INPUT_CLASS, "flex-1")}
           />
           {filterText.trim() && (
             <button
@@ -192,12 +205,20 @@ type ExtensionRowProps = {
   onToggle: () => void;
 };
 
-function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowProps) {
+function ExtensionRow({
+  entryKey,
+  partial,
+  expanded,
+  onToggle,
+}: ExtensionRowProps) {
   const effective = effectiveSettings(partial);
   const isCatchAll = entryKey === "*";
 
   return (
-    <div data-ext={entryKey} className="rounded-lg border border-border/60 bg-card/60">
+    <div
+      data-ext={entryKey}
+      className="rounded-lg border border-border/60 bg-card/60"
+    >
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
@@ -284,7 +305,7 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               <span className="text-[12px] text-muted-foreground">
                 Indent size
               </span>
-              <NumberField
+              <NumericField
                 value={effective.indentSize}
                 min={EDITOR_INDENT_MIN}
                 max={EDITOR_INDENT_MAX}
@@ -301,7 +322,7 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               <span className="text-[12px] text-muted-foreground">
                 {effective.columnRuler === 0 ? "off" : "col"}
               </span>
-              <NumberField
+              <NumericField
                 value={effective.columnRuler}
                 min={0}
                 max={EDITOR_COLUMN_RULER_MAX}
@@ -315,56 +336,6 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
         </div>
       )}
     </div>
-  );
-}
-
-function NumberField({
-  value,
-  min,
-  max,
-  clamp,
-  onCommit,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  clamp: (n: number) => number;
-  onCommit: (n: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-
-  const commit = () => {
-    const n = Number.parseInt(draft, 10);
-    if (Number.isNaN(n)) {
-      setDraft(String(value));
-      return;
-    }
-    const next = clamp(n);
-    setDraft(String(next));
-    if (next !== value) onCommit(next);
-  };
-
-  return (
-    <input
-      type="number"
-      min={min}
-      max={max}
-      value={draft}
-      onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.currentTarget.blur();
-        }
-      }}
-      className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
-    />
   );
 }
 
