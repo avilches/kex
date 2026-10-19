@@ -42,8 +42,9 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
 - **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el
   body y el contenido de un Popover se portal a body, quedando muerto para el raton (el
   teclado sigue). En el codebase esta regla esta resuelta con `pointer-events-auto` en el
-  className del `PopoverContent` afectado: referencia viva `AddApplicationMenu.tsx`. Aplicarla
-  a todo popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
+  className del `PopoverContent` afectado: referencias vivas `AddApplicationMenu.tsx` y el
+  popover de Make global en `ActionRow.tsx`. Aplicarla a todo popover que abra dentro de
+  `WorkspaceSettingsDialog` o de otros modales.
 - **Conteo apagado en triggers**: los menus agrupados de `ActionsBar` muestran un numero
   apagado junto al label del trigger con las filas que contienen (workspace + global).
 
