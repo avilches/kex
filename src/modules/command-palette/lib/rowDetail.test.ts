@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tabLocation } from "./rowDetail";
+import { tabLocation, tabStatus } from "./rowDetail";
 import type { TabEntry } from "./tabEntries";
 
 const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
@@ -17,6 +17,8 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   worktree: "",
   branch: "",
   process: "",
+  command: "",
+  agent: "",
   indicator: null,
   tab: { id: "tab-1", kind: "terminal" },
   agentSession: undefined,
@@ -25,6 +27,26 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceActiveAt: 0,
   order: 0,
   ...over,
+});
+
+describe("tabStatus", () => {
+  it("joins the process name and the branch with a middle dot", () => {
+    expect(tabStatus(entry({ command: "top", branch: "main" }))).toBe("top · main");
+  });
+
+  it("drops the arguments, any path and leading variables of the command", () => {
+    expect(tabStatus(entry({ command: "pnpm dev --port 3000" }))).toBe("pnpm");
+    expect(tabStatus(entry({ command: "NODE_ENV=prod /usr/bin/node server.js" }))).toBe("node");
+  });
+
+  it("shows only the branch for an agent, and only the process without a branch", () => {
+    expect(tabStatus(entry({ command: "claude --resume", agent: "claude", branch: "main" }))).toBe("main");
+    expect(tabStatus(entry({ command: "vim notes.md" }))).toBe("vim");
+  });
+
+  it("is null when there is nothing to show", () => {
+    expect(tabStatus(entry())).toBeNull();
+  });
 });
 
 describe("tabLocation", () => {

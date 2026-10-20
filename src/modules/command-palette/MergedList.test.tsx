@@ -27,6 +27,8 @@ const tab: TabEntry = {
   worktree: "",
   branch: "",
   process: "",
+  command: "",
+  agent: "",
   indicator: null,
   tab: { id: "t1", kind: "terminal" },
   agentSession: undefined,

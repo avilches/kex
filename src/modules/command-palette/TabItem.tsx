@@ -6,7 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { RowTag } from "./RowTag";
-import { tabLocation } from "./lib/rowDetail";
+import { tabLocation, tabStatus } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
@@ -21,6 +21,7 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
 
 export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }) {
   const location = tabLocation(entry);
+  const status = tabStatus(entry);
   const note = entry.note?.replace(/\s+/g, " ").trim();
   return (
     <CommandItem
@@ -36,6 +37,9 @@ export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }
         <span className="truncate">{entry.title || KIND_LABEL[entry.kind]}</span>
         {location ? (
           <span className="truncate text-[10.5px] font-normal text-muted-foreground/80">{location}</span>
+        ) : null}
+        {status ? (
+          <span className="truncate text-[10.5px] font-normal text-muted-foreground/70">{status}</span>
         ) : null}
         {note ? (
           <span className="truncate text-[10.5px] font-normal text-muted-foreground/60">{note}</span>

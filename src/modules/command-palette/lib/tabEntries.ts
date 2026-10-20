@@ -34,6 +34,9 @@ export type TabEntry = {
   worktree: string;
   branch: string;
   process: string;
+  // What the terminal runs (or ran when it hibernated), and the agent in it, apart.
+  command: string;
+  agent: string;
   indicator: AgentEntryVisual | null;
   // The live tab and its agent session, so the row can draw the exact icon of the tab bar.
   tab: Tab;
@@ -60,11 +63,12 @@ export function worktreeName(path: string): string {
   return WORKTREE_RE.exec(path)?.[1] ?? "";
 }
 
-function processOf(tab: Tab, src: TabSources): string {
+function runningOf(tab: Tab, src: TabSources): { command: string; agent: string } {
   const asleep = tab.kind === "terminal" ? tab.hibernation : undefined;
-  const command = src.runningCommand(tab.id) ?? asleep?.command ?? "";
-  const agent = src.agentOf(tab.id) ?? asleep?.agent ?? "";
-  return [command.trim(), agent].filter(Boolean).join(" ");
+  return {
+    command: (src.runningCommand(tab.id) ?? asleep?.command ?? "").trim(),
+    agent: src.agentOf(tab.id) ?? asleep?.agent ?? "",
+  };
 }
 
 export function buildTabEntries(workspaces: readonly Workspace[], src: TabSources): TabEntry[] {
@@ -77,6 +81,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
       for (const tab of pane.tabs) {
         const cwd = tabDir(tab) ?? "";
         const git = src.git(cwd || undefined);
+        const { command, agent } = runningOf(tab, src);
         out.push({
           tabId: tab.id,
           workspaceId: ws.id,
@@ -91,7 +96,9 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           detail: tab.kind === "browser" ? tab.url : (tabFilePath(tab) ?? cwd),
           worktree: worktreeName(git.repoRoot) || worktreeName(cwd),
           branch: git.branch,
-          process: processOf(tab, src),
+          process: [command, agent].filter(Boolean).join(" "),
+          command,
+          agent,
           indicator: src.visualOf(tab.id),
           tab,
           agentSession: src.agentSessionOf(tab.id),

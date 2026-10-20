@@ -21,6 +21,8 @@ const tab = (tabId: string, over: Partial<TabEntry> = {}): TabEntry => ({
   worktree: "",
   branch: "",
   process: "",
+  command: "",
+  agent: "",
   indicator: null,
   tab: { id: tabId, kind: "terminal" },
   agentSession: undefined,

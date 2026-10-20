@@ -22,6 +22,8 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   worktree: "",
   branch: "",
   process: "",
+  command: "",
+  agent: "",
   indicator: null,
   tab: { id: "tab-1", kind: "terminal" },
   agentSession: undefined,
@@ -47,6 +49,11 @@ describe("TabItem", () => {
     row(entry());
     expect(screen.getByText("zsh")).toBeTruthy();
     expect(screen.getByText("Work")).toBeTruthy();
+  });
+
+  it("shows the process and the branch under the path", () => {
+    row(entry({ command: "top -o cpu", branch: "main" }));
+    expect(screen.getByText("top · main")).toBeTruthy();
   });
 
   it("labels the row as a Tab", () => {
