@@ -120,29 +120,17 @@ describe("menuEntries", () => {
     expect(menuEntries(idle(script()))).toEqual([{ kind: "main", enabled: true }]);
   });
 
-  it("adds a Stop row, reachable by keyboard, to a running script", () => {
-    const entries = menuEntries(idle(script(), { state: "running", stoppable: true }));
-    expect(entries).toEqual([
-      { kind: "main", enabled: true },
-      { kind: "stop", enabled: true },
-    ]);
+  it("keeps a running script's row enabled: clicking the name focuses its tab", () => {
+    expect(menuEntries(idle(script(), { state: "running", stoppable: true }))).toEqual([{ kind: "main", enabled: true }]);
   });
 
-  it("shows a script that is stopping with its Stop row disabled", () => {
-    const entries = menuEntries(idle(script(), { state: "waiting" }));
-    expect(entries).toEqual([
-      { kind: "main", enabled: false },
-      { kind: "stop", enabled: false },
-    ]);
+  it("keeps a waiting script's row enabled: clicking the name focuses its tab", () => {
+    expect(menuEntries(idle(script(), { state: "waiting" }))).toEqual([{ kind: "main", enabled: true }]);
   });
 
-  it("disables the row of a script or an app that cannot run, with no Stop row", () => {
+  it("disables the row of a script or an app that cannot run", () => {
     expect(menuEntries(idle(script(), { disabledReason: "needs a git branch" }))).toEqual([{ kind: "main", enabled: false }]);
     expect(menuEntries(idle(app(), { disabledReason: "needs an open file" }))).toEqual([{ kind: "main", enabled: false }]);
-  });
-
-  it("never gives an app a Stop row", () => {
-    expect(menuEntries(idle(app()))).toEqual([{ kind: "main", enabled: true }]);
   });
 });
 

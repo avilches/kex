@@ -219,14 +219,13 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
 
 export type MenuEntry = { kind: "main" | "stop"; enabled: boolean };
 
-// The rows a menu draws for one item. The main row focuses or runs it; a script that is
-// running or stopping also gets a Stop row of its own, because the stop control inside the
-// main row is a nested button that the arrow keys of the menu never reach. A blocked Action
-// has a disabled row, but a running script never does, so it can always be focused.
+// The rows a menu draws for one item. The main row focuses or runs it. A blocked Action
+// has a disabled row, but a running script never does, so it can be brought into view; a
+// waiting one stays enabled too, because the row click focuses its tab and does not
+// restart it. The start or stop control of the row is outside the item, so the row never
+// needs a second entry.
 export function menuEntries(item: BarItem): MenuEntry[] {
   const waiting = item.state === "waiting";
-  const busy = item.state !== "idle";
-  const main: MenuEntry = { kind: "main", enabled: !waiting && (busy || item.disabledReason === null) };
-  if (!item.action.runInTerminal || !busy) return [main];
-  return [main, { kind: "stop", enabled: item.stoppable }];
+  const main: MenuEntry = { kind: "main", enabled: waiting || item.state === "running" || item.disabledReason === null };
+  return [main];
 }

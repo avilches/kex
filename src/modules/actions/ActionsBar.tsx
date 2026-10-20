@@ -41,7 +41,7 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
       className={cn(
         "flex size-[22px] shrink-0 items-center justify-center rounded transition-colors",
         running && "text-destructive hover:bg-destructive/15",
-        waiting && "cursor-not-allowed text-amber-500/70",
+        waiting && "bg-amber-500/10 text-amber-500/70",
         !running && !waiting && !blocked && "text-green-500 hover:bg-green-500/15",
         blocked && "cursor-not-allowed text-muted-foreground/40",
         className,
@@ -53,6 +53,7 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
 }
 
 // Clicking the name of a script that has a tab brings it into view; without one it runs.
+// A waiting script focuses like a running one: only the icon zone shows the spinner.
 function nameClick(item: BarItem, { run, focus }: Handlers) {
   if (item.state !== "idle" && focus(item.action)) return;
   run(item.action);
@@ -72,14 +73,13 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
       className={cn(
         "flex h-8 shrink-0 items-center rounded-md text-[11px]",
         item.active && "ring-1 ring-border",
-        item.state === "waiting" && "bg-amber-500/10",
       )}
     >
       {script && <ScriptControl item={item} {...h} className="ml-0.5" />}
       <button
         type="button"
         title={ownButtonTitle(item)}
-        disabled={disabled || item.state === "waiting"}
+        disabled={disabled}
         onClick={() => nameClick(item, h)}
         className={cn(
           "flex h-8 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground transition-colors",
@@ -98,37 +98,40 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
   const blocked = item.state === "idle" && item.disabledReason !== null;
-  const [main, stop] = menuEntries(item);
-  return (
-    <>
-      <DropdownMenuItem
-        title={item.disabledReason ? `${item.name}: ${item.disabledReason}` : undefined}
-        disabled={!main?.enabled}
-        className="gap-1 px-1 py-0.5"
-        onSelect={() => {
-          if (!script) h.run(item.action);
-          else nameClick(item, h);
-        }}
-      >
-        {script ? <ScriptControl item={item} {...h} /> : <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>}
-        <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
-          <ActionNameLines name={item.name} value={item.subtitle} />
-        </span>
-        {blocked && item.subtitle !== WORKSPACE_UNSET && (
-          <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
-        )}
-        {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
-      </DropdownMenuItem>
-      {stop && (
-        <DropdownMenuItem
-          disabled={!stop.enabled}
-          className="gap-1 px-1 py-0.5 pl-7 text-[12px] text-destructive focus:text-destructive"
-          onSelect={() => h.stop(item.action)}
-        >
-          {item.state === "waiting" ? "Stopping..." : `Stop ${item.name}`}
-        </DropdownMenuItem>
+  const nameZone = (
+    <DropdownMenuItem
+      title={item.disabledReason ? `${item.name}: ${item.disabledReason}` : undefined}
+      disabled={!menuEntries(item)[0].enabled}
+      className="flex flex-1 items-center py-0.5"
+      onSelect={() => {
+        if (!script) h.run(item.action);
+        else nameClick(item, h);
+      }}
+    >
+      <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
+        <ActionNameLines name={item.name} value={item.subtitle} />
+      </span>
+      {blocked && item.subtitle !== WORKSPACE_UNSET && (
+        <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
       )}
-    </>
+      {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
+    </DropdownMenuItem>
+  );
+  // The start or stop zone is a sibling cell of the name zone, so its hover never lights
+  // the name and the name hover never lights it; only the name zone is a menu item.
+  if (script) {
+    return (
+      <div className="flex items-center">
+        <ScriptControl item={item} {...h} />
+        {nameZone}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
+      {nameZone}
+    </div>
   );
 }
 
