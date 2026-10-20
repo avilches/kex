@@ -1,10 +1,10 @@
 import { pathBasename } from "@/lib/pathUtils";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import type { ClosedTabRecord } from "@/modules/workspaces/lib/closedTabHistory";
+import type { TabHistoryRecord } from "@/modules/workspaces/lib/tabHistory";
 import { RECENT_LIMIT } from "./tabRank";
 import type { TabEntry } from "./tabEntries";
 
-export type ClosedTabEntry = ClosedTabRecord & {
+export type ClosedTabEntry = TabHistoryRecord & {
   key: string;
   title: string;
   detail: string;
@@ -18,7 +18,7 @@ export type ClosedTabEntry = ClosedTabRecord & {
 export const CLOSED_SEARCH_LIMIT = 12;
 export const CLOSED_RECENT_LIMIT = Math.min(RECENT_LIMIT, 6);
 
-export const closedRowKey = (entry: Pick<ClosedTabRecord, "kind" | "path">) =>
+export const closedRowKey = (entry: Pick<TabHistoryRecord, "kind" | "path">) =>
   `closed:${entry.kind}:${entry.path}`;
 
 function liveIdentity(entry: TabEntry): string | null {
@@ -27,12 +27,12 @@ function liveIdentity(entry: TabEntry): string | null {
   return `${entry.kind === "terminal" ? "terminal" : "file"}\0${path}`;
 }
 
-function sortClosed(a: ClosedTabRecord, b: ClosedTabRecord): number {
-  return b.uses - a.uses || b.lastUsedAt - a.lastUsedAt || b.closedAt - a.closedAt;
+function sortClosed(a: TabHistoryRecord, b: TabHistoryRecord): number {
+  return b.uses - a.uses || b.lastUsedAt - a.lastUsedAt;
 }
 
 export function buildClosedTabEntries(
-  records: readonly ClosedTabRecord[],
+  records: readonly TabHistoryRecord[],
   workspaces: readonly Workspace[],
   liveTabs: readonly TabEntry[],
   workspaceTitle: (ws: Workspace) => string,

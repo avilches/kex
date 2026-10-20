@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedTabRecord } from "@/modules/workspaces/lib/closedTabHistory";
+import type { TabHistoryRecord } from "@/modules/workspaces/lib/tabHistory";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { TabEntry } from "./tabEntries";
 import { buildClosedTabEntries } from "./closedEntries";
 
-const record = (path: string, over: Partial<ClosedTabRecord> = {}): ClosedTabRecord => ({
+const record = (path: string, over: Partial<TabHistoryRecord> = {}): TabHistoryRecord => ({
   kind: "terminal",
   path,
   workspaceId: "ws-1",
-  closedAt: 1,
   uses: 0,
   lastUsedAt: 0,
   ...over,
@@ -58,10 +57,10 @@ describe("buildClosedTabEntries", () => {
     expect(out[0]?.workspaceTitle).toBe("");
   });
 
-  it("sorts by uses, then last use, then when it was closed", () => {
+  it("sorts by uses, then by last use", () => {
     const out = buildClosedTabEntries(
       [
-        record("/a", { closedAt: 9 }),
+        record("/a", { lastUsedAt: 1 }),
         record("/b", { uses: 1 }),
         record("/c", { lastUsedAt: 5 }),
       ],

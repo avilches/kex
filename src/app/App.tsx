@@ -115,11 +115,12 @@ import {
   findTabPane,
   focusedTab,
   focusedTabId,
-  loadClosedTabs,
+  loadTabHistory,
+  noteTabUse,
   planDiffTabOpen,
   siblingPane,
-  touchClosedTab,
-  type ClosedTabRecord,
+  tabIdentityKey,
+  type TabHistoryRecord,
   type DiffIdentity,
   type Tab,
   type MarkdownTabHandle,
@@ -372,6 +373,25 @@ export default function App() {
   useEffect(() => {
     if (activeTabId && !activeWorkspaceHibernated) recordTabUse(activeTabId);
   }, [activeTabId, activeWorkspaceHibernated]);
+
+  // Usage-based history: every real change of the focused location counts once, including
+  // opening a tab and returning to one that was already open. Re-renders that keep the same
+  // location do not add uses.
+  const activeTabIdentity = activeTab ? tabIdentityKey(activeTab) : null;
+  const activeTabHistoryKey =
+    activeWorkspace && activeTabIdentity
+      ? `${activeWorkspace.id}\0${activeTabIdentity}`
+      : null;
+  const lastNotedTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeTab || !activeWorkspace || activeWorkspaceHibernated || !activeTabHistoryKey) {
+      lastNotedTabRef.current = null;
+      return;
+    }
+    if (lastNotedTabRef.current === activeTabHistoryKey) return;
+    lastNotedTabRef.current = activeTabHistoryKey;
+    noteTabUse(activeTab, activeWorkspace.id);
+  }, [activeTab, activeWorkspace, activeWorkspaceHibernated, activeTabHistoryKey]);
 
   // Returns focus to the active tab after a transient interruption -- a
   // dropdown, dialog, or context menu closing -- instead of leaving it on
@@ -3262,12 +3282,12 @@ export default function App() {
     [paletteSources, workspaces],
   );
 
-  const [closedTabRecords, setClosedTabRecords] = useState<ClosedTabRecord[]>([]);
+  const [tabHistoryRecords, setTabHistoryRecords] = useState<TabHistoryRecord[]>([]);
   useEffect(() => {
     if (!commandPaletteOpen) return;
     let cancelled = false;
-    void loadClosedTabs().then((records) => {
-      if (!cancelled) setClosedTabRecords(records);
+    void loadTabHistory().then((records) => {
+      if (!cancelled) setTabHistoryRecords(records);
     });
     return () => {
       cancelled = true;
@@ -3276,16 +3296,15 @@ export default function App() {
   const paletteClosedEntries = useMemo(
     () =>
       paletteSources
-        ? buildClosedTabEntries(closedTabRecords, workspaces, paletteTabEntries, (ws) =>
+        ? buildClosedTabEntries(tabHistoryRecords, workspaces, paletteTabEntries, (ws) =>
             paletteSources.workspaceTitle(ws),
           )
         : [],
-    [paletteSources, closedTabRecords, workspaces, paletteTabEntries],
+    [paletteSources, tabHistoryRecords, workspaces, paletteTabEntries],
   );
 
   const onPaletteRunClosed = useCallback(
     async (entry: ClosedTabEntry) => {
-      void touchClosedTab({ kind: entry.kind, path: entry.path });
       if (
         workspacesRef.current.find((w) => w.id === entry.workspaceId)?.hibernated
       ) {

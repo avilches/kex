@@ -38,11 +38,10 @@ export type GrepResponse = {
 type GlobHit = { path: string; rel: string };
 export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
 
-export type ClosedTabHistoryEntry = {
+export type TabHistoryEntry = {
   kind: "terminal" | "file";
   path: string;
   workspaceId: string;
-  closedAt: number;
   uses: number;
   lastUsedAt: number;
 };
@@ -398,10 +397,11 @@ export const native = {
     invoke<DetectedEditor[]>("editor_scan"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
-  closedTabsList: (): Promise<ClosedTabHistoryEntry[]> =>
-    invoke<ClosedTabHistoryEntry[]>("closed_tabs_list"),
-  closedTabsRecord: (entry: ClosedTabHistoryEntry): Promise<ClosedTabHistoryEntry> =>
-    invoke<ClosedTabHistoryEntry>("closed_tabs_record", { entry }),
-  closedTabsTouch: (kind: "terminal" | "file", path: string): Promise<boolean> =>
-    invoke<boolean>("closed_tabs_touch", { kind, path }),
+  tabHistoryList: (): Promise<TabHistoryEntry[]> =>
+    invoke<TabHistoryEntry[]>("tab_history_list"),
+  tabHistoryRecord: (kind: "terminal" | "file", path: string, workspaceId: string): Promise<void> =>
+    invoke<void>("tab_history_record", { kind, path, workspaceId }),
+  tabHistoryTouch: (
+    entries: { kind: "terminal" | "file"; path: string; workspaceId: string; count: number }[],
+  ): Promise<void> => invoke<void>("tab_history_touch", { entries }),
 };
