@@ -42,6 +42,7 @@ import {
   loadRestorePlans,
 } from "@/modules/agents/lib/agentSessionRestore";
 import {
+  buildClosedTabEntries,
   buildTabEntries,
   buildWorkspaceEntries,
   CommandPalette,
@@ -50,6 +51,7 @@ import {
   usePaletteGit,
   selectTab,
   selectWorkspace,
+  type ClosedTabEntry,
   type TabEntry,
   type WorkspaceEntry,
 } from "@/modules/command-palette";
@@ -113,8 +115,11 @@ import {
   findTabPane,
   focusedTab,
   focusedTabId,
+  loadClosedTabs,
   planDiffTabOpen,
   siblingPane,
+  touchClosedTab,
+  type ClosedTabRecord,
   type DiffIdentity,
   type Tab,
   type MarkdownTabHandle,
@@ -1214,19 +1219,23 @@ export default function App() {
   // ── Open tab helpers ────────────────────────────────────────────────────
 
   const openFileInTab = useCallback(
-    (path: string, pin?: boolean) => {
-      if (!activeWorkspace) return undefined;
+    (path: string, pin?: boolean, workspaceId?: string) => {
+      const target =
+        (workspaceId
+          ? workspacesRef.current.find((w) => w.id === workspaceId)
+          : activeWorkspace) ?? activeWorkspace;
+      if (!target) return undefined;
       const markdown = isMarkdownPath(path);
       // Check if already open (as editor or rendered markdown); activate it.
-      const existingOpenTab = findOpenPathTab(activeWorkspace.paneTree, path);
+      const existingOpenTab = findOpenPathTab(target.paneTree, path);
       if (existingOpenTab) {
         const existing = existingOpenTab.tab;
         if (pin && isFilePreviewTab(existing)) {
-          updateTabData(activeWorkspace.id, existing.id, (p) =>
+          updateTabData(target.id, existing.id, (p) =>
             isFilePreviewTab(p) ? { ...p, preview: false } : p,
           );
         }
-        activateTab(activeWorkspace.id, existing.id);
+        activateTab(target.id, existing.id);
         flashTab(existing.id);
         return existing.id;
       }
@@ -1237,16 +1246,16 @@ export default function App() {
         : { id: tabId, kind: "editor", path, dirty: false, preview: isPreview };
 
       if (isPreview) {
-        const activePane = allPanes(activeWorkspace.paneTree).find(
-          (p) => p.id === activeWorkspace.activePaneId,
+        const pane = allPanes(target.paneTree).find(
+          (p) => p.id === target.activePaneId,
         );
-        const existingPreview = activePane
-          ? findReplaceableFilePreview(activePane.tabs)
+        const existingPreview = pane
+          ? findReplaceableFilePreview(pane.tabs)
           : undefined;
         if (existingPreview) {
           replaceTab(
-            activeWorkspace.id,
-            activeWorkspace.activePaneId,
+            target.id,
+            target.activePaneId,
             existingPreview.id,
             newTab,
           );
@@ -1254,10 +1263,10 @@ export default function App() {
         }
       }
 
-      openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
+      openTab(target.id, target.activePaneId, newTab);
       return tabId;
     },
-    [activeWorkspace, activateTab, openTab, replaceTab],
+    [activeWorkspace, activateTab, openTab, replaceTab, updateTabData],
   );
 
   const openFileAndFocus = useCallback(
@@ -2034,6 +2043,18 @@ export default function App() {
       await handleMoveTabFollowingFocus(sourceWorkspaceId, tabId, request);
     },
     [handleMoveTabFollowingFocus],
+  );
+
+  const moveActiveTabToWorkspace = useCallback(
+    (target: string | "new") => {
+      if (!activeWorkspace || !activeTabId) return;
+      void handleMoveTabFollowingFocus(
+        activeWorkspace.id,
+        activeTabId,
+        target === "new" ? { kind: "new" } : { kind: "auto", workspaceId: target },
+      );
+    },
+    [activeWorkspace, activeTabId, handleMoveTabFollowingFocus],
   );
 
   const handleDropTabOnWorkspace = useCallback(
@@ -3240,6 +3261,65 @@ export default function App() {
     () => (paletteSources ? buildWorkspaceEntries(workspaces, paletteSources) : []),
     [paletteSources, workspaces],
   );
+
+  const [closedTabRecords, setClosedTabRecords] = useState<ClosedTabRecord[]>([]);
+  useEffect(() => {
+    if (!commandPaletteOpen) return;
+    let cancelled = false;
+    void loadClosedTabs().then((records) => {
+      if (!cancelled) setClosedTabRecords(records);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [commandPaletteOpen]);
+  const paletteClosedEntries = useMemo(
+    () =>
+      paletteSources
+        ? buildClosedTabEntries(closedTabRecords, workspaces, paletteTabEntries, (ws) =>
+            paletteSources.workspaceTitle(ws),
+          )
+        : [],
+    [paletteSources, closedTabRecords, workspaces, paletteTabEntries],
+  );
+
+  const onPaletteRunClosed = useCallback(
+    async (entry: ClosedTabEntry) => {
+      void touchClosedTab({ kind: entry.kind, path: entry.path });
+      if (
+        workspacesRef.current.find((w) => w.id === entry.workspaceId)?.hibernated
+      ) {
+        await wakeWorkspace(entry.workspaceId);
+      }
+      let target = workspacesRef.current.find((w) => w.id === entry.workspaceId);
+      if (target?.hibernated) target = undefined;
+      if (!target) {
+        const stillExists = workspacesRef.current.some(
+          (w) => w.id === entry.workspaceId,
+        );
+        toast.info(
+          stillExists
+            ? "That workspace could not be woken, opened in the active one"
+            : "That workspace is gone, opened in the active one",
+        );
+        target = workspacesRef.current.find(
+          (w) => w.id === activeWorkspaceIdRef.current,
+        );
+      }
+      if (!target) return;
+      setActiveWorkspaceId(target.id);
+      if (entry.kind === "terminal") {
+        openTab(target.id, target.activePaneId, {
+          id: newTabId(),
+          kind: "terminal",
+          cwd: entry.path,
+        });
+      } else {
+        openFileInTab(entry.path, true, target.id);
+      }
+    },
+    [wakeWorkspace, setActiveWorkspaceId, openTab, openFileInTab],
+  );
   const onPaletteSelectTab = useCallback(
     (entry: TabEntry) => {
       void selectTab(entry, {
@@ -3300,6 +3380,15 @@ export default function App() {
             },
             hasActiveTerminal: activeTab?.kind === "terminal",
             hibernated: !!activeWorkspace?.hibernated,
+            activePaneTabCount: activePane?.tabs.length ?? 0,
+            hasActiveTab: !!activeTab,
+            hasActiveTabTitle: !!activeTab?.title,
+            closeOtherTabs: handleCloseOtherTabs,
+            closeAllTabs: handleCloseAllTabs,
+            resetActiveTabTitle: () => {
+              if (activeTab && activeWorkspace)
+                updateTabData(activeWorkspace.id, activeTab.id, (p) => ({ ...p, title: undefined }));
+            },
             openWorkspaceProperties: () =>
               useWorkspaceSettingsStore
                 .getState()
@@ -3347,6 +3436,9 @@ export default function App() {
       clearFocusedTerminal,
       setZenPaneId,
       activeTab,
+      activePane,
+      handleCloseOtherTabs,
+      handleCloseAllTabs,
       shortcutHandlers,
       shortcutContext,
       updateTabData,
@@ -3692,10 +3784,14 @@ export default function App() {
             onOpenContentHit={openContentHit}
             insertCommand={insertHistoryCommand}
             activeTabId={activeTabId}
+            activeWorkspaceId={activeWorkspaceId}
             tabEntries={paletteTabEntries}
             workspaceEntries={paletteWorkspaceEntries}
+            closedEntries={paletteClosedEntries}
             onSelectTab={onPaletteSelectTab}
             onSelectWorkspace={onPaletteSelectWorkspace}
+            onRunClosed={onPaletteRunClosed}
+            onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
           />
 
           <NewEditorDialog

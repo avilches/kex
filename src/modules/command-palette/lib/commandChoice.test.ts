@@ -21,6 +21,7 @@ describe("commandChoice", () => {
 
   it("learns the rows that only open a sub mode, since they are the ones chosen by text most", () => {
     expect(commandChoice(item("theme.pick"))).toEqual({ action: "themes", learn: true });
+    expect(commandChoice(item("tab.moveToWorkspace"))).toEqual({ action: "workspaces", learn: true });
     expect(commandChoice(item("search.content"))).toEqual({ action: "content", learn: true });
     expect(commandChoice(item("history.open"))).toEqual({ action: "history", learn: true });
   });

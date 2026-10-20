@@ -38,6 +38,15 @@ export type GrepResponse = {
 type GlobHit = { path: string; rel: string };
 export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
 
+export type ClosedTabHistoryEntry = {
+  kind: "terminal" | "file";
+  path: string;
+  workspaceId: string;
+  closedAt: number;
+  uses: number;
+  lastUsedAt: number;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -389,4 +398,10 @@ export const native = {
     invoke<DetectedEditor[]>("editor_scan"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
+  closedTabsList: (): Promise<ClosedTabHistoryEntry[]> =>
+    invoke<ClosedTabHistoryEntry[]>("closed_tabs_list"),
+  closedTabsRecord: (entry: ClosedTabHistoryEntry): Promise<ClosedTabHistoryEntry> =>
+    invoke<ClosedTabHistoryEntry>("closed_tabs_record", { entry }),
+  closedTabsTouch: (kind: "terminal" | "file", path: string): Promise<boolean> =>
+    invoke<boolean>("closed_tabs_touch", { kind, path }),
 };

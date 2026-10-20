@@ -140,6 +140,18 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 ---
 
+## `closed_tabs::*` - Closed tab history
+
+State: `closed-tabs.json` in the app data dir, next to `agent-sessions.json`. Only terminals (by `cwd`) and files (by path) are stored, with the workspace they were closed in, `closedAt`, `uses` and `lastUsedAt`. Writes are atomic (temp file + rename), serialized by a process lock, and capped at 200 entries, dropping the least used and oldest first so a folder reopened many times survives.
+
+| Command | Description |
+|---|---|
+| `closed_tabs_list` | Return every stored record, most used first, then most recently used and closed. Corrupt or missing files read as an empty list |
+| `closed_tabs_record(entry)` | Insert or update one `{ kind, path, workspaceId, closedAt, uses, lastUsedAt }`. Recording a location that already exists refreshes its workspace and close time and keeps its use count. Paths are normalized to forward slashes without a trailing one. Rejects unknown kinds and empty paths |
+| `closed_tabs_touch(kind, path)` | Bump `uses` and `lastUsedAt` for an existing record. Returns `false` when the location is no longer in the history |
+
+---
+
 ## Misc
 
 | Command | Description |

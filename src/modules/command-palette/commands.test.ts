@@ -38,6 +38,12 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     toggleZenMode: fn(),
     hasActiveTerminal: true,
     hibernated: false,
+    activePaneTabCount: 2,
+    hasActiveTab: true,
+    hasActiveTabTitle: true,
+    closeOtherTabs: fn(),
+    closeAllTabs: fn(),
+    resetActiveTabTitle: fn(),
     openWorkspaceProperties: fn(),
     openActionsConfiguration: fn(),
     shortcutHandlers: {},
@@ -130,6 +136,28 @@ describe("palette catalog", () => {
     const without = createCommandItems(ctx({ hasActiveTabNote: false })).find((i) => i.id === "tab.note.remove");
     expect(with_?.disabledReason).toBeUndefined();
     expect(without?.disabledReason).toBeTruthy();
+  });
+
+  it("disables Close other tabs when the pane holds a single tab", () => {
+    const single = createCommandItems(ctx({ activePaneTabCount: 1 })).find((i) => i.id === "tab.closeOthers");
+    const many = createCommandItems(ctx({ activePaneTabCount: 2 })).find((i) => i.id === "tab.closeOthers");
+    expect(single?.disabledReason).toBe("Single tab");
+    expect(many?.disabledReason).toBeUndefined();
+  });
+
+  it("disables the tab title reset when the tab has no own title", () => {
+    const own = createCommandItems(ctx({ hasActiveTabTitle: true })).find((i) => i.id === "tab.resetTitle");
+    const inherited = createCommandItems(ctx({ hasActiveTabTitle: false })).find((i) => i.id === "tab.resetTitle");
+    expect(own?.disabledReason).toBeUndefined();
+    expect(inherited?.disabledReason).toBe("No custom title");
+  });
+
+  it("disables the rows that need an active tab when there is none", () => {
+    const items = new Map(
+      createCommandItems(ctx({ hasActiveTab: false, activePaneTabCount: 0 })).map((i) => [i.id, i]),
+    );
+    expect(items.get("tab.moveToWorkspace")?.disabledReason).toBe("No active tab");
+    expect(items.get("tab.closeAll")?.disabledReason).toBe("No tabs");
   });
 });
 
