@@ -14,6 +14,7 @@ import { syncIntegrations } from "./modules/agents/lib/integrationActions";
 import { loadPreferences, updateInstalledIntegrations } from "./modules/settings/store";
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
+import { flushTabUses } from "./modules/workspaces/lib/tabHistory";
 import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
@@ -96,6 +97,7 @@ getCurrentWindow().onCloseRequested(async (event) => {
     await flushAgentTitles();
     await flushSidebarSnapshots();
     await flushEditors();
+    await flushTabUses();
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
   } catch { /* nothing - window stays open; user can retry */ }
@@ -109,6 +111,7 @@ listen("kex:before-quit", async () => {
       await flushAgentTitles();
       await flushSidebarSnapshots();
       await flushEditors();
+      await flushTabUses();
       await flushWorkspaceState();
     }
   } finally {

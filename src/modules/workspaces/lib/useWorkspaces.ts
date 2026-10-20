@@ -16,7 +16,7 @@ import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
 import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
-import { recordTabClosed } from "./tabHistory";
+import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
@@ -512,7 +512,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // when the user closes the last workspace and clicks X simultaneously.
   useEffect(() => {
     if (workspaces.length === 0 && claimClose()) {
-      void flushWorkspaceState().finally(async () => {
+      void Promise.all([flushTabUses(), flushWorkspaceState()]).finally(async () => {
         // Signal Rust to stay alive after the window closes (macOS-style windowless mode).
         await invoke("enter_windowless_mode").catch(() => {});
         void getCurrentWindow().destroy();
