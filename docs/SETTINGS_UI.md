@@ -40,11 +40,26 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   `ActionRow`, entrada de extension en `FileTypesSection`) abre `AlertDialog` y solo llega al
   store con el boton destructivo confirmado.
 - **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el
-  body y el contenido de un Popover se portal a body, quedando muerto para el raton (el
-  teclado sigue). En el codebase esta regla esta resuelta con `pointer-events-auto` en el
-  className del `PopoverContent` afectado: referencias vivas `AddApplicationMenu.tsx` y el
-  popover de Make global en `ActionRow.tsx`. Aplicarla a todo popover que abra dentro de
-  `WorkspaceSettingsDialog` o de otros modales.
+  body y un popover portalizado a body queda muerto para el raton (y `RemoveScroll` se come la
+  rueda). El patron vigente es `DialogScrollHost` (`src/components/dialogScrollHost.tsx`): el
+  dialogo expone su nodo scrolleable via contexto y el popover se renderiza dentro con
+  `container={host}` manteniendo `pointer-events-auto` en el `PopoverContent`; referencias
+  vivas `AddApplicationMenu.tsx` (combo de apps) y el popover de Make global en `ActionRow.tsx`.
+  Aplicarla (con su provider, `WheelScrollDialogHost` en `WorkspaceSettingsDialog.tsx`) a todo
+  popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
+- **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,
+  `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}` y `{host}`. Los
+  nombres canonico son `{filepath}` y `{filename}` (los antiguos `{path}`/`{file}` ya no
+  existen); los presets de JetBrains solo ofrecen las variantes de workspace y cwd porque sus
+  editores no abren ficheros sueltos.
+- **Menu "+ Action"**: sin acciones, la ActionsBar muestra el trigger punteado "+ Action" (solo
+  el simbolo, sin icono) con dos entradas: "Add global action" abre Settings > Actions con un
+  borrador de script vacio y el foco en el commando, y "This workspace only" hace lo mismo en
+  el dialogo de workspace. Con acciones, el trigger reaparece al pasar el raton por la barra.
+- **Nombres en dos lineas**: un nombre de Action con `{variable}` la muestra debajo en mono
+  pequeno en todas las superficies donde se renderiza el nombre (boton propio del header, filas
+  de los menus agrupados y tarjeta plegada del editor), via `ActionNameLines.tsx`; el ancho del
+  boton propio se mide solo con el nombre principal.
 - **Conteo apagado en triggers**: los menus agrupados de `ActionsBar` muestran un numero
   apagado junto al label del trigger con las filas que contienen (workspace + global).
 
