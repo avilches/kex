@@ -261,6 +261,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddGlobal, on
   const model = useActionsBarModel({ workspace, room });
   return (
     <div ref={ref} data-tauri-drag-region className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
+      <AddActionMenu onAddGlobal={onAddGlobal} onAddWorkspace={onAddWorkspace} reveal={model.empty ? "always" : "hover"} />
       {model.buttons.map((item) => (
         <OwnButton key={item.id} item={item} {...controller} />
       ))}
@@ -282,7 +283,6 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddGlobal, on
         onConfigure={onConfigure}
         {...controller}
       />
-      <AddActionMenu onAddGlobal={onAddGlobal} onAddWorkspace={onAddWorkspace} reveal={model.empty ? "always" : "hover"} />
     </div>
   );
 }
