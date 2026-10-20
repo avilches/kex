@@ -41,9 +41,9 @@ type PendingUse = {
 };
 
 // Frecency has to survive tab switching without writing the whole JSON on every click. Uses
-// accumulate in memory and land in one batch after a short pause, or immediately when the
-// palette opens or a tab closes.
-const FLUSH_DELAY_MS = 800;
+// accumulate in memory and land in one batch at most every ten seconds, or immediately when
+// the palette opens or a tab closes.
+const FLUSH_INTERVAL_MS = 10_000;
 const pending = new Map<string, PendingUse>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let writes: Promise<void> = Promise.resolve();
@@ -53,7 +53,7 @@ function scheduleFlush(): void {
   flushTimer = setTimeout(() => {
     flushTimer = null;
     void flushTabUses();
-  }, FLUSH_DELAY_MS);
+  }, FLUSH_INTERVAL_MS);
 }
 
 // One focus of the tab counts as one use. The counter is what decides the order in the palette

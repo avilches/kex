@@ -62,6 +62,25 @@ describe("noteTabUse", () => {
     await flushTabUses();
     expect(nativeMocks.touch).not.toHaveBeenCalled();
   });
+
+  it("writes at most once every ten seconds while tabs keep changing", async () => {
+    vi.useFakeTimers();
+    try {
+      noteTabUse(terminal("/work/a"), "ws-1");
+      await vi.advanceTimersByTimeAsync(5_000);
+      noteTabUse(terminal("/work/a"), "ws-1");
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(nativeMocks.touch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(nativeMocks.touch).toHaveBeenCalledTimes(1);
+      expect(nativeMocks.touch.mock.calls[0][0]).toEqual([
+        { kind: "terminal", path: "/work/a", workspaceId: "ws-1", count: 2 },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("recordTabClosed", () => {
