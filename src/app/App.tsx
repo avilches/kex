@@ -38,6 +38,7 @@ import { isMarkdownPath } from "@/lib/utils";
 import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
 import { findReplaceableFilePreview, isFilePreviewTab } from "@/modules/workspaces/lib/fileTabPreview";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
+import { buildAgentEntries, entriesByWorkspace } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   loadRestorePlans,
@@ -147,6 +148,9 @@ import {
   bulkClosableIds,
   otherBulkClosableIds,
 } from "@/modules/workspaces/lib/tabClose";
+import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
+import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
+import { workspaceDetailRows } from "@/modules/workspaces/lib/workspaceDetail";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -2687,26 +2691,60 @@ export default function App() {
     [activeWorkspaceId, sourceControl.status, gitColorScheme],
   );
 
-  const cycleWorkspace = useCallback(
+  const detailFilter = useDetailFilter();
+  const cycleLinear = useCallback(
     (delta: 1 | -1) => {
+      if (!activeWorkspaceId) return;
       const visible = visibleWorkspaceOrder(
         workspaces,
         groups,
         collapsedGroups,
         activeWorkspaceId,
       );
-      if (visible.length < 2) return;
-      const idx = visible.findIndex((w) => w.id === activeWorkspaceId);
-      const baseIdx = idx === -1 ? 0 : idx;
-      const nextIdx = (baseIdx + delta + visible.length) % visible.length;
-      setActiveWorkspaceId(visible[nextIdx].id);
+      const { sessions, notifications, tabLocations: live } =
+        useAgentStore.getState();
+      const entries = entriesByWorkspace(
+        buildAgentEntries(sessions, notifications, live),
+      );
+      const navWorkspaces = visible.map((w) => {
+        const tabs =
+          w.detailExpanded && !w.hibernated
+            ? allPanes(w.paneTree).flatMap((p) => p.tabs)
+            : [];
+        const agentTabIds = new Set(
+          tabs.filter((t) => t.kind === "terminal" && sessions[t.id]).map((t) => t.id),
+        );
+        const rows = workspaceDetailRows(
+          tabs,
+          agentTabIds,
+          entries[w.id] ?? [],
+          detailFilter,
+        );
+        return { id: w.id, rowTabIds: rows.map((r) => r.tabId) };
+      });
+      const current = visible.find((w) => w.id === activeWorkspaceId);
+      const target = linearNavTarget(
+        navWorkspaces,
+        {
+          workspaceId: activeWorkspaceId,
+          tabId: current ? focusedTabId(current.paneTree, current.activePaneId) : null,
+        },
+        delta,
+      );
+      if (!target) return;
+      if (target.workspaceId !== activeWorkspaceId) {
+        setActiveWorkspaceId(target.workspaceId);
+      }
+      if (target.tabId) onActivateTabStable(target.workspaceId, target.tabId);
     },
     [
       workspaces,
       groups,
       collapsedGroups,
       activeWorkspaceId,
+      detailFilter,
       setActiveWorkspaceId,
+      onActivateTabStable,
     ],
   );
 
@@ -2946,8 +2984,8 @@ export default function App() {
       "settings.open": () => void openSettingsWindow(),
       "notifications.toggle": () => useBellStore.getState().toggle(),
       "window.new": () => void native.openMainWindow(),
-      "workspace.prev": () => cycleWorkspace(-1),
-      "workspace.next": () => cycleWorkspace(1),
+      "nav.prev": () => cycleLinear(-1),
+      "nav.next": () => cycleLinear(1),
       "workspace.selectByIndex": (e) => {
         const idx = parseInt(e.key, 10) - 1;
         const visible = visibleWorkspaceOrder(
@@ -3045,7 +3083,7 @@ export default function App() {
       groups,
       collapsedGroups,
       openCommandPalette,
-      cycleWorkspace,
+      cycleLinear,
       onActivateTabStable,
       handleCloseActiveTab,
       reopenClosed,

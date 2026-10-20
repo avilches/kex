@@ -64,8 +64,8 @@ export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
   "pane.focusDown": "relative navigation with no target to pick",
   "pane.focusLeft": "relative navigation with no target to pick",
   "pane.focusRight": "relative navigation with no target to pick",
-  "workspace.prev": "relative navigation with no target to pick",
-  "workspace.next": "relative navigation with no target to pick",
+  "nav.prev": "relative navigation with no target to pick",
+  "nav.next": "relative navigation with no target to pick",
   "tab.selectByIndex": "handler is parametrised by the digit key",
   "workspace.selectByIndex": "handler is parametrised by the digit key",
 };
