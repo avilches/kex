@@ -18,6 +18,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -1748,6 +1749,7 @@ function TreeDirRow({
       </ContextMenuTrigger>
       {absolutePath ? (
         <ContextMenuContent className={COMPACT_CONTENT}>
+          <RowActionsMenu kind="folder" path={absolutePath} />
           <ContextMenuItem
             className={COMPACT_ITEM}
             onSelect={() => void revealInFinder(absolutePath)}
@@ -1949,6 +1951,7 @@ const EntryRow = memo(function EntryRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
+        {absolutePath && <RowActionsMenu kind="file" path={absolutePath} />}
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => {

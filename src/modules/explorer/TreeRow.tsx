@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/context-menu";
 import { pathDirname } from "@/lib/pathUtils";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { cn } from "@/lib/utils";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
 import type { GitColorScheme } from "@/modules/settings/store";
@@ -307,6 +308,7 @@ function EntryRowImpl(props: EntryRowProps) {
             Set as Workspace Root
           </ContextMenuItem>
         )}
+        <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {isDir && onNewWorkspaceFromFolder && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -557,6 +559,7 @@ export function FsRootRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
+        <RowActionsMenu kind="folder" path={path} />
         {onSetAsRoot && (
           <ContextMenuItem
             className={COMPACT_ITEM}

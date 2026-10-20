@@ -25,6 +25,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { unlinkTab } from "@/modules/actions/lib/actionStateStore";
 import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
+import { ActionMenuProvider } from "@/modules/actions/RowActionsMenu";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
@@ -3521,6 +3522,7 @@ export default function App() {
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
+        <ActionMenuProvider run={runAction} ws={activeWorkspace ?? null}>
         <div className="zoom-content relative flex h-[calc(100vh/var(--app-zoom))] flex-col overflow-hidden bg-background text-foreground">
           <Header
             onToggleSidebar={toggleSidebar}
@@ -3915,6 +3917,7 @@ export default function App() {
             onConfirmDeleteClose={confirmDeleteClose}
           />
         </div>
+        </ActionMenuProvider>
       </TooltipProvider>
     </ThemeProvider>
   );

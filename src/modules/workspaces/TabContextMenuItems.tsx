@@ -36,6 +36,7 @@ import { ColorPaletteGrid } from "./ColorPaletteGrid";
 import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
+import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 import { tabFilePath } from "./lib/tabPath";
 
@@ -85,6 +86,12 @@ export function TabContextMenuItems({
   const runOnStart =
     tab.kind === "terminal" && onUpdateTab ? (
       <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
+    ) : null;
+  const rowActions =
+    tab.kind === "terminal" ? (
+      <RowActionsMenu kind="folder" path={tab.cwd ?? ""} />
+    ) : "path" in tab && tab.path ? (
+      <RowActionsMenu kind="file" path={tab.path} />
     ) : null;
 
   return (
@@ -232,6 +239,12 @@ export function TabContextMenuItems({
         </>
       )}
       <TabAgentMenuItems tabId={tab.id}>{runOnStart}</TabAgentMenuItems>
+      {rowActions && (
+        <>
+          <ContextMenuSeparator />
+          {rowActions}
+        </>
+      )}
       <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>

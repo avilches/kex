@@ -31,6 +31,15 @@ import {
 import { getActionTab, linkActionTab } from "./actionStateStore";
 import type { Action } from "./types";
 
+// Values a run takes from where it was launched instead of the focused tab: the context
+// menus (explorer rows, breadcrumbs, tabs) run an Action against their own folder or file.
+export type RunOverlay = {
+  vars?: Partial<RunContext["vars"]>;
+  focusFolder?: string | null;
+  /** Where a spawned app is launched from; the folder or file folder of the row. */
+  spawnCwd?: string | null;
+};
+
 type TerminalHandle = { write: (data: string) => void };
 
 type Found = { workspace: Workspace; pane: { id: string }; tab: Tab } | null;
@@ -77,15 +86,15 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   };
 }
 
-function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps): RunContext {
+function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
   const focused = focusedTab(ws.paneTree, ws.activePaneId);
   const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
     hibernated: !!ws.hibernated,
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
-    vars: buildCommandVars(focused, ws, info, getSystemInfo().host),
-    folders: { focusFolder: deps.focusFolder.current, workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },
+    vars: { ...buildCommandVars(focused, ws, info, getSystemInfo().host), ...overlay?.vars },
+    folders: { focusFolder: overlay?.focusFolder ?? deps.focusFolder.current, workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },
     link: action.runInTerminal ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
     atPaneLimit: allPanes(ws.paneTree).length >= workspacePaneLimit,
@@ -174,16 +183,18 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   );
 
   const runAction = useCallback(
-    (action: Action) => {
+    (action: Action, overlay?: RunOverlay) => {
       const ws = activeWorkspace;
       if (!ws) return;
-      const plan = planActionRun(action, contextFor(action, ws, deps));
+      const plan = planActionRun(action, contextFor(action, ws, deps, overlay));
       switch (plan.kind) {
         case "blocked":
           if (!plan.silent) toast.error(plan.reason, { duration: 4000 });
           return;
         case "spawn-app":
-          void native.actionSpawn(plan.argv, ws.workspaceRoot || ws.cwd || undefined).catch((e: unknown) => {
+          void native
+            .actionSpawn(plan.argv, overlay?.spawnCwd ?? ws.workspaceRoot ?? ws.cwd ?? undefined)
+            .catch((e: unknown) => {
             const why = e instanceof Error ? e.message : String(e);
             toast.error(`${action.name.trim() || "Action"} not run: ${why}`, { duration: 6000 });
           });
