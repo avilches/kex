@@ -181,16 +181,16 @@ describe("ownButtonsThatFit", () => {
   });
 
   it("does not spend a slot on an Action the place hides", () => {
-    const hidden = script({ id: "hidden", command: "agent {cwd}" });
-    const visible = script({ id: "visible" });
-    const room = ownButtonWidth(visible) + BAR_GAP + MENUS_RESERVE;
+    const hidden = script({ id: "hidden", name: "One", command: "agent {cwd}" });
+    const visible = script({ id: "visible", name: "Two" });
+    const room = [hidden, visible].reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
     const file = { file: true, folder: false };
     const folder = { file: false, folder: true };
-    const noPlace = ownButtonsThatFit([hidden, visible], room);
-    expect(ownButtonsThatFit([hidden, visible], room, folder)).toBe(noPlace);
-    expect(ownButtonsThatFit([hidden, visible], room, file)).toBe(noPlace);
+    expect(ownButtonsThatFit([hidden, visible], room, file)).toBe(1);
+    expect(ownButtonsThatFit([hidden, visible], room, folder)).toBe(2);
     const running = new Map([["hidden", "running" as const]]);
-    expect(ownButtonsThatFit([hidden, visible], room, file, running)).toBe(1);
+    expect(ownButtonsThatFit([hidden, visible], room, file, running)).toBe(2);
+    expect(ownButtonsThatFit([hidden, visible], room, folder, running)).toBe(2);
   });
 
   it("a hidden own button never folds a visible one out of the bar", () => {

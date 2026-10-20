@@ -51,7 +51,7 @@ export function ownButtonsThatFit(
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   for (const action of actions) {
-    if (!shownAtPlace(action, states?.get(action.id) ?? "idle", place)) continue;
+    if (!shownAtPlace(action, action.runInTerminal ? (states?.get(action.id) ?? "idle") : "idle", place)) continue;
     left -= ownButtonWidth(action) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
