@@ -21,6 +21,7 @@ import { COMPACT_CONTENT, COMPACT_ITEM } from "@/modules/explorer/lib/menuItemCl
 import { buildCommandVars } from "@/modules/actions/lib/commandVars";
 import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
 import { contextActionEntries, type ContextActionEntry, type ContextActionKind } from "@/modules/actions/lib/contextActionEntries";
+import { WORKSPACE_UNSET } from "@/modules/actions/lib/actionsBar";
 import { ActionIcon } from "@/modules/actions/ActionIcon";
 import { ActionNameLines } from "@/modules/actions/ActionNameLines";
 import type { Action } from "@/modules/actions/lib/types";
@@ -123,7 +124,7 @@ export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind;
             <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
               <ActionNameLines name={entry.action.name} value={entry.subtitle} />
             </span>
-            {!entry.enabled && entry.reason && (
+            {!entry.enabled && entry.reason && entry.subtitle !== WORKSPACE_UNSET && (
               <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>
             )}
           </ContextMenuItem>

@@ -96,10 +96,6 @@ const VARIABLE = /\{[?!]?[a-z]/;
 
 export const WORKSPACE_UNSET = "Workspace Root not configured";
 
-/** The reason for a workspace Action with no configured root; the subtitle already tells
- * the story, so menus skip the right-hand reason for exactly this case. */
-export const WORKSPACE_MISSING = describeMissing(["workspace"]);
-
 // The line under the name: the value the place gives the preset variable, not the raw
 // template ({cwd} under "Code {cwd}" is the folder it would open). A workspace Action
 // without a configured root says so; a variable with no readable part keeps the template.

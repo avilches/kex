@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { menuEntries, WORKSPACE_MISSING, type BarItem } from "./lib/actionsBar";
+import { menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -114,7 +114,7 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
         <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
           <ActionNameLines name={item.name} value={item.subtitle} />
         </span>
-        {blocked && item.disabledReason !== WORKSPACE_MISSING && (
+        {blocked && item.subtitle !== WORKSPACE_UNSET && (
           <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
         )}
         {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
