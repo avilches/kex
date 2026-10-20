@@ -16,9 +16,16 @@ function processName(command: string): string {
   return word.split(/[\\/]/).pop() ?? "";
 }
 
-// The line under the path: the process the terminal runs (an agent already has its icon) and the
-// branch, joined by a middle dot. Null when the tab has neither.
-export function tabStatus(entry: TabEntry): string | null {
+const DOT = " \u00b7 ";
+
+// The lines a tab row shows under its title: the path, the process the terminal runs (an agent
+// already has its icon) and the branch. With both process and branch they get a line of their own;
+// with only one it joins the path, the process before it and the branch after it.
+export function tabDetailLines(entry: TabEntry): string[] {
+  const path = tabLocation(entry);
   const process = entry.agent ? "" : processName(entry.command);
-  return [process, entry.branch].filter(Boolean).join(" · ") || null;
+  const branch = entry.branch;
+  if (process && branch) return [path, process + DOT + branch].filter((l): l is string => !!l);
+  const line = [process, path, branch].filter(Boolean).join(DOT);
+  return line ? [line] : [];
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tabLocation, tabStatus } from "./rowDetail";
+import { tabDetailLines, tabLocation } from "./rowDetail";
 import type { TabEntry } from "./tabEntries";
 
 const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
@@ -29,23 +29,29 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   ...over,
 });
 
-describe("tabStatus", () => {
-  it("joins the process name and the branch with a middle dot", () => {
-    expect(tabStatus(entry({ command: "top", branch: "main" }))).toBe("top · main");
+describe("tabDetailLines", () => {
+  it("puts the process and the branch on their own line when there are both", () => {
+    expect(tabDetailLines(entry({ command: "top", branch: "main" }))).toEqual(["/p/Kex", "top \u00b7 main"]);
+  });
+
+  it("puts a lone process before the path and a lone branch after it", () => {
+    expect(tabDetailLines(entry({ command: "vim notes.md" }))).toEqual(["vim \u00b7 /p/Kex"]);
+    expect(tabDetailLines(entry({ branch: "main" }))).toEqual(["/p/Kex \u00b7 main"]);
   });
 
   it("drops the arguments, any path and leading variables of the command", () => {
-    expect(tabStatus(entry({ command: "pnpm dev --port 3000" }))).toBe("pnpm");
-    expect(tabStatus(entry({ command: "NODE_ENV=prod /usr/bin/node server.js" }))).toBe("node");
+    expect(tabDetailLines(entry({ command: "pnpm dev --port 3000" }))).toEqual(["pnpm \u00b7 /p/Kex"]);
+    expect(tabDetailLines(entry({ command: "NODE_ENV=prod /usr/bin/node server.js" }))).toEqual(["node \u00b7 /p/Kex"]);
   });
 
-  it("shows only the branch for an agent, and only the process without a branch", () => {
-    expect(tabStatus(entry({ command: "claude --resume", agent: "claude", branch: "main" }))).toBe("main");
-    expect(tabStatus(entry({ command: "vim notes.md" }))).toBe("vim");
+  it("ignores the process of an agent", () => {
+    expect(tabDetailLines(entry({ command: "claude", agent: "claude" }))).toEqual(["/p/Kex"]);
+    expect(tabDetailLines(entry({ command: "claude", agent: "claude", branch: "main" }))).toEqual(["/p/Kex \u00b7 main"]);
   });
 
-  it("is null when there is nothing to show", () => {
-    expect(tabStatus(entry())).toBeNull();
+  it("is just the path with nothing else, and empty with nothing at all", () => {
+    expect(tabDetailLines(entry())).toEqual(["/p/Kex"]);
+    expect(tabDetailLines(entry({ detail: "" }))).toEqual([]);
   });
 });
 

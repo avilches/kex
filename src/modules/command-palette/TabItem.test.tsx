@@ -51,9 +51,12 @@ describe("TabItem", () => {
     expect(screen.getByText("Work")).toBeTruthy();
   });
 
-  it("shows the process and the branch under the path", () => {
-    row(entry({ command: "top -o cpu", branch: "main" }));
+  it("shows the process and the branch under the path, or beside it when only one exists", () => {
+    row(entry({ detail: "/p/Kex", command: "top -o cpu", branch: "main" }));
     expect(screen.getByText("top · main")).toBeTruthy();
+    cleanup();
+    row(entry({ detail: "/p/Kex", branch: "main" }));
+    expect(screen.getByText("/p/Kex · main")).toBeTruthy();
   });
 
   it("labels the row as a Tab", () => {
