@@ -25,13 +25,17 @@ vi.mock("@/modules/settings/preferences", () => ({
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a) } }));
 
+const send = vi.fn();
+const feed = vi.fn(() => ({ feed: null, send }));
+vi.mock("@/modules/actions/lib/actionsFeed", () => ({ useWorkspaceActionsFeed: () => feed() }));
+
 import { ActionsSection } from "./ActionsSection";
 
-function mount() {
+function mount(extra: { startDraft?: string; onDraftConsumed?: () => void } = {}) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(ActionsSection)));
+  act(() => root.render(createElement(ActionsSection, extra)));
   return { container, unmount: () => act(() => root.unmount()) };
 }
 
@@ -110,5 +114,15 @@ describe("ActionsSection", () => {
     act(() => void buttons(container).find((b) => b.textContent?.includes("Scan"))!.click());
     expect(scan).toHaveBeenCalled();
     unmount();
+  });
+
+  it("the section ext keeps the :script tail so the workspace tab opens with a blank command row", () => {
+    let seen: string | undefined;
+    feed.mockImplementationOnce(() => {
+      seen = undefined;
+      return { feed: null, send };
+    });
+    mount({ startDraft: "workspace:script", onDraftConsumed: () => (seen = "consumed") });
+    expect(seen).toBe("consumed");
   });
 });

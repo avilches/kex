@@ -17,8 +17,12 @@ export function useWorkspaceActionsFeed(): { feed: ActionsPush | null; send: (ed
   useEffect(() => {
     const unlisten: UnlistenFn[] = [];
     void emit(ACTIONS_ATTACH_EVENT);
+    // The attach event can outrun the main window's listener (a boot-restored Settings
+    // window beats the app mount), so it is repeated while this side is alive.
+    const heartbeat = setInterval(() => void emit(ACTIONS_ATTACH_EVENT), 15_000);
     void listen<ActionsPush>(ACTIONS_PUSH_EVENT, (e) => setFeed(e.payload)).then((u) => unlisten.push(u));
     return () => {
+      clearInterval(heartbeat);
       void emit(ACTIONS_DETACH_EVENT);
       for (const u of unlisten) u();
     };

@@ -43,7 +43,7 @@ export function planCommandEvent(
 }
 
 /**
- * The command a tab reports as running. A script is typed wrapped in a `cd`,
+ * The command a tab reports as running. A script is typed as its expanded command,
  * so the shell reports that wrapper; the tab should show the user's command.
  */
 export function displayedRunningCommand(

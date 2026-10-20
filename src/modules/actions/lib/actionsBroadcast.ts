@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import {
   ACTIONS_ATTACH_EVENT,
   ACTIONS_DETACH_EVENT,
@@ -59,53 +59,68 @@ type Props = {
 // single source of truth: what the Settings window sees of an edit is its own push back.
 export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): void {
   const context = useActionContext(workspace);
-  const title = useWorkspaceTitle(workspace as never);
   const attached = useRef(0);
   const lastKey = useRef<string | null>(null);
   const mutatorsRef = useRef(mutators);
   mutatorsRef.current = mutators;
   const contextRef = useRef<ActionContext | null>(context);
   contextRef.current = context;
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
+  const titleRef = useRef("Untitled");
+  titleRef.current = (workspace?.title || "").trim() || "Untitled";
 
-  const buildPush = (): ActionsPush | null =>
-    workspace
-      ? {
-          workspaceId: workspace.id,
-          workspaceName: title,
-          actions: workspace.actions ?? [],
-          context: contextRef.current,
+  const push = useRef(() => {
+    const ws = workspaceRef.current;
+    if (!ws || attached.current === 0) return;
+    void getAllWebviewWindows().then((windows) => {
+      // A destroyed window never reports detach, so the count alone cannot be trusted:
+      // the Settings window must exist as long as it counts itself attached.
+      if (!windows.some((w) => w.label === "settings")) {
+        if (attached.current !== 0) {
+          attached.current = 0;
+          lastKey.current = null;
         }
-      : null;
+        return;
+      }
+      const payload: ActionsPush = {
+        workspaceId: ws.id,
+        workspaceName: titleRef.current,
+        actions: ws.actions ?? [],
+        context: contextRef.current,
+      };
+      const key = pushKey(payload);
+      if (key === lastKey.current) return;
+      lastKey.current = key;
+      void emit(ACTIONS_PUSH_EVENT, payload);
+    });
+  });
+  const pushNow = useRef(push.current);
+  pushNow.current = () => {
+    lastKey.current = null;
+    push.current();
+  };
 
   useEffect(() => {
     const unlisten: UnlistenFn[] = [];
-    const rePush = () => lastKey.current = null;
-    void emit(ACTIONS_ATTACH_EVENT).then(rePush);
     void listen(ACTIONS_ATTACH_EVENT, () => {
-      attached.current += 1;
-      rePush();
+      attached.current = 1;
+      pushNow.current();
     }).then((u) => unlisten.push(u));
     void listen(ACTIONS_DETACH_EVENT, () => {
       attached.current = Math.max(0, attached.current - 1);
       lastKey.current = null;
     }).then((u) => unlisten.push(u));
     void listen<ActionsEdit>(ACTIONS_EDIT_EVENT, (e) => {
-      rePush();
+      lastKey.current = null;
       applyEdit(mutatorsRef.current, e.payload);
     }).then((u) => unlisten.push(u));
     return () => {
-      attached.current = 0;
-      void emit(ACTIONS_DETACH_EVENT);
       for (const u of unlisten) u();
     };
   }, []);
 
   useEffect(() => {
-    const push = buildPush();
-    if (!push || attached.current === 0) return;
-    const key = pushKey(push);
-    if (key === lastKey.current) return;
-    lastKey.current = key;
-    void emit(ACTIONS_PUSH_EVENT, push);
+    push.current();
   });
 }

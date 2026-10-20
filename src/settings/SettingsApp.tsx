@@ -39,11 +39,11 @@ const SECTIONS = SETTINGS_SECTIONS.map((s) => ({ ...s, component: COMPONENTS[s.i
 
 const VALID_SECTIONS: SettingsSection[] = SECTIONS.map((s) => s.id);
 
-function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
+export function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
   if (!raw) return { section: "general" };
-  const [sectionId, ext] = raw.split(":");
+  const [sectionId, ...rest] = raw.split(":");
   const section = (VALID_SECTIONS as string[]).includes(sectionId) ? (sectionId as SettingsSection) : "general";
-  return { section, ext: ext || undefined };
+  return { section, ext: rest.length > 0 ? rest.join(":") : undefined };
 }
 
 // Blocks a section can be asked to scroll to ("appearance:titles").

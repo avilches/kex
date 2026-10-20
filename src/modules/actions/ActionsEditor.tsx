@@ -176,8 +176,8 @@ export function ActionsEditor({
         saved={saved.has(action.id)}
         expanded={isDraft || openId === action.id}
         onToggleExpand={() => toggleRow(action.id)}
-        onMoveToGlobal={onMoveToGlobal && saved && saved.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
-        onMoveToWorkspace={onMoveToWorkspace && saved && saved.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
+        onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
+        onMoveToWorkspace={onMoveToWorkspace && saved?.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
         onChange={(next) => change(action, next)}
         onRemove={() => remove(action)}
       />

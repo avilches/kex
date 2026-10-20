@@ -1070,6 +1070,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     (workspaceId: string, actionId: string) => {
       const action = globalActions.get().find((a) => a.id === actionId);
       if (!action) return;
+      // Adoption can mint a fresh id and leave the old one behind: its link is dropped,
+      // while a kept id keeps running and stays stoppable as a workspace Action.
+      const clash = workspaceActions(workspacesRef.current, workspaceId).some((a) => a.id === actionId);
+      if (clash) unlinkRemovedActions([action], []);
       void globalActions
         .change((list) => removeAction(list, actionId))
         .then(() => setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptAction(list, action, newActionId))))

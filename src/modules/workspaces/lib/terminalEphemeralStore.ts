@@ -105,8 +105,8 @@ export function clearScriptRunningEntry(tabId: string): void {
   notifyScript();
 }
 
-// The user's own command of the script a tab is running. The shell reports the
-// typed wrapper (`cd -- '...' && { cmd }`), never this text.
+// The user's own command of the script a tab is running, as the Action template, while
+// the shell reports the expanded line it typed; this copy is what the tab shows.
 const scriptCommands = new Map<string, string>();
 
 export function setScriptCommand(tabId: string, command: string): void {
