@@ -36,6 +36,7 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
   terminal: true,
   markRunning: false,
   foreignCommand: false,
+  cwd: "/w",
   ...o,
 });
 
@@ -43,7 +44,7 @@ describe("planActionRun, scripts", () => {
   it("opens a split scripts pane the first time", () => {
     const plan = planActionRun(script(), ctx());
     expect(plan).toMatchObject({ kind: "new-tab", placement: "split-scripts-pane", cwd: "/w", title: "Dev" });
-    expect(plan.kind === "new-tab" && plan.input).toBe("cd -- '/w' && { npm run dev\n\n}\r");
+    expect(plan.kind === "new-tab" && plan.input).toBe("npm run dev\r");
   });
 
   it("adds the tab to the scripts pane once it exists", () => {
@@ -148,9 +149,9 @@ describe("planActionRun, scripts", () => {
     expect(plan.kind === "new-tab" && plan.input).toContain("ls '/w/my src'");
   });
 
-  it("types a PowerShell line for a PowerShell workspace", () => {
-    const plan = planActionRun(script(), ctx({ shell: "powershell" }));
-    expect(plan.kind === "new-tab" && plan.input).toBe("Set-Location -LiteralPath '/w'; if ($?) { npm run dev\n\n}\r");
+  it("quotes a PowerShell value but keeps the line the shell types", () => {
+    const plan = planActionRun(script({ command: "agent {cwd}" }), ctx({ shell: "powershell" }));
+    expect(plan.kind === "new-tab" && plan.input).toBe("agent '/w/src'\r");
   });
 });
 
@@ -181,14 +182,16 @@ describe("planActionRun, script folder", () => {
     expect(plan.kind === "blocked" && plan.reason).toMatch(/^Dev not run: the folder must be an absolute path/);
   });
 
-  it("types no cd when there is no folder at all", () => {
-    const plan = planActionRun(script(), ctx({ folders: {} }));
-    expect(plan.kind === "new-tab" && plan.input).toBe("npm run dev\r");
+  it("opens a new tab when the folder differs from the reused tab's, without a cd line", () => {
+    const plan = planActionRun(script({ cwdMode: "fixed", cwd: "/elsewhere" }), ctx({ link: link() }));
+    expect(plan).toMatchObject({ kind: "new-tab", cwd: "/elsewhere", input: "npm run dev\r" });
   });
 
-  it("uses the folder for a reused tab too", () => {
-    const plan = planActionRun(script({ cwdMode: "fixed", cwd: "/elsewhere" }), ctx({ link: link() }));
-    expect(plan.kind === "reuse-tab" && plan.input).toBe("cd -- '/elsewhere' && { npm run dev\n\n}\r");
+  it("reuses the tab only when its folder is the folder the command would get", () => {
+    const elsewhere = planActionRun(script({ command: "agent {cwd}" }), ctx({ link: link({ cwd: "/elsewhere" }) }));
+    expect(elsewhere.kind).toBe("new-tab");
+    const same = planActionRun(script({ command: "agent {cwd}" }), ctx({ link: link() }));
+    expect(same.kind).toBe("reuse-tab");
   });
 });
 

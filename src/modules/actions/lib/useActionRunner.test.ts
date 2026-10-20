@@ -26,7 +26,7 @@ vi.mock("@/modules/workspace", () => ({
 const script: Action = { id: "ac-s", name: "Dev", runInTerminal: true, command: "npm run dev", ownButton: true };
 const app: Action = { id: "ac-a", name: "Code", runInTerminal: false, command: "code {workspace}", ownButton: true };
 
-const termTab = (id: string): Tab => ({ id, kind: "terminal" });
+const termTab = (id: string, cwd?: string): Tab => ({ id, kind: "terminal", cwd });
 const ws = (o: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
   title: "",
@@ -92,7 +92,7 @@ describe("useActionRunner", () => {
     const tab = (deps.splitPaneAndOpenTab.mock.calls[0] as unknown[])[3] as Tab;
     deps.terminalHandles.current.set(tab.id, { write });
     act(() => void vi.advanceTimersByTime(200));
-    expect(write).toHaveBeenCalledWith("cd -- '/w' && { npm run dev\n\n}\r");
+    expect(write).toHaveBeenCalledWith("npm run dev\r");
     clearScriptRunningEntry(tab.id);
   });
 
@@ -125,7 +125,7 @@ describe("useActionRunner", () => {
 
   it("reuses an idle linked terminal instead of opening another tab", () => {
     linkActionTab(script.id, "tab-old");
-    const { deps, result } = setup(ws(), { "tab-old": termTab("tab-old") });
+    const { deps, result } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
     act(() => result.current.runAction(script));
     expect(deps.splitPaneAndOpenTab).not.toHaveBeenCalled();
     expect(deps.openTab).not.toHaveBeenCalled();

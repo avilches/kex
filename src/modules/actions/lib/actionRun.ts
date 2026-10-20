@@ -1,4 +1,4 @@
-import { buildScriptInput, resolveScriptCwd, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
+import { resolveScriptCwd, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
 import { planScriptStop } from "@/modules/workspaces/lib/scriptRunState";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
@@ -21,6 +21,7 @@ export type LinkedTab = {
   markRunning: boolean;
   /** The user is running a command of their own there. */
   foreignCommand: boolean;
+  cwd: string | undefined;
 };
 
 export type RunContext = {
@@ -54,6 +55,11 @@ export type RunPlan =
     };
 
 const label = (action: Action) => action.name.trim() || "Action";
+
+const equalFolder = (a: string | undefined, b: string | undefined): boolean => {
+  if (!a || !b) return a === b;
+  return a.replace(/\\/g, "/") === b.replace(/\\/g, "/");
+};
 
 const blocked = (action: Action, why: string): RunPlan => ({
   kind: "blocked",
@@ -104,11 +110,15 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
   if (cwdIssue) return blocked(action, cwdIssue);
   let input: string;
   try {
-    input = buildScriptInput(expandCommandShell(action.command, ctx.vars, ctx.shell), cwd, ctx.shell);
+    input = `${expandCommandShell(action.command, ctx.vars, ctx.shell)}\r`;
   } catch (e) {
     return blocked(action, expandFailure(e));
   }
-  if (link?.exists && link.terminal && !link.foreignCommand) {
+  // A reused tab already sits in its own folder, so the command can only be typed there
+  // when the folder it would get is the one the tab has; otherwise the terminal is born
+  // in the folder, with no `cd` line typed at all.
+  const sameFolder = link?.exists && equalFolder(link.cwd, cwd);
+  if (sameFolder && link.terminal && !link.foreignCommand) {
     return { kind: "reuse-tab", tabId: link.tabId, input };
   }
   return { kind: "new-tab", placement: newTabPlacement(ctx), input, cwd, title: label(action) };

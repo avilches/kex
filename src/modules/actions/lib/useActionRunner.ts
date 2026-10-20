@@ -84,6 +84,7 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
     terminal,
     markRunning: !!mark,
     foreignCommand: terminal && !mark && deps.scriptCommandSeen.current.has(tabId),
+    cwd: found && found.tab.kind === "terminal" ? found.tab.cwd : undefined,
   };
 }
 
