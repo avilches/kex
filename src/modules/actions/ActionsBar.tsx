@@ -198,8 +198,12 @@ export function AddActionMenu({
   onAddWorkspace: () => void;
   reveal: "always" | "hover";
 }) {
+  // While its menu is open the trigger stays visible even after the bar hover ended: with
+  // the anchor hidden the positioned content has nothing to point back to and lands at
+  // the top-left corner of the window.
+  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -207,7 +211,7 @@ export function AddActionMenu({
           aria-haspopup="menu"
           className={cn(
             "flex h-7 shrink-0 items-center rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            reveal === "hover" && "hidden group-hover/ap:flex",
+            reveal === "hover" && !open && "hidden group-hover/ap:flex",
           )}
         >
           <span>+ Action</span>
