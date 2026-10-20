@@ -2,6 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { SHORTCUTS } from "@/modules/shortcuts/shortcuts";
 import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { DEFAULT_PREFERENCES } from "@/modules/settings/store";
+import type { PaneNode, SplitNode } from "@/modules/workspaces/lib/types";
 import {
   COMMAND_GROUPS,
   UNLISTED_SHORTCUTS,
@@ -9,10 +11,32 @@ import {
   createCommandItems,
 } from "./commands";
 
+function paneTree(count: number): SplitNode {
+  const pane = (index: number): PaneNode => ({
+    kind: "pane",
+    id: `pane-${index}`,
+    tabs: [],
+    activeTabId: null,
+  });
+  let tree: SplitNode = pane(0);
+  for (let index = 1; index < count; index += 1) {
+    tree = {
+      kind: "split",
+      id: `split-${index}`,
+      orientation: "horizontal",
+      first: tree,
+      second: pane(index),
+      dividerPosition: 0.5,
+    };
+  }
+  return tree;
+}
+
 function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteActionContext {
   const fn = () => vi.fn();
   return {
     activeWorkspacePaneTree: null,
+    workspacePaneLimit: DEFAULT_PREFERENCES.workspacePaneLimit,
     workspaceCount: 2,
     activeId: "ws-1",
     searchTarget: null,
@@ -150,6 +174,28 @@ describe("palette catalog", () => {
     const inherited = createCommandItems(ctx({ hasActiveTabTitle: false })).find((i) => i.id === "tab.resetTitle");
     expect(own?.disabledReason).toBeUndefined();
     expect(inherited?.disabledReason).toBe("No custom title");
+  });
+
+  it("uses the configured pane limit instead of a hardcoded one", () => {
+    const splitIds = ["pane.splitRight", "pane.splitDown", "pane.splitBrowserRight", "pane.splitBrowserDown"];
+    const under = new Map(
+      createCommandItems(ctx({ activeWorkspacePaneTree: paneTree(7), workspacePaneLimit: 8 })).map((i) => [i.id, i]),
+    );
+    const at = new Map(
+      createCommandItems(ctx({ activeWorkspacePaneTree: paneTree(8), workspacePaneLimit: 8 })).map((i) => [i.id, i]),
+    );
+    for (const id of splitIds) {
+      expect(under.get(id)?.disabledReason, id).toBeUndefined();
+      expect(at.get(id)?.disabledReason, id).toBe("Pane limit");
+    }
+  });
+
+  it("pins the default pane limit at 8", () => {
+    expect(DEFAULT_PREFERENCES.workspacePaneLimit).toBe(8);
+    const atLimit = new Map(
+      createCommandItems(ctx({ activeWorkspacePaneTree: paneTree(8) })).map((i) => [i.id, i]),
+    );
+    expect(atLimit.get("pane.splitRight")?.disabledReason).toBe("Pane limit");
   });
 
   it("disables the rows that need an active tab when there is none", () => {

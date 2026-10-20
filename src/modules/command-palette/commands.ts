@@ -44,8 +44,6 @@ export const COMMAND_GROUPS = [
   "Settings",
 ] as const;
 
-const MAX_PANES_PER_WORKSPACE = 4;
-
 // Explorer labels ("File System", "Workspace Root") only make sense under their group in the
 // shortcuts panel; in one flat list they get it back. Other groups already read on their own.
 export function paletteTitle(label: string, group: string): string {
@@ -74,6 +72,7 @@ export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
 
 export type CommandPaletteActionContext = {
   activeWorkspacePaneTree: SplitNode | null;
+  workspacePaneLimit: number;
   workspaceCount: number;
   activeId: string;
   searchTarget: SearchTarget;
@@ -127,7 +126,7 @@ export function createCommandItems(
   const onlyOneWorkspace = ctx.workspaceCount < 2;
   const noWorkspaceRoot = !ctx.explorerRoot && !ctx.home;
   const splitDisabled =
-    activePaneCount >= MAX_PANES_PER_WORKSPACE ? "Pane limit" : undefined;
+    activePaneCount >= ctx.workspacePaneLimit ? "Pane limit" : undefined;
   const closeDisabled =
     onlyOneWorkspace && activePaneCount < 2 ? "Last workspace" : undefined;
 

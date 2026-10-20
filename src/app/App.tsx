@@ -744,6 +744,7 @@ export default function App() {
     [activeWorkspaceId, setWorkspaceSidebarView],
   );
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
+  const workspacePaneLimit = usePreferencesStore((s) => s.workspacePaneLimit);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -3365,6 +3366,7 @@ export default function App() {
       commandPaletteOpen
         ? createCommandItems({
             activeWorkspacePaneTree: activeWorkspace?.paneTree ?? null,
+            workspacePaneLimit,
             workspaceCount: workspaces.length,
             activeId: activeWorkspaceId,
             searchTarget,
@@ -3438,6 +3440,7 @@ export default function App() {
     [
       commandPaletteOpen,
       activeWorkspace,
+      workspacePaneLimit,
       workspaces.length,
       activeWorkspaceId,
       searchTarget,
