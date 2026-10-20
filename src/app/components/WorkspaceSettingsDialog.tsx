@@ -23,6 +23,7 @@ import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
+import { DialogScrollHost } from "@/components/dialogScrollHost";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
   resolveWorkspaceColor,
@@ -64,6 +65,7 @@ type Props = {
 export function WorkspaceSettingsDialog(props: Props) {
   const { open, workspaceId, initialSection, initialFocus, closeSettings } = useWorkspaceSettingsStore();
   const ws = props.workspaces.find((w) => w.id === workspaceId);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
 
   function handleClose() {
     closeSettings();
@@ -72,6 +74,7 @@ export function WorkspaceSettingsDialog(props: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent
+        ref={setContentEl}
         className="sm:max-w-xl"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
@@ -82,14 +85,16 @@ export function WorkspaceSettingsDialog(props: Props) {
           <DialogTitle><WorkspaceHeading ws={ws} /></DialogTitle>
         </DialogHeader>
         {ws && (
-          <WorkspaceSettingsForm
-            key={`${ws.id}-${initialSection}-${initialFocus}`}
-            ws={ws}
-            initialSection={initialSection}
-            initialFocus={initialFocus}
-            onRequestClose={handleClose}
-            {...props}
-          />
+          <DialogScrollHost content={contentEl}>
+            <WorkspaceSettingsForm
+              key={`${ws.id}-${initialSection}-${initialFocus}`}
+              ws={ws}
+              initialSection={initialSection}
+              initialFocus={initialFocus}
+              onRequestClose={handleClose}
+              {...props}
+            />
+          </DialogScrollHost>
         )}
       </DialogContent>
     </Dialog>
@@ -456,6 +461,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
       {activeSection === "actions" && (
         <WorkspaceActions
           ws={ws}
+          autoDraft={initialFocus === "newAction" ? { kind: "script" } : null}
           onAdd={props.onAddAction}
           onUpdate={props.onUpdateAction}
           onRemove={props.onRemoveAction}
@@ -469,6 +475,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
 function WorkspaceActions({
   ws,
+  autoDraft,
   onAdd,
   onUpdate,
   onRemove,
@@ -476,6 +483,7 @@ function WorkspaceActions({
   onPromote,
 }: {
   ws: Workspace;
+  autoDraft: { kind: "script" } | null;
   onAdd: Props["onAddAction"];
   onUpdate: Props["onUpdateAction"];
   onRemove: Props["onRemoveAction"];
@@ -492,6 +500,7 @@ function WorkspaceActions({
         actions={ws.actions ?? []}
         suggestions={suggestionsFromDetected(detectedEditors)}
         context={context}
+        autoDraft={autoDraft}
         emptyHint="No actions in this workspace yet. Scripts run in a terminal; apps open in the background."
         onAdd={(action) => onAdd(ws.id, action)}
         onUpdate={(id, next) => {

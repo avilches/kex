@@ -39,11 +39,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useDialogScrollHost } from "@/components/dialogScrollHost";
 import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
+import { splitActionName } from "./lib/actionName";
 import {
   actionProblems,
   CWD_MODE_LABELS,
@@ -82,6 +84,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [globalOpen, setGlobalOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const scrollHost = useDialogScrollHost();
   const [draft, setDraft] = useState(action.command);
   const [commandFocused, setCommandFocused] = useState(false);
   const [name, setName] = useState(action.name);
@@ -93,6 +96,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
   const display = action.name.trim() || "Name";
+  const { main: displayMain, variable: displayVariable } = splitActionName(display);
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, onChange });
@@ -157,7 +161,12 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             }}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-[12.5px]">{display}</span>
+          <span className="flex min-w-0 flex-1 flex-col leading-tight">
+            <span className="truncate text-[12px]">{displayMain}</span>
+            {displayVariable && (
+              <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displayVariable}</span>
+            )}
+          </span>
         )}
         {expanded ? (
           <span className="flex shrink-0 items-center gap-1">
@@ -184,9 +193,9 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
                 <HugeiconsIcon icon={Globe02Icon} size={12} strokeWidth={2} />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="pointer-events-auto w-64 p-3">
+            <PopoverContent align="end" container={scrollHost} className="pointer-events-auto w-64 p-3">
               <p className="text-[12px] leading-snug text-muted-foreground">
-                Actions of one workspace stay in it. A global Action moves to Settings and every workspace can run it.
+                Action will be available in any workspace. To edit the action, go to Settings
               </p>
               <Button
                 size="sm"

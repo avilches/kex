@@ -31,13 +31,13 @@ const app = (o: Partial<Action> = {}): Action => ({
   ...o,
 });
 
-const vars = { cwd: "/p", dir: "p", workspace: "/p", file: "", path: "", branch: "", repo: "", host: "mac" };
+const vars = { cwd: "/p", dir: "p", workspace: "/p", filename: "", filepath: "", branch: "", repo: "", host: "mac" };
 const ctx = { vars, shell: "posix" as const };
 
 describe("describeMissing", () => {
   it("names what a variable needs in plain words", () => {
-    expect(describeMissing(["path"])).toBe("needs an open file");
-    expect(describeMissing(["file"])).toBe("needs an open file");
+    expect(describeMissing(["filepath"])).toBe("needs an open file");
+    expect(describeMissing(["filename"])).toBe("needs an open file");
     expect(describeMissing(["workspace"])).toBe("needs a workspace root");
     expect(describeMissing(["cwd"])).toBe("needs a folder");
     expect(describeMissing(["branch"])).toBe("needs a git branch");
@@ -45,7 +45,7 @@ describe("describeMissing", () => {
   });
 
   it("joins several needs and falls back to the variable name", () => {
-    expect(describeMissing(["path", "workspace"])).toBe("needs an open file and a workspace root");
+    expect(describeMissing(["filepath", "workspace"])).toBe("needs an open file and a workspace root");
     expect(describeMissing(["host"])).toBe("{host} has no value here");
   });
 });
@@ -57,7 +57,7 @@ describe("actionAvailability", () => {
   });
 
   it("explains the missing variable of an app", () => {
-    expect(actionAvailability(app({ command: "code {path}" }), ctx)).toBe("needs an open file");
+    expect(actionAvailability(app({ command: "code {filepath}" }), ctx)).toBe("needs an open file");
     expect(actionAvailability(app({ command: "code {workspace}" }), { ...ctx, vars: { ...vars, workspace: "" } })).toBe(
       "needs a workspace root",
     );
@@ -82,7 +82,7 @@ describe("actionAvailability", () => {
     const asleep = { ...ctx, hibernated: true };
     expect(actionAvailability(app(), asleep)).toBe("workspace is hibernated");
     expect(actionAvailability(script(), asleep)).toBe("workspace is hibernated");
-    expect(actionAvailability(app({ command: "code {path}" }), asleep)).toBe("workspace is hibernated");
+    expect(actionAvailability(app({ command: "code {filepath}" }), asleep)).toBe("workspace is hibernated");
     expect(actionAvailability(app({ command: "  " }), asleep)).toBe("it has no command");
   });
 
@@ -210,7 +210,7 @@ describe("buildActionsBarModel", () => {
 
   it("carries the run state, the active mark and the disabled reason", () => {
     const m = buildActionsBarModel({
-      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {path}", ownButton: true })],
+      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {filepath}", ownButton: true })],
       context: ctx,
       states: new Map([["s1", "running"]]),
       activeId: "s1",

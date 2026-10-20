@@ -1,34 +1,36 @@
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
-import {
-  TITLE_VARIABLE_DOCS,
-  type TitleVariableGroup,
-} from "@/modules/workspaces/lib/titleTemplate";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import {
   commandProblem,
   missingVariables,
   unsafeVariables,
   type CommandShell,
+  type CommandVariable,
 } from "./commandTemplate";
 import type { Action } from "./types";
 
-// A command runs against a place (folder, file, workspace), never against a running
-// program or a browser page, so only these variables exist for it.
-export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "file", "path", "host"] as const;
-
-export type CommandVariable = (typeof COMMAND_VARIABLES)[number];
+export { COMMAND_VARIABLES } from "./commandTemplate";
 
 export type CommandVariableDoc = {
   name: CommandVariable;
   description: string;
-  group: TitleVariableGroup;
 };
 
-export function commandVariableDocs(): CommandVariableDoc[] {
-  return COMMAND_VARIABLES.flatMap((name) => {
-    const doc = TITLE_VARIABLE_DOCS.find((v) => v.name === name);
-    return doc ? [{ name, description: doc.description, group: doc.group }] : [];
-  });
+// The docs for the picker live here: the title templates have a different vocabulary
+// (their {file} and {path} keep their own meaning), so Actions do not reuse those names.
+const VARIABLE_DOCS: readonly CommandVariableDoc[] = [
+  { name: "cwd", description: "Full path of the folder the tab is in (for a file, the folder that holds it)" },
+  { name: "dir", description: "Only the name of that folder" },
+  { name: "branch", description: "Git branch of that folder, empty outside a repository" },
+  { name: "repo", description: "Name of the git repository" },
+  { name: "workspace", description: "Full path of the workspace root, empty when the workspace has none" },
+  { name: "filename", description: "Name of the file the tab works on" },
+  { name: "filepath", description: "Full path of that file" },
+  { name: "host", description: "Name of this computer" },
+];
+
+export function commandVariableDocs(): readonly CommandVariableDoc[] {
+  return VARIABLE_DOCS;
 }
 
 // A script row is a terminal command pointed at a folder; an app row is a background

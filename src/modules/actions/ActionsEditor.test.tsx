@@ -9,10 +9,10 @@ import type { Action } from "./lib/types";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const saved: Action = { id: "ac-1", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false };
-const savedApp: Action = { id: "ac-2", name: "Zed", runInTerminal: false, command: "zed {path}", ownButton: false };
+const savedApp: Action = { id: "ac-2", name: "Zed", runInTerminal: false, command: "zed {filepath}", ownButton: false };
 
 const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
-const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {path}", iconId: "bbedit", defaultCommand: "bbedit {path}" };
+const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}" };
 
 function mount(actions: Action[], extra: Partial<Parameters<typeof ActionsEditor>[0]> = {}) {
   const handlers = {
@@ -160,8 +160,8 @@ describe("ActionsEditor", () => {
     expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(2);
     const [scriptDraft, appDraft] = [...container.querySelectorAll("textarea[aria-label='Command']")] as HTMLTextAreaElement[];
     expect(scriptDraft).not.toBe(appDraft);
-    typeField(appDraft, "code {path}");
-    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
+    typeField(appDraft, "code {filepath}");
+    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {filepath}" });
     unmount();
   });
 
@@ -186,9 +186,9 @@ describe("ActionsEditor", () => {
     click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Custom app")));
     expect(onAdd).not.toHaveBeenCalled();
     expect(commandField(container)).not.toBeNull();
-    typeField(commandField(container), "code {path}");
+    typeField(commandField(container), "code {filepath}");
     expect(onAdd).toHaveBeenCalledTimes(1);
-    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {path}" });
+    expect(onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {filepath}" });
     unmount();
   });
 
@@ -262,7 +262,7 @@ describe("ActionsEditor", () => {
     const { container, unmount } = mount([saved], { onMakeGlobal });
     click(container.querySelector("button[aria-label='Make global']"));
     const content = [...document.querySelectorAll("[role='dialog'], [data-state='open']")].find((n) =>
-      n.textContent?.includes("every workspace"),
+      n.textContent?.includes("any workspace"),
     );
     expect(content).toBeDefined();
     const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Make global");

@@ -68,7 +68,7 @@ import { runEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { openSettingsWindow, openActionsNewScriptSettings } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
@@ -3366,6 +3366,14 @@ export default function App() {
     useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "actions");
   }, [activeWorkspaceId]);
 
+  const onAddGlobalAction = useCallback(() => {
+    void openActionsNewScriptSettings();
+  }, []);
+
+  const onAddWorkspaceAction = useCallback(() => {
+    useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "actions", "newAction");
+  }, [activeWorkspaceId]);
+
   const sidebarRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
 
@@ -3413,6 +3421,8 @@ export default function App() {
             searchRef={searchInlineRef}
             actionsController={actionsController}
             onOpenActionsSettings={onOpenActionsSettings}
+            onAddGlobalAction={onAddGlobalAction}
+            onAddWorkspaceAction={onAddWorkspaceAction}
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
             groups={groups}

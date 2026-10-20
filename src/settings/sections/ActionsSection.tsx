@@ -40,7 +40,13 @@ function editQuietly(fn: (list: Action[]) => Action[]) {
   edit(fn).catch(() => {});
 }
 
-export function ActionsSection() {
+type Props = {
+  /** Extra in the section param ("actions:script"): open with a blank command draft. */
+  startDraft?: string;
+  onDraftConsumed?: () => void;
+};
+
+export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
   const actions = usePreferencesStore((s) => s.actions);
   const { detectedEditors, isScanning, scan } = useExternalEditors();
 
@@ -51,6 +57,11 @@ export function ActionsSection() {
       scan();
     }
   }, [detectedEditors.length, isScanning, scan]);
+
+  useEffect(() => {
+    if (!startDraft) return;
+    onDraftConsumed?.();
+  }, [startDraft, onDraftConsumed]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,6 +82,7 @@ export function ActionsSection() {
         actions={actions}
         suggestions={suggestionsFromDetected(detectedEditors)}
         context={null}
+        autoDraft={startDraft ? { kind: "script" } : null}
         emptyHint="No global actions yet. Add a command or pick an application above."
         onAdd={(action) => edit((list) => addAction(list, action))}
         onUpdate={(id, next) => editQuietly((list) => updateAction(list, id, next))}

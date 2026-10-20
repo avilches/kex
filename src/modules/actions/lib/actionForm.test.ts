@@ -21,13 +21,13 @@ const app: Action = { id: "ac-2", name: "PyCharm", runInTerminal: false, command
 describe("commandVariableDocs", () => {
   it("lists only the variables a command can have a value for, with their descriptions", () => {
     const docs = commandVariableDocs();
-    expect(docs.map((d) => d.name)).toEqual(["cwd", "dir", "branch", "repo", "workspace", "file", "path", "host"]);
+    expect(docs.map((d) => d.name)).toEqual(["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host"]);
     expect(docs.every((d) => d.description.length > 0)).toBe(true);
   });
 });
 
 describe("actionProblems", () => {
-  const ctx = { vars: { cwd: "/p", workspace: "", path: "", branch: "", repo: "", dir: "p", file: "", host: "h" }, shell: "posix" as const };
+  const ctx = { vars: { cwd: "/p", workspace: "", filefilepath: "", branch: "", repo: "", dir: "p", filename: "", host: "h" }, shell: "posix" as const };
 
   it("reports nothing for a plain command", () => {
     expect(actionProblems(script, ctx)).toEqual([]);

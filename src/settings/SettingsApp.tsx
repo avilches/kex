@@ -8,7 +8,7 @@ import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, useEffect, useRef, useState } from "react";
+import { type JSX, createElement, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
@@ -22,7 +22,7 @@ import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
 import { WorkspacesSection } from "./sections/WorkspacesSection";
 
-const COMPONENTS: Record<SettingsSection, () => JSX.Element> = {
+const COMPONENTS: Record<SettingsSection, (props: never) => JSX.Element> = {
   general: GeneralSection,
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
@@ -68,6 +68,13 @@ function readInitialFileTypesExt(): string | undefined {
   return section === "filetypes" ? ext : undefined;
 }
 
+function readInitialActionsDraft(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const url = new URL(window.location.href);
+  const { section, ext } = parseSectionParam(url.searchParams.get("section"));
+  return section === "actions" ? ext : undefined;
+}
+
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsSection>(readInitialSection);
   const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
@@ -76,6 +83,8 @@ export function SettingsApp() {
   // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
   const fileTypesExtConsumed = useRef(false);
   const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
+  const [actionsDraft, setActionsDraft] = useState<string | undefined>(readInitialActionsDraft);
+  const actionsDraftConsumed = useRef(true);
 
   useEffect(() => {
     if (!anchor) return;
@@ -125,6 +134,10 @@ export function SettingsApp() {
       if (ext && section === "filetypes") {
         fileTypesExtConsumed.current = false;
         setFileTypesExt(ext);
+      }
+      if (section === "actions") {
+        actionsDraftConsumed.current = false;
+        setActionsDraft(ext);
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
@@ -202,8 +215,16 @@ export function SettingsApp() {
                     setFileTypesExt(undefined);
                   }}
                 />
+              ) : active === "actions" ? (
+                <ActionsSection
+                  startDraft={actionsDraftConsumed.current ? undefined : actionsDraft}
+                  onDraftConsumed={() => {
+                    actionsDraftConsumed.current = true;
+                    setActionsDraft(undefined);
+                  }}
+                />
               ) : (
-                ActiveSection && <ActiveSection />
+                ActiveSection && createElement(ActiveSection)
               )}
             </div>
           </div>

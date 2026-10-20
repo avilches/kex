@@ -22,8 +22,8 @@ export function buildCommandVars(
   return {
     cwd: raw.cwd,
     dir: raw.dir,
-    file: raw.file,
-    path: raw.path,
+    filename: raw.file,
+    filepath: raw.path,
     workspace: raw.workspace,
     branch: git.branch,
     repo: git.repoRoot.split(/[\\/]/).filter(Boolean).pop() ?? "",

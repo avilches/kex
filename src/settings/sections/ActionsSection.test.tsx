@@ -75,7 +75,7 @@ describe("ActionsSection", () => {
   });
 
   it("keeps offering every app, so two actions can share one", () => {
-    actions = [{ id: "ac-1", name: "PyCharm {path}", runInTerminal: false, command: "pycharm {path}", appId: "pycharm", ownButton: false }];
+    actions = [{ id: "ac-1", name: "PyCharm {filepath}", runInTerminal: false, command: "pycharm {filepath}", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
     openApplications(container);
     expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);

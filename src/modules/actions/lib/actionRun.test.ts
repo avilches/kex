@@ -22,7 +22,7 @@ const app = (o: Partial<Action> = {}): Action => script({ runInTerminal: false, 
 const ctx = (o: Partial<RunContext> = {}): RunContext => ({
   hibernated: false,
   shell: "posix",
-  vars: { cwd: "/w/src", dir: "src", file: "", path: "", workspace: "/w", branch: "main", repo: "w" },
+  vars: { cwd: "/w/src", dir: "src", filename: "", filepath: "", workspace: "/w", branch: "main", repo: "w" },
   folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w" },
   link: null,
   scriptPaneExists: false,
@@ -120,13 +120,13 @@ describe("planActionRun, scripts", () => {
   });
 
   it("is blocked by a variable with no value", () => {
-    const plan = planActionRun(script({ command: "open {path}" }), ctx());
-    expect(plan).toEqual({ kind: "blocked", reason: "Dev not run: {path} has no value here" });
+    const plan = planActionRun(script({ command: "open {filepath}" }), ctx());
+    expect(plan).toEqual({ kind: "blocked", reason: "Dev not run: {filepath} has no value here" });
   });
 
   it("names every missing variable", () => {
-    const plan = planActionRun(script({ command: "x {path} {file}" }), ctx());
-    expect(plan).toMatchObject({ reason: "Dev not run: {path}, {file} have no value here" });
+    const plan = planActionRun(script({ command: "x {filepath} {filename}" }), ctx());
+    expect(plan).toMatchObject({ reason: "Dev not run: {filepath}, {filename} have no value here" });
   });
 
   it("is blocked by a value that is unsafe in a script", () => {
@@ -201,19 +201,19 @@ describe("planActionRun, apps", () => {
   });
 
   it("keeps a value with spaces as one argument", () => {
-    const plan = planActionRun(app({ command: "code {path}" }), ctx({ vars: { ...ctx().vars, path: "/w/my file.ts" } }));
+    const plan = planActionRun(app({ command: "code {filepath}" }), ctx({ vars: { ...ctx().vars, filepath: "/w/my file.ts" } }));
     expect(plan).toEqual({ kind: "spawn-app", argv: ["code", "/w/my file.ts"] });
   });
 
   it("allows characters a script would refuse, as there is no shell", () => {
-    const plan = planActionRun(app({ command: "code {path}" }), ctx({ vars: { ...ctx().vars, path: "/w/a$b'c.ts" } }));
+    const plan = planActionRun(app({ command: "code {filepath}" }), ctx({ vars: { ...ctx().vars, filepath: "/w/a$b'c.ts" } }));
     expect(plan).toEqual({ kind: "spawn-app", argv: ["code", "/w/a$b'c.ts"] });
   });
 
   it("is blocked by a variable with no value", () => {
-    expect(planActionRun(app({ command: "code {path}" }), ctx())).toEqual({
+    expect(planActionRun(app({ command: "code {filepath}" }), ctx())).toEqual({
       kind: "blocked",
-      reason: "VS Code not run: {path} has no value here",
+      reason: "VS Code not run: {filepath} has no value here",
     });
   });
 

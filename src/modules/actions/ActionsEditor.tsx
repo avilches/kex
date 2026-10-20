@@ -33,6 +33,8 @@ type Props = {
   onRemove: (id: string) => void;
   onReorder: (fromId: string, toId: string) => void;
   onMakeGlobal?: (id: string) => void;
+  /** Opens with one blank draft created and focused (the + Action host does that itself). */
+  autoDraft?: { kind: "script" } | null;
 };
 
 // The kind is chosen once, on creation, and a saved row cannot switch it afterwards.
@@ -69,6 +71,7 @@ export function ActionsEditor({
   onRemove,
   onReorder,
   onMakeGlobal,
+  autoDraft,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [drafts, setDrafts] = useState<Action[]>([]);
@@ -99,6 +102,15 @@ export function ActionsEditor({
   };
 
   const addCommand = () => addDraft(blankScript);
+
+  // Only on mount: a standalone draft the host asked for before any user input.
+  const autoDraftUsed = useRef(false);
+  useEffect(() => {
+    if (autoDraftUsed.current || !autoDraft?.kind) return;
+    autoDraftUsed.current = true;
+    addDraft(blankScript);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addApplication = (s: AppSuggestion) => {
     if (!s.defaultCommand.trim()) return addDraft(blankApp);

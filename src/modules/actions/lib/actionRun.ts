@@ -26,7 +26,7 @@ export type LinkedTab = {
 export type RunContext = {
   hibernated: boolean;
   shell: ScriptShell;
-  /** Raw values for the command variables ({cwd}, {workspace}, {path}...); "" means no value. */
+  /** Raw values for the command variables ({cwd}, {workspace}, {filepath}...); "" means no value. */
   vars: Readonly<Record<string, string>>;
   folders: {
     focusFolder?: string | null;

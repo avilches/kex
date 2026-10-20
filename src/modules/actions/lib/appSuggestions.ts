@@ -40,7 +40,7 @@ function commandFor(editor: DetectedEditor, target: string): string {
 
 // Every app gets the same three starting points, so one app can back several Actions
 // with different templates instead of the editor guessing which target fits.
-const VARIANTS = ["path", "workspace", "cwd"] as const;
+const VARIANTS = ["filepath", "workspace", "cwd"] as const;
 
 // Alphabetical by app, and within one app the three presets in their variant order, so
 // the combo reads like a list of names and the variants of one app stay together.
@@ -51,12 +51,20 @@ export function compareByName(a: AppSuggestion, b: AppSuggestion): number {
 }
 
 /** One entry per enabled detected app and preset variable, followed by nothing else. */
+// The three starting points, so one app can back several Actions with different templates.
+// Project-based IDEs (JetBrains) open workspace folders or the tab's folder, never a file.
+function variantsFor(editorId: string): readonly (typeof VARIANTS)[number][] {
+  return EDITOR_CATALOG.find((e) => e.id === editorId)?.group === "JetBrains"
+    ? VARIANTS.filter((v) => v !== "filepath")
+    : VARIANTS;
+}
+
 export function suggestionsFromDetected(detected: readonly DetectedEditor[]): AppSuggestion[] {
   return detected
     .filter((e) => e.enabled !== false)
     .flatMap((editor) => {
       const name = KNOWN.get(editor.id)?.name ?? editor.name;
-      return VARIANTS.map((target) => ({
+      return variantsFor(editor.id).map((target) => ({
         key: `${editor.id}:${target}`,
         appId: editor.id,
         name: `${name} {${target}}`,

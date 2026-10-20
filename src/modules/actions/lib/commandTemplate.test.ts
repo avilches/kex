@@ -74,7 +74,7 @@ describe("commandProblem", () => {
 
   it("for a script, refuses a variable inside the user's own quotes and names it", () => {
     expect(commandProblem(`printf "{cwd}"`, "posix")).toMatch(/\{cwd\} sits inside quotes/);
-    expect(commandProblem(`echo '{file}' {cwd}`, "posix")).toMatch(/\{file\}/);
+    expect(commandProblem(`echo '{filename}' {cwd}`, "posix")).toMatch(/\{filename\}/);
     expect(commandProblem("echo x\n  cd \"a {dir? {dir}}\"", "powershell")).toMatch(/\{dir\}/);
   });
 
@@ -97,7 +97,7 @@ describe("expandCommandArgv", () => {
 
   it("a value with quotes or spaces cannot add arguments", () => {
     const evil = `x" --exec 'rm -rf /' "y`;
-    expect(expandCommandArgv(`open --file={path} --end`, { path: evil })).toEqual([
+    expect(expandCommandArgv(`open --file={filepath} --end`, { filepath: evil })).toEqual([
       "open",
       `--file=${evil}`,
       "--end",
@@ -114,7 +114,7 @@ describe("expandCommandArgv", () => {
   });
 
   it("falls back across variables like a title does", () => {
-    expect(expandCommandArgv("e {path|cwd}", { path: "", cwd: "/w" })).toEqual(["e", "/w"]);
+    expect(expandCommandArgv("e {filepath|cwd}", { filepath: "", cwd: "/w" })).toEqual(["e", "/w"]);
   });
 
   it("leaves an unknown variable literal and honors doubled braces", () => {
@@ -122,7 +122,7 @@ describe("expandCommandArgv", () => {
   });
 
   it("keeps an argument whose variable is empty as an empty argument", () => {
-    expect(expandCommandArgv("e {path} x", { path: "" })).toEqual(["e", "", "x"]);
+    expect(expandCommandArgv("e {filepath} x", { filepath: "" })).toEqual(["e", "", "x"]);
   });
 
   it("does not resolve names that live on Object.prototype", () => {
@@ -160,12 +160,12 @@ describe("expandCommandShell", () => {
   });
 
   it("decides emptiness on the raw value, not on the quoted one", () => {
-    expect(expandCommandShell("a {path|cwd}", { path: "", cwd: "/w" }, "posix")).toBe("a '/w'");
-    expect(expandCommandShell("a{path?  --f {path}}", { path: "" }, "posix")).toBe("a");
+    expect(expandCommandShell("a {filepath|cwd}", { filepath: "", cwd: "/w" }, "posix")).toBe("a '/w'");
+    expect(expandCommandShell("a{filepath?  --f {filepath}}", { filepath: "" }, "posix")).toBe("a");
   });
 
   it("an empty value writes nothing, since the action is disabled before getting here", () => {
-    expect(expandCommandShell("a {path} b", { path: "" }, "posix")).toBe("a  b");
+    expect(expandCommandShell("a {filepath} b", { filepath: "" }, "posix")).toBe("a  b");
   });
 
   it("leaves shell braces and parameter expansions that are not variables untouched", () => {
@@ -395,15 +395,15 @@ describe("unsafe values are refused whatever the command looks like", () => {
   });
 
   it("names every offending variable and lets the UI ask beforehand", () => {
-    const vars = { cwd: "/ok", path: "/a'b", dir: "x$y" };
-    expect(unsafeVariables("e {cwd} {path} {dir}", vars, "posix")).toEqual(["path", "dir"]);
-    expect(commandProblem("e {cwd} {path}", "posix", vars)).toMatch(/\{path\} cannot be used in a script/);
+    const vars = { cwd: "/ok", filepath: "/a'b", dir: "x$y" };
+    expect(unsafeVariables("e {cwd} {filepath} {dir}", vars, "posix")).toEqual(["filepath", "dir"]);
+    expect(commandProblem("e {cwd} {filepath}", "posix", vars)).toMatch(/\{filepath\} cannot be used in a script/);
     expect(commandProblem("e {cwd}", "posix", vars)).toBeNull();
-    expect(commandProblem("e {path}", "posix")).toBeNull();
+    expect(commandProblem("e {filepath}", "posix")).toBeNull();
   });
 
   it("an unsafe value that is not written (a fallback not taken) is not reported", () => {
-    expect(unsafeVariables("e {cwd|path}", { cwd: "/ok", path: "a'b" }, "posix")).toEqual([]);
+    expect(unsafeVariables("e {cwd|filepath}", { cwd: "/ok", filepath: "a'b" }, "posix")).toEqual([]);
   });
 
   it("does not touch argv mode, where there is no shell", () => {
@@ -411,7 +411,7 @@ describe("unsafe values are refused whatever the command looks like", () => {
   });
 
   it("only looks at the values that are written", () => {
-    expect(expandCommandShell(`echo "x" {path|cwd}`, { path: "", cwd: "/ok" }, "posix")).toBe(`echo "x" '/ok'`);
+    expect(expandCommandShell(`echo "x" {filepath|cwd}`, { filepath: "", cwd: "/ok" }, "posix")).toBe(`echo "x" '/ok'`);
   });
 
   it("applies to PowerShell for $, backtick and every quote, but a backslash is harmless", () => {
@@ -456,23 +456,23 @@ for (const shell of ["bash", "zsh"]) {
 
 describe("commandVariablesUsed and missingVariables", () => {
   it("lists every variable the template names, groups and conditions included", () => {
-    expect([...commandVariablesUsed("a {path|cwd} {branch? b {dir}} {repo?{:}x}")].sort()).toEqual([
+    expect([...commandVariablesUsed("a {filepath|cwd} {branch? b {dir}} {repo?{:}x}")].sort()).toEqual([
       "branch",
       "cwd",
       "dir",
-      "path",
+      "filepath",
       "repo",
     ]);
   });
 
   it("reports the used variables that have no value", () => {
-    expect(missingVariables("pycharm {path}", { path: "", cwd: "/w" })).toEqual(["path"]);
+    expect(missingVariables("pycharm {filepath}", { filepath: "", cwd: "/w" })).toEqual(["filepath"]);
     expect(missingVariables("pycharm {cwd}", { cwd: "/w" })).toEqual([]);
   });
 
   it("a variable with a fallback that has a value is not missing", () => {
-    expect(missingVariables("e {path|cwd}", { path: "", cwd: "/w" })).toEqual([]);
-    expect(missingVariables("e {path|cwd}", { path: "", cwd: " " })).toEqual(["path", "cwd"]);
+    expect(missingVariables("e {filepath|cwd}", { filepath: "", cwd: "/w" })).toEqual([]);
+    expect(missingVariables("e {filepath|cwd}", { filepath: "", cwd: " " })).toEqual(["filepath", "cwd"]);
   });
 
   it("an optional part does not make the action unavailable", () => {
@@ -484,6 +484,6 @@ describe("commandVariablesUsed and missingVariables", () => {
   });
 
   it("is order stable and lists each missing name once", () => {
-    expect(missingVariables("{path} {path} {file}", { path: "", file: "" })).toEqual(["path", "file"]);
+    expect(missingVariables("{filepath} {filepath} {filename}", { filepath: "", filename: "" })).toEqual(["filepath", "filename"]);
   });
 });

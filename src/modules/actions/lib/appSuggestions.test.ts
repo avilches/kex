@@ -14,18 +14,17 @@ describe("suggestionsFromDetected", () => {
   it("offers one entry per app and preset variable, alphabetically", () => {
     const list = suggestionsFromDetected([ed("pycharm", "pycharm"), ed("bbedit", "bbedit")]);
     expect(list.map((s) => s.key)).toEqual([
-      "bbedit:path",
+      "bbedit:filepath",
       "bbedit:workspace",
       "bbedit:cwd",
-      "pycharm:path",
       "pycharm:workspace",
       "pycharm:cwd",
     ]);
     expect(list[0]).toMatchObject({
       appId: "bbedit",
-      name: "BBEdit {path}",
+      name: "BBEdit {filepath}",
       iconId: "bbedit",
-      defaultCommand: "bbedit {path}",
+      defaultCommand: "bbedit {filepath}",
     });
     expect(list[1]!.defaultCommand).toBe("bbedit {workspace}");
     expect(list[2]!.defaultCommand).toBe("bbedit {cwd}");
@@ -37,18 +36,18 @@ describe("suggestionsFromDetected", () => {
       "open -na 'PyCharm CE.app' --args {workspace}",
     );
     const [v] = suggestionsFromDetected([ed("vscode", "/Applications/Visual Studio Code.app/bin/code")]);
-    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {path}");  });
+    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {filepath}");  });
 
   it("keeps braces and quotes in a path literal", () => {
     const [a] = suggestionsFromDetected([ed("vscode", "/a/{x}/code")]);
-    expect(a!.defaultCommand).toBe("/a/{{x}}/code {path}");
+    expect(a!.defaultCommand).toBe("/a/{{x}}/code {filepath}");
     const [b] = suggestionsFromDetected([ed("vscode", "/it's here/code")]);
-    expect(b!.defaultCommand).toBe(`"/it's here/code" {path}`);
+    expect(b!.defaultCommand).toBe(`"/it's here/code" {filepath}`);
   });
 
   it("skips disabled apps and keeps enabled ones", () => {
     const list = suggestionsFromDetected([ed("vscode", "code", [], false), ed("cursor", "cursor"), ed("zed", "zed", [], false)]);
-    expect(list.map((s) => s.key)).toEqual(["cursor:path", "cursor:workspace", "cursor:cwd"]);
+    expect(list.map((s) => s.key)).toEqual(["cursor:filepath", "cursor:workspace", "cursor:cwd"]);
   });
 
   it("lets two actions share one app with different templates", () => {
@@ -59,7 +58,7 @@ describe("suggestionsFromDetected", () => {
 
   it("falls back to the detected name for an app outside the catalog", () => {
     const [s] = suggestionsFromDetected([ed("mystery", "mystery")]);
-    expect(s).toMatchObject({ name: "mystery {path}", defaultCommand: "mystery {path}" });
+    expect(s).toMatchObject({ name: "mystery {filepath}", defaultCommand: "mystery {filepath}" });
   });
 });
 

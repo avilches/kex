@@ -3,7 +3,6 @@ import { quotedVariables } from "@/modules/actions/lib/quotedVariables";
 import {
   missingTemplateVariables,
   renderTemplate,
-  TITLE_VARIABLES,
   titleVariablesUsed,
   type TemplateVars,
 } from "@/modules/workspaces/lib/titleTemplate";
@@ -11,6 +10,12 @@ import {
 // Command templates ("pycharm {cwd}") share the grammar and the variables of title
 // templates, but a command is run, not shown: whitespace is kept, values are raw (home is
 // never turned into ~) and every value is quoted for how the command will be run.
+
+// A command runs against a place (folder, file, workspace), never against a running
+// program or a browser page, so only these variables exist for it.
+export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host"] as const;
+
+export type CommandVariable = (typeof COMMAND_VARIABLES)[number];
 
 export type CommandShell = "posix" | "powershell";
 
@@ -49,9 +54,9 @@ export function splitArgv(command: string): string[] {
   return args;
 }
 
-const knownTitleVariable = (name: string) => (TITLE_VARIABLES as readonly string[]).includes(name);
+const knownCommandVariable = (name: string) => COMMAND_VARIABLES.includes(name as CommandVariable);
 
-function quotedProblem(command: string, shell: CommandShell, isKnown = knownTitleVariable): string | null {
+function quotedProblem(command: string, shell: CommandShell, isKnown = knownCommandVariable): string | null {
   const quoted = quotedVariables(command, shell, isKnown);
   if (quoted.length === 0) return null;
   const names = quoted.map((n) => `{${n}}`).join(", ");

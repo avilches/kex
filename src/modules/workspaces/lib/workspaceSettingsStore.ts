@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type WorkspaceSettingsSection = "properties" | "actions";
-export type WorkspaceSettingsFocus = "name" | "workspaceRoot";
+export type WorkspaceSettingsFocus = "name" | "workspaceRoot" | "newAction";
 
 type WorkspaceSettingsStore = {
   open: boolean;

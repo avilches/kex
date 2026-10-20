@@ -28,3 +28,9 @@ export async function openFileTypesSettings(ext?: string): Promise<void> {
   const section = ext ? `filetypes:${ext}` : "filetypes";
   await invoke("open_settings_window", { section });
 }
+
+// Opens Settings > Actions with a blank command draft ready to be typed. Encodes as
+// "actions:script", the filetypes scheme again: section plus the extra from one param.
+export async function openActionsNewScriptSettings(): Promise<void> {
+  await invoke("open_settings_window", { section: "actions:script" });
+}

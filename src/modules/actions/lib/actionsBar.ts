@@ -1,4 +1,5 @@
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { splitActionName } from "./actionName";
 import { commandProblem, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import type { Action } from "./types";
 
@@ -18,11 +19,12 @@ const CHAR_WIDTH = 6;
 const LABEL_CAP = 120;
 const RUN_ZONE = 24;
 const ICON = 18;
-// The two menu triggers ("Scripts" and "Apps") are always kept in view.
+// The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 2 * 78 + BAR_GAP;
 
 export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">): number {
-  const label = Math.min(LABEL_CAP, (action.name.trim() || "Action").length * CHAR_WIDTH);
+  const { main } = splitActionName(action.name.trim() || "Action");
+  const label = Math.min(LABEL_CAP, main.length * CHAR_WIDTH);
   return PADDING + label + (action.runInTerminal ? RUN_ZONE : ICON);
 }
 
@@ -47,8 +49,8 @@ export type BarContext = {
 };
 
 const NEEDS: Record<string, string> = {
-  path: "an open file",
-  file: "an open file",
+  filepath: "an open file",
+  filename: "an open file",
   workspace: "a workspace root",
   cwd: "a folder",
   dir: "a folder",

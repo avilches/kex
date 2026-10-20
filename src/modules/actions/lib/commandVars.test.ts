@@ -36,8 +36,8 @@ describe("buildCommandVars", () => {
 
   it("keeps raw values: no home abbreviation and no trimming", () => {
     expect(vars.cwd).toBe("/Users/me/code/kex/src");
-    expect(vars.path).toBe("/Users/me/code/kex/src/index.ts");
-    expect(vars.file).toBe("index.ts");
+    expect(vars.filepath).toBe("/Users/me/code/kex/src/index.ts");
+    expect(vars.filename).toBe("index.ts");
     expect(vars.workspace).toBe("/Users/me/code/kex");
     expect(vars.repo).toBe("kex");
   });
@@ -78,7 +78,7 @@ describe("every offered variable is substituted when an Action runs", () => {
 
   it("agrees with the bar when a value is missing", () => {
     const noFile = buildCommandVars({ id: "t1", kind: "terminal", cwd: "/p" }, { workspaceRoot: "/p" }, { branch: "", repoRoot: "" }, "MacBook");
-    for (const name of ["file", "path", "branch", "repo"] as const) {
+    for (const name of ["filename", "filepath", "branch", "repo"] as const) {
       const action = app(`tool {${name}}`);
       const reason = actionAvailability(action, { vars: noFile, shell: "posix" });
       const plan = planActionRun(action, runCtx({ vars: noFile }));

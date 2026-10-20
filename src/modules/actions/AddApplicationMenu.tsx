@@ -11,6 +11,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useDialogScrollHost } from "@/components/dialogScrollHost";
 import { ActionIcon } from "./ActionIcon";
 import { splitActionName } from "./lib/actionName";
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
@@ -24,6 +25,7 @@ type Props = {
 // per preset, every entry carrying its app icon. Custom app starts an empty app row instead.
 export function AddApplicationMenu({ suggestions, onPick }: Props) {
   const [open, setOpen] = useState(false);
+  const host = useDialogScrollHost();
   const pick = (suggestion: AppSuggestion) => {
     setOpen(false);
     onPick(suggestion);
@@ -37,7 +39,7 @@ export function AddApplicationMenu({ suggestions, onPick }: Props) {
           <HugeiconsIcon icon={ChevronDownIcon} size={10} strokeWidth={2} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="pointer-events-auto w-[360px] p-0">
+      <PopoverContent align="end" container={host} className="pointer-events-auto w-[360px] p-0">
         <Command>
           <CommandInput placeholder="Search applications..." />
           <CommandList className="max-h-64">
