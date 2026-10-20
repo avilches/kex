@@ -11,10 +11,13 @@ import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import {
+  Add01Icon,
   AlertCircleIcon,
   ArrowTurnBackwardIcon,
   CommandIcon,
+  SleepingIcon,
   Tick02Icon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -32,6 +35,7 @@ import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
 import { mergeRows } from "./lib/mergeRows";
+import type { ClosedTabEntry } from "./lib/closedEntries";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
 import type { PaletteItem } from "./types";
@@ -46,10 +50,14 @@ type Props = {
   onOpenContentHit: (path: string, line: number) => void;
   insertCommand: ((cmd: string) => void) | null;
   activeTabId: string | null;
+  activeWorkspaceId: string;
   tabEntries: TabEntry[];
   workspaceEntries: WorkspaceEntry[];
+  closedEntries: ClosedTabEntry[];
   onSelectTab: (entry: TabEntry) => void;
   onSelectWorkspace: (entry: WorkspaceEntry) => void;
+  onRunClosed: (entry: ClosedTabEntry) => void;
+  onMoveActiveTabToWorkspace: (target: string | "new") => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -63,29 +71,36 @@ export function CommandPalette({
   onOpenContentHit,
   insertCommand,
   activeTabId,
+  activeWorkspaceId,
   tabEntries,
   workspaceEntries,
+  closedEntries,
   onSelectTab,
   onSelectWorkspace,
+  onRunClosed,
+  onMoveActiveTabToWorkspace,
 }: Props) {
   const [query, setQuery] = useState("");
   const [value, setValue] = useState("");
-  const [page, setPage] = useState<"root" | "themes">("root");
+  const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
   const inThemes = page === "themes";
+  const inWorkspaces = page === "workspaces";
+  const inSubpage = inThemes || inWorkspaces;
   const themeFilter = inThemes ? query.trim() : "";
+  const workspaceFilter = inWorkspaces ? query.trim() : "";
 
   const content = useContentSearch(
     workspaceRoot,
     parsed.term,
-    open && !inThemes && parsed.mode === "content",
+    open && !inSubpage && parsed.mode === "content",
   );
   const history = useCommandHistory(
     parsed.term,
-    open && !inThemes && parsed.mode === "history",
+    open && !inSubpage && parsed.mode === "history",
   );
 
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
@@ -99,13 +114,14 @@ export function CommandPalette({
             commands: commandItems,
             tabs: tabEntries,
             workspaces: workspaceEntries,
+            closed: closedEntries,
             term: parsed.term,
             activeTabId,
             learned,
             mru,
           })
         : [],
-    [inCommands, commandItems, tabEntries, workspaceEntries, parsed.term, activeTabId, learned, mru],
+    [inCommands, commandItems, tabEntries, workspaceEntries, closedEntries, parsed.term, activeTabId, learned, mru],
   );
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
@@ -126,6 +142,18 @@ export function CommandPalette({
       .sort((a, b) => (b.s ?? 0) - (a.s ?? 0))
       .map((x) => x.t);
   }, [inThemes, themeFilter, customThemes]);
+
+  const workspaceTargets = useMemo(() => {
+    if (!inWorkspaces) return [];
+    const others = workspaceEntries.filter((e) => e.workspaceId !== activeWorkspaceId);
+    const q = workspaceFilter.toLowerCase();
+    if (!q) return others;
+    return others
+      .map((e) => ({ e, s: fuzzyBest(q, [e.title]) }))
+      .filter((x) => x.s !== null)
+      .sort((a, b) => (b.s ?? 0) - (a.s ?? 0))
+      .map((x) => x.e);
+  }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
 
   const resetPalette = useCallback(() => {
     setQuery("");
@@ -187,18 +215,31 @@ export function CommandPalette({
     setValue("");
   }, [previewThemeId]);
 
+  const enterWorkspaces = useCallback(() => {
+    setPage("workspaces");
+    setQuery("");
+    setValue("");
+  }, []);
+
+  const exitWorkspaces = useCallback(() => {
+    setPage("root");
+    setQuery("");
+    setValue("");
+  }, []);
+
   const runCommand = useCallback(
     (item: PaletteItem) => {
       const choice = commandChoice(item);
       if (choice.action === "none") return;
       if (choice.learn) recordChoice(parsed.term, commandRowKey(item.id));
       if (choice.action === "themes") return enterThemes();
+      if (choice.action === "workspaces") return enterWorkspaces();
       if (choice.action === "content") return setQuery("#");
       if (choice.action === "history") return setQuery(">");
       recordUse(item.id);
       runAfterClose(item.run);
     },
-    [enterThemes, runAfterClose, parsed.term],
+    [enterThemes, enterWorkspaces, runAfterClose, parsed.term],
   );
 
   const openContent = useCallback(
@@ -227,36 +268,40 @@ export function CommandPalette({
   // Radix listens for Escape on document capture, before React handlers, so the
   // subpage has to intercept it earlier to go back instead of closing the palette.
   useEffect(() => {
-    if (!open || !inThemes) return;
+    if (!open || !inSubpage) return;
     const onEscape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      exitThemes();
+      if (inThemes) exitThemes();
+      else exitWorkspaces();
     };
     window.addEventListener("keydown", onEscape, true);
     return () => window.removeEventListener("keydown", onEscape, true);
-  }, [open, inThemes, exitThemes]);
+  }, [open, inSubpage, inThemes, exitThemes, exitWorkspaces]);
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!inThemes) return;
+      if (!inSubpage) return;
       if (e.key === "Backspace" && query.length === 0) {
         e.preventDefault();
         e.stopPropagation();
-        exitThemes();
+        if (inThemes) exitThemes();
+        else exitWorkspaces();
       }
     },
-    [inThemes, query, exitThemes],
+    [inSubpage, inThemes, query, exitThemes, exitWorkspaces],
   );
 
   const placeholder = inThemes
     ? "Search themes..."
-    : parsed.mode === "content"
-      ? "Find text in files..."
-      : parsed.mode === "history"
-        ? "Search command history..."
-        : "Type a command, tab or workspace, > for history, # to find in files";
+    : inWorkspaces
+      ? "Search workspaces..."
+      : parsed.mode === "content"
+        ? "Find text in files..."
+        : parsed.mode === "history"
+          ? "Search command history..."
+          : "Type a command, tab or workspace, > for history, # to find in files";
 
   return (
     <CommandDialog
@@ -319,6 +364,60 @@ export function CommandPalette({
                 ))}
                 {themes.length === 0 ? <StatusItem label="No themes" /> : null}
               </CommandGroup>
+            ) : inWorkspaces ? (
+              <CommandGroup heading="Move tab to workspace">
+                <CommandItem
+                  value="move-workspace:back"
+                  onSelect={exitWorkspaces}
+                  className="text-[12.5px]"
+                >
+                  <HugeiconsIcon
+                    icon={ArrowTurnBackwardIcon}
+                    size={14}
+                    strokeWidth={1.75}
+                  />
+                  <span>Back</span>
+                </CommandItem>
+                <CommandItem
+                  value="move-workspace:new"
+                  onSelect={() => runAfterClose(() => onMoveActiveTabToWorkspace("new"))}
+                  className="text-[12.5px]"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+                  <span>New workspace</span>
+                </CommandItem>
+                {workspaceTargets.map((entry) => (
+                  <CommandItem
+                    key={entry.workspaceId}
+                    value={`move-workspace:${entry.workspaceId}`}
+                    onSelect={() =>
+                      runAfterClose(() => onMoveActiveTabToWorkspace(entry.workspaceId))
+                    }
+                    className="text-[12.5px]"
+                  >
+                    <WorkspaceMark
+                      id={entry.workspaceId}
+                      color={entry.color}
+                      icon={entry.icon ?? undefined}
+                      size={14}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+                    {entry.hibernated ? (
+                      <span role="img" aria-label="Workspace is hibernated" className="shrink-0">
+                        <HugeiconsIcon
+                          icon={SleepingIcon}
+                          size={12}
+                          strokeWidth={1.75}
+                          className="text-muted-foreground"
+                        />
+                      </span>
+                    ) : null}
+                  </CommandItem>
+                ))}
+                {workspaceTargets.length === 0 ? (
+                  <StatusItem label="No other workspaces" />
+                ) : null}
+              </CommandGroup>
             ) : parsed.mode === "commands" ? (
               merged.length === 0 ? (
                 <EmptyHint />
@@ -336,6 +435,7 @@ export function CommandPalette({
                     recordChoice(parsed.term, workspaceRowKey(entry.workspaceId));
                     runAfterClose(() => onSelectWorkspace(entry));
                   }}
+                  onRunClosed={(entry) => runAfterClose(() => onRunClosed(entry))}
                 />
               )
             ) : parsed.mode === "content" ? (

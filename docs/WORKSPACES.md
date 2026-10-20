@@ -71,7 +71,10 @@ points that move the active tab to a real tab: `activateTab`, `openPanel`, `repl
 `closeTab` reads the closing pane's history and passes it to `applyCloseTab`, which picks the
 first history id that still exists in the remaining tabs, falling back to the positional neighbour
 (`remaining[idx] ?? remaining[idx - 1]`) when the history is empty. The `history` argument is
-optional, so the pure function keeps its legacy neighbour behaviour when called without it.
+optional, so the pure function keeps its legacy neighbour behaviour when called without it. Before
+applying the close it also records the tab's location (terminal cwd, editor or markdown file) in
+the persistent closed-tab history (`recordClosedTab`, `closedTabHistory.ts`), which feeds the
+command palette's Folder/File rows; browsers and views without a path are skipped.
 
 A single reconciliation effect (`useEffect` on `workspaces`) prunes the map against live
 panes/tabs: it drops dead panes and dead `tabId`s, so a stale id is never selected and the map
@@ -282,7 +285,7 @@ commands store and the script state map, so a row disappears when its agent fini
 empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
 (script: the same stop the Header's stop button sends, without moving focus; disabled as "Stopping" while
 `waiting`). Closing a workspace (hibernated or awake) abandons its carried buffers (`abandonUnflushedBuffers`: an awake workspace's editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are refused) and clears its
-hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see ARCHITECTURE 5.7a). Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
+hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see ARCHITECTURE 5.7a), and sends every tab it held to the persistent closed-tab history first. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
 #### Auto-hibernate

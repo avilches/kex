@@ -1,7 +1,9 @@
 import { CommandGroup } from "@/components/ui/command";
 import { type KeyBinding, type ShortcutId, getShortcutLabel } from "@/modules/shortcuts";
 import { ActionItem } from "./ActionItem";
+import { ClosedItem } from "./ClosedItem";
 import { COMMAND_GROUPS } from "./commands";
+import type { ClosedTabEntry } from "./lib/closedEntries";
 import type { MergedRow } from "./lib/mergeRows";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { TabItem } from "./TabItem";
@@ -15,6 +17,7 @@ type Props = {
   onRunCommand: (item: PaletteItem) => void;
   onRunTab: (entry: TabEntry) => void;
   onRunWorkspace: (entry: WorkspaceEntry) => void;
+  onRunClosed: (entry: ClosedTabEntry) => void;
 };
 
 function shortcutLabel(id: ShortcutId | undefined, user: Record<ShortcutId, KeyBinding[]>): string | null {
@@ -27,6 +30,9 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
   }
   if (row.kind === "workspace") {
     return <WorkspaceItem entry={row.entry} onRun={() => p.onRunWorkspace(row.entry)} />;
+  }
+  if (row.kind === "closed") {
+    return <ClosedItem entry={row.entry} onRun={() => p.onRunClosed(row.entry)} />;
   }
   return (
     <ActionItem
@@ -50,12 +56,20 @@ export function MergedList(p: Props) {
     );
   }
   const tabs = p.rows.filter((r) => r.kind === "tab");
+  const closed = p.rows.filter((r) => r.kind === "closed");
   const actions = p.rows.filter((r): r is Extract<MergedRow, { kind: "command" }> => r.kind === "command");
   return (
     <>
       {tabs.length > 0 ? (
         <CommandGroup heading="Recent tabs">
           {tabs.map((row) => (
+            <Row key={row.key} row={row} p={p} />
+          ))}
+        </CommandGroup>
+      ) : null}
+      {closed.length > 0 ? (
+        <CommandGroup heading="Recently closed">
+          {closed.map((row) => (
             <Row key={row.key} row={row} p={p} />
           ))}
         </CommandGroup>

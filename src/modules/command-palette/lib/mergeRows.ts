@@ -1,4 +1,9 @@
 import type { PaletteItem } from "../types";
+import {
+  CLOSED_RECENT_LIMIT,
+  CLOSED_SEARCH_LIMIT,
+  type ClosedTabEntry,
+} from "./closedEntries";
 import { fuzzyScoreLower, passesQuality } from "./fuzzy";
 import { type LearnedMap, learnedBoost } from "./learned";
 import { mruRank } from "./mru";
@@ -9,12 +14,14 @@ import { byRecency, RECENT_LIMIT, SEARCH_LIMIT, tabRowKey, workspaceRowKey } fro
 export type MergedRow =
   | { kind: "command"; key: string; item: PaletteItem }
   | { kind: "tab"; key: string; entry: TabEntry }
-  | { kind: "workspace"; key: string; entry: WorkspaceEntry };
+  | { kind: "workspace"; key: string; entry: WorkspaceEntry }
+  | { kind: "closed"; key: string; entry: ClosedTabEntry };
 
 export type MergeInput = {
   commands: PaletteItem[];
   tabs: TabEntry[];
   workspaces: WorkspaceEntry[];
+  closed?: ClosedTabEntry[];
   term: string;
   activeTabId: string | null;
   learned: LearnedMap;
@@ -70,8 +77,31 @@ function commandPoints(blob: string[], q: string): number | null {
   return top;
 }
 
+// Every reopen counts, and counting outranks the tier of the field that matched: a folder the
+// user returns to twenty times should beat a live tab found by a scattered title match, which
+// is the whole point of keeping the history. It still sits below a precise live title hit
+// until it has real use behind it.
+function closedPoints(entry: ClosedTabEntry, q: string): number | null {
+  let points: number | null = null;
+  const title = fuzzyPoints(q, entry.title);
+  if (title !== null) points = title;
+  const location = substring(q, entry.detail);
+  if (location !== null) {
+    const candidate = SUBSTRING_BASE - TIER_STEP + location;
+    if (points === null || candidate > points) points = candidate;
+  }
+  const workspace = fuzzyPoints(q, entry.workspaceTitle);
+  if (workspace !== null) {
+    const candidate = SUBSTRING_BASE - 2 * TIER_STEP + workspace / 100;
+    if (points === null || candidate > points) points = candidate;
+  }
+  if (points === null) return null;
+  return points + entry.uses * TIER_STEP;
+}
+
 export function mergeRows(input: MergeInput): MergedRow[] {
   const { commands, tabs, workspaces, activeTabId, learned, mru } = input;
+  const closed = input.closed ?? [];
   const q = input.term.trim().toLowerCase();
 
   if (!q) {
@@ -80,10 +110,13 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       .sort(byRecency)
       .slice(0, RECENT_LIMIT)
       .map((entry): MergedRow => ({ kind: "tab", key: tabRowKey(entry.tabId), entry }));
+    const recentlyClosed = closed
+      .slice(0, CLOSED_RECENT_LIMIT)
+      .map((entry): MergedRow => ({ kind: "closed", key: entry.key, entry }));
     const actions = [...commands]
       .sort((a, b) => mruRank(mru, b.id) - mruRank(mru, a.id))
       .map((item): MergedRow => ({ kind: "command", key: commandRowKey(item.id), item }));
-    return [...recents, ...actions];
+    return [...recents, ...recentlyClosed, ...actions];
   }
 
   const scored: Scored[] = [];
@@ -107,6 +140,11 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     const key = workspaceRowKey(entry.workspaceId);
     scored.push({ row: { kind: "workspace", key, entry }, points: p + learnedBoost(learned, q, key), recency: null });
   }
+  for (const entry of closed) {
+    const p = closedPoints(entry, q);
+    if (p === null) continue;
+    scored.push({ row: { kind: "closed", key: entry.key, entry }, points: p, recency: null });
+  }
 
   scored.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
@@ -115,9 +153,11 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   });
 
   let tabCount = 0;
+  let closedCount = 0;
   const rows: MergedRow[] = [];
   for (const s of scored) {
     if (s.row.kind === "tab" && ++tabCount > SEARCH_LIMIT) continue;
+    if (s.row.kind === "closed" && ++closedCount > CLOSED_SEARCH_LIMIT) continue;
     rows.push(s.row);
   }
   return rows;

@@ -49,6 +49,7 @@ function mount(rows: MergedRow[], typing: boolean) {
           onRunCommand={vi.fn()}
           onRunTab={vi.fn()}
           onRunWorkspace={vi.fn()}
+          onRunClosed={vi.fn()}
         />
       </CommandList>
     </Command>,

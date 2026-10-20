@@ -7,7 +7,10 @@ import { allPaneIds } from "@/modules/workspaces/lib/splitNode";
 import type { SplitNode } from "@/modules/workspaces/lib/types";
 import {
   ArrowReloadHorizontalIcon,
+  ArrowRight01Icon,
   Cancel01Icon,
+  CancelCircleIcon,
+  CancelSquareIcon,
   FileEditIcon,
   FileSearchIcon,
   Globe02Icon,
@@ -96,6 +99,12 @@ export type CommandPaletteActionContext = {
   toggleZenMode: () => void;
   hasActiveTerminal: boolean;
   hibernated: boolean;
+  activePaneTabCount: number;
+  hasActiveTab: boolean;
+  hasActiveTabTitle: boolean;
+  closeOtherTabs: () => void;
+  closeAllTabs: () => void;
+  resetActiveTabTitle: () => void;
   openWorkspaceProperties: () => void;
   openActionsConfiguration: () => void;
   shortcutHandlers: ShortcutHandlers;
@@ -232,6 +241,42 @@ export function createCommandItems(
       shortcutId: "tab.close",
       disabledReason: closeDisabled,
       run: ctx.closeActiveTabOrPane,
+    },
+    {
+      id: "tab.closeOthers",
+      title: "Close other tabs",
+      group: "Tabs",
+      keywords: ["close", "others", "tabs", "pane"],
+      icon: CancelCircleIcon,
+      disabledReason: ctx.activePaneTabCount > 1 ? undefined : "Single tab",
+      run: ctx.closeOtherTabs,
+    },
+    {
+      id: "tab.closeAll",
+      title: "Close all tabs",
+      group: "Tabs",
+      keywords: ["close", "all", "tabs", "pane"],
+      icon: CancelSquareIcon,
+      disabledReason: ctx.activePaneTabCount > 0 ? undefined : "No tabs",
+      run: ctx.closeAllTabs,
+    },
+    {
+      id: "tab.moveToWorkspace",
+      title: "Move tab to workspace...",
+      group: "Tabs",
+      keywords: ["move", "tab", "workspace", "send"],
+      icon: ArrowRight01Icon,
+      disabledReason: ctx.hasActiveTab ? undefined : "No active tab",
+      run: noop,
+    },
+    {
+      id: "tab.resetTitle",
+      title: "Reset tab title",
+      group: "Tabs",
+      keywords: ["reset", "title", "name", "tab"],
+      icon: ArrowReloadHorizontalIcon,
+      disabledReason: ctx.hasActiveTabTitle ? undefined : "No custom title",
+      run: ctx.resetActiveTabTitle,
     },
     {
       id: "pane.splitRight",

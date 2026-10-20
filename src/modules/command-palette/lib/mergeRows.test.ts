@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PaletteItem } from "../types";
+import type { ClosedTabEntry } from "./closedEntries";
 import type { LearnedMap } from "./learned";
 import { type MergeInput, mergeRows } from "./mergeRows";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
@@ -40,6 +41,22 @@ const ws = (workspaceId: string, title: string): WorkspaceEntry => ({
   hibernated: false,
   tabCount: 1,
   lastUsedAt: 0,
+});
+const closed = (path: string, over: Partial<ClosedTabEntry> = {}): ClosedTabEntry => ({
+  kind: "terminal",
+  path,
+  workspaceId: "ws-1",
+  closedAt: 1,
+  uses: 0,
+  lastUsedAt: 0,
+  key: `closed:terminal:${path}`,
+  title: path.split("/").pop() || path,
+  detail: path,
+  workspaceTitle: "Work",
+  workspaceColor: null,
+  workspaceIcon: null,
+  hibernated: false,
+  ...over,
 });
 
 const input = (over: Partial<MergeInput>): MergeInput => ({
@@ -115,6 +132,53 @@ describe("mergeRows", () => {
   it("includes workspaces", () => {
     const rows = mergeRows(input({ term: "back", workspaces: [ws("w1", "Backlog")] }));
     expect(keys(rows)).toEqual(["ws:w1"]);
+  });
+
+  it("with an empty term lists closed entries between recents and actions", () => {
+    const rows = mergeRows(
+      input({
+        commands: [cmd("a", "A")],
+        tabs: [tab("t1", { lastUsedAt: 5 })],
+        closed: [closed("/work/api"), closed("/work/ui")],
+      }),
+    );
+    expect(keys(rows)).toEqual([
+      "tab:t1",
+      "closed:terminal:/work/api",
+      "closed:terminal:/work/ui",
+      "cmd:a",
+    ]);
+  });
+
+  it("finds a closed entry by its name and by its full path", () => {
+    expect(keys(mergeRows(input({ term: "api", closed: [closed("/work/api")] })))).toEqual([
+      "closed:terminal:/work/api",
+    ]);
+    expect(keys(mergeRows(input({ term: "work/ap", closed: [closed("/work/api")] })))).toEqual([
+      "closed:terminal:/work/api",
+    ]);
+  });
+
+  it("lets a heavily reused closed entry beat a live tab, but not one with no use behind it", () => {
+    const live = tab("t1", { title: "api" });
+    const fresh = closed("/work/api", { uses: 0 });
+    const used = closed("/work/api", { uses: 20 });
+    expect(keys(mergeRows(input({ term: "api", tabs: [live], closed: [fresh] })))).toEqual([
+      "tab:t1",
+      "closed:terminal:/work/api",
+    ]);
+    expect(keys(mergeRows(input({ term: "api", tabs: [live], closed: [used] })))).toEqual([
+      "closed:terminal:/work/api",
+      "tab:t1",
+    ]);
+  });
+
+  it("caps the closed rows rendered while typing", () => {
+    const closedEntries = Array.from({ length: 40 }, (_, i) =>
+      closed(`/work/term-${i}`, { uses: i }),
+    );
+    const rows = mergeRows(input({ term: "term", closed: closedEntries }));
+    expect(rows.filter((r) => r.kind === "closed").length).toBeLessThanOrEqual(12);
   });
 
   it("returns nothing for rows that do not match", () => {

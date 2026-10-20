@@ -1,7 +1,8 @@
 pub mod modules;
 
 use modules::{
-    actions, agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace,
+    actions, agent, closed_tabs, editors, float_browser, fs, git, history, pty, shell, window_state,
+    workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -805,6 +806,7 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|e| std::io::Error::other(e.to_string()))?;
             agent::session_store::init(data_dir.clone());
+            closed_tabs::init(data_dir.clone());
             let state_path = data_dir.join("workspaces.json");
             let mgr = window_state::WindowStateManager::new(state_path);
             mgr.load();
@@ -975,6 +977,9 @@ pub fn run() {
             agent::os_notify::agent_os_notify,
             agent_session_restore_plan,
             agent_session_preview_cmd,
+            closed_tabs::closed_tabs_list,
+            closed_tabs::closed_tabs_record,
+            closed_tabs::closed_tabs_touch,
             check_launch_dir,
             history::history_suggest,
             history::history_commands,
