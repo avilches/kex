@@ -224,10 +224,24 @@ export function CommandPalette({
     [setThemeId, handleOpenChange],
   );
 
+  // Radix listens for Escape on document capture, before React handlers, so the
+  // subpage has to intercept it earlier to go back instead of closing the palette.
+  useEffect(() => {
+    if (!open || !inThemes) return;
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      exitThemes();
+    };
+    window.addEventListener("keydown", onEscape, true);
+    return () => window.removeEventListener("keydown", onEscape, true);
+  }, [open, inThemes, exitThemes]);
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!inThemes) return;
-      if (e.key === "Escape" || (e.key === "Backspace" && query.length === 0)) {
+      if (e.key === "Backspace" && query.length === 0) {
         e.preventDefault();
         e.stopPropagation();
         exitThemes();
