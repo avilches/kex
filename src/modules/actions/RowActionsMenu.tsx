@@ -49,7 +49,7 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
   const dir = kind === "file" ? (path ? pathDirname(path) : "") : path;
-  const info = useDirGit(dir || undefined);
+  const info = useDirGit(dir || undefined, path ? `ctx-${kind}:${path}` : undefined);
   const tab = useMemo(() => rowTab(kind, path), [kind, path]);
   const vars = useMemo(
     () =>
@@ -67,7 +67,7 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
     [vars, global, kind, shell, ws?.actions, ws?.hibernated],
   );
   const overlay = useMemo<RunOverlay | null>(
-    () => (vars ? { vars, focusFolder: vars.cwd || null, spawnCwd: vars.cwd || undefined } : null),
+    () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),
     [vars],
   );
   return { entries, overlay };

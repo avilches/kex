@@ -71,7 +71,7 @@ describe("contextActionEntries", () => {
     expect(entries[0]).toMatchObject({ enabled: false, reason: "workspace is hibernated" });
   });
 
-  it("Actions with no command are skipped and no context mutes every row by command alone", () => {
-    expect(contextActionEntries([action("  "), action("pycharm {workspace}")], "folder", null)).toHaveLength(1);
+  it("Actions with no command are skipped", () => {
+    expect(contextActionEntries([action("  "), action("pycharm {workspace}")], "folder", { vars: vars(), shell: "posix" })).toHaveLength(1);
   });
 });

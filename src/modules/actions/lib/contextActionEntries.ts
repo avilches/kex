@@ -19,17 +19,13 @@ const FILE_VARS = new Set(["filepath", "filename"]);
 export function contextActionEntries(
   actions: readonly Action[],
   kind: ContextActionKind,
-  ctx: BarContext | null,
+  ctx: BarContext,
 ): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
   for (const action of actions) {
     if (action.command.trim() === "") continue;
     const reason = actionAvailability(action, ctx);
-    const missing = ctx
-      ? missingVariables(action.command, ctx.vars)
-      : kind === "folder"
-        ? []
-        : ["filepath"];
+    const missing = missingVariables(action.command, ctx.vars);
     if (kind === "folder" && missing.some((n) => FILE_VARS.has(n))) continue;
     rows.push({ action, enabled: reason === null, reason });
   }

@@ -299,6 +299,7 @@ function EntryRowImpl(props: EntryRowProps) {
           if (renameInProgress) e.preventDefault();
         }}
       >
+        <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {isDir && onSetAsRoot && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -308,7 +309,6 @@ function EntryRowImpl(props: EntryRowProps) {
             Set as Workspace Root
           </ContextMenuItem>
         )}
-        <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {isDir && onNewWorkspaceFromFolder && (
           <ContextMenuItem
             className={COMPACT_ITEM}

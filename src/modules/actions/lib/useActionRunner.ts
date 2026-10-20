@@ -34,10 +34,11 @@ import type { Action } from "./types";
 // Values a run takes from where it was launched instead of the focused tab: the context
 // menus (explorer rows, breadcrumbs, tabs) run an Action against their own folder or file.
 export type RunOverlay = {
-  vars?: Partial<RunContext["vars"]>;
-  focusFolder?: string | null;
+  /** The full map of values the row stands for; it replaces the focused tab's. */
+  vars?: RunContext["vars"];
+  focusFolder?: string;
   /** Where a spawned app is launched from; the folder or file folder of the row. */
-  spawnCwd?: string | null;
+  spawnCwd?: string;
 };
 
 type TerminalHandle = { write: (data: string) => void };
@@ -195,9 +196,9 @@ export function useActionRunner(deps: ActionRunnerDeps) {
           void native
             .actionSpawn(plan.argv, overlay?.spawnCwd ?? ws.workspaceRoot ?? ws.cwd ?? undefined)
             .catch((e: unknown) => {
-            const why = e instanceof Error ? e.message : String(e);
-            toast.error(`${action.name.trim() || "Action"} not run: ${why}`, { duration: 6000 });
-          });
+              const why = e instanceof Error ? e.message : String(e);
+              toast.error(`${action.name.trim() || "Action"} not run: ${why}`, { duration: 6000 });
+            });
           return;
         case "already-running":
           revealActionTab(plan.tabId);

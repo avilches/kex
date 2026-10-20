@@ -90,12 +90,13 @@ export function TabContextMenuItems({
   const rowActions =
     tab.kind === "terminal" ? (
       <RowActionsMenu kind="folder" path={tab.cwd ?? ""} />
-    ) : "path" in tab && tab.path ? (
-      <RowActionsMenu kind="file" path={tab.path} />
+    ) : focusFilePath ? (
+      <RowActionsMenu kind="file" path={focusFilePath} />
     ) : null;
 
   return (
     <>
+      {rowActions}
       {canSave && (
         <>
           <ContextMenuItem onSelect={() => onSaveTab(tab.id)}>
@@ -239,12 +240,6 @@ export function TabContextMenuItems({
         </>
       )}
       <TabAgentMenuItems tabId={tab.id}>{runOnStart}</TabAgentMenuItems>
-      {rowActions && (
-        <>
-          <ContextMenuSeparator />
-          {rowActions}
-        </>
-      )}
       <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>
