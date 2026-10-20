@@ -16,7 +16,7 @@ import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
 import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
-import { recordClosedTab } from "./closedTabHistory";
+import { recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
@@ -551,7 +551,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       const stash = useAgentStore.getState().stashClosedSession;
       if (!closing.hibernated) for (const t of terminalTabs(closing)) stash(t.id);
       for (const pane of allPanes(closing.paneTree))
-        for (const tab of pane.tabs) recordClosedTab(tab, id);
+        for (const tab of pane.tabs) recordTabClosed(tab, id);
       closedTabsRef.current = captureClosedWorkspace(
         closedTabsRef.current,
         closing,
@@ -787,7 +787,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (ws) {
       const found = findTabPane(ws.paneTree, tabId);
       if (found) {
-        recordClosedTab(found.tab, workspaceId);
+        recordTabClosed(found.tab, workspaceId);
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
           kind: "tab",

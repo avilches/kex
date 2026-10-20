@@ -73,8 +73,9 @@ first history id that still exists in the remaining tabs, falling back to the po
 (`remaining[idx] ?? remaining[idx - 1]`) when the history is empty. The `history` argument is
 optional, so the pure function keeps its legacy neighbour behaviour when called without it. Before
 applying the close it also records the tab's location (terminal cwd, editor or markdown file) in
-the persistent closed-tab history (`recordClosedTab`, `closedTabHistory.ts`), which feeds the
-command palette's Folder/File rows; browsers and views without a path are skipped.
+the persistent tab history (`recordTabClosed`, `tabHistory.ts`), which feeds the command
+palette's Folder/File rows; browsers and views without a path are skipped. Closing only records
+the location in its workspace: the `uses` counter comes from focus, handled in `App.tsx`.
 
 A single reconciliation effect (`useEffect` on `workspaces`) prunes the map against live
 panes/tabs: it drops dead panes and dead `tabId`s, so a stale id is never selected and the map

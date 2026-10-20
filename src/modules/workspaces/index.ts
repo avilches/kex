@@ -4,10 +4,13 @@ export { TabContent, type MarkdownTabHandle, type TabCallbacks } from "./TabCont
 export { PaneView } from "./PaneView";
 export { collectRunningTerminals, useWorkspaces, type UseWorkspacesReturn } from "./lib/useWorkspaces";
 export {
-  loadClosedTabs,
-  touchClosedTab,
-  type ClosedTabRecord,
-} from "./lib/closedTabHistory";
+  flushTabUses,
+  loadTabHistory,
+  noteTabUse,
+  recordTabClosed,
+  tabIdentityKey,
+  type TabHistoryRecord,
+} from "./lib/tabHistory";
 export { tabTitle, tabIcon } from "./lib/tabTitle";
 export { SplitNodeView } from "./SplitNodeView";
 export { WorkspaceView } from "./WorkspaceView";

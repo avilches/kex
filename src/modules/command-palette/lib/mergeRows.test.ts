@@ -46,7 +46,6 @@ const closed = (path: string, over: Partial<ClosedTabEntry> = {}): ClosedTabEntr
   kind: "terminal",
   path,
   workspaceId: "ws-1",
-  closedAt: 1,
   uses: 0,
   lastUsedAt: 0,
   key: `closed:terminal:${path}`,
