@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import {
   addAction,
+  adoptAction,
   removeAction,
   reorderActions,
   updateAction,
@@ -43,7 +44,7 @@ import { type ClosedEntry, type Tab, type PaneNode, type TabHibernation, type Wo
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
 import type { SidebarView } from "./sidebarState";
-import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
+import { newActionId, newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 import {
   buildReopenedTab,
   captureClosedEntry,
@@ -1063,6 +1064,23 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     }
   }, [workspaces]);
 
+  // The inverse of the promotion: the Action leaves the global list and joins the workspace,
+  // keeping its id. The global write goes first, so a failed move leaves the actions alone.
+  const demoteGlobalAction = useCallback(
+    (workspaceId: string, actionId: string) => {
+      const action = globalActions.get().find((a) => a.id === actionId);
+      if (!action) return;
+      void globalActions
+        .change((list) => removeAction(list, actionId))
+        .then(() => setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptAction(list, action, newActionId))))
+        .catch((err: unknown) => {
+          console.error("Could not move the global action back", err);
+          toast.error(`Could not move "${action.name}" to the workspace`);
+        });
+    },
+    [],
+  );
+
   const setAgentTitles = useCallback((titles: ReadonlyMap<string, string>) => {
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
   }, []);
@@ -1184,6 +1202,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     reorderWorkspaceActions,
     setActiveWorkspaceAction,
     promoteWorkspaceAction,
+    demoteGlobalAction,
     setTerminalRunningCommand,
     toggleOverlayPreview,
     toggleSplitPreview,

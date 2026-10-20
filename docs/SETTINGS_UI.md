@@ -44,7 +44,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   rueda). El patron vigente es `DialogScrollHost` (`src/components/dialogScrollHost.tsx`): el
   dialogo expone su nodo scrolleable via contexto y el popover se renderiza dentro con
   `container={host}` manteniendo `pointer-events-auto` en el `PopoverContent`; referencias
-  vivas `AddApplicationMenu.tsx` (combo de apps) y el popover de Make global en `ActionRow.tsx`.
+  vivas `AddApplicationMenu.tsx` (combo de apps) en la ventana de Settings.
   Aplicarla (con su provider, `WheelScrollDialogHost` en `WorkspaceSettingsDialog.tsx`) a todo
   popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
 - **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,

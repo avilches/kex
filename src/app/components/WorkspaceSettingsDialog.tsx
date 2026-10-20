@@ -11,20 +11,9 @@ import {
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import { normalizeRootPath, toForwardSlashes } from "@/lib/pathUtils";
-import {
-  ActionsEditor,
-  ActionIcon,
-  suggestionsFromDetected,
-  useActionContext,
-  type Action,
-} from "@/modules/actions";
-import { useExternalEditors } from "@/modules/external-editors";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
-import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
+import { useWorkspaceSettingsStore, type WorkspaceSettingsFocus, type WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import { DialogScrollHost } from "@/components/dialogScrollHost";
-import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
@@ -54,11 +43,6 @@ type Props = {
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
   onSetWorkspaceRoot: (id: string, path: string | undefined) => void;
-  onAddAction: (id: string, action: Action) => void;
-  onUpdateAction: (id: string, actionId: string, patch: Partial<Omit<Action, "id">>) => void;
-  onRemoveAction: (id: string, actionId: string) => void;
-  onReorderActions: (id: string, fromId: string, toId: string) => void;
-  onPromoteAction: (id: string, actionId: string) => void;
   onRestoreFocus: () => void;
 };
 
@@ -259,8 +243,7 @@ function IconPicker({
 
 type FormProps = { ws: Workspace; initialSection: WorkspaceSettingsSection; initialFocus: WorkspaceSettingsFocus; onRequestClose: () => void } & Omit<Props, "workspaces">;
 
-function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClose, ...props }: FormProps) {
-  const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>(initialSection);
+function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: FormProps) {
   const [cwdValue, setCwdValue] = useState(ws.workspaceRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
@@ -270,16 +253,15 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
   useEffect(() => {
-    if (activeSection === "properties") {
-      setTimeout(() => {
-        if (initialFocus === "workspaceRoot") {
-          cwdInputRef.current?.focus();
-        } else {
-          nameInputRef.current?.focus();
-        }
-      }, 0);
-    }
-  }, [activeSection, initialFocus]);
+    const t = setTimeout(() => {
+      if (initialFocus === "workspaceRoot") {
+        cwdInputRef.current?.focus();
+      } else {
+        nameInputRef.current?.focus();
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [initialFocus]);
 
   useEffect(() => {
     if (!cwdValue) {
@@ -305,26 +287,6 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
   return (
     <div className="flex min-h-[380px] flex-col gap-0 py-1">
-      {/* Section bar */}
-      <div className="mb-4 flex gap-0 border-b border-border">
-        {(["properties", "actions"] as const).map((section) => (
-          <button
-            key={section}
-            type="button"
-            onClick={() => setActiveSection(section)}
-            className={cn(
-              "-mb-px px-3 py-1.5 text-[12px] font-medium outline-none transition-colors focus-visible:outline-none",
-              activeSection === section
-                ? "border-b-2 border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {section === "properties" ? "Properties" : "Actions"}
-          </button>
-        ))}
-      </div>
-
-      {activeSection === "properties" && (
         <div className="flex flex-col gap-5">
           {/* Name: full width */}
           <div className="flex flex-col gap-1.5">
@@ -456,90 +418,6 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
             />
           </div>
         </div>
-      )}
-
-      {activeSection === "actions" && (
-        <WorkspaceActions
-          ws={ws}
-          autoDraft={initialFocus === "newAction" ? { kind: "script" } : null}
-          onAdd={props.onAddAction}
-          onUpdate={props.onUpdateAction}
-          onRemove={props.onRemoveAction}
-          onReorder={props.onReorderActions}
-          onMoveToGlobal={props.onPromoteAction}
-        />
-      )}
     </div>
-  );
-}
-
-function WorkspaceActions({
-  ws,
-  autoDraft,
-  onAdd,
-  onUpdate,
-  onRemove,
-  onReorder,
-  onMoveToGlobal,
-}: {
-  ws: Workspace;
-  autoDraft: { kind: "script" } | null;
-  onAdd: Props["onAddAction"];
-  onUpdate: Props["onUpdateAction"];
-  onRemove: Props["onRemoveAction"];
-  onReorder: Props["onReorderActions"];
-  onMoveToGlobal: Props["onPromoteAction"];
-}) {
-  const { detectedEditors } = useExternalEditors();
-  const context = useActionContext(ws);
-  const globalActions = usePreferencesStore((s) => s.actions) ?? [];
-  return (
-    <div className="flex flex-col gap-2">
-      {globalActions.length > 0 && <GlobalActionsHint actions={globalActions} />}
-      <ActionsEditor
-        actions={ws.actions ?? []}
-        suggestions={suggestionsFromDetected(detectedEditors)}
-        context={context}
-        autoDraft={autoDraft}
-        emptyHint="No actions in this workspace yet. Scripts run in a terminal; apps open in the background."
-        onAdd={(action) => onAdd(ws.id, action)}
-        onUpdate={(id, next) => {
-          const { id: _id, ...patch } = next;
-          onUpdate(ws.id, id, patch);
-        }}
-        onRemove={(id) => onRemove(ws.id, id)}
-        onReorder={(from, to) => onReorder(ws.id, from, to)}
-        onMoveToGlobal={(id: string) => onMoveToGlobal(ws.id, id)}
-      />
-    </div>
-  );
-}
-
-// The global Actions of this workspace live in Settings; the pill keeps them visible here,
-// scripts grouped before the apps, and hands the user to the right section when clicked.
-function GlobalActionsHint({ actions }: { actions: readonly Action[] }) {
-  const scripts = actions.filter((a) => a.runInTerminal);
-  const apps = actions.filter((a) => !a.runInTerminal);
-  return (
-    <button
-      type="button"
-      title={`${actions.length} global actions in Settings: ${actions.map((a) => a.name || "Action").join(", ")}`}
-      onClick={() => void openSettingsWindow("actions")}
-      className="flex h-7 w-fit shrink-0 items-center gap-1.5 rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    >
-      {scripts.map((a) => (
-        <span key={a.id} className="flex size-4 shrink-0 items-center justify-center">
-          <ActionIcon action={a} size={12} />
-        </span>
-      ))}
-      {apps.map((a) => (
-        <span key={a.id} className="flex size-4 shrink-0 items-center justify-center">
-          <ActionIcon action={a} size={12} />
-        </span>
-      ))}
-      <span>
-        {actions.length} global {actions.length === 1 ? "action" : "actions"}
-      </span>
-    </button>
   );
 }

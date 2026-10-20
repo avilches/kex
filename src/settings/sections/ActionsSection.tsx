@@ -1,6 +1,6 @@
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
   updateAction,
   type Action,
 } from "@/modules/actions";
+import { useWorkspaceActionsFeed } from "@/modules/actions/lib/actionsFeed";
 import { useExternalEditors } from "@/modules/external-editors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SectionHeader } from "../components/SectionHeader";
@@ -40,8 +41,10 @@ function editQuietly(fn: (list: Action[]) => Action[]) {
   edit(fn).catch(() => {});
 }
 
+type Tab = "global" | "workspace";
+
 type Props = {
-  /** Extra in the section param ("actions:script"): open with a blank command draft. */
+  /** Extra in the section param ("actions:script", "actions:workspace:script"): open with a blank command draft, on the tab the extra says. */
   startDraft?: string;
   onDraftConsumed?: () => void;
 };
@@ -49,6 +52,8 @@ type Props = {
 export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
   const actions = usePreferencesStore((s) => s.actions);
   const { detectedEditors, isScanning, scan } = useExternalEditors();
+  const { feed, send } = useWorkspaceActionsFeed();
+  const [tab, setTab] = useState<Tab>(startDraft?.startsWith("workspace") ? "workspace" : "global");
 
   const didScan = useRef(false);
   useEffect(() => {
@@ -57,6 +62,9 @@ export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
       scan();
     }
   }, [detectedEditors.length, isScanning, scan]);
+
+  const draft = startDraft?.endsWith(":script") ? "script" : undefined;
+  const autoDraft = draft === "script" ? ({ kind: "script" } as const) : null;
 
   useEffect(() => {
     if (!startDraft) return;
@@ -73,22 +81,66 @@ export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
         </Button>
       </div>
 
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            ["global", "Global"],
+            ["workspace", feed ? `Current workspace: ${feed.workspaceName}` : "Current workspace"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cnTab(tab === id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <p className="-mt-2 text-[11.5px] text-muted-foreground">
-        Global actions are available in every workspace. A script runs in a terminal and can be stopped; an app opens
-        in the background. Actions of a single project live in its workspace settings.
+        {tab === "global"
+          ? "Global actions are available in every workspace. A script runs in a terminal and can be stopped; an app opens in the background."
+          : "Actions of the current workspace are available in it alone; every tab of the app shares them."}
       </p>
 
-      <ActionsEditor
-        actions={actions}
-        suggestions={suggestionsFromDetected(detectedEditors)}
-        context={null}
-        autoDraft={startDraft ? { kind: "script" } : null}
-        emptyHint="No global actions yet. Add a command or pick an application above."
-        onAdd={(action) => edit((list) => addAction(list, action))}
-        onUpdate={(id, next) => editQuietly((list) => updateAction(list, id, next))}
-        onRemove={(id) => editQuietly((list) => removeAction(list, id))}
-        onReorder={(from, to) => editQuietly((list) => reorderActions(list, from, to))}
-      />
+      {tab === "global" ? (
+        <ActionsEditor
+          actions={actions}
+          suggestions={suggestionsFromDetected(detectedEditors)}
+          context={null}
+          autoDraft={autoDraft}
+          emptyHint="No global actions yet. Add a command or pick an application above."
+          onAdd={(action) => edit((list) => addAction(list, action))}
+          onUpdate={(id, next) => editQuietly((list) => updateAction(list, id, next))}
+          onRemove={(id) => editQuietly((list) => removeAction(list, id))}
+          onReorder={(from, to) => editQuietly((list) => reorderActions(list, from, to))}
+          onMoveToWorkspace={feed ? (id) => send({ kind: "toWorkspace", workspaceId: feed.workspaceId, id }) : undefined}
+        />
+      ) : feed ? (
+        <ActionsEditor
+          key={feed.workspaceId}
+          actions={feed.actions}
+          suggestions={suggestionsFromDetected(detectedEditors)}
+          context={feed.context}
+          emptyHint={`No actions in ${feed.workspaceName} yet. Add a command or pick an application above.`}
+          onAdd={(action) => send({ kind: "add", workspaceId: feed.workspaceId, action })}
+          onUpdate={(id, next) => send({ kind: "update", workspaceId: feed.workspaceId, id, action: next })}
+          onRemove={(id) => send({ kind: "remove", workspaceId: feed.workspaceId, id })}
+          onReorder={(from, to) => send({ kind: "reorder", workspaceId: feed.workspaceId, fromId: from, toId: to })}
+          onMoveToGlobal={(id) => send({ kind: "toGlobal", workspaceId: feed.workspaceId, id })}
+        />
+      ) : (
+        <p className="text-[11.5px] text-muted-foreground">The app does not report a workspace. Open a workspace and reload this window.</p>
+      )}
     </div>
   );
+}
+
+function cnTab(active: boolean): string {
+  return [
+    "-mb-px px-3 py-1.5 text-[12px] font-medium outline-none transition-colors focus-visible:outline-none",
+    active ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground",
+  ].join(" ");
 }

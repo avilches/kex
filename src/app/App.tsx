@@ -71,7 +71,13 @@ import { runEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
-import { openSettingsWindow, openActionsNewScriptSettings } from "@/modules/settings/openSettingsWindow";
+import {
+  openSettingsWindow,
+  openGlobalActionsSettings,
+  openWorkspaceActionsSettings,
+} from "@/modules/settings/openSettingsWindow";
+import { useWorkspaceActionsBroadcast } from "@/modules/actions/lib/actionsBroadcast";
+import type { Action } from "@/modules/actions/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
@@ -329,6 +335,7 @@ export default function App() {
     removeWorkspaceAction,
     reorderWorkspaceActions,
     promoteWorkspaceAction,
+    demoteGlobalAction,
     dropDeadScriptPanes,
     setScriptPaneId,
     setTerminalRunningCommand,
@@ -3415,10 +3422,7 @@ export default function App() {
               useWorkspaceSettingsStore
                 .getState()
                 .openSettings(activeWorkspaceId),
-            openActionsConfiguration: () =>
-              useWorkspaceSettingsStore
-                .getState()
-                .openSettings(activeWorkspaceId, "actions"),
+            openActionsConfiguration: () => void openWorkspaceActionsSettings(),
             shortcutHandlers,
             isShortcutAvailable: (id) => !paletteShortcutUnavailable(id, shortcutContext),
             openSettingsSection: (section) => void openSettingsWindow(section),
@@ -3477,17 +3481,35 @@ export default function App() {
     [runAction, stopAction, focusActionTab],
   );
 
+  // Settings owns the Actions editor now; the workspace scope flows to it through the
+  // broadcast and every edit comes back as an operation the stores apply.
+  const workspaceActionsMutators = useMemo(
+    () => ({
+      add: addWorkspaceAction,
+      update: (workspaceId: string, actionId: string, action: Action) => {
+        const { id: _id, ...patch } = action;
+        updateWorkspaceAction(workspaceId, actionId, patch);
+      },
+      remove: removeWorkspaceAction,
+      reorder: reorderWorkspaceActions,
+      toGlobal: promoteWorkspaceAction,
+      toWorkspace: demoteGlobalAction,
+    }),
+    [addWorkspaceAction, updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, promoteWorkspaceAction, demoteGlobalAction],
+  );
+  useWorkspaceActionsBroadcast({ workspace: activeWorkspace ?? null, mutators: workspaceActionsMutators });
+
   const onOpenActionsSettings = useCallback(() => {
-    useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "actions");
-  }, [activeWorkspaceId]);
+    void openWorkspaceActionsSettings();
+  }, []);
 
   const onAddGlobalAction = useCallback(() => {
-    void openActionsNewScriptSettings();
+    void openGlobalActionsSettings(true);
   }, []);
 
   const onAddWorkspaceAction = useCallback(() => {
-    useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "actions", "newAction");
-  }, [activeWorkspaceId]);
+    void openWorkspaceActionsSettings(true);
+  }, []);
 
   const sidebarRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
@@ -3836,11 +3858,6 @@ export default function App() {
               if (path !== undefined) setWorkspaceRoot(id, path);
               else clearWorkspaceRoot(id);
             }}
-            onAddAction={addWorkspaceAction}
-            onUpdateAction={updateWorkspaceAction}
-            onRemoveAction={removeWorkspaceAction}
-            onReorderActions={reorderWorkspaceActions}
-            onPromoteAction={promoteWorkspaceAction}
             onRestoreFocus={restoreLeafFocus}
           />
 

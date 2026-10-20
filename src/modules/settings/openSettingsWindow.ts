@@ -31,6 +31,11 @@ export async function openFileTypesSettings(ext?: string): Promise<void> {
 
 // Opens Settings > Actions with a blank command draft ready to be typed. Encodes as
 // "actions:script", the filetypes scheme again: section plus the extra from one param.
-export async function openActionsNewScriptSettings(): Promise<void> {
-  await invoke("open_settings_window", { section: "actions:script" });
+// The workspace tab of the section edits the Actions of the current workspace.
+export async function openGlobalActionsSettings(withDraft = false): Promise<void> {
+  await invoke("open_settings_window", { section: withDraft ? "actions:script" : "actions" });
+}
+
+export async function openWorkspaceActionsSettings(withDraft = false): Promise<void> {
+  await invoke("open_settings_window", { section: withDraft ? "actions:workspace:script" : "actions:workspace" });
 }
