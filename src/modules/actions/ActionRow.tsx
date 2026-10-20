@@ -6,7 +6,7 @@ import {
   ChevronUpIcon,
   DragDropVerticalIcon,
   FolderOpenIcon,
-  Globe02Icon,
+  MoveToIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
@@ -24,13 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -39,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useDialogScrollHost } from "@/components/dialogScrollHost";
 import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
@@ -67,8 +60,9 @@ type Props = {
   /** Folded to its header row, like the file-type cards; drafts always stay expanded. */
   expanded: boolean;
   onToggleExpand: () => void;
-  /** Short button that moves a workspace Action to the global list; absent in Settings. */
-  onMakeGlobal?: () => void;
+  /** Offers the move between scopes; the row shows the direction it does not belong to. */
+  onMoveToGlobal?: () => void;
+  onMoveToWorkspace?: () => void;
   onChange: (next: Action) => void;
   onRemove: () => void;
 };
@@ -77,15 +71,13 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, context, saved, expanded, onToggleExpand, onMakeGlobal, onChange, onRemove },
+  { action, context, saved, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
-  const [globalOpen, setGlobalOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
-  const scrollHost = useDialogScrollHost();
   const [draft, setDraft] = useState(action.command);
   const [commandFocused, setCommandFocused] = useState(false);
   const [name, setName] = useState(action.name);
@@ -172,47 +164,26 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             )}
           </span>
         )}
-        {expanded ? (
-          <span className="flex shrink-0 items-center gap-1">
-            <Checkbox
-              id={`${action.id}-own`}
-              checked={action.ownButton}
-              onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
-            />
-            <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[11px] text-muted-foreground" title="Own button in the header">
-              Header
-            </label>
-          </span>
-        ) : (
-          action.ownButton && (
-            <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground" title="Own button in the header">
-              Header
-            </span>
-          )
-        )}
-        {onMakeGlobal && (
-          <Popover open={globalOpen} onOpenChange={setGlobalOpen}>
-            <PopoverTrigger asChild>
-              <button type="button" title="Make global" aria-label="Make global" className={SMALL_BUTTON}>
-                <HugeiconsIcon icon={Globe02Icon} size={12} strokeWidth={2} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" container={scrollHost} className="pointer-events-auto w-64 p-3">
-              <p className="text-[12px] leading-snug text-muted-foreground">
-                Action will be available in any workspace. To edit the action, go to Settings
-              </p>
-              <Button
-                size="sm"
-                className="mt-2 h-7 w-full text-[12px]"
-                onClick={() => {
-                  setGlobalOpen(false);
-                  onMakeGlobal();
-                }}
-              >
-                Make global
-              </Button>
-            </PopoverContent>
-          </Popover>
+        <span className="flex shrink-0 items-center gap-1">
+          <Checkbox
+            id={`${action.id}-own`}
+            checked={action.ownButton}
+            onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
+          />
+          <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[11px] text-muted-foreground" title="Own button in the header">
+            Header
+          </label>
+        </span>
+        {(onMoveToGlobal || onMoveToWorkspace) && (
+          <button
+            type="button"
+            title={onMoveToGlobal ? "Move to global" : "Move to workspace only"}
+            aria-label={onMoveToGlobal ? "Move to global" : "Move to workspace only"}
+            className={SMALL_BUTTON}
+            onClick={onMoveToGlobal ?? onMoveToWorkspace}
+          >
+            <HugeiconsIcon icon={MoveToIcon} size={12} strokeWidth={2} />
+          </button>
         )}
         <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
           <AlertDialogTrigger asChild>

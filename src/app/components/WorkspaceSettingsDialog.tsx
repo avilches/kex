@@ -466,7 +466,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
           onUpdate={props.onUpdateAction}
           onRemove={props.onRemoveAction}
           onReorder={props.onReorderActions}
-          onPromote={props.onPromoteAction}
+          onMoveToGlobal={props.onPromoteAction}
         />
       )}
     </div>
@@ -480,7 +480,7 @@ function WorkspaceActions({
   onUpdate,
   onRemove,
   onReorder,
-  onPromote,
+  onMoveToGlobal,
 }: {
   ws: Workspace;
   autoDraft: { kind: "script" } | null;
@@ -488,7 +488,7 @@ function WorkspaceActions({
   onUpdate: Props["onUpdateAction"];
   onRemove: Props["onRemoveAction"];
   onReorder: Props["onReorderActions"];
-  onPromote: Props["onPromoteAction"];
+  onMoveToGlobal: Props["onPromoteAction"];
 }) {
   const { detectedEditors } = useExternalEditors();
   const context = useActionContext(ws);
@@ -509,7 +509,7 @@ function WorkspaceActions({
         }}
         onRemove={(id) => onRemove(ws.id, id)}
         onReorder={(from, to) => onReorder(ws.id, from, to)}
-        onMakeGlobal={(id) => onPromote(ws.id, id)}
+        onMoveToGlobal={(id: string) => onMoveToGlobal(ws.id, id)}
       />
     </div>
   );

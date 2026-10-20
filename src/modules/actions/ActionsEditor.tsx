@@ -32,7 +32,8 @@ type Props = {
   onUpdate: (id: string, next: Action) => void;
   onRemove: (id: string) => void;
   onReorder: (fromId: string, toId: string) => void;
-  onMakeGlobal?: (id: string) => void;
+  onMoveToGlobal?: (id: string) => void;
+  onMoveToWorkspace?: (id: string) => void;
   /** Opens with one blank draft created and focused (the + Action host does that itself). */
   autoDraft?: { kind: "script" } | null;
 };
@@ -70,7 +71,8 @@ export function ActionsEditor({
   onUpdate,
   onRemove,
   onReorder,
-  onMakeGlobal,
+  onMoveToGlobal,
+  onMoveToWorkspace,
   autoDraft,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -174,7 +176,8 @@ export function ActionsEditor({
         saved={saved.has(action.id)}
         expanded={isDraft || openId === action.id}
         onToggleExpand={() => toggleRow(action.id)}
-        onMakeGlobal={onMakeGlobal && saved.has(action.id) ? () => onMakeGlobal(action.id) : undefined}
+        onMoveToGlobal={onMoveToGlobal && saved && saved.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
+        onMoveToWorkspace={onMoveToWorkspace && saved && saved.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
         onChange={(next) => change(action, next)}
         onRemove={() => remove(action)}
       />

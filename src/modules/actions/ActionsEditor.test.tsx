@@ -246,29 +246,16 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("offers Make global only on saved rows and only when the host passes it", () => {
-    const withGlobal = mount([saved], { onMakeGlobal: vi.fn() });
-    expect(withGlobal.container.querySelector("button[aria-label='Make global']")).not.toBeNull();
-    click(commandButton(withGlobal.container));
-    expect(withGlobal.container.querySelectorAll("button[aria-label='Make global']")).toHaveLength(1);
+  it("offers the scope move only when the host passes it", () => {
+    const withGlobal = mount([saved], { onMoveToGlobal: vi.fn() });
+    expect(withGlobal.container.querySelector("button[aria-label='Move to global']")).not.toBeNull();
     withGlobal.unmount();
+    const withWorkspace = mount([saved], { onMoveToWorkspace: vi.fn() });
+    expect(withWorkspace.container.querySelector("button[aria-label='Move to workspace only']")).not.toBeNull();
+    withWorkspace.unmount();
     const without = mount([saved]);
-    expect(without.container.querySelector("button[aria-label='Make global']")).toBeNull();
+    expect(without.container.querySelector("button[aria-label='Move to global']")).toBeNull();
     without.unmount();
-  });
-
-  it("Make global explains itself and confirms from its popover", () => {
-    const onMakeGlobal = vi.fn();
-    const { container, unmount } = mount([saved], { onMakeGlobal });
-    click(container.querySelector("button[aria-label='Make global']"));
-    const content = [...document.querySelectorAll("[role='dialog'], [data-state='open']")].find((n) =>
-      n.textContent?.includes("any workspace"),
-    );
-    expect(content).toBeDefined();
-    const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Make global");
-    click(confirm);
-    expect(onMakeGlobal).toHaveBeenCalledWith("ac-1");
-    unmount();
   });
 
   it("the name field follows the stored name when it changes from outside", () => {
