@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
+
+import { Command, CommandList } from "@/components/ui/command";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Command, CommandList } from "@/components/ui/command";
 import type { MergedRow } from "./lib/mergeRows";
 import type { TabEntry } from "./lib/tabEntries";
 import { MergedList } from "./MergedList";
@@ -11,7 +12,12 @@ vi.mock("@/modules/shortcuts", () => ({ getShortcutLabel: () => null }));
 
 afterEach(cleanup);
 
-const item = (id: string, title: string, group: string): PaletteItem => ({ id, title, group, run: () => {} });
+const item = (id: string, title: string, group: string): PaletteItem => ({
+  id,
+  title,
+  group,
+  run: () => {},
+});
 const tab: TabEntry = {
   tabId: "t1",
   workspaceId: "w",
@@ -56,13 +62,22 @@ function mount(rows: MergedRow[], typing: boolean) {
   );
 }
 
-const titles = () => screen.getAllByRole("option").map((o) => o.textContent ?? "");
+const titles = () =>
+  screen.getAllByRole("option").map((o) => o.textContent ?? "");
 
 describe("MergedList", () => {
   const rows: MergedRow[] = [
-    { kind: "command", key: "cmd:s", item: item("s", "Appearance settings", "Settings") },
+    {
+      kind: "command",
+      key: "cmd:s",
+      item: item("s", "Appearance settings", "Settings"),
+    },
     { kind: "tab", key: "tab:t1", entry: tab },
-    { kind: "command", key: "cmd:g", item: item("g", "Open settings", "General") },
+    {
+      kind: "command",
+      key: "cmd:g",
+      item: item("g", "Open settings", "General"),
+    },
   ];
 
   it("while typing, renders rows in the ranked order whatever their kind or group", () => {

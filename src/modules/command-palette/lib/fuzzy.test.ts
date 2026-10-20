@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fuzzyBest, fuzzyBestLower, fuzzyScore, fuzzyScoreLower, passesQuality } from "./fuzzy";
+import {
+  fuzzyBest,
+  fuzzyBestLower,
+  fuzzyMatchLower,
+  fuzzyScore,
+  fuzzyScoreLower,
+  passesQuality,
+} from "./fuzzy";
 
 function score(query: string, target: string): number {
   const s = fuzzyScore(query, target);
@@ -94,6 +101,31 @@ describe("fuzzyScoreLower", () => {
   });
 });
 
+describe("fuzzyMatchLower", () => {
+  it("returns the matched target positions in order", () => {
+    expect(fuzzyMatchLower("set", "settings")).toEqual({
+      score: fuzzyScoreLower("set", "settings"),
+      indices: [0, 1, 2],
+    });
+    expect(fuzzyMatchLower("splr", "split pane right")).toEqual({
+      score: fuzzyScoreLower("splr", "split pane right"),
+      indices: [0, 1, 2, 11],
+    });
+  });
+
+  it("matches the same subsequence fuzzyScoreLower scores", () => {
+    expect(fuzzyMatchLower("set", "split editor tab")).toEqual({
+      score: fuzzyScoreLower("set", "split editor tab"),
+      indices: [0, 6, 9],
+    });
+  });
+
+  it("returns empty indices for an empty query and null for a non-match", () => {
+    expect(fuzzyMatchLower("", "anything")).toEqual({ score: 0, indices: [] });
+    expect(fuzzyMatchLower("xyz", "split pane")).toBeNull();
+  });
+});
+
 describe("fuzzyBestLower", () => {
   it("takes the highest-scoring candidate", () => {
     const s = fuzzyBestLower("ai", ["close tab", "toggle ai agent"]);
@@ -111,16 +143,34 @@ describe("fuzzyBestLower", () => {
 
 describe("passesQuality", () => {
   it("rejects a sparse subsequence of a long id-like string", () => {
-    expect(passesQuality(3, fuzzyScoreLower("ser", "sidebar.showexplorer") ?? 0)).toBe(false);
-    expect(passesQuality(3, fuzzyScoreLower("ser", "sidebar: show git history") ?? 0)).toBe(false);
+    expect(
+      passesQuality(3, fuzzyScoreLower("ser", "sidebar.showexplorer") ?? 0),
+    ).toBe(false);
+    expect(
+      passesQuality(
+        3,
+        fuzzyScoreLower("ser", "sidebar: show git history") ?? 0,
+      ),
+    ).toBe(false);
   });
 
   it("accepts a word-start or consecutive match", () => {
     expect(passesQuality(3, fuzzyScoreLower("ser", "search") ?? 0)).toBe(true);
-    expect(passesQuality(3, fuzzyScoreLower("ser", "settings.section.terminal") ?? 0)).toBe(true);
-    expect(passesQuality(4, fuzzyScoreLower("splr", "split pane right") ?? 0)).toBe(true);
-    expect(passesQuality(3, fuzzyScoreLower("blb", "backlog board") ?? 0)).toBe(true);
-    expect(passesQuality(3, fuzzyScoreLower("git", "show git changes") ?? 0)).toBe(true);
+    expect(
+      passesQuality(
+        3,
+        fuzzyScoreLower("ser", "settings.section.terminal") ?? 0,
+      ),
+    ).toBe(true);
+    expect(
+      passesQuality(4, fuzzyScoreLower("splr", "split pane right") ?? 0),
+    ).toBe(true);
+    expect(passesQuality(3, fuzzyScoreLower("blb", "backlog board") ?? 0)).toBe(
+      true,
+    );
+    expect(
+      passesQuality(3, fuzzyScoreLower("git", "show git changes") ?? 0),
+    ).toBe(true);
   });
 
   it("asks 8 points per typed character", () => {

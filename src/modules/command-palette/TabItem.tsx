@@ -1,13 +1,15 @@
 import { CommandItem } from "@/components/ui/command";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { SleepingIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { RowTag } from "./RowTag";
+import { SleepingIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { HighlightText } from "./HighlightText";
+import type { RowHighlight } from "./lib/mergeRows";
 import { tabDetailLines } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
+import { RowTag } from "./RowTag";
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
   terminal: "Terminal",
@@ -19,9 +21,21 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
   "git-commit-file": "Git commit file",
 };
 
-export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }) {
+export function TabItem({
+  entry,
+  highlight,
+  onRun,
+}: {
+  entry: TabEntry;
+  highlight?: RowHighlight;
+  onRun: () => void;
+}) {
   const lines = tabDetailLines(entry);
   const note = entry.note?.replace(/\s+/g, " ").trim();
+  const titleIndices =
+    highlight?.field === "title" ? highlight.indices : undefined;
+  const wsIndices =
+    highlight?.field === "workspace" ? highlight.indices : undefined;
   return (
     <CommandItem
       value={`tab:${entry.tabId}`}
@@ -30,17 +44,32 @@ export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }
     >
       <RowTag kind="Tab" />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
-        <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+        <TabBarIcon
+          tab={entry.tab}
+          agentSession={entry.agentSession}
+          running={entry.running}
+        />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{entry.title || KIND_LABEL[entry.kind]}</span>
+        <span className="truncate">
+          {entry.title ? (
+            <HighlightText text={entry.title} indices={titleIndices} />
+          ) : (
+            KIND_LABEL[entry.kind]
+          )}
+        </span>
         {lines.map((line) => (
-          <span key={line} className="truncate text-[10.5px] font-normal text-muted-foreground/80">
+          <span
+            key={line}
+            className="truncate text-[10.5px] font-normal text-muted-foreground/80"
+          >
             {line}
           </span>
         ))}
         {note ? (
-          <span className="truncate text-[10.5px] font-normal text-muted-foreground/60">{note}</span>
+          <span className="truncate text-[10.5px] font-normal text-muted-foreground/60">
+            {note}
+          </span>
         ) : null}
       </span>
       {entry.indicator === "working" ? (
@@ -56,7 +85,11 @@ export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }
         />
       ) : null}
       {entry.hibernated ? (
-        <span role="img" aria-label="Workspace is hibernated" className="shrink-0">
+        <span
+          role="img"
+          aria-label="Workspace is hibernated"
+          className="shrink-0"
+        >
           <HugeiconsIcon
             icon={SleepingIcon}
             size={12}
@@ -72,7 +105,9 @@ export function TabItem({ entry, onRun }: { entry: TabEntry; onRun: () => void }
           icon={entry.workspaceIcon ?? undefined}
           size={12}
         />
-        <span className="truncate">{entry.workspaceTitle}</span>
+        <span className="truncate">
+          <HighlightText text={entry.workspaceTitle} indices={wsIndices} />
+        </span>
       </span>
     </CommandItem>
   );

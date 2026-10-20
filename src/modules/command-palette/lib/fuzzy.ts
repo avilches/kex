@@ -17,16 +17,26 @@ function isCamelStart(target: string, i: number): boolean {
   return c >= 65 && c <= 90 && !(p >= 65 && p <= 90);
 }
 
-export function fuzzyScore(query: string, target: string): number | null {
-  if (query.length === 0) return 0;
+export type FuzzyMatch = { score: number; indices: number[] };
+
+// With lowerInputs the strings arrive pre-lowercased, so the second toLowerCase is
+// idempotent and the exact-case and camel bonuses can never fire: queries scored
+// there and by fuzzyScore land on the same subsequence either way.
+function scoreSubsequence(
+  query: string,
+  target: string,
+  lowerInputs: boolean,
+): FuzzyMatch | null {
+  if (query.length === 0) return { score: 0, indices: [] };
   if (query.length > target.length) return null;
 
-  const q = query.toLowerCase();
-  const t = target.toLowerCase();
+  const q = lowerInputs ? query.toLowerCase() : query;
+  const t = lowerInputs ? target.toLowerCase() : target;
 
   let score = 0;
   let qi = 0;
   let lastMatch = -1;
+  const indices: number[] = [];
 
   for (let ti = 0; ti < t.length && qi < q.length; ti++) {
     if (t[ti] !== q[qi]) continue;
@@ -37,14 +47,19 @@ export function fuzzyScore(query: string, target: string): number | null {
     if (lastMatch === ti - 1) bonus += BONUS_CONSECUTIVE;
     else if (lastMatch >= 0)
       bonus -= Math.min(ti - lastMatch - 1, MAX_GAP_PENALTY);
-    if (target[ti] === query[qi]) bonus += BONUS_EXACT_CASE;
+    if (!lowerInputs && target[ti] === query[qi]) bonus += BONUS_EXACT_CASE;
 
     score += bonus;
+    indices.push(ti);
     lastMatch = ti;
     qi++;
   }
 
-  return qi === q.length ? score : null;
+  return qi === q.length ? { score, indices } : null;
+}
+
+export function fuzzyScore(query: string, target: string): number | null {
+  return scoreSubsequence(query, target, false)?.score ?? null;
 }
 
 export function fuzzyBest(query: string, candidates: string[]): number | null {
@@ -61,30 +76,15 @@ export function fuzzyScoreLower(
   lowerQuery: string,
   lowerTarget: string,
 ): number | null {
-  if (lowerQuery.length === 0) return 0;
-  if (lowerQuery.length > lowerTarget.length) return null;
+  return scoreSubsequence(lowerQuery, lowerTarget, true)?.score ?? null;
+}
 
-  let score = 0;
-  let qi = 0;
-  let lastMatch = -1;
-
-  for (let ti = 0; ti < lowerTarget.length && qi < lowerQuery.length; ti++) {
-    if (lowerTarget[ti] !== lowerQuery[qi]) continue;
-
-    let bonus = 1;
-    if (ti === 0 || isBoundary(lowerTarget[ti - 1])) bonus += BONUS_BOUNDARY;
-    else if (isCamelStart(lowerTarget, ti)) bonus += BONUS_CAMEL;
-    if (lastMatch === ti - 1) bonus += BONUS_CONSECUTIVE;
-    else if (lastMatch >= 0)
-      bonus -= Math.min(ti - lastMatch - 1, MAX_GAP_PENALTY);
-    // No BONUS_EXACT_CASE: both sides are already lowercase.
-
-    score += bonus;
-    lastMatch = ti;
-    qi++;
-  }
-
-  return qi === lowerQuery.length ? score : null;
+// Same match, paired with the target positions it consumed, so the palette can bold them.
+export function fuzzyMatchLower(
+  lowerQuery: string,
+  lowerTarget: string,
+): FuzzyMatch | null {
+  return scoreSubsequence(lowerQuery, lowerTarget, true);
 }
 
 export function fuzzyBestLower(

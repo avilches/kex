@@ -1,5 +1,9 @@
 import { CommandGroup } from "@/components/ui/command";
-import { type KeyBinding, type ShortcutId, getShortcutLabel } from "@/modules/shortcuts";
+import {
+  getShortcutLabel,
+  type KeyBinding,
+  type ShortcutId,
+} from "@/modules/shortcuts";
 import { ActionItem } from "./ActionItem";
 import { ClosedItem } from "./ClosedItem";
 import { COMMAND_GROUPS } from "./commands";
@@ -20,23 +24,45 @@ type Props = {
   onRunClosed: (entry: ClosedTabEntry) => void;
 };
 
-function shortcutLabel(id: ShortcutId | undefined, user: Record<ShortcutId, KeyBinding[]>): string | null {
+function shortcutLabel(
+  id: ShortcutId | undefined,
+  user: Record<ShortcutId, KeyBinding[]>,
+): string | null {
   return id ? getShortcutLabel(id, user) : null;
 }
 
 function Row({ row, p }: { row: MergedRow; p: Props }) {
   if (row.kind === "tab") {
-    return <TabItem entry={row.entry} onRun={() => p.onRunTab(row.entry)} />;
+    return (
+      <TabItem
+        entry={row.entry}
+        highlight={row.highlight}
+        onRun={() => p.onRunTab(row.entry)}
+      />
+    );
   }
   if (row.kind === "workspace") {
-    return <WorkspaceItem entry={row.entry} onRun={() => p.onRunWorkspace(row.entry)} />;
+    return (
+      <WorkspaceItem
+        entry={row.entry}
+        highlight={row.highlight}
+        onRun={() => p.onRunWorkspace(row.entry)}
+      />
+    );
   }
   if (row.kind === "closed") {
-    return <ClosedItem entry={row.entry} onRun={() => p.onRunClosed(row.entry)} />;
+    return (
+      <ClosedItem
+        entry={row.entry}
+        highlight={row.highlight}
+        onRun={() => p.onRunClosed(row.entry)}
+      />
+    );
   }
   return (
     <ActionItem
       item={row.item}
+      highlight={row.highlight}
       shortcutLabel={shortcutLabel(row.item.shortcutId, p.userShortcuts)}
       onRun={() => p.onRunCommand(row.item)}
     />
@@ -57,7 +83,9 @@ export function MergedList(p: Props) {
   }
   const tabs = p.rows.filter((r) => r.kind === "tab");
   const closed = p.rows.filter((r) => r.kind === "closed");
-  const actions = p.rows.filter((r): r is Extract<MergedRow, { kind: "command" }> => r.kind === "command");
+  const actions = p.rows.filter(
+    (r): r is Extract<MergedRow, { kind: "command" }> => r.kind === "command",
+  );
   return (
     <>
       {tabs.length > 0 ? (
