@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   actionAvailability,
+  actionShownAt,
+  actionTarget,
+  barSubtitle,
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
@@ -10,6 +13,7 @@ import {
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  WORKSPACE_UNSET,
 } from "./actionsBar";
 import type { BarItem } from "./actionsBar";
 import type { Action } from "./types";
@@ -108,6 +112,7 @@ describe("menuEntries", () => {
     active: false,
     stoppable: false,
     disabledReason: null,
+    subtitle: null,
     ...over,
   });
 
@@ -280,5 +285,98 @@ describe("buildActionsBarModel", () => {
       activeId: undefined,
     });
     expect(m.buttons[0]?.name).toBe("Action");
+  });
+});
+
+describe("actionTarget", () => {
+  it("reads the target from the variables the command uses, file first", () => {
+    expect(actionTarget("code {filepath}")).toBe("file");
+    expect(actionTarget("zip {filename}")).toBe("file");
+    expect(actionTarget("code {filepath} {workspace}")).toBe("file");
+    expect(actionTarget("agent {cwd}")).toBe("folder");
+    expect(actionTarget("make {branch}")).toBe("folder");
+    expect(actionTarget("pycharm {workspace}")).toBe("workspace");
+    expect(actionTarget("notify {host}")).toBe("workspace");
+    expect(actionTarget("pnpm dev")).toBe("workspace");
+  });
+});
+
+describe("actionShownAt", () => {
+  const place = { file: true, folder: false };
+  it("shows file Actions on a file, folder Actions in a folder and workspace Actions everywhere", () => {
+    expect(actionShownAt("file", place)).toBe(true);
+    expect(actionShownAt("folder", place)).toBe(false);
+    expect(actionShownAt("workspace", place)).toBe(true);
+    expect(actionShownAt("workspace", "all")).toBe(true);
+  });
+});
+
+describe("barSubtitle", () => {
+  it("resolves the name variable to the value of this place", () => {
+    expect(barSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toBe("/p/a.ts");
+    expect(barSubtitle("Agent {cwd}", ctx)).toBe("/p");
+  });
+
+  it("says when the workspace root is missing and hides the line for other empty values", () => {
+    const empty = { ...ctx, vars: { ...vars, workspace: "" } };
+    expect(barSubtitle("PyCharm {workspace}", empty)).toBe(WORKSPACE_UNSET);
+    expect(barSubtitle("Make {branch}", ctx)).toBeNull();
+  });
+
+  it("keeps the template for unknown variables and skips actions without a suffix", () => {
+    expect(barSubtitle("X {stage}", ctx)).toBe("{stage}");
+    expect(barSubtitle("dev", ctx)).toBeNull();
+    expect(barSubtitle("PyCharm {workspace}", null)).toBe(WORKSPACE_UNSET);
+  });
+});
+
+describe("buildActionsBarModel place", () => {
+  const fileAction = app({ id: "f1", command: "code {filepath}", name: "Code {filepath}" });
+  const folderAction = script({ id: "d1", command: "agent {cwd}", name: "Agent {cwd}" });
+  const wsAction = app({ id: "w1", command: "pycharm {workspace}" });
+
+  it("shows file Actions on a file and folder Actions on a terminal", () => {
+    const onFile = buildActionsBarModel({
+      local: [fileAction, folderAction, wsAction],
+      context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
+      states: new Map(),
+      activeId: undefined,
+      place: { file: true, folder: false },
+    });
+    expect(onFile.scripts).toHaveLength(0);
+    expect(onFile.apps.map((i) => i.action.id)).toEqual(["f1", "w1"]);
+
+    const onFolder = buildActionsBarModel({
+      local: [fileAction, folderAction, wsAction],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+      place: { file: false, folder: true },
+    });
+    expect(onFolder.scripts.map((i) => i.action.id)).toEqual(["d1"]);
+    expect(onFolder.apps.map((i) => i.action.id)).toEqual(["w1"]);
+  });
+
+  it("keeps a running script visible whatever the focused tab is", () => {
+    const model = buildActionsBarModel({
+      local: [folderAction],
+      context: ctx,
+      states: new Map([["d1", "running"]]),
+      activeId: "d1",
+      place: { file: true, folder: false },
+    });
+    expect(model.scripts).toHaveLength(1);
+    expect(model.scripts[0]).toMatchObject({ stoppable: true, disabledReason: null });
+  });
+
+  it("resolves the second line to the value of the place", () => {
+    const model = buildActionsBarModel({
+      local: [fileAction],
+      context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
+      states: new Map(),
+      activeId: undefined,
+      place: { file: true, folder: false },
+    });
+    expect(model.apps[0]?.subtitle).toBe("/p/a.ts");
   });
 });

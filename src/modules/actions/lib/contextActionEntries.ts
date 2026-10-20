@@ -1,5 +1,4 @@
-import { actionAvailability, type BarContext } from "./actionsBar";
-import { missingVariables } from "./commandTemplate";
+import { actionAvailability, barSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
 import type { Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -9,13 +8,15 @@ export type ContextActionEntry = {
   /** false is a muted row with its reason; selecting it runs nothing. */
   enabled: boolean;
   reason: string | null;
+  /** The value the row gives the preset variable, instead of the raw template. */
+  subtitle: string | null;
 };
 
-const FILE_VARS = new Set(["filepath", "filename"]);
+const TARGETS: Record<ContextActionKind, ActionTarget> = { folder: "folder", file: "file" };
 
-/** The Actions that fit the place a context menu was opened on. A folder row offers every
- * Action but the ones that need the file it has none of; a file row offers them all. An
- * Action whose remaining variables cannot be filled right now is a muted row with why. */
+/** The Actions offered on a row: folder rows offer only folder Actions, file rows only
+ * file Actions, and the workspace Actions stay in the Header at all times. A row whose
+ * remaining variables cannot be filled is a muted entry with why. */
 export function contextActionEntries(
   actions: readonly Action[],
   kind: ContextActionKind,
@@ -24,10 +25,14 @@ export function contextActionEntries(
   const rows: ContextActionEntry[] = [];
   for (const action of actions) {
     if (action.command.trim() === "") continue;
+    if (actionTarget(action.command) !== TARGETS[kind]) continue;
     const reason = actionAvailability(action, ctx);
-    const missing = missingVariables(action.command, ctx.vars);
-    if (kind === "folder" && missing.some((n) => FILE_VARS.has(n))) continue;
-    rows.push({ action, enabled: reason === null, reason });
+    rows.push({
+      action,
+      enabled: reason === null,
+      reason,
+      subtitle: barSubtitle(action.name.trim() || "Action", ctx),
+    });
   }
   return rows;
 }

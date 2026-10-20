@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { menuEntries, type BarItem } from "./lib/actionsBar";
+import { menuEntries, WORKSPACE_MISSING, type BarItem } from "./lib/actionsBar";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -88,7 +88,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
       >
         {!script && <ActionIcon action={item.action} size={14} />}
         <span className="max-w-[120px] min-w-0">
-          <ActionNameLines name={item.name} />
+          <ActionNameLines name={item.name} value={item.subtitle} />
         </span>
       </button>
     </div>
@@ -112,9 +112,11 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
       >
         {script ? <ScriptControl item={item} {...h} /> : <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>}
         <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
-          <ActionNameLines name={item.name} />
+          <ActionNameLines name={item.name} value={item.subtitle} />
         </span>
-        {blocked && <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>}
+        {blocked && item.disabledReason !== WORKSPACE_MISSING && (
+          <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
+        )}
         {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
       </DropdownMenuItem>
       {stop && (
@@ -158,6 +160,7 @@ export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onC
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
+        className="w-auto min-w-64 max-w-96"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           onRestoreFocus();

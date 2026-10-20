@@ -56,10 +56,12 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   el simbolo, sin icono) con dos entradas: "Add global action" abre Settings > Actions con un
   borrador de script vacio y el foco en el commando, y "This workspace only" hace lo mismo en
   el dialogo de workspace. Con acciones, el trigger reaparece al pasar el raton por la barra.
-- **Nombres en dos lineas**: un nombre de Action con `{variable}` la muestra debajo en mono
-  pequeno en todas las superficies donde se renderiza el nombre (boton propio del header, filas
-  de los menus agrupados y tarjeta plegada del editor), via `ActionNameLines.tsx`; el ancho del
-  boton propio se mide solo con el nombre principal.
+- **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo el valor que
+  el lugar actual da a esa variable (la carpeta, el fichero, la raiz del workspace) en mono
+  pequeno en las superficies donde se renderiza el nombre (boton propio del header, filas de
+  los menus agrupados, submenu contextual y tarjeta plegada del editor), via `ActionNameLines.tsx`
+  y `barSubtitle`; para `{workspace}` sin raiz configurada la linea dice "Workspace Root not
+  configured". El ancho del boton propio se mide solo con el nombre principal.
 - **Conteo apagado en triggers**: los menus agrupados de `ActionsBar` muestran un numero
   apagado junto al label del trigger con las filas que contienen (workspace + global).
 

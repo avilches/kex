@@ -93,7 +93,8 @@ export function ActionMenuProvider({
   return <ApiCtx.Provider value={{ run, ws }}>{children}</ApiCtx.Provider>;
 }
 
-// The Actions entry of a context menu: a submenu with every Action that fits the row, the
+// The Actions entry of a context menu: a submenu with the folder Actions of a folder row
+// or the file Actions of a file row (the workspace Actions live in the Header alone), the
 // unfillable ones muted with why, each running against the folder or file of the row.
 // Nothing is rendered while there are no Actions or the row has no path.
 export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind; path: string }) {
@@ -109,7 +110,7 @@ export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind;
         <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={2} />
         Actions
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className={COMPACT_CONTENT}>
+      <ContextMenuSubContent className={cn(COMPACT_CONTENT, "min-w-64")}>
         {entries.map((entry) => (
           <ContextMenuItem
             key={entry.action.id}
@@ -120,7 +121,7 @@ export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind;
           >
             <ActionIcon action={entry.action} size={14} />
             <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
-              <ActionNameLines name={entry.action.name} />
+              <ActionNameLines name={entry.action.name} value={entry.subtitle} />
             </span>
             {!entry.enabled && entry.reason && (
               <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>

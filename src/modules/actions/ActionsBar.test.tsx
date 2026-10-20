@@ -19,6 +19,7 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   active: false,
   stoppable: false,
   disabledReason: null,
+  subtitle: null,
   ...over,
 });
 

@@ -31,7 +31,16 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
     [local, global, room],
   );
   return useMemo(
-    () => buildActionsBarModel({ local, global, context, states, activeId: workspace?.activeAction, ownButtonsShown }),
+    () =>
+      buildActionsBarModel({
+        local,
+        global,
+        context,
+        states,
+        activeId: workspace?.activeAction,
+        ownButtonsShown,
+        place: context?.place,
+      }),
     [local, global, context, states, workspace?.activeAction, ownButtonsShown],
   );
 }

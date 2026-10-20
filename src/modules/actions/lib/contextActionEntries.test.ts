@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { contextActionEntries } from "./contextActionEntries";
 import type { Action } from "./types";
 
-const action = (command: string, runInTerminal = false): Action => ({
+const action = (command: string, runInTerminal = false, name = "A"): Action => ({
   id: "a",
-  name: "A",
+  name,
   runInTerminal,
   command,
   ownButton: false,
@@ -24,24 +24,24 @@ const vars = (over: Record<string, string> = {}) => ({
 });
 
 describe("contextActionEntries", () => {
-  it("a folder row does not list Actions that need a file, and lists the rest", () => {
-    const entries = contextActionEntries([action("pycharm {workspace}"), action("code {filepath}")], "folder", {
-      vars: vars(),
-      shell: "posix",
-    });
-    expect(entries.map((e) => e.action.command)).toEqual(["pycharm {workspace}"]);
+  it("a folder row lists only folder Actions: the workspace and file ones stay out", () => {
+    const entries = contextActionEntries(
+      [action("pycharm {workspace}"), action("code {filepath}"), action("agent {cwd}"), action("pnpm dev")],
+      "folder",
+      { vars: vars(), shell: "posix" },
+    );
+    expect(entries.map((e) => e.action.command)).toEqual(["agent {cwd}"]);
     expect(entries[0]).toMatchObject({ enabled: true, reason: null });
   });
 
-  it("a file row lists every Action; one with a missing value is muted with why", () => {
+  it("a file row lists only file Actions; one with a missing value is muted with why", () => {
     const entries = contextActionEntries(
-      [action("code {filepath}"), action("gh pr d {branch}")],
+      [action("code {filepath}", false, "Code {filepath}"), action("gh pr d {branch}"), action("agent {cwd}")],
       "file",
       { vars: vars({ branch: "", filepath: "/w/a.ts", filename: "a.ts" }), shell: "posix" },
     );
-    expect(entries).toHaveLength(2);
-    expect(entries[0]).toMatchObject({ enabled: true, reason: null });
-    expect(entries[1]).toMatchObject({ enabled: false, reason: "needs a git branch" });
+    expect(entries.map((e) => e.action.command)).toEqual(["code {filepath}"]);
+    expect(entries[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/w/a.ts" });
   });
 
   it("a folder whose git info is missing mutes the branch Actions instead of hiding them", () => {
@@ -53,17 +53,8 @@ describe("contextActionEntries", () => {
     expect(entries[0]).toMatchObject({ enabled: false, reason: "needs a git branch" });
   });
 
-  it("a file folder context outside a workspace mutes the workspace Actions", () => {
-    const entries = contextActionEntries([action("pycharm {workspace}"), action("code {filepath}")], "file", {
-      vars: vars({ workspace: "", filepath: "/a.ts", filename: "a.ts" }),
-      shell: "posix",
-    });
-    expect(entries.map((e) => e.enabled)).toEqual([false, true]);
-    expect(entries[0]?.reason).toBe("needs a workspace root");
-  });
-
   it("a hibernated workspace mutes everything", () => {
-    const entries = contextActionEntries([action("pycharm {workspace}")], "folder", {
+    const entries = contextActionEntries([action("agent {cwd}")], "folder", {
       vars: vars(),
       shell: "posix",
       hibernated: true,
@@ -72,6 +63,15 @@ describe("contextActionEntries", () => {
   });
 
   it("Actions with no command are skipped", () => {
-    expect(contextActionEntries([action("  "), action("pycharm {workspace}")], "folder", { vars: vars(), shell: "posix" })).toHaveLength(1);
+    expect(contextActionEntries([action("  "), action("agent {cwd}")], "folder", { vars: vars(), shell: "posix" })).toHaveLength(1);
+  });
+
+  it("the subtitle resolves the name variable and falls back to the workspace message", () => {
+    const entries = contextActionEntries(
+      [action("agent {cwd}", false, "Agent {cwd}"), action("deploy {workspace} {cwd}", false, "Deploy {workspace}")],
+      "folder",
+      { vars: vars({ workspace: "" }), shell: "posix" },
+    );
+    expect(entries.map((e) => e.subtitle)).toEqual(["/w/src", "Workspace Root not configured"]);
   });
 });

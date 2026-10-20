@@ -46,6 +46,7 @@ import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor"
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { splitActionName } from "./lib/actionName";
+import { barSubtitle } from "./lib/actionsBar";
 import {
   actionProblems,
   CWD_MODE_LABELS,
@@ -97,6 +98,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
   const display = action.name.trim() || "Name";
   const { main: displayMain, variable: displayVariable } = splitActionName(display);
+  const displaySubtitle = context ? barSubtitle(display, context) : undefined;
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, onChange });
@@ -163,8 +165,10 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
         ) : (
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate text-[12px]">{displayMain}</span>
-            {displayVariable && (
-              <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displayVariable}</span>
+            {displaySubtitle !== undefined ? (
+              displaySubtitle && <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displaySubtitle}</span>
+            ) : (
+              displayVariable && <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displayVariable}</span>
             )}
           </span>
         )}

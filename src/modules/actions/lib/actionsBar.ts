@@ -1,6 +1,6 @@
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
-import { commandProblem, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
+import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import type { Action } from "./types";
 
 export const COMPACT_WIDTH = 720;
@@ -58,6 +58,30 @@ const NEEDS: Record<string, string> = {
   repo: "a git repository",
 };
 
+// What an Action binds to, read from the variables its command uses: the file it opens,
+// the folder it runs in, or nothing local, so it is a matter of the workspace alone. One
+// Action has one target: a command using {filepath} and {workspace} is a file Action.
+export type ActionTarget = "file" | "folder" | "workspace";
+
+const FOLDER_VARS = new Set(["cwd", "dir", "branch", "repo"]);
+
+export function actionTarget(command: string): ActionTarget {
+  const used = commandVariablesUsed(command);
+  if (used.has("filepath") || used.has("filename")) return "file";
+  for (const name of used) if (FOLDER_VARS.has(name)) return "folder";
+  return "workspace";
+}
+
+// Where a command is offered: file Actions need a file (an editor or a file row), folder
+// Actions a terminal or a folder row, and workspace Actions are Header-only, never bound
+// to any row or tab.
+export type FocusPlace = { file: boolean; folder: boolean };
+
+export function actionShownAt(target: ActionTarget, place: FocusPlace | "all"): boolean {
+  if (place === "all") return true;
+  return target === "file" ? place.file : target === "folder" ? place.folder : true;
+}
+
 // The words for what an Action still lacks; a variable with no friendly name is quoted.
 export function describeMissing(names: readonly string[]): string {
   const unknown = names.filter((n) => !(n in NEEDS));
@@ -69,6 +93,25 @@ export function describeMissing(names: readonly string[]): string {
 }
 
 const VARIABLE = /\{[?!]?[a-z]/;
+
+export const WORKSPACE_UNSET = "Workspace Root not configured";
+
+/** The reason for a workspace Action with no configured root; the subtitle already tells
+ * the story, so menus skip the right-hand reason for exactly this case. */
+export const WORKSPACE_MISSING = describeMissing(["workspace"]);
+
+// The line under the name: the value the place gives the preset variable, not the raw
+// template ({cwd} under "Code {cwd}" is the folder it would open). A workspace Action
+// without a configured root says so; a variable with no readable part keeps the template.
+export function barSubtitle(name: string, ctx: BarContext | null): string | null {
+  const { variable } = splitActionName(name);
+  if (!variable) return null;
+  const varName = variable.slice(1, -1);
+  const value = ctx?.vars[varName];
+  if (value) return value;
+  if (varName === "workspace") return WORKSPACE_UNSET;
+  return typeof value === "string" ? null : variable;
+}
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
 // terminal, so a value that cannot be quoted safely also blocks them; an app is spawned
@@ -97,6 +140,8 @@ export type BarItem = {
   /** Only scripts that are running can be stopped; apps never. */
   stoppable: boolean;
   disabledReason: string | null;
+  /** The value the preset variable reads here; null leaves the name lineless. */
+  subtitle: string | null;
 };
 
 export type BarModel = {
@@ -117,12 +162,16 @@ type BuildInput = {
   activeId: string | undefined;
   /** How many own buttons are shown; the rest fold into the menus. Absent: all of them. */
   ownButtonsShown?: number;
+  /** What the focused tab is: file Actions show on a file, folder Actions on a terminal,
+   * workspace Actions always. Absent: every Action shows (nothing depends on a place). */
+  place?: FocusPlace;
 };
 
 // Own buttons first in the user's order (workspace Actions, then global, scripts and apps
 // mixed), then the two grouped menus. A running script is never disabled whatever its
-// variables are now: it has to stay stoppable.
-export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown }: BuildInput): BarModel {
+// variables are now: it has to stay stoppable, and it stays visible whatever the focused
+// tab is, so its Stop keeps a place to live.
+export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
   const toItem = (action: Action): BarItem => {
     const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
@@ -134,19 +183,22 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       active: action.id === activeId,
       stoppable: running,
       disabledReason: running ? null : actionAvailability(action, context),
+      subtitle: barSubtitle(action.name.trim() || "Action", context),
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const model: BarModel = { buttons: [], scripts: [], apps: [], scriptsGlobal: [], appsGlobal: [], empty: local.length + global.length === 0 };
   for (const [position, action] of [...local, ...global].entries()) {
-    const item = toItem(action);
     const isGlobal = position >= local.length;
-    if (action.ownButton && model.buttons.length < limit) {
-      model.buttons.push(item);
-      continue;
+    const item = toItem(action);
+    if (!place || item.state !== "idle" || actionShownAt(actionTarget(action.command), place)) {
+      if (action.ownButton && model.buttons.length < limit) {
+        model.buttons.push(item);
+        continue;
+      }
+      if (isGlobal) (action.runInTerminal ? model.scriptsGlobal : model.appsGlobal).push(item);
+      else (action.runInTerminal ? model.scripts : model.apps).push(item);
     }
-    if (isGlobal) (action.runInTerminal ? model.scriptsGlobal : model.appsGlobal).push(item);
-    else (action.runInTerminal ? model.scripts : model.apps).push(item);
   }
   return model;
 }
