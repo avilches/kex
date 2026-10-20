@@ -355,7 +355,11 @@ For each session in the store:
    `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its
    `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
    the first `cwd` field, and `cwd_launch` from the store when the transcript has none. omp and pi: the `cwd` of the
-   `session` header, JSONL line 2 for omp and line 1 for pi). The command is the row's
+   `session` header, JSONL line 2 for omp and line 1 for pi). For claude the plan also carries `worktreeCwd`: the
+   `worktreePath` of the last `worktree-state` entry, only when that folder still exists. The resumed agent
+   reports its folder after the first prompt (its resume `SessionStart` carries the launch folder, so that event
+   is not forwarded as an agent cwd), so `applyStagedSnapshot` seeds `agentCwd`/`worktreeCwd` from the plan and
+   New Terminal ("last folder") lands in the worktree from the start. The command is the row's
    resume template on top of the stripped launch line: `strip_for_resume_base(launch_cmd, agent) + --resume '<id>'`
    (shell-quoted), or the plain per-agent template when no launch command is known (`claude --resume '<id>'`,
    `omp --resume '<id>'`, `pi --session '<id>'`).

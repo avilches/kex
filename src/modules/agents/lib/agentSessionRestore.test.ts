@@ -104,6 +104,18 @@ describe("staged restore snapshot", () => {
     expect(s.sessions.t7.status).toBe("attention");
   });
 
+  it("seeds the worktree the agent was in, so the tab follows it before the first prompt", () => {
+    stageRestoredSnapshot("t8", makePlan({ tabId: "t8", worktreeCwd: "/home/user/project/.claude/worktrees/pepe" }));
+    useAgentStore.getState().startIdle("t8", "ws", "claude");
+
+    expect(applyStagedSnapshot("t8")).toBe(true);
+
+    expect(useAgentStore.getState().sessions.t8.meta).toMatchObject({
+      agentCwd: "/home/user/project/.claude/worktrees/pepe",
+      worktreeCwd: "/home/user/project/.claude/worktrees/pepe",
+    });
+  });
+
   it("is keyed by the tab that spawns the PTY, not by the id inside the plan (reopened closed tab)", () => {
     stageRestoredSnapshot("t-new", makePlan({ tabId: "t-old", title: "reopened" }));
     useAgentStore.getState().startIdle("t-new", "ws", "claude");

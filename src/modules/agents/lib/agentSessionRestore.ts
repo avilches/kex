@@ -19,6 +19,7 @@ export type RestorePlan = {
   resumeCmd: string;
   attemptedCmd: string;
   cwdLaunch: string;
+  worktreeCwd?: string | null;
   errorReason: string;
   title?: string | null;
   notification?: string | null;
@@ -56,6 +57,7 @@ export async function loadRestorePlans(): Promise<void> {
 type StagedSnapshot = {
   title: string | null;
   notification: NotificationKind | "interrupted" | null;
+  worktreeCwd: string | null;
   stagedAt: number;
 };
 const stagedSnapshots = new Map<string, StagedSnapshot>();
@@ -81,8 +83,9 @@ export function stageRestoredSnapshot(tabId: string, plan: RestorePlan): void {
   for (const [id, staged] of stagedSnapshots) {
     if (now - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) stagedSnapshots.delete(id);
   }
-  if (title || notification) {
-    stagedSnapshots.set(tabId, { title, notification, stagedAt: now });
+  const worktreeCwd = plan.worktreeCwd || null;
+  if (title || notification || worktreeCwd) {
+    stagedSnapshots.set(tabId, { title, notification, worktreeCwd, stagedAt: now });
   }
 }
 
@@ -101,6 +104,11 @@ export function applyStagedSnapshot(tabId: string): boolean {
   const store = useAgentStore.getState();
   const session = store.sessions[tabId];
   if (staged.title) setOscTitle(tabId, staged.title);
+  // The resumed agent reports its folder only after the first prompt; until then the
+  // worktree it is about to re-enter has to come from the plan.
+  if (staged.worktreeCwd && session) {
+    store.setMeta(tabId, { agentCwd: staged.worktreeCwd, worktreeCwd: staged.worktreeCwd });
+  }
   if (!staged.notification || !session) return true;
   if (staged.notification === "interrupted") {
     store.markInterrupted(tabId);
