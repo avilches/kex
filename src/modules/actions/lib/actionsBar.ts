@@ -28,12 +28,30 @@ export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">): 
   return PADDING + label + (action.runInTerminal ? RUN_ZONE : ICON);
 }
 
+// Whether the bar renders this Action where the user is: hidden ones take no room,
+// so they must not consume a slot of the fold either.
+export function shownAtPlace(
+  action: Action,
+  state: ScriptState | "idle",
+  place: FocusPlace | undefined,
+): boolean {
+  return !place || state !== "idle" || actionShownAt(actionTarget(action.command), place);
+}
+
 // How many of the own buttons, taken in the user's order, fit in the room the bar has. The
 // rest fold into the menus, so the bar never pushes the search box and the window controls out.
-export function ownButtonsThatFit(actions: readonly Pick<Action, "name" | "runInTerminal">[], room: number): number {
+// Count only the buttons the place actually renders: an Action hidden by its target
+// (a file Action with a terminal focused, say) must not keep a visible one out.
+export function ownButtonsThatFit(
+  actions: readonly Action[],
+  room: number,
+  place?: FocusPlace,
+  states?: ReadonlyMap<string, ScriptState>,
+): number {
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   for (const action of actions) {
+    if (!shownAtPlace(action, states?.get(action.id) ?? "idle", place)) continue;
     left -= ownButtonWidth(action) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
@@ -187,7 +205,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
   for (const [position, action] of [...local, ...global].entries()) {
     const isGlobal = position >= local.length;
     const item = toItem(action);
-    if (!place || item.state !== "idle" || actionShownAt(actionTarget(action.command), place)) {
+    if (shownAtPlace(action, item.state, place)) {
       if (action.ownButton && model.buttons.length < limit) {
         model.buttons.push(item);
         continue;

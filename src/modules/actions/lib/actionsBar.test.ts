@@ -179,6 +179,34 @@ describe("ownButtonsThatFit", () => {
     expect(ownButtonsThatFit([], 500)).toBe(0);
     expect(Number.isInteger(ownButtonsThatFit(four, 333.7))).toBe(true);
   });
+
+  it("does not spend a slot on an Action the place hides", () => {
+    const hidden = script({ id: "hidden", command: "agent {cwd}" });
+    const visible = script({ id: "visible" });
+    const room = ownButtonWidth(visible) + BAR_GAP + MENUS_RESERVE;
+    const file = { file: true, folder: false };
+    const folder = { file: false, folder: true };
+    const noPlace = ownButtonsThatFit([hidden, visible], room);
+    expect(ownButtonsThatFit([hidden, visible], room, folder)).toBe(noPlace);
+    expect(ownButtonsThatFit([hidden, visible], room, file)).toBe(noPlace);
+    const running = new Map([["hidden", "running" as const]]);
+    expect(ownButtonsThatFit([hidden, visible], room, file, running)).toBe(1);
+  });
+
+  it("a hidden own button never folds a visible one out of the bar", () => {
+    const hidden = script({ id: "hidden", command: "agent {cwd}", ownButton: true });
+    const visible = script({ id: "visible", ownButton: true });
+    const m = buildActionsBarModel({
+      local: [hidden, visible],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+      ownButtonsShown: 1,
+      place: { file: true, folder: false },
+    });
+    expect(m.buttons.map((b) => b.id)).toEqual(["visible"]);
+    expect(m.scripts).toEqual([]);
+  });
 });
 
 describe("buildActionsBarModel", () => {

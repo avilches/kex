@@ -27,8 +27,11 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
   const ownButtonsShown = useMemo(
-    () => (room === undefined ? undefined : ownButtonsThatFit([...local, ...global].filter((a) => a.ownButton), room)),
-    [local, global, room],
+    () =>
+      room === undefined
+        ? undefined
+        : ownButtonsThatFit([...local, ...global].filter((a) => a.ownButton), room, context?.place, states),
+    [local, global, room, context, states],
   );
   return useMemo(
     () =>
