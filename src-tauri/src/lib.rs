@@ -901,6 +901,7 @@ pub fn run() {
             fs::search::fs_list_files,
             fs::grep::fs_grep,
             fs::grep::fs_grep_interactive,
+            fs::grep::fs_grep_cancel,
             fs::grep::fs_glob,
             fs::notes::notes_read_dirs,
             fs::notes::notes_read_heads,

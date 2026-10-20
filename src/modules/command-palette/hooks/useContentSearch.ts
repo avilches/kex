@@ -20,21 +20,33 @@ type GrepResponse = {
   files_scanned: number;
 };
 
+let nextRequestId = 0;
+
 export function useContentSearch(
   root: string | null,
   term: string,
   enabled: boolean,
 ): AsyncQueryState<ContentHit> {
   const run = useCallback(
-    async (q: string): Promise<ContentHit[]> => {
-      if (!root) return [];
-      const res = await invoke<GrepResponse>("fs_grep_interactive", {
-        pattern: q,
-        root,
-        maxResults: LIMIT,
-        workspace: currentWorkspaceEnv(),
-      });
-      return res.hits;
+    async (q: string, signal: AbortSignal): Promise<ContentHit[]> => {
+      if (!root || signal.aborted) return [];
+      const requestId = ++nextRequestId;
+      const cancel = () => {
+        void invoke("fs_grep_cancel", { requestId });
+      };
+      signal.addEventListener("abort", cancel, { once: true });
+      try {
+        const res = await invoke<GrepResponse>("fs_grep_interactive", {
+          pattern: q,
+          root,
+          requestId,
+          maxResults: LIMIT,
+          workspace: currentWorkspaceEnv(),
+        });
+        return signal.aborted ? [] : res.hits;
+      } finally {
+        signal.removeEventListener("abort", cancel);
+      }
     },
     [root],
   );
