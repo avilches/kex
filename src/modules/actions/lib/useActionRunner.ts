@@ -71,9 +71,6 @@ export type ActionRunnerDeps = {
 const WRITE_DELAY_NEW_MS = 150;
 const WRITE_DELAY_REUSED_MS = 50;
 const WRITE_RETRY_MS = 100;
-// A program that ignores Ctrl+C (the less pager under `man`) keeps the running
-// mark: then the tree of the tab gets the signal that keystrokes cannot deliver.
-const STOP_SIGNAL_DELAY_MS = 600;
 
 function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   const tabId = getActionTab(actionId);
@@ -242,12 +239,13 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   const stopAction = useCallback(
     (action: Action) => {
       const tabId = getActionTab(action.id);
+      const mark = tabId ? getScriptRunningSnapshot().get(tabId) : undefined;
       const plan = planActionStop(
         tabId
           ? {
               tabId,
               exists: !!findTabGlobal(tabId),
-              running: !!getScriptRunningSnapshot().get(tabId),
+              mark,
               commandSeen: scriptCommandSeen.current.has(tabId),
             }
           : null,
@@ -255,18 +253,15 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       if (plan.kind === "none") return;
       revealActionTab(plan.tabId);
       setScriptRunning(plan.tabId, plan.mark);
-      terminalHandles.current.get(plan.tabId)?.write("\x03");
-      if (!IS_WINDOWS) {
-        setTimeout(() => {
-          // Still marked: the shell has not reported the end of the command, so
-          // the program ignored Ctrl+C. The signal goes to the whole tree, which
-          // kills it even if the session id of the PTY is unknown to us.
-          if (!getScriptRunningSnapshot().get(plan.tabId)) return;
-          void native
-            .ptyStop(plan.tabId)
-            .catch((e: unknown) => console.warn(`pty_stop id=${plan.tabId} failed`, e));
-        }, STOP_SIGNAL_DELAY_MS);
+      if (plan.stage === "type") {
+        terminalHandles.current.get(plan.tabId)?.write("\x03");
+        return;
       }
+      // Windows keeps Ctrl+C: its processes are not pid-addressable this way.
+      if (IS_WINDOWS) return;
+      void native
+        .ptyStop(plan.tabId)
+        .catch((e: unknown) => console.warn(`pty_stop tab=${plan.tabId} failed`, e));
     },
     [findTabGlobal, revealActionTab, scriptCommandSeen, terminalHandles],
   );

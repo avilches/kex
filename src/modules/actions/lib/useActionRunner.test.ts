@@ -211,27 +211,22 @@ describe("useActionRunner", () => {
     expect(deps.revealTab).toHaveBeenCalledWith("w1", "tab-old");
   });
 
-  it("stop signals the script tree only when the command is still marked after Ctrl+C", () => {
+  it("a second stop on the still-marked script signals its tree instead of typing again", () => {
     linkActionTab(script.id, "tab-old");
-    setScriptRunning("tab-old", "running");
+    setScriptRunning("tab-old", "waiting");
     const { result, write, deps } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
-    deps.terminalHandles.current.set("tab-old", { write });
     deps.scriptCommandSeen.current.add("tab-old");
     act(() => result.current.stopAction(script));
-    expect(write).toHaveBeenCalledWith("\x03");
-    expect(ptyStop).not.toHaveBeenCalled();
-    act(() => void vi.advanceTimersByTime(700));
+    expect(write).not.toHaveBeenCalled();
     expect(ptyStop).toHaveBeenCalledWith("tab-old");
+    expect(getScriptRunningSnapshot().get("tab-old")).toBe("waiting");
   });
 
-  it("stop never signals a tree whose command already ended", () => {
+  it("a stop on a script whose command ended does nothing at all", () => {
     linkActionTab(script.id, "tab-old");
-    setScriptRunning("tab-old", "running");
-    const { result, deps } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
-    deps.scriptCommandSeen.current.add("tab-old");
+    const { result, write } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
     act(() => result.current.stopAction(script));
-    clearScriptRunningEntry("tab-old");
-    act(() => void vi.advanceTimersByTime(700));
+    expect(write).not.toHaveBeenCalled();
     expect(ptyStop).not.toHaveBeenCalled();
   });
 

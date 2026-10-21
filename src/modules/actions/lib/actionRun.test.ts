@@ -231,7 +231,7 @@ describe("planActionRun, apps", () => {
 });
 
 describe("planActionStop", () => {
-  const live = { tabId: "t", exists: true, running: true, commandSeen: true };
+  const live = { tabId: "t", exists: true, mark: "running" as const, commandSeen: true };
 
   it("does nothing without a tab to stop", () => {
     expect(planActionStop(null)).toEqual({ kind: "none" });
@@ -239,16 +239,17 @@ describe("planActionStop", () => {
   });
 
   it("does nothing when the Action is not running, so a tab reused by something else is left alone", () => {
-    expect(planActionStop({ ...live, running: false })).toEqual({ kind: "none" });
-    expect(planActionStop({ ...live, running: false, commandSeen: false })).toEqual({ kind: "none" });
+    expect(planActionStop({ ...live, mark: undefined })).toEqual({ kind: "none" });
+    expect(planActionStop({ ...live, mark: undefined, commandSeen: false })).toEqual({ kind: "none" });
   });
 
-  it("waits for the shell to confirm when the command was seen", () => {
-    expect(planActionStop(live)).toEqual({ kind: "stop", tabId: "t", mark: "waiting" });
+  it("types Ctrl+C on a running script and waits for the shell to confirm", () => {
+    expect(planActionStop(live)).toEqual({ kind: "stop", tabId: "t", mark: "waiting", stage: "type" });
+    expect(planActionStop({ ...live, commandSeen: false })).toEqual({ kind: "stop", tabId: "t", mark: false, stage: "type" });
   });
 
-  it("clears the mark at once when no command was ever seen", () => {
-    expect(planActionStop({ ...live, commandSeen: false })).toEqual({ kind: "stop", tabId: "t", mark: false });
+  it("signals the tree when a waiting script shows the mark again, whatever the shell reports", () => {
+    expect(planActionStop({ ...live, mark: "waiting" })).toEqual({ kind: "stop", tabId: "t", mark: "waiting", stage: "signal" });
   });
 });
 

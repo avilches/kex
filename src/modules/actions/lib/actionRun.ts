@@ -147,21 +147,30 @@ export function planActionRun(action: Action, ctx: RunContext): RunPlan {
 
 export type StopPlan =
   | { kind: "none" }
-  | { kind: "stop"; tabId: string; mark: ScriptState | false };
+  | {
+      kind: "stop";
+      tabId: string;
+      mark: ScriptState | false;
+      /** "type" types Ctrl+C (the first stop of a run); "signal" SIGTERMs the tab's tree. */
+      stage: "type" | "signal";
+    };
 
 /**
- * Stop only means something for a script that is running in a tab that still exists. The
- * running mark is what proves it: once the script ended the mark is gone, and whatever the
- * user started in that tab since (vim, another dev server) is not ours to interrupt.
+ * Stop is manual in two stages, no timers: the first click on a running script types
+ * Ctrl+C; a click on the still-running (the mark became "waiting") script signals the
+ * whole tree, which the failed Ctrl+C could not reach either way. No mark, nothing to
+ * do; whatever the user started in that tab since (vim, another dev server) is not ours.
  */
-export function planActionStop(link: {
-  tabId: string;
-  exists: boolean;
-  running: boolean;
-  commandSeen: boolean;
-} | null): StopPlan {
-  if (!link?.exists || !link.running) return { kind: "none" };
-  return { kind: "stop", tabId: link.tabId, mark: planScriptStop(link.commandSeen) };
+export function planActionStop(
+  link: { tabId: string; exists: boolean; mark: ScriptState | undefined; commandSeen: boolean } | null,
+): StopPlan {
+  if (!link?.exists || !link.mark) return { kind: "none" };
+  return {
+    kind: "stop",
+    tabId: link.tabId,
+    mark: planScriptStop(link.commandSeen),
+    stage: link.mark === "waiting" ? "signal" : "type",
+  };
 }
 
 export type RevealPlan = {

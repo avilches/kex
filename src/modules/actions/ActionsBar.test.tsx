@@ -89,13 +89,16 @@ describe("OwnButton", () => {
     unmount();
   });
 
-  it("keeps the name clickable while the script is stopping", () => {
-    const { container, handlers, unmount } = mount(item(script, { state: "waiting" }), vi.fn(() => true));
-    const zone = byLabel(container, "Stopping... dev");
+  it("shows the red stop button again while stopping, and both stops agree", () => {
+    const { container, handlers, unmount } = mount(item(script, { state: "waiting", stoppable: false }), vi.fn(() => true));
+    const zone = byLabel(container, "Stop dev");
     expect(zone).not.toBeNull();
-    expect((zone as HTMLButtonElement).disabled).toBe(true);
+    expect((zone as HTMLButtonElement).disabled).toBe(false);
     click([...container.querySelectorAll("button")].find((b) => b.textContent === "dev") ?? null);
     expect(handlers.focus).toHaveBeenCalledWith(script);
+    expect(handlers.run).not.toHaveBeenCalled();
+    click(zone!);
+    expect(handlers.stop).toHaveBeenCalledWith(script);
     expect(handlers.run).not.toHaveBeenCalled();
     unmount();
   });

@@ -17,7 +17,7 @@ State: `PtyState = RwLock<HashMap<id, Session>>`
 | `pty_resize` | Resize PTY (columns / rows) |
 | `pty_close` | Close PTY and kill the shell process |
 | `pty_close_all` | Close all PTYs (used on app exit) |
-| `pty_stop(tabId)` | Stop the script of a terminal tab: SIGTERM to every descendant of the shell, found by sysinfo from the session. Unix only; Windows answers an error, the caller stays with Ctrl+C. Used as the second stage of the Action Stop, after Ctrl+C has not ended the run |
+| `pty_stop(tabId)` | Stop the script of a terminal tab: SIGTERM to every descendant of the shell, found by sysinfo from the session. Unix only; Windows answers an error, the caller stays with Ctrl+C. Used by the second stage of the Action Stop: the user clicks the stop zone of a script whose Ctrl+C did not end the run (its mark is still there) |
 | `pty_has_foreground_process` | Whether a process other than the shell itself is in the foreground |
 | `pty_shell_name` | Detected shell name for the PTY session |
 | `pty_list_shells` | Shells found on this machine: `name`, `path` and `integrated` (whether Kex injects OSC 7/133 integration for it). Feeds the shell selector in Terminal settings |

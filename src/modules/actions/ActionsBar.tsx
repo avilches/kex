@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
@@ -20,34 +19,34 @@ import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 type Handlers = Pick<BarController, "run" | "stop" | "focus">;
 
 // The play or stop zone of a script. It has its own hover, apart from the name next to it,
-// so it reads at a glance that pressing it starts or stops the script.
+// so it reads at a glance that pressing it starts or stops the script. While the script is
+// stopping the zone stays the red Stop button: the first stop typed Ctrl+C, and clicking
+// again delivers the signal that no keystroke can, with no spinner to wait for.
 function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handlers & { className?: string }) {
-  const running = item.state === "running";
-  const waiting = item.state === "waiting";
-  const blocked = !running && !waiting && item.disabledReason !== null;
-  const label = running ? "Stop" : waiting ? "Stopping..." : "Run";
+  const busy = item.state !== "idle";
+  const blocked = !busy && item.disabledReason !== null;
+  const label = busy ? "Stop" : "Run";
   return (
     <button
       type="button"
       aria-label={`${label} ${item.name}`}
       title={blocked ? `${item.name}: ${item.disabledReason}` : `${label}: ${item.name}`}
-      disabled={waiting || blocked}
+      disabled={blocked}
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => {
         e.stopPropagation();
-        if (running) stop(item.action);
+        if (busy) stop(item.action);
         else run(item.action);
       }}
       className={cn(
         "flex size-[22px] shrink-0 items-center justify-center rounded transition-colors",
-        running && "text-destructive hover:bg-destructive/15",
-        waiting && "bg-amber-500/10 text-amber-500/70",
-        !running && !waiting && !blocked && "text-green-500 hover:bg-green-500/15",
+        busy && "text-destructive hover:bg-destructive/15",
+        !busy && !blocked && "text-green-500 hover:bg-green-500/15",
         blocked && "cursor-not-allowed text-muted-foreground/40",
         className,
       )}
     >
-      {waiting ? <Spinner size={13} className="text-current" /> : <HugeiconsIcon icon={running ? StopIcon : PlayIcon} size={12} strokeWidth={2} />}
+      <HugeiconsIcon icon={busy ? StopIcon : PlayIcon} size={12} strokeWidth={2} />
     </button>
   );
 }
