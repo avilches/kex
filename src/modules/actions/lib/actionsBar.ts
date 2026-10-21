@@ -275,6 +275,34 @@ export type DropAction =
   | { kind: "move"; scope: "workspace" | "global"; id: string }
   | { kind: "hide"; scope: "workspace" | "global"; id: string };
 
+export const MENU_DRAG_PREFIX = "menu:";
+
+// A row of the menu dragged out onto the bar becomes a button of its own scope, in the place
+// of the button it lands on when that is of its kind, or at the end of the scope on its
+// empty stand-in. A scope that is full takes nothing, and a row never crosses scopes here.
+export type ShowDrop = { kind: "show"; scope: "workspace" | "global"; id: string; beforeId?: string };
+
+export function resolveMenuDrop(
+  menuItems: readonly Pick<BarItem, "id" | "global" | "action">[],
+  buttons: readonly Pick<BarItem, "id" | "global" | "action">[],
+  full: { workspace: boolean; global: boolean },
+  activeId: string,
+  overId: string,
+): ShowDrop | null {
+  if (!activeId.startsWith(MENU_DRAG_PREFIX)) return null;
+  const id = activeId.slice(MENU_DRAG_PREFIX.length);
+  const from = menuItems.find((b) => b.id === id);
+  if (!from) return null;
+  const scope = from.global ? "global" : "workspace";
+  if (full[scope]) return null;
+  if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
+    return (overId === DROP_GLOBAL) === from.global ? { kind: "show", scope, id } : null;
+  }
+  const to = buttons.find((b) => b.id === overId);
+  if (!to || to.global !== from.global) return null;
+  return { kind: "show", scope, id, ...(to.action.runInTerminal === from.action.runInTerminal ? { beforeId: to.id } : {}) };
+}
+
 export const DROP_MENU = "zone:menu";
 export const DROP_WORKSPACE = "zone:workspace";
 export const DROP_GLOBAL = "zone:global";
@@ -299,6 +327,8 @@ export function resolveDrop(
 
 export type BarModel = {
   buttons: BarItem[];
+  /** The scope already has the most buttons it may show: nothing more can become one. */
+  full: { workspace: boolean; global: boolean };
   /** The Actions that are not own buttons, scripts and apps mixed: the workspace
    * ones first, then the global ones, each scope in the user's order. */
   menu: { workspace: BarItem[]; global: BarItem[] };
@@ -347,7 +377,13 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const ordered = [...appsFirst(local).map((a) => [a, false] as const), ...appsFirst(global).map((a) => [a, true] as const)];
-  const model: BarModel = { buttons: [], menu: { workspace: [], global: [] }, empty: local.length + global.length === 0 };
+  const isFull = (list: readonly Action[]) => list.filter((a) => a.ownButton).length >= MAX_BUTTONS_PER_SCOPE;
+  const model: BarModel = {
+    buttons: [],
+    full: { workspace: isFull(local), global: isFull(global) },
+    menu: { workspace: [], global: [] },
+    empty: local.length + global.length === 0,
+  };
   const buttonIds = new Set(
     ownButtonCandidates(appsFirst(local), appsFirst(global), states, place)
       .slice(0, limit)

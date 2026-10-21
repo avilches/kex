@@ -21,6 +21,7 @@ import {
   ownButtonsThatFit,
   ownButtonWidth,
   resolveDrop,
+  resolveMenuDrop,
   SETTINGS_LABELS,
   scriptsFirst,
   soleAppButtons,
@@ -498,6 +499,49 @@ describe("canReorderButtons", () => {
     expect(canReorderButtons(b(script({ id: "s1" })), b(script({ id: "s2" })))).toBe(true);
     expect(canReorderButtons(b(app()), b(script()))).toBe(false);
     expect(canReorderButtons(b(app()), b(app({ id: "a2" }), true))).toBe(false);
+  });
+});
+
+describe("resolveMenuDrop", () => {
+  const b = (id: string, over: { global?: boolean; script?: boolean } = {}) => ({
+    id,
+    global: over.global ?? false,
+    action: over.script ? script({ id }) : app({ id }),
+  });
+  const menu = [b("m1"), b("ms", { script: true }), b("mg", { global: true })];
+  const buttons = [b("w1"), b("ws", { script: true }), b("g1", { global: true })];
+  const open = { workspace: false, global: false };
+
+  it("shows the row as a button over a button of its scope, in that button's place when the kind matches", () => {
+    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", "w1")).toEqual({ kind: "show", scope: "workspace", id: "m1", beforeId: "w1" });
+    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", "ws")).toEqual({ kind: "show", scope: "workspace", id: "m1" });
+  });
+
+  it("shows it at the end of an empty scope's stand-in, never across scopes", () => {
+    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", DROP_GLOBAL)).toEqual({ kind: "show", scope: "global", id: "mg" });
+    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", DROP_WORKSPACE)).toBeNull();
+    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", "w1")).toBeNull();
+  });
+
+  it("refuses a full scope, the menu itself and anything that is not a menu row", () => {
+    expect(resolveMenuDrop(menu, buttons, { workspace: true, global: false }, "menu:m1", "w1")).toBeNull();
+    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", DROP_MENU)).toBeNull();
+    expect(resolveMenuDrop(menu, buttons, open, "w1", "ws")).toBeNull();
+    expect(resolveMenuDrop(menu, buttons, open, "menu:ghost", "w1")).toBeNull();
+  });
+});
+
+describe("buildActionsBarModel full", () => {
+  it("is true for a scope that holds three own buttons, counting hidden ones", () => {
+    const own = (id: string) => app({ id, ownButton: true });
+    const m = buildActionsBarModel({
+      local: [own("a"), own("b"), own("c")],
+      global: [own("g1"), app({ id: "g2" })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(m.full).toEqual({ workspace: true, global: false });
   });
 });
 

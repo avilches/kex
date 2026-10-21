@@ -3,8 +3,10 @@ import {
   closestCenter,
   type CollisionDetection,
   DndContext,
+  DragOverlay,
   PointerSensor,
   pointerWithin,
+  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -54,8 +56,10 @@ import {
   DROP_GLOBAL,
   DROP_MENU,
   DROP_WORKSPACE,
+  MENU_DRAG_PREFIX,
   menuEntries,
   resolveDrop,
+  resolveMenuDrop,
   WORKSPACE_UNSET,
   type BarItem,
 } from "./lib/actionsBar";
@@ -241,6 +245,9 @@ function MenuDrop({ dragging, hasMenu, children }: { dragging: boolean; hasMenu:
 
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
+  // Dragging a row out of the menu onto the bar makes it a button. Only the pointer
+  // listeners are taken, never the attributes, which would replace the menu item's role.
+  const { setNodeRef, listeners, isDragging } = useDraggable({ id: `${MENU_DRAG_PREFIX}${item.id}` });
   const blocked = item.state === "idle" && item.disabledReason !== null;
   const text = (
     <>
@@ -257,6 +264,8 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
     // The hover words: where the Action opens. A blocked row keeps its reason.
     title: item.title ?? undefined,
     disabled: !menuEntries(item)[0].enabled,
+    ref: setNodeRef,
+    ...listeners,
   };
   // An app is one menu item, icon and text lit together: the whole row is one click. A
   // script has two zones, the start or stop control and the name, siblings so that each
@@ -268,7 +277,7 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
         <ScriptControl item={item} {...h} />
         <DropdownMenuItem
           {...common}
-          className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
+          className={cn("flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1", isDragging && "opacity-50")}
           onSelect={(e) => {
             e.preventDefault();
             nameClick(item, h);
@@ -282,7 +291,7 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   return (
     <DropdownMenuItem
       {...common}
-      className="flex min-h-9 min-w-0 items-center gap-2 overflow-hidden py-0.5 pr-3"
+      className={cn("flex min-h-9 min-w-0 items-center gap-2 overflow-hidden py-0.5 pr-3", isDragging && "opacity-50")}
       onSelect={() => nameClick(item, h)}
     >
       <span className="flex shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
@@ -435,14 +444,22 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BarItem | null>(null);
   const dragged = draggingId ? model.buttons.find((b) => b.id === draggingId) : undefined;
+  const menuItems = [...model.menu.workspace, ...model.menu.global];
+  const draggedFromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX)
+    ? menuItems.find((i) => i.id === draggingId.slice(MENU_DRAG_PREFIX.length))
+    : undefined;
   const workspaceButtons = model.buttons.filter((b) => !b.global);
   const globalButtons = model.buttons.filter((b) => b.global);
-  const workspaceStandIn = !!dragged?.global && workspaceButtons.length === 0;
-  const globalStandIn = !!dragged && !dragged.global && globalButtons.length === 0;
+  const workspaceStandIn =
+    (!!dragged?.global && workspaceButtons.length === 0) ||
+    (!!draggedFromMenu && !draggedFromMenu.global && workspaceButtons.length === 0 && !model.full.workspace);
+  const globalStandIn =
+    (!!dragged && !dragged.global && globalButtons.length === 0) ||
+    (!!draggedFromMenu?.global && globalButtons.length === 0 && !model.full.global);
   // The pointer decides what is under the drag; with none, the nearest button of its own scope.
   const collision: CollisionDetection = (args) => {
     const within = pointerWithin(args).filter((c) => c.id !== args.active.id);
-    if (within.length > 0) return within;
+    if (within.length > 0 || String(args.active.id).startsWith(MENU_DRAG_PREFIX)) return within;
     const scope = model.buttons.find((b) => b.id === args.active.id)?.global;
     const own = args.droppableContainers.filter((c) => model.buttons.some((b) => b.id === c.id && b.global === scope));
     return closestCenter({ ...args, droppableContainers: own });
@@ -457,7 +474,14 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   };
   const dragEnd = ({ active, over }: DragEndEvent) => {
     endDrag();
-    const drop = over ? resolveDrop(model.buttons, String(active.id), String(over.id)) : null;
+    if (!over) return;
+    const show = resolveMenuDrop(menuItems, model.buttons, model.full, String(active.id), String(over.id));
+    if (show) {
+      controller.update(show.scope, show.id, { ownButton: true });
+      if (show.beforeId) controller.reorder(show.scope, show.id, show.beforeId);
+      return;
+    }
+    const drop = resolveDrop(model.buttons, String(active.id), String(over.id));
     if (!drop) return;
     if (drop.kind === "reorder") controller.reorder(drop.scope, drop.fromId, drop.toId);
     else if (drop.kind === "move") controller.move(drop.scope, drop.id);
@@ -518,6 +542,14 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
             {...controller}
           />
         </MenuDrop>
+        <DragOverlay dropAnimation={null}>
+          {draggedFromMenu && (
+            <div className="flex h-8 items-center gap-1.5 rounded-md bg-popover px-2 text-[11px] shadow-lg ring-1 ring-foreground/10">
+              <ActionIcon action={draggedFromMenu.action} size={14} />
+              <span className="max-w-[120px] truncate">{splitActionName(draggedFromMenu.name).main}</span>
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
       <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <AlertDialogContent className="w-[360px] rounded-2xl">
