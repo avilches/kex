@@ -25,6 +25,7 @@ import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { splitActionName } from "./lib/actionName";
 import { canReorderButtons, menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
+import type { Action } from "./lib/types";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -156,8 +157,8 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   };
   // An app is one menu item, icon and text lit together: the whole row is one click. A
   // script has two zones, the start or stop control and the name, siblings so that each
-  // hover lights only its own; the name runs an idle script, keeping the menu open to run
-  // more, and brings a live one into view, which needs the menu closed to hand over focus.
+  // hover lights only its own; the name runs an idle script or brings a live one into view,
+  // and either way the menu stays open.
   if (script) {
     return (
       <div className="flex min-w-0 items-center pl-1.5">
@@ -166,7 +167,7 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
           {...common}
           className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
           onSelect={(e) => {
-            if (item.state === "idle") e.preventDefault();
+            e.preventDefault();
             nameClick(item, h);
           }}
         >
@@ -197,11 +198,23 @@ type MenuProps = {
 
 // The one menu of the bar: every non-own Action, the workspace scope first and the global
 // one after, each in the user's order, with the Settings entry at the bottom.
-export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfigure, ...h }: MenuProps) {
+export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfigure, ...props }: MenuProps) {
+  // The menu is not modal, so focus can move to a script's terminal while it stays open;
+  // once that happened, the focus leaving the menu is not a reason to dismiss it. A click
+  // outside, Escape or a pick still close it.
+  const holdOpen = useRef(false);
   if (items.length === 0 && globalItems.length === 0) return null;
+  const h = {
+    ...props,
+    focus: (action: Action) => {
+      const done = props.focus(action);
+      if (done) holdOpen.current = true;
+      return done;
+    },
+  };
   const busy = items.some((i) => i.state !== "idle") || globalItems.some((i) => i.state !== "idle");
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false} onOpenChange={() => (holdOpen.current = false)}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -217,6 +230,9 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
       <DropdownMenuContent
         align="end"
         className="w-auto min-w-64 max-w-96"
+        onFocusOutside={(e) => {
+          if (holdOpen.current) e.preventDefault();
+        }}
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           onRestoreFocus();
