@@ -244,9 +244,12 @@ export function CommandPalette({
 
   const openContent = useCallback(
     (path: string, line: number) => {
-      runAfterClose(() => onOpenContentHit(path, line));
+      onOpenContentHit(path, line);
+      window.setTimeout(() => {
+        document.getElementById("kex-command-palette-input")?.focus();
+      }, 0);
     },
-    [onOpenContentHit, runAfterClose],
+    [onOpenContentHit],
   );
 
   const runHistory = useCallback(
@@ -309,6 +312,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
+      modal={parsed.mode !== "content"}
       className="w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))]"
     >
       <Command
