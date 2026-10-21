@@ -64,6 +64,7 @@ const THEME_PREVIEW_DELAY_MS = 140;
 
 let lastContentQuery = "";
 let lastContentValue = "";
+let lastContentScrollTop = 0;
 
 export function CommandPalette({
   open,
@@ -162,6 +163,10 @@ export function CommandPalette({
     if (parsed.mode === "content") {
       lastContentQuery = query;
       lastContentValue = value;
+      lastContentScrollTop =
+        listRef.current
+          ?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+          ?.scrollTop ?? 0;
     }
     setQuery("");
     setValue("");
@@ -177,20 +182,42 @@ export function CommandPalette({
     [onOpenChange, resetPalette],
   );
 
+  const contentRestoredRef = useRef(false);
+
   useEffect(() => {
     if (!open) return;
+    let restored = false;
     if (initialMode === "content" && lastContentQuery.startsWith("#")) {
       setQuery(lastContentQuery);
       setValue(lastContentValue);
+      restored = true;
     } else {
       setQuery(initialMode === "content" ? "#" : "");
       setPage("root");
     }
+    contentRestoredRef.current = restored;
     const handle = window.setTimeout(() => {
-      document.getElementById("kex-command-palette-input")?.focus();
+      const input = document.getElementById(
+        "kex-command-palette-input",
+      ) as HTMLInputElement | null;
+      if (!input) return;
+      input.focus();
+      // Restores the search term selected so typing replaces it wholesale.
+      if (restored) input.select();
     }, 0);
     return () => window.clearTimeout(handle);
   }, [open, initialMode]);
+
+  // Applies the captured scroll offset once the restored query produced its
+  // results again, so the visible slice matches the previous session.
+  useEffect(() => {
+    if (!open || !contentRestoredRef.current) return;
+    if (content.loading || content.results.length === 0) return;
+    const viewport = listRef.current?.querySelector<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]',
+    );
+    viewport?.scrollTo({ top: lastContentScrollTop });
+  }, [open, content.loading, content.results.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -324,7 +351,8 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      modal={parsed.mode !== "content"}
+      modal={false}
+      onFocusOutside={(event) => event.preventDefault()}
       className="w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))]"
     >
       <Command
