@@ -57,8 +57,10 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
 - **Barra del Header**: un solo menu "Actions" con todas las Actions sin boton propio, bajo
-  el titulo "Workspace actions" primero y despues "Global actions", cada alcance en su orden;
-  el click en el nombre de un script en marcha lleva a su tab sin cerrar el menu. Un comando
+  el titulo "Workspace actions" primero y despues "Global actions" (los titulos se pintan
+  solo cuando hay acciones de los dos alcances), cada alcance en su orden; la ultima entrada
+  es "Action Settings" con el engranaje, que abre Settings > Actions; el click en el nombre
+  de un script en marcha lleva a su tab sin cerrar el menu. Un comando
   sin variables (un script normal del workspace) sale en gris mientras el workspace no tenga
   raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
   propia variable.

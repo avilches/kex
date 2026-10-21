@@ -143,6 +143,26 @@ describe("ActionsMenu", () => {
     view.unmount();
   });
 
+  it("names the scopes only when the combo holds actions of both scopes", () => {
+    const view = mountMenu([item(app)], []);
+    view.open();
+    const menu = document.querySelector("[role='menu']")!;
+    expect(menu.textContent).not.toContain("Workspace actions");
+    expect(menu.textContent).not.toContain("Global actions");
+    expect(menu.textContent).toContain("Action Settings");
+    expect(menu.textContent).not.toContain("Configure Actions");
+    view.unmount();
+    const both = mountMenu([item(app)], [item({ ...script, id: "g1" })]);
+    both.open();
+    const full = document.querySelector("[role='menu']")!;
+    expect(full.textContent).toContain("Workspace actions");
+    expect(full.textContent).toContain("Global actions");
+    // Even with both scopes, Action Settings comes last with its separator.
+    const entries = [...full.querySelectorAll("[role='menuitem']")];
+    expect(entries[entries.length - 1]?.textContent).toBe("Action Settings");
+    both.unmount();
+  });
+
   it("says where the row opens on its hover title", () => {
     const view = mountMenu([item(app, { title: "Open PyCharm in /w" })], []);
     view.open();
