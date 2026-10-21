@@ -46,6 +46,7 @@ const tabFrom = (workspaceId: string) => ({
   kind: "tab",
   tab: { id: "t1", kind: "terminal" },
   workspaceId,
+  prevTabId: null,
 });
 
 function mount(active = true) {

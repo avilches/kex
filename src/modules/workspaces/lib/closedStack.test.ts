@@ -8,6 +8,8 @@ import {
   clearStaleFolds,
   insertRestoredWorkspace,
   pickReopen,
+  remapPrevTabId,
+  resolveReopenSlot,
   reviveWorkspace,
 } from "./closedStack";
 
@@ -25,6 +27,7 @@ const tabEntry = (id: string, workspaceId: string, paneId: string, over: Partial
   tab: term(id),
   paneId,
   workspaceId,
+  prevTabId: null,
   ...over,
 });
 
@@ -312,5 +315,45 @@ describe("buildReopenedTab", () => {
   it("leaves other kinds unchanged besides the id", () => {
     const tab: Tab = { id: "old", kind: "browser", url: "https://example.com" };
     expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "browser", url: "https://example.com" });
+  });
+});
+
+describe("resolveReopenSlot", () => {
+  const ws = makeWs("w1", "p1", [term("a"), term("c")]);
+
+  it("goes right after the open predecessor", () => {
+    const e = tabEntry("b", "w1", "p1", { prevTabId: "a" });
+    expect(resolveReopenSlot(e, [], ws)).toEqual({ paneId: "p1", index: 1 });
+  });
+
+  it("follows a closed predecessor to its own predecessor", () => {
+    const e = tabEntry("c", "w1", "p1", { prevTabId: "b" });
+    const b = tabEntry("b", "w1", "p1", { prevTabId: "a" });
+    expect(resolveReopenSlot(e, [b], ws)).toEqual({ paneId: "p1", index: 1 });
+  });
+
+  it("goes first in its pane when it was first or the chain is lost", () => {
+    expect(resolveReopenSlot(tabEntry("z", "w1", "p1"), [], ws)).toEqual({ paneId: "p1", index: 0 });
+    const lost = tabEntry("z", "w1", "p1", { prevTabId: "gone" });
+    expect(resolveReopenSlot(lost, [], ws)).toEqual({ paneId: "p1", index: 0 });
+  });
+
+  it("uses the pane of the predecessor when its own pane is gone", () => {
+    const e = tabEntry("b", "w1", "pX", { prevTabId: "a" });
+    expect(resolveReopenSlot(e, [], ws).paneId).toBe("p1");
+    expect(resolveReopenSlot(tabEntry("b", "w1", "pX"), [], ws).paneId).toBe("p1");
+  });
+
+  it("survives a cycle in the chain", () => {
+    const e = tabEntry("b", "w1", "p1", { prevTabId: "x" });
+    const x = tabEntry("x", "w1", "p1", { prevTabId: "b" });
+    expect(resolveReopenSlot(e, [x], ws)).toEqual({ paneId: "p1", index: 0 });
+  });
+});
+
+describe("remapPrevTabId", () => {
+  it("repoints entries that followed the reopened tab", () => {
+    const out = remapPrevTabId([tabEntry("c", "w1", "p1", { prevTabId: "b" })], "b", "b2");
+    expect(out[0]).toMatchObject({ prevTabId: "b2" });
   });
 });

@@ -48,6 +48,8 @@ import { newActionId, newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/
 import {
   buildReopenedTab,
   captureClosedEntry,
+  remapPrevTabId,
+  resolveReopenSlot,
   captureClosedWorkspace,
   clearStaleFolds,
   insertRestoredWorkspace,
@@ -795,6 +797,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           tab: found.tab,
           paneId: found.pane.id,
           workspaceId,
+          prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,
           lastOfWorkspace: workspaceTabCount(ws) === 1,
         });
       }
@@ -841,7 +844,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const newId = newTabId();
     await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
-    openTab(picked.workspaceId, picked.paneId, newTab);
+    closedTabsRef.current = remapPrevTabId(closedTabsRef.current, entry.tab.id, newId);
+    const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
+    const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
+    openTab(picked.workspaceId, slot.paneId, newTab, slot.index);
     selectWorkspace(picked.workspaceId);
     useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, picked.workspaceId);
   }, [openTab, selectWorkspace]);
