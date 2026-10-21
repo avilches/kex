@@ -164,11 +164,11 @@ describe("palette catalog", () => {
     expect(without?.disabledReason).toBeTruthy();
   });
 
-  it("offers the profiler as start or stop depending on whether it runs", () => {
+  it("offers the profiler as enable or disable depending on the setting", () => {
     const find = (running: boolean) =>
       createCommandItems(ctx({ profilerRunning: running })).find((i) => i.id === "profiler.toggle");
-    expect(find(false)?.title).toBe("Start performance profiler");
-    expect(find(true)?.title).toBe("Stop performance profiler");
+    expect(find(false)?.title).toBe("Enable performance profiler");
+    expect(find(true)?.title).toBe("Disable performance profiler");
   });
 
   it("disables Close other tabs when the pane holds a single tab", () => {

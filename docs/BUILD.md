@@ -92,10 +92,11 @@ token. It is dev only and not part of `pnpm build`.
 
 Two tools, because each sees what the other cannot. Start with the first and take the second while the window is slow.
 
-**In-app profiler (JavaScript).** Command palette, "Start performance profiler" (`modules/profiler/`). It is off at every launch and costs nothing until started. While on, it wraps `window.requestAnimationFrame` and, every 10 seconds, writes one line to `Kex.log` (`~/Library/Logs/app.betauer.kex/Kex.log`, `.dev` for a debug build) that starts with `[profiler]` followed by JSON:
+**In-app profiler (JavaScript).** Settings > General > Diagnostics > "Performance profiler" (or the palette entry "Enable performance profiler"; `modules/profiler/`). It is off by default and costs nothing until enabled; once enabled it stays on across restarts. While on, it wraps `window.requestAnimationFrame` and, every 10 seconds, writes one line to `Kex.log` (`~/Library/Logs/app.betauer.kex/Kex.log`, `.dev` for a debug build) that starts with `[profiler]` followed by JSON:
 
 | Field | Meaning |
 |---|---|
+| `window` | Label of the window that wrote the line (each window runs its own profiler) |
 | `rafShare` | Fraction of the window the main thread spent inside `requestAnimationFrame` callbacks (`rafMs` over `windowMs`) |
 | `rafCalls`, `frames` | Callbacks run and frames seen in the window |
 | `jankFrames`, `worstGapMs` | Frames that arrived 100 ms or more after the previous one, and the longest gap |

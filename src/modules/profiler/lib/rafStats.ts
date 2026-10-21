@@ -26,6 +26,7 @@ export type OriginRow = {
 };
 
 export type ProfilerReport = {
+  window: string;
   windowMs: number;
   rafShare: number;
   rafMs: number;
@@ -96,6 +97,7 @@ export function buildReport(
   acc: Accumulator,
   windowMs: number,
   census: Census,
+  windowLabel: string,
   topN = 12,
 ): ProfilerReport {
   const top = [...acc.origins.entries()]
@@ -109,6 +111,7 @@ export function buildReport(
       max: Number(s.max.toFixed(1)),
     }));
   return {
+    window: windowLabel,
     windowMs: Math.round(windowMs),
     rafShare: windowMs > 0 ? Number((acc.callbackMs / windowMs).toFixed(3)) : 0,
     rafMs: Math.round(acc.callbackMs),

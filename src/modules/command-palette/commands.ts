@@ -400,7 +400,7 @@ export function createCommandItems(
     },
     {
       id: "profiler.toggle",
-      title: ctx.profilerRunning ? "Stop performance profiler" : "Start performance profiler",
+      title: ctx.profilerRunning ? "Disable performance profiler" : "Enable performance profiler",
       group: "General",
       keywords: ["performance", "profiler", "slow", "lag", "diagnostics", "log", "frames"],
       icon: Activity01Icon,

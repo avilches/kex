@@ -15,15 +15,11 @@ const JANK_MS = 100;
 
 let stopActive: (() => void) | null = null;
 
-export function isProfilerRunning(): boolean {
-  return stopActive !== null;
-}
-
 function write(line: string): void {
   void info(line).catch(() => {});
 }
 
-export function startProfiler(): void {
+export function startProfiler(windowLabel: string): void {
   if (stopActive) return;
   const original = window.requestAnimationFrame;
   let acc = createAccumulator();
@@ -60,29 +56,23 @@ export function startProfiler(): void {
 
   const report = () => {
     const now = performance.now();
-    write(formatReport(buildReport(acc, now - windowStart, takeCensus(document))));
+    write(formatReport(buildReport(acc, now - windowStart, takeCensus(document), windowLabel)));
     acc = createAccumulator();
     windowStart = now;
   };
   const timer = setInterval(report, REPORT_EVERY_MS);
 
-  write("[profiler] started");
+  write(`[profiler] started ${windowLabel}`);
   stopActive = () => {
     clearInterval(timer);
     cancelAnimationFrame(frameId);
     document.removeEventListener("visibilitychange", onVisibility);
     if (window.requestAnimationFrame === wrapped) window.requestAnimationFrame = original;
-    write("[profiler] stopped");
+    write(`[profiler] stopped ${windowLabel}`);
   };
 }
 
 export function stopProfiler(): void {
   stopActive?.();
   stopActive = null;
-}
-
-export function toggleProfiler(): boolean {
-  if (stopActive) stopProfiler();
-  else startProfiler();
-  return isProfilerRunning();
 }

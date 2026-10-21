@@ -1,1 +1,1 @@
-export { isProfilerRunning, toggleProfiler } from "./lib/profiler";
+export { useProfilerSetting } from "./lib/useProfilerSetting";

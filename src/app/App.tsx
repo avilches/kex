@@ -57,7 +57,7 @@ import {
   type TabEntry,
   type WorkspaceEntry,
 } from "@/modules/command-palette";
-import { isProfilerRunning, toggleProfiler } from "@/modules/profiler";
+import { useProfilerSetting } from "@/modules/profiler";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -83,6 +83,7 @@ import type { Action } from "@/modules/actions/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
+  setPerformanceProfiler,
   setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import {
@@ -757,6 +758,8 @@ export default function App() {
   );
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const workspacePaneLimit = usePreferencesStore((s) => s.workspacePaneLimit);
+  const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
+  useProfilerSetting();
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -3478,14 +3481,15 @@ export default function App() {
               if (activeWorkspace)
                 onSplitBrowserDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
             },
-            profilerRunning: isProfilerRunning(),
-            toggleProfiler: () => void toggleProfiler(),
+            profilerRunning: performanceProfiler,
+            toggleProfiler: () => void setPerformanceProfiler(!performanceProfiler),
           })
         : [],
     [
       commandPaletteOpen,
       activeWorkspace,
       workspacePaneLimit,
+      performanceProfiler,
       workspaces.length,
       activeWorkspaceId,
       searchTarget,

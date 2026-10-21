@@ -102,6 +102,12 @@ describe("scmViewMode", () => {
   });
 });
 
+describe("performanceProfiler", () => {
+  it("is off by default", () => {
+    expect(DEFAULT_PREFERENCES.performanceProfiler).toBe(false);
+  });
+});
+
 describe("spinnerStyle", () => {
   it("defaults to arc", () => {
     expect(DEFAULT_PREFERENCES.spinnerStyle).toBe("arc");

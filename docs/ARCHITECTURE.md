@@ -671,7 +671,7 @@ src/
     ├── external-editors/          - Detection and catalog of installed editors and apps, their icons (feeds app Actions)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
-    ├── profiler/                  - Opt-in performance profiler (palette toggle): wraps requestAnimationFrame, logs a [profiler] line to Kex.log every 10 s with the slowest callbacks, jank frames and a DOM census. Pure parts in `lib/rafStats.ts` and `lib/domCensus.ts`
+    ├── profiler/                  - Opt-in performance profiler (Settings > General > Diagnostics, or the palette, both through the `performanceProfiler` preference; `useProfilerSetting` follows it in every window): wraps requestAnimationFrame, logs a [profiler] line to Kex.log every 10 s with the slowest callbacks, jank frames and a DOM census. Pure parts in `lib/rafStats.ts` and `lib/domCensus.ts`
     └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab path line, note in the row), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 

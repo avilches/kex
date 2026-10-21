@@ -78,25 +78,26 @@ describe("buildReport", () => {
     recordCallback(acc, "small", 4);
     recordCallback(acc, "big", 60);
     recordCallback(acc, "big", 40);
-    const report = buildReport(acc, 1000, CENSUS);
+    const report = buildReport(acc, 1000, CENSUS, "main");
     expect(report.top.map((r) => r.origin)).toEqual(["big", "small"]);
     expect(report.top[0]).toEqual({ origin: "big", calls: 2, ms: 100, avg: 50, max: 60 });
     expect(report.rafShare).toBe(0.104);
     expect(report.rafCalls).toBe(3);
     expect(report.census).toBe(CENSUS);
+    expect(report.window).toBe("main");
   });
 
   it("limits the list and survives an empty window", () => {
     const acc = createAccumulator();
     for (let i = 0; i < 20; i += 1) recordCallback(acc, `o${i}`, i);
-    expect(buildReport(acc, 1000, CENSUS, 5).top).toHaveLength(5);
-    const empty = buildReport(createAccumulator(), 0, CENSUS);
+    expect(buildReport(acc, 1000, CENSUS, "main", 5).top).toHaveLength(5);
+    const empty = buildReport(createAccumulator(), 0, CENSUS, "main");
     expect(empty.rafShare).toBe(0);
     expect(empty.top).toEqual([]);
   });
 
   it("formats as a tagged single-line JSON that round-trips", () => {
-    const line = formatReport(buildReport(createAccumulator(), 1000, CENSUS));
+    const line = formatReport(buildReport(createAccumulator(), 1000, CENSUS, "main"));
     expect(line.startsWith("[profiler] {")).toBe(true);
     expect(line).not.toContain("\n");
     expect(JSON.parse(line.slice("[profiler] ".length)).census).toEqual(CENSUS);

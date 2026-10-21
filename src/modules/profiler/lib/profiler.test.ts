@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const info = vi.fn((_line: string) => Promise.resolve());
 vi.mock("@tauri-apps/plugin-log", () => ({ info }));
 
-const { isProfilerRunning, startProfiler, stopProfiler, toggleProfiler } = await import("./profiler");
+const { startProfiler, stopProfiler } = await import("./profiler");
 
 let frames: FrameRequestCallback[];
 let nativeRaf: typeof window.requestAnimationFrame;
@@ -37,15 +37,14 @@ describe("profiler", () => {
 
   it("wraps requestAnimationFrame while running and restores the original after", () => {
     const before = window.requestAnimationFrame;
-    startProfiler();
+    startProfiler("main");
     expect(window.requestAnimationFrame).not.toBe(before);
     stopProfiler();
     expect(window.requestAnimationFrame).toBe(before);
-    expect(isProfilerRunning()).toBe(false);
   });
 
   it("still runs the wrapped callback with the frame time", () => {
-    startProfiler();
+    startProfiler("main");
     const seen: number[] = [];
     window.requestAnimationFrame((t) => seen.push(t));
     runFrames(42);
@@ -53,15 +52,15 @@ describe("profiler", () => {
   });
 
   it("passes a non-function through to the native call untouched", () => {
-    startProfiler();
+    startProfiler("main");
     expect(() => window.requestAnimationFrame(undefined as never)).not.toThrow();
   });
 
   it("starts once and logs a tagged report every ten seconds", () => {
-    startProfiler();
-    startProfiler();
+    startProfiler("main");
+    startProfiler("main");
     expect(info).toHaveBeenCalledTimes(1);
-    expect(info).toHaveBeenLastCalledWith("[profiler] started");
+    expect(info).toHaveBeenLastCalledWith("[profiler] started main");
     window.requestAnimationFrame(() => {});
     runFrames(10);
     vi.advanceTimersByTime(10_000);
@@ -69,11 +68,12 @@ describe("profiler", () => {
     expect(line.startsWith("[profiler] {")).toBe(true);
     const report = JSON.parse(line.slice("[profiler] ".length));
     expect(report.rafCalls).toBe(1);
+    expect(report.window).toBe("main");
     expect(report.census.nodes).toBeGreaterThan(0);
   });
 
   it("counts a frame gap above 100 ms as jank", () => {
-    startProfiler();
+    startProfiler("main");
     runFrames(0);
     runFrames(16);
     runFrames(300);
@@ -84,15 +84,10 @@ describe("profiler", () => {
   });
 
   it("stops reporting once stopped", () => {
-    startProfiler();
+    startProfiler("main");
     stopProfiler();
     info.mockClear();
     vi.advanceTimersByTime(30_000);
     expect(info).not.toHaveBeenCalled();
-  });
-
-  it("toggles and reports the new state", () => {
-    expect(toggleProfiler()).toBe(true);
-    expect(toggleProfiler()).toBe(false);
   });
 });
