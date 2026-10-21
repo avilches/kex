@@ -459,6 +459,10 @@ last close, whatever it closed. The closed stack (in memory, capped at 10) holds
 - A tab entry (`closeTab`) reopens only in the workspace it was closed in. If that workspace was closed, the entry is
   dropped (unless a workspace entry restores it first, see below). If it is hibernated, the entry is skipped but kept,
   so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be reopened.
+-   It remembers the tab on its left (`prevTabId`) and reopens right after it, in whatever pane that tab is in now
+  (`resolveReopenSlot`). A predecessor that was closed too is looked up in the stack and its own predecessor takes
+  over; with none left it goes first in its old pane (the active pane if that one is gone). Reopened tabs get new
+  ids, so `remapPrevTabId` repoints the entries that followed the old one.
 - A workspace entry (`closeWorkspace`) is a snapshot of the whole `Workspace` (pane tree, tabs, title, color, icon,
   group, actions, hibernation) plus its index in the bar. Undo puts it back at that index and selects it. It is
   skipped when a workspace with that id is already open.
