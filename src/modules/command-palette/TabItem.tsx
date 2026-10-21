@@ -9,7 +9,7 @@ import { HighlightText } from "./HighlightText";
 import type { RowHighlight } from "./lib/mergeRows";
 import { tabDetailLines } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
-import { RowTag } from "./RowTag";
+import { RowTag, tabTagKind } from "./RowTag";
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
   terminal: "Terminal",
@@ -42,7 +42,7 @@ export function TabItem({
       onSelect={onRun}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
-      <RowTag kind="Tab" />
+      <RowTag kind={tabTagKind(entry.kind)} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
         <TabBarIcon
           tab={entry.tab}

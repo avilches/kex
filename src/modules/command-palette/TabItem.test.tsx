@@ -59,9 +59,12 @@ describe("TabItem", () => {
     expect(screen.getByText("/p/Kex · main")).toBeTruthy();
   });
 
-  it("labels the row as a Tab", () => {
+  it("labels the row by what the tab holds", () => {
     row(entry());
-    expect(screen.getByText("Tab")).toBeTruthy();
+    expect(screen.getByText("Terminal")).toBeTruthy();
+    cleanup();
+    row(entry({ kind: "markdown" }));
+    expect(screen.getByText("File")).toBeTruthy();
   });
 
   it("shows a spinner only while the agent works", () => {
@@ -79,7 +82,7 @@ describe("TabItem", () => {
 
   it("falls back to the kind label when the title is empty", () => {
     row(entry({ kind: "browser", title: "", cwd: "", tab: { id: "tab-1", kind: "browser", url: "" } }));
-    expect(screen.getByText("Browser")).toBeTruthy();
+    expect(screen.getAllByText("Browser")).toHaveLength(2);
   });
 
   it("marks a hibernated tab", () => {
