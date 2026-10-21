@@ -7,10 +7,11 @@ import { copyToClipboard } from "./contextActions";
 import { COMPACT_ITEM } from "./menuItemClass";
 import { relativeCopyFor } from "./relativeCopy";
 
-const SUBPATH_CLASS = "block max-w-[240px] truncate text-right text-[10px] text-muted-foreground";
+const SUBPATH_CLASS = "block max-w-[240px] truncate text-left text-[10px] text-muted-foreground";
 
 // The row is right-to-left so the ellipsis eats the start of a long path and keeps its
-// tail; the inner ltr run stops the bidi algorithm from moving the leading slash.
+// tail, while text-left keeps a short one flush with the label; the inner ltr run stops the
+// bidi algorithm from moving the leading slash.
 function Sub({ text }: { text: string }) {
   return (
     <span className={SUBPATH_CLASS} dir="rtl" title={text}>

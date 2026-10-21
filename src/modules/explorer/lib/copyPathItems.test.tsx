@@ -42,12 +42,12 @@ describe("copy path items", () => {
     expect(screen.getByText("/ws/src/a/b.ts").parentElement?.className).toContain("text-muted-foreground");
   });
 
-  it("clips a long path at its start, right aligned", () => {
+  it("keeps a short path left aligned and clips a long one at its start", () => {
     open();
     const sub = screen.getByText("/ws/src/a/b.ts").parentElement!;
     expect(sub.getAttribute("dir")).toBe("rtl");
     expect(sub.className).toContain("truncate");
-    expect(sub.className).toContain("text-right");
+    expect(sub.className).toContain("text-left");
     expect(screen.getByText("/ws/src/a/b.ts").getAttribute("dir")).toBe("ltr");
   });
 
