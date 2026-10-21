@@ -90,22 +90,13 @@ token. It is dev only and not part of `pnpm build`.
 
 ## Profiling a slow window
 
-Two tools, because each sees what the other cannot. Start with the first and take the second while the window is slow.
+Everything lives in `performance/`; its `CLAUDE.md` has the procedure, how to read the results and what has been measured.
 
-**In-app profiler (JavaScript).** Settings > General > Diagnostics > "Performance profiler" (or the palette entry "Enable performance profiler"; `modules/profiler/`). It is off by default and costs nothing until enabled; once enabled it stays on across restarts. While on, it wraps `window.requestAnimationFrame` and, every 10 seconds, writes one line to `Kex.log` (`~/Library/Logs/app.betauer.kex/Kex.log`, `.dev` for a debug build) that starts with `[profiler]` followed by JSON:
+- **In-app profiler (JavaScript).** Settings > General > Diagnostics > "Performance profiler" (or the palette entry "Enable performance profiler"; code in `src/modules/profiler/`). It is off by default and stays on across restarts once enabled. While on, every window writes a `[profiler]` JSON line to `Kex.log` every 10 seconds: time spent in `requestAnimationFrame` callbacks and who registered them, frames that took 100 ms or more, and a census of the DOM and of the terminals.
+- **Native sample (WebKit).** `python3 performance/kexperf.py sample` samples the `WebContent` process that belongs to a running Kex for 10 seconds, and `watch` does it by itself when a webview stays above 60 % CPU. It sees style resolution and layout, which the profiler cannot.
+- **Reading them.** `kexperf.py profiler` summarizes the `[profiler]` lines and `kexperf.py analyze FILE` the main thread of a sample.
 
-| Field | Meaning |
-|---|---|
-| `window` | Label of the window that wrote the line (each window runs its own profiler) |
-| `rafShare` | Fraction of the window the main thread spent inside `requestAnimationFrame` callbacks (`rafMs` over `windowMs`) |
-| `rafCalls`, `frames` | Callbacks run and frames seen in the window |
-| `jankFrames`, `worstGapMs` | Frames that arrived 100 ms or more after the previous one, and the longest gap |
-| `census` | `nodes` (all DOM elements), `xterms` (terminals bound to a tab), `domRendererTerminals` and `webglTerminals` (which renderer each uses), `domRows` (row elements the DOM renderer keeps) |
-| `top` | The 12 callbacks that took longest: `origin` (callback source plus the six frames that registered it), `calls`, `ms`, `avg`, `max` |
-
-`Kex.log` rotates at 1 MB and keeps 20 archived files next to it (`Kex_<date>.log`, about 21 MB at most). One profiler line is about 1 KB on average, so with the profiler on a file lasts 1 to 2.5 hours and the 21 files cover roughly one to two days; without it, a month or more. In a minified release build local function names are mangled, so an origin may read as a short name plus a file, line and column. The profiler cannot see style resolution or layout, which is where a slow window often spends its time; that is what the native sample is for.
-
-**Native sample (WebKit).** `scripts/sample-webview.sh` (macOS) finds the Kex that is running, asks the system which `WebContent` process is its own (`responsibility_get_pid_responsible_for_pid`, so another app's webview is never picked), and runs `sample` on the busiest one for 10 seconds. The file goes to the same logs folder as `Kex.log`. Options: `--pid` (needed when several Kex run, for example the installed app and a dev build), `--seconds`, `--out`. In the sample, `updateRendering` is the page's render step; under it, `Style::TreeResolver` is style resolution, `updateLayout` is layout and `serviceRequestAnimationFrame` is the JavaScript the profiler measures.
+`Kex.log` rotates at 1 MB and keeps 20 archived files next to it (`Kex_<date>.log`, about 21 MB at most). A profiler line is about 1 KB, so with the profiler on a file lasts 1 to 2.5 hours and the 21 files cover roughly one to two days; without it, a month or more.
 
 ## Quality checks
 
