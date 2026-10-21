@@ -1,4 +1,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown01Icon, PlayIcon, Rocket01Icon, Settings01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -10,9 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
+import { canReorderButtons, menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -94,6 +105,29 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
           </span>
         )}
       </button>
+    </div>
+  );
+}
+
+// A button that can be dragged while the reorder modifier is held. Out of that mode it is a
+// plain wrapper: no listeners, no attributes. In it the click is swallowed, so grabbing a
+// button never runs it, and the children ignore the pointer so even a disabled button
+// (which the webview hides pointer events from) can be picked up.
+function ReorderableButton({ item, reorderMode, ...h }: { item: BarItem; reorderMode: boolean } & Handlers) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !reorderMode,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition, zIndex: isDragging ? 10 : undefined }}
+      {...(reorderMode ? attributes : {})}
+      {...listeners}
+      onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
+      className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&>*]:pointer-events-none", isDragging && "cursor-grabbing bg-accent opacity-80")}
+    >
+      <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
     </div>
   );
 }
@@ -235,6 +269,30 @@ type BarProps = {
 // the menu instead of pushing the rest out.
 export function ActionsBar({ workspace, controller, onConfigure, onAddAction, onRestoreFocus }: BarProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState(false);
+  const [held, setHeld] = useState(false);
+  const draggingRef = useRef(false);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const modifier = (e: { metaKey: boolean; ctrlKey: boolean }) => (IS_MAC ? e.metaKey : e.ctrlKey);
+  // The modifier is read from the keyboard only while the pointer is over the bar, and a
+  // drag in flight keeps the mode whatever happens to the key or the pointer meanwhile.
+  useEffect(() => {
+    if (!hover) return;
+    const sync = (e: KeyboardEvent) => {
+      if (!draggingRef.current) setHeld(modifier(e));
+    };
+    const clear = () => {
+      if (!draggingRef.current) setHeld(false);
+    };
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+      window.removeEventListener("blur", clear);
+    };
+  }, [hover]);
   const [room, setRoom] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (!ref.current) return;
@@ -243,15 +301,53 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     return () => ro.disconnect();
   }, []);
   const model = useActionsBarModel({ workspace, room });
+  const dragEnd = ({ active, over }: DragEndEvent) => {
+    draggingRef.current = false;
+    if (!over || active.id === over.id) return;
+    const from = model.buttons.find((b) => b.id === active.id);
+    const to = model.buttons.find((b) => b.id === over.id);
+    if (from && to && canReorderButtons(from, to)) controller.reorder(from.global ? "global" : "workspace", from.id, to.id);
+  };
   return (
-    <div ref={ref} data-tauri-drag-region className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
+    <div
+      ref={ref}
+      data-tauri-drag-region
+      onPointerEnter={(e) => {
+        setHover(true);
+        setHeld(modifier(e));
+      }}
+      onPointerMove={(e) => {
+        if (!draggingRef.current) setHeld(modifier(e));
+      }}
+      onPointerLeave={() => {
+        if (draggingRef.current) return;
+        setHover(false);
+        setHeld(false);
+      }}
+      className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden"
+    >
       <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
-      {model.buttons.map((item, i) => (
-        <Fragment key={item.id}>
-          {item.global && i > 0 && !model.buttons[i - 1].global && <span aria-hidden className="h-4 w-px shrink-0 bg-border" />}
-          <OwnButton item={item} {...controller} />
-        </Fragment>
-      ))}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        autoScroll={false}
+        onDragStart={() => {
+          draggingRef.current = true;
+        }}
+        onDragEnd={dragEnd}
+        onDragCancel={() => {
+          draggingRef.current = false;
+        }}
+      >
+        <SortableContext items={model.buttons.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
+          {model.buttons.map((item, i) => (
+            <Fragment key={item.id}>
+              {item.global && i > 0 && !model.buttons[i - 1].global && <span aria-hidden className="h-4 w-px shrink-0 bg-border" />}
+              <ReorderableButton item={item} reorderMode={held} {...controller} />
+            </Fragment>
+          ))}
+        </SortableContext>
+      </DndContext>
       <ActionsMenu
         label="Actions"
         items={model.menu.workspace}

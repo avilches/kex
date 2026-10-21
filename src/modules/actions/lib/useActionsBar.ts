@@ -11,6 +11,8 @@ export type BarController = {
   stop: (action: Action) => void;
   /** Brings the tab of a running script into view; false when it has none. */
   focus: (action: Action) => boolean;
+  /** Moves an Action of the given scope to the place of another one of the same scope. */
+  reorder: (scope: "workspace" | "global", fromId: string, toId: string) => void;
 };
 
 type Input = {

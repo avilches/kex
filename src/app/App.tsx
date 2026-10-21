@@ -25,6 +25,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { unlinkTab } from "@/modules/actions/lib/actionStateStore";
 import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
+import { reorderActions } from "@/modules/actions/lib/actions";
+import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { ActionMenuProvider } from "@/modules/actions/RowActionsMenu";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
@@ -3525,8 +3527,22 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const actionsController = useMemo(
-    () => ({ run: runAction, stop: stopAction, focus: focusActionTab }),
-    [runAction, stopAction, focusActionTab],
+    () => ({
+      run: runAction,
+      stop: stopAction,
+      focus: focusActionTab,
+      reorder: (scope: "workspace" | "global", fromId: string, toId: string) => {
+        if (scope === "workspace") {
+          if (activeWorkspaceIdRef.current) reorderWorkspaceActions(activeWorkspaceIdRef.current, fromId, toId);
+          return;
+        }
+        globalActions.change((list) => reorderActions(list, fromId, toId)).catch((err: unknown) => {
+          console.error("Could not save the global actions", err);
+          toast.error("Could not save the actions");
+        });
+      },
+    }),
+    [runAction, stopAction, focusActionTab, reorderWorkspaceActions],
   );
 
   // Settings owns the Actions editor now; the workspace scope flows to it through the

@@ -7,6 +7,7 @@ import {
   actionTarget,
   appsFirst,
   buildActionsBarModel,
+  canReorderButtons,
   BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
@@ -481,5 +482,16 @@ describe("appsFirst and scriptsFirst", () => {
   it("partition by kind and keep the order inside each kind", () => {
     expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "a2", "s1", "s2"]);
     expect(scriptsFirst(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "a2"]);
+  });
+});
+
+describe("canReorderButtons", () => {
+  const b = (action: Action, global = false) => ({ global, action });
+
+  it("allows a swap inside one scope and one kind only", () => {
+    expect(canReorderButtons(b(app({ id: "a1" })), b(app({ id: "a2" })))).toBe(true);
+    expect(canReorderButtons(b(script({ id: "s1" })), b(script({ id: "s2" })))).toBe(true);
+    expect(canReorderButtons(b(app()), b(script()))).toBe(false);
+    expect(canReorderButtons(b(app()), b(app({ id: "a2" }), true))).toBe(false);
   });
 });

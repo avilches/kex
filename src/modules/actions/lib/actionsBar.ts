@@ -216,6 +216,12 @@ export function scriptsFirst<T extends Pick<Action, "runInTerminal">>(actions: r
 
 export const MAX_BUTTONS_PER_SCOPE = 3;
 
+// Buttons trade places only inside one scope and one kind: the bar always draws apps before
+// scripts and the workspace before the global ones, so any other drop would not stick.
+export function canReorderButtons(a: Pick<BarItem, "global" | "action">, b: Pick<BarItem, "global" | "action">): boolean {
+  return a.global === b.global && a.action.runInTerminal === b.action.runInTerminal;
+}
+
 // The own buttons the bar may draw, in order: those the place shows, with no more than
 // MAX_BUTTONS_PER_SCOPE per scope, scripts and apps together; the rest live in the menu.
 // Each list comes already in bar order, the workspace one before the global one.
