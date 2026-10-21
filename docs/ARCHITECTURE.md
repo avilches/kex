@@ -552,6 +552,9 @@ src/
     │   │                            Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
     │   │                            The copy items (`explorer/lib/copyPathItems.tsx`) print the path under the label;
     │   │                            Copy Relative Path shows why it is disabled (no workspace root, or outside it).
+    │   │                            The path is left aligned and a long one is clipped at its start (rtl row, text-left, ltr run).
+    │   │                            The tab context menu (`TabCopyPathItems`) adds the same two items under Icon for
+    │   │                            terminals (agent worktree, else cwd), editors and diffs; Copy Absolute Path carries `path.copy`.
     │   │                            The terminal surface has a right-click menu (`TerminalContextMenu`): Copy (enabled
     │   │                            only with a selection) and Paste. While an app tracks the mouse (Claude Code
     │   │                            draws its own selection), a right click does not select the word under the

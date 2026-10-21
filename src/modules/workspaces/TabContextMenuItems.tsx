@@ -34,6 +34,7 @@ import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
 import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
+import { TabCopyPathItems } from "./TabCopyPathItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
@@ -178,6 +179,7 @@ export function TabContextMenuItems({
               </ContextMenuSubContent>
             </ContextMenuSub>
           )}
+          <TabCopyPathItems tab={tab} workspaceId={workspaceId} />
           {focusTarget && (
             <ContextMenuItem
               disabled={isAutofocusTab(tab) && (tab.autofocus ?? false)}

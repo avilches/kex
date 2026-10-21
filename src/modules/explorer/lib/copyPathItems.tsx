@@ -1,31 +1,56 @@
-import { ContextMenuItem } from "@/components/ui/context-menu";
+import { useLayoutEffect, useRef, useState } from "react";
+import { ContextMenuItem, ContextMenuShortcut } from "@/components/ui/context-menu";
 import { Link01Icon, CopySlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { copyToClipboard } from "./contextActions";
 import { COMPACT_ITEM } from "./menuItemClass";
 import { relativeCopyFor } from "./relativeCopy";
 
-const SUBPATH_CLASS = "max-w-[240px] truncate text-[10px] text-muted-foreground";
-
+// The text box is right-to-left so overflow is cut at the start of a long path and keeps its
+// tail, while text-left keeps a short one flush with the label; the inner ltr run stops the
+// bidi algorithm from moving the leading slash. The ellipsis is drawn by hand, only once the
+// box is measured as clipped, because text-overflow does not mark a start cut reliably.
 function Sub({ text }: { text: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [clipped, setClipped] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el) setClipped(el.scrollWidth > el.clientWidth);
+  }, [text]);
   return (
-    <span className={SUBPATH_CLASS} title={text}>
-      {text}
+    <span className="flex max-w-[240px] text-[10px] text-muted-foreground" title={text}>
+      {clipped && <span className="shrink-0">…</span>}
+      <span
+        ref={box}
+        dir="rtl"
+        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left"
+      >
+        <bdo dir="ltr">{text}</bdo>
+      </span>
     </span>
   );
+}
+
+function Shortcut({ id }: { id: ShortcutId }) {
+  const label = useShortcutLabel(id);
+  return label ? <ContextMenuShortcut>{label}</ContextMenuShortcut> : null;
 }
 
 export function CopyRelativePathItem({
   path,
   workspaceRoot,
+  compact = true,
 }: {
   path: string;
   workspaceRoot: string | null;
+  compact?: boolean;
 }) {
   const rel = relativeCopyFor(path, workspaceRoot);
   return (
     <ContextMenuItem
-      className={COMPACT_ITEM}
+      className={compact ? COMPACT_ITEM : undefined}
       disabled={!rel.ok}
       onSelect={() => {
         if (rel.ok) void copyToClipboard(rel.text, "Copied relative path");
@@ -56,15 +81,26 @@ export function CopyRelativeTextItem({ text }: { text: string }) {
   );
 }
 
-export function CopyAbsolutePathItem({ path }: { path: string }) {
+export function CopyAbsolutePathItem({
+  path,
+  compact = true,
+  shortcut,
+}: {
+  path: string;
+  compact?: boolean;
+  shortcut?: ShortcutId;
+}) {
   return (
     <ContextMenuItem
-      className={COMPACT_ITEM}
+      className={compact ? COMPACT_ITEM : undefined}
       onSelect={() => void copyToClipboard(path, "Copied absolute path")}
     >
       <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-      <span className="flex min-w-0 flex-col">
-        <span>Copy Absolute Path</span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex items-center">
+          Copy Absolute Path
+          {shortcut && <Shortcut id={shortcut} />}
+        </span>
         <Sub text={path} />
       </span>
     </ContextMenuItem>
