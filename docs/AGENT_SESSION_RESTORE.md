@@ -719,7 +719,7 @@ Two things to check if the log looks unhelpful right after a restore failure:
   which deletes the previous log with no backup, and does so as soon as the app starts (the size check runs before
   the new session writes anything) - so a log that had already grown past `max_file_size` in the *previous* session,
   the one that actually failed to restore, was gone before you could open it. Kex now rotates with
-  `RotationStrategy::KeepSome(4)`, which renames the oversized file instead of deleting it: look for
+  `RotationStrategy::KeepSome(20)`, which renames the oversized file instead of deleting it: look for
   `Kex_<date>.log` siblings next to the active `Kex.log` in the same directory and check those too, not just
   the current file.
 - **`prompt`/`msg`/`last`/`err`/`delta` fields look cut off.** `pty::ipc::dispatch` truncates these free-text agent
