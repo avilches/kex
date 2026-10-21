@@ -38,20 +38,23 @@ function CommandDialog({
   children,
   className,
   showCloseButton = false,
+  modal = true,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string
   description?: string
   className?: string
   showCloseButton?: boolean
+  modal?: boolean
 }) {
   return (
-    <Dialog {...props}>
+    <Dialog modal={modal} {...props}>
       <DialogHeader className="sr-only">
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent
+        modal={modal}
         className={cn(
           "top-1/3 translate-y-0 overflow-hidden rounded-4xl! p-0",
           className

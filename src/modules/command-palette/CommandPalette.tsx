@@ -62,6 +62,9 @@ type Props = {
 
 const THEME_PREVIEW_DELAY_MS = 140;
 
+let lastContentQuery = "";
+let lastContentValue = "";
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -156,11 +159,15 @@ export function CommandPalette({
   }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
 
   const resetPalette = useCallback(() => {
+    if (parsed.mode === "content") {
+      lastContentQuery = query;
+      lastContentValue = value;
+    }
     setQuery("");
     setValue("");
     setPage("root");
     previewThemeId(null);
-  }, [previewThemeId]);
+  }, [previewThemeId, parsed.mode, query, value]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -172,8 +179,13 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) return;
-    setQuery(initialMode === "content" ? "#" : "");
-    setPage("root");
+    if (initialMode === "content" && lastContentQuery.startsWith("#")) {
+      setQuery(lastContentQuery);
+      setValue(lastContentValue);
+    } else {
+      setQuery(initialMode === "content" ? "#" : "");
+      setPage("root");
+    }
     const handle = window.setTimeout(() => {
       document.getElementById("kex-command-palette-input")?.focus();
     }, 0);
@@ -244,9 +256,12 @@ export function CommandPalette({
 
   const openContent = useCallback(
     (path: string, line: number) => {
-      runAfterClose(() => onOpenContentHit(path, line));
+      onOpenContentHit(path, line);
+      window.setTimeout(() => {
+        document.getElementById("kex-command-palette-input")?.focus();
+      }, 0);
     },
-    [onOpenContentHit, runAfterClose],
+    [onOpenContentHit],
   );
 
   const runHistory = useCallback(
@@ -309,6 +324,7 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
+      modal={parsed.mode !== "content"}
       className="w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))]"
     >
       <Command
