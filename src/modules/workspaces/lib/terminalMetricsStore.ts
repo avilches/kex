@@ -8,6 +8,8 @@ export type TabMetrics = {
   cpuPercent: number;
   memBytes: number;
   shellName: string;
+  /** First foreground child of the shell; null when nothing is running. */
+  foregroundChild: string | null;
 };
 
 type Listener = () => void;
@@ -44,7 +46,8 @@ function sameMetrics(a: TabMetrics | undefined, b: TabMetrics): boolean {
     a.pid === b.pid &&
     a.cpuPercent === b.cpuPercent &&
     a.memBytes === b.memBytes &&
-    a.shellName === b.shellName
+    a.shellName === b.shellName &&
+    a.foregroundChild === b.foregroundChild
   );
 }
 

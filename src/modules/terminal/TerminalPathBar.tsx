@@ -50,7 +50,7 @@ export function TerminalPathBar({
     null;
   const agentSession = useAgentStore((s) => s.sessions[tabId] ?? null);
   const { segments } = buildCwdBreadcrumb(cwd, workspaceRoot, home);
-  const process = running ?? metrics?.shellName ?? null;
+  const process = running ?? metrics?.foregroundChild ?? metrics?.shellName ?? null;
   return (
     <div className="surface-terminal flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-[var(--terminal-background)] px-2 text-[11px]">
       <div className="flex min-w-0 flex-1 items-center gap-2">

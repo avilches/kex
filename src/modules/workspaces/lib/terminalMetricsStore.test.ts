@@ -13,7 +13,7 @@ import {
 
 let seq = 0;
 function mk(cpu: number): TabMetrics {
-  return { pid: 42, cpuPercent: cpu, memBytes: 2048, shellName: "zsh" };
+  return { pid: 42, cpuPercent: cpu, memBytes: 2048, shellName: "zsh", foregroundChild: null };
 }
 
 function useRenderCount(tabId: string): number {
@@ -71,6 +71,23 @@ describe("terminalMetricsStore", () => {
       clearMetricsEntry(ta);
     });
     expect(a.result.current).toBe(2);
+  });
+
+  it("a foregroundChild change notifies even when the other metrics are equal", () => {
+    const t = `tfc-${seq}`;
+    setMetrics(t, mk(4));
+    const { result } = renderHook(() => useRenderCount(t));
+    expect(result.current).toBe(0);
+
+    act(() => {
+      setMetrics(t, { ...mk(4), foregroundChild: "omp" });
+    });
+    expect(result.current).toBe(1);
+
+    act(() => {
+      setMetrics(t, { ...mk(4) });
+    });
+    expect(result.current).toBe(2);
   });
 
   it("useMetrics returns the entry and keeps identity while values stay equal", () => {

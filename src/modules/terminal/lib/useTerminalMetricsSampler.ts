@@ -13,6 +13,7 @@ type RawMetrics = {
   cpu_percent: number;
   mem_bytes: number;
   shell_name: string;
+  fg_name: string;
 };
 
 export function useTerminalMetricsSampler(paneTree: SplitNode | null): void {
@@ -42,7 +43,13 @@ export function useTerminalMetricsSampler(paneTree: SplitNode | null): void {
           if (!tabId) continue;
           batch.push([
             tabId,
-            { pid: m.pid, cpuPercent: m.cpu_percent, memBytes: m.mem_bytes, shellName: m.shell_name },
+            {
+              pid: m.pid,
+              cpuPercent: m.cpu_percent,
+              memBytes: m.mem_bytes,
+              shellName: m.shell_name,
+              foregroundChild: m.fg_name || null,
+            },
           ]);
         }
         setMetricsBatch(batch);

@@ -405,6 +405,9 @@ pub struct PtyMetrics {
     pub cpu_percent: f32,
     pub mem_bytes: u64,
     pub shell_name: String,
+    /// First foreground child of the shell, same heuristic as
+    /// `pty_has_foreground_process`. Empty when no child is running.
+    pub fg_name: String,
 }
 
 // Sample CPU% (normalized 0..=100) and RAM for each given pty's shell process
@@ -456,6 +459,9 @@ pub fn pty_metrics(
             cpu_percent,
             mem_bytes,
             shell_name,
+            fg_name: shell_foreground_process(shell_pid)
+                .map(|(_, name)| name)
+                .unwrap_or_default(),
         });
     }
     out
