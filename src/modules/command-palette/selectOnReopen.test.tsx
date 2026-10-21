@@ -128,6 +128,7 @@ describe("palette select-all on reopen", () => {
 
     const reopened = inputEl();
     expect(reopened.value).toBe("#foo");
-    expect([reopened.selectionStart, reopened.selectionEnd]).toEqual([0, 4]);
+    // The restored term is selected but the leading # sigil stays out.
+    expect([reopened.selectionStart, reopened.selectionEnd]).toEqual([1, 4]);
   });
 });

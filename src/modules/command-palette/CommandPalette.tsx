@@ -222,9 +222,13 @@ export function CommandPalette({
       // The restored query is selected only once it reached the DOM: the
       // re-render carrying it may still be queued behind this timer, and
       // assigning the value afterwards would wipe an earlier selection.
+      // The selection covers the search term but not the leading # sigil,
+      // so typing replaces just the term.
       requestAnimationFrame(() => {
         const input = paletteInputElement();
-        if (input && input.value === lastContentQuery) input.select();
+        if (input && input.value === lastContentQuery && input.value.length > 1) {
+          input.setSelectionRange(1, input.value.length);
+        }
       });
     }, 0);
     return () => window.clearTimeout(handle);
