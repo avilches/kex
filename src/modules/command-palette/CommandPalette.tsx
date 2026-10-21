@@ -18,8 +18,8 @@ import {
   ArrowTurnBackwardIcon,
   CommandIcon,
   SleepingIcon,
-  Tick02Icon,
   TerminalIcon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -28,18 +28,18 @@ import {
   CONTENT_SEARCH_MIN_QUERY,
   useContentSearch,
 } from "./hooks/useContentSearch";
-import { fuzzyBest } from "./lib/fuzzy";
+import type { ClosedTabEntry } from "./lib/closedEntries";
 import { commandChoice } from "./lib/commandChoice";
+import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
+import { mergeRows } from "./lib/mergeRows";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
-import { mergeRows } from "./lib/mergeRows";
-import type { ClosedTabEntry } from "./lib/closedEntries";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
-import type { PaletteItem } from "./types";
 import { MergedList } from "./MergedList";
+import type { PaletteItem } from "./types";
 
 type Props = {
   open: boolean;
@@ -61,6 +61,12 @@ type Props = {
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
+
+// cmdk overrides the rendered input's id attribute, so helpers that focus or
+// select the palette input query it by its cmdk marker instead of by id.
+function paletteInputElement(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>('[cmdk-input=""]');
+}
 
 let lastContentQuery = "";
 let lastContentValue = "";
@@ -125,14 +131,26 @@ export function CommandPalette({
             mru,
           })
         : [],
-    [inCommands, commandItems, tabEntries, workspaceEntries, closedEntries, parsed.term, activeTabId, learned, mru],
+    [
+      inCommands,
+      commandItems,
+      tabEntries,
+      workspaceEntries,
+      closedEntries,
+      parsed.term,
+      activeTabId,
+      learned,
+      mru,
+    ],
   );
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
   const listRef = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the top whenever the typed text changes
   useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')?.scrollTo({ top: 0 });
+    listRef.current
+      ?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+      ?.scrollTo({ top: 0 });
   }, [query]);
 
   const themes = useMemo(() => {
@@ -149,7 +167,9 @@ export function CommandPalette({
 
   const workspaceTargets = useMemo(() => {
     if (!inWorkspaces) return [];
-    const others = workspaceEntries.filter((e) => e.workspaceId !== activeWorkspaceId);
+    const others = workspaceEntries.filter(
+      (e) => e.workspaceId !== activeWorkspaceId,
+    );
     const q = workspaceFilter.toLowerCase();
     if (!q) return others;
     return others
@@ -164,9 +184,9 @@ export function CommandPalette({
       lastContentQuery = query;
       lastContentValue = value;
       lastContentScrollTop =
-        listRef.current
-          ?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
-          ?.scrollTop ?? 0;
+        listRef.current?.querySelector<HTMLElement>(
+          '[data-slot="scroll-area-viewport"]',
+        )?.scrollTop ?? 0;
     }
     setQuery("");
     setValue("");
@@ -197,13 +217,15 @@ export function CommandPalette({
     }
     contentRestoredRef.current = restored;
     const handle = window.setTimeout(() => {
-      const input = document.getElementById(
-        "kex-command-palette-input",
-      ) as HTMLInputElement | null;
-      if (!input) return;
-      input.focus();
-      // Restores the search term selected so typing replaces it wholesale.
-      if (restored) input.select();
+      paletteInputElement()?.focus();
+      if (!restored) return;
+      // The restored query is selected only once it reached the DOM: the
+      // re-render carrying it may still be queued behind this timer, and
+      // assigning the value afterwards would wipe an earlier selection.
+      requestAnimationFrame(() => {
+        const input = paletteInputElement();
+        if (input && input.value === lastContentQuery) input.select();
+      });
     }, 0);
     return () => window.clearTimeout(handle);
   }, [open, initialMode]);
@@ -285,7 +307,7 @@ export function CommandPalette({
     (path: string, line: number) => {
       onOpenContentHit(path, line);
       window.setTimeout(() => {
-        document.getElementById("kex-command-palette-input")?.focus();
+        paletteInputElement()?.focus();
       }, 0);
     },
     [onOpenContentHit],
@@ -424,7 +446,9 @@ export function CommandPalette({
                 </CommandItem>
                 <CommandItem
                   value="move-workspace:new"
-                  onSelect={() => runAfterClose(() => onMoveActiveTabToWorkspace("new"))}
+                  onSelect={() =>
+                    runAfterClose(() => onMoveActiveTabToWorkspace("new"))
+                  }
                   className="text-[12.5px]"
                 >
                   <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
@@ -435,7 +459,9 @@ export function CommandPalette({
                     key={entry.workspaceId}
                     value={`move-workspace:${entry.workspaceId}`}
                     onSelect={() =>
-                      runAfterClose(() => onMoveActiveTabToWorkspace(entry.workspaceId))
+                      runAfterClose(() =>
+                        onMoveActiveTabToWorkspace(entry.workspaceId),
+                      )
                     }
                     className="text-[12.5px]"
                   >
@@ -445,9 +471,15 @@ export function CommandPalette({
                       icon={entry.icon ?? undefined}
                       size={14}
                     />
-                    <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {entry.title}
+                    </span>
                     {entry.hibernated ? (
-                      <span role="img" aria-label="Workspace is hibernated" className="shrink-0">
+                      <span
+                        role="img"
+                        aria-label="Workspace is hibernated"
+                        className="shrink-0"
+                      >
                         <HugeiconsIcon
                           icon={SleepingIcon}
                           size={12}
@@ -476,10 +508,15 @@ export function CommandPalette({
                     runAfterClose(() => onSelectTab(entry));
                   }}
                   onRunWorkspace={(entry) => {
-                    recordChoice(parsed.term, workspaceRowKey(entry.workspaceId));
+                    recordChoice(
+                      parsed.term,
+                      workspaceRowKey(entry.workspaceId),
+                    );
                     runAfterClose(() => onSelectWorkspace(entry));
                   }}
-                  onRunClosed={(entry) => runAfterClose(() => onRunClosed(entry))}
+                  onRunClosed={(entry) =>
+                    runAfterClose(() => onRunClosed(entry))
+                  }
                 />
               )
             ) : parsed.mode === "content" ? (
@@ -628,7 +665,9 @@ function StatusItem({
         />
       ) : null}
       <span
-        className={tone === "error" ? "text-destructive" : "text-muted-foreground"}
+        className={
+          tone === "error" ? "text-destructive" : "text-muted-foreground"
+        }
       >
         {label}
       </span>

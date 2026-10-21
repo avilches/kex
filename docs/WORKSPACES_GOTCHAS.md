@@ -1150,3 +1150,45 @@ que ser un evento de borrado de las dos caches con las mismas reglas que la sesi
 hibernacion y de restore). La diferencia entre "claude se arregla solo y omp no" era el olfato: si
 una cosa se limpia sola con un agente y no con otro, mirar que escribe cada uno al SALIR, no solo
 al arrancar.
+
+## Bug 10: el foco y la seleccion del input de la paleta de comandos se perdian o no existian (RESUELTO, TASK-874)
+
+### Sintoma
+
+Al reabrir Find in Files las dos mejoras acordadas no se veian: el texto de busqueda no
+aparecia seleccionado (habia que reescribir la query entera) y, tras abrir un hit, el foco
+del input se recuperaba solo a veces.
+
+### Pistas falsas investigadas (para no repetirlas)
+
+1. **Radix Dialog no-modal despide por focus-outside** (onFocusOutside en el DismissableLayer):
+   cierto y ya corregido por su cuenta (la paleta ignora el despido por foco y solo cierra con
+   Escape o click fuera), pero no explicaba la seleccion perdida.
+2. **Orden del refocus contra el commit de React**: se penso que el input.select() a 0 ms corria
+   antes de que la query restaurada llegara al DOM. En happy-dom el select con el buscador
+   correcto funciona al primer intento; el orden no era el problema.
+
+### Causa raiz
+
+`document.getElementById("kex-command-palette-input")` SIEMPRE devolvia null: cmdk renderiza
+su `<input>` con `id={b.inputId}` (useId de Radix) DESPUES de hacer spread de los props, asi
+que el id custom del palette nunca llega al DOM. Todos los refocus y selects por id eran
+no-ops silenciosos; el foco que si se veia venia del autofocus automatico de Radix
+FocusScope (focusFirst con select: true). Los catch de "funciona por lo del autofocus"
+disfrazaban el fallo.
+
+### Fix
+
+- `paletteInputElement()` consulta `[cmdk-input=""]` (CommandPalette.tsx); nada depende del id.
+- La seleccion de la query restaurada corre tras el timer a requestAnimationFrame para cubrir
+  el caso (real en webview) de que el re-render con el valor llegue despues del timer; si el
+  valor ya esta en el DOM se selecciona; si nunca llego, no se toca.
+- `selectOnReopen.test.tsx` fija la invariante (reabrir restaura y selecciona) con el mismo
+  selector.
+
+### Leccion
+
+Nunca confiar en un id propio para llegar a un elemento renderizado por un tercero (cmdk o
+Radix): o se comprueba en el DOM real que el id sobrevive al spread del wrapper, o se consulta
+por un marcador que el propio tercero escribe. El no-op silencioso de getElementById se
+se disfrazaba de "el autofocus de Radix lo cubre" y costó varias rondas de pase GUI en encontrarlo.
