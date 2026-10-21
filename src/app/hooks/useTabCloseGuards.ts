@@ -1,17 +1,18 @@
 import { useCallback, useRef, useState } from "react";
 import { leafHasForegroundProcess } from "@/modules/terminal";
 import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import {
   runCloseQueue,
   type EditorCloseDecision,
   type TerminalCloseDecision,
 } from "./closeQueue";
 
-type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
+type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string; tab?: Tab };
 
 type FoundTab = {
   workspace: { id: string };
-  tab: { kind: string; dirty?: boolean; locked?: boolean; path?: string; title?: string };
+  tab: { kind: string; dirty?: boolean; locked?: boolean; path?: string; title?: string } & Tab;
 };
 
 type Params = {
@@ -73,6 +74,7 @@ export function useTabCloseGuards({
           kind: "terminal",
           processName,
           command: getRunningCommandsSnapshot().get(tabId),
+          tab: found?.tab,
         });
         terminalResolverRef.current = resolve;
       }),

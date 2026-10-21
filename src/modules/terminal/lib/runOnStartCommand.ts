@@ -36,6 +36,19 @@ export function effectiveRunOnStartCommand(tab: Fields, running: string | null):
   return running ?? tab.persistentCommand ?? "";
 }
 
+/** Command a closed tab would run if its close is undone, or null when Run on Start is off or has nothing to run. */
+export function commandOnUndoClose(
+  tab: Fields & Pick<TerminalTab, "restoreOnRestart">,
+  running: string | null,
+  agentResumeCmd: string | null,
+  isAgent: boolean,
+): string | null {
+  const enabled = isAgent ? tab.restoreOnRestart !== false : (tab.restoreOnRestart ?? false);
+  if (!enabled) return null;
+  const command = isAgent && agentResumeCmd ? agentResumeCmd : effectiveRunOnStartCommand(tab, running);
+  return command || null;
+}
+
 export function commitRunOnStartEdit(value: string, running: string | null): Fields {
   const v = value.trim();
   if (v) return { persistentCommand: v, persistentCommandManual: true };
