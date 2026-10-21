@@ -1,17 +1,19 @@
-import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
+import {
+  stashUnflushedBuffer,
+  takeUnflushedBuffer,
+} from "@/modules/editor/lib/unflushedBuffers";
 import { useAutoSaveTimer } from "@/modules/editor/lib/useAutoSaveTimer";
 import { useConflictFlag } from "@/modules/editor/lib/useConflictFlag";
-import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
-import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { stashUnflushedBuffer, takeUnflushedBuffer } from "@/modules/editor/lib/unflushedBuffers";
+import { currentWorkspaceEnv } from "@/modules/workspace";
+import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
-
 
 export type DocumentState =
   | { status: "loading" }
@@ -44,17 +46,23 @@ type Options = {
   visible?: boolean;
 };
 
-export function useDocument({ path, tabId, onDirtyChange, visible = true }: Options) {
+export function useDocument({
+  path,
+  tabId,
+  onDirtyChange,
+  visible = true,
+}: Options) {
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
   const { conflict, setConflict, keepLocalChanges } = useConflictFlag();
 
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
-  const { autoSaveRef, clear: clearAutoSaveTimer, scheduleIfDirty } = useAutoSaveTimer(
-    autoSave,
-    autoSaveDelay,
-  );
+  const {
+    autoSaveRef,
+    clear: clearAutoSaveTimer,
+    scheduleIfDirty,
+  } = useAutoSaveTimer(autoSave, autoSaveDelay);
 
   // Track the saved buffer so we can detect changes cheaply.
   const savedRef = useRef<string>("");
@@ -103,14 +111,18 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
     setDirty(false);
     setConflict(false);
 
-    invoke<ReadResult>("fs_read_file", { path, workspace: currentWorkspaceEnv() })
+    invoke<ReadResult>("fs_read_file", {
+      path,
+      workspace: currentWorkspaceEnv(),
+    })
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {
           const unflushed = takeUnflushedBuffer(tabId);
           savedRef.current = res.content;
           bufferRef.current = unflushed?.text ?? res.content;
-          const stillDirty = unflushed != null && unflushed.text !== res.content;
+          const stillDirty =
+            unflushed != null && unflushed.text !== res.content;
           setDirty(stillDirty);
           if (stillDirty && unflushed.conflict) setConflict(true);
           setDoc({
@@ -132,7 +144,11 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
         if (cancelled) return;
         void fileExists(path).then((exists) => {
           if (cancelled) return;
-          setDoc(exists ? { status: "error", message: String(e) } : { status: "deleted" });
+          setDoc(
+            exists
+              ? { status: "error", message: String(e) }
+              : { status: "deleted" },
+          );
         });
       });
 
@@ -147,51 +163,62 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
   // runs regardless of dirty/force: an edit in progress must not hide that
   // its file was removed out from under it, or autosave would go on to
   // silently recreate it.
-  const performReload = useCallback((force = false) => {
-    const applyContent = shouldApplyReload(force, dirtyRef.current);
-    void invoke<ReadResult>("fs_read_file", {
-      path,
-      workspace: currentWorkspaceEnv(),
-    })
-      .then((res) => {
-        // The file is back after being deleted: leave the deleted state even
-        // if content is unchanged or the buffer is dirty (then the edits are
-        // kept and the conflict overlay lets the user choose).
-        if (!applyContent) {
-          if (docStatusRef.current === "deleted" && res.kind === "text") {
-            setDoc({ status: "ready", content: bufferRef.current, size: res.size });
-          }
-          return;
-        }
-        if (res.kind === "text") {
-          // The dedup check only exists to skip a wasted re-render for a
-          // duplicate watcher event while the buffer is clean; a forced
-          // reload (the user explicitly clicked "Reload from disk") must
-          // always apply and discard the dirty buffer, even if the disk
-          // content happens to already equal what was last read.
-          if (!force && docStatusRef.current === "ready" && res.content === savedRef.current) {
-            return;
-          }
-          savedRef.current = res.content;
-          bufferRef.current = res.content;
-          setDirty(false);
-          setDoc({ status: "ready", content: res.content, size: res.size });
-        } else if (res.kind === "binary") {
-          setDoc({ status: "binary", size: res.size });
-        } else if (res.kind === "toolarge") {
-          setDoc({ status: "toolarge", size: res.size, limit: res.limit });
-        }
+  const performReload = useCallback(
+    (force = false) => {
+      const applyContent = shouldApplyReload(force, dirtyRef.current);
+      void invoke<ReadResult>("fs_read_file", {
+        path,
+        workspace: currentWorkspaceEnv(),
       })
-      .catch((e) => {
-        void fileExists(path).then((exists) => {
-          if (exists) {
-            if (applyContent) setDoc({ status: "error", message: String(e) });
+        .then((res) => {
+          // The file is back after being deleted: leave the deleted state even
+          // if content is unchanged or the buffer is dirty (then the edits are
+          // kept and the conflict overlay lets the user choose).
+          if (!applyContent) {
+            if (docStatusRef.current === "deleted" && res.kind === "text") {
+              setDoc({
+                status: "ready",
+                content: bufferRef.current,
+                size: res.size,
+              });
+            }
             return;
           }
-          setDoc({ status: "deleted" });
+          if (res.kind === "text") {
+            // The dedup check only exists to skip a wasted re-render for a
+            // duplicate watcher event while the buffer is clean; a forced
+            // reload (the user explicitly clicked "Reload from disk") must
+            // always apply and discard the dirty buffer, even if the disk
+            // content happens to already equal what was last read.
+            if (
+              !force &&
+              docStatusRef.current === "ready" &&
+              res.content === savedRef.current
+            ) {
+              return;
+            }
+            savedRef.current = res.content;
+            bufferRef.current = res.content;
+            setDirty(false);
+            setDoc({ status: "ready", content: res.content, size: res.size });
+          } else if (res.kind === "binary") {
+            setDoc({ status: "binary", size: res.size });
+          } else if (res.kind === "toolarge") {
+            setDoc({ status: "toolarge", size: res.size, limit: res.limit });
+          }
+        })
+        .catch((e) => {
+          void fileExists(path).then((exists) => {
+            if (exists) {
+              if (applyContent) setDoc({ status: "error", message: String(e) });
+              return;
+            }
+            setDoc({ status: "deleted" });
+          });
         });
-      });
-  }, [path]);
+    },
+    [path],
+  );
 
   // While dirty with real unsaved edits (buffer differs from the saved
   // snapshot), never clobber them silently: block the pane on a conflict
@@ -261,8 +288,17 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
   // normal editing flow.
   const recreate = useCallback(async () => {
     await saveNow();
-    setDoc({ status: "ready", content: bufferRef.current, size: bufferRef.current.length });
-  }, [saveNow]);
+    // The write rewrote the buffer to disk, so a reload conflict pending from
+    // the deletion (raised while dirty, invisibly, because the deleted state
+    // renders no overlay) is resolved by the write itself: both overlay
+    // options would end up with this same content.
+    setConflict(false);
+    setDoc({
+      status: "ready",
+      content: bufferRef.current,
+      size: bufferRef.current.length,
+    });
+  }, [saveNow, setConflict]);
 
   // Guards against the file being detected as deleted between scheduling the
   // autosave and it actually firing.
@@ -276,7 +312,10 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
       bufferRef.current = next;
       const isDirty = next !== savedRef.current;
       setDirty(isDirty);
-      scheduleIfDirty(isDirty && docStatusRef.current !== "deleted", saveIfNotDeleted);
+      scheduleIfDirty(
+        isDirty && docStatusRef.current !== "deleted",
+        saveIfNotDeleted,
+      );
     },
     [scheduleIfDirty, saveIfNotDeleted],
   );
@@ -293,7 +332,11 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
         // the edit is carried in memory instead and picked up if the same
         // tab mounts again (see unflushedBuffers). A failed final write falls
         // back to the same carry so the edit is not lost.
-        if (autoSaveRef.current.autoSave && !conflictRef.current && docStatusRef.current !== "deleted") {
+        if (
+          autoSaveRef.current.autoSave &&
+          !conflictRef.current &&
+          docStatusRef.current !== "deleted"
+        ) {
           saveNow().catch((e) => {
             console.error("[autosave flush]", e);
             stashUnflushedBuffer(tabId, content);
@@ -305,5 +348,16 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
     };
   }, [tabId, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate, refresh };
+  return {
+    doc,
+    dirty,
+    conflict,
+    keepLocalChanges,
+    reloadFromDisk,
+    onChange,
+    save,
+    reload,
+    recreate,
+    refresh,
+  };
 }
