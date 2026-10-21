@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
+import { splitActionName } from "./lib/actionName";
 import { canReorderButtons, menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
@@ -69,10 +70,12 @@ function nameClick(item: BarItem, { run, focus }: Handlers) {
   run(item.action);
 }
 
+// The hover words spell the variable out ("Open RustRover in /p/root"), never the raw template.
 function ownButtonTitle(item: BarItem): string {
   if (item.disabledReason) return `${item.name}: ${item.disabledReason}`;
-  if (!item.action.runInTerminal) return `Open ${item.name}`;
-  return item.state === "idle" ? `Run ${item.name}` : `Show ${item.name}`;
+  const { main } = splitActionName(item.name);
+  if (item.action.runInTerminal && item.state !== "idle") return `Show ${main}`;
+  return item.title ?? `${item.action.runInTerminal ? "Run" : "Open"} ${main}`;
 }
 
 export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
@@ -135,18 +138,21 @@ function ReorderableButton({ item, reorderMode, ...h }: { item: BarItem; reorder
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
   const blocked = item.state === "idle" && item.disabledReason !== null;
+  // Both leading cells are as tall as the first line; a row with one line centers them in
+  // the row, which keeps its height equal to the rows of two lines.
+  const lead = item.subtitle ? "" : "mt-[5px]";
   const nameZone = (
     <DropdownMenuItem
       // The hover words: where the Action opens. A blocked row keeps its reason.
       title={item.title ?? undefined}
       disabled={!menuEntries(item)[0].enabled}
-      className="flex flex-1 items-center py-0.5"
+      className="flex min-h-8 flex-1 items-center py-0.5 pr-2.5 pl-1"
       onSelect={(e) => {
         if (script) e.preventDefault();
         nameClick(item, h);
       }}
     >
-      <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
+      <span className={cn("flex min-w-0 flex-1", blocked && "opacity-60")}>
         <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
       </span>
       {blocked && item.subtitle !== WORKSPACE_UNSET && (
@@ -159,15 +165,15 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   // the name and the name hover never lights it; only the name zone is a menu item.
   if (script) {
     return (
-      <div className="flex items-center">
-        <ScriptControl item={item} {...h} />
+      <div className="flex items-start">
+        <ScriptControl item={item} {...h} className={lead} />
         {nameZone}
       </div>
     );
   }
   return (
-    <div className="flex items-center">
-      <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
+    <div className="flex items-start">
+      <span className={cn("flex size-[22px] shrink-0 items-center justify-center", lead)}><ActionIcon action={item.action} size={14} /></span>
       {nameZone}
     </div>
   );
@@ -208,7 +214,7 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
           onRestoreFocus();
         }}
       >
-        {items.length > 0 && globalItems.length > 0 && (
+        {items.length > 0 && (
           <DropdownMenuLabel className="text-[10px] text-muted-foreground">Workspace actions</DropdownMenuLabel>
         )}
         {items.map((item) => (
@@ -217,9 +223,7 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
         {globalItems.length > 0 && (
           <>
             {items.length > 0 && <DropdownMenuSeparator />}
-            {items.length > 0 && (
-              <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
-            )}
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
             {globalItems.map((item) => (
               <MenuRow key={item.id} item={item} {...h} />
             ))}
