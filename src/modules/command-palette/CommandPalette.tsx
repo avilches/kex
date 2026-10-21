@@ -62,6 +62,9 @@ type Props = {
 
 const THEME_PREVIEW_DELAY_MS = 140;
 
+let lastContentQuery = "";
+let lastContentValue = "";
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -156,11 +159,15 @@ export function CommandPalette({
   }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
 
   const resetPalette = useCallback(() => {
+    if (parsed.mode === "content") {
+      lastContentQuery = query;
+      lastContentValue = value;
+    }
     setQuery("");
     setValue("");
     setPage("root");
     previewThemeId(null);
-  }, [previewThemeId]);
+  }, [previewThemeId, parsed.mode, query, value]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -172,8 +179,13 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) return;
-    setQuery(initialMode === "content" ? "#" : "");
-    setPage("root");
+    if (initialMode === "content" && lastContentQuery.startsWith("#")) {
+      setQuery(lastContentQuery);
+      setValue(lastContentValue);
+    } else {
+      setQuery(initialMode === "content" ? "#" : "");
+      setPage("root");
+    }
     const handle = window.setTimeout(() => {
       document.getElementById("kex-command-palette-input")?.focus();
     }, 0);
