@@ -22,7 +22,8 @@ const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
 
-export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">): number {
+export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">, iconOnly = false): number {
+  if (iconOnly) return PADDING + ICON;
   const { main } = splitActionName(action.name.trim() || "Action");
   const label = Math.min(LABEL_CAP, main.length * CHAR_WIDTH);
   return PADDING + label + (action.runInTerminal ? RUN_ZONE : ICON);
@@ -50,9 +51,10 @@ export function ownButtonsThatFit(
 ): number {
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
+  const sole = soleAppButtons(actions);
   for (const action of actions) {
     if (!shownAtPlace(action, action.runInTerminal ? (states?.get(action.id) ?? "idle") : "idle", place)) continue;
-    left -= ownButtonWidth(action) + BAR_GAP;
+    left -= ownButtonWidth(action, !action.runInTerminal && action.appId !== undefined && sole.has(action.appId)) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
   }
@@ -198,6 +200,8 @@ export type BarItem = {
   subtitleTrim: boolean;
   /** The hover words of the row, or null to say nothing. */
   title: string | null;
+  /** An own button drawn as its app icon alone. */
+  iconOnly: boolean;
 };
 
 // The Header shows apps before scripts, each keeping the user's order; Settings keeps
@@ -210,25 +214,38 @@ export function scriptsFirst<T extends Pick<Action, "runInTerminal">>(actions: r
   return [...actions.filter((a) => a.runInTerminal), ...actions.filter((a) => !a.runInTerminal)];
 }
 
-export const MAX_SCRIPT_BUTTONS = 3;
+export const MAX_BUTTONS_PER_SCOPE = 3;
 
 // The own buttons the bar may draw, in order: those the place shows, with no more than
-// MAX_SCRIPT_BUTTONS scripts among them; the scripts past the cap live in the menu.
+// MAX_BUTTONS_PER_SCOPE per scope, scripts and apps together; the rest live in the menu.
+// Each list comes already in bar order, the workspace one before the global one.
 export function ownButtonCandidates(
-  ordered: readonly Action[],
+  local: readonly Action[],
+  global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
   place: FocusPlace | undefined,
 ): Action[] {
-  let scripts = 0;
   const out: Action[] = [];
-  for (const action of ordered) {
-    if (!action.ownButton) continue;
-    const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
-    if (!shownAtPlace(action, state, place)) continue;
-    if (action.runInTerminal && ++scripts > MAX_SCRIPT_BUTTONS) continue;
-    out.push(action);
+  for (const scope of [local, global]) {
+    let taken = 0;
+    for (const action of scope) {
+      if (!action.ownButton || taken >= MAX_BUTTONS_PER_SCOPE) continue;
+      const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
+      if (!shownAtPlace(action, state, place)) continue;
+      taken += 1;
+      out.push(action);
+    }
   }
   return out;
+}
+
+// A button of a detected app that is the only one of that app in the bar needs no words:
+// its icon says which app it is. With several of the same app, the name and the line under
+// it tell them apart.
+export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "runInTerminal">[]): Set<string> {
+  const count = new Map<string, number>();
+  for (const a of buttons) if (!a.runInTerminal && a.appId) count.set(a.appId, (count.get(a.appId) ?? 0) + 1);
+  return new Set([...count].filter(([, n]) => n === 1).map(([id]) => id));
 }
 
 export type BarModel = {
@@ -276,17 +293,14 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       title: actionRowTitle(label, action.runInTerminal, disabledReason, context),
+      iconOnly: false,
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const ordered = [...appsFirst(local).map((a) => [a, false] as const), ...appsFirst(global).map((a) => [a, true] as const)];
   const model: BarModel = { buttons: [], menu: { workspace: [], global: [] }, empty: local.length + global.length === 0 };
   const buttonIds = new Set(
-    ownButtonCandidates(
-      ordered.map(([a]) => a),
-      states,
-      place,
-    )
+    ownButtonCandidates(appsFirst(local), appsFirst(global), states, place)
       .slice(0, limit)
       .map((a) => a.id),
   );
@@ -297,6 +311,8 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     else if (isGlobal) model.menu.global.push(item);
     else model.menu.workspace.push(item);
   }
+  const sole = soleAppButtons(model.buttons.map((b) => b.action));
+  for (const b of model.buttons) b.iconOnly = !b.action.runInTerminal && b.action.appId !== undefined && sole.has(b.action.appId);
   return model;
 }
 

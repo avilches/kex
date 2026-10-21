@@ -30,7 +30,7 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
     () =>
       room === undefined
         ? undefined
-        : ownButtonsThatFit(ownButtonCandidates([...appsFirst(local), ...appsFirst(global)], states, context?.place), room, context?.place, states),
+        : ownButtonsThatFit(ownButtonCandidates(appsFirst(local), appsFirst(global), states, context?.place), room, context?.place, states),
     [local, global, room, context, states],
   );
   return useMemo(

@@ -67,6 +67,7 @@ function ownButtonTitle(item: BarItem): string {
 export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
   const disabled = item.disabledReason !== null;
+  const iconOnly = item.iconOnly && !script;
   return (
     <div
       className={cn(
@@ -78,6 +79,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
       <button
         type="button"
         title={ownButtonTitle(item)}
+        aria-label={iconOnly ? item.name : undefined}
         disabled={disabled}
         onClick={() => nameClick(item, h)}
         className={cn(
@@ -86,9 +88,11 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
         )}
       >
         {!script && <ActionIcon action={item.action} size={14} />}
-        <span className="max-w-[120px] min-w-0">
-          <ActionNameLines name={item.name} value={item.subtitle} />
-        </span>
+        {!iconOnly && (
+          <span className="max-w-[120px] min-w-0">
+            <ActionNameLines name={item.name} value={item.subtitle} />
+          </span>
+        )}
       </button>
     </div>
   );

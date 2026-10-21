@@ -11,12 +11,13 @@ import {
   COMPACT_WIDTH,
   describeMissing,
   isCompactBar,
-  MAX_SCRIPT_BUTTONS,
+  MAX_BUTTONS_PER_SCOPE,
   menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
   scriptsFirst,
+  soleAppButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
 import type { BarItem } from "./actionsBar";
@@ -128,6 +129,7 @@ describe("menuEntries", () => {
     subtitle: null,
     subtitleTrim: false,
     title: null,
+    iconOnly: false,
     ...over,
   });
 
@@ -290,34 +292,43 @@ describe("buildActionsBarModel", () => {
     expect(m.empty).toBe(false);
   });
 
-  it("allows at most three script buttons; the rest go to the menu", () => {
-    const scripts = ["s1", "s2", "s3", "s4"].map((id) => script({ id, name: id, ownButton: true }));
+  it("allows at most three own buttons per scope, scripts and apps together", () => {
+    const scripts = ["s1", "s2", "s3"].map((id) => script({ id, name: id, ownButton: true }));
     const m = buildActionsBarModel({
       local: [...scripts, app({ id: "a1", ownButton: true })],
+      global: ["g1", "g2", "g3", "g4"].map((id) => app({ id, name: id, ownButton: true })),
       context: ctx,
       states: new Map(),
       activeId: undefined,
     });
-    expect(MAX_SCRIPT_BUTTONS).toBe(3);
-    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1", "s2", "s3"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s4"]);
-  });
-
-  it("counts the script cap across both scopes and flags which button is global", () => {
-    const m = buildActionsBarModel({
-      local: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true })],
-      global: [script({ id: "s3", ownButton: true }), script({ id: "s4", ownButton: true }), app({ id: "a1", ownButton: true })],
-      context: ctx,
-      states: new Map(),
-      activeId: undefined,
-    });
+    expect(MAX_BUTTONS_PER_SCOPE).toBe(3);
     expect(m.buttons.map((b) => [b.id, b.global])).toEqual([
+      ["a1", false],
       ["s1", false],
       ["s2", false],
-      ["a1", true],
-      ["s3", true],
+      ["g1", true],
+      ["g2", true],
+      ["g3", true],
     ]);
-    expect(m.menu.global.map((b) => b.id)).toEqual(["s4"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s3"]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["g4"]);
+  });
+
+  it("draws a button as its icon alone only when it is the sole button of its app", () => {
+    const zedWs = app({ id: "z1", appId: "zed", name: "Zed {workspace}", ownButton: true });
+    const zedFile = app({ id: "z2", appId: "zed", name: "Zed {filepath}", command: "zed {filepath}", ownButton: true });
+    const code = app({ id: "c1", appId: "code", name: "Code {workspace}", ownButton: true });
+    const custom = app({ id: "u1", name: "Mine", ownButton: true });
+    const dev = script({ id: "s1", ownButton: true });
+    const m = buildActionsBarModel({ local: [zedWs, zedFile, code], global: [custom, dev], context: ctx, states: new Map(), activeId: undefined });
+    expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
+      ["z1", false],
+      ["z2", false],
+      ["c1", true],
+      ["u1", false],
+      ["s1", false],
+    ]);
+    expect(soleAppButtons([zedWs, zedFile, code]).has("code")).toBe(true);
   });
 
   it("an own button of either scope still competes for the same bar room", () => {

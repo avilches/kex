@@ -23,6 +23,7 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   subtitle: null,
   subtitleTrim: false,
   title: null,
+  iconOnly: false,
   ...over,
 });
 
