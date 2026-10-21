@@ -2175,11 +2175,11 @@ mod tests {
         apply_numstat_by_path(&mut files, numstat);
         assert_eq!(files[0].added, 5, "text file added lines");
         assert_eq!(files[0].removed, 3, "text file removed lines");
-        assert_eq!(files[0].is_binary, false, "text file is not binary");
+        assert!(!files[0].is_binary, "text file is not binary");
         // binary file keeps 0 counts and is marked binary
         assert_eq!(files[1].added, 0, "binary file added must be 0");
         assert_eq!(files[1].removed, 0, "binary file removed must be 0");
-        assert_eq!(files[1].is_binary, true, "binary file must be marked");
+        assert!(files[1].is_binary, "binary file must be marked");
     }
 }
 
