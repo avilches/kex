@@ -1,11 +1,11 @@
 import {
   ArrowDown01Icon,
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
   ArrowUp01Icon,
   Cancel01Icon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CircleArrowDownDoubleIcon,
+  CircleArrowUpDoubleIcon,
   DragDropVerticalIcon,
   FolderOpenIcon,
   PencilEditIcon,
@@ -202,7 +202,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             className={SMALL_BUTTON}
             onClick={onMoveToGlobal ?? onMoveToWorkspace}
           >
-            <HugeiconsIcon icon={onMoveToGlobal ? ArrowLeft01Icon : ArrowRight01Icon} size={12} strokeWidth={2} />
+            <HugeiconsIcon icon={onMoveToGlobal ? CircleArrowUpDoubleIcon : CircleArrowDownDoubleIcon} size={12} strokeWidth={2} />
           </button>
         )}
         {immutable ? (

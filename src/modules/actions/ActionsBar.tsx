@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown01Icon, PlayIcon, Rocket01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, PlayIcon, Rocket01Icon, Settings01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
@@ -170,22 +170,27 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
           onRestoreFocus();
         }}
       >
-        <DropdownMenuLabel className="text-[10px] text-muted-foreground">Workspace actions</DropdownMenuLabel>
+        {items.length > 0 && globalItems.length > 0 && (
+          <DropdownMenuLabel className="text-[10px] text-muted-foreground">Workspace actions</DropdownMenuLabel>
+        )}
         {items.map((item) => (
           <MenuRow key={item.id} item={item} {...h} />
         ))}
         {globalItems.length > 0 && (
           <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
+            {items.length > 0 && <DropdownMenuSeparator />}
+            {items.length > 0 && (
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
+            )}
             {globalItems.map((item) => (
               <MenuRow key={item.id} item={item} {...h} />
             ))}
           </>
         )}
-        <DropdownMenuSeparator />
+        {(items.length > 0 || globalItems.length > 0) && <DropdownMenuSeparator />}
         <DropdownMenuItem onSelect={onConfigure} className="text-muted-foreground">
-          Configure Actions
+          <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+          Action Settings
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
