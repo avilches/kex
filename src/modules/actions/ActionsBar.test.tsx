@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { OwnButton } from "./ActionsBar";
+import { ActionsMenu, OwnButton } from "./ActionsBar";
 import type { BarItem } from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 
@@ -20,6 +20,8 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   stoppable: false,
   disabledReason: null,
   subtitle: null,
+  subtitleTrim: false,
+  title: null,
   ...over,
 });
 
@@ -101,5 +103,66 @@ describe("OwnButton", () => {
     expect(handlers.stop).toHaveBeenCalledWith(script);
     expect(handlers.run).not.toHaveBeenCalled();
     unmount();
+  });
+});
+
+describe("ActionsMenu", () => {
+  function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false)) {
+    const handlers = { run: vi.fn(), stop: vi.fn(), focus };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        createElement(ActionsMenu, {
+          label: "Actions",
+          items,
+          globalItems,
+          onRestoreFocus: vi.fn(),
+          onConfigure: vi.fn(),
+          ...handlers,
+        }),
+      ),
+    );
+    const open = () =>
+      act(() => {
+        const trigger = container.querySelector("button[title='Actions']") as HTMLElement;
+        trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" }));
+        trigger.click();
+      });
+    return { container, handlers, open, unmount: () => act(() => root.unmount()) };
+  }
+
+  it("pools every non-own Action into one menu: workspace scope, then global", () => {
+    const view = mountMenu([item(app)], [item({ ...script, id: "g1" })]);
+    view.open();
+    const menu = document.querySelector("[role='menu']")!;
+    expect(menu.textContent).toContain("Workspace actions");
+    expect(menu.textContent).toContain("Global actions");
+    expect([...menu.querySelectorAll("[role='menuitem']")].slice(0, 2).map((r) => r.textContent)).toEqual(["PyCharm", "dev"]);
+    view.unmount();
+  });
+
+  it("says where the row opens on its hover title", () => {
+    const view = mountMenu([item(app, { title: "Open PyCharm in /w" })], []);
+    view.open();
+    const row = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "PyCharm") as HTMLElement;
+    expect(row.getAttribute("title")).toBe("Open PyCharm in /w");
+    view.unmount();
+  });
+
+  it("focusing a running script's name does not close the menu, and its play zone still stops", () => {
+    const running = item(script, { state: "running", stoppable: true });
+    const view = mountMenu([running], [], vi.fn(() => true));
+    view.open();
+    const row = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "dev") as HTMLElement;
+    act(() => void row.click());
+    expect(view.handlers.focus).toHaveBeenCalledWith(script);
+    expect(view.handlers.run).not.toHaveBeenCalled();
+    expect(document.querySelector("[role='menu']")).not.toBeNull();
+    const stop = document.querySelector("button[aria-label='Stop dev']") as HTMLElement;
+    act(() => void stop.click());
+    expect(view.handlers.stop).toHaveBeenCalledWith(script);
+    view.unmount();
   });
 });

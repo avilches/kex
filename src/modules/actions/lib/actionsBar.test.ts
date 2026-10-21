@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   actionAvailability,
+  actionRowTitle,
   actionShownAt,
+  actionSubtitle,
   actionTarget,
-  barSubtitle,
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
@@ -113,6 +114,8 @@ describe("menuEntries", () => {
     stoppable: false,
     disabledReason: null,
     subtitle: null,
+    subtitleTrim: false,
+    title: null,
     ...over,
   });
 
@@ -193,7 +196,7 @@ describe("ownButtonsThatFit", () => {
       place: { file: true, folder: false },
     });
     expect(m.buttons.map((b) => b.id)).toEqual(["visible"]);
-    expect(m.scripts).toEqual([]);
+    expect(m.menu.workspace).toEqual([]);
   });
 });
 
@@ -210,23 +213,20 @@ describe("buildActionsBarModel", () => {
   it("keeps own buttons in user order, scripts and apps mixed", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1", "s3"]);
-    expect(m.scripts.map((b) => b.id)).toEqual(["s2"]);
-    expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2"]);
     expect(m.empty).toBe(false);
   });
 
   it("moves every own button into its menu when none fits", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
-    expect(m.scripts.map((b) => b.id)).toEqual(["s1", "s2", "s3"]);
-    expect(m.apps.map((b) => b.id)).toEqual(["a1", "a2"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "a1", "s2", "a2", "s3"]);
   });
 
   it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1"]);
-    expect(m.scripts.map((b) => b.id)).toEqual(["s2", "s3"]);
-    expect(m.apps.map((b) => b.id)).toEqual(["a2"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2", "s3"]);
   });
 
   it("carries the run state, the active mark and the disabled reason", () => {
@@ -265,18 +265,16 @@ describe("buildActionsBarModel", () => {
     expect(buildActionsBarModel({ local: [], context: ctx, states: new Map(), activeId: undefined }).empty).toBe(true);
   });
 
-  it("keeps the global Actions apart in their own menu sections", () => {
+  it("pools non-own Actions into one menu, workspace scope first and then global", () => {
     const m = buildActionsBarModel({
-      local: [script({ id: "s1", name: "dev" })],
-      global: [script({ id: "s2", name: "top" }), app({ id: "a1", name: "Zed" })],
+      local: [script({ id: "s1", name: "dev" }), app({ id: "a0", name: "Zed", ownButton: true })],
+      global: [script({ id: "s2", name: "top" }), app({ id: "a1", name: "Code" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
     });
-    expect(m.scripts.map((b) => b.id)).toEqual(["s1"]);
-    expect(m.scriptsGlobal.map((b) => b.id)).toEqual(["s2"]);
-    expect(m.apps).toEqual([]);
-    expect(m.appsGlobal.map((b) => b.id)).toEqual(["a1"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1"]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["s2", "a1"]);
     expect(m.empty).toBe(false);
   });
 
@@ -290,7 +288,7 @@ describe("buildActionsBarModel", () => {
       ownButtonsShown: 1,
     });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1"]);
-    expect(m.appsGlobal.map((b) => b.id)).toEqual(["a1"]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["a1"]);
   });
 
   it("labels an unnamed Action", () => {
@@ -327,22 +325,50 @@ describe("actionShownAt", () => {
   });
 });
 
-describe("barSubtitle", () => {
-  it("resolves the name variable to the value of this place", () => {
-    expect(barSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toBe("/p/a.ts");
-    expect(barSubtitle("Agent {cwd}", ctx)).toBe("/p");
+describe("actionSubtitle", () => {
+  it("says Workspace for the workspace variable and the file name alone for the file", () => {
+    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: "Workspace", startTrim: false });
+    expect(actionSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toEqual({
+      text: "a.ts",
+      startTrim: false,
+    });
   });
 
-  it("says when the workspace root is missing and hides the line for other empty values", () => {
+  it("keeps the path of a folder Action and marks it for a start cut", () => {
+    expect(actionSubtitle("Agent {cwd}", ctx)).toEqual({ text: "/p", startTrim: true });
+    expect(actionSubtitle("Math {branch}", ctx)).toEqual({ text: "{branch}", startTrim: false });
+  });
+
+  it("says when the workspace root is missing and keeps the template for other empty values", () => {
     const empty = { ...ctx, vars: { ...vars, workspace: "" } };
-    expect(barSubtitle("PyCharm {workspace}", empty)).toBe(WORKSPACE_UNSET);
-    expect(barSubtitle("Make {branch}", ctx)).toBeNull();
+    expect(actionSubtitle("PyCharm {workspace}", empty)).toEqual({ text: WORKSPACE_UNSET, startTrim: false });
+    expect(actionSubtitle("Make {branch}", empty).text).toBe("{branch}");
   });
 
   it("keeps the template for unknown variables and skips actions without a suffix", () => {
-    expect(barSubtitle("X {stage}", ctx)).toBe("{stage}");
-    expect(barSubtitle("dev", ctx)).toBeNull();
-    expect(barSubtitle("PyCharm {workspace}", null)).toBe(WORKSPACE_UNSET);
+    expect(actionSubtitle("X {stage}", ctx)).toEqual({ text: "{stage}", startTrim: false });
+    expect(actionSubtitle("dev", ctx)).toEqual({ text: null, startTrim: false });
+    expect(actionSubtitle("PyCharm {workspace}", null)).toEqual({ text: WORKSPACE_UNSET, startTrim: false });
+  });
+});
+
+describe("actionRowTitle", () => {
+  it("opens apps with the full place and files with the file name", () => {
+    expect(actionRowTitle("PyCharm {workspace}", false, null, { ...ctx, vars: { ...vars, workspace: "/p/root" } })).toBe(
+      "Open PyCharm in /p/root",
+    );
+    expect(actionRowTitle("Code {filepath}", false, null, { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toBe(
+      "Open a.ts with Code",
+    );
+  });
+
+  it("runs scripts instead of opening them", () => {
+    expect(actionRowTitle("Agent {cwd}", true, null, ctx)).toBe("Run Agent in /p");
+  });
+
+  it("keeps the reason for a blocked row and stays quiet with nothing to say", () => {
+    expect(actionRowTitle("dev", false, "needs a git branch", ctx)).toBe("dev: needs a git branch");
+    expect(actionRowTitle("dev", false, null, ctx)).toBeNull();
   });
 });
 
@@ -359,8 +385,7 @@ describe("buildActionsBarModel place", () => {
       activeId: undefined,
       place: { file: true, folder: false },
     });
-    expect(onFile.scripts).toHaveLength(0);
-    expect(onFile.apps.map((i) => i.action.id)).toEqual(["f1", "w1"]);
+    expect(onFile.menu.workspace.map((i) => i.action.id)).toEqual(["f1", "w1"]);
 
     const onFolder = buildActionsBarModel({
       local: [fileAction, folderAction, wsAction],
@@ -369,8 +394,7 @@ describe("buildActionsBarModel place", () => {
       activeId: undefined,
       place: { file: false, folder: true },
     });
-    expect(onFolder.scripts.map((i) => i.action.id)).toEqual(["d1"]);
-    expect(onFolder.apps.map((i) => i.action.id)).toEqual(["w1"]);
+    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["d1", "w1"]);
   });
 
   it("keeps a running script visible whatever the focused tab is", () => {
@@ -381,11 +405,11 @@ describe("buildActionsBarModel place", () => {
       activeId: "d1",
       place: { file: true, folder: false },
     });
-    expect(model.scripts).toHaveLength(1);
-    expect(model.scripts[0]).toMatchObject({ stoppable: true, disabledReason: null });
+    expect(model.menu.workspace).toHaveLength(1);
+    expect(model.menu.workspace[0]).toMatchObject({ stoppable: true, disabledReason: null });
   });
 
-  it("resolves the second line to the value of the place", () => {
+  it("resolves the second line to what the place says and adds a Run row title", () => {
     const model = buildActionsBarModel({
       local: [fileAction],
       context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
@@ -393,6 +417,7 @@ describe("buildActionsBarModel place", () => {
       activeId: undefined,
       place: { file: true, folder: false },
     });
-    expect(model.apps[0]?.subtitle).toBe("/p/a.ts");
+    expect(model.menu.workspace[0]?.subtitle).toBe("a.ts");
+    expect(model.menu.workspace[0]?.title).toBe("Open a.ts with Code");
   });
 });

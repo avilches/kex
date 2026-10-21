@@ -1,6 +1,7 @@
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
+import type { Action } from "./types";
 
 export type AppSuggestion = {
   /** Unique within a list: the app id, plus the variable the preset points at. */
@@ -22,6 +23,18 @@ export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
 };
 
 const KNOWN = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
+
+/** The presets still to install, one per app and starting point: a preset that some action
+ * already holds (same app, same command) is installed, and installed presets stay out of
+ * the combo, because the good next step is Edit on the action, not a second copy. */
+export function uninstalledSuggestions(
+  suggestions: readonly AppSuggestion[],
+  actions: readonly Action[],
+): AppSuggestion[] {
+  return suggestions.filter(
+    (s) => !(s.appId && actions.some((a) => a.appId === s.appId && a.command === s.defaultCommand)),
+  );
+}
 
 // Text goes through the template parser, where a brace is a variable; doubling keeps it literal.
 function literal(text: string): string {

@@ -3551,12 +3551,10 @@ export default function App() {
     void openWorkspaceActionsSettings();
   }, []);
 
-  const onAddGlobalAction = useCallback(() => {
-    void openGlobalActionsSettings(true);
-  }, []);
-
-  const onAddWorkspaceAction = useCallback(() => {
-    void openWorkspaceActionsSettings(true);
+  // The dashed add of the Header leads straight to the editor, no scope menu in between:
+  // Settings opens on the Global tab, where both add buttons wait.
+  const onAddAction = useCallback(() => {
+    void openGlobalActionsSettings();
   }, []);
 
   const sidebarRepoRoot =
@@ -3607,8 +3605,7 @@ export default function App() {
             searchRef={searchInlineRef}
             actionsController={actionsController}
             onOpenActionsSettings={onOpenActionsSettings}
-            onAddGlobalAction={onAddGlobalAction}
-            onAddWorkspaceAction={onAddWorkspaceAction}
+            onAddAction={onAddAction}
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
             groups={groups}

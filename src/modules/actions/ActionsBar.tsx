@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown01Icon, ComputerTerminal01Icon, PlayIcon, StopIcon, Tick02Icon, AppWindowMacIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, PlayIcon, Rocket01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
@@ -99,16 +99,17 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const blocked = item.state === "idle" && item.disabledReason !== null;
   const nameZone = (
     <DropdownMenuItem
-      title={item.disabledReason ? `${item.name}: ${item.disabledReason}` : undefined}
+      // The hover words: where the Action opens. A blocked row keeps its reason.
+      title={item.title ?? undefined}
       disabled={!menuEntries(item)[0].enabled}
       className="flex flex-1 items-center py-0.5"
-      onSelect={() => {
-        if (!script) h.run(item.action);
+      onSelect={(e) => {
+        if (script && item.state !== "idle" && h.focus(item.action)) e.preventDefault();
         else nameClick(item, h);
       }}
     >
       <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
-        <ActionNameLines name={item.name} value={item.subtitle} />
+        <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
       </span>
       {blocked && item.subtitle !== WORKSPACE_UNSET && (
         <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
@@ -136,14 +137,15 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
 
 type MenuProps = {
   label: string;
-  icon: typeof PlayIcon;
   items: BarItem[];
   globalItems: BarItem[];
   onRestoreFocus: () => void;
   onConfigure: () => void;
 } & Handlers;
 
-export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onConfigure, ...h }: MenuProps) {
+// The one menu of the bar: every non-own Action, the workspace scope first and the global
+// one after, each in the user's order, with the Settings entry at the bottom.
+export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfigure, ...h }: MenuProps) {
   if (items.length === 0 && globalItems.length === 0) return null;
   const busy = items.some((i) => i.state !== "idle") || globalItems.some((i) => i.state !== "idle");
   return (
@@ -154,7 +156,7 @@ export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onC
           title={label}
           className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <HugeiconsIcon icon={icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
+          <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
           <span>{label}</span>
           <span className="text-[10px] text-muted-foreground/60">{items.length + globalItems.length}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
@@ -168,14 +170,14 @@ export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onC
           onRestoreFocus();
         }}
       >
-        <DropdownMenuLabel className="text-[10px] text-muted-foreground">{label}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-[10px] text-muted-foreground">Workspace actions</DropdownMenuLabel>
         {items.map((item) => (
           <MenuRow key={item.id} item={item} {...h} />
         ))}
         {globalItems.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
             {globalItems.map((item) => (
               <MenuRow key={item.id} item={item} {...h} />
             ))}
@@ -192,98 +194,56 @@ export function GroupMenu({ label, icon, items, globalItems, onRestoreFocus, onC
 
 // With no Actions at all the bar shows the dashed add button; once there are Actions it
 // hides and comes back when the pointer crosses the bar, so the bar keeps its room for
-// buttons while the entry point stays one hover away. Its menu picks the scope first:
-// the choice opens the matching editor with a blank command draft ready to be typed.
-export function AddActionMenu({
-  onAddGlobal,
-  onAddWorkspace,
-  reveal,
-}: {
-  onAddGlobal: () => void;
-  onAddWorkspace: () => void;
-  reveal: "always" | "hover";
-}) {
-  // While its menu is open the trigger stays visible even after the bar hover ended: with
-  // the anchor hidden the positioned content has nothing to point back to and lands at
-  // the top-left corner of the window.
-  const [open, setOpen] = useState(false);
+// buttons while the entry point stays one hover away. It leads straight to the editor.
+function AddActionMenu({ onAdd, reveal }: { onAdd: () => void; reveal: "always" | "hover" }) {
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Add an action: run a command or open an app"
-          aria-haspopup="menu"
-          className={cn(
-            "flex h-7 shrink-0 items-center rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            reveal === "hover" && !open && "hidden group-hover/ap:flex",
-          )}
-        >
-          <span>+ Action</span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        onCloseAutoFocus={(e) => {
-          e.preventDefault();
-        }}
-      >
-        <DropdownMenuItem onSelect={onAddGlobal} className="text-[12px]">
-          Add global action
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onAddWorkspace} className="text-[12px]">
-          This workspace only
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <button
+      type="button"
+      title="Add an action: run a command or open an app"
+      aria-haspopup="menu"
+      onClick={onAdd}
+      className={cn(
+        "flex h-7 shrink-0 items-center rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        reveal === "hover" && "hidden group-hover/ap:flex",
+      )}
+    >
+      <span>+ Action</span>
+    </button>
   );
 }
-
 
 type BarProps = {
   workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction" | "hibernated"> | null;
   controller: BarController;
   onConfigure: () => void;
-  onAddGlobal: () => void;
-  onAddWorkspace: () => void;
+  onAddAction: () => void;
   onRestoreFocus: () => void;
 };
 
-// The Header's actions: own buttons in the user's order, then a menu of scripts and a menu
-// of apps, each with the global Actions in a Global section and a dimmed row count. The
-// bar takes all the room between the title and the search box and measures it: as it
-// shrinks, the last own buttons fold into the menus instead of pushing the rest out.
-export function ActionsBar({ workspace, controller, onConfigure, onAddGlobal, onAddWorkspace, onRestoreFocus }: BarProps) {
+// The Header's actions: own buttons in the user's order, then the single Actions menu of
+// the rest with its workspace and global sections. The bar takes all the room between the
+// title and the search box and measures it: as it shrinks, the last own buttons fold into
+// the menu instead of pushing the rest out.
+export function ActionsBar({ workspace, controller, onConfigure, onAddAction, onRestoreFocus }: BarProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<number | undefined>(undefined);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    if (!ref.current) return;
     const ro = new ResizeObserver((entries) => setRoom(entries[0]?.contentRect.width));
-    ro.observe(el);
+    ro.observe(ref.current);
     return () => ro.disconnect();
   }, []);
   const model = useActionsBarModel({ workspace, room });
   return (
     <div ref={ref} data-tauri-drag-region className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
-      <AddActionMenu onAddGlobal={onAddGlobal} onAddWorkspace={onAddWorkspace} reveal={model.empty ? "always" : "hover"} />
+      <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
       {model.buttons.map((item) => (
         <OwnButton key={item.id} item={item} {...controller} />
       ))}
-      <GroupMenu
-        label="Scripts"
-        icon={ComputerTerminal01Icon}
-        items={model.scripts}
-        globalItems={model.scriptsGlobal}
-        onRestoreFocus={onRestoreFocus}
-        onConfigure={onConfigure}
-        {...controller}
-      />
-      <GroupMenu
-        label="Apps"
-        icon={AppWindowMacIcon}
-        items={model.apps}
-        globalItems={model.appsGlobal}
+      <ActionsMenu
+        label="Actions"
+        items={model.menu.workspace}
+        globalItems={model.menu.global}
         onRestoreFocus={onRestoreFocus}
         onConfigure={onConfigure}
         {...controller}

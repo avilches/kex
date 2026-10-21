@@ -1,12 +1,14 @@
 import {
   ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   ArrowUp01Icon,
   Cancel01Icon,
   ChevronDownIcon,
   ChevronUpIcon,
   DragDropVerticalIcon,
   FolderOpenIcon,
-  MoveToIcon,
+  PencilEditIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
@@ -35,11 +37,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
+import { StartTrimmed } from "@/components/StartTrimmed";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { splitActionName } from "./lib/actionName";
-import { barSubtitle } from "./lib/actionsBar";
+import { actionSubtitle } from "./lib/actionsBar";
 import {
   actionProblems,
   CWD_MODE_LABELS,
@@ -57,6 +60,10 @@ type Props = {
   context: ActionContext | null;
   /** False while the row is a draft the store has not accepted yet. */
   saved: boolean;
+  /** An app preset as Kex installs it: read-only, and deleting it asks nothing. */
+  immutable?: boolean;
+  /** Duplicates an immutable row into an editable one; only immutable rows offer it. */
+  onDuplicate?: () => void;
   /** Folded to its header row, like the file-type cards; drafts always stay expanded. */
   expanded: boolean;
   onToggleExpand: () => void;
@@ -71,7 +78,7 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, context, saved, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
+  { action, context, saved, immutable, onDuplicate, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
@@ -90,15 +97,16 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
   const display = action.name.trim() || "Name";
   const { main: displayMain, variable: displayVariable } = splitActionName(display);
-  const displaySubtitle = context ? barSubtitle(display, context) : undefined;
+  const subtitle = context ? actionSubtitle(display, context) : null;
 
-  // The latest values for the unmount flush, which closes over nothing else.
+  // The latest values for the unmount flush, which closes over nothing else. An immutable
+  // row holds nothing pending, so its flush saves nothing and is skipped.
   const pending = useRef({ action, draft, onChange });
   pending.current = { action, draft, onChange };
 
   useImperativeHandle(ref, () => ({
     focusCommand: () => {
-      if (!expanded) onToggleExpand();
+      if (!expanded && !immutable) onToggleExpand();
       requestAnimationFrame(() => {
         commandRef.current?.focus();
         commandRef.current?.select();
@@ -112,7 +120,10 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   };
 
   // Closing the dialog or Settings while a command is still being typed must not lose it.
-  useEffect(() => () => saveCommand(pending.current.draft), []);
+  useEffect(() => {
+    if (immutable) return;
+    return () => saveCommand(pending.current.draft);
+  }, [immutable]);
 
   return (
     <div
@@ -137,7 +148,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
         >
           <ActionIcon action={action} size={14} />
         </button>
-        {expanded ? (
+        {expanded && !immutable ? (
           <input
             className={cn(INPUT_CLASS, "min-w-0 flex-1")}
             aria-label="Action name"
@@ -155,25 +166,35 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             }}
           />
         ) : (
-          <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-[12px]">{displayMain}</span>
-            {displaySubtitle !== undefined ? (
-              displaySubtitle && <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displaySubtitle}</span>
+          <span className="flex min-w-0 flex-1 flex-col leading-tight text-[12px]">
+            <span className="truncate">{displayMain}</span>
+            {subtitle?.text ? (
+              subtitle.startTrim ? (
+                <StartTrimmed text={subtitle.text} className="flex font-mono text-[9.5px] text-muted-foreground" />
+              ) : (
+                <span className="truncate font-mono text-[9.5px] text-muted-foreground">{subtitle.text}</span>
+              )
             ) : (
               displayVariable && <span className="truncate font-mono text-[9.5px] text-muted-foreground">{displayVariable}</span>
             )}
           </span>
         )}
-        <span className="flex shrink-0 items-center gap-1">
-          <Checkbox
-            id={`${action.id}-own`}
-            checked={action.ownButton}
-            onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
-          />
-          <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[11px] text-muted-foreground" title="Own button in the header">
-            Header
-          </label>
-        </span>
+        {immutable ? (
+          <button type="button" title="Edit: makes an editable copy" aria-label="Edit action" onClick={onDuplicate} className={SMALL_BUTTON}>
+            <HugeiconsIcon icon={PencilEditIcon} size={12} strokeWidth={2} />
+          </button>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1">
+            <Checkbox
+              id={`${action.id}-own`}
+              checked={action.ownButton}
+              onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
+            />
+            <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[11px] text-muted-foreground" title="Own button in the bar">
+              Button
+            </label>
+          </span>
+        )}
         {(onMoveToGlobal || onMoveToWorkspace) && (
           <button
             type="button"
@@ -182,30 +203,42 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             className={SMALL_BUTTON}
             onClick={onMoveToGlobal ?? onMoveToWorkspace}
           >
-            <HugeiconsIcon icon={MoveToIcon} size={12} strokeWidth={2} />
+            <HugeiconsIcon icon={onMoveToGlobal ? ArrowRight01Icon : ArrowLeft01Icon} size={12} strokeWidth={2} />
           </button>
         )}
-        <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
-          <AlertDialogTrigger asChild>
-            <button type="button" title="Remove" aria-label="Remove action" className={cn(SMALL_BUTTON, "hover:text-destructive")}>
-              <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="w-[360px] rounded-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-base">Delete &quot;{display}&quot;?</AlertDialogTitle>
-              <AlertDialogDescription className="text-[12px]">
-                The Action is removed{saved ? "" : " before it was ever saved"} and cannot come back.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={onRemove}>
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {immutable ? (
+          <button
+            type="button"
+            title="Remove"
+            aria-label="Remove action"
+            onClick={onRemove}
+            className={cn(SMALL_BUTTON, "hover:text-destructive")}
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          </button>
+        ) : (
+          <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+            <AlertDialogTrigger asChild>
+              <button type="button" title="Remove" aria-label="Remove action" className={cn(SMALL_BUTTON, "hover:text-destructive")}>
+                <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="w-[360px] rounded-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-base">Delete &quot;{display}&quot;?</AlertDialogTitle>
+                <AlertDialogDescription className="text-[12px]">
+                  The Action is removed{saved ? "" : " before it was ever saved"} and cannot come back.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={onRemove}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         {expanded ? (
           <button type="button" aria-label="Collapse action" onClick={onToggleExpand} className={SMALL_BUTTON}>
             <HugeiconsIcon icon={ChevronUpIcon} size={12} strokeWidth={2} />
@@ -223,6 +256,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             <Textarea
               ref={commandRef}
               rows={3}
+              readOnly={immutable}
               className={cn(
                 INPUT_CLASS,
                 "h-auto min-h-0 resize-y font-mono leading-snug [field-sizing:fixed]",
@@ -244,15 +278,17 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
               }}
             />
             {command.required && <div className="text-[11px] text-destructive">Command is required</div>}
-            <button
-              type="button"
-              aria-expanded={variablesOpen}
-              onClick={() => setVariablesOpen((o) => !o)}
-              className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              <HugeiconsIcon icon={variablesOpen ? ArrowUp01Icon : ArrowDown01Icon} size={12} strokeWidth={2} />
-              {variablesOpen ? "Hide variables" : "Show variables"}
-            </button>
+            {!immutable && (
+              <button
+                type="button"
+                aria-expanded={variablesOpen}
+                onClick={() => setVariablesOpen((o) => !o)}
+                className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+              >
+                <HugeiconsIcon icon={variablesOpen ? ArrowUp01Icon : ArrowDown01Icon} size={12} strokeWidth={2} />
+                {variablesOpen ? "Hide variables" : "Show variables"}
+              </button>
+            )}
             {variablesOpen && (
               <div className="flex flex-col text-[11px] leading-snug">
                 {commandVariableDocs().map((v) => (

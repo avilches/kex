@@ -31,11 +31,11 @@ vi.mock("@/modules/actions/lib/actionsFeed", () => ({ useWorkspaceActionsFeed: (
 
 import { ActionsSection } from "./ActionsSection";
 
-function mount(extra: { startDraft?: string; onDraftConsumed?: () => void } = {}) {
+function mount() {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(ActionsSection, extra)));
+  act(() => root.render(createElement(ActionsSection)));
   return { container, unmount: () => act(() => root.unmount()) };
 }
 
@@ -116,13 +116,14 @@ describe("ActionsSection", () => {
     unmount();
   });
 
-  it("the section ext keeps the :script tail so the workspace tab opens with a blank command row", () => {
-    let seen: string | undefined;
-    feed.mockImplementationOnce(() => {
-      seen = undefined;
-      return { feed: null, send };
-    });
-    mount({ startDraft: "workspace:script", onDraftConsumed: () => (seen = "consumed") });
-    expect(seen).toBe("consumed");
+  it("installs several presets in one combo session: a pick keeps the combo open", () => {
+    const { container, unmount } = mount();
+    openApplications(container);
+    act(() => void (options().find((o) => o.textContent?.includes("PyCharm{workspace}")) as HTMLElement).click());
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(options().length).toBeGreaterThan(1);
+    act(() => void (options().find((o) => o.textContent?.includes("Zed{filepath}")) as HTMLElement).click());
+    expect(change).toHaveBeenCalledTimes(2);
+    unmount();
   });
 });

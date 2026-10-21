@@ -1,4 +1,4 @@
-import { actionAvailability, barSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
+import { actionAvailability, actionRowTitle, actionSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
 import type { Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -8,8 +8,12 @@ export type ContextActionEntry = {
   /** false is a muted row with its reason; selecting it runs nothing. */
   enabled: boolean;
   reason: string | null;
-  /** The value the row gives the preset variable, instead of the raw template. */
+  /** The line under the name: what the row's file or folder gives the variable. */
   subtitle: string | null;
+  /** The subtitle is a path a long value renders with its start cut. */
+  subtitleTrim: boolean;
+  /** The hover words of an enabled row (where it opens); null says nothing. */
+  title: string | null;
 };
 
 const TARGETS: Record<ContextActionKind, ActionTarget> = { folder: "folder", file: "file" };
@@ -26,12 +30,16 @@ export function contextActionEntries(
   for (const action of actions) {
     if (action.command.trim() === "") continue;
     if (actionTarget(action.command) !== TARGETS[kind]) continue;
+    const name = action.name.trim() || "Action";
+    const subtitle = actionSubtitle(name, ctx);
     const reason = actionAvailability(action, ctx);
     rows.push({
       action,
       enabled: reason === null,
       reason,
-      subtitle: barSubtitle(action.name.trim() || "Action", ctx),
+      subtitle: subtitle.text,
+      subtitleTrim: subtitle.startTrim,
+      title: actionRowTitle(name, action.runInTerminal, null, ctx),
     });
   }
   return rows;

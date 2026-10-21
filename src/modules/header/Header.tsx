@@ -31,8 +31,7 @@ type Props = {
   searchRef: RefObject<SearchInlineHandle | null>;
   actionsController: BarController;
   onOpenActionsSettings: () => void;
-  onAddGlobalAction: () => void;
-  onAddWorkspaceAction: () => void;
+  onAddAction: () => void;
   activeWorkspace: Workspace | null;
   activeTab: Tab | null;
   groups: WorkspaceGroup[];
@@ -49,8 +48,7 @@ export function Header({
   searchRef,
   actionsController,
   onOpenActionsSettings,
-  onAddGlobalAction,
-  onAddWorkspaceAction,
+  onAddAction,
   activeWorkspace,
   activeTab,
   groups,
@@ -138,8 +136,7 @@ export function Header({
         workspace={activeWorkspace}
         controller={actionsController}
         onConfigure={onOpenActionsSettings}
-        onAddGlobal={onAddGlobalAction}
-        onAddWorkspace={onAddWorkspaceAction}
+        onAddAction={onAddAction}
         onRestoreFocus={onRestoreFocus}
       />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
