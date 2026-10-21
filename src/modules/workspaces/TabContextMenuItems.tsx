@@ -99,7 +99,6 @@ export function TabContextMenuItems({
   return (
     <>
       {rowActions}
-      <TabProcessMenuItems tab={tab} />
       {canSave && (
         <>
           <ContextMenuItem onSelect={() => onSaveTab(tab.id)}>
@@ -243,7 +242,10 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <TabAgentMenuItems tabId={tab.id}>{runOnStart}</TabAgentMenuItems>
+      <TabAgentMenuItems tabId={tab.id}>
+        <TabProcessMenuItems tab={tab} />
+        {runOnStart}
+      </TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
         onSelect={() =>
