@@ -550,6 +550,7 @@ solo cubre un dispositivo.
 ### Sintoma
 
 Tras introducir los grupos de status (y permitir colapsarlos), `workspace.next`/`workspace.prev`
+(hoy `nav.next`/`nav.prev`, que ademas recorren los tabs con `lib/linearNav.ts`)
 (Cmd+Alt+abajo/arriba) saltaban entre workspaces en un orden que no coincidia con el de la barra
 lateral. `workspace.selectByIndex` (Cmd+1..9) podia ademas saltar a un workspace oculto dentro de un
 grupo colapsado.

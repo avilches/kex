@@ -51,8 +51,8 @@ export type ShortcutId =
   | "workspace.settings"
   | "workspace.run"
   | "workspace.hibernate"
-  | "workspace.prev"
-  | "workspace.next"
+  | "nav.prev"
+  | "nav.next"
   | "workspace.selectByIndex"
   | "view.zoomIn"
   | "view.zoomOut"
@@ -138,14 +138,14 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
   },
   {
-    id: "workspace.prev",
-    label: "Previous Workspace",
+    id: "nav.prev",
+    label: "Previous Tab (then Workspace)",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowUp" }],
   },
   {
-    id: "workspace.next",
-    label: "Next Workspace",
+    id: "nav.next",
+    label: "Next Tab (then Workspace)",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
