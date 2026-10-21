@@ -81,7 +81,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
         disabled={disabled}
         onClick={() => nameClick(item, h)}
         className={cn(
-          "flex h-8 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground transition-colors",
+          "flex h-8 items-center gap-1.5 rounded-md px-1.5 text-left text-muted-foreground transition-colors",
           "hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
         )}
       >
