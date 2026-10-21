@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,8 +12,82 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { pathBasename } from "@/lib/pathUtils";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { commandOnUndoClose, followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
+import {
+  getRunningCommandsSnapshot,
+  getRunningScriptCommand,
+  subscribeToRunningCommands,
+} from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
+import type { Tab } from "@/modules/workspaces/lib/types";
+import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 
-type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
+type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string; tab?: Tab };
+
+function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
+  // Radix keeps the content mounted during the exit animation, after the pending tab is already null.
+  const shown = useRef<TabInfo | null>(null);
+  if (info) shown.current = info;
+  const current = shown.current;
+  const tab = current?.tab ?? null;
+  const titleInfo = useAgentTabTitle(tab);
+  const agentSession = useAgentStore((s) => (current ? (s.sessions[current.id] ?? null) : null));
+  const reported = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
+  const running = current
+    ? followableCommand(reported.get(current.id) ?? null, getRunningScriptCommand(current.id))
+    : null;
+
+  const [resumeCmd, setResumeCmd] = useState<string | null>(null);
+  const id = current?.id;
+  const isAgent = agentSession !== null;
+  useEffect(() => {
+    setResumeCmd(null);
+    if (!info || !isAgent) return;
+    let cancelled = false;
+    void previewResumeCmd(info.id).then((plan) => {
+      if (!cancelled) setResumeCmd(plan?.resumeCmd ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, info, isAgent]);
+
+  const name = titleInfo?.displayTitle || current?.title || current?.processName || "terminal";
+  const undoCommand =
+    tab?.kind === "terminal" ? commandOnUndoClose(tab, running, resumeCmd, isAgent) : null;
+
+  return (
+    <>
+      <AlertDialogHeader>
+        <AlertDialogTitle className="flex items-center gap-2">
+          {tab && (
+            <span className="flex shrink-0 items-center">
+              {titleInfo?.agentSession && !tab.icon ? (
+                <AgentIcon agent={titleInfo.agentSession.agent} size={16} />
+              ) : (
+                tabIcon(tab, titleInfo?.isRunning)
+              )}
+            </span>
+          )}
+          <span className="truncate">Close terminal {name}?</span>
+        </AlertDialogTitle>
+        <AlertDialogDescription>The running process will be killed</AlertDialogDescription>
+      </AlertDialogHeader>
+      {current?.command && (
+        <p className="break-all font-mono text-[12px] text-muted-foreground">{current.command}</p>
+      )}
+      {undoCommand && (
+        <p className="text-[12px] text-muted-foreground">
+          Run on start enabled: if you undo closing this tab, this command will be executed:{" "}
+          <span className="break-all font-mono">{undoCommand}</span>
+        </p>
+      )}
+    </>
+  );
+}
 
 type Props = {
   pendingCloseTab: TabInfo | null;
@@ -84,20 +158,8 @@ export function CloseDialogs({
         open={pendingTerminalCloseTab !== null}
         onOpenChange={(open) => !open && onCancelTerminalClose()}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Close terminal {pendingTerminalCloseTab?.processName || "process"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The running process will be killed
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {pendingTerminalCloseTab?.command && (
-            <p className="text-[12px] text-muted-foreground break-all">
-              Command: {pendingTerminalCloseTab.command}
-            </p>
-          )}
+        <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-lg">
+          <TerminalCloseHeader info={pendingTerminalCloseTab} />
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Checkbox
               checked={dontAskAgain}

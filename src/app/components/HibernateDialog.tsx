@@ -140,7 +140,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
 
   return (
     <AlertDialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent className="grid-cols-[minmax(0,1fr)]">
+      <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {titleWs && (

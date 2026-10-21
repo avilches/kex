@@ -1,11 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
   commandOnEnable,
+  commandOnUndoClose,
   commitRunOnStartEdit,
   effectiveRunOnStartCommand,
   followableCommand,
   syncFollowedCommand,
 } from "./runOnStartCommand";
+
+describe("commandOnUndoClose", () => {
+  it("is null when Run on Start is off", () => {
+    expect(commandOnUndoClose({ persistentCommand: "pnpm dev" }, null, null, false)).toBeNull();
+    expect(commandOnUndoClose({ restoreOnRestart: false }, null, "claude --resume x", true)).toBeNull();
+  });
+  it("returns the saved command for a plain terminal", () => {
+    expect(commandOnUndoClose({ restoreOnRestart: true, persistentCommand: "pnpm dev" }, null, null, false)).toBe("pnpm dev");
+  });
+  it("follows the running command unless it was typed manually", () => {
+    expect(commandOnUndoClose({ restoreOnRestart: true, persistentCommand: "a" }, "b", null, false)).toBe("b");
+    expect(
+      commandOnUndoClose({ restoreOnRestart: true, persistentCommand: "a", persistentCommandManual: true }, "b", null, false),
+    ).toBe("a");
+  });
+  it("uses the resume command for an agent, on by default", () => {
+    expect(commandOnUndoClose({}, null, "claude --resume x", true)).toBe("claude --resume x");
+  });
+});
 
 describe("effectiveRunOnStartCommand", () => {
   it("follows the running command when not manual", () => {
