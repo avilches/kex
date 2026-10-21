@@ -36,7 +36,7 @@ export const CONFLICT_SAVE_ERROR =
   "the file changed on disk while it had unsaved edits. Keep your changes or reload from disk first";
 
 export const DELETED_SAVE_ERROR =
-  "the file was deleted from disk. Recreate it from the tab or discard your changes";
+  "the file was deleted from disk. Use Restore file to bring it back or discard your changes";
 
 type Options = {
   path: string;

@@ -328,7 +328,7 @@ describe("useDocument reload", () => {
       status: "deleted",
     } satisfies DocumentState);
     // The deletion reload left a conflict pending while dirty; the deleted
-    // state renders no overlay, so Save to recreate file stays clickable.
+    // state renders no overlay, so the Restore file button stays clickable.
     expect(harness.hook.conflict).toBe(true);
 
     // Recreate: writes the in-memory buffer back to the path. The write

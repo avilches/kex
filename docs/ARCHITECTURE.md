@@ -110,7 +110,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **File sync.** The editor reads and writes files through the Rust filesystem commands. If a file changes on disk while you have it open (e.g., `git checkout`), the editor can detect the change via the file watcher.
 
-**Deleted files.** Deleting an open file never closes its tab, whatever the deletion path (explorer or notes view, trash, external process): the editor and markdown tabs switch to a dedicated deleted state with Close tab, Refresh (re-checks; toasts "still missing" if the file did not come back) and Save to recreate file, which rewrites the in-memory buffer to the original path. Autosave is suspended while deleted, so the file is not recreated silently. A non-ENOENT read failure still shows the generic error state.
+**Deleted files.** Deleting an open file never closes its tab, whatever the deletion path (explorer or notes view, trash, external process): the editor and markdown tabs switch to a dedicated deleted state with Close tab, Refresh (re-checks; toasts "still missing" if the file did not come back) and Restore file, which rewrites the in-memory buffer to the original path. Autosave is suspended while deleted, so the file is not recreated silently. A non-ENOENT read failure still shows the generic error state.
 
 ### 3.3 File explorer
 

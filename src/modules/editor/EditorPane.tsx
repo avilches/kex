@@ -475,13 +475,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
               size="sm"
               onClick={() => {
                 recreate().catch((e) => {
-                  toast.error("Could not recreate file", {
+                  toast.error("Could not restore file", {
                     description: e instanceof Error ? e.message : String(e),
                   });
                 });
               }}
             >
-              Save to recreate file
+              Restore file
             </Button>
           </div>
         </div>
