@@ -6,3 +6,4 @@
 - [Nunca hacer reset --hard en el worktree principal](feedback_never_reset_main_worktree.md) — El usuario trabaja en main en paralelo y su HEAD se mueve; releer HEAD justo antes y recuperar con reflog + fsck --unreachable
 - [Webview debug via fetch](reference_webview_debug_via_fetch.md) — La consola del webview no llega a ningun log accesible; instrumentar con fetch a un servidor HTTP local y relanzar el binario
 - [cargo fmt y reset sobre main](feedback_fmt_y_reset_sobre_main.md) — cargo fmt toca ficheros ajenos (mirar `git show --stat` antes de mezclar) y un reset sobre main deja el trabajo suelto en el checkout del usuario; arreglar con un commit encima
+- [Revisar el rendimiento de Kex](reference_revisar_rendimiento.md) — Cuando Kex va lento o piden revisar el rendimiento: profiler de la paleta, script de volcados, cómo leerlos, línea base sana y lenta, y lo que ya se midió
