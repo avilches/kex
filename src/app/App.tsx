@@ -522,7 +522,7 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      requestLeafFocus(tabId);
+      focusTab(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1585,6 +1585,25 @@ export default function App() {
   // activation, also of the abandoned pane's active tab, regardless of how
   // the switch was triggered (mouse click, tab.next/prev/selectByIndex).
   // Centralized here so every activation path shares one implementation.
+  const focusTab = useCallback(
+    (tabId: string) => {
+      const kind = findTabGlobal(tabId)?.tab.kind;
+      requestAnimationFrame(() =>
+        focusTabContent(kind, tabId, {
+          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
+          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
+          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
+          focusLeaf: requestLeafFocus,
+        }),
+      );
+    },
+    [findTabGlobal],
+  );
+
+  // The one place a navigation gesture (tab click, tab and linear shortcuts,
+  // agent jumps) activates a tab: it also hands the tab its focus, so a new
+  // caller cannot forget it. File-open flows activate with activateTab and
+  // decide their own focus.
   const onActivateTabStable = useCallback(
     (wsId: string, tabId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
@@ -1598,8 +1617,9 @@ export default function App() {
         }
       }
       activateTab(wsId, tabId);
+      focusTab(tabId);
     },
-    [activateTab],
+    [activateTab, focusTab],
   );
 
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
@@ -1935,18 +1955,9 @@ export default function App() {
       const found = findTabGlobal(tabId);
       if (!found) return;
       setActiveWorkspaceId(found.workspace.id);
-      activateTab(found.workspace.id, tabId);
-      const kind = found.tab.kind;
-      requestAnimationFrame(() =>
-        focusTabContent(kind, tabId, {
-          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
-          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
-          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
-          focusLeaf: requestLeafFocus,
-        }),
-      );
+      onActivateTabStable(found.workspace.id, tabId);
     },
-    [activateTab, findTabGlobal, setActiveWorkspaceId],
+    [onActivateTabStable, findTabGlobal, setActiveWorkspaceId],
   );
 
   const saveWorkspaceDocs = useCallback(
@@ -2029,21 +2040,6 @@ export default function App() {
     setEditorFlush(() => flushDirtyEditorsRef.current());
     return () => setEditorFlush(null);
   }, []);
-
-  const focusTab = useCallback(
-    (tabId: string) => {
-      const kind = findTabGlobal(tabId)?.tab.kind;
-      requestAnimationFrame(() =>
-        focusTabContent(kind, tabId, {
-          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
-          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
-          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
-          focusLeaf: requestLeafFocus,
-        }),
-      );
-    },
-    [findTabGlobal],
-  );
 
   const focusActiveTab = useCallback(() => {
     const ws = workspacesRef.current.find(
@@ -2960,7 +2956,6 @@ export default function App() {
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const next = tabs[(idx + 1) % tabs.length];
         onActivateTabStable(activeWorkspace.id, next.id);
-        focusTab(next.id);
       },
       "tab.prev": () => {
         if (!activeWorkspace || !activePane) return;
@@ -2969,7 +2964,6 @@ export default function App() {
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
         onActivateTabStable(activeWorkspace.id, prev.id);
-        focusTab(prev.id);
       },
       "tab.selectByIndex": (e) => {
         if (!activeWorkspace || !activePane) return;
@@ -2977,10 +2971,8 @@ export default function App() {
         if (tabs.length === 0) return;
         const digit = parseInt(e.key, 10);
         const idx = digit === 0 ? tabs.length - 1 : digit - 1;
-        if (idx >= 0 && idx < tabs.length) {
+        if (idx >= 0 && idx < tabs.length)
           onActivateTabStable(activeWorkspace.id, tabs[idx].id);
-          focusTab(tabs[idx].id);
-        }
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
