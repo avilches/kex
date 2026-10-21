@@ -138,15 +138,12 @@ function ReorderableButton({ item, reorderMode, ...h }: { item: BarItem; reorder
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
   const blocked = item.state === "idle" && item.disabledReason !== null;
-  // Both leading cells are as tall as the first line; a row with one line centers them in
-  // the row, which keeps its height equal to the rows of two lines.
-  const lead = item.subtitle ? "" : "mt-[5px]";
   const nameZone = (
     <DropdownMenuItem
       // The hover words: where the Action opens. A blocked row keeps its reason.
       title={item.title ?? undefined}
       disabled={!menuEntries(item)[0].enabled}
-      className="flex min-h-8 flex-1 items-center py-0.5 pr-2.5 pl-1"
+      className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
       onSelect={(e) => {
         if (script) e.preventDefault();
         nameClick(item, h);
@@ -165,15 +162,15 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   // the name and the name hover never lights it; only the name zone is a menu item.
   if (script) {
     return (
-      <div className="flex items-start">
-        <ScriptControl item={item} {...h} className={lead} />
+      <div className="flex min-w-0 items-center pl-1.5">
+        <ScriptControl item={item} {...h} />
         {nameZone}
       </div>
     );
   }
   return (
-    <div className="flex items-start">
-      <span className={cn("flex size-[22px] shrink-0 items-center justify-center", lead)}><ActionIcon action={item.action} size={14} /></span>
+    <div className="flex min-w-0 items-center pl-1.5">
+      <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
       {nameZone}
     </div>
   );
