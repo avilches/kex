@@ -159,6 +159,7 @@ import {
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { workspaceDetailRows } from "@/modules/workspaces/lib/workspaceDetail";
+import { focusTabContent } from "@/modules/workspaces/lib/focusTabContent";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -1934,7 +1935,15 @@ export default function App() {
       if (!found) return;
       setActiveWorkspaceId(found.workspace.id);
       activateTab(found.workspace.id, tabId);
-      requestLeafFocus(tabId);
+      const kind = found.tab.kind;
+      requestAnimationFrame(() =>
+        focusTabContent(kind, tabId, {
+          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
+          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
+          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
+          focusLeaf: requestLeafFocus,
+        }),
+      );
     },
     [activateTab, findTabGlobal, setActiveWorkspaceId],
   );
@@ -2023,12 +2032,14 @@ export default function App() {
   const focusTab = useCallback(
     (tabId: string) => {
       const kind = findTabGlobal(tabId)?.tab.kind;
-      requestAnimationFrame(() => {
-        if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-        else if (kind === "markdown") markdownHandles.current.get(tabId)?.focus();
-        else if (kind === "browser") browserHandles.current.get(tabId)?.focusAddressBar();
-        else requestLeafFocus(tabId);
-      });
+      requestAnimationFrame(() =>
+        focusTabContent(kind, tabId, {
+          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
+          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
+          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
+          focusLeaf: requestLeafFocus,
+        }),
+      );
     },
     [findTabGlobal],
   );
@@ -2948,6 +2959,7 @@ export default function App() {
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const next = tabs[(idx + 1) % tabs.length];
         onActivateTabStable(activeWorkspace.id, next.id);
+        focusTab(next.id);
       },
       "tab.prev": () => {
         if (!activeWorkspace || !activePane) return;
@@ -2956,6 +2968,7 @@ export default function App() {
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
         onActivateTabStable(activeWorkspace.id, prev.id);
+        focusTab(prev.id);
       },
       "tab.selectByIndex": (e) => {
         if (!activeWorkspace || !activePane) return;
@@ -2963,8 +2976,10 @@ export default function App() {
         if (tabs.length === 0) return;
         const digit = parseInt(e.key, 10);
         const idx = digit === 0 ? tabs.length - 1 : digit - 1;
-        if (idx >= 0 && idx < tabs.length)
+        if (idx >= 0 && idx < tabs.length) {
           onActivateTabStable(activeWorkspace.id, tabs[idx].id);
+          focusTab(tabs[idx].id);
+        }
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
