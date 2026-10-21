@@ -76,6 +76,16 @@ describe("OwnButton", () => {
     unmount();
   });
 
+  it("spells the variable out on the hover title, never the raw template", () => {
+    const named: Action = { ...app, name: "RustRover {cwd}" };
+    const open = mount(item(named, { title: "Open RustRover in /p/Kex" }));
+    expect(open.container.querySelector("button")?.getAttribute("title")).toBe("Open RustRover in /p/Kex");
+    open.unmount();
+    const bare = mount(item(named));
+    expect(bare.container.querySelector("button")?.getAttribute("title")).toBe("Open RustRover");
+    bare.unmount();
+  });
+
   it("disables an Action that cannot run and says why in its title", () => {
     const { container, handlers, unmount } = mount(item(app, { disabledReason: "needs an open file" }));
     const button = container.querySelector("button") as HTMLButtonElement;
@@ -145,11 +155,11 @@ describe("ActionsMenu", () => {
     view.unmount();
   });
 
-  it("names the scopes only when the combo holds actions of both scopes", () => {
+  it("names the scope of each group the combo holds, even when there is only one", () => {
     const view = mountMenu([item(app)], []);
     view.open();
     const menu = document.querySelector("[role='menu']")!;
-    expect(menu.textContent).not.toContain("Workspace actions");
+    expect(menu.textContent).toContain("Workspace actions");
     expect(menu.textContent).not.toContain("Global actions");
     expect(menu.textContent).toContain("Action Settings");
     expect(menu.textContent).not.toContain("Configure Actions");

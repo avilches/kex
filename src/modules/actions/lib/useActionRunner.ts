@@ -132,9 +132,13 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     [terminalHandles],
   );
 
-  /** Brings a script's tab into view: like the old Run button, wherever it lives. */
+  /**
+   * Brings a script's tab into view: like the old Run button, wherever it lives. A reveal in
+   * another pane keeps the focus where the user is, unless the caller asks for it: clicking a
+   * script's name is a request to go there, a run that finds its tab already open is not.
+   */
   const revealActionTab = useCallback(
-    (tabId: string): boolean => {
+    (tabId: string, takeFocus = false): boolean => {
       const found = findTabGlobal(tabId);
       if (!found || !activeWorkspace) return false;
       const plan = planTabReveal({
@@ -150,7 +154,8 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       } else {
         const userLeaf = focusedTabId(found.workspace.paneTree, found.workspace.activePaneId);
         revealTab(found.workspace.id, tabId);
-        if (userLeaf) requestLeafFocus(userLeaf);
+        if (takeFocus) requestLeafFocus(tabId);
+        else if (userLeaf) requestLeafFocus(userLeaf);
       }
       return true;
     },
@@ -270,7 +275,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   const focusActionTab = useCallback(
     (action: Action): boolean => {
       const tabId = getActionTab(action.id);
-      return tabId ? revealActionTab(tabId) : false;
+      return tabId ? revealActionTab(tabId, true) : false;
     },
     [revealActionTab],
   );
