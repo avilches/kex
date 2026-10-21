@@ -494,9 +494,9 @@ function SortableWorkspaceItem({
           tabs={ws.tabs}
           entries={agentEntries}
           filter={detailFilter}
-          focusedTabId={active ? ws.focusedTabId : null}
+          focusedTabId={active && !ws.hibernated ? ws.focusedTabId : null}
           color={displayColor}
-          visibleTabIds={active ? ws.visibleTabIds : ""}
+          visibleTabIds={active && !ws.hibernated ? ws.visibleTabIds : ""}
           hibernated={ws.hibernated}
           onWake={onWake ? () => onWake(ws.id) : undefined}
           onActivate={activateDetailTab}
