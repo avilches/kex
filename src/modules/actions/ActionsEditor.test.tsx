@@ -345,10 +345,12 @@ describe("ActionsEditor", () => {
     ownTrue.unmount();
   });
 
-  it("an installed preset is read-only: no own-flag, no variables toggle, and Delete asks nothing", () => {
+  it("an installed preset is read-only but keeps its Button flag, and Delete asks nothing", () => {
     const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
-    const { container, onRemove, unmount } = mount([installed]);
-    expect(container.querySelectorAll("button[role='checkbox']")).toHaveLength(0);
+    const { container, onUpdate, onRemove, unmount } = mount([installed]);
+    expect(container.querySelector("button[role='checkbox']")).not.toBeNull();
+    click(container.querySelector("button[role='checkbox']"));
+    expect(onUpdate).toHaveBeenCalledWith("ac-3", expect.objectContaining({ ownButton: true }));
     expect(container.querySelector("button[aria-label='Edit action']")).not.toBeNull();
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(onRemove).toHaveBeenCalledWith("ac-3");

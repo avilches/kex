@@ -72,6 +72,6 @@ describe("contextActionEntries", () => {
       "folder",
       { vars: vars({ workspace: "" }), shell: "posix" },
     );
-    expect(entries.map((e) => e.subtitle)).toEqual(["/w/src", "Workspace Root not configured"]);
+    expect(entries.map((e) => e.subtitle)).toEqual(["/w/src", "Set a root to this workspace"]);
   });
 });

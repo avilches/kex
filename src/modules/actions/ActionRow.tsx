@@ -179,22 +179,21 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             )}
           </span>
         )}
-        {immutable ? (
+        {immutable && (
           <button type="button" title="Edit: makes an editable copy" aria-label="Edit action" onClick={onDuplicate} className={SMALL_BUTTON}>
             <HugeiconsIcon icon={PencilEditIcon} size={12} strokeWidth={2} />
           </button>
-        ) : (
-          <span className="flex shrink-0 items-center gap-1">
-            <Checkbox
-              id={`${action.id}-own`}
-              checked={action.ownButton}
-              onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
-            />
-            <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[11px] text-muted-foreground" title="Own button in the bar">
-              Button
-            </label>
-          </span>
         )}
+        <span className="flex shrink-0 items-center gap-1">
+          <Checkbox
+            id={`${action.id}-own`}
+            checked={action.ownButton}
+            onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
+          />
+          <label htmlFor={`${action.id}-own`} className={cn("text-[11px] text-muted-foreground", immutable ? "cursor-default" : "cursor-pointer")} title="Own button in the bar">
+            Button
+          </label>
+        </span>
         {(onMoveToGlobal || onMoveToWorkspace) && (
           <button
             type="button"
@@ -203,7 +202,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             className={SMALL_BUTTON}
             onClick={onMoveToGlobal ?? onMoveToWorkspace}
           >
-            <HugeiconsIcon icon={onMoveToGlobal ? ArrowRight01Icon : ArrowLeft01Icon} size={12} strokeWidth={2} />
+            <HugeiconsIcon icon={onMoveToGlobal ? ArrowLeft01Icon : ArrowRight01Icon} size={12} strokeWidth={2} />
           </button>
         )}
         {immutable ? (

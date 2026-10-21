@@ -53,22 +53,25 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   nombres canonico son `{filepath}` y `{filename}` (los antiguos `{path}`/`{file}` ya no
   existen); los presets de JetBrains solo ofrecen las variantes de workspace y cwd porque sus
   editores no abren ficheros sueltos.
-- **Menu "+ Action"**: sin acciones, la ActionsBar muestra el trigger punteado "+ Action"
-  (solo el simbolo, sin icono) que abre Settings > Actions directamente, sin menu intermedio
+- **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
+  simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
 - **Barra del Header**: un solo menu "Actions" con todas las Actions sin boton propio, bajo
   el titulo "Workspace actions" primero y despues "Global actions", cada alcance en su orden;
-  el click en el nombre de un script en marcha lleva a su tab sin cerrar el menu.
+  el click en el nombre de un script en marcha lleva a su tab sin cerrar el menu. Un comando
+  sin variables (un script normal del workspace) sale en gris mientras el workspace no tenga
+  raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
+  propia variable.
 - **Editor de Actions en Settings**: el combo de apps no se cierra al elegir (se pueden
   anadir varios de una vez) y no muestra los presets ya instalados (coincidencia por
   `appId` + commando exacto). Una Action proveniente de un preset es inmutable: se consulta
-  desplegada pero no se edita; el boton "Edit" de su tarjeta hace una copia editable (nueva
-  id, sin `appId`, entregada al store al punto) y borrarla no pide confirmacion; una Action
-  de usuario si abre `AlertDialog`.
+  desplegada pero no se edita (su flag "Button" si se puede cambiar); el boton "Edit" de su
+  tarjeta hace una copia editable (nueva id, sin `appId`, entregada al store al punto) y
+  borrarla no pide confirmacion; una Action de usuario si abre `AlertDialog`.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
   pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y
-  `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Workspace Root
-  not configured"), `{filepath}` solo el nombre del fichero y `{cwd}` la ruta con el
+  `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Set a root to
+  this workspace"), `{filepath}` solo el nombre del fichero y `{cwd}` la ruta con el
   principio recortado (el mismo truco de la fila "Copy absolute path", ahora compartido en
   `src/components/StartTrimmed.tsx`). Las superficies donde se pinta el nombre: boton propio
   del header, menu Unico del header, submenu contextual, combo de apps del editor y tarjeta

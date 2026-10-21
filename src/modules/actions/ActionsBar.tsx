@@ -207,7 +207,7 @@ function AddActionMenu({ onAdd, reveal }: { onAdd: () => void; reveal: "always" 
         reveal === "hover" && "hidden group-hover/ap:flex",
       )}
     >
-      <span>+ Action</span>
+      <span>+</span>
     </button>
   );
 }

@@ -64,8 +64,16 @@ describe("actionAvailability", () => {
   it("explains the missing variable of an app", () => {
     expect(actionAvailability(app({ command: "code {filepath}" }), ctx)).toBe("needs an open file");
     expect(actionAvailability(app({ command: "code {workspace}" }), { ...ctx, vars: { ...vars, workspace: "" } })).toBe(
-      "needs a workspace root",
+      "Set a root to this workspace",
     );
+  });
+
+  it("blocks a command with no variables while the workspace has no root, never a folder-bound one", () => {
+    const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
+    expect(actionAvailability(script({ command: "pnpm dev" }), rootless)).toBe("Set a root to this workspace");
+    expect(actionAvailability(app({ command: "make {cwd}" }), rootless)).toBeNull();
+    expect(actionAvailability(script({ command: "notify {host}" }), rootless)).toBeNull();
+    expect(actionAvailability(script({ command: "pnpm dev" }), ctx)).toBeNull();
   });
 
   it("explains the missing variable of a script", () => {

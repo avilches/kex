@@ -112,7 +112,7 @@ export function describeMissing(names: readonly string[]): string {
 
 const VARIABLE = /\{[?!]?[a-z]/;
 
-export const WORKSPACE_UNSET = "Workspace Root not configured";
+export const WORKSPACE_UNSET = "Set a root to this workspace";
 
 export type ActionSubtitle = {
   /** The line under the name; null leaves the name lineless. */
@@ -161,14 +161,18 @@ export function actionRowTitle(
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
 // terminal, so a value that cannot be quoted safely also blocks them; an app is spawned
-// without a shell and never is.
+// without a shell and never is. A command with no variables runs in the workspace itself,
+// so a missing root blocks it too, with the words the row shows for that case.
 export function actionAvailability(action: Action, ctx: BarContext | null): string | null {
   if (action.command.trim() === "") return "it has no command";
   if (ctx?.hibernated) return "workspace is hibernated";
   if (!ctx) return VARIABLE.test(action.command) ? "needs a workspace" : null;
+  const used = commandVariablesUsed(action.command);
+  if (used.size === 0 && !ctx.vars.workspace) return WORKSPACE_UNSET;
   const problem = commandProblem(action.command, action.runInTerminal ? ctx.shell : undefined);
   if (problem) return problem;
   const missing = missingVariables(action.command, ctx.vars);
+  if (missing.includes("workspace")) return WORKSPACE_UNSET;
   if (missing.length > 0) return describeMissing(missing);
   if (action.runInTerminal) {
     const unsafe = unsafeVariables(action.command, ctx.vars, ctx.shell);
