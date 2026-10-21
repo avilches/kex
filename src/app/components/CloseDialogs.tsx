@@ -27,13 +27,13 @@ import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 
 type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string; tab?: Tab };
 
-function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
+/** Command the tab would run if its close were undone, or null when nothing would. */
+function useUndoCloseCommand(info: TabInfo | null): string | null {
   // Radix keeps the content mounted during the exit animation, after the pending tab is already null.
   const shown = useRef<TabInfo | null>(null);
   if (info) shown.current = info;
   const current = shown.current;
   const tab = current?.tab ?? null;
-  const titleInfo = useAgentTabTitle(tab);
   const agentSession = useAgentStore((s) => (current ? (s.sessions[current.id] ?? null) : null));
   const reported = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const running = current
@@ -55,9 +55,18 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
     };
   }, [id, info, isAgent]);
 
+  return tab?.kind === "terminal" ? commandOnUndoClose(tab, running, resumeCmd, isAgent) : null;
+}
+
+function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
+  // Radix keeps the content mounted during the exit animation, after the pending tab is already null.
+  const shown = useRef<TabInfo | null>(null);
+  if (info) shown.current = info;
+  const current = shown.current;
+  const tab = current?.tab ?? null;
+  const titleInfo = useAgentTabTitle(tab);
+
   const name = titleInfo?.displayTitle || current?.title || current?.processName || "terminal";
-  const undoCommand =
-    tab?.kind === "terminal" ? commandOnUndoClose(tab, running, resumeCmd, isAgent) : null;
 
   return (
     <>
@@ -79,13 +88,18 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
       {current?.command && (
         <p className="break-all font-mono text-[12px] text-muted-foreground">{current.command}</p>
       )}
-      {undoCommand && (
-        <p className="text-[12px] text-muted-foreground">
-          Run on start enabled: if you undo closing this tab, this command will be executed:{" "}
-          <span className="break-all font-mono">{undoCommand}</span>
-        </p>
-      )}
     </>
+  );
+}
+
+/** "Run on start" note, rendered below the dialog buttons. */
+function TerminalUndoCloseNotice({ info }: { info: TabInfo | null }) {
+  const undoCommand = useUndoCloseCommand(info);
+  if (!undoCommand) return null;
+  return (
+    <p className="text-[12px] text-muted-foreground">
+      Run on start enabled: you can undo close this tab
+    </p>
   );
 }
 
@@ -178,6 +192,7 @@ export function CloseDialogs({
               Close
             </AlertDialogAction>
           </AlertDialogFooter>
+          <TerminalUndoCloseNotice info={pendingTerminalCloseTab} />
         </AlertDialogContent>
       </AlertDialog>
     </>
