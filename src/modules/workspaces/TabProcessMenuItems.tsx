@@ -24,11 +24,12 @@ import {
 import { processLabel } from "./lib/terminalProcess";
 import type { Tab } from "./lib/types";
 
-// Process entry of the tab menu, inside the agent block above Run on Start: a
-// submenu whose trigger names what the terminal is running right now (the
-// process the path bar shows) with its pid, and whose items copy the pid or
-// take the tree down. Only a terminal tab with a live PTY renders it; the menu
-// content mounts while open, so the snapshot is fetched fresh each time.
+// Process entry of the tab menu: the first item of the agent block, right under
+// the agent name; a submenu whose trigger reads "Process: " plus what the
+// terminal is running right now (the process the path bar shows), and whose
+// items copy the pid or take the tree down. Only a terminal tab with a live
+// PTY renders it; the menu content mounts while open, so the snapshot is
+// fetched fresh each time.
 export function TabProcessMenuItems({ tab }: { tab: Tab }) {
   const [info, setInfo] = useState<PtyProcessInfo | null>(null);
   const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
@@ -68,10 +69,7 @@ export function TabProcessMenuItems({ tab }: { tab: Tab }) {
           size={14}
           strokeWidth={2}
         />
-        <span className="min-w-0 truncate">{label}</span>
-        <span className="ml-auto max-w-[140px] truncate pl-3 font-mono text-[10px] font-normal text-muted-foreground">
-          {info.pid}
-        </span>
+        <span className="min-w-0 truncate">Process: {label}</span>
       </ContextMenuSubTrigger>
       <ContextMenuSubContent>
         <ContextMenuItem onSelect={() => void writeClipboardText(String(info.pid))}>

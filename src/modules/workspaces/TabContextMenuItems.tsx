@@ -242,8 +242,10 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <TabAgentMenuItems tabId={tab.id}>
-        <TabProcessMenuItems tab={tab} />
+      <TabAgentMenuItems
+        tabId={tab.id}
+        process={<TabProcessMenuItems tab={tab} />}
+      >
         {runOnStart}
       </TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />

@@ -96,13 +96,17 @@ export function CopyTabIdItem({ tabId }: { tabId: string }) {
   );
 }
 
-// The agent block of the tab menu. `children` render inside it, after the session actions:
-// Run on Start belongs to the agent, so it sits with it instead of with the generic tab items.
+// The agent block of the tab menu. `process` renders first, right under the
+// agent name and icon; `children` render after the session actions (Run on
+// Start belongs to the agent, so it sits with it instead of with the generic
+// tab items).
 export function TabAgentMenuItems({
   tabId,
+  process,
   children,
 }: {
   tabId: string;
+  process?: ReactNode;
   children?: ReactNode;
 }) {
   const session = useAgentStore((s) => s.sessions[tabId]);
@@ -111,8 +115,9 @@ export function TabAgentMenuItems({
   const transcriptPath = meta?.transcriptPath;
   const transcriptExists = useFileExists(transcriptPath);
   if (!session || !showsAgentMenu(session)) {
-    return children ? (
+    return process || children ? (
       <>
+        {process}
         {children}
         <ContextMenuSeparator />
       </>
@@ -132,6 +137,7 @@ export function TabAgentMenuItems({
           )}
         </span>
       </ContextMenuLabel>
+      {process}
       {sessionId && (
         <ValueItem
           icon={Copy01Icon}
