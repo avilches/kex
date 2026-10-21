@@ -11,6 +11,7 @@ import { buildSearchBlobs, commandRowKey } from "./rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import {
   byRecency,
+  byRecentList,
   RECENT_LIMIT,
   SEARCH_LIMIT,
   tabRowKey,
@@ -169,7 +170,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   if (!q) {
     const recents = tabs
       .filter((t) => t.tabId !== activeTabId)
-      .sort(byRecency)
+      .sort(byRecentList)
       .slice(0, RECENT_LIMIT)
       .map(
         (entry): MergedRow => ({
@@ -264,5 +265,10 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       continue;
     rows.push(s.row);
   }
-  return rows;
+  const shownWorkspaces = new Set(
+    rows.flatMap((r) => (r.kind === "tab" ? [r.entry.workspaceId] : [])),
+  );
+  return rows.filter(
+    (r) => r.kind !== "workspace" || !shownWorkspaces.has(r.entry.workspaceId),
+  );
 }

@@ -152,6 +152,31 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["ws:w1"]);
   });
 
+  it("with an empty term puts attention tabs first, then busy ones, then the rest by recency", () => {
+    const rows = mergeRows(
+      input({
+        tabs: [
+          tab("old", { lastUsedAt: 1 }),
+          tab("recent", { lastUsedAt: 9 }),
+          tab("busy", { lastUsedAt: 2, indicator: "working" }),
+          tab("ping", { lastUsedAt: 1, indicator: "attention" }),
+        ],
+      }),
+    );
+    expect(keys(rows)).toEqual(["tab:ping", "tab:busy", "tab:recent", "tab:old"]);
+  });
+
+  it("drops a workspace row when one of its tabs is already in the results", () => {
+    const rows = mergeRows(
+      input({
+        term: "back",
+        tabs: [tab("t", { title: "backend", workspaceId: "w1" })],
+        workspaces: [ws("w1", "Backlog"), ws("w2", "Backup")],
+      }),
+    );
+    expect(keys(rows)).toEqual(["tab:t", "ws:w2"]);
+  });
+
   it("with an empty term lists closed entries between recents and actions", () => {
     const rows = mergeRows(
       input({

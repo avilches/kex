@@ -34,7 +34,7 @@ export function ClosedItem({
       onSelect={onRun}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
-      <RowTag kind={folder ? "Folder" : "File"} />
+      <RowTag kind={folder ? "Terminal" : "File"} closed />
       <span className="shrink-0 text-muted-foreground">
         <HugeiconsIcon
           icon={folder ? Folder01Icon : File01Icon}
