@@ -57,6 +57,7 @@ import {
   type TabEntry,
   type WorkspaceEntry,
 } from "@/modules/command-palette";
+import { isProfilerRunning, toggleProfiler } from "@/modules/profiler";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -3477,6 +3478,8 @@ export default function App() {
               if (activeWorkspace)
                 onSplitBrowserDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
             },
+            profilerRunning: isProfilerRunning(),
+            toggleProfiler: () => void toggleProfiler(),
           })
         : [],
     [

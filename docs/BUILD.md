@@ -88,6 +88,20 @@ token. It is dev only and not part of `pnpm build`.
 - Vite's watcher ignores only this checkout's own `.claude/` (`vite.config.ts`), so hot reload also
   works when running from `.claude/worktrees/<branch>`.
 
+## Profiling a slow window
+
+**In-app profiler (JavaScript).** Command palette, "Start performance profiler" (`modules/profiler/`). It is off at every launch and costs nothing until started. While on, it wraps `window.requestAnimationFrame` and, every 10 seconds, writes one line to `Kex.log` (`~/Library/Logs/app.betauer.kex/Kex.log`, `.dev` for a debug build) that starts with `[profiler]` followed by JSON:
+
+| Field | Meaning |
+|---|---|
+| `rafShare` | Fraction of the window the main thread spent inside `requestAnimationFrame` callbacks (`rafMs` over `windowMs`) |
+| `rafCalls`, `frames` | Callbacks run and frames seen in the window |
+| `jankFrames`, `worstGapMs` | Frames that arrived 100 ms or more after the previous one, and the longest gap |
+| `census` | `nodes` (all DOM elements), `xterms` (terminals bound to a tab), `domRendererTerminals` and `webglTerminals` (which renderer each uses), `domRows` (row elements the DOM renderer keeps) |
+| `top` | The 12 callbacks that took longest: `origin` (callback source plus the six frames that registered it), `calls`, `ms`, `avg`, `max` |
+
+In a minified release build local function names are mangled, so an origin may read as a short name plus a file, line and column. The profiler cannot see style resolution or layout, which is where a slow window often spends its time.
+
 ## Quality checks
 
 ```bash
