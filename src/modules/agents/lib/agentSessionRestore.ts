@@ -168,16 +168,17 @@ export async function detachAgentSession(tabId: string): Promise<void> {
 // (and so no session id in the store) is otherwise invisible until someone notices.
 const resumeWatches = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function watchResume(plan: RestorePlan): void {
+// Keyed by the tab that spawned the PTY: a reopened closed tab carries the plan of its old id.
+export function watchResume(tabId: string, plan: RestorePlan): void {
   if (!import.meta.env.DEV || !expectsSessionReport(plan.agent)) return;
-  clearTimeout(resumeWatches.get(plan.tabId));
+  clearTimeout(resumeWatches.get(tabId));
   resumeWatches.set(
-    plan.tabId,
+    tabId,
     setTimeout(() => {
-      resumeWatches.delete(plan.tabId);
-      if (isHibernating(plan.tabId)) return;
-      if (hasResumed(useAgentStore.getState().sessions[plan.tabId])) return;
-      const msg = describeSilentResume(plan);
+      resumeWatches.delete(tabId);
+      if (isHibernating(tabId)) return;
+      if (hasResumed(useAgentStore.getState().sessions[tabId])) return;
+      const msg = describeSilentResume({ ...plan, tabId });
       void warn(`[agent-session] ${msg}`);
       toast.warning(msg, { duration: 20_000 });
     }, RESUME_CHECK_MS),

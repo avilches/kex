@@ -1009,7 +1009,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   if (decision.inject === "resume" && plan) {
     stageRestoredSnapshot(leafId, plan);
     void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
-    watchResume(plan);
+    watchResume(leafId, plan);
   } else if (decision.inject === "command" && s.persistentCommand) {
     void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
   }
@@ -1078,7 +1078,7 @@ export async function retryPendingRestore(leafId: string): Promise<void> {
       useAgentStore.getState().setRestoreError(leafId, leafId, block.agent ?? "", block.reason),
     adopt: (plan) => {
       stageRestoredSnapshot(leafId, plan);
-      watchResume(plan);
+      watchResume(leafId, plan);
     },
     write: (line) => writeWhenShellReady(s, leafId, pty, line),
   }));
