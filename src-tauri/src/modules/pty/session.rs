@@ -56,6 +56,8 @@ pub struct Session {
     pub(super) _ipc_guard: Option<super::ipc::IpcGuard>,
     /// PID of the shell process. 0 means unknown; callers must skip checks when 0.
     pub shell_pid: u32,
+    /// The frontend tab the session belongs to, which the Actions runner knows.
+    pub script_tab_id: Option<String>,
     pub killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub master: Mutex<Box<dyn MasterPty + Send>>,
@@ -195,6 +197,7 @@ pub fn spawn(
         #[cfg(unix)]
         _ipc_guard: Some(ipc_guard),
         shell_pid,
+        script_tab_id: tab_id.clone(),
         killer: Mutex::new(killer),
         writer: writer.clone(),
         master: Mutex::new(pair.master),
@@ -407,6 +410,7 @@ mod tests {
             #[cfg(unix)]
             _ipc_guard: None,
             shell_pid: child.process_id().unwrap_or(0),
+            script_tab_id: None,
             killer: Mutex::new(killer),
             writer,
             master: Mutex::new(pair.master),
@@ -458,6 +462,7 @@ mod tests {
             #[cfg(unix)]
             _ipc_guard: None,
             shell_pid: 0,
+            script_tab_id: None,
             killer: Mutex::new(killer),
             writer,
             master: Mutex::new(pair.master),

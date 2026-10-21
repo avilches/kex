@@ -52,6 +52,31 @@ pub fn aggregate_tree(procs: &HashMap<u32, ProcStat>, root: u32, num_cpus: usize
     (norm, mem)
 }
 
+/// The pids of every descendant of `root`, `root` itself not counted. A pid
+/// whose parent is itself (the init of a container) is skipped by the seen set.
+pub fn descendants_of(procs: &HashMap<u32, ProcStat>, root: u32) -> Vec<u32> {
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    for (pid, st) in procs {
+        children.entry(st.parent).or_default().push(*pid);
+    }
+    let mut stack = vec![root];
+    let mut seen: HashSet<u32> = HashSet::new();
+    let mut out: Vec<u32> = Vec::new();
+    while let Some(pid) = stack.pop() {
+        if !seen.insert(pid) {
+            continue;
+        }
+        if pid != root {
+            out.push(pid);
+        }
+        if let Some(kids) = children.get(&pid) {
+            stack.extend(kids.iter().copied());
+        }
+    }
+    out.sort_unstable();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +112,26 @@ mod tests {
         let (cpu, mem) = aggregate_tree(&procs, 100, 4);
         assert_eq!(cpu, 0.0);
         assert_eq!(mem, 0);
+    }
+
+    #[test]
+    fn descendants_walks_the_whole_tree_and_skips_the_root() {
+        let mut procs = HashMap::new();
+        procs.insert(100, st(1, 0.0, 0));
+        procs.insert(101, st(100, 0.0, 0));
+        procs.insert(102, st(100, 0.0, 0));
+        procs.insert(103, st(101, 0.0, 0));
+        procs.insert(104, st(999, 0.0, 0));
+        assert_eq!(descendants_of(&procs, 100), vec![101, 102, 103]);
+        assert_eq!(descendants_of(&procs, 104), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn descendants_bends_a_cycle_instead_of_looping() {
+        let mut procs = HashMap::new();
+        procs.insert(200, st(201, 0.0, 0));
+        procs.insert(201, st(200, 0.0, 0));
+        assert_eq!(descendants_of(&procs, 200), vec![201]);
+        assert_eq!(descendants_of(&procs, 300), Vec::<u32>::new());
     }
 }

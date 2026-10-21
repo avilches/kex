@@ -14,8 +14,9 @@ import type { Action } from "./types";
 
 const spawn = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const toastError = vi.hoisted(() => vi.fn());
+const ptyStop = vi.hoisted(() => vi.fn(() => Promise.resolve(0)));
 vi.mock("@/lib/native", () => ({
-  native: { actionSpawn: spawn, fsStat: () => Promise.resolve({ kind: "dir" }) },
+  native: { actionSpawn: spawn, fsStat: () => Promise.resolve({ kind: "dir" }), ptyStop },
 }));
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 vi.mock("@/modules/terminal/lib/useTerminalSession", () => ({ requestLeafFocus: vi.fn() }));
@@ -64,6 +65,7 @@ function setup(workspace: Workspace, found: Record<string, Tab> = {}) {
 beforeEach(() => {
   vi.useFakeTimers();
   spawn.mockClear();
+  ptyStop.mockClear();
   toastError.mockClear();
 });
 
@@ -207,6 +209,30 @@ describe("useActionRunner", () => {
     linkActionTab(script.id, "tab-old");
     expect(result.current.focusActionTab(script)).toBe(true);
     expect(deps.revealTab).toHaveBeenCalledWith("w1", "tab-old");
+  });
+
+  it("stop signals the script tree only when the command is still marked after Ctrl+C", () => {
+    linkActionTab(script.id, "tab-old");
+    setScriptRunning("tab-old", "running");
+    const { result, write, deps } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
+    deps.terminalHandles.current.set("tab-old", { write });
+    deps.scriptCommandSeen.current.add("tab-old");
+    act(() => result.current.stopAction(script));
+    expect(write).toHaveBeenCalledWith("\x03");
+    expect(ptyStop).not.toHaveBeenCalled();
+    act(() => void vi.advanceTimersByTime(700));
+    expect(ptyStop).toHaveBeenCalledWith("tab-old");
+  });
+
+  it("stop never signals a tree whose command already ended", () => {
+    linkActionTab(script.id, "tab-old");
+    setScriptRunning("tab-old", "running");
+    const { result, deps } = setup(ws(), { "tab-old": termTab("tab-old", "/w") });
+    deps.scriptCommandSeen.current.add("tab-old");
+    act(() => result.current.stopAction(script));
+    clearScriptRunningEntry("tab-old");
+    act(() => void vi.advanceTimersByTime(700));
+    expect(ptyStop).not.toHaveBeenCalled();
   });
 
   it("F12 runs the active Action, and stops it when it is running", () => {

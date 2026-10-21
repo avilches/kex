@@ -397,6 +397,8 @@ export const native = {
     invoke<DetectedEditor[]>("editor_scan"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
+  /** Count of descendant processes signaled for the script of this tab; 0 means the program is gone. */
+  ptyStop: (tabId: string): Promise<number> => invoke<number>("pty_stop", { tabId }),
   tabHistoryList: (): Promise<TabHistoryEntry[]> =>
     invoke<TabHistoryEntry[]>("tab_history_list"),
   tabHistoryRecord: (kind: "terminal" | "file", path: string, workspaceId: string): Promise<void> =>

@@ -22,7 +22,7 @@ use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegist
 use session::Session;
 
 pub use metrics::ProcessMonitor;
-use metrics::{aggregate_tree, ProcStat};
+use metrics::{aggregate_tree, descendants_of, ProcStat};
 
 pub struct PtyState {
     sessions: RwLock<HashMap<u32, Arc<Session>>>,
@@ -220,6 +220,61 @@ pub fn pty_resize(
             e.to_string()
         });
     result
+}
+
+// Stops a script by signaling every descendant of the shell, the closest thing to
+// Ctrl+C that no program may swallow (about the one counter-example: less ignores
+// Ctrl+C, and `man top` would keep running without this). Windows answers an error
+// and the caller falls back to typing Ctrl+C, the way it always did.
+#[tauri::command]
+#[cfg(unix)]
+pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
+    use sysinfo::{ProcessesToUpdate, System};
+
+    let shell_pid = state
+        .sessions
+        .read()
+        .unwrap()
+        .values()
+        .find(|s| s.script_tab_id.as_deref() == Some(tab_id.as_str()))
+        .map(|s| s.shell_pid);
+    let Some(shell_pid) = shell_pid else {
+        return Ok(0);
+    };
+    if shell_pid == 0 {
+        return Ok(0);
+    };
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    let procs: HashMap<u32, ProcStat> = sys
+        .processes()
+        .iter()
+        .map(|(pid, proc_)| {
+            (
+                pid.as_u32(),
+                ProcStat {
+                    parent: proc_.parent().map(|p| p.as_u32()).unwrap_or(0),
+                    cpu: 0.0,
+                    mem: 0,
+                },
+            )
+        })
+        .collect();
+    let mut signaled = 0;
+    for pid in descendants_of(&procs, shell_pid) {
+        if unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) == 0 } {
+            signaled += 1;
+        }
+    }
+    Ok(signaled)
+}
+
+#[tauri::command]
+#[cfg(not(unix))]
+pub fn pty_stop(tab_id: String) -> Result<usize, String> {
+    Err(format!(
+        "pty_stop is not supported here; tab_id={tab_id} stops with Ctrl+C"
+    ))
 }
 
 #[tauri::command]
