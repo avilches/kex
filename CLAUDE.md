@@ -102,6 +102,13 @@ dar con la causa raiz, anadir una entrada nueva al GOTCHAS del subsistema corres
 si no existe, siguiendo el formato de `WORKSPACES_GOTCHAS.md`: Sintoma, pistas falsas descartadas,
 causa raiz, fix, leccion) antes de dar la tarea por terminada.
 
+### Rendimiento: leer `performance/CLAUDE.md` antes de investigar
+
+Si el usuario habla de Kex lento, congelado, de CPU o memoria altas, o pide revisar el rendimiento, lee
+`performance/CLAUDE.md` antes de hacer nada: ahí están el procedimiento, las herramientas
+(`python3 performance/kexperf.py`), el profiler que lleva la app (Settings > General > Diagnostics), cómo leer sus
+resultados, lo ya medido y las hipótesis abiertas. No instrumentes ni propongas arreglos sin pasar por ahí.
+
 ### Themes: leer `docs/THEMES.md` antes de tocar uno
 
 Cualquier peticion sobre themes (un color, el contraste, un theme nuevo, `inactivePaneDim`, colores de git o del terminal)
