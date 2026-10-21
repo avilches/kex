@@ -90,6 +90,8 @@ token. It is dev only and not part of `pnpm build`.
 
 ## Profiling a slow window
 
+Two tools, because each sees what the other cannot. Start with the first and take the second while the window is slow.
+
 **In-app profiler (JavaScript).** Command palette, "Start performance profiler" (`modules/profiler/`). It is off at every launch and costs nothing until started. While on, it wraps `window.requestAnimationFrame` and, every 10 seconds, writes one line to `Kex.log` (`~/Library/Logs/app.betauer.kex/Kex.log`, `.dev` for a debug build) that starts with `[profiler]` followed by JSON:
 
 | Field | Meaning |
@@ -100,7 +102,9 @@ token. It is dev only and not part of `pnpm build`.
 | `census` | `nodes` (all DOM elements), `xterms` (terminals bound to a tab), `domRendererTerminals` and `webglTerminals` (which renderer each uses), `domRows` (row elements the DOM renderer keeps) |
 | `top` | The 12 callbacks that took longest: `origin` (callback source plus the six frames that registered it), `calls`, `ms`, `avg`, `max` |
 
-In a minified release build local function names are mangled, so an origin may read as a short name plus a file, line and column. The profiler cannot see style resolution or layout, which is where a slow window often spends its time.
+In a minified release build local function names are mangled, so an origin may read as a short name plus a file, line and column. The profiler cannot see style resolution or layout, which is where a slow window often spends its time; that is what the native sample is for.
+
+**Native sample (WebKit).** `scripts/sample-webview.sh` (macOS) finds the Kex that is running, asks the system which `WebContent` process is its own (`responsibility_get_pid_responsible_for_pid`, so another app's webview is never picked), and runs `sample` on the busiest one for 10 seconds. The file goes to the same logs folder as `Kex.log`. Options: `--pid` (needed when several Kex run, for example the installed app and a dev build), `--seconds`, `--out`. In the sample, `updateRendering` is the page's render step; under it, `Style::TreeResolver` is style resolution, `updateLayout` is layout and `serviceRequestAnimationFrame` is the JavaScript the profiler measures.
 
 ## Quality checks
 

@@ -504,7 +504,7 @@ Upstream ships its agent instructions as `AGENTS.md` at the repo root. The fork 
 
 ### Performance profiler
 
-Diagnostic for a window that feels slow, off by default and with no cost while off. The command palette entry "Start performance profiler" (`profiler.toggle`, no shortcut) wraps `requestAnimationFrame` and writes one `[profiler]` JSON line to `Kex.log` every 10 seconds; "Stop performance profiler" restores the original function. See `docs/BUILD.md`, "Profiling a slow window".
+Diagnostic for a window that feels slow, off by default and with no cost while off. The command palette entry "Start performance profiler" (`profiler.toggle`, no shortcut) wraps `requestAnimationFrame` and writes one `[profiler]` JSON line to `Kex.log` every 10 seconds; "Stop performance profiler" restores the original function. `scripts/sample-webview.sh` takes a native `sample` of the WebContent process that belongs to a running Kex. See `docs/BUILD.md`, "Profiling a slow window".
 
 ## Roadmap (planned, not yet built)
 
