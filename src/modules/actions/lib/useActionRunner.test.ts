@@ -208,7 +208,8 @@ describe("useActionRunner", () => {
     expect(result.current.focusActionTab(script)).toBe(false);
     linkActionTab(script.id, "tab-old");
     expect(result.current.focusActionTab(script)).toBe(true);
-    expect(deps.revealTab).toHaveBeenCalledWith("w1", "tab-old");
+    expect(deps.activateTab).toHaveBeenCalledWith("w1", "tab-old");
+    expect(deps.revealTab).not.toHaveBeenCalled();
   });
 
   it("a second stop on the still-marked script signals its tree instead of typing again", () => {

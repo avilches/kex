@@ -183,7 +183,7 @@ describe("ActionsMenu", () => {
     view.unmount();
   });
 
-  it("focusing a running script's name does not close the menu, and its play zone still stops", () => {
+  it("a running script's name brings it into view and closes the menu so focus can land, and its play zone still stops", () => {
     const running = item(script, { state: "running", stoppable: true });
     const view = mountMenu([running], [], vi.fn(() => true));
     view.open();
@@ -191,7 +191,8 @@ describe("ActionsMenu", () => {
     act(() => void row.click());
     expect(view.handlers.focus).toHaveBeenCalledWith(script);
     expect(view.handlers.run).not.toHaveBeenCalled();
-    expect(document.querySelector("[role='menu']")).not.toBeNull();
+    expect(document.querySelector("[role='menu']")).toBeNull();
+    view.open();
     const stop = document.querySelector("button[aria-label='Stop dev']") as HTMLElement;
     act(() => void stop.click());
     expect(view.handlers.stop).toHaveBeenCalledWith(script);

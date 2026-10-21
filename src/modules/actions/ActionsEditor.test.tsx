@@ -379,8 +379,20 @@ describe("ActionsEditor", () => {
     const [id, own] = onUpdate.mock.calls[0]! as [string, Action];
     expect(id).toBe("ac-3");
     expect(own).toMatchObject({ name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}" });
-    expect("appId" in own).toBe(false);
+    expect(own.appId).toBe("");
     unmount();
+  });
+
+  it("disables the Button checkbox of the rest once three have one, never of those that do", () => {
+    const own = (id: string): Action => ({ id, name: id, runInTerminal: true, command: "x", cwdMode: "workspace", ownButton: true });
+    const full = mount([own("a"), own("b"), own("c"), { ...own("d"), ownButton: false }]);
+    const boxes = [...full.container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
+    expect(boxes.map((b) => b.disabled)).toEqual([false, false, false, true]);
+    full.unmount();
+    const room = mount([own("a"), own("b"), { ...own("c"), ownButton: false }]);
+    const open = [...room.container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
+    expect(open.some((b) => b.disabled)).toBe(false);
+    room.unmount();
   });
 
   it("lists scripts before apps and refuses to drag one kind over the other", () => {

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
 import { AddApplicationMenu } from "./AddApplicationMenu";
-import { scriptsFirst } from "./lib/actionsBar";
+import { MAX_BUTTONS_PER_SCOPE, scriptsFirst } from "./lib/actionsBar";
 import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
@@ -89,6 +89,8 @@ export function ActionsEditor({
   // so the row keeps its DOM node and its focus while the write is on its way.
   const visible = scriptsFirst([...actions, ...drafts.filter((d) => !saved.has(d.id))]);
 
+  const buttonsFull = actions.filter((a) => a.ownButton).length >= MAX_BUTTONS_PER_SCOPE;
+
   const draftIds = new Set(drafts.map((d) => d.id));
 
   const toggleRow = (id: string) => {
@@ -111,11 +113,11 @@ export function ActionsEditor({
     Promise.resolve(onAddRef.current(actionFromSuggestion(s))).catch(() => {});
   };
 
-  // Edit on an app preset: the entry itself becomes the user's own, with no appId, so it
-  // is editable and the preset is offered again in the combo.
+  // Edit on an app preset: the entry itself becomes the user's own, so it is editable and
+  // the preset is offered again in the combo. The empty appId is what clears it: the update
+  // merges over the stored action, and a missing key would keep the old value.
   const takeOwnership = (action: Action) => {
-    const { appId: _appId, ...own } = action;
-    onUpdate(action.id, own);
+    onUpdate(action.id, { ...action, appId: "" });
     setOpenId(action.id);
     requestAnimationFrame(() => rows.current.get(action.id)?.focusCommand());
   };
@@ -184,6 +186,7 @@ export function ActionsEditor({
                 context={context}
                 saved={saved.has(action.id)}
                 immutable={saved.has(action.id) && action.appId !== undefined}
+                buttonsFull={buttonsFull}
                 expanded={isDraft || openId === action.id}
                 onToggleExpand={() => toggleRow(action.id)}
                 onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}

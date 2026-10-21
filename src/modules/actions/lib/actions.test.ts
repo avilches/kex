@@ -161,3 +161,11 @@ describe("partitionForHeader", () => {
     expect(p.apps.map((a) => a.id)).toEqual(["a2"]);
   });
 });
+
+describe("updateAction appId", () => {
+  it("an empty appId clears the preset link, which a missing key cannot do", () => {
+    const preset: Action = { id: "a1", name: "Zed", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+    expect(updateAction([preset], "a1", { appId: "" })[0]?.appId).toBeUndefined();
+    expect(updateAction([preset], "a1", { ownButton: true })[0]?.appId).toBe("zed");
+  });
+});

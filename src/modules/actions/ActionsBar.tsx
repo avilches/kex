@@ -138,17 +138,8 @@ function ReorderableButton({ item, reorderMode, ...h }: { item: BarItem; reorder
 function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
   const script = item.action.runInTerminal;
   const blocked = item.state === "idle" && item.disabledReason !== null;
-  const nameZone = (
-    <DropdownMenuItem
-      // The hover words: where the Action opens. A blocked row keeps its reason.
-      title={item.title ?? undefined}
-      disabled={!menuEntries(item)[0].enabled}
-      className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
-      onSelect={(e) => {
-        if (script) e.preventDefault();
-        nameClick(item, h);
-      }}
-    >
+  const text = (
+    <>
       <span className={cn("flex min-w-0 flex-1", blocked && "opacity-60")}>
         <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
       </span>
@@ -156,23 +147,43 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
         <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
       )}
       {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
-    </DropdownMenuItem>
+    </>
   );
-  // The start or stop zone is a sibling cell of the name zone, so its hover never lights
-  // the name and the name hover never lights it; only the name zone is a menu item.
+  const common = {
+    // The hover words: where the Action opens. A blocked row keeps its reason.
+    title: item.title ?? undefined,
+    disabled: !menuEntries(item)[0].enabled,
+  };
+  // An app is one menu item, icon and text lit together: the whole row is one click. A
+  // script has two zones, the start or stop control and the name, siblings so that each
+  // hover lights only its own; the name runs an idle script, keeping the menu open to run
+  // more, and brings a live one into view, which needs the menu closed to hand over focus.
   if (script) {
     return (
       <div className="flex min-w-0 items-center pl-1.5">
         <ScriptControl item={item} {...h} />
-        {nameZone}
+        <DropdownMenuItem
+          {...common}
+          className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
+          onSelect={(e) => {
+            if (item.state === "idle") e.preventDefault();
+            nameClick(item, h);
+          }}
+        >
+          {text}
+        </DropdownMenuItem>
       </div>
     );
   }
   return (
-    <div className="flex min-w-0 items-center pl-1.5">
-      <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
-      {nameZone}
-    </div>
+    <DropdownMenuItem
+      {...common}
+      className="flex min-h-9 min-w-0 items-center gap-2 overflow-hidden py-0.5 pr-3"
+      onSelect={() => nameClick(item, h)}
+    >
+      <span className="flex shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
+      {text}
+    </DropdownMenuItem>
   );
 }
 
