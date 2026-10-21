@@ -36,7 +36,7 @@ export type ScmViewMode = "list" | "tree";
 export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
 export type SpinnerStyle = (typeof SPINNER_STYLES)[number];
 
-export type TerminalNewFolderMode = "home" | "workspace" | "context";
+export type TerminalNewFolderMode = "home" | "workspace" | "context" | "ask";
 
 export type DiffViewMode = "unified" | "split";
 
@@ -534,6 +534,7 @@ export function parseThemePref(value: unknown): ThemePref {
 export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
   if (value === "home") return "home";
   if (value === "workspace") return "workspace";
+  if (value === "ask") return "ask";
   return "context";
 }
 
