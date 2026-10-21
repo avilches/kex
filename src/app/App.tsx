@@ -61,6 +61,11 @@ import {
 } from "@/modules/command-palette";
 import { useProfilerSetting } from "@/modules/profiler";
 import {
+  buildFolderGroups,
+  FolderPalette,
+  type FolderRow,
+} from "@/modules/new-terminal";
+import {
   NewEditorDialog,
   useEditorFileSync,
   type EditorPaneHandle,
@@ -1198,15 +1203,30 @@ export default function App() {
     };
   }, [workspaceRootPath]);
 
+  // ── Ask-me folder palette (Open new terminals in: Ask me) ────────────────
+  // The palette asks for the folder before any terminal exists; `split` marks a
+  // split entry point, where the anchor pane is fixed and only the folder is asked.
+  const [folderPaletteOpen, setFolderPaletteOpen] = useState(false);
+  const [folderAskTarget, setFolderAskTarget] = useState<{
+    wsId?: string;
+    paneId?: string;
+    split?: "horizontal" | "vertical";
+  } | null>(null);
+
   const openNewTerminal = useCallback(
     (targetPaneId?: string, targetWsId?: string) => {
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
+      if (terminalNewFolderMode === "ask") {
+        setFolderAskTarget({ wsId: targetWsId, paneId: targetPaneId });
+        setFolderPaletteOpen(true);
+        return;
+      }
       const ws = targetWsId
         ? workspacesRef.current.find((w) => w.id === targetWsId)
         : workspacesRef.current.find(
             (w) => w.id === activeWorkspaceIdRef.current,
           );
       if (!ws) return;
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
       openTab(ws.id, targetPaneId ?? ws.activePaneId, {
         id: newTabId(),
         kind: "terminal",
@@ -1660,34 +1680,58 @@ export default function App() {
     [openNewTerminal],
   );
 
-  const onSplitTerminalRightStable = useCallback(
-    (wsId: string, paneId: string) => {
+  const canSplitTerminal = useCallback(
+    (
+      wsId: string,
+      paneId: string,
+      orientation: "horizontal" | "vertical",
+    ): boolean => {
       const { paneSplitLimit, workspacePaneLimit } =
         usePreferencesStore.getState();
       const ws = workspacesRef.current.find((w) => w.id === wsId);
-      if (!ws) return;
+      if (!ws) return false;
       if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
         toastSplitBlocked("pane-limit", workspacePaneLimit);
-        return;
+        return false;
       }
       const el = document.querySelector<HTMLElement>(
         `[data-pane-id="${paneId}"]`,
       );
-      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
-        toastSplitBlocked("too-narrow");
-        return;
+      const limit =
+        orientation === "horizontal"
+          ? paneSplitLimit.width
+          : paneSplitLimit.height;
+      const side = el?.getBoundingClientRect()[
+        orientation === "horizontal" ? "width" : "height"
+      ];
+      if (!el || side === undefined || side < limit) {
+        toastSplitBlocked(orientation === "horizontal" ? "too-narrow" : "too-short");
+        return false;
       }
-      const newPaneId = splitPane(wsId, paneId, "horizontal");
+      return true;
+    },
+    [],
+  );
+
+  const splitAndOpenTerminal = useCallback(
+    (
+      wsId: string,
+      paneId: string,
+      orientation: "horizontal" | "vertical",
+      cwd?: string,
+    ) => {
       setZenPaneId(null);
+      const newPaneId = splitPane(wsId, paneId, orientation);
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openTab(wsId, newPaneId, {
         id: newTabId(),
         kind: "terminal",
-        cwd: resolveNewTerminalCwd({
+        cwd: cwd ?? resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
           home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          lastFolder: scriptFocusFolderRef.current ?? ws?.cwd ?? null,
+          workspaceRoot: ws?.workspaceRoot ?? ws?.fsRoot ?? null,
           launchDir: getLaunchDir() ?? null,
         }),
       });
@@ -1695,39 +1739,36 @@ export default function App() {
     [splitPane, openTab],
   );
 
+  const onSplitTerminalRightStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
+      if (terminalNewFolderMode === "ask") {
+        if (canSplitTerminal(wsId, paneId, "horizontal")) {
+          setFolderAskTarget({ wsId, paneId, split: "horizontal" });
+          setFolderPaletteOpen(true);
+        }
+        return;
+      }
+      if (!canSplitTerminal(wsId, paneId, "horizontal")) return;
+      splitAndOpenTerminal(wsId, paneId, "horizontal");
+    },
+    [canSplitTerminal, splitAndOpenTerminal],
+  );
+
   const onSplitTerminalDownStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { paneSplitLimit, workspacePaneLimit } =
-        usePreferencesStore.getState();
-      const ws = workspacesRef.current.find((w) => w.id === wsId);
-      if (!ws) return;
-      if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
-        toastSplitBlocked("pane-limit", workspacePaneLimit);
-        return;
-      }
-      const el = document.querySelector<HTMLElement>(
-        `[data-pane-id="${paneId}"]`,
-      );
-      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
-        toastSplitBlocked("too-short");
-        return;
-      }
-      const newPaneId = splitPane(wsId, paneId, "vertical");
-      setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openTab(wsId, newPaneId, {
-        id: newTabId(),
-        kind: "terminal",
-        cwd: resolveNewTerminalCwd({
-          mode: terminalNewFolderMode,
-          home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
-          launchDir: getLaunchDir() ?? null,
-        }),
-      });
+      if (terminalNewFolderMode === "ask") {
+        if (canSplitTerminal(wsId, paneId, "vertical")) {
+          setFolderAskTarget({ wsId, paneId, split: "vertical" });
+          setFolderPaletteOpen(true);
+        }
+        return;
+      }
+      if (!canSplitTerminal(wsId, paneId, "vertical")) return;
+      splitAndOpenTerminal(wsId, paneId, "vertical");
     },
-    [splitPane, openTab],
+    [canSplitTerminal, splitAndOpenTerminal],
   );
 
   const onNewBrowserStable = useCallback(
@@ -3338,6 +3379,91 @@ export default function App() {
     [paletteSources, workspaces],
   );
 
+  // ── Ask-me folder palette data ────────────────────────────────────────────
+  const folderPaletteDirs = useMemo(
+    () =>
+      folderPaletteOpen
+        ? workspaces.flatMap((w) =>
+            allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
+          )
+        : [],
+    [folderPaletteOpen, workspaces],
+  );
+  const folderDirGitVersion = usePaletteGit(folderPaletteOpen, folderPaletteDirs);
+  const folderSources = useMemo(
+    () => (folderPaletteOpen ? liveTabSources() : null),
+    // dirGitVersion: branches arrive after the palette opens, and the entries must pick them up.
+    [folderPaletteOpen, workspaces, folderDirGitVersion],
+  );
+  const folderTabEntries = useMemo(
+    () => (folderSources ? buildTabEntries(workspaces, folderSources) : []),
+    [folderSources, workspaces],
+  );
+  const folderGroups = useMemo(
+    () =>
+      folderSources
+        ? buildFolderGroups({
+            workspaces,
+            activeWorkspaceId,
+            activeTabEntry:
+              folderTabEntries.find((e) => e.tabId === activeTabId) ?? null,
+            entries: folderTabEntries,
+          })
+        : [],
+    [folderSources, workspaces, activeWorkspaceId, folderTabEntries, activeTabId],
+  );
+
+  const onFolderPick = useCallback(
+    async (row: FolderRow) => {
+      setFolderPaletteOpen(false);
+      const pending = folderAskTarget;
+      setFolderAskTarget(null);
+      // An entry point aimed at a specific pane (welcome, split): the anchor is
+      // fixed and only the folder comes from the palette.
+      if (pending?.wsId && pending.paneId) {
+        if (pending.split) {
+          if (canSplitTerminal(pending.wsId, pending.paneId, pending.split)) {
+            splitAndOpenTerminal(pending.wsId, pending.paneId, pending.split, row.path);
+          }
+        } else {
+          openTab(pending.wsId, pending.paneId, {
+            id: newTabId(),
+            kind: "terminal",
+            cwd: row.path,
+          });
+        }
+        return;
+      }
+      let target = workspacesRef.current.find((w) => w.id === row.workspaceId);
+      if (!target) return;
+      if (target.hibernated) await wakeWorkspace(target.id);
+      target = workspacesRef.current.find((w) => w.id === row.workspaceId);
+      if (target?.hibernated) target = undefined;
+      if (!target) {
+        toast.info("That workspace could not be woken, opened in the active one");
+        target = workspacesRef.current.find(
+          (w) => w.id === activeWorkspaceIdRef.current,
+        );
+      }
+      if (!target) return;
+      setActiveWorkspaceId(target.id);
+      // openTab inserts right after the pane's focused tab and makes the new tab active.
+      openTab(target.id, target.activePaneId, {
+        id: newTabId(),
+        kind: "terminal",
+        cwd: row.path,
+      });
+    },
+    [
+      folderAskTarget,
+      canSplitTerminal,
+      splitAndOpenTerminal,
+      openTab,
+      wakeWorkspace,
+      setActiveWorkspaceId,
+    ],
+  );
+
   const [tabHistoryRecords, setTabHistoryRecords] = useState<TabHistoryRecord[]>([]);
   useEffect(() => {
     if (!commandPaletteOpen) return;
@@ -3897,6 +4023,13 @@ export default function App() {
             onSelectWorkspace={onPaletteSelectWorkspace}
             onRunClosed={onPaletteRunClosed}
             onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
+          />
+
+          <FolderPalette
+            open={folderPaletteOpen}
+            onOpenChange={setFolderPaletteOpen}
+            groups={folderGroups}
+            onPick={onFolderPick}
           />
 
           <NewEditorDialog

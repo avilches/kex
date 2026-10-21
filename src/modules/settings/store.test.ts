@@ -145,10 +145,11 @@ describe("terminalNewFolderMode", () => {
     expect(DEFAULT_PREFERENCES.terminalNewFolderMode).toBe("context");
   });
 
-  it("parses all three valid modes and falls back to context", () => {
+  it("parses all four valid modes and falls back to context", () => {
     expect(parseTerminalNewFolderMode("home")).toBe("home");
     expect(parseTerminalNewFolderMode("workspace")).toBe("workspace");
     expect(parseTerminalNewFolderMode("context")).toBe("context");
+    expect(parseTerminalNewFolderMode("ask")).toBe("ask");
     expect(parseTerminalNewFolderMode("WORKSPACE")).toBe("context");
     expect(parseTerminalNewFolderMode(undefined)).toBe("context");
     expect(parseTerminalNewFolderMode(null)).toBe("context");

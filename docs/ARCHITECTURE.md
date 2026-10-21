@@ -674,7 +674,19 @@ src/
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
     ├── profiler/                  - Opt-in performance profiler (Settings > General > Diagnostics, or the palette, both through the `performanceProfiler` preference; `useProfilerSetting` follows it in every window): wraps requestAnimationFrame, logs a [profiler] line to Kex.log every 10 s with the slowest callbacks, jank frames and a DOM census. Pure parts in `lib/rafStats.ts` and `lib/domCensus.ts`
-    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab path line, note in the row), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
+    ├── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab path line, note in the row), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
+    └── new-terminal/              - "Ask me" mode for Open new terminals in (Settings > Terminal): FolderPalette,
+                                     a Command-Palette-like dialog that picks the folder of a new terminal instead of
+                                     deducing it. Pure core in `lib/folderEntries.ts` (tested): groups the current
+                                     tab cwd, the worktree main checkout and the workspace root first, then the other
+                                     tab cwds of the active workspace, then one group per other workspace (root + tab
+                                     cwds, hibernated included); paths are deduped per group, first occurrence keeps
+                                     its label; search is a fuzzy subsequence match on the path (reuses the palette's
+                                     `fuzzyMatchLower`) that never reorders. `App.tsx` intercepts every terminal
+                                     creation (`openNewTerminal` and both split callbacks): a free creation can land
+                                     in another workspace (switches to it, waking it if needed, and inserts right
+                                     after that workspace's focused tab); an entry point aimed at a specific pane
+                                     (split, empty-pane welcome) keeps its anchor and takes only the folder.
 ```
 
 ### Tab kinds (tagged union)
