@@ -196,7 +196,7 @@ regression on every cold start; keep the anchored form so a future `*/react/*` d
 
 ## Rust release profile
 
-`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary.
+`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary. `[profile.release.build-override]` sets `strip="none"` so build scripts and proc macros are not stripped: with Rust 1.96 `pnpm tauri build` failed from a clean `target` (`can't find crate for tauri_macros`) without it, while the final binary stays stripped.
 
 ## Platform targets
 

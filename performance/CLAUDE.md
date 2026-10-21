@@ -126,9 +126,12 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
   mismos datos de producción. No las abras a la vez: se pisan `workspaces.json` y reanudan las mismas sesiones de
   agente. Un build de desarrollo usa `app.betauer.kex.dev` y sus propios datos.
 - No se puede mover ni redimensionar la ventana desde un agente: `osascript` no tiene permiso de accesibilidad.
-- Un build release desde una carpeta `target` nueva falla con Rust 1.96 por `strip = true` en `src-tauri/Cargo.toml`
-  (`can't find crate for ...` en macros de procedimiento). Se evita con `CARGO_PROFILE_RELEASE_STRIP=none` en ese
-  build. `pnpm buildlocal` desde cero fallaría igual.
+- Hasta el 2026-10-21, `pnpm tauri build` desde una carpeta `target` nueva fallaba con Rust 1.96 (`can't find crate
+  for ...` en macros de procedimiento como `tauri_macros` o `thiserror_impl`), mientras que `cargo build --release`
+  con el mismo `strip = true` pasaba. Se arregló con `[profile.release.build-override] strip = "none"` en
+  `src-tauri/Cargo.toml`, que deja de recortar solo las macros y los scripts de build; el ejecutable final sigue
+  recortado (11,0 MB, frente a 13,8 MB sin recortar). La causa exacta no se investigó: se comprobó el efecto, no el
+  motivo. Si reaparece el error, mira primero que esa sección siga en `Cargo.toml`.
 - Para nombres de función legibles en un release hay que compilar con `build.minify: false` en `vite.config.ts`, solo en
   un worktree de usar y tirar. En el release normal las funciones locales salen con el nombre mutilado.
 - Instrumentar siempre en un worktree propio y no dejar ese código en `main`. Un volcado de `sample` desde un agente
