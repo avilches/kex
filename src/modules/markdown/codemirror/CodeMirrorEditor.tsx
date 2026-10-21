@@ -1,4 +1,5 @@
 import { CM_MARKDOWN_SETUP } from "@/lib/codemirrorSetup";
+import { viewSearchHandle, type ViewSearchHandle } from "@/lib/cmSearch";
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import {
   buildLiveDecorationExtensions,
@@ -16,6 +17,7 @@ import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
 export type CodeMirrorEditorHandle = {
+  search: ViewSearchHandle;
   focus(): void;
   // 0-based line; puts the cursor at its start and scrolls it to the top.
   scrollToLine(line: number): void;
@@ -117,6 +119,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
     }, []);
 
     useImperativeHandle(ref, () => ({
+      search: viewSearchHandle(() => cmRef.current?.view),
       focus: () => cmRef.current?.view?.focus(),
       getPosition: () => {
         const view = cmRef.current?.view;

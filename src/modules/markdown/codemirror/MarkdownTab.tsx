@@ -183,7 +183,17 @@ export function MarkdownTab(props: Props): JSX.Element {
   const toggleOutlineRef = useRef(toggleOutline);
   toggleOutlineRef.current = toggleOutline;
   useEffect(() => {
+    const activeSearch = () =>
+      viewModeRef.current === "preview"
+        ? previewPaneRef.current?.search
+        : editorRef.current?.search;
     registerMarkdownHandleRef.current?.(props.tabId, {
+      search: {
+        setQuery: (q) => activeSearch()?.setQuery(q),
+        findNext: () => activeSearch()?.findNext(),
+        findPrevious: () => activeSearch()?.findPrevious(),
+        clearQuery: () => activeSearch()?.clearQuery(),
+      },
       save: () => saveRef.current(),
       cycleView: () => cycleViewRef.current(),
       toggleOutline: () => toggleOutlineRef.current(),

@@ -1,5 +1,6 @@
 import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
+import type { ViewSearchHandle } from "@/lib/cmSearch";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
 import {
   EditorPathBar,
@@ -74,6 +75,7 @@ type CommitFileDiffOpenInput = {
 };
 
 export type MarkdownTabHandle = {
+  search: ViewSearchHandle;
   save(): Promise<void>;
   cycleView(): void;
   toggleOutline(): void;

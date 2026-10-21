@@ -1,6 +1,7 @@
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { CM_MARKDOWN_PREVIEW_SETUP } from "@/lib/codemirrorSetup";
+import { viewSearchHandle, type ViewSearchHandle } from "@/lib/cmSearch";
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { buildStaticPreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export type MarkdownPreviewPaneHandle = {
+  search: ViewSearchHandle;
   // 1-based source line at the top of the viewport.
   getTopLine(): number | null;
 };
@@ -37,6 +39,7 @@ export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(
     if (view && line) scrollToTopLine(view, line);
   }, []);
   useImperativeHandle(ref, () => ({
+    search: viewSearchHandle(() => cmRef.current?.view),
     getTopLine: () => {
       const view = cmRef.current?.view;
       return view ? topLineOf(view) : null;

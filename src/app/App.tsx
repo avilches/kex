@@ -65,6 +65,7 @@ import {
 } from "@/modules/editor";
 import type { GitHistorySearchHandle } from "@/modules/git-history";
 import {
+  buildSearchTarget,
   Header,
   type SearchInlineHandle,
   type SearchTarget,
@@ -419,8 +420,6 @@ export default function App() {
   }, [activeTabId]);
 
   const isTerminalTab = activeTab?.kind === "terminal";
-  const isEditorTab = activeTab?.kind === "editor";
-  const isGitHistoryTab = activeTab?.kind === "git-history";
   const activeCwd = isTerminalTab
     ? ((activeTab as { cwd?: string }).cwd ?? null)
     : null;
@@ -453,6 +452,8 @@ export default function App() {
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
+  const [activeMarkdownHandle, setActiveMarkdownHandle] =
+    useState<MarkdownTabHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] =
     useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
@@ -817,6 +818,11 @@ export default function App() {
         ? (editorHandles.current.get(activeTabId) ?? null)
         : null,
     );
+    setActiveMarkdownHandle(
+      activeTabId !== null
+        ? (markdownHandles.current.get(activeTabId) ?? null)
+        : null,
+    );
   }, [activeTabId]);
 
   // ── Workspace state management ────────────────────────────────────────────
@@ -833,6 +839,7 @@ export default function App() {
     browserHandles.current.clear();
     setActiveSearchAddon(null);
     setActiveEditorHandle(null);
+    setActiveMarkdownHandle(null);
   }, []);
 
   const { toggleActiveAction, runAction, stopAction, focusActionTab } = useActionRunner({
@@ -2451,6 +2458,7 @@ export default function App() {
       registerMarkdownHandle: (tabId, handle) => {
         if (handle) markdownHandles.current.set(tabId, handle);
         else markdownHandles.current.delete(tabId);
+        if (tabId === activeTabId) setActiveMarkdownHandle(handle);
       },
       onBrowserUrlChange: (tabId, url) => {
         const found = findTabGlobal(tabId);
@@ -2612,35 +2620,27 @@ export default function App() {
 
   // ── Search ────────────────────────────────────────────────────────────────
 
-  const searchTarget = useMemo<SearchTarget>(() => {
-    if (isTerminalTab && activeTabId !== null && activeSearchAddon)
-      return {
-        kind: "terminal",
-        addon: activeSearchAddon,
-        focus: () => requestLeafFocus(activeTabId),
-      };
-    if (isEditorTab && activeEditorHandle)
-      return {
-        kind: "editor",
-        handle: activeEditorHandle,
-        focus: () => activeEditorHandle.focus(),
-      };
-    if (isGitHistoryTab && gitHistoryHandle)
-      return {
-        kind: "git-history",
-        handle: gitHistoryHandle,
-        focus: () => {},
-      };
-    return null;
-  }, [
-    isTerminalTab,
-    isEditorTab,
-    isGitHistoryTab,
-    activeTabId,
-    activeSearchAddon,
-    activeEditorHandle,
-    gitHistoryHandle,
-  ]);
+  const activeTabKind = activeTab?.kind;
+  const searchTarget = useMemo<SearchTarget>(
+    () =>
+      buildSearchTarget({
+        tabKind: activeTabKind,
+        tabId: activeTabId,
+        terminalAddon: activeSearchAddon,
+        editorHandle: activeEditorHandle,
+        markdownHandle: activeMarkdownHandle,
+        gitHistoryHandle,
+        focusTerminal: requestLeafFocus,
+      }),
+    [
+      activeTabKind,
+      activeTabId,
+      activeSearchAddon,
+      activeEditorHandle,
+      activeMarkdownHandle,
+      gitHistoryHandle,
+    ],
+  );
 
   const onExplorerSearchClose = useCallback(() => {
     searchTarget?.focus();
