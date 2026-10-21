@@ -38,8 +38,17 @@ describe("copy path items", () => {
 
   it("shows the text each entry copies, muted, below its label", () => {
     open();
-    expect(screen.getByText("src/a/b.ts").className).toContain("text-muted-foreground");
-    expect(screen.getByText("/ws/src/a/b.ts").className).toContain("text-muted-foreground");
+    expect(screen.getByText("src/a/b.ts").parentElement?.className).toContain("text-muted-foreground");
+    expect(screen.getByText("/ws/src/a/b.ts").parentElement?.className).toContain("text-muted-foreground");
+  });
+
+  it("clips a long path at its start, right aligned", () => {
+    open();
+    const sub = screen.getByText("/ws/src/a/b.ts").parentElement!;
+    expect(sub.getAttribute("dir")).toBe("rtl");
+    expect(sub.className).toContain("truncate");
+    expect(sub.className).toContain("text-right");
+    expect(screen.getByText("/ws/src/a/b.ts").getAttribute("dir")).toBe("ltr");
   });
 
   it("copies the relative text it was given", () => {

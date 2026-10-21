@@ -1,31 +1,42 @@
-import { ContextMenuItem } from "@/components/ui/context-menu";
+import { ContextMenuItem, ContextMenuShortcut } from "@/components/ui/context-menu";
 import { Link01Icon, CopySlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { copyToClipboard } from "./contextActions";
 import { COMPACT_ITEM } from "./menuItemClass";
 import { relativeCopyFor } from "./relativeCopy";
 
-const SUBPATH_CLASS = "max-w-[240px] truncate text-[10px] text-muted-foreground";
+const SUBPATH_CLASS = "block max-w-[240px] truncate text-right text-[10px] text-muted-foreground";
 
+// The row is right-to-left so the ellipsis eats the start of a long path and keeps its
+// tail; the inner ltr run stops the bidi algorithm from moving the leading slash.
 function Sub({ text }: { text: string }) {
   return (
-    <span className={SUBPATH_CLASS} title={text}>
-      {text}
+    <span className={SUBPATH_CLASS} dir="rtl" title={text}>
+      <bdo dir="ltr">{text}</bdo>
     </span>
   );
+}
+
+function Shortcut({ id }: { id: ShortcutId }) {
+  const label = useShortcutLabel(id);
+  return label ? <ContextMenuShortcut>{label}</ContextMenuShortcut> : null;
 }
 
 export function CopyRelativePathItem({
   path,
   workspaceRoot,
+  compact = true,
 }: {
   path: string;
   workspaceRoot: string | null;
+  compact?: boolean;
 }) {
   const rel = relativeCopyFor(path, workspaceRoot);
   return (
     <ContextMenuItem
-      className={COMPACT_ITEM}
+      className={compact ? COMPACT_ITEM : undefined}
       disabled={!rel.ok}
       onSelect={() => {
         if (rel.ok) void copyToClipboard(rel.text, "Copied relative path");
@@ -56,10 +67,18 @@ export function CopyRelativeTextItem({ text }: { text: string }) {
   );
 }
 
-export function CopyAbsolutePathItem({ path }: { path: string }) {
+export function CopyAbsolutePathItem({
+  path,
+  compact = true,
+  shortcut,
+}: {
+  path: string;
+  compact?: boolean;
+  shortcut?: ShortcutId;
+}) {
   return (
     <ContextMenuItem
-      className={COMPACT_ITEM}
+      className={compact ? COMPACT_ITEM : undefined}
       onSelect={() => void copyToClipboard(path, "Copied absolute path")}
     >
       <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
@@ -67,6 +86,7 @@ export function CopyAbsolutePathItem({ path }: { path: string }) {
         <span>Copy Absolute Path</span>
         <Sub text={path} />
       </span>
+      {shortcut && <Shortcut id={shortcut} />}
     </ContextMenuItem>
   );
 }
