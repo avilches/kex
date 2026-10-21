@@ -21,6 +21,7 @@ import {
   ownButtonsThatFit,
   ownButtonWidth,
   resolveDrop,
+  SETTINGS_LABELS,
   scriptsFirst,
   soleAppButtons,
   WORKSPACE_UNSET,
@@ -497,6 +498,19 @@ describe("canReorderButtons", () => {
     expect(canReorderButtons(b(script({ id: "s1" })), b(script({ id: "s2" })))).toBe(true);
     expect(canReorderButtons(b(app()), b(script()))).toBe(false);
     expect(canReorderButtons(b(app()), b(app({ id: "a2" }), true))).toBe(false);
+  });
+});
+
+describe("Settings labels", () => {
+  it("say what the variable stands for in the subtitle and the hover, never the raw template", () => {
+    expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current Directory", startTrim: true });
+    expect(actionSubtitle("Code {filepath}", SETTINGS_LABELS).text).toBe("Current File");
+    expect(actionRowTitle("Rust {cwd}", false, null, SETTINGS_LABELS)).toBe("Open Rust in Current Directory");
+    expect(actionRowTitle("Code {filepath}", false, null, SETTINGS_LABELS)).toBe("Open Current File with Code");
+  });
+
+  it("a blocked row names the app without its variable", () => {
+    expect(actionRowTitle("Rust {cwd}", false, "needs a folder", ctx)).toBe("Rust: needs a folder");
   });
 });
 

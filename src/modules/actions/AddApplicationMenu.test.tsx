@@ -4,7 +4,6 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { AddApplicationMenu } from "./AddApplicationMenu";
 import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
-import type { ActionContext } from "./lib/useActionContext";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -14,19 +13,12 @@ const suggestions: AppSuggestion[] = [
   { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}" },
 ];
 
-const context: ActionContext = {
-  vars: { cwd: "/p/src", dir: "src", filename: "a.ts", filepath: "/p/src/a.ts", workspace: "/p", branch: "", repo: "", host: "mac" },
-  shell: "posix",
-  hibernated: false,
-  place: { file: false, folder: false },
-};
-
-function mount(contextArg: ActionContext | null = context, actions: readonly AppSuggestion[] = suggestions) {
+function mount(actions: readonly AppSuggestion[] = suggestions) {
   const onPick = vi.fn();
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(AddApplicationMenu, { suggestions: actions as AppSuggestion[], context: contextArg, onPick })));
+  act(() => root.render(createElement(AddApplicationMenu, { suggestions: actions as AppSuggestion[], onPick })));
   const options = () => [...document.querySelectorAll("[cmdk-item]")];
   return {
     container,
@@ -44,8 +36,8 @@ describe("AddApplicationMenu", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
-      "BBEdita.ts",
-      "Zeda.ts",
+      "BBEditCurrent File",
+      "ZedCurrent File",
       "ZedWorkspace",
       "Custom appwrite the command yourself",
     ]);
@@ -53,12 +45,12 @@ describe("AddApplicationMenu", () => {
   });
 
   it("tells the place of each preset on its hover title", () => {
-    const view = mount(context);
+    const view = mount();
     click(view.trigger);
     const row = view.options().find((o) => o.textContent?.includes("ZedWorkspace")) as HTMLElement;
-    expect(row.getAttribute("title")).toBe("Open Zed in /p");
-    const fileRow = view.options().find((o) => o.textContent?.includes("Zeda.ts")) as HTMLElement;
-    expect(fileRow.getAttribute("title")).toBe("Open a.ts with Zed");
+    expect(row.getAttribute("title")).toBe("Open Zed in Workspace");
+    const fileRow = view.options().find((o) => o.textContent?.includes("ZedCurrent File")) as HTMLElement;
+    expect(fileRow.getAttribute("title")).toBe("Open Current File with Zed");
     view.unmount();
   });
 

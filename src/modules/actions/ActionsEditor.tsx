@@ -167,7 +167,7 @@ export function ActionsEditor({
           <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} />
           Add Command
         </Button>
-        <AddApplicationMenu suggestions={availableSuggestions} context={context} onPick={addApplication} />
+        <AddApplicationMenu suggestions={availableSuggestions} onPick={addApplication} />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>

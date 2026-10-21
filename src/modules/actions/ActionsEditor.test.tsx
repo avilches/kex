@@ -166,7 +166,7 @@ describe("ActionsEditor", () => {
   it("an app preset goes straight to the store with its appId and command", () => {
     const { container, onAdd, unmount } = mount([]);
     click(applicationButton(container));
-    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("Zed{workspace}")));
+    click([...document.querySelectorAll("[role='option']")].find((o) => o.textContent?.includes("ZedWorkspace")));
     expect(onAdd).toHaveBeenCalledTimes(1);
     expect(onAdd.mock.calls[0]![0]).toMatchObject({
       name: "Zed {workspace}",
@@ -364,7 +364,7 @@ describe("ActionsEditor", () => {
     const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
     const { container, unmount } = mount([installed], { suggestions: [zed] });
     click(applicationButton(container));
-    const offered = [...document.querySelectorAll("[role='option']")].filter((o) => o.textContent?.includes("Zed{workspace}"));
+    const offered = [...document.querySelectorAll("[role='option']")].filter((o) => o.textContent?.includes("ZedWorkspace"));
     expect(offered).toHaveLength(0);
     unmount();
   });

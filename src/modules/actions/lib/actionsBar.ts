@@ -116,6 +116,19 @@ const VARIABLE = /\{[?!]?[a-z]/;
 
 export const WORKSPACE_UNSET = "Set a root to this workspace";
 
+// Settings has no focused tab to read values from, so under an app name and on its hover it
+// says what the variable stands for in words. The bar never uses this: it shows real values.
+export const SETTINGS_LABELS: BarContext = {
+  vars: {
+    cwd: "Current Directory",
+    dir: "Current Directory",
+    filepath: "Current File",
+    filename: "Current File",
+    workspace: "Workspace",
+  },
+  shell: "posix",
+};
+
 export type ActionSubtitle = {
   /** The line under the name; null leaves the name lineless. */
   text: string | null;
@@ -149,8 +162,8 @@ export function actionRowTitle(
   disabledReason: string | null,
   ctx: BarContext | null,
 ): string | null {
-  if (disabledReason) return `${name.trim()}: ${disabledReason}`;
   const { main, variable } = splitActionName(name);
+  if (disabledReason) return `${main}: ${disabledReason}`;
   if (!variable) return null;
   const varName = variable.slice(1, -1);
   const verb = terminal ? "Run" : "Open";

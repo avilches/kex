@@ -107,8 +107,8 @@ function nameClick(item: BarItem, { run, focus }: Handlers) {
 
 // The hover words spell the variable out ("Open RustRover in /p/root"), never the raw template.
 function ownButtonTitle(item: BarItem): string {
-  if (item.disabledReason) return `${item.name}: ${item.disabledReason}`;
   const { main } = splitActionName(item.name);
+  if (item.disabledReason) return `${main}: ${item.disabledReason}`;
   if (item.action.runInTerminal && item.state !== "idle") return `Show ${main}`;
   return item.title ?? `${item.action.runInTerminal ? "Run" : "Open"} ${main}`;
 }

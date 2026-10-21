@@ -69,7 +69,7 @@ describe("ActionsSection", () => {
   it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
     openApplications(container);
-    const item = options().find((o) => o.textContent?.includes("PyCharm{workspace}"));
+    const item = options().find((o) => o.textContent?.includes("PyCharmWorkspace"));
     act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
@@ -119,10 +119,10 @@ describe("ActionsSection", () => {
   it("installs several presets in one combo session: a pick keeps the combo open", () => {
     const { container, unmount } = mount();
     openApplications(container);
-    act(() => void (options().find((o) => o.textContent?.includes("PyCharm{workspace}")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent?.includes("PyCharmWorkspace")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     expect(options().length).toBeGreaterThan(1);
-    act(() => void (options().find((o) => o.textContent?.includes("Zed{filepath}")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent?.includes("ZedCurrent File")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(2);
     unmount();
   });
