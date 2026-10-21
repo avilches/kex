@@ -5,15 +5,18 @@ import {
   actionShownAt,
   actionSubtitle,
   actionTarget,
+  appsFirst,
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
   isCompactBar,
+  MAX_SCRIPT_BUTTONS,
   menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  scriptsFirst,
   WORKSPACE_UNSET,
 } from "./actionsBar";
 import type { BarItem } from "./actionsBar";
@@ -115,6 +118,7 @@ describe("isCompactBar", () => {
 describe("menuEntries", () => {
   const idle = (a: Action, over: Partial<BarItem> = {}): BarItem => ({
     id: a.id,
+    global: false,
     name: a.name,
     action: a,
     state: "idle",
@@ -218,23 +222,23 @@ describe("buildActionsBarModel", () => {
   ];
 
 
-  it("keeps own buttons in user order, scripts and apps mixed", () => {
+  it("puts apps before scripts, each kind in user order", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
-    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1", "s3"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a2", "s2"]);
     expect(m.empty).toBe(false);
   });
 
   it("moves every own button into its menu when none fits", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "a1", "s2", "a2", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a1", "a2", "s1", "s2", "s3"]);
   });
 
   it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
-    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "a1"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2", "s3"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a2", "s2", "s3"]);
   });
 
   it("carries the run state, the active mark and the disabled reason", () => {
@@ -244,7 +248,7 @@ describe("buildActionsBarModel", () => {
       states: new Map([["s1", "running"]]),
       activeId: "s1",
     });
-    const [s, a] = m.buttons;
+    const [a, s] = m.buttons;
     expect(s).toMatchObject({ state: "running", active: true, disabledReason: null, stoppable: true });
     expect(a).toMatchObject({ state: "idle", active: false, disabledReason: "needs an open file", stoppable: false });
   });
@@ -266,7 +270,7 @@ describe("buildActionsBarModel", () => {
       states: new Map([["s1", "running"]]),
       activeId: undefined,
     });
-    expect(m.buttons.map((b) => b.disabledReason)).toEqual([null, "workspace is hibernated", "workspace is hibernated"]);
+    expect(m.buttons.map((b) => b.disabledReason)).toEqual(["workspace is hibernated", null, "workspace is hibernated"]);
   });
 
   it("reports empty only when there are no Actions at all", () => {
@@ -282,8 +286,38 @@ describe("buildActionsBarModel", () => {
       activeId: undefined,
     });
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1"]);
-    expect(m.menu.global.map((b) => b.id)).toEqual(["s2", "a1"]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["a1", "s2"]);
     expect(m.empty).toBe(false);
+  });
+
+  it("allows at most three script buttons; the rest go to the menu", () => {
+    const scripts = ["s1", "s2", "s3", "s4"].map((id) => script({ id, name: id, ownButton: true }));
+    const m = buildActionsBarModel({
+      local: [...scripts, app({ id: "a1", ownButton: true })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(MAX_SCRIPT_BUTTONS).toBe(3);
+    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1", "s2", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s4"]);
+  });
+
+  it("counts the script cap across both scopes and flags which button is global", () => {
+    const m = buildActionsBarModel({
+      local: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true })],
+      global: [script({ id: "s3", ownButton: true }), script({ id: "s4", ownButton: true }), app({ id: "a1", ownButton: true })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(m.buttons.map((b) => [b.id, b.global])).toEqual([
+      ["s1", false],
+      ["s2", false],
+      ["a1", true],
+      ["s3", true],
+    ]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["s4"]);
   });
 
   it("an own button of either scope still competes for the same bar room", () => {
@@ -402,7 +436,7 @@ describe("buildActionsBarModel place", () => {
       activeId: undefined,
       place: { file: false, folder: true },
     });
-    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["d1", "w1"]);
+    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["w1", "d1"]);
   });
 
   it("keeps a running script visible whatever the focused tab is", () => {
@@ -427,5 +461,14 @@ describe("buildActionsBarModel place", () => {
     });
     expect(model.menu.workspace[0]?.subtitle).toBe("a.ts");
     expect(model.menu.workspace[0]?.title).toBe("Open a.ts with Code");
+  });
+});
+
+describe("appsFirst and scriptsFirst", () => {
+  const mixed = [script({ id: "s1" }), app({ id: "a1" }), script({ id: "s2" }), app({ id: "a2" })];
+
+  it("partition by kind and keep the order inside each kind", () => {
+    expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "a2", "s1", "s2"]);
+    expect(scriptsFirst(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "a2"]);
   });
 });

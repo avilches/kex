@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowDown01Icon, PlayIcon, Rocket01Icon, Settings01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -104,8 +104,8 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
       disabled={!menuEntries(item)[0].enabled}
       className="flex flex-1 items-center py-0.5"
       onSelect={(e) => {
-        if (script && item.state !== "idle" && h.focus(item.action)) e.preventDefault();
-        else nameClick(item, h);
+        if (script) e.preventDefault();
+        nameClick(item, h);
       }}
     >
       <span className={cn("flex min-w-0 flex-1 px-1", blocked && "opacity-60")}>
@@ -128,7 +128,7 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
     );
   }
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center">
       <span className="flex size-[22px] shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
       {nameZone}
     </div>
@@ -242,8 +242,11 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   return (
     <div ref={ref} data-tauri-drag-region className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
       <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
-      {model.buttons.map((item) => (
-        <OwnButton key={item.id} item={item} {...controller} />
+      {model.buttons.map((item, i) => (
+        <Fragment key={item.id}>
+          {item.global && i > 0 && !model.buttons[i - 1].global && <span aria-hidden className="h-4 w-px shrink-0 bg-border" />}
+          <OwnButton item={item} {...controller} />
+        </Fragment>
       ))}
       <ActionsMenu
         label="Actions"

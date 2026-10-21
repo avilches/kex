@@ -13,6 +13,7 @@ const app: Action = { id: "a1", name: "PyCharm", runInTerminal: false, command: 
 
 const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   id: action.id,
+  global: false,
   name: action.name,
   action,
   state: "idle",
@@ -183,6 +184,20 @@ describe("ActionsMenu", () => {
     const stop = document.querySelector("button[aria-label='Stop dev']") as HTMLElement;
     act(() => void stop.click());
     expect(view.handlers.stop).toHaveBeenCalledWith(script);
+    view.unmount();
+  });
+
+  it("starting an idle script from its name keeps the menu open, while an app closes it", () => {
+    const view = mountMenu([item(script)], [item({ ...app, id: "a2" })]);
+    view.open();
+    const rowOf = (text: string) =>
+      [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === text) as HTMLElement;
+    act(() => void rowOf("dev").click());
+    expect(view.handlers.run).toHaveBeenCalledWith(script);
+    expect(document.querySelector("[role='menu']")).not.toBeNull();
+    act(() => void rowOf("PyCharm").click());
+    expect(view.handlers.run).toHaveBeenCalledTimes(2);
+    expect(document.querySelector("[role='menu']")).toBeNull();
     view.unmount();
   });
 });

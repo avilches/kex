@@ -95,11 +95,9 @@ describe("ActionsEditor", () => {
   it("only one row is open at a time", () => {
     const { container, unmount } = mount([savedApp, saved]);
     expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
-    const lastExpand = () => {
-      const list = [...container.querySelectorAll("button[aria-label='Expand action']")];
-      return list[list.length - 1] as HTMLElement;
-    };
-    click(lastExpand());
+    const expandButtons = () => [...container.querySelectorAll("button[aria-label='Expand action']")] as HTMLElement[];
+    const lastExpand = () => expandButtons()[expandButtons().length - 1];
+    click(expandButtons()[0]);
     expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
     expect(container.textContent).toContain("Run in");
     click(lastExpand());
@@ -351,7 +349,11 @@ describe("ActionsEditor", () => {
     expect(container.querySelector("button[role='checkbox']")).not.toBeNull();
     click(container.querySelector("button[role='checkbox']"));
     expect(onUpdate).toHaveBeenCalledWith("ac-3", expect.objectContaining({ ownButton: true }));
-    expect(container.querySelector("button[aria-label='Edit action']")).not.toBeNull();
+    expect(container.querySelector("button[aria-label='Edit action']")).toBeNull();
+    expand(container);
+    const edit = container.querySelector("button[aria-label='Edit action']");
+    expect(edit).not.toBeNull();
+    expect(edit?.previousElementSibling?.getAttribute("aria-label")).toBe("Command");
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(onRemove).toHaveBeenCalledWith("ac-3");
     expect(dialogButton("Delete")).toBeUndefined();
@@ -367,15 +369,24 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("Edit duplicates an installed preset into an editable user action handed to the store", () => {
+  it("Edit turns an installed preset into the user's own action, in place", () => {
     const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
-    const { container, onAdd, unmount } = mount([installed]);
+    const { container, onAdd, onUpdate, unmount } = mount([installed]);
+    expand(container);
     click(container.querySelector("button[aria-label='Edit action']"));
-    expect(onAdd).toHaveBeenCalledTimes(1);
-    const copy = onAdd.mock.calls[0]![0] as Action;
-    expect(copy.id).not.toBe("ac-3");
-    expect(copy).toMatchObject({ name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}" });
-    expect(copy.appId).toBeUndefined();
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [id, own] = onUpdate.mock.calls[0]! as [string, Action];
+    expect(id).toBe("ac-3");
+    expect(own).toMatchObject({ name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}" });
+    expect("appId" in own).toBe(false);
+    unmount();
+  });
+
+  it("lists scripts before apps and refuses to drag one kind over the other", () => {
+    const { container, unmount } = mount([savedApp, saved]);
+    const names = [...container.querySelectorAll("span.truncate")].map((n) => n.textContent);
+    expect(names.indexOf("Dev")).toBeLessThan(names.indexOf("Zed"));
     unmount();
   });
 });

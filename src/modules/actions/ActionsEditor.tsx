@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
 import { AddApplicationMenu } from "./AddApplicationMenu";
+import { scriptsFirst } from "./lib/actionsBar";
 import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
@@ -59,9 +60,8 @@ function actionFromSuggestion(s: AppSuggestion): Action {
 // One editor for both scopes. A new command row is a draft until its command is filled in,
 // because an Action with no command is not valid and the stores refuse it; closing the
 // editor forgets the drafts, as the old Scripts tab dropped its empty rows. An app preset
-// arrives with a command, so it is handed straight to the store, and so is an Edit copy of
-// an installed preset: Kex-provided actions are read-only, so editing starts from a copy
-// with no appId of its own.
+// arrives with a command, so it is handed straight to the store; Kex-provided actions are read-only, so editing
+// turns the entry into one with no appId of its own.
 export function ActionsEditor({
   actions,
   suggestions,
@@ -87,7 +87,7 @@ export function ActionsEditor({
   const saved = new Set(actions.map((a) => a.id));
   // A draft stays rendered, under the same key, until the store shows an action with its id,
   // so the row keeps its DOM node and its focus while the write is on its way.
-  const visible = [...actions, ...drafts.filter((d) => !saved.has(d.id))];
+  const visible = scriptsFirst([...actions, ...drafts.filter((d) => !saved.has(d.id))]);
 
   const draftIds = new Set(drafts.map((d) => d.id));
 
@@ -111,15 +111,13 @@ export function ActionsEditor({
     Promise.resolve(onAddRef.current(actionFromSuggestion(s))).catch(() => {});
   };
 
-  // Edit on an app preset: a copy without the appId, so it is an editable user Action, is
-  // handed to the store at once and opens with its command selected.
-  const duplicate = (action: Action) => {
-    const copy: Action = { ...action, id: newActionId(), appId: undefined };
-    setDrafts((d) => [...d, copy]);
-    handedOver.current.add(copy.id);
-    setOpenId(copy.id);
-    Promise.resolve(onAddRef.current(copy)).catch(() => handedOver.current.delete(copy.id));
-    requestAnimationFrame(() => rows.current.get(copy.id)?.focusCommand());
+  // Edit on an app preset: the entry itself becomes the user's own, with no appId, so it
+  // is editable and the preset is offered again in the combo.
+  const takeOwnership = (action: Action) => {
+    const { appId: _appId, ...own } = action;
+    onUpdate(action.id, own);
+    setOpenId(action.id);
+    requestAnimationFrame(() => rows.current.get(action.id)?.focusCommand());
   };
 
   const change = (current: Action, next: Action) => {
@@ -149,7 +147,10 @@ export function ActionsEditor({
   };
 
   const dragEnd = ({ active, over }: DragEndEvent) => {
-    if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
+    if (!over || active.id === over.id) return;
+    const kind = (id: string | number) => visible.find((a) => a.id === id)?.runInTerminal;
+    if (kind(active.id) !== kind(over.id)) return;
+    onReorder(String(active.id), String(over.id));
   };
 
   const availableSuggestions = useMemo(
@@ -187,7 +188,7 @@ export function ActionsEditor({
                 onToggleExpand={() => toggleRow(action.id)}
                 onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
                 onMoveToWorkspace={onMoveToWorkspace && saved?.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
-                onDuplicate={action.appId !== undefined ? () => duplicate(action) : undefined}
+                onEdit={action.appId !== undefined ? () => takeOwnership(action) : undefined}
                 onChange={(next) => change(action, next)}
                 onRemove={() => remove(action)}
               />
@@ -201,7 +202,7 @@ export function ActionsEditor({
       <p className="text-[11px] text-muted-foreground">
         Command examples: <span className="font-mono">pnpm dev</span> for a script,{" "}
         <span className="font-mono">pycharm {"{workspace}"}</span> for an app.
-        {" "}An app preset is read-only; Edit on it makes a copy you can change.
+        {" "}An app preset is read-only; Edit on it turns it into your own.
       </p>
     </div>
   );

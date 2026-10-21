@@ -183,6 +183,8 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
 
 export type BarItem = {
   id: string;
+  /** The Action belongs to the global scope rather than the workspace. */
+  global: boolean;
   name: string;
   action: Action;
   state: ScriptState | "idle";
@@ -197,6 +199,37 @@ export type BarItem = {
   /** The hover words of the row, or null to say nothing. */
   title: string | null;
 };
+
+// The Header shows apps before scripts, each keeping the user's order; Settings keeps
+// the opposite, scripts first, so the list there never interleaves the two kinds.
+export function appsFirst<T extends Pick<Action, "runInTerminal">>(actions: readonly T[]): T[] {
+  return [...actions.filter((a) => !a.runInTerminal), ...actions.filter((a) => a.runInTerminal)];
+}
+
+export function scriptsFirst<T extends Pick<Action, "runInTerminal">>(actions: readonly T[]): T[] {
+  return [...actions.filter((a) => a.runInTerminal), ...actions.filter((a) => !a.runInTerminal)];
+}
+
+export const MAX_SCRIPT_BUTTONS = 3;
+
+// The own buttons the bar may draw, in order: those the place shows, with no more than
+// MAX_SCRIPT_BUTTONS scripts among them; the scripts past the cap live in the menu.
+export function ownButtonCandidates(
+  ordered: readonly Action[],
+  states: ReadonlyMap<string, ScriptState>,
+  place: FocusPlace | undefined,
+): Action[] {
+  let scripts = 0;
+  const out: Action[] = [];
+  for (const action of ordered) {
+    if (!action.ownButton) continue;
+    const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
+    if (!shownAtPlace(action, state, place)) continue;
+    if (action.runInTerminal && ++scripts > MAX_SCRIPT_BUTTONS) continue;
+    out.push(action);
+  }
+  return out;
+}
 
 export type BarModel = {
   buttons: BarItem[];
@@ -225,7 +258,7 @@ type BuildInput = {
 // to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
 // place to live.
 export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
-  const toItem = (action: Action): BarItem => {
+  const toItem = (action: Action, isGlobal: boolean): BarItem => {
     const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
     const label = action.name.trim() || "Action";
@@ -233,6 +266,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const disabledReason = running ? null : actionAvailability(action, context);
     return {
       id: action.id,
+      global: isGlobal,
       name: label,
       action,
       state,
@@ -245,18 +279,23 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
+  const ordered = [...appsFirst(local).map((a) => [a, false] as const), ...appsFirst(global).map((a) => [a, true] as const)];
   const model: BarModel = { buttons: [], menu: { workspace: [], global: [] }, empty: local.length + global.length === 0 };
-  for (const [position, action] of [...local, ...global].entries()) {
-    const isGlobal = position >= local.length;
-    const item = toItem(action);
-    if (shownAtPlace(action, item.state, place)) {
-      if (action.ownButton && model.buttons.length < limit) {
-        model.buttons.push(item);
-        continue;
-      }
-      if (isGlobal) model.menu.global.push(item);
-      else model.menu.workspace.push(item);
-    }
+  const buttonIds = new Set(
+    ownButtonCandidates(
+      ordered.map(([a]) => a),
+      states,
+      place,
+    )
+      .slice(0, limit)
+      .map((a) => a.id),
+  );
+  for (const [action, isGlobal] of ordered) {
+    const item = toItem(action, isGlobal);
+    if (!shownAtPlace(action, item.state, place)) continue;
+    if (buttonIds.has(action.id)) model.buttons.push(item);
+    else if (isGlobal) model.menu.global.push(item);
+    else model.menu.workspace.push(item);
   }
   return model;
 }

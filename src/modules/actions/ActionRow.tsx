@@ -62,8 +62,8 @@ type Props = {
   saved: boolean;
   /** An app preset as Kex installs it: read-only, and deleting it asks nothing. */
   immutable?: boolean;
-  /** Duplicates an immutable row into an editable one; only immutable rows offer it. */
-  onDuplicate?: () => void;
+  /** Turns an immutable row into the user's own editable action; only immutable rows offer it. */
+  onEdit?: () => void;
   /** Folded to its header row, like the file-type cards; drafts always stay expanded. */
   expanded: boolean;
   onToggleExpand: () => void;
@@ -78,7 +78,7 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, context, saved, immutable, onDuplicate, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
+  { action, context, saved, immutable, onEdit, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
@@ -179,11 +179,6 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
             )}
           </span>
         )}
-        {immutable && (
-          <button type="button" title="Edit: makes an editable copy" aria-label="Edit action" onClick={onDuplicate} className={SMALL_BUTTON}>
-            <HugeiconsIcon icon={PencilEditIcon} size={12} strokeWidth={2} />
-          </button>
-        )}
         <span className="flex shrink-0 items-center gap-1">
           <Checkbox
             id={`${action.id}-own`}
@@ -252,13 +247,14 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
       {expanded && (
         <>
           <div className="flex flex-col gap-1">
+            <div className="flex items-start gap-1">
             <Textarea
               ref={commandRef}
               rows={3}
               readOnly={immutable}
               className={cn(
                 INPUT_CLASS,
-                "h-auto min-h-0 resize-y font-mono leading-snug [field-sizing:fixed]",
+                "h-auto min-h-0 flex-1 resize-y font-mono leading-snug [field-sizing:fixed]",
                 (command.required || blocking.some((p) => p.kind === "command")) && "border-destructive",
               )}
               aria-label="Command"
@@ -276,6 +272,18 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
                 saveCommand(e.target.value);
               }}
             />
+            {immutable && (
+              <button
+                type="button"
+                title="Edit: turns it into your own action"
+                aria-label="Edit action"
+                onClick={onEdit}
+                className={cn(SMALL_BUTTON, "mt-1")}
+              >
+                <HugeiconsIcon icon={PencilEditIcon} size={12} strokeWidth={2} />
+              </button>
+            )}
+            </div>
             {command.required && <div className="text-[11px] text-destructive">Command is required</div>}
             {!immutable && (
               <button
@@ -303,12 +311,14 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
                       setDraft(value);
                       saveCommand(value);
                     }}
-                    className="flex items-center gap-2 border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
+                    className="flex flex-col border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
                   >
-                    <span className="shrink-0 font-mono text-foreground">{`{${v.name}}`}</span>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">{v.description}</span>
-                    {context && (
-                      <span className="max-w-[110px] shrink-0 truncate font-mono text-muted-foreground" title={context.vars[v.name]}>
+                    <span className="flex w-full items-center gap-2">
+                      <span className="shrink-0 font-mono text-foreground">{`{${v.name}}`}</span>
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">{v.description}</span>
+                    </span>
+                    {context?.vars[v.name] && (
+                      <span className="w-full truncate font-mono text-[10px] text-muted-foreground/80" title={context.vars[v.name]}>
                         {context.vars[v.name]}
                       </span>
                     )}
