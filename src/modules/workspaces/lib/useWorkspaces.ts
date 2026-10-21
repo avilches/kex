@@ -21,7 +21,7 @@ import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
-import { applyAgentTitles } from "./agentTitles";
+import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
 import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
@@ -1095,6 +1095,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
   }, []);
 
+  const clearAgentTitles = useCallback((tabIds: ReadonlySet<string>) => {
+    setWorkspaces((prev) => clearAgentTitlesFn(prev, tabIds));
+  }, []);
+
   const hibernateWorkspace = useCallback((workspaceId: string, snapshots?: Record<string, TabHibernation>) => {
     setWorkspaces((prev) => applyHibernate(prev, workspaceId, Date.now(), snapshots));
   }, []);
@@ -1182,6 +1186,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    clearAgentTitles,
     wakeWorkspace,
     activateTab,
     revealTab,

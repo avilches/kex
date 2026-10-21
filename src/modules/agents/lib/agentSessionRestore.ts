@@ -35,6 +35,16 @@ export function restorePlansReady(): Promise<void> {
   return readyPromise;
 }
 
+// Tabs a re-attach may still claim: a restore plan loaded at launch, or a snapshot staged
+// for a tab that is spawning its PTY. The title an agent sent for them has to survive the
+// window between the session dying and the agent returning.
+export function restoreSnapshotTabIds(): Set<string> {
+  const ids = new Set<string>();
+  if (restorePlans) for (const id of restorePlans.keys()) ids.add(id);
+  for (const id of stagedSnapshots.keys()) ids.add(id);
+  return ids;
+}
+
 export async function loadRestorePlans(): Promise<void> {
   try {
     const plans = await invoke<RestorePlan[]>("agent_session_restore_plan");

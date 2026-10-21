@@ -314,6 +314,7 @@ export default function App() {
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    clearAgentTitles,
     applyExplorerSnapshotBatch,
     wakeWorkspace,
     activateTab,
@@ -1960,7 +1961,7 @@ export default function App() {
     [saveTab],
   );
 
-  useEffect(() => startAgentTitleSync(setAgentTitles), [setAgentTitles]);
+  useEffect(() => startAgentTitleSync(setAgentTitles, clearAgentTitles), [setAgentTitles, clearAgentTitles]);
   useEffect(
     () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
     [applyExplorerSnapshotBatch],
