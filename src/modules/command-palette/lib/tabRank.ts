@@ -17,3 +17,14 @@ export function byRecency(a: TabEntry, b: TabEntry): number {
     a.order - b.order
   );
 }
+
+// Empty-box order: tabs that need you first, then the ones still busy, then the rest.
+function attentionTier(e: TabEntry): number {
+  if (e.indicator === "attention" || e.indicator === "error") return 0;
+  if (e.indicator === "working" || e.running) return 1;
+  return 2;
+}
+
+export function byRecentList(a: TabEntry, b: TabEntry): number {
+  return attentionTier(a) - attentionTier(b) || byRecency(a, b);
+}
