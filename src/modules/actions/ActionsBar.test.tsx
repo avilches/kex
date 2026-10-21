@@ -90,7 +90,7 @@ describe("OwnButton", () => {
   });
 
   it("shows the red stop button again while stopping, and both stops agree", () => {
-    const { container, handlers, unmount } = mount(item(script, { state: "waiting", stoppable: false }), vi.fn(() => true));
+    const { container, handlers, unmount } = mount(item(script, { state: "waiting", stoppable: true }), vi.fn(() => true));
     const zone = byLabel(container, "Stop dev");
     expect(zone).not.toBeNull();
     expect((zone as HTMLButtonElement).disabled).toBe(false);

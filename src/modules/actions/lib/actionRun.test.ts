@@ -251,6 +251,10 @@ describe("planActionStop", () => {
   it("signals the tree when a waiting script shows the mark again, whatever the shell reports", () => {
     expect(planActionStop({ ...live, mark: "waiting" })).toEqual({ kind: "stop", tabId: "t", mark: "waiting", stage: "signal" });
   });
+
+  it("clears and signals a waiting script whose command was never seen", () => {
+    expect(planActionStop({ ...live, mark: "waiting", commandSeen: false })).toEqual({ kind: "stop", tabId: "t", mark: false, stage: "signal" });
+  });
 });
 
 describe("planTabReveal", () => {

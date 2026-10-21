@@ -52,7 +52,7 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
 }
 
 // Clicking the name of a script that has a tab brings it into view; without one it runs.
-// A waiting script focuses like a running one: only the icon zone shows the spinner.
+// A waiting script focuses like a running one: its own zone still stops.
 function nameClick(item: BarItem, { run, focus }: Handlers) {
   if (item.state !== "idle" && focus(item.action)) return;
   run(item.action);

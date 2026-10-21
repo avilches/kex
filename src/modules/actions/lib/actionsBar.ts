@@ -151,7 +151,7 @@ export type BarItem = {
   action: Action;
   state: ScriptState | "idle";
   active: boolean;
-  /** Only scripts that are running can be stopped; apps never. */
+  /** The zone can stop it: running, or already stopping by the first Ctrl+C. */
   stoppable: boolean;
   disabledReason: string | null;
   /** The value the preset variable reads here; null leaves the name lineless. */
@@ -195,7 +195,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       action,
       state,
       active: action.id === activeId,
-      stoppable: running,
+      stoppable: state !== "idle",
       disabledReason: running ? null : actionAvailability(action, context),
       subtitle: barSubtitle(action.name.trim() || "Action", context),
     };
