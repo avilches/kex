@@ -4,10 +4,12 @@ import { planScriptStop } from "@/modules/workspaces/lib/scriptRunState";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   commandProblem,
+  commandVariablesUsed,
   expandCommandArgv,
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
+import { WORKSPACE_UNSET } from "./actionsBar";
 import type { Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -88,6 +90,7 @@ function expandFailure(e: unknown): string {
 function planApp(action: Action, ctx: RunContext): RunPlan {
   const problem = commandProblem(action.command);
   if (problem) return blocked(action, problem);
+  if (commandVariablesUsed(action.command).size === 0 && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
   try {
@@ -105,6 +108,7 @@ function newTabPlacement(ctx: RunContext): NewTabPlacement {
 function planScript(action: Action, ctx: RunContext): RunPlan {
   const { link } = ctx;
   if (link?.exists && link.markRunning) return { kind: "already-running", tabId: link.tabId };
+  if (commandVariablesUsed(action.command).size === 0 && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
   const problem = commandProblem(action.command, ctx.shell, ctx.vars);

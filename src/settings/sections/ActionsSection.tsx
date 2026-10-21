@@ -63,7 +63,7 @@ export function ActionsSection() {
         <SectionHeader title="Actions" />
         <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-[11px]" onClick={scan} disabled={isScanning}>
           <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
-          {isScanning ? "Scanning..." : "Scan"}
+          {isScanning ? "Scanning..." : "Scan applications"}
         </Button>
       </div>
 

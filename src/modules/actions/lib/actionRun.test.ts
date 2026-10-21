@@ -41,6 +41,13 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
 });
 
 describe("planActionRun, scripts", () => {
+  it("blocks a plain script while the workspace has no root, with the same words the bar uses", () => {
+    const rootless = ctx({ vars: { ...ctx().vars, workspace: "" }, folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
+    expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: Set a root to this workspace" });
+    expect(planActionRun(script({ command: "ls {cwd}" }), rootless).kind).toBe("new-tab");
+    expect(planActionRun(script(), ctx())).toMatchObject({ kind: "new-tab" });
+  });
+
   it("opens a split scripts pane the first time", () => {
     const plan = planActionRun(script(), ctx());
     expect(plan).toMatchObject({ kind: "new-tab", placement: "split-scripts-pane", cwd: "/w", title: "Dev" });
