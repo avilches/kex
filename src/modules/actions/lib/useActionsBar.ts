@@ -6,13 +6,20 @@ import type { Action } from "./types";
 import { useActionContext } from "./useActionContext";
 import { useActionStates } from "./useActionStates";
 
+export type BarScope = "workspace" | "global";
+
 export type BarController = {
   run: (action: Action) => void;
   stop: (action: Action) => void;
   /** Brings the tab of a running script into view; false when it has none. */
   focus: (action: Action) => boolean;
   /** Moves an Action of the given scope to the place of another one of the same scope. */
-  reorder: (scope: "workspace" | "global", fromId: string, toId: string) => void;
+  reorder: (scope: BarScope, fromId: string, toId: string) => void;
+  /** Merges a patch into an Action of the given scope. */
+  update: (scope: BarScope, id: string, patch: Partial<Omit<Action, "id">>) => void;
+  remove: (scope: BarScope, id: string) => void;
+  /** Moves an Action to the other scope. */
+  move: (scope: BarScope, id: string) => void;
 };
 
 type Input = {

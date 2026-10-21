@@ -254,6 +254,36 @@ export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "runInTe
   return new Set([...count].filter(([, n]) => n === 1).map(([id]) => id));
 }
 
+// What dropping a dragged button on `overId` does. Over another button of its own scope it
+// is a reorder (same kind only); over a button of the other scope, or over the empty
+// placeholder of that scope, it moves to that scope; over the menu it stops being a button.
+export type DropAction =
+  | { kind: "reorder"; scope: "workspace" | "global"; fromId: string; toId: string }
+  | { kind: "move"; scope: "workspace" | "global"; id: string }
+  | { kind: "hide"; scope: "workspace" | "global"; id: string };
+
+export const DROP_MENU = "zone:menu";
+export const DROP_WORKSPACE = "zone:workspace";
+export const DROP_GLOBAL = "zone:global";
+
+export function resolveDrop(
+  buttons: readonly Pick<BarItem, "id" | "global" | "action">[],
+  activeId: string,
+  overId: string,
+): DropAction | null {
+  const from = buttons.find((b) => b.id === activeId);
+  if (!from || activeId === overId) return null;
+  const scope = from.global ? "global" : "workspace";
+  if (overId === DROP_MENU) return { kind: "hide", scope, id: from.id };
+  if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
+    return (overId === DROP_GLOBAL) === from.global ? null : { kind: "move", scope, id: from.id };
+  }
+  const to = buttons.find((b) => b.id === overId);
+  if (!to) return null;
+  if (to.global !== from.global) return { kind: "move", scope, id: from.id };
+  return canReorderButtons(from, to) ? { kind: "reorder", scope, fromId: from.id, toId: to.id } : null;
+}
+
 export type BarModel = {
   buttons: BarItem[];
   /** The Actions that are not own buttons, scripts and apps mixed: the workspace

@@ -23,9 +23,9 @@ import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspac
 import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { unlinkTab } from "@/modules/actions/lib/actionStateStore";
+import { unlinkRemovedActions, unlinkTab } from "@/modules/actions/lib/actionStateStore";
 import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
-import { reorderActions } from "@/modules/actions/lib/actions";
+import { createBarOps } from "@/modules/actions/lib/barOps";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { ActionMenuProvider } from "@/modules/actions/RowActionsMenu";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -3526,23 +3526,29 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const barOps = useMemo(
+    () =>
+      createBarOps({
+        workspaceId: () => activeWorkspaceIdRef.current ?? undefined,
+        workspaceActions: (id) => workspacesRef.current.find((w) => w.id === id)?.actions ?? [],
+        updateWorkspaceAction,
+        removeWorkspaceAction,
+        reorderWorkspaceActions,
+        promoteWorkspaceAction,
+        demoteGlobalAction,
+        global: globalActions,
+        unlink: unlinkRemovedActions,
+        fail: (message, err) => {
+          console.error(message, err);
+          toast.error(message);
+        },
+      }),
+    [updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, promoteWorkspaceAction, demoteGlobalAction],
+  );
+
   const actionsController = useMemo(
-    () => ({
-      run: runAction,
-      stop: stopAction,
-      focus: focusActionTab,
-      reorder: (scope: "workspace" | "global", fromId: string, toId: string) => {
-        if (scope === "workspace") {
-          if (activeWorkspaceIdRef.current) reorderWorkspaceActions(activeWorkspaceIdRef.current, fromId, toId);
-          return;
-        }
-        globalActions.change((list) => reorderActions(list, fromId, toId)).catch((err: unknown) => {
-          console.error("Could not save the global actions", err);
-          toast.error("Could not save the actions");
-        });
-      },
-    }),
-    [runAction, stopAction, focusActionTab, reorderWorkspaceActions],
+    () => ({ run: runAction, stop: stopAction, focus: focusActionTab, ...barOps }),
+    [runAction, stopAction, focusActionTab, barOps],
   );
 
   // Settings owns the Actions editor now; the workspace scope flows to it through the

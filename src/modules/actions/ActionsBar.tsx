@@ -1,15 +1,30 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   closestCenter,
+  type CollisionDetection,
   DndContext,
   PointerSensor,
+  pointerWithin,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown01Icon, PlayIcon, Rocket01Icon, Settings01Icon, StopIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowDown01Icon,
+  CircleArrowDownDoubleIcon,
+  CircleArrowUpDoubleIcon,
+  Delete02Icon,
+  PlayIcon,
+  Rocket01Icon,
+  Settings01Icon,
+  StopIcon,
+  Tick02Icon,
+  ViewOffIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
@@ -19,12 +34,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { splitActionName } from "./lib/actionName";
-import { canReorderButtons, menuEntries, WORKSPACE_UNSET, type BarItem } from "./lib/actionsBar";
+import {
+  DROP_GLOBAL,
+  DROP_MENU,
+  DROP_WORKSPACE,
+  menuEntries,
+  resolveDrop,
+  WORKSPACE_UNSET,
+  type BarItem,
+} from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
@@ -113,26 +147,95 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
   );
 }
 
+type Ops = Pick<BarController, "update" | "move">;
+
 // A button that can be dragged while the reorder modifier is held. Out of that mode it is a
 // plain wrapper: no listeners, no attributes. In it the click is swallowed, so grabbing a
 // button never runs it, and the children ignore the pointer so even a disabled button
-// (which the webview hides pointer events from) can be picked up.
-function ReorderableButton({ item, reorderMode, ...h }: { item: BarItem; reorderMode: boolean } & Handlers) {
+// (which the webview hides pointer events from) can be picked up. The right-click menu
+// is the third way, after Settings and dragging, to take an Action to the menu, to the
+// other scope or out of the app.
+function ReorderableButton({
+  item,
+  reorderMode,
+  ops,
+  onDelete,
+  ...h
+}: { item: BarItem; reorderMode: boolean; ops: Ops; onDelete: (item: BarItem) => void } & Handlers) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !reorderMode,
   });
+  const scope = item.global ? "global" : "workspace";
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition, zIndex: isDragging ? 10 : undefined }}
+          {...(reorderMode ? attributes : {})}
+          {...listeners}
+          onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
+          className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&>*]:pointer-events-none", isDragging && "cursor-grabbing bg-accent opacity-80")}
+        >
+          <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="min-w-52">
+        <ContextMenuItem onSelect={() => ops.update(scope, item.id, { ownButton: false })}>
+          <HugeiconsIcon icon={ViewOffIcon} size={13} strokeWidth={2} />
+          Hide from bar
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => ops.move(scope, item.id)}>
+          <HugeiconsIcon icon={item.global ? CircleArrowDownDoubleIcon : CircleArrowUpDoubleIcon} size={13} strokeWidth={2} />
+          {item.global ? "Move to Workspace Only" : "Move to Global"}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onSelect={() => onDelete(item)}>
+          <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={2} />
+          Delete Action
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+// Where a dragged button can land when its own scope has no buttons, or the menu has no
+// Actions: a grey dashed stand-in that only exists during the drag.
+function DropPlaceholder({ id, label, children }: { id: string; label: string; children?: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition, zIndex: isDragging ? 10 : undefined }}
-      {...(reorderMode ? attributes : {})}
-      {...listeners}
-      onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
-      className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&>*]:pointer-events-none", isDragging && "cursor-grabbing bg-accent opacity-80")}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-muted/40 px-3 text-[11px] text-muted-foreground transition-colors",
+        isOver && "border-foreground/50 bg-accent text-foreground",
+      )}
     >
-      <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
+      {children}
     </div>
+  );
+}
+
+// The menu is a drop target while a button is dragged: dropping there hides the button.
+// Without a menu a grey dashed "Actions" appears for the duration of the drag instead.
+function MenuDrop({ dragging, hasMenu, children }: { dragging: boolean; hasMenu: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: DROP_MENU, disabled: !dragging });
+  if (hasMenu) {
+    return (
+      <div ref={setNodeRef} className={cn("shrink-0 rounded-md transition-shadow", dragging && isOver && "ring-1 ring-foreground/40")}>
+        {children}
+      </div>
+    );
+  }
+  if (!dragging) return null;
+  return (
+    <DropPlaceholder id={DROP_MENU} label="Hide from the bar">
+      <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} />
+      <span>Actions</span>
+    </DropPlaceholder>
   );
 }
 
@@ -329,13 +432,48 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     return () => ro.disconnect();
   }, []);
   const model = useActionsBarModel({ workspace, room });
-  const dragEnd = ({ active, over }: DragEndEvent) => {
-    draggingRef.current = false;
-    if (!over || active.id === over.id) return;
-    const from = model.buttons.find((b) => b.id === active.id);
-    const to = model.buttons.find((b) => b.id === over.id);
-    if (from && to && canReorderButtons(from, to)) controller.reorder(from.global ? "global" : "workspace", from.id, to.id);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<BarItem | null>(null);
+  const dragged = draggingId ? model.buttons.find((b) => b.id === draggingId) : undefined;
+  const workspaceButtons = model.buttons.filter((b) => !b.global);
+  const globalButtons = model.buttons.filter((b) => b.global);
+  const workspaceStandIn = !!dragged?.global && workspaceButtons.length === 0;
+  const globalStandIn = !!dragged && !dragged.global && globalButtons.length === 0;
+  // The pointer decides what is under the drag; with none, the nearest button of its own scope.
+  const collision: CollisionDetection = (args) => {
+    const within = pointerWithin(args).filter((c) => c.id !== args.active.id);
+    if (within.length > 0) return within;
+    const scope = model.buttons.find((b) => b.id === args.active.id)?.global;
+    const own = args.droppableContainers.filter((c) => model.buttons.some((b) => b.id === c.id && b.global === scope));
+    return closestCenter({ ...args, droppableContainers: own });
   };
+  const dragStart = ({ active }: DragStartEvent) => {
+    draggingRef.current = true;
+    setDraggingId(String(active.id));
+  };
+  const endDrag = () => {
+    draggingRef.current = false;
+    setDraggingId(null);
+  };
+  const dragEnd = ({ active, over }: DragEndEvent) => {
+    endDrag();
+    const drop = over ? resolveDrop(model.buttons, String(active.id), String(over.id)) : null;
+    if (!drop) return;
+    if (drop.kind === "reorder") controller.reorder(drop.scope, drop.fromId, drop.toId);
+    else if (drop.kind === "move") controller.move(drop.scope, drop.id);
+    else controller.update(drop.scope, drop.id, { ownButton: false });
+  };
+  const askDelete = (item: BarItem) => {
+    if (item.action.appId) controller.remove(item.global ? "global" : "workspace", item.id);
+    else setPendingDelete(item);
+  };
+  const renderButtons = (list: BarItem[]) => (
+    <SortableContext items={list.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
+      {list.map((item) => (
+        <ReorderableButton key={item.id} item={item} reorderMode={held} ops={controller} onDelete={askDelete} {...controller} />
+      ))}
+    </SortableContext>
+  );
   return (
     <div
       ref={ref}
@@ -357,33 +495,47 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collision}
         autoScroll={false}
-        onDragStart={() => {
-          draggingRef.current = true;
-        }}
+        onDragStart={dragStart}
         onDragEnd={dragEnd}
-        onDragCancel={() => {
-          draggingRef.current = false;
-        }}
+        onDragCancel={endDrag}
       >
-        <SortableContext items={model.buttons.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
-          {model.buttons.map((item, i) => (
-            <Fragment key={item.id}>
-              {item.global && i > 0 && !model.buttons[i - 1].global && <span aria-hidden className="h-4 w-px shrink-0 bg-border" />}
-              <ReorderableButton item={item} reorderMode={held} {...controller} />
-            </Fragment>
-          ))}
-        </SortableContext>
+        {renderButtons(workspaceButtons)}
+        {workspaceStandIn && <DropPlaceholder id={DROP_WORKSPACE} label="Move to workspace only" />}
+        {(workspaceButtons.length > 0 || workspaceStandIn) && (globalButtons.length > 0 || globalStandIn) && (
+          <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+        )}
+        {renderButtons(globalButtons)}
+        {globalStandIn && <DropPlaceholder id={DROP_GLOBAL} label="Move to global" />}
+        <MenuDrop dragging={draggingId !== null} hasMenu={model.menu.workspace.length + model.menu.global.length > 0}>
+          <ActionsMenu
+            label="Actions"
+            items={model.menu.workspace}
+            globalItems={model.menu.global}
+            onRestoreFocus={onRestoreFocus}
+            onConfigure={onConfigure}
+            {...controller}
+          />
+        </MenuDrop>
       </DndContext>
-      <ActionsMenu
-        label="Actions"
-        items={model.menu.workspace}
-        globalItems={model.menu.global}
-        onRestoreFocus={onRestoreFocus}
-        onConfigure={onConfigure}
-        {...controller}
-      />
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent className="w-[360px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base">Delete &quot;{pendingDelete?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[12px]">The Action is removed and cannot come back.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => pendingDelete && controller.remove(pendingDelete.global ? "global" : "workspace", pendingDelete.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

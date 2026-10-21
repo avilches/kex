@@ -11,12 +11,16 @@ import {
   BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
+  DROP_GLOBAL,
+  DROP_MENU,
+  DROP_WORKSPACE,
   isCompactBar,
   MAX_BUTTONS_PER_SCOPE,
   menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  resolveDrop,
   scriptsFirst,
   soleAppButtons,
   WORKSPACE_UNSET,
@@ -493,5 +497,38 @@ describe("canReorderButtons", () => {
     expect(canReorderButtons(b(script({ id: "s1" })), b(script({ id: "s2" })))).toBe(true);
     expect(canReorderButtons(b(app()), b(script()))).toBe(false);
     expect(canReorderButtons(b(app()), b(app({ id: "a2" }), true))).toBe(false);
+  });
+});
+
+describe("resolveDrop", () => {
+  const b = (id: string, over: { global?: boolean; script?: boolean } = {}) => ({
+    id,
+    global: over.global ?? false,
+    action: over.script ? script({ id }) : app({ id }),
+  });
+  const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true }), b("g2", { global: true })];
+
+  it("reorders over a button of the same scope and kind, never across kinds", () => {
+    expect(resolveDrop(bar, "w1", "w2")).toEqual({ kind: "reorder", scope: "workspace", fromId: "w1", toId: "w2" });
+    expect(resolveDrop(bar, "w1", "ws")).toBeNull();
+  });
+
+  it("moves over a button of the other scope or its empty stand-in", () => {
+    expect(resolveDrop(bar, "w1", "g1")).toEqual({ kind: "move", scope: "workspace", id: "w1" });
+    expect(resolveDrop(bar, "g1", "w2")).toEqual({ kind: "move", scope: "global", id: "g1" });
+    expect(resolveDrop(bar, "w1", DROP_GLOBAL)).toEqual({ kind: "move", scope: "workspace", id: "w1" });
+    expect(resolveDrop(bar, "g1", DROP_WORKSPACE)).toEqual({ kind: "move", scope: "global", id: "g1" });
+  });
+
+  it("ignores a drop on its own scope's stand-in, on itself or on nothing known", () => {
+    expect(resolveDrop(bar, "w1", DROP_WORKSPACE)).toBeNull();
+    expect(resolveDrop(bar, "g1", DROP_GLOBAL)).toBeNull();
+    expect(resolveDrop(bar, "w1", "w1")).toBeNull();
+    expect(resolveDrop(bar, "w1", "ghost")).toBeNull();
+    expect(resolveDrop(bar, "ghost", "w1")).toBeNull();
+  });
+
+  it("hides the button when it lands on the menu", () => {
+    expect(resolveDrop(bar, "g2", DROP_MENU)).toEqual({ kind: "hide", scope: "global", id: "g2" });
   });
 });
