@@ -14,8 +14,10 @@ const tabs: Tab[] = [
 function setup() {
   const workspacesRef = {
     current: [
-      { paneTree: { kind: "pane", id: "p1", tabs, activeTabId: "a" } },
-    ] as Pick<Workspace, "paneTree">[],
+      { id: "ws-1", workspaceRoot: "/repo", paneTree: { kind: "pane", id: "p1", tabs, activeTabId: "a" } },
+      { id: "ws-2", fsRoot: "/fs", paneTree: { kind: "pane", id: "p2", tabs: [], activeTabId: null } },
+      { id: "ws-3", paneTree: { kind: "pane", id: "p3", tabs: [], activeTabId: null } },
+    ] as Pick<Workspace, "id" | "paneTree" | "workspaceRoot" | "fsRoot">[],
   };
   const closeTabs = vi.fn();
   const closeTabsRef = { current: closeTabs };
@@ -34,6 +36,14 @@ describe("useSidebarTabMenuActions", () => {
     expect(saveTabRef.current).toHaveBeenCalledWith("a");
   });
 
+  it("resolves the root a relative path is measured from: pinned root, then filesystem root", () => {
+    const { hook } = setup();
+    expect(hook.result.current.workspaceRoot("ws-1")).toBe("/repo");
+    expect(hook.result.current.workspaceRoot("ws-2")).toBe("/fs");
+    expect(hook.result.current.workspaceRoot("ws-3")).toBeNull();
+    expect(hook.result.current.workspaceRoot("nope")).toBeNull();
+  });
+
   it("keeps the same object across renders", () => {
     const { hook } = setup();
     const first = hook.result.current;
@@ -47,11 +57,13 @@ describe("useSidebarTabMenuActions", () => {
     const actions = hook.result.current;
     expect(actions.paneTabCount("a")).toBe(3);
     workspacesRef.current = [
-      { paneTree: { kind: "pane", id: "p1", tabs: tabs.slice(0, 2), activeTabId: "a" } },
+      { id: "ws-1", paneTree: { kind: "pane", id: "p1", tabs: tabs.slice(0, 2), activeTabId: "a" } },
     ];
     expect(actions.paneTabCount("a")).toBe(2);
 
-    workspacesRef.current = [{ paneTree: { kind: "pane", id: "p1", tabs, activeTabId: "a" } }];
+    workspacesRef.current = [
+      { id: "ws-1", paneTree: { kind: "pane", id: "p1", tabs, activeTabId: "a" } },
+    ];
     actions.onCloseOtherTabs("a");
     expect(closeTabs).toHaveBeenLastCalledWith(["c"]);
     actions.onCloseAllTabs("a");

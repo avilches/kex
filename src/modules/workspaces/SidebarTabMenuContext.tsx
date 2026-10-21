@@ -15,6 +15,7 @@ export type SidebarTabMenuActions = {
   onUpdateTab: (tabId: string, updater: (p: Tab) => Tab) => void;
   onSaveTab: (tabId: string) => void;
   onRevealInExplorer: (path: string) => void;
+  workspaceRoot: (workspaceId: string) => string | null;
 };
 
 const noop = () => {};
@@ -28,6 +29,7 @@ const SidebarTabMenuContext = createContext<SidebarTabMenuActions>({
   onUpdateTab: noop,
   onSaveTab: noop,
   onRevealInExplorer: noop,
+  workspaceRoot: () => null,
 });
 
 export const SidebarTabMenuProvider = SidebarTabMenuContext.Provider;
@@ -37,7 +39,7 @@ export function useSidebarTabMenu(): SidebarTabMenuActions {
 }
 
 type ActionSources = {
-  workspacesRef: RefObject<Pick<Workspace, "paneTree">[]>;
+  workspacesRef: RefObject<Pick<Workspace, "id" | "paneTree" | "workspaceRoot" | "fsRoot">[]>;
   closeTabsRef: RefObject<(tabIds: string[]) => unknown>;
   saveTabRef: RefObject<(tabId: string) => unknown>;
   tabCallbacksRef: RefObject<{
@@ -69,6 +71,10 @@ export function useSidebarTabMenuActions({
       onRenameTab: (tabId, title) => tabCallbacksRef.current.onRenameTab?.(tabId, title),
       onUpdateTab: (tabId, updater) => tabCallbacksRef.current.onUpdateTab?.(tabId, updater),
       onRevealInExplorer: (path) => tabCallbacksRef.current.onFocusOnExplorer?.(path),
+      workspaceRoot: (workspaceId) => {
+        const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+        return ws?.workspaceRoot ?? ws?.fsRoot ?? null;
+      },
     };
   }, [workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef]);
 }

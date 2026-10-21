@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tabFilePath } from "./tabPath";
+import { tabCopyPath, tabFilePath } from "./tabPath";
 import type { Tab } from "./types";
 
 describe("tabFilePath", () => {
@@ -68,5 +68,39 @@ describe("tabFilePath", () => {
     expect(
       tabFilePath({ id: "1", kind: "git-history", repoRoot: "/r" }),
     ).toBeNull();
+  });
+});
+
+describe("tabCopyPath", () => {
+  const terminal: Tab = { id: "1", kind: "terminal", cwd: "/repo" };
+
+  it("copies the shell cwd of a terminal", () => {
+    expect(tabCopyPath(terminal, null)).toBe("/repo");
+  });
+
+  it("prefers the worktree the agent entered over the shell cwd", () => {
+    expect(tabCopyPath(terminal, "/repo/.claude/worktrees/x")).toBe(
+      "/repo/.claude/worktrees/x",
+    );
+  });
+
+  it("has nothing to copy for a terminal without a cwd", () => {
+    expect(tabCopyPath({ id: "1", kind: "terminal" }, null)).toBeNull();
+  });
+
+  it("copies the file of an editor and of a diff", () => {
+    expect(
+      tabCopyPath({ id: "1", kind: "editor", path: "/a/b.ts", dirty: false, preview: false }, "/wt"),
+    ).toBe("/a/b.ts");
+    expect(
+      tabCopyPath(
+        { id: "1", kind: "git-diff", path: "src/x.ts", repoRoot: "/repo", mode: "+", originalPath: null, preview: false },
+        null,
+      ),
+    ).toBe("/repo/src/x.ts");
+  });
+
+  it("has nothing to copy for a browser tab", () => {
+    expect(tabCopyPath({ id: "1", kind: "browser", url: "https://a.b" } as Tab, null)).toBeNull();
   });
 });
