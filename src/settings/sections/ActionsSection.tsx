@@ -43,17 +43,11 @@ function editQuietly(fn: (list: Action[]) => Action[]) {
 
 type Tab = "global" | "workspace";
 
-type Props = {
-  /** Extra in the section param ("actions:script", "actions:workspace:script"): open with a blank command draft, on the tab the extra says. */
-  startDraft?: string;
-  onDraftConsumed?: () => void;
-};
-
-export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
+export function ActionsSection() {
   const actions = usePreferencesStore((s) => s.actions);
   const { detectedEditors, isScanning, scan } = useExternalEditors();
   const { feed, send } = useWorkspaceActionsFeed();
-  const [tab, setTab] = useState<Tab>(startDraft?.startsWith("workspace") ? "workspace" : "global");
+  const [tab, setTab] = useState<Tab>("global");
 
   const didScan = useRef(false);
   useEffect(() => {
@@ -62,14 +56,6 @@ export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
       scan();
     }
   }, [detectedEditors.length, isScanning, scan]);
-
-  const draft = startDraft?.endsWith(":script") ? "script" : undefined;
-  const autoDraft = draft === "script" ? ({ kind: "script" } as const) : null;
-
-  useEffect(() => {
-    if (!startDraft) return;
-    onDraftConsumed?.();
-  }, [startDraft, onDraftConsumed]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -110,7 +96,6 @@ export function ActionsSection({ startDraft, onDraftConsumed }: Props) {
           actions={actions}
           suggestions={suggestionsFromDetected(detectedEditors)}
           context={null}
-          autoDraft={autoDraft}
           emptyHint="No global actions yet. Add a command or pick an application above."
           onAdd={(action) => edit((list) => addAction(list, action))}
           onUpdate={(id, next) => editQuietly((list) => updateAction(list, id, next))}

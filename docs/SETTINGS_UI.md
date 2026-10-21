@@ -38,7 +38,8 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   guardado siempre permanece desplegado.
 - **Borrado con confirmacion**: cualquier removida de una fila guardada (tarjeta de Action en
   `ActionRow`, entrada de extension en `FileTypesSection`) abre `AlertDialog` y solo llega al
-  store con el boton destructivo confirmado.
+  store con el boton destructivo confirmado. Excepcion: una Action inmutable de app (`appId`
+  presente) se borra sin pedir nada, porque vuelve una sola eleccion en el combo.
 - **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el
   body y un popover portalizado a body queda muerto para el raton (y `RemoveScroll` se come la
   rueda). El patron vigente es `DialogScrollHost` (`src/components/dialogScrollHost.tsx`): el
@@ -52,18 +53,30 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   nombres canonico son `{filepath}` y `{filename}` (los antiguos `{path}`/`{file}` ya no
   existen); los presets de JetBrains solo ofrecen las variantes de workspace y cwd porque sus
   editores no abren ficheros sueltos.
-- **Menu "+ Action"**: sin acciones, la ActionsBar muestra el trigger punteado "+ Action" (solo
-  el simbolo, sin icono) con dos entradas: "Add global action" abre Settings > Actions con un
-  borrador de script vacio y el foco en el commando, y "This workspace only" hace lo mismo en
-  el dialogo de workspace. Con acciones, el trigger reaparece al pasar el raton por la barra.
-- **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo el valor que
-  el lugar actual da a esa variable (la carpeta, el fichero, la raiz del workspace) en mono
-  pequeno en las superficies donde se renderiza el nombre (boton propio del header, filas de
-  los menus agrupados, submenu contextual y tarjeta plegada del editor), via `ActionNameLines.tsx`
-  y `barSubtitle`; para `{workspace}` sin raiz configurada la linea dice "Workspace Root not
-  configured". El ancho del boton propio se mide solo con el nombre principal.
-- **Conteo apagado en triggers**: los menus agrupados de `ActionsBar` muestran un numero
-  apagado junto al label del trigger con las filas que contienen (workspace + global).
+- **Menu "+ Action"**: sin acciones, la ActionsBar muestra el trigger punteado "+ Action"
+  (solo el simbolo, sin icono) que abre Settings > Actions directamente, sin menu intermedio
+  ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
+- **Barra del Header**: un solo menu "Actions" con todas las Actions sin boton propio, bajo
+  el titulo "Workspace actions" primero y despues "Global actions", cada alcance en su orden;
+  el click en el nombre de un script en marcha lleva a su tab sin cerrar el menu.
+- **Editor de Actions en Settings**: el combo de apps no se cierra al elegir (se pueden
+  anadir varios de una vez) y no muestra los presets ya instalados (coincidencia por
+  `appId` + commando exacto). Una Action proveniente de un preset es inmutable: se consulta
+  desplegada pero no se edita; el boton "Edit" de su tarjeta hace una copia editable (nueva
+  id, sin `appId`, entregada al store al punto) y borrarla no pide confirmacion; una Action
+  de usuario si abre `AlertDialog`.
+- **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
+  pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y
+  `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Workspace Root
+  not configured"), `{filepath}` solo el nombre del fichero y `{cwd}` la ruta con el
+  principio recortado (el mismo truco de la fila "Copy absolute path", ahora compartido en
+  `src/components/StartTrimmed.tsx`). Las superficies donde se pinta el nombre: boton propio
+  del header, menu Unico del header, submenu contextual, combo de apps del editor y tarjeta
+  plegada. El hover de una fila dice donde abre via `actionRowTitle`: `Open <nombre> in <ruta>`
+  para workspace y carpeta, `Open <fichero> with <nombre>` para fichero. El ancho del boton
+  propio se mide solo con el nombre principal.
+- **Conteo apagado en trigger**: el menu Unico de `ActionsBar` muestra un numero apagado
+  junto al label con las filas que contiene (workspace + global).
 
 ## Estilo de inputs en Settings
 

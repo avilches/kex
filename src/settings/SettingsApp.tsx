@@ -68,13 +68,6 @@ function readInitialFileTypesExt(): string | undefined {
   return section === "filetypes" ? ext : undefined;
 }
 
-function readInitialActionsDraft(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  const url = new URL(window.location.href);
-  const { section, ext } = parseSectionParam(url.searchParams.get("section"));
-  return section === "actions" ? ext : undefined;
-}
-
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsSection>(readInitialSection);
   const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
@@ -83,8 +76,6 @@ export function SettingsApp() {
   // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
   const fileTypesExtConsumed = useRef(false);
   const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
-  const [actionsDraft, setActionsDraft] = useState<string | undefined>(readInitialActionsDraft);
-  const actionsDraftConsumed = useRef(true);
 
   useEffect(() => {
     if (!anchor) return;
@@ -134,10 +125,6 @@ export function SettingsApp() {
       if (ext && section === "filetypes") {
         fileTypesExtConsumed.current = false;
         setFileTypesExt(ext);
-      }
-      if (section === "actions") {
-        actionsDraftConsumed.current = false;
-        setActionsDraft(ext);
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
@@ -216,13 +203,7 @@ export function SettingsApp() {
                   }}
                 />
               ) : active === "actions" ? (
-                <ActionsSection
-                  startDraft={actionsDraftConsumed.current ? undefined : actionsDraft}
-                  onDraftConsumed={() => {
-                    actionsDraftConsumed.current = true;
-                    setActionsDraft(undefined);
-                  }}
-                />
+                <ActionsSection />
               ) : (
                 ActiveSection && createElement(ActiveSection)
               )}

@@ -20,7 +20,7 @@ const LABEL_CAP = 120;
 const RUN_ZONE = 24;
 const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
-export const MENUS_RESERVE = 2 * 78 + BAR_GAP;
+export const MENUS_RESERVE = 78;
 
 export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">): number {
   const { main } = splitActionName(action.name.trim() || "Action");
@@ -114,17 +114,49 @@ const VARIABLE = /\{[?!]?[a-z]/;
 
 export const WORKSPACE_UNSET = "Workspace Root not configured";
 
-// The line under the name: the value the place gives the preset variable, not the raw
-// template ({cwd} under "Code {cwd}" is the folder it would open). A workspace Action
-// without a configured root says so; a variable with no readable part keeps the template.
-export function barSubtitle(name: string, ctx: BarContext | null): string | null {
+export type ActionSubtitle = {
+  /** The line under the name; null leaves the name lineless. */
+  text: string | null;
+  /** True when the value is a path rendered with its start cut instead of its tail. */
+  startTrim: boolean;
+};
+
+// The line under the name says what the Action points at in words, not the raw template:
+// a workspace Action stays "Workspace" (the root itself reads on the hover title), a file
+// Action the file name alone, a folder path its value with the start cut. A variable with
+// no readable part keeps the template; a workspace one without a root says so.
+export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubtitle {
   const { variable } = splitActionName(name);
-  if (!variable) return null;
+  if (!variable) return { text: null, startTrim: false };
   const varName = variable.slice(1, -1);
   const value = ctx?.vars[varName];
-  if (value) return value;
-  if (varName === "workspace") return WORKSPACE_UNSET;
-  return typeof value === "string" ? null : variable;
+  if (varName === "workspace") return { text: value ? "Workspace" : WORKSPACE_UNSET, startTrim: false };
+  if (value && (varName === "filepath" || varName === "filename")) {
+    return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false };
+  }
+  if (value) return { text: value, startTrim: varName === "cwd" };
+  return { text: variable, startTrim: false };
+}
+
+// The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
+// out in full for the workspace and folder targets and the file name alone for file targets.
+// A blocked row keeps its reason; a variable with no value here has nothing to add.
+export function actionRowTitle(
+  name: string,
+  terminal: boolean,
+  disabledReason: string | null,
+  ctx: BarContext | null,
+): string | null {
+  if (disabledReason) return `${name.trim()}: ${disabledReason}`;
+  const { main, variable } = splitActionName(name);
+  if (!variable) return null;
+  const varName = variable.slice(1, -1);
+  const verb = terminal ? "Run" : "Open";
+  const value = ctx?.vars[varName] ?? "";
+  if (!value) return null;
+  if (varName === "filepath" || varName === "filename") return `${verb} ${value.split(/[\\/]/).filter(Boolean).pop() ?? value} with ${main}`;
+  if (varName === "workspace" || varName === "cwd" || varName === "dir") return `${verb} ${main} in ${value}`;
+  return null;
 }
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
@@ -154,17 +186,19 @@ export type BarItem = {
   /** The zone can stop it: running, or already stopping by the first Ctrl+C. */
   stoppable: boolean;
   disabledReason: string | null;
-  /** The value the preset variable reads here; null leaves the name lineless. */
+  /** The line under the name: what the Action points at in this place. */
   subtitle: string | null;
+  /** The subtitle is a path a long value renders with its start cut. */
+  subtitleTrim: boolean;
+  /** The hover words of the row, or null to say nothing. */
+  title: string | null;
 };
 
 export type BarModel = {
   buttons: BarItem[];
-  scripts: BarItem[];
-  apps: BarItem[];
-  /** The global Actions of the workspace scope live in Settings and run everywhere. */
-  scriptsGlobal: BarItem[];
-  appsGlobal: BarItem[];
+  /** The Actions that are not own buttons, scripts and apps mixed: the workspace
+   * ones first, then the global ones, each scope in the user's order. */
+  menu: { workspace: BarItem[]; global: BarItem[] };
   empty: boolean;
 };
 
@@ -182,26 +216,32 @@ type BuildInput = {
 };
 
 // Own buttons first in the user's order (workspace Actions, then global, scripts and apps
-// mixed), then the two grouped menus. A running script is never disabled whatever its
-// variables are now: it has to stay stoppable, and it stays visible whatever the focused
-// tab is, so its Stop keeps a place to live.
+// mixed), then the one menu for the rest: workspace Actions, then global, again in the
+// user's order. A running script is never disabled whatever its variables are now: it has
+// to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
+// place to live.
 export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
   const toItem = (action: Action): BarItem => {
     const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
+    const label = action.name.trim() || "Action";
+    const subtitle = actionSubtitle(label, context);
+    const disabledReason = running ? null : actionAvailability(action, context);
     return {
       id: action.id,
-      name: action.name.trim() || "Action",
+      name: label,
       action,
       state,
       active: action.id === activeId,
       stoppable: state !== "idle",
-      disabledReason: running ? null : actionAvailability(action, context),
-      subtitle: barSubtitle(action.name.trim() || "Action", context),
+      disabledReason,
+      subtitle: subtitle.text,
+      subtitleTrim: subtitle.startTrim,
+      title: actionRowTitle(label, action.runInTerminal, disabledReason, context),
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
-  const model: BarModel = { buttons: [], scripts: [], apps: [], scriptsGlobal: [], appsGlobal: [], empty: local.length + global.length === 0 };
+  const model: BarModel = { buttons: [], menu: { workspace: [], global: [] }, empty: local.length + global.length === 0 };
   for (const [position, action] of [...local, ...global].entries()) {
     const isGlobal = position >= local.length;
     const item = toItem(action);
@@ -210,8 +250,8 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
         model.buttons.push(item);
         continue;
       }
-      if (isGlobal) (action.runInTerminal ? model.scriptsGlobal : model.appsGlobal).push(item);
-      else (action.runInTerminal ? model.scripts : model.apps).push(item);
+      if (isGlobal) model.menu.global.push(item);
+      else model.menu.workspace.push(item);
     }
   }
   return model;

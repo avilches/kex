@@ -13,23 +13,25 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDialogScrollHost } from "@/components/dialogScrollHost";
 import { ActionIcon } from "./ActionIcon";
-import { splitActionName } from "./lib/actionName";
+import { ActionNameLines } from "./ActionNameLines";
+import { actionRowTitle, actionSubtitle } from "./lib/actionsBar";
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
+import type { ActionContext } from "./lib/useActionContext";
 
 type Props = {
   suggestions: readonly AppSuggestion[];
+  context: ActionContext | null;
   onPick: (suggestion: AppSuggestion) => void;
 };
 
-// The second add button: a searchable combo over the detected apps, one alphabetical entry
-// per preset, every entry carrying its app icon. Custom app starts an empty app row instead.
-export function AddApplicationMenu({ suggestions, onPick }: Props) {
+// The searchable combo over the detected apps: one alphabetical entry per preset, every
+// entry carrying its app icon and, under it, what the preset points at here ("Workspace",
+// the file name, the folder path). It stays open on a pick so several presets can be
+// installed in a row; the installed ones never show up in the list.
+export function AddApplicationMenu({ suggestions, context, onPick }: Props) {
   const [open, setOpen] = useState(false);
   const host = useDialogScrollHost();
-  const pick = (suggestion: AppSuggestion) => {
-    setOpen(false);
-    onPick(suggestion);
-  };
+  const pick = (suggestion: AppSuggestion) => onPick(suggestion);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -46,24 +48,24 @@ export function AddApplicationMenu({ suggestions, onPick }: Props) {
             <CommandEmpty>No application found.</CommandEmpty>
             <CommandGroup>
               {[...suggestions].sort(compareByName).map((s) => {
-                const { main, variable } = splitActionName(s.name);
+                const sub = context ? actionSubtitle(s.name, context) : null;
                 return (
                   <CommandItem
                     key={s.key}
                     value={s.key}
                     keywords={[s.name, s.defaultCommand]}
                     onSelect={() => pick(s)}
+                    title={context ? (actionRowTitle(s.name, false, null, context) ?? undefined) : undefined}
                     className="text-[12px]"
                   >
                     <span className="flex size-5 shrink-0 items-center justify-center">
                       <ActionIcon action={{ appId: s.appId, runInTerminal: false }} size={13} />
                     </span>
-                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                      <span className="truncate">{main}</span>
-                      {variable && (
-                        <span className="truncate font-mono text-[10.5px] text-muted-foreground">{variable}</span>
-                      )}
-                    </span>
+                    <ActionNameLines
+                      name={s.name}
+                      value={sub?.text ?? undefined}
+                      startTrim={sub?.startTrim}
+                    />
                   </CommandItem>
                 );
               })}

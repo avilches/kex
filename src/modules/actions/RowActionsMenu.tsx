@@ -115,14 +115,14 @@ export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind;
         {entries.map((entry) => (
           <ContextMenuItem
             key={entry.action.id}
-            title={entry.reason ?? undefined}
+            title={entry.reason ?? entry.title ?? undefined}
             disabled={!entry.enabled}
             className={COMPACT_ITEM}
             onSelect={() => run(entry.action, overlay)}
           >
             <ActionIcon action={entry.action} size={14} />
             <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
-              <ActionNameLines name={entry.action.name} value={entry.subtitle} />
+              <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
             </span>
             {!entry.enabled && entry.reason && entry.subtitle !== WORKSPACE_UNSET && (
               <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>

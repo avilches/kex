@@ -41,7 +41,7 @@ describe("contextActionEntries", () => {
       { vars: vars({ branch: "", filepath: "/w/a.ts", filename: "a.ts" }), shell: "posix" },
     );
     expect(entries.map((e) => e.action.command)).toEqual(["code {filepath}"]);
-    expect(entries[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/w/a.ts" });
+    expect(entries[0]).toMatchObject({ enabled: true, reason: null, subtitle: "a.ts" });
   });
 
   it("a folder whose git info is missing mutes the branch Actions instead of hiding them", () => {

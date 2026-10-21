@@ -1,36 +1,15 @@
-import { useLayoutEffect, useRef, useState } from "react";
 import { ContextMenuItem, ContextMenuShortcut } from "@/components/ui/context-menu";
 import { Link01Icon, CopySlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
+import { StartTrimmed } from "@/components/StartTrimmed";
 import { copyToClipboard } from "./contextActions";
 import { COMPACT_ITEM } from "./menuItemClass";
 import { relativeCopyFor } from "./relativeCopy";
 
-// The text box is right-to-left so overflow is cut at the start of a long path and keeps its
-// tail, while text-left keeps a short one flush with the label; the inner ltr run stops the
-// bidi algorithm from moving the leading slash. The ellipsis is drawn by hand, only once the
-// box is measured as clipped, because text-overflow does not mark a start cut reliably.
 function Sub({ text }: { text: string }) {
-  const box = useRef<HTMLSpanElement>(null);
-  const [clipped, setClipped] = useState(false);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (el) setClipped(el.scrollWidth > el.clientWidth);
-  }, [text]);
-  return (
-    <span className="flex max-w-[240px] text-[10px] text-muted-foreground" title={text}>
-      {clipped && <span className="shrink-0">…</span>}
-      <span
-        ref={box}
-        dir="rtl"
-        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left"
-      >
-        <bdo dir="ltr">{text}</bdo>
-      </span>
-    </span>
-  );
+  return <StartTrimmed text={text} className="flex max-w-[240px] text-[10px] text-muted-foreground" />;
 }
 
 function Shortcut({ id }: { id: ShortcutId }) {

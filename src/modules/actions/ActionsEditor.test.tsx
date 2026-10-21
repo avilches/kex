@@ -341,7 +341,39 @@ describe("ActionsEditor", () => {
     expect(onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ ownButton: true }));
     unmount();
     const ownTrue = mount([{ ...saved, ownButton: true }]);
-    expect(ownTrue.container.textContent).toContain("Header");
+    expect(ownTrue.container.textContent).toContain("Button");
     ownTrue.unmount();
+  });
+
+  it("an installed preset is read-only: no own-flag, no variables toggle, and Delete asks nothing", () => {
+    const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+    const { container, onRemove, unmount } = mount([installed]);
+    expect(container.querySelectorAll("button[role='checkbox']")).toHaveLength(0);
+    expect(container.querySelector("button[aria-label='Edit action']")).not.toBeNull();
+    click(container.querySelector("button[aria-label='Remove action']"));
+    expect(onRemove).toHaveBeenCalledWith("ac-3");
+    expect(dialogButton("Delete")).toBeUndefined();
+    unmount();
+  });
+
+  it("the combo never offers a preset that is already installed", () => {
+    const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+    const { container, unmount } = mount([installed], { suggestions: [zed] });
+    click(applicationButton(container));
+    const offered = [...document.querySelectorAll("[role='option']")].filter((o) => o.textContent?.includes("Zed{workspace}"));
+    expect(offered).toHaveLength(0);
+    unmount();
+  });
+
+  it("Edit duplicates an installed preset into an editable user action handed to the store", () => {
+    const installed: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+    const { container, onAdd, unmount } = mount([installed]);
+    click(container.querySelector("button[aria-label='Edit action']"));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const copy = onAdd.mock.calls[0]![0] as Action;
+    expect(copy.id).not.toBe("ac-3");
+    expect(copy).toMatchObject({ name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}" });
+    expect(copy.appId).toBeUndefined();
+    unmount();
   });
 });
