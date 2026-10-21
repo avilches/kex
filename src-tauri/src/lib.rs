@@ -882,6 +882,8 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_stop,
+            pty::pty_kill,
+            pty::pty_process_info,
             pty::pty_close,
             pty::pty_close_all,
             pty::pty_has_foreground_process,

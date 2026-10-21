@@ -222,28 +222,15 @@ pub fn pty_resize(
     result
 }
 
-// Stops a script by signaling every descendant of the shell, the closest thing to
-// Ctrl+C that no program may swallow (about the one counter-example: less ignores
-// Ctrl+C, and `man top` would keep running without this). Windows answers an error
-// and the caller falls back to typing Ctrl+C, the way it always did.
-#[tauri::command]
+// Signals every descendant of the shell, the closest thing to Ctrl+C that no
+// program may swallow (about the one counter-example: less ignores Ctrl+C, and
+// `man top` would keep running without this). The shell itself is never a
+// target. Windows answers an error and the caller falls back to typing Ctrl+C,
+// the way it always did.
 #[cfg(unix)]
-pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
+fn signal_descendants(shell_pid: u32, sig: i32) -> usize {
     use sysinfo::{ProcessesToUpdate, System};
 
-    let shell_pid = state
-        .sessions
-        .read()
-        .unwrap()
-        .values()
-        .find(|s| s.script_tab_id.as_deref() == Some(tab_id.as_str()))
-        .map(|s| s.shell_pid);
-    let Some(shell_pid) = shell_pid else {
-        return Ok(0);
-    };
-    if shell_pid == 0 {
-        return Ok(0);
-    };
     let mut sys = System::new();
     sys.refresh_processes(ProcessesToUpdate::All, true);
     let procs: HashMap<u32, ProcStat> = sys
@@ -260,13 +247,38 @@ pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, 
             )
         })
         .collect();
-    let mut signaled = 0;
-    for pid in descendants_of(&procs, shell_pid) {
-        if unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) == 0 } {
-            signaled += 1;
-        }
+    descendants_of(&procs, shell_pid)
+        .into_iter()
+        .filter(|&pid| unsafe { libc::kill(pid as libc::pid_t, sig) == 0 })
+        .count()
+}
+
+#[cfg(unix)]
+fn signal_tab_tree(state: &PtyState, tab_id: &str, sig: i32) -> Result<usize, String> {
+    let shell_pid = state
+        .sessions
+        .read()
+        .unwrap()
+        .values()
+        .find(|s| s.script_tab_id.as_deref() == Some(tab_id))
+        .map(|s| s.shell_pid);
+    match shell_pid {
+        None | Some(0) => Ok(0),
+        Some(pid) => Ok(signal_descendants(pid, sig)),
     }
-    Ok(signaled)
+}
+
+#[tauri::command]
+#[cfg(unix)]
+pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
+    signal_tab_tree(&state, &tab_id, libc::SIGTERM)
+}
+
+/// Same tree as `pty_stop` but SIGKILL: for programs that ignore or swallow SIGTERM.
+#[tauri::command]
+#[cfg(unix)]
+pub fn pty_kill(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
+    signal_tab_tree(&state, &tab_id, libc::SIGKILL)
 }
 
 #[tauri::command]
@@ -274,6 +286,14 @@ pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, 
 pub fn pty_stop(tab_id: String) -> Result<usize, String> {
     Err(format!(
         "pty_stop is not supported here; tab_id={tab_id} stops with Ctrl+C"
+    ))
+}
+
+#[tauri::command]
+#[cfg(not(unix))]
+pub fn pty_kill(tab_id: String) -> Result<usize, String> {
+    Err(format!(
+        "pty_kill is not supported here; tab_id={tab_id} stops with Ctrl+C"
     ))
 }
 
@@ -326,7 +346,56 @@ pub fn pty_has_foreground_process(
     if shell_pid == 0 {
         return Ok(None);
     }
-    Ok(shell_foreground_process_name(shell_pid))
+    Ok(shell_foreground_process(shell_pid).map(|(_, name)| name))
+}
+
+#[derive(Serialize)]
+pub struct PtyProcessInfo {
+    pub pid: u32,
+    pub shell_name: String,
+    pub fg_pid: Option<u32>,
+    pub fg_name: Option<String>,
+}
+
+// Fresh per-tab process snapshot for UI surfaces that only run while open, like
+// the tab context menu: the path bar's sampler only covers visible tabs.
+#[tauri::command]
+pub fn pty_process_info(
+    state: tauri::State<PtyState>,
+    monitor: tauri::State<ProcessMonitor>,
+    id: u32,
+) -> Result<Option<PtyProcessInfo>, String> {
+    use sysinfo::{Pid, ProcessesToUpdate};
+
+    let shell_pid = state
+        .sessions
+        .read()
+        .unwrap()
+        .get(&id)
+        .map(|s| s.shell_pid);
+    let Some(shell_pid) = shell_pid else {
+        return Ok(None);
+    };
+    if shell_pid == 0 {
+        return Ok(None);
+    }
+    let (fg_pid, fg_name) = match shell_foreground_process(shell_pid) {
+        Some((pid, name)) => (Some(pid), Some(name)),
+        None => (None, None),
+    };
+    let shell_name = {
+        let mut sys = monitor.0.lock().unwrap();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
+        sys.process(Pid::from_u32(shell_pid))
+            .map(|p| p.name().to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    Ok(Some(PtyProcessInfo {
+        pid: shell_pid,
+        shell_name,
+        fg_pid,
+        fg_name,
+    }))
 }
 
 #[derive(Serialize)]
@@ -392,9 +461,9 @@ pub fn pty_metrics(
     out
 }
 
-// Returns the name of the first foreground child of the shell, or None if no child exists.
+// Returns the first foreground child of the shell as (pid, name), or None if no child exists.
 #[cfg(unix)]
-fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
+fn shell_foreground_process(shell_pid: u32) -> Option<(u32, String)> {
     let output = std::process::Command::new("pgrep")
         .args(["-l", "-P", &shell_pid.to_string()])
         .output()
@@ -402,15 +471,16 @@ fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
     if !output.status.success() {
         return None;
     }
-    // Each line is "<pid> <name>"; take the first child's name.
+    // Each line is "<pid> <name>"; take the first child.
     let stdout = String::from_utf8_lossy(&output.stdout);
     let first_line = stdout.lines().next()?;
-    let name = first_line.split_whitespace().nth(1)?.to_string();
-    Some(name)
+    let (pid, name) = first_line.split_once(' ')?;
+    let pid: u32 = pid.parse().ok()?;
+    Some((pid, name.to_string()))
 }
 
 #[cfg(windows)]
-fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
+fn shell_foreground_process(shell_pid: u32) -> Option<(u32, String)> {
     use std::ffi::CStr;
     use std::mem::{size_of, zeroed};
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
@@ -424,7 +494,7 @@ fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
         }
         let mut entry: PROCESSENTRY32 = zeroed();
         entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
-        let mut found_name = None;
+        let mut found = None;
         if Process32First(snapshot, &mut entry) != 0 {
             loop {
                 if entry.th32ParentProcessID == shell_pid {
@@ -432,7 +502,7 @@ fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
                         .to_string_lossy()
                         .into_owned();
                     let name = name.strip_suffix(".exe").unwrap_or(&name).to_string();
-                    found_name = Some(name);
+                    found = Some((entry.th32ProcessID, name));
                     break;
                 }
                 if Process32Next(snapshot, &mut entry) == 0 {
@@ -441,7 +511,7 @@ fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
             }
         }
         CloseHandle(snapshot);
-        found_name
+        found
     }
 }
 
@@ -486,4 +556,70 @@ pub fn pty_close_all(
 #[tauri::command]
 pub fn pty_shell_name() -> String {
     shell_init::detect_shell_name()
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    // bash stays alive waiting on its second child, so the tree has a stable
+    // root while the tests signal its descendants. The first sleep stays a job
+    // (not disowned) so bash reaps it once it is killed.
+    fn spawn_bash_with_sleep() -> u32 {
+        std::process::Command::new("bash")
+            .args(["-c", "sleep 60 & sleep 60"])
+            .spawn()
+            .unwrap()
+            .id()
+    }
+
+    fn pid_alive(pid: u32) -> bool {
+        unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+    }
+
+    fn child_of(root: u32) -> (u32, String) {
+        for _ in 0..50 {
+            if let Some(found) = shell_foreground_process(root) {
+                return found;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!("no child of {root} appeared");
+    }
+
+    fn kill_tree(root: u32) {
+        signal_descendants(root, libc::SIGKILL);
+        unsafe { libc::kill(root as libc::pid_t, libc::SIGKILL) };
+    }
+
+    #[test]
+    fn signal_descendants_kills_children_but_not_the_root() {
+        let root = spawn_bash_with_sleep();
+        let (fg_pid, name) = child_of(root);
+        assert_eq!(name, "sleep");
+
+        let signaled = signal_descendants(root, libc::SIGKILL);
+        assert!(signaled >= 1, "expected the sleep to be signaled");
+        // The child turns zombie until its parent reaps it, so wait it out.
+        for _ in 0..100 {
+            if !pid_alive(fg_pid) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(!pid_alive(fg_pid), "the child must be gone after SIGKILL");
+        assert!(pid_alive(root), "the shell root must survive its children");
+
+        kill_tree(root);
+    }
+
+    #[test]
+    fn foreground_process_reports_pid_and_name() {
+        let root = spawn_bash_with_sleep();
+        let (fg_pid, name) = child_of(root);
+        assert_eq!(name, "sleep");
+        assert!(pid_alive(fg_pid), "the reported pid must be the live child");
+
+        kill_tree(root);
+    }
 }

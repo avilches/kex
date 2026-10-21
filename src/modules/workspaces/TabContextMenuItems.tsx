@@ -34,6 +34,7 @@ import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
 import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
+import { TabProcessMenuItems } from "./TabProcessMenuItems";
 import { TabCopyPathItems } from "./TabCopyPathItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
@@ -98,6 +99,7 @@ export function TabContextMenuItems({
   return (
     <>
       {rowActions}
+      <TabProcessMenuItems tab={tab} />
       {canSave && (
         <>
           <ContextMenuItem onSelect={() => onSaveTab(tab.id)}>

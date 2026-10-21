@@ -18,6 +18,8 @@ State: `PtyState = RwLock<HashMap<id, Session>>`
 | `pty_close` | Close PTY and kill the shell process |
 | `pty_close_all` | Close all PTYs (used on app exit) |
 | `pty_stop(tabId)` | Stop the script of a terminal tab: SIGTERM to every descendant of the shell, found by sysinfo from the session. Unix only; Windows answers an error, the caller stays with Ctrl+C. Used by the second stage of the Action Stop: the user clicks the stop zone of a script whose Ctrl+C did not end the run (its mark is still there) |
+| `pty_kill(tabId)` | Same tree as `pty_stop` but SIGKILL, for programs that ignore or swallow SIGTERM. Unix only; Windows answers an error |
+| `pty_process_info(ptyId)` | Fresh snapshot of a terminal's process tree head: `{ pid, shell_name, fg_pid, fg_name }` where `pid` is the shell PID and the `fg_*` fields are the first foreground child (same heuristic as `pty_has_foreground_process`), or `null` when the session is gone. The tab context menu calls it on open, because the `pty_metrics` sampler only covers visible tabs |
 | `pty_has_foreground_process` | Whether a process other than the shell itself is in the foreground |
 | `pty_shell_name` | Detected shell name for the PTY session |
 | `pty_list_shells` | Shells found on this machine: `name`, `path` and `integrated` (whether Kex injects OSC 7/133 integration for it). Feeds the shell selector in Terminal settings |

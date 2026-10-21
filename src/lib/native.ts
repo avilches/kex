@@ -38,6 +38,13 @@ export type GrepResponse = {
 type GlobHit = { path: string; rel: string };
 export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
 
+export type PtyProcessInfo = {
+  pid: number;
+  shell_name: string;
+  fg_pid: number | null;
+  fg_name: string | null;
+};
+
 export type TabHistoryEntry = {
   kind: "terminal" | "file";
   path: string;
@@ -399,6 +406,10 @@ export const native = {
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
   /** Count of descendant processes signaled for the script of this tab; 0 means the program is gone. */
   ptyStop: (tabId: string): Promise<number> => invoke<number>("pty_stop", { tabId }),
+  /** Same tree as ptyStop but SIGKILL, for programs that ignore SIGTERM. */
+  ptyKill: (tabId: string): Promise<number> => invoke<number>("pty_kill", { tabId }),
+  ptyProcessInfo: (ptyId: number): Promise<PtyProcessInfo | null> =>
+    invoke<PtyProcessInfo | null>("pty_process_info", { id: ptyId }),
   tabHistoryList: (): Promise<TabHistoryEntry[]> =>
     invoke<TabHistoryEntry[]>("tab_history_list"),
   tabHistoryRecord: (kind: "terminal" | "file", path: string, workspaceId: string): Promise<void> =>
