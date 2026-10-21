@@ -459,6 +459,10 @@ last close, whatever it closed. The closed stack (in memory, capped at 10) holds
 - A tab entry (`closeTab`) reopens only in the workspace it was closed in. If that workspace was closed, the entry is
   dropped (unless a workspace entry restores it first, see below). If it is hibernated, the entry is skipped but kept,
   so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be reopened.
+-   It remembers the tab on its left (`prevTabId`) and reopens right after it, in whatever pane that tab is in now
+  (`resolveReopenSlot`). A predecessor that was closed too is looked up in the stack and its own predecessor takes
+  over; with none left it goes first in its old pane (the active pane if that one is gone). Reopened tabs get new
+  ids, so `remapPrevTabId` repoints the entries that followed the old one.
 - A workspace entry (`closeWorkspace`) is a snapshot of the whole `Workspace` (pane tree, tabs, title, color, icon,
   group, actions, hibernation) plus its index in the bar. Undo puts it back at that index and selects it. It is
   skipped when a workspace with that id is already open.
@@ -548,6 +552,9 @@ src/
     │   │                            Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
     │   │                            The copy items (`explorer/lib/copyPathItems.tsx`) print the path under the label;
     │   │                            Copy Relative Path shows why it is disabled (no workspace root, or outside it).
+    │   │                            The path is left aligned and a long one is clipped at its start (rtl row, text-left, ltr run).
+    │   │                            The tab context menu (`TabCopyPathItems`) adds the same two items under Icon for
+    │   │                            terminals (agent worktree, else cwd), editors and diffs; Copy Absolute Path carries `path.copy`.
     │   │                            The terminal surface has a right-click menu (`TerminalContextMenu`): Copy (enabled
     │   │                            only with a selection) and Paste. While an app tracks the mouse (Claude Code
     │   │                            draws its own selection), a right click does not select the word under the
@@ -664,6 +671,7 @@ src/
     ├── external-editors/          - Detection and catalog of installed editors and apps, their icons (feeds app Actions)
     ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   - Auto-updater dialog
+    ├── profiler/                  - Opt-in performance profiler (Settings > General > Diagnostics, or the palette, both through the `performanceProfiler` preference; `useProfilerSetting` follows it in every window): wraps requestAnimationFrame, logs a [profiler] line to Kex.log every 10 s with the slowest callbacks, jank frames and a DOM census. Pure parts in `lib/rafStats.ts` and `lib/domCensus.ts`
     └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab path line, note in the row), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 

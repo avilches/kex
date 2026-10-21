@@ -1,5 +1,6 @@
 export type Coalescer<K, V> = {
   push: (key: K, value: V) => void;
+  drop: (key: K) => void;
   flush: () => boolean;
   dispose: () => void;
 };
@@ -26,12 +27,15 @@ export function createCoalescer<K, V>(
     return true;
   };
 
-  return {
+    return {
     push(key, value) {
       pending.set(key, value);
       const wait = lastFlush + intervalMs - Date.now();
       if (wait <= 0) flush();
       else if (timer === null) timer = setTimeout(flush, wait);
+    },
+    drop(key) {
+      pending.delete(key);
     },
     flush,
     dispose() {

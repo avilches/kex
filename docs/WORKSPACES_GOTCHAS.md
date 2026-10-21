@@ -1101,3 +1101,52 @@ Cualquier restore automatico de foco disparado por `onFocusChanged` pisa el foco
 usuario tenia antes del Cmd+Tab, y el webview no avisa por Blur: hace falta comprobar
 `document.activeElement` en el camino del restore. Si un Bug de "algo se me apaga al volver de
 otra ventana" aparece, buscar primero este patron.
+
+## Bug 23: el tab seguia mostrando el titulo del agente despues de salir de omp o pi (RESUELTO)
+
+### Sintoma
+
+Un tab donde se arranco `omp` (o `pi`) conservaba el nombre que la TUI escribia con OSC 0
+("pi > Kex") una vez el agente terminaba, y ese nombre reaparecia tras reiniciar la app. Con
+claude y opencode el titulo se normalizaba solo al salir, sin nada raro que ver en Kex.
+
+### Pistas falsas descartadas
+
+- Que el detector Rust no emitiera `exited`: el log (`kex_lib::modules::pty::agent_detect`) mostraba
+  el ciclo completo para omp: `osc133 C: armed agent=omp` y despues `D: exited` + `detach`.
+- Que frontend pasara de la senal: `AgentNotificationsBridge.handleSignal` con `exited` hace
+  `store.finish` y `agent_detach_session`; el icono del agente si se apagaba.
+- Que el titulo viniera de la plantilla de Kex: la de agente es `{osc|session|{agent}}` y la de
+  terminal manda el `{cmd|osc}`; el texto "pi > Kex" es literalmente lo que pi escribio por OSC 0.
+
+### Causa raiz
+
+La TUI de pi/omp pone el titulo del terminal ("pi > carpeta") y, al salir, no restaura ni borra lo
+que escribio: su OSC 0 queda como ultima escritura. Kex guarda ese titulo en dos sitios
+(`oscTitleStore` en memoria y `Tab.agentTitle` persistido en el JSON del workspace, via
+`agentTitleSync`), y nunca lo borra cuando la sesion muere: `clearOscTitle` solo se llama al
+respawnear/disposear. La integracion de shell no escribe titulo en el prompt, asi que nada pisa el
+nombre del agente. Los otros agentes (claude, opencode) reescriben el titulo al salir por su cuenta,
+por eso ahi no se veia.
+
+### Fix
+
+- `AgentNotificationsBridge.handleSignal`, rama `exited`: en el mismo `if (detachesRecord(...))`
+  (que ya excluye la hibernacion) se llama a `clearOscTitle(tabId)`.
+- `startAgentTitleSync` ahora conoce el final de la sesion: cada tab cuyo titulo persistido nacio
+  de una sesion de agente se revoca en cuanto la sesion desaparece (path de revoke ->
+  `clearAgentTitles` en `useWorkspaces` -> funcion pura en `agentTitles.ts`), sin esperar a la
+  senal: cubre detach manual, discard de restore y el arranque tras un cierre en carrera. La revocacion esta
+  protegida (shield) mientras el workspace hiberna o un plan de restore o snapshot staged puede
+  reclamar el tab, y espera a que `restorePlansReady()` se resuelva para no pisar los planes que
+  llegan async al arrancar. La revocacion una vez aplicada no se deshace: si la sesion revive, la
+  primera lectura del titulo vuelve a persistirla.
+- El titulo propio del usuario (`tab.title`) siempre gana y no se toca en ningun camino.
+
+### Leccion
+
+Cuando un dato del agente se cachea en memoria y en disco, el final de la sesion del agente tiene
+que ser un evento de borrado de las dos caches con las mismas reglas que la sesion (escudo de
+hibernacion y de restore). La diferencia entre "claude se arregla solo y omp no" era el olfato: si
+una cosa se limpia sola con un agente y no con otro, mirar que escribe cada uno al SALIR, no solo
+al arrancar.

@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
+const LOG_ARCHIVES_KEPT: usize = 20;
+
 /// Drained on first read so HMR / re-mounts can't replay the launch dir.
 #[derive(Default)]
 struct LaunchDir(Mutex<Option<String>>);
@@ -574,9 +576,12 @@ pub fn run() {
                 ))
                 // Default is KeepOne, which fs::remove_file()s the previous log with no
                 // backup, checked on every startup, so a log that filled up in the prior
-                // session is gone before the new one writes a byte. KeepSome(4) renames
-                // instead of deleting, keeping 4 archived logs alongside the active one.
-                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(4))
+                // session is gone before the new one writes a byte. KeepSome renames
+                // instead of deleting, keeping LOG_ARCHIVES_KEPT archived logs alongside
+                // the active one: with the profiler on, a 1 MB file lasts 1 to 2.5 hours.
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(
+                    LOG_ARCHIVES_KEPT,
+                ))
                 .max_file_size(1_000_000)
                 .build(),
         )

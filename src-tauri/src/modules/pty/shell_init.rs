@@ -189,6 +189,10 @@ fn apply_common(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("KEX_TERMINAL", "1");
+    // Inherited from the Terminal.app that launched Kex, it makes /etc/zshrc source
+    // zshrc_Apple_Terminal and replay "Restored session: <date>" in every new shell.
+    cmd.env("TERM_PROGRAM", "Kex");
+    cmd.env_remove("TERM_PROGRAM_VERSION");
     if blocks {
         cmd.env("KEX_BLOCKS", "1");
     }
@@ -466,6 +470,17 @@ mod unix {
             );
             std::fs::remove_dir_all(&dir).ok();
             assert_eq!(cmd.get_env("PWD"), Some(dir.as_os_str()));
+        }
+
+        #[test]
+        fn the_shell_never_inherits_another_terminals_identity() {
+            let mut cmd = portable_pty::CommandBuilder::new("sh");
+            cmd.env("TERM_PROGRAM", "Apple_Terminal");
+            super::super::apply_common(&mut cmd, None, false, None, None);
+            assert_eq!(
+                cmd.get_env("TERM_PROGRAM"),
+                Some(std::ffi::OsStr::new("Kex"))
+            );
         }
 
         #[test]

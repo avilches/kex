@@ -3,6 +3,10 @@ import type { Workspace } from "@/modules/workspaces";
 import { focusedTabId } from "@/modules/workspaces";
 import { routeAgentNotification } from "../lib/route";
 import type { AgentSignal } from "../lib/types";
+import { invoke } from "@tauri-apps/api/core";
+import type { AgentSession } from "../lib/types";
+import { isHibernating } from "../lib/hibernatingTabs";
+import { clearOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { useAgentStore } from "../store/agentStore";
 import { handleSessionMeta, handleSignal, type Ctx } from "./AgentNotificationsBridge";
 
@@ -15,6 +19,8 @@ vi.mock("@/modules/terminal", () => ({
 }));
 vi.mock("@/modules/terminal/lib/oscTitleStore", () => ({
   getOscTitle: () => undefined,
+  setOscTitle: vi.fn(),
+  clearOscTitle: vi.fn(),
 }));
 vi.mock("@/lib/native", () => ({
   native: { gitResolveRepo: vi.fn(() => Promise.resolve(null)) },
@@ -24,7 +30,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@/lib/useTauriListen", () => ({ useTauriListen: vi.fn() }));
 vi.mock("../lib/route", () => ({ routeAgentNotification: vi.fn() }));
-vi.mock("../lib/hibernatingTabs", () => ({ isHibernating: () => false }));
+vi.mock("../lib/hibernatingTabs", () => ({ isHibernating: vi.fn(() => false) }));
 vi.mock("../lib/agentSessionRestore", () => ({
   applyStagedSnapshot: () => false,
 }));
@@ -222,5 +228,45 @@ describe("handleSessionMeta", () => {
     expect(session().status).toBe("idle");
     expect(session().meta?.launchKnown).toBe(true);
     expect(session().meta?.transcriptPath).toBe("/p/omp/s.jsonl");
+  });
+});
+
+const agentSession = (): AgentSession => ({
+  tabId: "tab-1",
+  workspaceId: "ws-1",
+  agent: "omp",
+  status: "idle",
+  startedAt: 0,
+  lastActivityAt: 0,
+  attentionSince: null,
+  restored: false,
+  restoreError: false,
+  subagents: {},
+  meta: {},
+});
+
+describe("handleSignal: the tab title when the agent ends", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+    vi.mocked(clearOscTitle).mockClear();
+    vi.mocked(invoke).mockClear();
+    vi.mocked(isHibernating).mockReturnValue(false);
+  });
+
+  test("the exit of a non-hibernating agent clears the OSC title of the tab", () => {
+    useAgentStore.setState({ sessions: { "tab-1": agentSession() } });
+    handleSignal(sig("exited"), ctx());
+    expect(session()).toBeUndefined();
+    expect(clearOscTitle).toHaveBeenCalledWith("tab-1");
+    expect(invoke).toHaveBeenCalledWith("agent_detach_session", { tabId: "tab-1" });
+  });
+
+  test("a hibernating agent keeps the title the wake will need", () => {
+    vi.mocked(isHibernating).mockReturnValue(true);
+    useAgentStore.setState({ sessions: { "tab-1": agentSession() } });
+    handleSignal(sig("exited"), ctx());
+    expect(session()).toBeUndefined();
+    expect(clearOscTitle).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("agent_detach_session", { tabId: "tab-1" });
   });
 });

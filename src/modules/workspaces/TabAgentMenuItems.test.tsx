@@ -30,6 +30,7 @@ function open(onRevealInExplorer: (p: string) => void = noop, extra?: React.Reac
     onUpdateTab: noop,
     onSaveTab: noop,
     onRevealInExplorer,
+    workspaceRoot: () => null,
   };
   render(
     <SidebarTabMenuProvider value={actions}>

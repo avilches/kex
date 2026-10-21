@@ -164,6 +164,7 @@ export type Preferences = {
   editorLetterSpacing: number;
   editorLineHeight: number;
   autostart: boolean;
+  performanceProfiler: boolean;
   autofocusMode: AutofocusMode;
   autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
@@ -245,6 +246,7 @@ const KEY_THEME_ID = "themeId";
 const KEY_TERMINAL_THEME = "terminalTheme";
 const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
+const KEY_PERFORMANCE_PROFILER = "performanceProfiler";
 const KEY_AUTOFOCUS_MODE = "autofocusMode";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
@@ -429,6 +431,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorLetterSpacing: LETTER_SPACING_DEFAULT,
   editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
+  performanceProfiler: false,
   autofocusMode: "manual",
   autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
@@ -604,6 +607,9 @@ export async function loadPreferences(): Promise<Preferences> {
       getEditor<number>(KEY_EDITOR_LINE_HEIGHT) ??
       DEFAULT_PREFERENCES.editorLineHeight,
     autostart: getGeneral<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
+    performanceProfiler:
+      getGeneral<boolean>(KEY_PERFORMANCE_PROFILER) ??
+      DEFAULT_PREFERENCES.performanceProfiler,
     autofocusMode: (() => {
       const v = getGeneral<string>(KEY_AUTOFOCUS_MODE);
       if (v === "manual" || v === "always") return v;
@@ -1268,6 +1274,10 @@ export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
 
+export async function setPerformanceProfiler(value: boolean): Promise<void> {
+  await writePref(KEY_PERFORMANCE_PROFILER, value);
+}
+
 // Read, change and write the list in one step, one at a time: two rows (or two windows) that
 // install different agents at once must both end up in it, which a list captured at render
 // time would not guarantee.
@@ -1310,6 +1320,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_THEME]: "terminalTheme",
   [KEY_THEME_AUTO]: "themeAuto",
   [KEY_AUTOSTART]: "autostart",
+  [KEY_PERFORMANCE_PROFILER]: "performanceProfiler",
   [KEY_AUTOFOCUS_MODE]: "autofocusMode",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",

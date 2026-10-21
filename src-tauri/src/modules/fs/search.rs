@@ -332,6 +332,6 @@ mod tests {
     fn depth_defaults_are_sane() {
         assert_eq!(DEFAULT_DEPTH, 8);
         assert_eq!(HARD_DEPTH, 16);
-        assert!(DEFAULT_DEPTH <= HARD_DEPTH);
+        const _: () = assert!(DEFAULT_DEPTH <= HARD_DEPTH);
     }
 }

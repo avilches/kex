@@ -88,6 +88,16 @@ token. It is dev only and not part of `pnpm build`.
 - Vite's watcher ignores only this checkout's own `.claude/` (`vite.config.ts`), so hot reload also
   works when running from `.claude/worktrees/<branch>`.
 
+## Profiling a slow window
+
+Everything lives in `performance/`; its `CLAUDE.md` has the procedure, how to read the results and what has been measured.
+
+- **In-app profiler (JavaScript).** Settings > General > Diagnostics > "Performance profiler" (or the palette entry "Enable performance profiler"; code in `src/modules/profiler/`). It is off by default and stays on across restarts once enabled. While on, every window writes a `[profiler]` JSON line to `Kex.log` every 10 seconds: time spent in `requestAnimationFrame` callbacks and who registered them, frames that took 100 ms or more, and a census of the DOM and of the terminals.
+- **Native sample (WebKit).** `python3 performance/kexperf.py sample` samples the `WebContent` process that belongs to a running Kex for 10 seconds, and `watch` does it by itself when a webview stays above 60 % CPU. It sees style resolution and layout, which the profiler cannot.
+- **Reading them.** `kexperf.py profiler` summarizes the `[profiler]` lines and `kexperf.py analyze FILE` the main thread of a sample.
+
+`Kex.log` rotates at 1 MB and keeps 20 archived files next to it (`Kex_<date>.log`, about 21 MB at most). A profiler line is about 1 KB, so with the profiler on a file lasts 1 to 2.5 hours and the 21 files cover roughly one to two days; without it, a month or more.
+
 ## Quality checks
 
 ```bash
@@ -186,7 +196,7 @@ regression on every cold start; keep the anchored form so a future `*/react/*` d
 
 ## Rust release profile
 
-`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary.
+`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary. `[profile.release.build-override]` sets `strip="none"` so build scripts and proc macros are not stripped: with Rust 1.96 `pnpm tauri build` failed from a clean `target` (`can't find crate for tauri_macros`) without it, while the final binary stays stripped.
 
 ## Platform targets
 

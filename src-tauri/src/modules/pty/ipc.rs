@@ -431,9 +431,18 @@ fn truncate_for_log(s: &str, max: usize) -> String {
 }
 
 /// A subagent's `cwd` says where the subagent runs, not where the main agent
-/// is, so only the main agent's own events may move the tab's worktree.
-fn reports_agent_cwd(event: &str, cwd: &str) -> bool {
-    !cwd.is_empty() && !matches!(event, "SessionEnd" | "SubagentStart" | "SubagentStop")
+/// is, so only the main agent's own events may move the tab's worktree. A resumed session
+/// starts in the launch folder and only moves into its worktree afterwards, so its
+/// SessionStart would wipe the worktree the restore plan already seeded.
+fn reports_agent_cwd(event: &str, source: &str, cwd: &str) -> bool {
+    if cwd.is_empty() {
+        return false;
+    }
+    match event {
+        "SessionEnd" | "SubagentStart" | "SubagentStop" => false,
+        "SessionStart" => source != "resume",
+        _ => true,
+    }
 }
 
 // Agents that only report their identity on SessionStart (or whose first lifecycle
@@ -458,7 +467,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         );
         return;
     };
-    if reports_agent_cwd(&p.event, &p.cwd) {
+    if reports_agent_cwd(&p.event, p.source.as_deref().unwrap_or(""), &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
         let _ = app.emit(
             AGENT_CWD_EVENT,
@@ -963,12 +972,20 @@ mod tests {
 
     #[test]
     fn only_main_agent_events_report_the_agent_cwd() {
-        assert!(reports_agent_cwd("Stop", "/p"));
-        assert!(reports_agent_cwd("UserPromptSubmit", "/p"));
-        assert!(!reports_agent_cwd("Stop", ""));
-        assert!(!reports_agent_cwd("SessionEnd", "/p"));
-        assert!(!reports_agent_cwd("SubagentStart", "/p"));
-        assert!(!reports_agent_cwd("SubagentStop", "/p"));
+        assert!(reports_agent_cwd("Stop", "", "/p"));
+        assert!(reports_agent_cwd("UserPromptSubmit", "", "/p"));
+        assert!(!reports_agent_cwd("Stop", "", ""));
+        assert!(!reports_agent_cwd("SessionEnd", "", "/p"));
+        assert!(!reports_agent_cwd("SubagentStart", "", "/p"));
+        assert!(!reports_agent_cwd("SubagentStop", "", "/p"));
+    }
+
+    #[test]
+    fn a_resumed_session_start_does_not_report_the_agent_cwd() {
+        assert!(!reports_agent_cwd("SessionStart", "resume", "/p"));
+        assert!(reports_agent_cwd("SessionStart", "startup", "/p"));
+        assert!(reports_agent_cwd("SessionStart", "", "/p"));
+        assert!(reports_agent_cwd("UserPromptSubmit", "resume", "/p"));
     }
 
     #[test]

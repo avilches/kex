@@ -6,6 +6,7 @@ import { SHORTCUTS, type ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { allPaneIds } from "@/modules/workspaces/lib/splitNode";
 import type { SplitNode } from "@/modules/workspaces/lib/types";
 import {
+  Activity01Icon,
   ArrowReloadHorizontalIcon,
   ArrowRight01Icon,
   Cancel01Icon,
@@ -113,6 +114,8 @@ export type CommandPaletteActionContext = {
   removeActiveTabNote: () => void;
   splitBrowserRight: () => void;
   splitBrowserDown: () => void;
+  profilerRunning: boolean;
+  toggleProfiler: () => void;
 };
 
 const noop = () => {};
@@ -394,6 +397,14 @@ export function createCommandItems(
       icon: Globe02Icon,
       disabledReason: splitDisabled,
       run: ctx.splitBrowserRight,
+    },
+    {
+      id: "profiler.toggle",
+      title: ctx.profilerRunning ? "Disable performance profiler" : "Enable performance profiler",
+      group: "General",
+      keywords: ["performance", "profiler", "slow", "lag", "diagnostics", "log", "frames"],
+      icon: Activity01Icon,
+      run: ctx.toggleProfiler,
     },
     {
       id: "pane.splitBrowserDown",

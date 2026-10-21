@@ -11,10 +11,7 @@ fn main() {
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(1420);
         println!(
-            "cargo:rustc-env=TAURI_CONFIG={}",
-            format!(
-                r#"{{"identifier":"app.betauer.kex.dev","productName":"Kex Dev","build":{{"devUrl":"http://localhost:{port}"}}}}"#
-            )
+            r#"cargo:rustc-env=TAURI_CONFIG={{"identifier":"app.betauer.kex.dev","productName":"Kex Dev","build":{{"devUrl":"http://localhost:{port}"}}}}"#
         );
     }
 

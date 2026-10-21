@@ -60,6 +60,8 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     openNewWindow: fn(),
     clearTerminal: fn(),
     toggleZenMode: fn(),
+    profilerRunning: false,
+    toggleProfiler: fn(),
     hasActiveTerminal: true,
     hibernated: false,
     activePaneTabCount: 2,
@@ -160,6 +162,13 @@ describe("palette catalog", () => {
     const without = createCommandItems(ctx({ hasActiveTabNote: false })).find((i) => i.id === "tab.note.remove");
     expect(with_?.disabledReason).toBeUndefined();
     expect(without?.disabledReason).toBeTruthy();
+  });
+
+  it("offers the profiler as enable or disable depending on the setting", () => {
+    const find = (running: boolean) =>
+      createCommandItems(ctx({ profilerRunning: running })).find((i) => i.id === "profiler.toggle");
+    expect(find(false)?.title).toBe("Enable performance profiler");
+    expect(find(true)?.title).toBe("Disable performance profiler");
   });
 
   it("disables Close other tabs when the pane holds a single tab", () => {

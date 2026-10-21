@@ -57,6 +57,7 @@ import {
   type TabEntry,
   type WorkspaceEntry,
 } from "@/modules/command-palette";
+import { useProfilerSetting } from "@/modules/profiler";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -82,6 +83,7 @@ import type { Action } from "@/modules/actions/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
+  setPerformanceProfiler,
   setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import {
@@ -157,6 +159,7 @@ import {
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { workspaceDetailRows } from "@/modules/workspaces/lib/workspaceDetail";
+import { focusTabContent } from "@/modules/workspaces/lib/focusTabContent";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -312,6 +315,7 @@ export default function App() {
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    clearAgentTitles,
     applyExplorerSnapshotBatch,
     wakeWorkspace,
     activateTab,
@@ -518,7 +522,7 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      requestLeafFocus(tabId);
+      focusTab(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -756,6 +760,8 @@ export default function App() {
   );
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const workspacePaneLimit = usePreferencesStore((s) => s.workspacePaneLimit);
+  const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
+  useProfilerSetting();
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -1579,6 +1585,25 @@ export default function App() {
   // activation, also of the abandoned pane's active tab, regardless of how
   // the switch was triggered (mouse click, tab.next/prev/selectByIndex).
   // Centralized here so every activation path shares one implementation.
+  const focusTab = useCallback(
+    (tabId: string) => {
+      const kind = findTabGlobal(tabId)?.tab.kind;
+      requestAnimationFrame(() =>
+        focusTabContent(kind, tabId, {
+          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
+          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
+          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
+          focusLeaf: requestLeafFocus,
+        }),
+      );
+    },
+    [findTabGlobal],
+  );
+
+  // The one place a navigation gesture (tab click, tab and linear shortcuts,
+  // agent jumps) activates a tab: it also hands the tab its focus, so a new
+  // caller cannot forget it. File-open flows activate with activateTab and
+  // decide their own focus.
   const onActivateTabStable = useCallback(
     (wsId: string, tabId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
@@ -1592,8 +1617,9 @@ export default function App() {
         }
       }
       activateTab(wsId, tabId);
+      focusTab(tabId);
     },
-    [activateTab],
+    [activateTab, focusTab],
   );
 
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
@@ -1929,10 +1955,9 @@ export default function App() {
       const found = findTabGlobal(tabId);
       if (!found) return;
       setActiveWorkspaceId(found.workspace.id);
-      activateTab(found.workspace.id, tabId);
-      requestLeafFocus(tabId);
+      onActivateTabStable(found.workspace.id, tabId);
     },
-    [activateTab, findTabGlobal, setActiveWorkspaceId],
+    [onActivateTabStable, findTabGlobal, setActiveWorkspaceId],
   );
 
   const saveWorkspaceDocs = useCallback(
@@ -1956,7 +1981,7 @@ export default function App() {
     [saveTab],
   );
 
-  useEffect(() => startAgentTitleSync(setAgentTitles), [setAgentTitles]);
+  useEffect(() => startAgentTitleSync(setAgentTitles, clearAgentTitles), [setAgentTitles, clearAgentTitles]);
   useEffect(
     () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
     [applyExplorerSnapshotBatch],
@@ -2015,19 +2040,6 @@ export default function App() {
     setEditorFlush(() => flushDirtyEditorsRef.current());
     return () => setEditorFlush(null);
   }, []);
-
-  const focusTab = useCallback(
-    (tabId: string) => {
-      const kind = findTabGlobal(tabId)?.tab.kind;
-      requestAnimationFrame(() => {
-        if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-        else if (kind === "markdown") markdownHandles.current.get(tabId)?.focus();
-        else if (kind === "browser") browserHandles.current.get(tabId)?.focusAddressBar();
-        else requestLeafFocus(tabId);
-      });
-    },
-    [findTabGlobal],
-  );
 
   const focusActiveTab = useCallback(() => {
     const ws = workspacesRef.current.find(
@@ -3064,7 +3076,7 @@ export default function App() {
           value = activeTab.path;
           label = "Copied current Editor file path";
         } else if (activeTab.kind === "terminal") {
-          value = activeTab.cwd;
+          value = scriptFocusFolderRef.current ?? activeTab.cwd;
           label = "Copied current Terminal folder";
         } else if (activeTab.kind === "browser") {
           value = activeTab.url;
@@ -3477,12 +3489,15 @@ export default function App() {
               if (activeWorkspace)
                 onSplitBrowserDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
             },
+            profilerRunning: performanceProfiler,
+            toggleProfiler: () => void setPerformanceProfiler(!performanceProfiler),
           })
         : [],
     [
       commandPaletteOpen,
       activeWorkspace,
       workspacePaneLimit,
+      performanceProfiler,
       workspaces.length,
       activeWorkspaceId,
       searchTarget,

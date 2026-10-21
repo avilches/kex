@@ -1,7 +1,7 @@
 import type { Workspace } from "@/modules/workspaces";
 import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
-import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import { clearOscTitle, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { native } from "@/lib/native";
 import { tabTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
@@ -178,6 +178,8 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     store.finish(tabId);
     if (detachesRecord(sig.kind, isHibernating(tabId))) {
       invoke("agent_detach_session", { tabId }).catch(() => {});
+      // The agent is gone: what it last sent as OSC title must not keep naming the tab.
+      clearOscTitle(tabId);
     }
   }
 

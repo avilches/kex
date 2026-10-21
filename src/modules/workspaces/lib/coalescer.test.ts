@@ -44,3 +44,18 @@ describe("createCoalescer", () => {
     expect(apply).toHaveBeenLastCalledWith(new Map([["a", 2]]));
   });
 });
+
+describe("createCoalescer drop", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("removes a pending key so a later flush skips it", () => {
+    const apply = vi.fn();
+    const c = createCoalescer<string, string>(apply, 10_000);
+    c.push("a", "A");
+    c.drop("a");
+    expect(c.flush()).toBe(false);
+    vi.advanceTimersByTime(10_000);
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+});

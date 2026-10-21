@@ -24,3 +24,10 @@ export function tabFilePath(tab: Tab): string | null {
       return "path" in tab ? tab.path.replace(/\\/g, "/") : null;
   }
 }
+
+// What "Copy Path" puts on the clipboard: the folder a terminal is working in (the worktree
+// its agent entered wins over the shell cwd) or the file a tab shows.
+export function tabCopyPath(tab: Tab, agentWorktree: string | null): string | null {
+  if (tab.kind === "terminal") return agentWorktree ?? tab.cwd ?? null;
+  return tabFilePath(tab);
+}

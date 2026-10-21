@@ -131,6 +131,8 @@ export type ClosedTabEntry = {
   tab: Tab;
   paneId: string;
   workspaceId: string;
+  // The tab on its left when it was closed, null if it was the first of its pane.
+  prevTabId: string | null;
   // Closing it left the workspace without tabs.
   lastOfWorkspace?: boolean;
 };

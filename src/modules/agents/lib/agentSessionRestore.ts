@@ -19,6 +19,7 @@ export type RestorePlan = {
   resumeCmd: string;
   attemptedCmd: string;
   cwdLaunch: string;
+  worktreeCwd?: string | null;
   errorReason: string;
   title?: string | null;
   notification?: string | null;
@@ -32,6 +33,16 @@ const readyPromise = new Promise<void>((r) => { readyResolve = r; });
 
 export function restorePlansReady(): Promise<void> {
   return readyPromise;
+}
+
+// Tabs a re-attach may still claim: a restore plan loaded at launch, or a snapshot staged
+// for a tab that is spawning its PTY. The title an agent sent for them has to survive the
+// window between the session dying and the agent returning.
+export function restoreSnapshotTabIds(): Set<string> {
+  const ids = new Set<string>();
+  if (restorePlans) for (const id of restorePlans.keys()) ids.add(id);
+  for (const id of stagedSnapshots.keys()) ids.add(id);
+  return ids;
 }
 
 export async function loadRestorePlans(): Promise<void> {
@@ -56,6 +67,7 @@ export async function loadRestorePlans(): Promise<void> {
 type StagedSnapshot = {
   title: string | null;
   notification: NotificationKind | "interrupted" | null;
+  worktreeCwd: string | null;
   stagedAt: number;
 };
 const stagedSnapshots = new Map<string, StagedSnapshot>();
@@ -81,8 +93,9 @@ export function stageRestoredSnapshot(tabId: string, plan: RestorePlan): void {
   for (const [id, staged] of stagedSnapshots) {
     if (now - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) stagedSnapshots.delete(id);
   }
-  if (title || notification) {
-    stagedSnapshots.set(tabId, { title, notification, stagedAt: now });
+  const worktreeCwd = plan.worktreeCwd || null;
+  if (title || notification || worktreeCwd) {
+    stagedSnapshots.set(tabId, { title, notification, worktreeCwd, stagedAt: now });
   }
 }
 
@@ -101,6 +114,11 @@ export function applyStagedSnapshot(tabId: string): boolean {
   const store = useAgentStore.getState();
   const session = store.sessions[tabId];
   if (staged.title) setOscTitle(tabId, staged.title);
+  // The resumed agent reports its folder only after the first prompt; until then the
+  // worktree it is about to re-enter has to come from the plan.
+  if (staged.worktreeCwd && session) {
+    store.setMeta(tabId, { agentCwd: staged.worktreeCwd, worktreeCwd: staged.worktreeCwd });
+  }
   if (!staged.notification || !session) return true;
   if (staged.notification === "interrupted") {
     store.markInterrupted(tabId);
@@ -160,16 +178,17 @@ export async function detachAgentSession(tabId: string): Promise<void> {
 // (and so no session id in the store) is otherwise invisible until someone notices.
 const resumeWatches = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function watchResume(plan: RestorePlan): void {
+// Keyed by the tab that spawned the PTY: a reopened closed tab carries the plan of its old id.
+export function watchResume(tabId: string, plan: RestorePlan): void {
   if (!import.meta.env.DEV || !expectsSessionReport(plan.agent)) return;
-  clearTimeout(resumeWatches.get(plan.tabId));
+  clearTimeout(resumeWatches.get(tabId));
   resumeWatches.set(
-    plan.tabId,
+    tabId,
     setTimeout(() => {
-      resumeWatches.delete(plan.tabId);
-      if (isHibernating(plan.tabId)) return;
-      if (hasResumed(useAgentStore.getState().sessions[plan.tabId])) return;
-      const msg = describeSilentResume(plan);
+      resumeWatches.delete(tabId);
+      if (isHibernating(tabId)) return;
+      if (hasResumed(useAgentStore.getState().sessions[tabId])) return;
+      const msg = describeSilentResume({ ...plan, tabId });
       void warn(`[agent-session] ${msg}`);
       toast.warning(msg, { duration: 20_000 });
     }, RESUME_CHECK_MS),

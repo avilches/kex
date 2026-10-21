@@ -85,6 +85,9 @@ pub struct RestorePlan {
     /// `error_reason` is, so the UI can show what is blocked without it ever being executed.
     pub attempted_cmd: String,
     pub cwd_launch: String,
+    /// A worktree the session was inside that still exists. The agent only reports its folder
+    /// after the first prompt, so the tab learns about the worktree from here until then.
+    pub worktree_cwd: Option<String>,
     pub error_reason: String,
     pub title: Option<String>,
     pub notification: Option<String>,
@@ -231,6 +234,7 @@ fn build_plans_from(
             .as_deref()
             .and_then(|lc| strip_for_resume_base(lc, &agent_name));
 
+        let mut worktree_cwd = None;
         let (cwd_launch, cmd, transcript_missing, plan_wanted) =
             match (&provider.sessions, &provider.missing_transcript) {
                 (None, _) => (
@@ -242,15 +246,18 @@ fn build_plans_from(
                 (Some(source), policy) => match source
                     .find(&record.session_id, &record.transcript_path)
                 {
-                    Some(transcript) => (
-                        provider
-                            .cwd_read
-                            .read_launch_cwd(&transcript)
-                            .unwrap_or_else(|| record.cwd_launch.clone()),
-                        Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
-                        false,
-                        true,
-                    ),
+                    Some(transcript) => {
+                        worktree_cwd = provider.cwd_read.read_worktree_path(&transcript);
+                        (
+                            provider
+                                .cwd_read
+                                .read_launch_cwd(&transcript)
+                                .unwrap_or_else(|| record.cwd_launch.clone()),
+                            Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
+                            false,
+                            true,
+                        )
+                    }
                     None => {
                         log::info!(
                         "[agent-session] restore plan: tab={tab_id} agent={agent_name} session={} \
@@ -288,6 +295,7 @@ fn build_plans_from(
                     resume_cmd: String::new(),
                     attempted_cmd: cmd.clone().unwrap_or_default(),
                     cwd_launch,
+                    worktree_cwd: None,
                     error_reason: reason,
                     title: record.title.clone(),
                     notification: record.notification.clone(),
@@ -320,6 +328,7 @@ fn build_plans_from(
             resume_cmd: cmd,
             attempted_cmd: String::new(),
             cwd_launch,
+            worktree_cwd,
             error_reason: String::new(),
             title: record.title,
             notification: record.notification,
@@ -1277,6 +1286,47 @@ mod tests {
         assert_eq!(plan.cwd_launch, launch.display().to_string());
     }
 
+    fn worktree_state_line(launch: &Path, worktree: &Path) -> String {
+        format!(
+            r#"{{"type":"worktree-state","worktreeSession":{{"originalCwd":"{}","worktreePath":"{}"}}}}"#,
+            launch.display(),
+            worktree.display()
+        )
+    }
+
+    #[test]
+    fn restore_reports_the_worktree_when_it_still_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        let worktree = dir.path().join("wt");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&worktree).unwrap();
+        let lines = vec![worktree_state_line(&launch, &worktree)];
+
+        let (plan, _) = plan_for_transcript(dir.path(), &lines, &launch);
+
+        assert_eq!(plan.cwd_launch, launch.display().to_string());
+        assert_eq!(plan.worktree_cwd, Some(worktree.display().to_string()));
+    }
+
+    #[test]
+    fn restore_reports_no_worktree_when_it_is_gone_or_was_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        let worktree = dir.path().join("wt");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&worktree).unwrap();
+        let entered = worktree_state_line(&launch, &worktree);
+        let left = r#"{"type":"worktree-state","worktreeSession":null}"#.to_string();
+
+        let (plan, _) = plan_for_transcript(dir.path(), &[entered.clone(), left], &launch);
+        assert_eq!(plan.worktree_cwd, None);
+
+        std::fs::remove_dir_all(&worktree).unwrap();
+        let (plan, _) = plan_for_transcript(dir.path(), &[entered], &launch);
+        assert_eq!(plan.worktree_cwd, None);
+    }
+
     #[test]
     fn restore_falls_back_to_first_cwd_without_worktree_state() {
         let dir = tempfile::tempdir().unwrap();
@@ -1705,6 +1755,7 @@ mod tests {
             resume_cmd: String::new(),
             attempted_cmd: String::new(),
             cwd_launch: String::new(),
+            worktree_cwd: None,
             error_reason: String::new(),
             title: None,
             notification: None,
@@ -1769,7 +1820,10 @@ mod tests {
 
         set_snapshot_at_path(&path, "tab-1", "abc", "t", "interrupted");
 
-        assert_eq!(read_store(&path).tabs["tab-1"].notification.as_deref(), Some("interrupted"));
+        assert_eq!(
+            read_store(&path).tabs["tab-1"].notification.as_deref(),
+            Some("interrupted")
+        );
     }
 
     #[test]

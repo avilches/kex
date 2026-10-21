@@ -250,6 +250,42 @@ impl CwdRead {
     }
 }
 
+impl CwdRead {
+    /// The worktree the session was last inside, when it still exists. The launch cwd is
+    /// deliberately not the worktree (it may be gone), so this is what lets the tab know
+    /// about a live one before the resumed agent reports its own folder.
+    pub fn read_worktree_path(&self, transcript: &Path) -> Option<String> {
+        match self {
+            Self::ScanEntries => scan_last_worktree(transcript),
+            Self::HeaderLine(_) | Self::Unused => None,
+        }
+    }
+}
+
+fn scan_last_worktree(jsonl: &Path) -> Option<String> {
+    let file = std::fs::File::open(jsonl).ok()?;
+    let mut last = None;
+    for line in std::io::BufReader::new(file).lines() {
+        let line = line.ok()?;
+        if !line.contains("\"worktree-state\"") {
+            continue;
+        }
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        if obj.get("type").and_then(|t| t.as_str()) != Some("worktree-state") {
+            continue;
+        }
+        last = obj
+            .get("worktreeSession")
+            .and_then(|w| w.get("worktreePath"))
+            .and_then(|v| v.as_str())
+            .filter(|c| !c.is_empty())
+            .map(str::to_string);
+    }
+    last.filter(|p| Path::new(p).is_dir())
+}
+
 fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     let file = std::fs::File::open(jsonl).ok()?;
     let reader = std::io::BufReader::new(file);

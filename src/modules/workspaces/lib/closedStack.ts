@@ -1,5 +1,5 @@
 import { newTabId } from "@/lib/ids";
-import { allPanes, findPane, updatePane } from "./splitNode";
+import { allPanes, findPane, findTabPane, updatePane } from "./splitNode";
 import type {
   ClosedEntry,
   ClosedTabEntry,
@@ -102,6 +102,38 @@ export function pickReopen(
     return { picked: { kind: "tab", entry, workspaceId: ws.id, paneId }, remaining: after };
   }
   return { picked: null, remaining };
+}
+
+export type ReopenSlot = { paneId: string; index: number };
+
+// Where a reopened tab goes: right after the tab that was on its left when it
+// closed, in whatever pane that tab is in now. A predecessor that was closed
+// too is looked up in the stack and its own predecessor takes over, so the tab
+// lands where the gap is. Without an open predecessor it goes first in its old
+// pane, or in the active one when that pane is gone.
+export function resolveReopenSlot(
+  entry: ClosedTabEntry,
+  others: ClosedEntry[],
+  ws: Workspace,
+): ReopenSlot {
+  const seen = new Set<string>([entry.tab.id]);
+  let prev = entry.prevTabId;
+  while (prev && !seen.has(prev)) {
+    seen.add(prev);
+    const open = findTabPane(ws.paneTree, prev);
+    if (open) return { paneId: open.pane.id, index: open.pane.tabs.findIndex((t) => t.id === prev) + 1 };
+    const closed = others.find(
+      (e): e is ClosedTabEntry => e.kind === "tab" && e.workspaceId === ws.id && e.tab.id === prev,
+    );
+    prev = closed ? closed.prevTabId : null;
+  }
+  return { paneId: findPane(ws.paneTree, entry.paneId) ? entry.paneId : ws.activePaneId, index: 0 };
+}
+
+// A reopened tab gets a new id; entries that pointed at the old one as their
+// predecessor follow it, or their position would be lost.
+export function remapPrevTabId(entries: ClosedEntry[], oldId: string, newId: string): ClosedEntry[] {
+  return entries.map((e) => (e.kind === "tab" && e.prevTabId === oldId ? { ...e, prevTabId: newId } : e));
 }
 
 function reviveTab(tab: Tab, id: string): Tab {

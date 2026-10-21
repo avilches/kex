@@ -36,6 +36,7 @@ function mount(visibleTabIds: string, tabs: Tab[] = baseTabs) {
     onUpdateTab,
     onSaveTab: () => {},
     onRevealInExplorer: () => {},
+    workspaceRoot: () => null,
   };
   const container = document.createElement("div");
   document.body.appendChild(container);

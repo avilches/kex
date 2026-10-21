@@ -9,6 +9,7 @@ import {
   setAutofocusMode,
   setAutofocusNewTabs,
   setAutostart,
+  setPerformanceProfiler,
   setPreviewOnClick,
 } from "@/modules/settings/store";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function GeneralSection() {
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
+  const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
   const [hooksInstalled, setHooksInstalled] = useState<boolean | null>(null);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
@@ -235,6 +237,19 @@ export function GeneralSection() {
           <Switch
             checked={autostart}
             onCheckedChange={(v) => void onToggleAutostart(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <FieldLabel>Diagnostics</FieldLabel>
+        <SettingRow
+          title="Performance profiler"
+          description="Writes a [profiler] line to Kex.log every 10 seconds with frame timings and what the page is doing. Stays on across restarts and costs a little CPU while on."
+        >
+          <Switch
+            checked={performanceProfiler}
+            onCheckedChange={(v) => void setPerformanceProfiler(v)}
           />
         </SettingRow>
       </div>

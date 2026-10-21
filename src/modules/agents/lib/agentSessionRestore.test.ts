@@ -9,8 +9,11 @@ import {
   stageRestoredSnapshot,
   stagedSnapshotCount,
   STAGED_SNAPSHOT_TTL_MS,
+  watchResume,
   type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
+import { RESUME_CHECK_MS } from "@/modules/agents/lib/restoreCheck";
+import { toast } from "sonner";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { _clearAll, getOscTitle, setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
@@ -26,6 +29,28 @@ function makePlan(overrides: Partial<RestorePlan> = {}): RestorePlan {
     ...overrides,
   };
 }
+
+describe("watchResume", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
+  });
+
+  it("checks the tab that spawned the PTY, not the old id inside a reopened tab's plan", () => {
+    vi.useFakeTimers();
+    try {
+      useAgentStore.getState().startIdle("tab-new", "ws", "claude");
+      useAgentStore.getState().setMeta("tab-new", { sessionId: "sess-1" });
+      const toastWarning = vi.spyOn(toast, "warning").mockImplementation(() => "");
+
+      watchResume("tab-new", makePlan({ tabId: "tab-closed-long-ago" }));
+      vi.advanceTimersByTime(RESUME_CHECK_MS + 1);
+
+      expect(toastWarning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe("seedRestorePlan", () => {
   it("makes a plan consumable under the seeded tab id, independent of the plan's own tabId field", () => {
@@ -102,6 +127,18 @@ describe("staged restore snapshot", () => {
     const s = useAgentStore.getState();
     expect(s.notifications).toHaveLength(0);
     expect(s.sessions.t7.status).toBe("attention");
+  });
+
+  it("seeds the worktree the agent was in, so the tab follows it before the first prompt", () => {
+    stageRestoredSnapshot("t8", makePlan({ tabId: "t8", worktreeCwd: "/home/user/project/.claude/worktrees/pepe" }));
+    useAgentStore.getState().startIdle("t8", "ws", "claude");
+
+    expect(applyStagedSnapshot("t8")).toBe(true);
+
+    expect(useAgentStore.getState().sessions.t8.meta).toMatchObject({
+      agentCwd: "/home/user/project/.claude/worktrees/pepe",
+      worktreeCwd: "/home/user/project/.claude/worktrees/pepe",
+    });
   });
 
   it("is keyed by the tab that spawns the PTY, not by the id inside the plan (reopened closed tab)", () => {

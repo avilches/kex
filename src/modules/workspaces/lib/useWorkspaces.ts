@@ -21,7 +21,7 @@ import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
-import { applyAgentTitles } from "./agentTitles";
+import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
 import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
@@ -48,6 +48,8 @@ import { newActionId, newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/
 import {
   buildReopenedTab,
   captureClosedEntry,
+  remapPrevTabId,
+  resolveReopenSlot,
   captureClosedWorkspace,
   clearStaleFolds,
   insertRestoredWorkspace,
@@ -795,6 +797,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           tab: found.tab,
           paneId: found.pane.id,
           workspaceId,
+          prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,
           lastOfWorkspace: workspaceTabCount(ws) === 1,
         });
       }
@@ -841,7 +844,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const newId = newTabId();
     await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
-    openTab(picked.workspaceId, picked.paneId, newTab);
+    closedTabsRef.current = remapPrevTabId(closedTabsRef.current, entry.tab.id, newId);
+    const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
+    const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
+    openTab(picked.workspaceId, slot.paneId, newTab, slot.index);
     selectWorkspace(picked.workspaceId);
     useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, picked.workspaceId);
   }, [openTab, selectWorkspace]);
@@ -1089,6 +1095,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyAgentTitles(prev, titles));
   }, []);
 
+  const clearAgentTitles = useCallback((tabIds: ReadonlySet<string>) => {
+    setWorkspaces((prev) => clearAgentTitlesFn(prev, tabIds));
+  }, []);
+
   const hibernateWorkspace = useCallback((workspaceId: string, snapshots?: Record<string, TabHibernation>) => {
     setWorkspaces((prev) => applyHibernate(prev, workspaceId, Date.now(), snapshots));
   }, []);
@@ -1176,6 +1186,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    clearAgentTitles,
     wakeWorkspace,
     activateTab,
     revealTab,
