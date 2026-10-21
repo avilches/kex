@@ -125,7 +125,6 @@ type Props = {
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
-  onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
@@ -387,7 +386,6 @@ export const FileExplorer = memo(
       revealRequest,
       onOpenFile,
       onPathRenamed,
-      onPathDeleted,
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
       onAddToGitignore,
@@ -402,7 +400,6 @@ export const FileExplorer = memo(
   ) {
     const tree = useFileTree(rootPath, {
       onPathRenamed,
-      onPathDeleted,
       showHidden,
       initialSnapshot: initialExplorer,
     });

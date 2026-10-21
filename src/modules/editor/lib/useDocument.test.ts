@@ -253,6 +253,65 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
+  it("recreates the file from the buffer and leaves no conflict when the watcher reloads it afterwards", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/recreate.txt");
+    await flush();
+
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+    expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+    // The deletion reload pending a conflict while dirty; recreate is only
+    // reachable after dismissing it (keep the in-memory buffer).
+    act(() => {
+      harness.hook.keepLocalChanges();
+    });
+
+    // Recreate: writes the in-memory buffer back to the path.
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    await act(async () => {
+      await harness.hook.recreate();
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "fs_write_file",
+      expect.objectContaining({ content: "local edit" }),
+    );
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "local edit",
+      size: 10,
+    } satisfies DocumentState);
+
+    // The watcher reload that fires after our own write must not pop the
+    // conflict overlay: the buffer equals what was just saved.
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "local edit", size: 10 });
+
+    let returned: boolean | undefined;
+    act(() => {
+      returned = harness.hook.reload();
+    });
+    await flush();
+
+    expect(returned).toBe(true);
+    expect(harness.hook.conflict).toBe(false);
+    expect(harness.hook.dirty).toBe(false);
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "local edit",
+      size: 10,
+    } satisfies DocumentState);
+
+    harness.unmount();
+  });
+
   it("leaves the deleted state when the file reappears with the same content", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
     const harness = mountUseDocument("/tmp/r1.txt");
