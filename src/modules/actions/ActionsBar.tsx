@@ -104,7 +104,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
         {!script && <ActionIcon action={item.action} size={14} />}
         {!iconOnly && (
           <span className="max-w-[120px] min-w-0">
-            <ActionNameLines name={item.name} value={item.subtitle} />
+            <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
           </span>
         )}
       </button>
