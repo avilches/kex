@@ -14,6 +14,7 @@ export function showAgentToast({ agent, title, body, onActivate }: AgentToastArg
     description: toastBody(body),
     icon: <AgentIcon agent={agent} size={18} />,
     action: { label: "Open", onClick: onActivate },
-    duration: 6000,
+    duration: 15_000,
+    closeButton: true,
   });
 }
