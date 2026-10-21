@@ -3064,7 +3064,7 @@ export default function App() {
           value = activeTab.path;
           label = "Copied current Editor file path";
         } else if (activeTab.kind === "terminal") {
-          value = activeTab.cwd;
+          value = scriptFocusFolderRef.current ?? activeTab.cwd;
           label = "Copied current Terminal folder";
         } else if (activeTab.kind === "browser") {
           value = activeTab.url;
