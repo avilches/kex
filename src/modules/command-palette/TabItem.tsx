@@ -42,7 +42,7 @@ export function TabItem({
       onSelect={onRun}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
-      <RowTag kind={tabTagKind(entry.kind)} />
+      <RowTag kind={tabTagKind(entry)} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
         <TabBarIcon
           tab={entry.tab}

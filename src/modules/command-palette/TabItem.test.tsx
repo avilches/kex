@@ -65,6 +65,9 @@ describe("TabItem", () => {
     cleanup();
     row(entry({ kind: "markdown" }));
     expect(screen.getByText("File")).toBeTruthy();
+    cleanup();
+    row(entry({ agent: "claude" }));
+    expect(screen.getByText("Agent")).toBeTruthy();
   });
 
   it("shows a spinner only while the agent works", () => {

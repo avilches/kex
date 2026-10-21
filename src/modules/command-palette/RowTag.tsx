@@ -7,12 +7,13 @@ export type RowTagKind =
   | "Action"
   | "Setting"
   | "Terminal"
+  | "Agent"
   | "File"
   | "Browser"
   | "Git";
 
-export function tabTagKind(kind: TabEntry["kind"]): RowTagKind {
-  if (kind === "terminal") return "Terminal";
+export function tabTagKind({ kind, agent }: Pick<TabEntry, "kind" | "agent">): RowTagKind {
+  if (kind === "terminal") return agent ? "Agent" : "Terminal";
   if (kind === "editor" || kind === "markdown") return "File";
   if (kind === "browser") return "Browser";
   return "Git";
