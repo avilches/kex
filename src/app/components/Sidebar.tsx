@@ -77,7 +77,6 @@ export type SidebarProps = {
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
-  onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
@@ -199,7 +198,6 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               )}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}
-              onPathDeleted={props.onPathDeleted}
               onRevealInTerminal={props.onRevealInTerminal}
               onNewWorkspaceFromFolder={props.onNewWorkspaceFromFolder}
               onAddToGitignore={props.onAddToGitignore}
@@ -274,7 +272,6 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                 onOpenToSide={props.onOpenNoteToSide}
                 onRevealInExplorer={props.onRevealNoteInExplorer}
                 onPathRenamed={props.onPathRenamed ?? (() => {})}
-                onPathDeleted={props.onPathDeleted ?? (() => {})}
               />
             </div>
           ) : null}

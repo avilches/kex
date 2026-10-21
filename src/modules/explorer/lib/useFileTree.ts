@@ -72,7 +72,6 @@ function sameDirListing(a: DirEntry[], b: DirEntry[]): boolean {
 
 type Options = {
   onPathRenamed?: (from: string, to: string) => void;
-  onPathDeleted?: (path: string) => void;
   showHidden?: boolean;
   initialSnapshot?: ExplorerSnapshot | null;
 };
@@ -578,7 +577,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     async (path: string) => {
       try {
         await invoke("fs_delete", { path, workspace: currentWorkspaceEnv() });
-        optionsRef.current?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
         console.error("fs_delete failed:", e);
@@ -594,7 +592,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     async (path: string) => {
       try {
         await invoke("fs_trash", { path, workspace: currentWorkspaceEnv() });
-        optionsRef.current?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
         console.error("fs_trash failed:", e);

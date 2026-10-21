@@ -23,9 +23,6 @@ type Props = {
   pendingTerminalCloseTab: TabInfo | null;
   onCancelTerminalClose: () => void;
   onConfirmTerminalClose: (dontAskAgain: boolean) => void;
-  pendingDeleteTabs: TabInfo[] | null;
-  onCancelDeleteClose: () => void;
-  onConfirmDeleteClose: () => void;
 };
 
 /** Confirmation dialogs for closing dirty editors and terminals with live processes. */
@@ -37,9 +34,6 @@ export function CloseDialogs({
   pendingTerminalCloseTab,
   onCancelTerminalClose,
   onConfirmTerminalClose,
-  pendingDeleteTabs,
-  onCancelDeleteClose,
-  onConfirmDeleteClose,
 }: Props) {
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
@@ -120,35 +114,6 @@ export function CloseDialogs({
               autoFocus
             >
               Close
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={pendingDeleteTabs !== null}
-        onOpenChange={(open) => !open && onCancelDeleteClose()}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingDeleteTabs?.length === 1
-                ? (() => {
-                    const title = pendingDeleteTabs[0]?.title;
-                    return title
-                      ? `"${title}" has unsaved changes. The file has been deleted. Close anyway?`
-                      : "This file has unsaved changes. The file has been deleted. Close anyway?";
-                  })()
-                : `${pendingDeleteTabs?.length ?? 0} files have unsaved changes. They have been deleted. Close all anyway?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={onCancelDeleteClose}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmDeleteClose}>
-              Close Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

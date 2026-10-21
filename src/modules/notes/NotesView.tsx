@@ -25,7 +25,6 @@ export type NotesViewProps = {
   onOpenToSide: (path: string) => void;
   onRevealInExplorer: (path: string) => void;
   onPathRenamed: (from: string, to: string) => void;
-  onPathDeleted: (path: string) => void;
 };
 
 export function NotesView(props: NotesViewProps) {
@@ -179,7 +178,6 @@ export function NotesView(props: NotesViewProps) {
     try {
       await invoke("fs_delete", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
-      props.onPathDeleted(abs(relPath));
       refreshPath(abs(relPath));
     } catch (e) {
       console.error("fs_delete failed:", e);
@@ -188,7 +186,7 @@ export function NotesView(props: NotesViewProps) {
       });
       refreshPath(abs(relPath));
     }
-  }, [pendingDelete, abs, state, refreshPath, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, refreshPath]);
 
   const handleTrash = useCallback(async () => {
     const target = pendingDelete;
@@ -198,7 +196,6 @@ export function NotesView(props: NotesViewProps) {
     try {
       await invoke("fs_trash", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
-      props.onPathDeleted(abs(relPath));
       refreshPath(abs(relPath));
     } catch (e) {
       console.error("fs_trash failed:", e);
@@ -207,7 +204,7 @@ export function NotesView(props: NotesViewProps) {
       });
       refreshPath(abs(relPath));
     }
-  }, [pendingDelete, abs, state, refreshPath, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, refreshPath]);
 
   return (
     <>
