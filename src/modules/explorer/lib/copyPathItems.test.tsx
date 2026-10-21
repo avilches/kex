@@ -38,17 +38,30 @@ describe("copy path items", () => {
 
   it("shows the text each entry copies, muted, below its label", () => {
     open();
-    expect(screen.getByText("src/a/b.ts").parentElement?.className).toContain("text-muted-foreground");
-    expect(screen.getByText("/ws/src/a/b.ts").parentElement?.className).toContain("text-muted-foreground");
+    expect(screen.getByText("src/a/b.ts").closest("[title]")?.className).toContain("text-muted-foreground");
+    expect(screen.getByText("/ws/src/a/b.ts").closest("[title]")?.className).toContain("text-muted-foreground");
   });
 
-  it("keeps a short path left aligned and clips a long one at its start", () => {
+  it("keeps a short path left aligned with no ellipsis", () => {
     open();
-    const sub = screen.getByText("/ws/src/a/b.ts").parentElement!;
-    expect(sub.getAttribute("dir")).toBe("rtl");
-    expect(sub.className).toContain("truncate");
-    expect(sub.className).toContain("text-left");
+    const box = screen.getByText("/ws/src/a/b.ts").parentElement!;
+    expect(box.getAttribute("dir")).toBe("rtl");
+    expect(box.className).toContain("overflow-hidden");
+    expect(box.className).toContain("text-left");
     expect(screen.getByText("/ws/src/a/b.ts").getAttribute("dir")).toBe("ltr");
+    expect(screen.queryByText("…")).toBeNull();
+  });
+
+  it("marks a path cut at its start with an ellipsis", () => {
+    const scrollWidth = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(300);
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
+    try {
+      open();
+      expect(screen.getAllByText("…")).toHaveLength(2);
+    } finally {
+      scrollWidth.mockRestore();
+      clientWidth.mockRestore();
+    }
   });
 
   it("copies the relative text it was given", () => {
