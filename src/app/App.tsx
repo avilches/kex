@@ -2111,15 +2111,10 @@ export default function App() {
   const {
     pendingCloseTab,
     pendingTerminalCloseTab,
-    pendingDeleteTabs,
     closeTabs,
     resolveEditor,
     resolveTerminal,
-    confirmDeleteClose,
-    cancelDeleteClose,
-    handlePathDeleted,
   } = useTabCloseGuards({
-    workspaces,
     disposeTab: (workspaceId, tabId) => {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind === "browser" && found.tab.floating) {
@@ -3712,7 +3707,6 @@ export default function App() {
                         revealRequest={revealRequest}
                         onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
@@ -3825,7 +3819,6 @@ export default function App() {
                         revealRequest={revealRequest}
                         onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
@@ -3985,9 +3978,6 @@ export default function App() {
             onConfirmTerminalClose={(dontAskAgain) =>
               resolveTerminal({ type: "close", dontAskAgain })
             }
-            pendingDeleteTabs={pendingDeleteTabs}
-            onCancelDeleteClose={cancelDeleteClose}
-            onConfirmDeleteClose={confirmDeleteClose}
           />
         </div>
         </ActionMenuProvider>

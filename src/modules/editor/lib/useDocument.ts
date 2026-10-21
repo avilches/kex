@@ -72,6 +72,11 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
 
   const saveNow = useCallback(async () => {
     const content = bufferRef.current;
+    // dirty mirrors buffers (see onChange); flipping the ref before the write
+    // keeps the fs:changed of our own write, which lands while the await is
+    // still in flight, from reading a stale dirty flag.
+    dirtyRef.current = false;
+    setDirty(false);
     await invoke("fs_write_file", {
       path,
       content,
@@ -79,7 +84,6 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
       source: "editor",
     });
     savedRef.current = content;
-    setDirty(false);
   }, [path]);
 
   // Notify parent of dirty transitions.
@@ -189,14 +193,18 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
       });
   }, [path]);
 
-  // While dirty, never clobber unsaved edits silently: block the pane on a
-  // conflict overlay and let the user pick between keeping them (dismiss) or
+  // While dirty with real unsaved edits (buffer differs from the saved
+  // snapshot), never clobber them silently: block the pane on a conflict
+  // overlay and let the user pick between keeping them (dismiss) or
   // discarding them for the disk version. performReload still runs (without
   // applying content) so a file removed while dirty is caught even though
-  // its content sync is skipped.
+  // its content sync is skipped. A stale dirty flag right after a save write
+  // (the fs:changed of our own write arrives before the React state commit)
+  // must not pop the overlay: the buffer equals the saved snapshot, so there
+  // is nothing to lose.
   // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reload = useCallback((): boolean => {
-    if (dirtyRef.current) {
+    if (dirtyRef.current && bufferRef.current !== savedRef.current) {
       performReload();
       setConflict(true);
       return false;

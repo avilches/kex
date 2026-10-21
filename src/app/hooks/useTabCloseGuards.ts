@@ -1,7 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import { leafHasForegroundProcess } from "@/modules/terminal";
-import type { Workspace } from "@/modules/workspaces";
-import { allPanes } from "@/modules/workspaces";
 import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   runCloseQueue,
@@ -17,7 +15,6 @@ type FoundTab = {
 };
 
 type Params = {
-  workspaces: Workspace[];
   disposeTab: (workspaceId: string, tabId: string) => void;
   findTab: (tabId: string) => FoundTab | null;
   saveTab: (tabId: string) => Promise<void>;
@@ -35,7 +32,6 @@ type Params = {
  * whole run.
  */
 export function useTabCloseGuards({
-  workspaces,
   disposeTab,
   findTab,
   saveTab,
@@ -47,7 +43,6 @@ export function useTabCloseGuards({
 }: Params) {
   const [pendingCloseTab, setPendingCloseTab] = useState<TabInfo | null>(null);
   const [pendingTerminalCloseTab, setPendingTerminalCloseTab] = useState<TabInfo | null>(null);
-  const [pendingDeleteTabs, setPendingDeleteTabs] = useState<TabInfo[] | null>(null);
 
   const editorResolverRef = useRef<((d: EditorCloseDecision) => void) | null>(null);
   const terminalResolverRef = useRef<((d: TerminalCloseDecision) => void) | null>(null);
@@ -145,49 +140,11 @@ export function useTabCloseGuards({
     ],
   );
 
-  const confirmDeleteClose = useCallback(() => {
-    if (pendingDeleteTabs !== null) {
-      for (const p of pendingDeleteTabs) {
-        const found = findTab(p.id);
-        if (found) disposeTab(found.workspace.id, p.id);
-      }
-      setPendingDeleteTabs(null);
-    }
-  }, [pendingDeleteTabs, findTab, disposeTab]);
-
-  const cancelDeleteClose = useCallback(() => setPendingDeleteTabs(null), []);
-
-  const handlePathDeleted = useCallback(
-    (path: string) => {
-      const dirty: TabInfo[] = [];
-      for (const ws of workspaces) {
-        for (const pane of allPanes(ws.paneTree)) {
-          for (const tab of pane.tabs) {
-            if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
-            const p = (tab as { path?: string }).path ?? "";
-            if (p !== path && !p.startsWith(`${path}/`)) continue;
-            if ((tab as { dirty?: boolean }).dirty) {
-              dirty.push({ id: tab.id, title: tab.title ?? p, kind: tab.kind, path: p });
-            } else {
-              disposeTab(ws.id, tab.id);
-            }
-          }
-        }
-      }
-      if (dirty.length > 0) setPendingDeleteTabs(dirty);
-    },
-    [workspaces, disposeTab],
-  );
-
   return {
     pendingCloseTab,
     pendingTerminalCloseTab,
-    pendingDeleteTabs,
     closeTabs,
     resolveEditor,
     resolveTerminal,
-    confirmDeleteClose,
-    cancelDeleteClose,
-    handlePathDeleted,
   };
 }
