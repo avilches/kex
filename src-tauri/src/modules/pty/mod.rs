@@ -22,7 +22,7 @@ use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegist
 use session::Session;
 
 pub use metrics::ProcessMonitor;
-use metrics::{aggregate_tree, descendants_of, ProcStat};
+use metrics::{aggregate_tree, descendants_of, real_proc_table, ProcStat};
 
 pub struct PtyState {
     sessions: RwLock<HashMap<u32, Arc<Session>>>,
@@ -229,24 +229,10 @@ pub fn pty_resize(
 // the way it always did.
 #[cfg(unix)]
 fn signal_descendants(shell_pid: u32, sig: i32) -> usize {
-    use sysinfo::{ProcessesToUpdate, System};
-
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
-    let procs: HashMap<u32, ProcStat> = sys
-        .processes()
-        .iter()
-        .map(|(pid, proc_)| {
-            (
-                pid.as_u32(),
-                ProcStat {
-                    parent: proc_.parent().map(|p| p.as_u32()).unwrap_or(0),
-                    cpu: 0.0,
-                    mem: 0,
-                },
-            )
-        })
-        .collect();
+    let procs = real_proc_table();
+    if procs.is_empty() {
+        return 0;
+    }
     descendants_of(&procs, shell_pid)
         .into_iter()
         .filter(|&pid| unsafe { libc::kill(pid as libc::pid_t, sig) == 0 })
@@ -263,8 +249,15 @@ fn signal_tab_tree(state: &PtyState, tab_id: &str, sig: i32) -> Result<usize, St
         .find(|s| s.script_tab_id.as_deref() == Some(tab_id))
         .map(|s| s.shell_pid);
     match shell_pid {
-        None | Some(0) => Ok(0),
-        Some(pid) => Ok(signal_descendants(pid, sig)),
+        None | Some(0) => {
+            log::info!("[pty-signal] tab_id={tab_id} no session shell pid ({shell_pid:?})");
+            Ok(0)
+        }
+        Some(pid) => {
+            let signaled = signal_descendants(pid, sig);
+            log::info!("[pty-signal] tab_id={tab_id} shell={pid} sig={sig} signaled={signaled}");
+            Ok(signaled)
+        }
     }
 }
 
@@ -426,12 +419,15 @@ pub fn pty_metrics(
         .map(|n| n.get())
         .unwrap_or(1);
 
+    // Parent links from `ps` (sysinfo's parent is broken for setuid processes),
+    // cpu and memory from sysinfo (delta-based through the shared monitor).
+    let real = real_proc_table();
     let mut procs: HashMap<u32, ProcStat> = HashMap::new();
     for (pid, proc_) in sys.processes() {
         procs.insert(
             pid.as_u32(),
             ProcStat {
-                parent: proc_.parent().map(|p| p.as_u32()).unwrap_or(0),
+                parent: real.get(&pid.as_u32()).map(|st| st.parent).unwrap_or(0),
                 cpu: proc_.cpu_usage(),
                 mem: proc_.memory(),
             },
@@ -625,6 +621,24 @@ mod tests {
         let (fg_pid, name) = child_of(root);
         assert_eq!(name, "sleep");
         assert!(pid_alive(fg_pid), "the reported pid must be the live child");
+
+        kill_tree(root);
+    }
+
+    #[test]
+    fn descendants_come_from_the_real_proc_table() {
+        let root = spawn_bash_with_sleep();
+        let (fg_pid, _name) = child_of(root);
+        let procs = real_proc_table();
+        assert!(
+            procs.contains_key(&root),
+            "the spawned shell must be in the ps table"
+        );
+        let descendants = descendants_of(&procs, root);
+        assert!(
+            descendants.contains(&fg_pid),
+            "the live child must be a descendant through the ps table (got {descendants:?})"
+        );
 
         kill_tree(root);
     }

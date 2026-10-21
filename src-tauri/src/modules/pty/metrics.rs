@@ -77,6 +77,36 @@ pub fn descendants_of(procs: &HashMap<u32, ProcStat>, root: u32) -> Vec<u32> {
     out
 }
 
+/// The real parent/child table of every process, straight from `ps`. sysinfo on
+/// macOS cannot read the parent of setuid executables (`top`, `sudo`, ...) and
+/// reports it as 0, which prunes them out of the tree exactly when the user
+/// runs one in the foreground; `ps` reads the same ppid unprivileged, so both
+/// the signal and the metrics walk this table. Fails to an empty map.
+pub fn real_proc_table() -> HashMap<u32, ProcStat> {
+    let Ok(output) = std::process::Command::new("ps")
+        .args(["-axo", "pid=,ppid="])
+        .output()
+    else {
+        return HashMap::new();
+    };
+    if !output.status.success() {
+        return HashMap::new();
+    }
+    parse_proc_table(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn parse_proc_table(output: &str) -> HashMap<u32, ProcStat> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let pid: u32 = fields.next()?.parse().ok()?;
+            let parent: u32 = fields.next()?.parse().ok()?;
+            Some((pid, ProcStat { parent, cpu: 0.0, mem: 0 }))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,5 +163,21 @@ mod tests {
         procs.insert(201, st(200, 0.0, 0));
         assert_eq!(descendants_of(&procs, 200), vec![201]);
         assert_eq!(descendants_of(&procs, 300), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn parses_the_ps_table_into_proc_stats() {
+        let procs = parse_proc_table("    1     0\n  100     1\n  200   100\n");
+        assert_eq!(procs.len(), 3);
+        assert_eq!(procs[&100].parent, 1);
+        assert_eq!(procs[&200].parent, 100);
+        assert_eq!(procs[&1].parent, 0);
+    }
+
+    #[test]
+    fn parse_proc_table_ignores_garbage_lines() {
+        let procs = parse_proc_table("no numbers here\n\n  abc     1\n  300     1\n");
+        assert_eq!(procs.len(), 1);
+        assert_eq!(procs[&300].parent, 1);
     }
 }
