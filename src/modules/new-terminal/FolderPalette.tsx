@@ -1,3 +1,4 @@
+import { useCommandState } from "cmdk";
 import {
   Command,
   CommandDialog,
@@ -11,13 +12,14 @@ import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { Home01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
+import { GitBranchIcon, Home01Icon, SleepingIcon, TerminalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
   type FolderGroup,
   type FolderRow,
+  type FolderRowMatched,
   type RepoHint,
 } from "./lib/folderEntries";
 
@@ -56,6 +58,10 @@ export function FolderPalette({
     [groups, query],
   );
   const empty = filtered.length === 0;
+  const repoOfRow = useMemo(
+    () => new Map(filtered.flatMap((g) => g.rows).map((r) => [r.key, r.repoKey] as const)),
+    [filtered],
+  );
 
   // The new first row is selected on every keystroke, but a list scrolled down
   // for the previous query stays where it was and hides it.
@@ -66,13 +72,16 @@ export function FolderPalette({
       ?.scrollTo({ top: 0 });
   }, [query, open]);
 
-  // The row under the cursor is read from cmdk's own selection, which this palette never controls.
+  // Tab acts on the row cmdk has selected, which this palette never controls (a controlled
+  // selection made the scroll lag a row); the hints below read it with useCommandState.
+  const selectedRowKey = () =>
+    listRef.current?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]')?.dataset
+      .folderRow ?? "";
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== "Tab" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
     e.preventDefault();
-    const key = listRef.current?.querySelector<HTMLElement>(
-      '[cmdk-item][aria-selected="true"]',
-    )?.dataset.folderRow;
+    const key = selectedRowKey();
     const row = key ? groups.flatMap((g) => g.rows).find((r) => r.key === key) : undefined;
     if (row?.repoKey && row.repoHint) onToggleWorktrees(row);
   };
@@ -120,13 +129,21 @@ export function FolderPalette({
                 >
                   {g.rows.map((row, at) => (
                     <Fragment key={row.key}>
-                      {startsRepo(g.rows, at) ? <RepoHeading row={row} /> : null}
+                      {startsRepo(g.rows, at) ? (
+                        <RepoHeading row={row} repoOfRow={repoOfRow} />
+                      ) : null}
                       <CommandItem
                         value={row.key}
                         data-folder-row={row.key}
                         onSelect={() => onPick(row)}
                         className="pl-7 text-[12.5px]"
                       >
+                        <HugeiconsIcon
+                          icon={TerminalIcon}
+                          size={13}
+                          strokeWidth={1.75}
+                          className="shrink-0 text-muted-foreground"
+                        />
                         <span className="min-w-0 flex-1 truncate">
                           <HighlightText text={row.display} indices={row.indices} />
                           {row.branch ? (
@@ -136,16 +153,7 @@ export function FolderPalette({
                             </span>
                           ) : null}
                         </span>
-                        {row.hint ? (
-                          <HintChip hint={row.hint} className="ml-auto" />
-                        ) : row.label ? (
-                          <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
-                            {row.label === "Home" ? (
-                              <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
-                            ) : null}
-                            <HighlightText text={row.label} indices={row.labelIndices} />
-                          </span>
-                        ) : null}
+                        <RowTail row={row} />
                       </CommandItem>
                     </Fragment>
                   ))}
@@ -198,16 +206,38 @@ function startsRepo(rows: readonly FolderRow[], at: number): boolean {
   return !(before && !before.pinned && before.repoKey === row.repoKey);
 }
 
-function RepoHeading({ row }: { row: FolderRow & { repoNameIndices?: number[] } }) {
+// The right end of a row: the Tab hint while the row has the focus, otherwise its label.
+function RowTail({ row }: { row: FolderRowMatched }) {
+  const focused = useCommandState((state) => state.value) === row.key;
+  if (focused && row.repoHint) return <HintChip hint={row.repoHint} className="ml-auto" />;
+  if (!row.label) return null;
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
+      {row.label === "Home" ? <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} /> : null}
+      <HighlightText text={row.label} indices={row.labelIndices} />
+    </span>
+  );
+}
+
+// The heading carries the repository hint while the focus is on a row of another repository.
+function RepoHeading({
+  row,
+  repoOfRow,
+}: {
+  row: FolderRowMatched;
+  repoOfRow: ReadonlyMap<string, string | null>;
+}) {
+  const focusInside = repoOfRow.get(useCommandState((state) => state.value)) === row.repoKey;
   return (
     <div
       aria-hidden
       className="flex items-center gap-2 pt-2 pr-3 pb-0.5 pl-7 text-[11px] font-medium text-muted-foreground"
     >
+      <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.75} className="shrink-0" />
       <span className="min-w-0 truncate">
         <HighlightText text={row.repoName ?? ""} indices={row.repoNameIndices} />
       </span>
-      {row.repoHint ? <HintChip hint={row.repoHint} className="ml-auto" /> : null}
+      {row.repoHint && !focusInside ? <HintChip hint={row.repoHint} className="ml-auto" /> : null}
     </div>
   );
 }

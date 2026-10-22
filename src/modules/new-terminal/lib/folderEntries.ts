@@ -33,10 +33,9 @@ export type FolderRow = {
   // How many folders of its repository sit together in its workspace; two or more
   // put a heading with the repository name above the first of them.
   cluster: number;
-  // What Tab does with the repository of this row, whether or not this row draws it.
+  // What Tab does with the repository of this row; drawn on the row that has the focus,
+  // or on the repository heading while the focus is elsewhere.
   repoHint: RepoHint | null;
-  // The hint when the row draws it itself, in place of its label: it has no repository heading to carry it.
-  hint: RepoHint | null;
   workspaceId: string;
   hibernated: boolean;
 };
@@ -162,7 +161,6 @@ function rowOf(
     pinned: extras.pinned ?? false,
     cluster: 1,
     repoHint: null,
-    hint: null,
     workspaceId,
     hibernated,
   };
@@ -226,12 +224,10 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);
     row.cluster = withHeading.has(row.repoKey) ? size.get(row.repoKey) ?? 1 : 1;
-    row.hint = row.cluster < 2 ? row.repoHint : null;
   }
   for (const row of raw.pinned) {
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);
-    row.hint = withHeading.has(row.repoKey) ? null : row.repoHint;
   }
   return { ...raw.head, rows: [...raw.pinned, ...clustered] };
 }
@@ -347,10 +343,10 @@ function merge(into: number[] | undefined, more: number[]): number[] {
 }
 
 // Every word typed must appear as a plain substring (case and accent insensitive) of something the
-// row shows: its path (never inside the home prefix), its branch, its label (while a Tab hint is
-// not taking its place), the name of its repository or the title of its workspace. The returned
-// indices are the characters that matched, per piece of text, so each row shows why it is there.
-// Groups keep their order, rows keep their order, groups left with no rows disappear.
+// row shows: its path (never inside the home prefix), its branch, its label, the name of its
+// repository or the title of its workspace. The returned indices are the characters that matched,
+// per piece of text, so each row shows why it is there. Groups keep their order, rows keep
+// their order, groups left with no rows disappear.
 export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
@@ -367,7 +363,7 @@ export function filterFolderGroups(
     for (const r of g.rows) {
       const path = foldText(r.path);
       const branch = foldText(r.branch ?? "");
-      const label = r.hint ? "" : foldText(r.label ?? "");
+      const label = foldText(r.label ?? "");
       const repoName = r.cluster >= 2 ? foldText(r.repoName ?? "") : "";
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;

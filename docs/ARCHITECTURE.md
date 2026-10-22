@@ -682,16 +682,19 @@ src/
                                      its tab folders; then one group per other workspace in position order (root,
                                      then folders, hibernated included). The folders of one repository (several of a
                                      workspace) sit together under a small heading with the repository name, its
-                                     workspace root first, then its main checkout, then by path; repositories and
+                                     workspace root first, then its main checkout, then by path (a git icon before
+                                     the name, a terminal icon before every folder); repositories and
                                      loose folders go alphabetically. A path appears once in the whole dialog, first
                                      occurrence keeps its label; the branch sits beside the folder, the right side
                                      carries the label; home shows as `~`; headings use the resolved workspace title
                                      and `WorkspaceMark`. Worktrees are not listed by default: `useRepoWorktrees`
                                      asks the worktree listing of every repository on screen once per open. When a
-                                     repository has worktrees not in the list, its heading shows `Tab show N
-                                     worktrees` (a row with no heading of its own, such as the pinned ones, draws it
-                                     in place of its label); Tab adds the missing ones to the workspace it was pressed
-                                     in, main checkout first, and the hint turns into `Tab hide worktrees`, which
+                                     repository has worktrees not in the list, the row that has the focus shows
+                                     `Tab show N worktrees` in place of its label (read with cmdk's
+                                     `useCommandState`, the selection itself stays uncontrolled), and the small heading
+                                     of that repository shows it while the focus is on another repository; Tab adds
+                                     the missing ones to the workspace it was pressed in, main checkout first, and the
+                                     hint turns into `Tab hide worktrees`, which
                                      takes them away again. Search is a plain substring match per word on the path,
                                      the branch, the label, the repository name and the workspace title, with the
                                      matched letters highlighted in each; it never reorders.

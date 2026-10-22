@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { createElement, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +18,6 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   pinned: over.pinned ?? false,
   cluster: over.cluster ?? 1,
   repoHint: over.repoHint ?? null,
-  hint: over.hint ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
   hibernated: over.hibernated ?? false,
@@ -210,32 +209,86 @@ describe("FolderPalette", () => {
         }),
       );
 
-    it("puts the repository name and the hint on one small heading above its folders", async () => {
-      mountGroups(clustered, vi.fn());
+    const arrowDown = async () => {
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+      });
       await settle();
-      const headings = [...document.querySelectorAll('[aria-hidden="true"]')].filter((el) =>
-        el.textContent?.includes("show 2 worktrees"),
+    };
+    const headingHints = () =>
+      [...document.querySelectorAll('[aria-hidden="true"]')].filter((el) =>
+        el.textContent?.includes("worktree"),
       );
-      expect(headings).toHaveLength(1);
-      expect(headings[0].textContent).toContain("repo");
-      expect(headings[0].querySelector("kbd")?.textContent).toBe("Tab");
-      const [first, second, third] = itemEls();
-      expect(first.textContent).toContain("Workspace Root");
-      expect(first.textContent).not.toContain("show");
-      expect(second.textContent).not.toContain("show");
-      expect(third.textContent).not.toContain("show");
-    });
 
-    it("draws the hint on the row itself, in place of its label, when there is no heading", async () => {
+    it("shows the hint on the heading of the repository while the focus is outside it", async () => {
       mountGroups(
-        [group({ rows: [base({ label: "Current tab", pinned: true, hint: show })] })],
+        [
+          group({
+            rows: [
+              row({ path: "/other", key: "ws-1:/other" }),
+              base({ path: "/repo", label: "Workspace Root", cluster: 2, key: "ws-1:/repo" }),
+              base({ path: "/repo/src", cluster: 2, key: "ws-1:/repo/src" }),
+            ],
+          }),
+        ],
         vi.fn(),
       );
       await settle();
-      const [only] = itemEls();
-      expect(only.textContent).toContain("show 2 worktrees");
-      expect(only.textContent).not.toContain("Current tab");
-      expect(only.querySelector("kbd")?.textContent).toBe("Tab");
+      const headings = headingHints();
+      expect(headings).toHaveLength(1);
+      expect(headings[0].textContent).toContain("repo");
+      expect(headings[0].textContent).toContain("show 2 worktrees");
+      expect(headings[0].querySelector("kbd")?.textContent).toBe("Tab");
+      const [, root] = itemEls();
+      expect(root.textContent).toContain("Workspace Root");
+      expect(root.textContent).not.toContain("show");
+    });
+
+    it("moves the hint onto the row that has the focus, and off the heading", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              row({ path: "/other", key: "ws-1:/other" }),
+              base({ path: "/repo", label: "Workspace Root", cluster: 2, key: "ws-1:/repo" }),
+              base({ path: "/repo/src", cluster: 2, key: "ws-1:/repo/src" }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      await arrowDown();
+      await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
+      const [other, root, src] = itemEls();
+      expect(root.textContent).not.toContain("Workspace Root");
+      expect(root.querySelector("kbd")?.textContent).toBe("Tab");
+      expect(other.textContent).not.toContain("show");
+      expect(src.textContent).not.toContain("show");
+      expect(headingHints()).toHaveLength(0);
+      await arrowDown();
+      await waitFor(() => expect(itemEls()[2].textContent).toContain("show 2 worktrees"));
+      expect(itemEls()[1].textContent).toContain("Workspace Root");
+    });
+
+    it("shows the hint on a lone row only while it has the focus", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              row({ path: "/other", key: "ws-1:/other" }),
+              base({ path: "/solo", label: "Current tab", pinned: true, key: "ws-1:/solo" }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      expect(itemEls()[1].textContent).toContain("Current tab");
+      expect(itemEls()[1].textContent).not.toContain("show");
+      await arrowDown();
+      await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
+      expect(itemEls()[1].textContent).not.toContain("Current tab");
     });
 
     it("says worktree in the singular for one, and hide once they are shown", async () => {
@@ -243,18 +296,30 @@ describe("FolderPalette", () => {
         [
           group({
             rows: [
-              row({ path: "/a", key: "ws-1:/a", repoKey: "/a", hint: { kind: "show", count: 1 }, repoHint: { kind: "show", count: 1 } }),
-              row({ path: "/b", key: "ws-1:/b", repoKey: "/b", hint: { kind: "hide" }, repoHint: { kind: "hide" } }),
+              row({ path: "/a", key: "ws-1:/a", repoKey: "/a", repoHint: { kind: "show", count: 1 } }),
+              row({ path: "/b", key: "ws-1:/b", repoKey: "/b", repoHint: { kind: "hide" } }),
             ],
           }),
         ],
         vi.fn(),
       );
       await settle();
-      const [a, b] = itemEls();
-      expect(a.textContent).toContain("show 1 worktree");
-      expect(a.textContent).not.toContain("worktrees");
-      expect(b.textContent).toContain("hide worktrees");
+      await waitFor(() => expect(itemEls()[0].textContent).toContain("show 1 worktree"));
+      expect(itemEls()[0].textContent).not.toContain("worktrees");
+      await arrowDown();
+      await waitFor(() => expect(itemEls()[1].textContent).toContain("hide worktrees"));
+    });
+
+    it("puts a terminal icon before every folder and a repository icon before the repository name", async () => {
+      mountGroups(clustered, vi.fn());
+      await settle();
+      for (const el of itemEls()) {
+        expect(el.querySelector("svg")).not.toBeNull();
+      }
+      const heading = [...document.querySelectorAll('[aria-hidden="true"]')].find((el) =>
+        el.textContent?.includes("repo"),
+      );
+      expect(heading?.querySelector("svg")).not.toBeNull();
     });
 
     it("Tab on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {

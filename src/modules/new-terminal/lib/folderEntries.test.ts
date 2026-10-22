@@ -301,23 +301,21 @@ describe("repositories", () => {
     });
     const at = (path: string) => group.rows.find((r) => r.path === path)!;
 
-    it("goes on the heading of a repository with several folders, not on its rows", () => {
+    it("is carried by every row of a repository, with a heading when it has several folders", () => {
       for (const path of ["/repo", "/repo/src"]) {
         expect(at(path).cluster).toBe(2);
         expect(at(path).repoHint).toEqual({ kind: "show", count: 1 });
-        expect(at(path).hint).toBeNull();
       }
     });
 
-    it("goes on the row itself when its repository has no heading", () => {
-      expect(at("/solo/cur").hint).toEqual({ kind: "show", count: 2 });
+    it("is carried by a row alone in its repository, and by a pinned row, without a heading", () => {
+      expect(at("/solo/cur").repoHint).toEqual({ kind: "show", count: 2 });
       expect(at("/solo2/x").cluster).toBe(1);
-      expect(at("/solo2/x").hint).toEqual({ kind: "show", count: 2 });
+      expect(at("/solo2/x").repoHint).toEqual({ kind: "show", count: 2 });
     });
 
     it("is absent when the repository has nothing more to show", () => {
       expect(at("/other").repoHint).toBeNull();
-      expect(at("/other").hint).toBeNull();
     });
   });
 
@@ -344,7 +342,7 @@ describe("repositories", () => {
 
     it("offers them first: the rows of the repository carry the show hint", () => {
       const group = open(new Map());
-      expect(group.rows[0].hint).toEqual({ kind: "show", count: 3 });
+      expect(group.rows[0].repoHint).toEqual({ kind: "show", count: 3 });
     });
 
     it("adds the missing ones to its group, main checkout first then alphabetical, without repeats", () => {
@@ -359,7 +357,7 @@ describe("repositories", () => {
       expect(new Set(group.rows.map((r) => r.path)).size).toBe(group.rows.length);
     });
 
-    it("turns the hint into hide, carried by the new heading", () => {
+    it("turns the hint into hide for every row of the repository", () => {
       const group = open(new Map([["/repo", "ws-1"]]));
       const added = group.rows.slice(1, 4);
       expect(added.map((r) => r.cluster)).toEqual([3, 3, 3]);
@@ -369,7 +367,6 @@ describe("repositories", () => {
         { kind: "hide" },
         { kind: "hide" },
       ]);
-      expect(group.rows.slice(0, 4).every((r) => r.hint === null)).toBe(true);
     });
 
     it("takes them away again when the expansion is dropped, leaving the list as it was", () => {
@@ -525,15 +522,15 @@ describe("filterFolderGroups", () => {
       expect(g.rows[0].repoNameIndices).toEqual([7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     });
 
-    it("does not search the label a row hint has replaced", () => {
+    it("keeps searching the label of a row whose repository has a hint", () => {
       const single = build({
         workspaces: [bare],
         activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/solo/cur" }),
         repoOf: () => "/solo",
         worktreesByRepo: listing(["/solo"], [main("/solo"), linked("/solo-wt", "w")]),
       });
-      expect(single[0].rows[0].hint).not.toBeNull();
-      expect(filterFolderGroups(single, "current")).toEqual([]);
+      expect(single[0].rows[0].repoHint).not.toBeNull();
+      expect(filterFolderGroups(single, "current")[0].rows).toHaveLength(1);
     });
   });
 });
