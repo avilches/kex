@@ -66,6 +66,8 @@ export type BarContext = {
   shell: CommandShell;
   /** The workspace is asleep: nothing can run until it wakes. */
   hibernated?: boolean;
+  /** The vars are words for what a variable stands for, not values (Settings has no tab). */
+  labels?: boolean;
 };
 
 const NEEDS: Record<string, string> = {
@@ -127,6 +129,7 @@ export const SETTINGS_LABELS: BarContext = {
     workspace: "Workspace",
   },
   shell: "posix",
+  labels: true,
 };
 
 export type ActionSubtitle = {
@@ -151,6 +154,23 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
   }
   if (value) return { text: value, startTrim: varName === "cwd" };
   return { text: variable, startTrim: false };
+}
+
+// A script with no variable in its name says where it runs: the workspace, the last folder
+// of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
+// wins because that is what the Action points at.
+export function scriptSubtitle(action: Pick<Action, "name" | "runInTerminal" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
+  const named = actionSubtitle(action.name, ctx);
+  if (!action.runInTerminal || named.text !== null) return named;
+  const mode = action.cwdMode ?? "workspace";
+  if (mode === "fixed") {
+    return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
+  }
+  if (mode === "context") {
+    const cwd = ctx && !ctx.labels ? ctx.vars.cwd : "";
+    return cwd ? { text: cwd, startTrim: true } : { text: "Current folder", startTrim: false };
+  }
+  return { text: ctx && !ctx.vars.workspace ? WORKSPACE_UNSET : "Workspace", startTrim: false };
 }
 
 // The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
@@ -394,7 +414,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
     const label = action.name.trim() || "Action";
-    const subtitle = actionSubtitle(label, context);
+    const subtitle = scriptSubtitle({ ...action, name: label }, context);
     const disabledReason = running ? null : actionAvailability(action, context);
     return {
       id: action.id,
