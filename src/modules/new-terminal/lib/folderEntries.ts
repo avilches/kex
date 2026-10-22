@@ -32,6 +32,10 @@ export type FolderRow = {
   pinned: boolean;
   // How many folders of its repository sit together in its workspace.
   cluster: number;
+  // How many worktrees its repository has, main checkout included; 0 until the listing arrives.
+  worktreeCount: number;
+  // Added with Tab: drawn nested under the repository's folders.
+  nested: boolean;
   // Its repository group has a heading with the repository name above the first folder: two or
   // more folders together, or the repository of the current tab, which opens the list.
   headed: boolean;
@@ -137,7 +141,7 @@ function repoKeyOf(b: Builder, path: string): string | null {
   return b.keyOfRoot.get(root) ?? root;
 }
 
-type RowExtras = { branch: string | null; repoKey: string; pinned: boolean };
+type RowExtras = { branch: string | null; repoKey: string; pinned: boolean; nested: boolean };
 
 function rowOf(
   b: Builder,
@@ -163,6 +167,8 @@ function rowOf(
     pinned: extras.pinned ?? false,
     cluster: 1,
     headed: false,
+    worktreeCount: 0,
+    nested: extras.nested ?? false,
     repoHint: null,
     workspaceId,
     hibernated,
@@ -190,10 +196,18 @@ type RawGroup = {
 };
 
 // Within a repository the current tab goes first, then the workspace root, then its main
-// checkout, then the rest by path.
+// checkout, then the rest by path, and the worktrees added with Tab last.
 function inCluster(a: FolderRow, b: FolderRow): number {
   const rank = (r: FolderRow) =>
-    r.label === "Current tab" ? 0 : r.label === "Workspace Root" ? 1 : r.path === r.repoKey ? 2 : 3;
+    r.nested
+      ? 4
+      : r.label === "Current tab"
+        ? 0
+        : r.label === "Workspace Root"
+          ? 1
+          : r.path === r.repoKey
+            ? 2
+            : 3;
   return rank(a) - rank(b) || compare(a.path, b.path);
 }
 
@@ -244,6 +258,7 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
     const rows = size.get(row.repoKey) ?? 1;
     row.cluster = rows;
     row.headed = withHeading.has(row.repoKey);
+    row.worktreeCount = b.worktreesOfKey.get(row.repoKey)?.length ?? 0;
   }
   for (const row of raw.pinned) {
     if (!row.repoKey) continue;
@@ -341,6 +356,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       rowOf(b, w.path, workspaceId, raw.head.hibernated, w.isMain ? "Main checkout" : null, {
         branch: w.branch,
         repoKey: key,
+        nested: true,
       }),
     );
     if (added.length === 0) continue;
