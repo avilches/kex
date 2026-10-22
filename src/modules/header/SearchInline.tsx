@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KEY_SEP } from "@/lib/platform";
-import type { EditorPaneHandle } from "@/modules/editor";
+import type { ViewSearchHandle } from "@/lib/cmSearch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { searchHighlightFromVars } from "@/modules/theme/terminalHighlight";
@@ -25,7 +25,7 @@ function termDecorations() {
 
 export type SearchTarget =
   | { kind: "terminal"; addon: SearchAddon; focus: () => void }
-  | { kind: "editor"; handle: EditorPaneHandle; focus: () => void }
+  | { kind: "editor"; handle: ViewSearchHandle; focus: () => void }
   | {
       kind: "git-history";
       handle: { setQuery: (q: string) => void; clearQuery: () => void };

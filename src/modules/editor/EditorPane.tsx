@@ -1,13 +1,8 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { CM_EDITOR_SETUP } from "@/lib/codemirrorSetup";
+import { viewSearchHandle } from "@/lib/cmSearch";
 import { redo, undo } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
-import {
-  findNext,
-  findPrevious,
-  SearchQuery,
-  setSearchQuery,
-} from "@codemirror/search";
 import {
   EditorView,
   highlightActiveLine,
@@ -361,31 +356,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useImperativeHandle(
       ref,
       () => ({
-        setQuery: (q: string) => {
-          const v = cmRef.current?.view;
-          if (!v) return;
-          v.dispatch({
-            effects: setSearchQuery.of(
-              new SearchQuery({ search: q, caseSensitive: false }),
-            ),
-          });
-          if (q) findNext(v);
-        },
-        findNext: () => {
-          const v = cmRef.current?.view;
-          if (v) findNext(v);
-        },
-        findPrevious: () => {
-          const v = cmRef.current?.view;
-          if (v) findPrevious(v);
-        },
-        clearQuery: () => {
-          const v = cmRef.current?.view;
-          if (!v) return;
-          v.dispatch({
-            effects: setSearchQuery.of(new SearchQuery({ search: "" })),
-          });
-        },
+        ...viewSearchHandle(() => cmRef.current?.view),
         focus: () => {
           const view = cmRef.current?.view;
           view?.focus();
