@@ -13,7 +13,6 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   displayShift: over.displayShift ?? 0,
   label: over.label ?? null,
   branch: over.branch ?? null,
-  process: over.process ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
   hibernated: over.hibernated ?? false,
@@ -146,5 +145,30 @@ describe("FolderPalette", () => {
     await settle();
     expect(document.querySelector('[aria-label="Workspace is hibernated"]')).not.toBeNull();
     expect(itemEls()[0].className).not.toContain("opacity-60");
+  });
+
+  it("shows the branch after the folder and only the label on the right", async () => {
+    render(
+      createElement(FolderPalette, {
+        open: true,
+        onOpenChange: vi.fn(),
+        groups: [
+          group({
+            rows: [
+              row({ path: "/repo", label: "Current tab", branch: "main", key: "ws-1:/repo" }),
+              row({ path: "/home/a", display: "~", label: "Home", key: "ws-1:/home/a" }),
+              row({ path: "/repo/src", key: "ws-1:/repo/src" }),
+            ],
+          }),
+        ],
+        onPick: vi.fn(),
+      }),
+    );
+    await settle();
+    const [current, home, plain] = itemEls();
+    expect(current.textContent).toBe("/repo \u00b7 mainCurrent tab");
+    expect(home.textContent).toBe("~Home");
+    expect(home.querySelector("svg")).not.toBeNull();
+    expect(plain.textContent).toBe("/repo/src");
   });
 });

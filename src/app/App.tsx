@@ -3389,12 +3389,17 @@ export default function App() {
   );
 
   // ── Ask-me folder palette data ────────────────────────────────────────────
+  // Every folder the palette can list shows its branch: tab folders, workspace roots and home.
   const folderPaletteDirs = useMemo(
     () =>
       folderPaletteOpen
-        ? workspaces.flatMap((w) =>
-            allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
-          )
+        ? [
+            homeRef.current ?? "",
+            ...workspaces.flatMap((w) => [
+              w.workspaceRoot ?? w.fsRoot ?? "",
+              ...allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
+            ]),
+          ]
         : [],
     [folderPaletteOpen, workspaces],
   );
@@ -3423,6 +3428,7 @@ export default function App() {
             activeTabEntry:
               folderTabEntries.find((e) => e.tabId === activeTabId) ?? null,
             entries: folderTabEntries,
+            branchOf: (dir) => folderSources.git(dir).branch,
           })
         : [],
     [folderSources, workspaces, folderWorkspaceEntries, activeWorkspaceId, folderTabEntries, activeTabId],

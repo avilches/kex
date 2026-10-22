@@ -9,12 +9,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { SleepingIcon } from "@hugeicons/core-free-icons";
+import { Home01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
-  folderRowNote,
   type FolderGroup,
   type FolderRow,
 } from "./lib/folderEntries";
@@ -102,10 +101,20 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                     >
                       <span className="min-w-0 flex-1 truncate">
                         <HighlightText text={row.display} indices={row.indices} />
+                        {row.branch ? (
+                          <span className="font-normal text-muted-foreground">
+                            {` · ${row.branch}`}
+                          </span>
+                        ) : null}
                       </span>
-                      <span className="ml-auto max-w-56 shrink-0 truncate text-[11px] font-normal text-muted-foreground">
-                        {folderRowNote(row)}
-                      </span>
+                      {row.label ? (
+                        <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                          {row.label === "Home" ? (
+                            <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+                          ) : null}
+                          {row.label}
+                        </span>
+                      ) : null}
                     </CommandItem>
                   ))}
                 </CommandGroup>

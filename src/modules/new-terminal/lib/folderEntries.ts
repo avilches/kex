@@ -1,16 +1,7 @@
 import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
-// The repo root of a worktree path: the tree before its `.claude/worktrees/<name>` segment.
-// Same convention the command palette uses (WORKTREE_RE in tabEntries.ts).
-const MAIN_CHECKOUT_RE = /[\\/]\.claude[\\/]worktrees[\\/][^\\/]+/;
-
-export function mainCheckoutOf(path: string): string | null {
-  const match = MAIN_CHECKOUT_RE.exec(path);
-  return match ? path.slice(0, match.index) : null;
-}
-
-export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root";
+export type FolderRowLabel = "Current tab" | "Workspace Root" | "Home";
 
 export type FolderRow = {
   key: string;
@@ -24,7 +15,6 @@ export type FolderRow = {
   matchOffset: number;
   label: FolderRowLabel | null;
   branch: string | null;
-  process: string | null;
   workspaceId: string;
   hibernated: boolean;
 };
@@ -55,6 +45,8 @@ export type FolderGroupsInput = {
   activeTabEntry: TabEntry | null;
   /** One entry per tab of every workspace; browser tabs carry no folder. */
   entries: readonly TabEntry[];
+  /** Branch of a folder; empty when it is not a repository or the answer has not arrived yet. */
+  branchOf: (dir: string) => string;
 };
 
 function matchOffsetOf(path: string, home: string | null): number {
@@ -79,22 +71,20 @@ function rowOf(
   path: string,
   workspaceId: string,
   hibernated: boolean,
-  home: string | null,
-  over: Partial<FolderRow> = {},
+  input: FolderGroupsInput,
+  label: FolderRowLabel | null,
 ): FolderRow {
-  const display = displayOf(path, home);
+  const display = displayOf(path, input.home);
   return {
     key: `${workspaceId}:${path}`,
     path,
     display,
     displayShift: path.length - display.length,
-    matchOffset: matchOffsetOf(path, home),
-    label: null,
-    branch: null,
-    process: null,
+    matchOffset: matchOffsetOf(path, input.home),
+    label,
+    branch: input.branchOf(path) || null,
     workspaceId,
     hibernated,
-    ...over,
   };
 }
 
@@ -104,26 +94,29 @@ function pushUnique(rows: FolderRow[], seen: Set<string>, row: FolderRow) {
   rows.push(row);
 }
 
+function byPath(a: FolderRow, b: FolderRow): number {
+  return a.path.localeCompare(b.path, undefined, { sensitivity: "base" });
+}
+
+// The folders of the tabs: alphabetical, no repeats, no label.
 function tabRowsOf(
   entries: readonly TabEntry[],
   seen: Set<string>,
-  home: string | null,
+  input: FolderGroupsInput,
 ): FolderRow[] {
-  const byRecency = [...entries].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
   const rows: FolderRow[] = [];
-  for (const e of byRecency) {
+  for (const e of entries) {
     if (!e.cwd) continue;
-    pushUnique(rows, seen, rowOf(e.cwd, e.workspaceId, e.hibernated, home, {
-      branch: e.branch || null,
-      process: e.process || null,
-    }));
+    pushUnique(rows, seen, rowOf(e.cwd, e.workspaceId, e.hibernated, input, null));
   }
-  return rows;
+  return rows.sort(byPath);
 }
 
 // One path appears once in the whole palette: the seen set is shared across
-// groups, so a route shown in an earlier group never comes back in a later one,
+// groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
+// Order: the active workspace (current tab folder, workspace root, home, then its
+// other folders), then every other workspace in position order (root, then folders).
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const byWorkspace = new Map<string, TabEntry[]>();
   for (const e of input.entries) {
@@ -138,66 +131,50 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
 
   const groups: FolderGroup[] = [];
   const seen = new Set<string>();
-  const home = input.home;
   const identity = new Map(input.workspaceEntries.map((e) => [e.workspaceId, e] as const));
-  const identityOf = (ws: Workspace) => {
+  const headOf = (ws: Workspace, active: boolean) => {
     const e = identity.get(ws.id);
     return {
+      workspaceId: ws.id,
       workspaceTitle: e?.title ?? ws.title,
       workspaceColor: e?.color ?? ws.color ?? null,
       workspaceIcon: e?.icon ?? ws.icon ?? null,
+      active,
+      hibernated: !!ws.hibernated,
     };
   };
+  const rootOf = (ws: Workspace) => ws.workspaceRoot ?? ws.fsRoot ?? null;
 
   const activeWs = input.workspaces.find((w) => w.id === input.activeWorkspaceId);
   if (activeWs) {
     const rows: FolderRow[] = [];
-    const activeEntry = input.activeTabEntry;
-    if (activeEntry?.cwd) {
-      pushUnique(rows, seen, rowOf(activeEntry.cwd, activeWs.id, false, home, {
-        label: "Current tab",
-        branch: activeEntry.branch || null,
-        process: activeEntry.process || null,
-      }));
-      const main = mainCheckoutOf(activeEntry.cwd);
-      if (main) {
-        pushUnique(rows, seen, rowOf(main, activeWs.id, false, home, { label: "Main checkout" }));
-      }
+    const sleeping = !!activeWs.hibernated;
+    const cwd = input.activeTabEntry?.cwd;
+    if (cwd) {
+      pushUnique(rows, seen, rowOf(cwd, activeWs.id, sleeping, input, "Current tab"));
     }
-    const root = activeWs.workspaceRoot ?? activeWs.fsRoot ?? null;
+    const root = rootOf(activeWs);
     if (root) {
-      pushUnique(rows, seen, rowOf(root, activeWs.id, false, home, { label: "Workspace Root" }));
+      pushUnique(rows, seen, rowOf(root, activeWs.id, sleeping, input, "Workspace Root"));
     }
-    for (const row of tabRowsOf(byWorkspace.get(activeWs.id) ?? [], seen, home)) {
-      rows.push(row);
+    const home = input.home?.replace(/[\\/]+$/, "");
+    if (home) {
+      pushUnique(rows, seen, rowOf(home, activeWs.id, sleeping, input, "Home"));
     }
-    groups.push({
-      workspaceId: activeWs.id,
-      ...identityOf(activeWs),
-      active: true,
-      hibernated: !!activeWs.hibernated,
-      rows,
-    });
+    rows.push(...tabRowsOf(byWorkspace.get(activeWs.id) ?? [], seen, input));
+    groups.push({ ...headOf(activeWs, true), rows });
   }
 
   for (const ws of input.workspaces) {
     if (ws.id === input.activeWorkspaceId) continue;
     const rows: FolderRow[] = [];
-    const root = ws.workspaceRoot ?? ws.fsRoot ?? null;
+    const root = rootOf(ws);
     if (root) {
-      pushUnique(rows, seen, rowOf(root, ws.id, !!ws.hibernated, home, { label: "Workspace Root" }));
+      pushUnique(rows, seen, rowOf(root, ws.id, !!ws.hibernated, input, "Workspace Root"));
     }
-    for (const row of tabRowsOf(byWorkspace.get(ws.id) ?? [], seen, home)) {
-      rows.push(row);
-    }
+    rows.push(...tabRowsOf(byWorkspace.get(ws.id) ?? [], seen, input));
     if (rows.length === 0) continue;
-    groups.push({
-      workspaceId: ws.id,
-      ...identityOf(ws),
-      active: false,
-      hibernated: !!ws.hibernated,
-      rows,
-    });
+    groups.push({ ...headOf(ws, false), rows });
   }
   return groups;
 }
@@ -242,10 +219,4 @@ export function filterFolderGroups(
     }
   }
   return out;
-}
-
-export function folderRowNote(row: FolderRow): string {
-  return [row.label, row.branch, row.process]
-    .filter(Boolean)
-    .join(" \u00b7 ");
 }
