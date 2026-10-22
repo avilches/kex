@@ -65,6 +65,7 @@ import {
   FolderPalette,
   type FolderRow,
 } from "@/modules/new-terminal";
+import { useRepoWorktrees } from "@/modules/new-terminal/lib/useRepoWorktrees";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -3417,6 +3418,14 @@ export default function App() {
     () => (folderSources ? buildWorkspaceEntries(workspaces, folderSources) : []),
     [folderSources, workspaces],
   );
+  const folderActiveEntry =
+    folderTabEntries.find((e) => e.tabId === activeTabId) ?? null;
+  const folderWorktrees = useRepoWorktrees(
+    folderPaletteOpen,
+    folderSources && folderActiveEntry?.cwd
+      ? folderSources.git(folderActiveEntry.cwd).repoRoot
+      : "",
+  );
   const folderGroups = useMemo(
     () =>
       folderSources
@@ -3425,13 +3434,13 @@ export default function App() {
             workspaceEntries: folderWorkspaceEntries,
             activeWorkspaceId,
             home: homeRef.current,
-            activeTabEntry:
-              folderTabEntries.find((e) => e.tabId === activeTabId) ?? null,
+            activeTabEntry: folderActiveEntry,
             entries: folderTabEntries,
+            worktrees: folderWorktrees,
             branchOf: (dir) => folderSources.git(dir).branch,
           })
         : [],
-    [folderSources, workspaces, folderWorkspaceEntries, activeWorkspaceId, folderTabEntries, activeTabId],
+    [folderSources, workspaces, folderWorkspaceEntries, activeWorkspaceId, folderTabEntries, folderActiveEntry, folderWorktrees],
   );
 
   const onFolderPick = useCallback(

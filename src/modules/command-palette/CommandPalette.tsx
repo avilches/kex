@@ -39,6 +39,7 @@ import { commandRowKey } from "./lib/rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
 import { MergedList } from "./MergedList";
+import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "./PaletteWidth";
 import type { PaletteItem } from "./types";
 
 type Props = {
@@ -91,6 +92,7 @@ export function CommandPalette({
   onMoveActiveTabToWorkspace,
 }: Props) {
   const [query, setQuery] = useState("");
+  const { contentStyle, handles } = usePaletteWidth();
   const [value, setValue] = useState("");
   const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -379,8 +381,10 @@ export function CommandPalette({
       description="Run a command, switch theme, or search your workspace."
       modal={false}
       onFocusOutside={(event) => event.preventDefault()}
-      className="w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))]"
+      className={PALETTE_WIDTH_CLASS}
+      contentStyle={contentStyle}
     >
+      {handles}
       <Command
         shouldFilter={false}
         loop

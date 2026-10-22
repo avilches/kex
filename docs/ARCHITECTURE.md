@@ -677,12 +677,19 @@ src/
     ├── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, one merged score-ranked list with learned choices when typing, tagged rows, tab path line, note in the row), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
     └── new-terminal/              - "Ask me" mode for Open new terminals in (Settings > Terminal): FolderPalette,
                                      a Command-Palette-like dialog that picks the folder of a new terminal instead of
-                                     deducing it. Pure core in `lib/folderEntries.ts` (tested): groups the current
-                                     tab cwd, the worktree main checkout and the workspace root first, then the other
-                                     tab cwds of the active workspace, then one group per other workspace (root + tab
-                                     cwds, hibernated included); paths are deduped per group, first occurrence keeps
-                                     its label; search is a fuzzy subsequence match on the path (reuses the palette's
-                                     `fuzzyMatchLower`) that never reorders. `App.tsx` intercepts every terminal
+                                     deducing it. Pure core in `lib/folderEntries.ts` (tested): the active workspace
+                                     group opens with the current tab folder, the main checkout of its repository
+                                     and the other worktrees alphabetically (`useRepoWorktrees`, one IPC call per
+                                     open), the workspace root and home, then its tab folders alphabetically; then one
+                                     group per other workspace in position order (root, then folders, hibernated
+                                     included). A path appears once in the whole dialog, first occurrence keeps its
+                                     label; the branch sits beside the folder, the right side only carries the label;
+                                     home shows as `~`; headings use the resolved workspace title and `WorkspaceMark`.
+                                     Search is a plain substring match per word on the path that never reorders.
+                                     The selection is cmdk's own (a controlled value made its scroll lag a row). The
+                                     dialog width is shared with the command palette (`paletteWidth` preference,
+                                     dragged from either side edge by `usePaletteWidth`, double-click resets).
+                                     `App.tsx` intercepts every terminal
                                      creation (`openNewTerminal` and both split callbacks): a free creation can land
                                      in another workspace (switches to it, waking it if needed, and inserts right
                                      after that workspace's focused tab); an entry point aimed at a specific pane

@@ -1,3 +1,4 @@
+import { clampPaletteWidth, DEFAULT_PALETTE_WIDTH } from "@/lib/paletteWidth";
 import { DEFAULT_ZOOM, snapZoom } from "@/lib/zoomLevels";
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
 import {
@@ -192,6 +193,7 @@ export type Preferences = {
   terminalNewFolderMode: TerminalNewFolderMode;
   lastWslDistro: string | null;
   zoomLevel: number;
+  paletteWidth: number;
   agentNotifications: boolean;
   installedIntegrations: IntegrationAgent[];
   shortcuts: Record<ShortcutId, KeyBinding[]>;
@@ -263,6 +265,7 @@ const KEY_TITLE_TEMPLATE_BROWSER = "titleTemplateBrowser";
 const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
 const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
 const KEY_ZOOM_LEVEL = "zoomLevel";
+const KEY_PALETTE_WIDTH = "paletteWidth";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
@@ -459,6 +462,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalNewFolderMode: "context",
   lastWslDistro: null,
   zoomLevel: DEFAULT_ZOOM,
+  paletteWidth: DEFAULT_PALETTE_WIDTH,
   agentNotifications: true,
   installedIntegrations: [],
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
@@ -701,6 +705,7 @@ export async function loadPreferences(): Promise<Preferences> {
       getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
       DEFAULT_PREFERENCES.lastWslDistro,
     zoomLevel: snapZoom(getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel),
+    paletteWidth: clampPaletteWidth(getGeneral<number>(KEY_PALETTE_WIDTH)),
     agentNotifications:
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
@@ -1159,6 +1164,10 @@ export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, snapZoom(value));
 }
 
+export async function setPaletteWidth(value: number): Promise<void> {
+  await writePref(KEY_PALETTE_WIDTH, clampPaletteWidth(value));
+}
+
 export async function setUiFont(value: string): Promise<void> {
   await writePref(KEY_UI_FONT, value.trim());
 }
@@ -1330,6 +1339,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTO_HIBERNATE]: "autoHibernate",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
+  [KEY_PALETTE_WIDTH]: "paletteWidth",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",

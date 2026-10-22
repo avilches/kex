@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
+import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { Home01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -28,6 +29,7 @@ type Props = {
 
 export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
   const [query, setQuery] = useState("");
+  const { contentStyle, handles } = usePaletteWidth();
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fresh palette on every open: no query from the previous ask.
@@ -58,8 +60,10 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
       description="Choose the folder for the new terminal."
       modal={false}
       onFocusOutside={(event) => event.preventDefault()}
-      className="w-[min(720px,calc(100vw-32px))] sm:max-w-[min(720px,calc(100vw-32px))]"
+      className={PALETTE_WIDTH_CLASS}
+      contentStyle={contentStyle}
     >
+      {handles}
       <Command
         shouldFilter={false}
         loop

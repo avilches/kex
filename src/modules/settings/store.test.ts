@@ -176,6 +176,11 @@ describe("diffViewMode", () => {
 });
 
 describe("PREF_KEY_MAP", () => {
+  it("maps paletteWidth so a resize reaches every window", () => {
+    expect(PREF_KEY_MAP.paletteWidth).toBe("paletteWidth");
+  });
+
+
   // A preference with a UI setter that is missing here never propagates to live
   // windows: onPreferencesChange looks the store key up in this map and drops
   // anything unmapped. Regression guard for the scratchpad Enter=Send toggle.

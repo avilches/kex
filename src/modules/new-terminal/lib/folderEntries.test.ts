@@ -57,6 +57,7 @@ const build = (over: Partial<FolderGroupsInput> = {}) =>
     home: null,
     activeTabEntry: null,
     entries: [],
+    worktrees: [],
     branchOf: () => "",
     ...over,
   });
@@ -103,11 +104,35 @@ describe("buildFolderGroups", () => {
     expect(group.rows.every((r) => !("process" in r))).toBe(true);
   });
 
-  it("drops the main checkout row: only the listed folders appear", () => {
+  it("puts the main checkout under the current tab, then the other worktrees alphabetically", () => {
     const [group] = build({
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/perf/src" }),
+      worktrees: [
+        { path: "/repo/.claude/worktrees/zeta", branch: "z", isMain: false },
+        { path: "/repo", branch: "main", isMain: true },
+        { path: "/repo/.claude/worktrees/alpha", branch: "a", isMain: false },
+      ],
     });
-    expect(group.rows.map((r) => r.path)).toEqual(["/repo/.claude/worktrees/perf/src", "/repo"]);
+    expect(group.rows.map((r) => [r.label, r.path, r.branch])).toEqual([
+      ["Current tab", "/repo/.claude/worktrees/perf/src", null],
+      ["Main checkout", "/repo", "main"],
+      [null, "/repo/.claude/worktrees/alpha", "a"],
+      [null, "/repo/.claude/worktrees/zeta", "z"],
+    ]);
+  });
+
+  it("lists the worktrees even when the current tab is the main checkout, and never repeats it", () => {
+    const [group] = build({
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo" }),
+      worktrees: [
+        { path: "/repo", branch: "main", isMain: true },
+        { path: "/repo/.claude/worktrees/a", branch: "a", isMain: false },
+      ],
+    });
+    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
+      ["Current tab", "/repo"],
+      [null, "/repo/.claude/worktrees/a"],
+    ]);
   });
 
   it("keeps one row and the first label when a tab folder coincides with the root or home", () => {

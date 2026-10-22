@@ -1,7 +1,11 @@
 import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
+import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 
-export type FolderRowLabel = "Current tab" | "Workspace Root" | "Home";
+export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" | "Home";
+
+/** A checkout of the repository the current tab is in, as the worktree listing reports it. */
+export type RepoWorktree = { path: string; branch: string | null; isMain: boolean };
 
 export type FolderRow = {
   key: string;
@@ -45,6 +49,8 @@ export type FolderGroupsInput = {
   activeTabEntry: TabEntry | null;
   /** One entry per tab of every workspace; browser tabs carry no folder. */
   entries: readonly TabEntry[];
+  /** Every checkout of the repository the current tab is in; empty outside a repository or until the answer arrives. */
+  worktrees: readonly RepoWorktree[];
   /** Branch of a folder; empty when it is not a repository or the answer has not arrived yet. */
   branchOf: (dir: string) => string;
 };
@@ -73,6 +79,7 @@ function rowOf(
   hibernated: boolean,
   input: FolderGroupsInput,
   label: FolderRowLabel | null,
+  branch: string | null = input.branchOf(path) || null,
 ): FolderRow {
   const display = displayOf(path, input.home);
   return {
@@ -82,7 +89,7 @@ function rowOf(
     displayShift: path.length - display.length,
     matchOffset: matchOffsetOf(path, input.home),
     label,
-    branch: input.branchOf(path) || null,
+    branch,
     workspaceId,
     hibernated,
   };
@@ -115,8 +122,8 @@ function tabRowsOf(
 // One path appears once in the whole palette: the seen set is shared across
 // groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
-// Order: the active workspace (current tab folder, workspace root, home, then its
-// other folders), then every other workspace in position order (root, then folders).
+// Order: the active workspace (current tab folder, main checkout and its worktrees,
+// workspace root, home, then its other folders), then every other workspace in position order (root, then folders).
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const byWorkspace = new Map<string, TabEntry[]>();
   for (const e of input.entries) {
@@ -137,7 +144,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     return {
       workspaceId: ws.id,
       workspaceTitle: e?.title ?? ws.title,
-      workspaceColor: e?.color ?? ws.color ?? null,
+      workspaceColor: e ? e.color : resolveWorkspaceColor(ws.color, ws.id),
       workspaceIcon: e?.icon ?? ws.icon ?? null,
       active,
       hibernated: !!ws.hibernated,
@@ -152,6 +159,17 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const cwd = input.activeTabEntry?.cwd;
     if (cwd) {
       pushUnique(rows, seen, rowOf(cwd, activeWs.id, sleeping, input, "Current tab"));
+    }
+    // The main checkout right under the current tab, then the other worktrees alphabetically.
+    const main = input.worktrees.find((w) => w.isMain);
+    if (main) {
+      pushUnique(rows, seen, rowOf(main.path, activeWs.id, sleeping, input, "Main checkout", main.branch));
+    }
+    const linked = input.worktrees
+      .filter((w) => !w.isMain)
+      .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: "base" }));
+    for (const w of linked) {
+      pushUnique(rows, seen, rowOf(w.path, activeWs.id, sleeping, input, null, w.branch));
     }
     const root = rootOf(activeWs);
     if (root) {

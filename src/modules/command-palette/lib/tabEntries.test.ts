@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PaneNode, Tab, Workspace } from "@/modules/workspaces/lib/types";
+import { initialColorForId } from "@/modules/workspaces/lib/workspaceColor";
 import { type TabSources, buildTabEntries, buildWorkspaceEntries, worktreeName } from "./tabEntries";
 
 const pane = (id: string, tabs: Tab[]): PaneNode => ({
@@ -135,6 +136,17 @@ describe("buildTabEntries", () => {
     expect(e.workspaceTitle).toBe("avilches: ~/Kex");
     expect(e.workspaceColor).toBe("#8b5cf6");
     expect(e.workspaceIcon).toBe("code");
+  });
+
+  it("gives a workspace without an explicit color its automatic one, and keeps an explicit no-color", () => {
+    const auto = workspace("ws-auto", "Auto", [term("tab-1")]);
+    const none = workspace("ws-none", "None", [term("tab-2")], { color: null });
+    const [a, b] = buildTabEntries([auto, none], sources());
+    expect(a.workspaceColor).toBe(initialColorForId("ws-auto"));
+    expect(b.workspaceColor).toBeNull();
+    const [wa, wb] = buildWorkspaceEntries([auto, none], sources());
+    expect(wa.color).toBe(initialColorForId("ws-auto"));
+    expect(wb.color).toBeNull();
   });
 
   it("carries last use, indicator and workspace activity", () => {

@@ -2,6 +2,7 @@ import type { AgentSession } from "@/modules/agents/lib/types";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
+import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
@@ -86,7 +87,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           tabId: tab.id,
           workspaceId: ws.id,
           workspaceTitle,
-          workspaceColor: ws.color ?? null,
+          workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
           workspaceIcon: ws.icon ?? null,
           hibernated: !!ws.hibernated,
           kind: tab.kind,
@@ -120,7 +121,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
     return {
       workspaceId: ws.id,
       title: src.workspaceTitle(ws),
-      color: ws.color ?? null,
+      color: resolveWorkspaceColor(ws.color, ws.id),
       icon: ws.icon ?? null,
       hibernated: !!ws.hibernated,
       tabCount: tabs.length,
