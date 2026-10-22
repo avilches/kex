@@ -281,13 +281,19 @@ function BarZone({
       className={cn(
         "relative flex shrink-0 items-center gap-2 rounded-md",
         empty && !dragging && "hidden",
-        dragging && "min-h-8 min-w-16 outline-1 outline-offset-2 outline-border outline-dashed",
-        dragging && !accepts && "opacity-40",
-        dragging && accepts && isOver && "bg-accent/60 outline-foreground/50",
+        dragging && "min-h-8 min-w-16 outline-2 outline-offset-2 outline-dashed",
+        dragging && !accepts && "opacity-40 outline-border",
+        dragging && accepts && "bg-foreground/[0.07] outline-foreground/45",
+        dragging && accepts && isOver && "bg-foreground/20 outline-solid outline-foreground/85",
       )}
     >
       {dragging && (
-        <span className="pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none text-muted-foreground">
+        <span
+          className={cn(
+            "pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none",
+            accepts ? "font-medium text-foreground/85" : "text-muted-foreground",
+          )}
+        >
           {label}
         </span>
       )}
@@ -306,8 +312,8 @@ function FakeMenu({ id }: { id: string }) {
       title="Hide from the bar"
       aria-label="Hide from the bar"
       className={cn(
-        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-muted/40 px-3 text-[11px] text-muted-foreground transition-colors",
-        isOver && "border-foreground/50 bg-accent text-foreground",
+        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border-2 border-dashed border-foreground/45 bg-foreground/[0.07] px-3 text-[11px] text-foreground/85 transition-colors",
+        isOver && "border-solid border-foreground/85 bg-foreground/20 text-foreground",
       )}
     >
       <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} />
@@ -431,8 +437,8 @@ function MenuSection({
       ref={setNodeRef}
       className={cn(
         "rounded-md",
-        dragging && "outline-1 -outline-offset-1 outline-border outline-dashed",
-        dragging && isOver && "bg-accent/50",
+        dragging && "bg-foreground/[0.07] outline-2 -outline-offset-2 outline-foreground/45 outline-dashed",
+        dragging && isOver && "bg-foreground/20 outline-solid outline-foreground/85",
       )}
     >
       <DropdownMenuLabel className="text-[10px] text-muted-foreground">{label}</DropdownMenuLabel>
@@ -442,7 +448,7 @@ function MenuSection({
         ))}
       </SortableContext>
       {items.length === 0 && (
-        <div className="mx-2 mb-1 flex h-9 items-center justify-center text-[11px] text-muted-foreground">Drop here</div>
+        <div className="mx-2 mb-1 flex h-9 items-center justify-center text-[11px] font-medium text-foreground/70">Drop here</div>
       )}
     </div>
   );
