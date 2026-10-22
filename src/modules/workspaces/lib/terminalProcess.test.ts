@@ -11,8 +11,9 @@ const info = (over: Partial<Info> = {}): Info => ({
 });
 
 describe("processLabel", () => {
-  it("prefers the running command and collapses its whitespace", () => {
-    expect(processLabel(info({ runningCommand: "  npm   run dev " }))).toBe("npm run dev");
+  it("prefers the running command and drops its arguments", () => {
+    expect(processLabel(info({ runningCommand: "  npm   run dev " }))).toBe("npm");
+    expect(processLabel(info({ runningCommand: "claude --resume 'f5ff'" }))).toBe("claude");
   });
 
   it("falls back to the foreground child, then the shell", () => {
