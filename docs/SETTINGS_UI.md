@@ -34,9 +34,9 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
 
 - **Tarjetas plegables**: las filas de configuracion que abren un formulario van plegadas a
   una linea (resumen) y se despliegan una a la vez con click, como archivos de extension en
-  `FileTypesSection` y tarjetas de Action en `ActionRow`/`ActionsEditor`. Un borrador aun no
-  guardado siempre permanece desplegado.
-- **Borrado con confirmacion**: cualquier removida de una fila guardada (tarjeta de Action en
+  `FileTypesSection`. Las Actions ya no se despliegan: cada una es una fila fija y su edicion
+  vive en un modal (`ActionEditDialog`), abierto con el lapiz de la fila.
+- **Borrado con confirmacion**: cualquier removida de una fila guardada (fila de Action en
   `ActionRow`, entrada de extension en `FileTypesSection`) abre `AlertDialog` y solo llega al
   store con el boton destructivo confirmado. Excepcion: una Action inmutable de app (`appId`
   presente) se borra sin pedir nada, porque vuelve una sola eleccion en el combo.
@@ -45,7 +45,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   rueda). El patron vigente es `DialogScrollHost` (`src/components/dialogScrollHost.tsx`): el
   dialogo expone su nodo scrolleable via contexto y el popover se renderiza dentro con
   `container={host}` manteniendo `pointer-events-auto` en el `PopoverContent`; referencias
-  vivas `AddApplicationMenu.tsx` (combo de apps) en la ventana de Settings.
+  vivas `AddActionMenu.tsx` (combo Add) en la ventana de Settings.
   Aplicarla (con su provider, `WheelScrollDialogHost` en `WorkspaceSettingsDialog.tsx`) a todo
   popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
 - **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,
@@ -64,12 +64,17 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   sin variables (un script normal del workspace) sale en gris mientras el workspace no tenga
   raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
   propia variable.
-- **Editor de Actions en Settings**: el combo de apps no se cierra al elegir (se pueden
-  anadir varios de una vez) y no muestra los presets ya instalados (coincidencia por
-  `appId` + commando exacto). Una Action proveniente de un preset es inmutable: se consulta
-  desplegada pero no se edita (su flag "Button" si se puede cambiar); el boton "Edit" de su
-  tarjeta hace una copia editable (nueva id, sin `appId`, entregada al store al punto) y
-  borrarla no pide confirmacion; una Action de usuario si abre `AlertDialog`.
+- **Editor de Actions en Settings**: dos columnas, Global y Workspace: <nombre>, cada una con
+  un unico combo Add (Add Command primero, luego los presets de apps y la app propia). El
+  combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
+  los ya instalados (coincidencia por `appId` + comando exacto). La fila es asa, icono,
+  nombre con subtitulo, casilla Button, lapiz y la X de borrar a la derecha del todo; el
+  lapiz abre `ActionEditDialog` (Run in primero en los scripts, luego nombre, comando y
+  variables; guarda al escribir y solo tiene Close). Arrastrar una fila a la otra columna la
+  mueve de ambito (al final de su tipo). Una Action de preset se edita igual que cualquiera:
+  al cambiar su nombre o su comando deja de ser un preset (`ownedAfterEdit`) y el preset
+  vuelve al combo; el flag Button no cuenta. Borrar una de preset no pide confirmacion, una de
+  usuario si abre `AlertDialog`.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
   pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y
   `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Set a root to
@@ -78,8 +83,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   `src/components/StartTrimmed.tsx`). Un script sin variable en el nombre dice donde corre
   (`scriptSubtitle`, segun su Run in): "Workspace", "Current folder" (la ruta real fuera de
   Settings) o la carpeta fija. Las superficies donde se pinta el nombre: boton propio
-  del header, menu Unico del header, submenu contextual, combo de apps del editor y tarjeta
-  plegada. El hover de una fila dice donde abre via `actionRowTitle`: `Open <nombre> in <ruta>`
+  del header, menu Unico del header, submenu contextual, combo Add y fila de Settings. El hover de una fila dice donde abre via `actionRowTitle`: `Open <nombre> in <ruta>`
   para workspace y carpeta, `Open <fichero> with <nombre>` para fichero. El ancho del boton
   propio se mide solo con el nombre principal.
 - **Conteo apagado en trigger**: el menu Unico de `ActionsBar` muestra un numero apagado

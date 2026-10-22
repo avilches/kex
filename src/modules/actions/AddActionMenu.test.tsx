@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { AddApplicationMenu } from "./AddApplicationMenu";
+import { AddActionMenu } from "./AddActionMenu";
 import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -14,28 +14,40 @@ const suggestions: AppSuggestion[] = [
 ];
 
 function mount(actions: readonly AppSuggestion[] = suggestions) {
-  const onPick = vi.fn();
+  const onAddCommand = vi.fn();
+  const onPickApp = vi.fn();
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(AddApplicationMenu, { suggestions: actions as AppSuggestion[], onPick })));
+  act(() => root.render(createElement(AddActionMenu, { suggestions: actions as AppSuggestion[], onAddCommand, onPickApp })));
   const options = () => [...document.querySelectorAll("[cmdk-item]")];
   return {
     container,
-    onPick,
+    onAddCommand,
+    onPickApp,
     options,
-    trigger: [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Add Application"))!,
+    trigger: [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Add"))!,
     unmount: () => act(() => root.unmount()),
   };
 }
 
 const click = (el: Element) => act(() => void (el as HTMLElement).click());
 
-describe("AddApplicationMenu", () => {
-  it("opens the searchable combo with one entry per preset, each with its icon", () => {
+function search(text: string) {
+  const box = document.querySelector<HTMLInputElement>("input[placeholder='Search...']")!;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  act(() => {
+    setter.call(box, text);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+describe("AddActionMenu", () => {
+  it("lists Add Command first, then one entry per preset with its icon, then the custom app", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
+      "Add Commandruns in a terminal",
       "BBEditCurrent File",
       "ZedCurrent File",
       "ZedWorkspace",
@@ -54,16 +66,22 @@ describe("AddApplicationMenu", () => {
     view.unmount();
   });
 
-  it("filters the entries from the search box", () => {
+  it("filters the entries from the search box, Add Command included", () => {
     const view = mount();
     click(view.trigger);
-    const search = document.querySelector<HTMLInputElement>("input[placeholder='Search applications...']")!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-    act(() => {
-      setter.call(search, "workspace");
-      search.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    search("workspace");
     expect(view.options().map((o) => o.textContent)).toEqual(["ZedWorkspace"]);
+    search("script");
+    expect(view.options().map((o) => o.textContent)).toEqual(["Add Commandruns in a terminal"]);
+    view.unmount();
+  });
+
+  it("Add Command closes the combo and asks for a script", () => {
+    const view = mount();
+    click(view.trigger);
+    click(view.options()[0]!);
+    expect(view.onAddCommand).toHaveBeenCalledTimes(1);
+    expect(view.options()).toHaveLength(0);
     view.unmount();
   });
 
@@ -71,22 +89,17 @@ describe("AddApplicationMenu", () => {
     const view = mount();
     click(view.trigger);
     click(view.options().find((o) => o.textContent?.includes("ZedWorkspace"))!);
-    expect(view.onPick).toHaveBeenCalledTimes(1);
-    expect(view.onPick).toHaveBeenCalledWith(suggestions[1]);
-    expect(view.options()).toHaveLength(4);
+    expect(view.onPickApp).toHaveBeenCalledTimes(1);
+    expect(view.onPickApp).toHaveBeenCalledWith(suggestions[1]);
+    expect(view.options()).toHaveLength(5);
     view.unmount();
   });
 
-  it("picking nothing found shows an empty state", () => {
+  it("shows an empty state when nothing matches", () => {
     const view = mount();
     click(view.trigger);
-    const search = document.querySelector<HTMLInputElement>("input[placeholder='Search applications...']")!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-    act(() => {
-      setter.call(search, "nothing here");
-      search.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(document.body.textContent).toContain("No application found.");
+    search("nothing here");
+    expect(document.body.textContent).toContain("Nothing found.");
     view.unmount();
   });
 });

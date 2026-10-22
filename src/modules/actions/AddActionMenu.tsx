@@ -1,4 +1,4 @@
-import { ChevronDownIcon, DocumentCodeIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, ChevronDownIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDialogScrollHost } from "@/components/dialogScrollHost";
@@ -19,32 +20,50 @@ import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/
 
 type Props = {
   suggestions: readonly AppSuggestion[];
-  onPick: (suggestion: AppSuggestion) => void;
+  onAddCommand: () => void;
+  onPickApp: (suggestion: AppSuggestion) => void;
 };
 
-// The searchable combo over the detected apps: one alphabetical entry per preset, every
-// entry carrying its app icon and, under it, what the preset points at ("Workspace",
-// "Current File", "Current Directory"). It stays open on a pick so several presets can be
-// installed in a row; the installed ones never show up in the list.
-export function AddApplicationMenu({ suggestions, onPick }: Props) {
+// The one Add control of a column: a searchable combo whose first entry is Add Command, then
+// one alphabetical entry per detected app preset (icon, and under it what the preset points
+// at) and the custom app. Presets keep the combo open so several can be installed in a row;
+// the entries that open an editor close it. Installed presets never show up in the list.
+export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
   const [open, setOpen] = useState(false);
   const host = useDialogScrollHost();
-  const pick = (suggestion: AppSuggestion) => onPick(suggestion);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-7 w-fit gap-1.5 px-2 text-[12px]" aria-haspopup="listbox">
-          <HugeiconsIcon icon={DocumentCodeIcon} size={12} strokeWidth={2} />
-          Add Application
+          <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={2} />
+          Add
           <HugeiconsIcon icon={ChevronDownIcon} size={10} strokeWidth={2} className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" container={host} className="pointer-events-auto w-[360px] p-0">
+      <PopoverContent align="start" container={host} className="pointer-events-auto w-[320px] p-0">
         <Command>
-          <CommandInput placeholder="Search applications..." />
+          <CommandInput placeholder="Search..." />
           <CommandList className="max-h-64">
-            <CommandEmpty>No application found.</CommandEmpty>
+            <CommandEmpty>Nothing found.</CommandEmpty>
             <CommandGroup>
+              <CommandItem
+                value="add-command"
+                keywords={["command", "script", "terminal"]}
+                onSelect={() => {
+                  setOpen(false);
+                  onAddCommand();
+                }}
+                className="text-[12px]"
+              >
+                <span className="flex size-5 shrink-0 items-center justify-center">
+                  <HugeiconsIcon icon={ComputerTerminal01Icon} size={13} strokeWidth={1.75} />
+                </span>
+                <span className="min-w-0 flex-1 truncate">Add Command</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">runs in a terminal</span>
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup heading="Applications">
               {[...suggestions].sort(compareByName).map((s) => {
                 const sub = actionSubtitle(s.name, SETTINGS_LABELS);
                 return (
@@ -52,7 +71,7 @@ export function AddApplicationMenu({ suggestions, onPick }: Props) {
                     key={s.key}
                     value={s.key}
                     keywords={[s.name, s.defaultCommand]}
-                    onSelect={() => pick(s)}
+                    onSelect={() => onPickApp(s)}
                     title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
                     className="text-[12px]"
                   >
@@ -69,7 +88,10 @@ export function AddApplicationMenu({ suggestions, onPick }: Props) {
               })}
               <CommandItem
                 value={CUSTOM_APP_SUGGESTION.key}
-                onSelect={() => pick(CUSTOM_APP_SUGGESTION)}
+                onSelect={() => {
+                  setOpen(false);
+                  onPickApp(CUSTOM_APP_SUGGESTION);
+                }}
                 className="text-[12px]"
               >
                 <span className="flex size-5 shrink-0 items-center justify-center">

@@ -42,9 +42,12 @@ function mount(target?: ActionsRequest) {
 const buttons = (c: HTMLElement) => [...c.querySelectorAll("button")];
 const options = () => [...document.querySelectorAll("[cmdk-item]")];
 
-function openApplications(c: HTMLElement) {
-  act(() => void buttons(c).find((b) => b.textContent?.includes("Add Application"))!.click());
+function openAdd(c: HTMLElement) {
+  const column = c.querySelector("[data-actions-column='global']")!;
+  act(() => void [...column.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Add")!.click());
 }
+
+const commandField = () => document.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement | null;
 
 describe("ActionsSection", () => {
   beforeEach(() => {
@@ -68,7 +71,7 @@ describe("ActionsSection", () => {
 
   it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
-    openApplications(container);
+    openAdd(container);
     const item = options().find((o) => o.textContent?.includes("PyCharmWorkspace"));
     act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
@@ -81,7 +84,7 @@ describe("ActionsSection", () => {
   it("keeps offering every app, so two actions can share one", () => {
     actions = [{ id: "ac-1", name: "PyCharm {filepath}", runInTerminal: false, command: "pycharm {filepath}", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
-    openApplications(container);
+    openAdd(container);
     expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);
     expect(options().some((o) => o.textContent?.includes("Zed"))).toBe(true);
     unmount();
@@ -90,22 +93,21 @@ describe("ActionsSection", () => {
   it("keeps the row being typed, and reports the error, when the write fails", async () => {
     change.mockRejectedValueOnce(new Error("disk full"));
     const { container, unmount } = mount();
-    const add = buttons(container).find((b) => b.textContent?.includes("Add Command"))!;
-    act(() => void add.click());
-    const command = container.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement;
+    openAdd(container);
+    act(() => void options()[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const command = commandField()!;
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     act(() => command.focus());
     act(() => {
       setter.call(command, "pnpm dev");
       command.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    act(() => void command.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    act(() => command.blur());
     await act(async () => {
       await new Promise<void>((r) => setTimeout(r, 0));
     });
     expect(toastError).toHaveBeenCalled();
-    expect(container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(1);
-    expect((container.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement).value).toBe("pnpm dev");
+    expect(commandField()!.value).toBe("pnpm dev");
     unmount();
   });
 
@@ -118,7 +120,7 @@ describe("ActionsSection", () => {
 
   it("installs several presets in one combo session: a pick keeps the combo open", () => {
     const { container, unmount } = mount();
-    openApplications(container);
+    openAdd(container);
     act(() => void (options().find((o) => o.textContent?.includes("PyCharmWorkspace")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     expect(options().length).toBeGreaterThan(1);
@@ -127,12 +129,27 @@ describe("ActionsSection", () => {
     unmount();
   });
 
-  it("opens the tab a target names, and moves to it when a new one arrives", () => {
-    const { container, unmount } = mount({ tab: "workspace", nonce: 0 });
-    expect(container.textContent).toContain("Actions of the current workspace");
+  it("shows both columns, and says so when the app reports no workspace", () => {
+    const { container, unmount } = mount();
+    expect(container.querySelector("[data-actions-column='global']")).not.toBeNull();
+    expect(container.querySelector("[data-actions-column='workspace']")!.textContent).toContain("does not report a workspace");
+    expect(container.textContent).not.toContain("Current workspace:");
     unmount();
-    const global = mount({ tab: "global", nonce: 0 });
-    expect(global.container.textContent).toContain("Global actions are available");
-    global.unmount();
+  });
+
+  it("opens the Action a target names in its modal", () => {
+    feed.mockReturnValue({
+      feed: {
+        workspaceId: "ws-1",
+        workspaceName: "Dashboard",
+        actions: [{ id: "ac-9", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false }],
+        context: null,
+      },
+      send,
+    } as never);
+    const { unmount } = mount({ tab: "workspace", id: "ac-9", nonce: 1 });
+    expect(commandField()?.value).toBe("pnpm dev");
+    unmount();
+    feed.mockReturnValue({ feed: null, send } as never);
   });
 });
