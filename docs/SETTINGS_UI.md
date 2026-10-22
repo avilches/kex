@@ -70,7 +70,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   los ya instalados (coincidencia por `appId` + comando exacto). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
-  workspace, Run in folder primero en los scripts (Home por defecto, Workspace root con la
+  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), Run in folder primero en los scripts (Home por defecto, Workspace root con la
   chincheta del explorer, Current tab folder, Absolute path), nombre, comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra);
   guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la

@@ -268,6 +268,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
           scope={editing.scope}
           saved={editedSaved}
           workspaceAvailable={workspace.available}
+          workspaceName={workspaceName}
           onScopeChange={switchScope}
           onChange={(next) => change(editing.scope, editedAction, next)}
           onClose={closeEditor}
