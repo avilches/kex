@@ -1,4 +1,4 @@
-import type { TabEntry } from "@/modules/command-palette/lib/tabEntries";
+import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
 // The repo root of a worktree path: the tree before its `.claude/worktrees/<name>` segment.
@@ -15,6 +15,10 @@ export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root";
 export type FolderRow = {
   key: string;
   path: string;
+  // The path as shown: the home prefix collapsed to "~".
+  display: string;
+  // How many characters shorter `display` is than `path`; match indices shift by it.
+  displayShift: number;
   // Where the search starts in the path: right after the home prefix, so the
   // home segment can never match a query (typing "ser" no longer hits "Users").
   matchOffset: number;
@@ -43,6 +47,8 @@ export type FolderGroupMatched = Omit<FolderGroup, "rows"> & {
 
 export type FolderGroupsInput = {
   workspaces: readonly Workspace[];
+  /** Resolved identity of each workspace: its title template already expanded, as the WorkspaceBar shows it. */
+  workspaceEntries: readonly WorkspaceEntry[];
   activeWorkspaceId: string;
   home: string | null;
   /** Entry of the focused tab of the active workspace; any kind carrying a folder. */
@@ -60,6 +66,15 @@ function matchOffsetOf(path: string, home: string | null): number {
   return norm.startsWith(`${h}/`) ? h.length + 1 : 0;
 }
 
+function displayOf(path: string, home: string | null): string {
+  if (!home) return path;
+  const norm = path.replace(/\\/g, "/");
+  const h = home.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (!h) return path;
+  if (norm === h) return "~";
+  return norm.startsWith(`${h}/`) ? `~${path.slice(h.length)}` : path;
+}
+
 function rowOf(
   path: string,
   workspaceId: string,
@@ -67,9 +82,12 @@ function rowOf(
   home: string | null,
   over: Partial<FolderRow> = {},
 ): FolderRow {
+  const display = displayOf(path, home);
   return {
     key: `${workspaceId}:${path}`,
     path,
+    display,
+    displayShift: path.length - display.length,
     matchOffset: matchOffsetOf(path, home),
     label: null,
     branch: null,
@@ -121,6 +139,15 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const groups: FolderGroup[] = [];
   const seen = new Set<string>();
   const home = input.home;
+  const identity = new Map(input.workspaceEntries.map((e) => [e.workspaceId, e] as const));
+  const identityOf = (ws: Workspace) => {
+    const e = identity.get(ws.id);
+    return {
+      workspaceTitle: e?.title ?? ws.title,
+      workspaceColor: e?.color ?? ws.color ?? null,
+      workspaceIcon: e?.icon ?? ws.icon ?? null,
+    };
+  };
 
   const activeWs = input.workspaces.find((w) => w.id === input.activeWorkspaceId);
   if (activeWs) {
@@ -146,9 +173,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     }
     groups.push({
       workspaceId: activeWs.id,
-      workspaceTitle: activeWs.title,
-      workspaceColor: activeWs.color ?? null,
-      workspaceIcon: activeWs.icon ?? null,
+      ...identityOf(activeWs),
       active: true,
       hibernated: !!activeWs.hibernated,
       rows,
@@ -168,9 +193,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     if (rows.length === 0) continue;
     groups.push({
       workspaceId: ws.id,
-      workspaceTitle: ws.title,
-      workspaceColor: ws.color ?? null,
-      workspaceIcon: ws.icon ?? null,
+      ...identityOf(ws),
       active: false,
       hibernated: !!ws.hibernated,
       rows,
@@ -209,7 +232,10 @@ export function filterFolderGroups(
         }
       }
       if (!ok) continue;
-      rows.push({ ...r, indices: indices.sort((a, b) => a - b) });
+      rows.push({
+        ...r,
+        indices: indices.map((i) => i - r.displayShift).sort((a, b) => a - b),
+      });
     }
     if (rows.length > 0) {
       out.push({ ...g, rows });

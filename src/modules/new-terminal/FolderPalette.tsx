@@ -101,7 +101,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                       className="pl-7 text-[12.5px]"
                     >
                       <span className="min-w-0 flex-1 truncate">
-                        <HighlightText text={row.path} indices={row.indices} />
+                        <HighlightText text={row.display} indices={row.indices} />
                       </span>
                       <span className="ml-auto max-w-56 shrink-0 truncate text-[11px] font-normal text-muted-foreground">
                         {folderRowNote(row)}
@@ -127,7 +127,7 @@ function GroupHeading({ group }: { group: FolderGroup }) {
         icon={group.workspaceIcon ?? undefined}
         size={14}
       />
-      <span className="min-w-0 truncate text-[12.5px] font-semibold text-foreground">
+      <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
         {group.workspaceTitle}
       </span>
       {group.hibernated ? (
@@ -138,9 +138,6 @@ function GroupHeading({ group }: { group: FolderGroup }) {
         >
           <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
         </span>
-      ) : null}
-      {group.active ? (
-        <span className="ml-auto shrink-0 font-normal">Current workspace</span>
       ) : null}
     </span>
   );

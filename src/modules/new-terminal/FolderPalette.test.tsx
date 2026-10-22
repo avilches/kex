@@ -9,6 +9,8 @@ import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   key: over.key ?? `${over.workspaceId ?? "ws-1"}:${over.path ?? "/repo"}`,
   path: over.path ?? "/repo",
+  display: over.display ?? over.path ?? "/repo",
+  displayShift: over.displayShift ?? 0,
   label: over.label ?? null,
   branch: over.branch ?? null,
   process: over.process ?? null,
@@ -82,8 +84,7 @@ describe("FolderPalette", () => {
     mount(onPick);
     await settle();
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Current workspace");
-    expect(text).toContain("/repo/.claude/worktrees/perf-lab/src-tauri");
+        expect(text).toContain("/repo/.claude/worktrees/perf-lab/src-tauri");
     expect(text).toContain("Current tab");
     expect(text).toContain("Dotfiles");
     expect(itemEls()).toHaveLength(4);

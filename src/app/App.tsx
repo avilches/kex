@@ -3408,11 +3408,16 @@ export default function App() {
     () => (folderSources ? buildTabEntries(workspaces, folderSources) : []),
     [folderSources, workspaces],
   );
+  const folderWorkspaceEntries = useMemo(
+    () => (folderSources ? buildWorkspaceEntries(workspaces, folderSources) : []),
+    [folderSources, workspaces],
+  );
   const folderGroups = useMemo(
     () =>
       folderSources
         ? buildFolderGroups({
             workspaces,
+            workspaceEntries: folderWorkspaceEntries,
             activeWorkspaceId,
             home: homeRef.current,
             activeTabEntry:
@@ -3420,7 +3425,7 @@ export default function App() {
             entries: folderTabEntries,
           })
         : [],
-    [folderSources, workspaces, activeWorkspaceId, folderTabEntries, activeTabId],
+    [folderSources, workspaces, folderWorkspaceEntries, activeWorkspaceId, folderTabEntries, activeTabId],
   );
 
   const onFolderPick = useCallback(

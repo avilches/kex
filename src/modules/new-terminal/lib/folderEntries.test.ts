@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TabEntry } from "@/modules/command-palette/lib/tabEntries";
+import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import {
   buildFolderGroups,
@@ -70,6 +70,7 @@ describe("buildFolderGroups", () => {
     ];
     const [group] = buildFolderGroups({
       workspaces: [active, other, empty],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: entries[0],
@@ -92,6 +93,7 @@ describe("buildFolderGroups", () => {
     ];
     const [group] = buildFolderGroups({
       workspaces: [active, other, empty],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: entries[0],
@@ -110,6 +112,7 @@ describe("buildFolderGroups", () => {
     ];
     const groups = buildFolderGroups({
       workspaces: [active, other, empty],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: null,
@@ -132,6 +135,7 @@ describe("buildFolderGroups", () => {
     ];
     const groups = buildFolderGroups({
       workspaces: [active, other],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
@@ -149,6 +153,7 @@ describe("buildFolderGroups", () => {
     const entries = [entry({ workspaceId: "ws-1", cwd: "/dotfiles", lastUsedAt: 4 })];
     const groups = buildFolderGroups({
       workspaces: [active, other],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: null,
@@ -161,6 +166,7 @@ describe("buildFolderGroups", () => {
     const sleeping = ws({ id: "ws-4", title: "Sleeping", workspaceRoot: "/sleep", hibernated: true });
     const groups = buildFolderGroups({
       workspaces: [active, sleeping],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: null,
@@ -178,6 +184,7 @@ describe("buildFolderGroups", () => {
     const noRoot = ws({ id: "ws-5", title: "Bare" });
     const groups = buildFolderGroups({
       workspaces: [active, noRoot],
+      workspaceEntries: [],
       activeWorkspaceId: "ws-1",
       home: null,
       activeTabEntry: null,
@@ -192,6 +199,7 @@ describe("filterFolderGroups", () => {
   const withHome = ws({ id: "ws-6", title: "HomeWorkspace" });
   const groups = buildFolderGroups({
     workspaces: [active, other, withHome],
+    workspaceEntries: [],
     activeWorkspaceId: "ws-1",
     home: "/Users/avilches",
     activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src-tauri", branch: "main" }),
@@ -229,7 +237,9 @@ describe("filterFolderGroups", () => {
   it("never matches inside the home prefix (ser does not hit Users)", () => {
     const matched = filterFolderGroups(groups, "ser");
     expect(matched.map((g) => g.rows.map((r) => r.path))).toEqual([["/Users/avilches/server.py"]]);
-    expect(matched[0].rows[0].indices).toEqual([16, 17, 18]);
+    // Indices are against the displayed "~/server.py".
+    expect(matched[0].rows[0].display).toBe("~/server.py");
+    expect(matched[0].rows[0].indices).toEqual([2, 3, 4]);
   });
 
   it("drops rows missing any token", () => {
@@ -247,9 +257,71 @@ describe("filterFolderGroups", () => {
 describe("folderRowNote", () => {
   it("joins label, branch and process", () => {
     expect(folderRowNote({
-      key: "k", path: "/p", label: "Current tab", branch: "feat", process: "claude",
+      key: "k", path: "/p", display: "/p", displayShift: 0, label: "Current tab", branch: "feat", process: "claude",
       matchOffset: 0,
       workspaceId: "ws-1", hibernated: false,
     })).toBe("Current tab \u00b7 feat \u00b7 claude");
+  });
+});
+
+describe("resolved workspace identity", () => {
+  const wsEntry = (over: Partial<WorkspaceEntry>): WorkspaceEntry => ({
+    workspaceId: "ws-1",
+    title: "Kex",
+    color: null,
+    icon: null,
+    hibernated: false,
+    tabCount: 1,
+    lastUsedAt: 0,
+    ...over,
+  });
+
+  it("titles a group with the expanded template, not the raw one", () => {
+    const raw = ws({ id: "ws-1", title: "{repo} | {tab}", workspaceRoot: "/repo" });
+    const blank = ws({ id: "ws-2", title: "", workspaceRoot: "/sleep", hibernated: true });
+    const groups = buildFolderGroups({
+      workspaces: [raw, blank],
+      workspaceEntries: [
+        wsEntry({ workspaceId: "ws-1", title: "Kex | zsh", icon: "Folder01Icon", color: "#4f8fff" }),
+        wsEntry({ workspaceId: "ws-2", title: "~/sleep", hibernated: true }),
+      ],
+      activeWorkspaceId: "ws-1",
+      home: null,
+      activeTabEntry: null,
+      entries: [],
+    });
+    expect(groups.map((g) => g.workspaceTitle)).toEqual(["Kex | zsh", "~/sleep"]);
+    expect(groups[0].workspaceIcon).toBe("Folder01Icon");
+    expect(groups[0].workspaceColor).toBe("#4f8fff");
+  });
+});
+
+describe("home collapsed to ~", () => {
+  const input = (home: string | null, cwd: string) => ({
+    workspaces: [active],
+    workspaceEntries: [],
+    activeWorkspaceId: "ws-1",
+    home,
+    activeTabEntry: null,
+    entries: [entry({ workspaceId: "ws-1", cwd })],
+  });
+
+  it("shows the home prefix as ~ and leaves other paths alone", () => {
+    const [group] = buildFolderGroups(input("/Users/a", "/Users/a/Hub/Kex"));
+    expect(group.rows.find((r) => r.path === "/Users/a/Hub/Kex")?.display).toBe("~/Hub/Kex");
+    const [outside] = buildFolderGroups(input("/Users/a", "/opt/tool"));
+    expect(outside.rows.find((r) => r.path === "/opt/tool")?.display).toBe("/opt/tool");
+  });
+
+  it("shows the home itself as ~", () => {
+    const [group] = buildFolderGroups(input("/Users/a/", "/Users/a"));
+    expect(group.rows.find((r) => r.path === "/Users/a")?.display).toBe("~");
+  });
+
+  it("expresses the match indices against the displayed text", () => {
+    const groups = buildFolderGroups(input("/Users/a", "/Users/a/Hub/Kex"));
+    const [g] = filterFolderGroups(groups, "hub");
+    const row = g.rows.find((r) => r.path === "/Users/a/Hub/Kex");
+    expect(row?.indices?.map((i) => row.display[i]).join("")).toBe("Hub");
   });
 });
