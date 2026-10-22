@@ -132,7 +132,7 @@ describe("promoteToGlobal", () => {
   });
 
   it("an id already taken in the global list gets a fresh id, so neither version is lost", () => {
-    const r = promoteToGlobal([act("a", { name: "mine" })], [act("a", { name: "old" })], "a", () => "fresh");
+    const r = promoteToGlobal([act("a", { name: "mine", command: "other" })], [act("a", { name: "old" })], "a", () => "fresh");
     expect(r.workspace).toEqual([]);
     expect(r.global.map((a) => [a.id, a.name])).toEqual([
       ["a", "old"],
@@ -172,8 +172,45 @@ describe("updateAction appId", () => {
   });
 });
 
+describe("adoptActionAt, apps with the same command", () => {
+  const app = (id: string, command: string, o: Partial<Action> = {}): Action => ({
+    id,
+    name: id,
+    runInTerminal: false,
+    command,
+    ownButton: false,
+    ...o,
+  });
+
+  it("overwrites the app that has the command, in its place and with its id, keeping the incoming name", () => {
+    const list = [app("a", "code ."), app("b", "zed .")];
+    const r = adoptActionAt(list, app("n", " zed . ", { name: "Zed (moved)", ownButton: true }), () => "fresh", "a");
+    expect(r.merged).toBe(true);
+    expect(r.list.map((x) => [x.id, x.name, x.ownButton])).toEqual([
+      ["a", "a", false],
+      ["b", "Zed (moved)", true],
+    ]);
+    expect(r.stored.id).toBe("b");
+  });
+
+  it("never merges a different command, nor a script", () => {
+    const list = [app("a", "code .")];
+    expect(adoptActionAt(list, app("n", "code -n ."), () => "fresh").merged).toBe(false);
+    const script = { ...app("s", "code ."), runInTerminal: true };
+    expect(adoptActionAt(list, script, () => "fresh").list).toHaveLength(2);
+    expect(adoptActionAt([script], app("n", "code ."), () => "fresh").list).toHaveLength(2);
+    expect(adoptActionAt([script], { ...script, id: "t" }, () => "fresh").list).toHaveLength(2);
+  });
+
+  it("moving an app across scopes leaves one in the destination and none in the source", () => {
+    const r = promoteToGlobal([app("w", "code .", { name: "Code (workspace)" })], [app("g", "code .", { name: "Code" })], "w", () => "fresh");
+    expect(r.workspace).toEqual([]);
+    expect(r.global.map((x) => [x.id, x.name])).toEqual([["g", "Code (workspace)"]]);
+  });
+});
+
 describe("adoptActionAt", () => {
-  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: "x", ownButton: false });
+  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: `open ${id}`, ownButton: false });
 
   it("goes before the named Action, last when it is unknown or not given", () => {
     const list = [mk("a"), mk("b")];
@@ -183,7 +220,7 @@ describe("adoptActionAt", () => {
   });
 
   it("returns the stored Action, with a fresh id when its own is taken", () => {
-    const { list, stored } = adoptActionAt([mk("a")], mk("a"), () => "fresh", "a");
+    const { list, stored } = adoptActionAt([mk("a")], { ...mk("a"), command: "open other" }, () => "fresh", "a");
     expect(stored.id).toBe("fresh");
     expect(list.map((x) => x.id)).toEqual(["fresh", "a"]);
   });
