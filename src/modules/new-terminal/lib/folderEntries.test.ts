@@ -384,6 +384,24 @@ describe("repositories", () => {
       expect(new Set(group.rows.map((r) => r.path)).size).toBe(group.rows.length);
     });
 
+    it("marks the added worktrees as nested, after the folders that were already there", () => {
+      const group = open(new Map([["/repo", "ws-1"]]));
+      expect(group.rows.map((r) => [r.path, r.nested])).toEqual([
+        ["/repo/.claude/worktrees/alpha", false],
+        ["/repo", true],
+        ["/repo/.claude/worktrees/beta", true],
+        ["/repo/.claude/worktrees/zeta", true],
+        ["/zzz", false],
+      ]);
+    });
+
+    it("counts every worktree of the repository, whether they are shown or not", () => {
+      const before = open(new Map()).rows[0];
+      const after = open(new Map([["/repo", "ws-1"]])).rows[0];
+      expect(before.worktreeCount).toBe(4);
+      expect(after.worktreeCount).toBe(4);
+    });
+
     it("turns the hint into hide for every row of the repository", () => {
       const group = open(new Map([["/repo", "ws-1"]]));
       const added = group.rows.slice(1, 4);

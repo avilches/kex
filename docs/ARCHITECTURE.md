@@ -683,8 +683,9 @@ src/
                                      right under it), then home, then the workspace root and its tab folders; then one
                                      group per other workspace in position order (root, then folders, hibernated
                                      included). The folders of one repository (several of a workspace) sit together
-                                     under a small heading with the repository name, its workspace root first, then
-                                     its main checkout, then by path (a git icon before the name, the tab bar's
+                                     under a small heading aligned with the workspace heading (a git icon, the
+                                     repository name and how many worktrees it has, which never changes), its
+                                     workspace root first, then its main checkout, then by path (the tab bar's
                                      terminal icon before every folder); repositories and
                                      loose folders go alphabetically. A path appears once in the whole dialog, first
                                      occurrence keeps its label; the branch sits beside the folder, the right side
@@ -693,14 +694,17 @@ src/
                                      asks the worktree listing of every repository on screen once per open. When a
                                      repository has worktrees not in the list, the row that has the focus shows
                                      `Tab show N worktrees` in place of its label (read with cmdk's
-                                     `useCommandState`, the selection itself stays uncontrolled), and the small heading
-                                     of that repository shows it while the focus is on another repository; Tab adds
-                                     the missing ones to the workspace it was pressed in, main checkout first, and the
+                                     `useCommandState`, the selection itself stays uncontrolled; the key is drawn with
+                                     a background that shows on the selected row, and with `leading-none` so the
+                                     row keeps its height); Tab adds the missing ones to the workspace it was pressed in,
+                                     nested (indented) under the repository's folders, main checkout first, and the
                                      hint turns into `Tab hide worktrees`, which
                                      takes them away again. Search is a plain substring match per word on the path,
                                      the branch, the label, the repository name and the workspace title, with the
                                      matched letters highlighted in each; it never reorders.
-                                     The selection is cmdk's own (a controlled value made its scroll lag a row). The
+                                     The selection is cmdk's own (a controlled value made its scroll lag a row);
+                                     because a repository heading sits before the first row of its group, cmdk's rule
+                                     that reveals the group heading never fires, so `KeepHeadingsVisible` does it. The
                                      dialog width is shared with the command palette (`paletteWidth` preference,
                                      dragged from either side edge by `usePaletteWidth`, double-click resets).
                                      Closing either palette with Escape gives the focus back to the active tab

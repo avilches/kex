@@ -8,6 +8,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
@@ -19,7 +20,7 @@ import {
   SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
   type FolderGroup,
@@ -63,10 +64,6 @@ export function FolderPalette({
     [groups, query],
   );
   const empty = filtered.length === 0;
-  const repoOfRow = useMemo(
-    () => new Map(filtered.flatMap((g) => g.rows).map((r) => [r.key, r.repoKey] as const)),
-    [filtered],
-  );
 
   // The new first row is selected on every keystroke, but a list scrolled down
   // for the previous query stays where it was and hides it.
@@ -105,6 +102,7 @@ export function FolderPalette({
     >
       {handles}
       <Command shouldFilter={false} loop onKeyDown={onKeyDown}>
+        <KeepHeadingsVisible listRef={listRef} />
         <CommandInput
           value={query}
           onValueChange={setQuery}
@@ -135,13 +133,13 @@ export function FolderPalette({
                   {g.rows.map((row, at) => (
                     <Fragment key={row.key}>
                       {startsRepo(g.rows, at) ? (
-                        <RepoHeading row={row} repoOfRow={repoOfRow} />
+                        <RepoHeading row={row} />
                       ) : null}
                       <CommandItem
                         value={row.key}
                         data-folder-row={row.key}
                         onSelect={() => onPick(row)}
-                        className="pl-7 text-[12.5px]"
+                        className={cn("text-[12.5px]", row.nested ? "pl-12" : "pl-7")}
                       >
                         <HugeiconsIcon
                           icon={ComputerTerminal01Icon}
@@ -211,6 +209,32 @@ function startsRepo(rows: readonly FolderRow[], at: number): boolean {
   return !(before && !before.pinned && before.repoKey === row.repoKey);
 }
 
+// cmdk brings the group heading into view when the selected row is the first child of its group,
+// but a repository heading sits before the first row, so that rule never fires here: going to the
+// top of the list (Home, or wrapping from the last row) would leave the workspace heading hidden.
+function KeepHeadingsVisible({ listRef }: { listRef: RefObject<HTMLElement | null> }) {
+  const value = useCommandState((state) => state.value);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the selection moves
+  useEffect(() => {
+    const items = listRef.current?.querySelectorAll<HTMLElement>("[cmdk-item]") ?? [];
+    const item = [...items].find((el) => el.dataset.folderRow === value);
+    const siblings = [...(item?.parentElement?.children ?? [])];
+    if (!item) return;
+    const before = siblings.slice(0, siblings.indexOf(item));
+    const previous = before[before.length - 1];
+    if (previous?.hasAttribute("data-repo-heading")) {
+      previous.scrollIntoView?.({ block: "nearest" });
+    }
+    if (before.every((el) => el.hasAttribute("data-repo-heading"))) {
+      item
+        .closest("[cmdk-group]")
+        ?.querySelector("[cmdk-group-heading]")
+        ?.scrollIntoView?.({ block: "nearest" });
+    }
+  }, [value]);
+  return null;
+}
+
 // The right end of a row: the Tab hint while the row has the focus, otherwise its label.
 function RowTail({ row }: { row: FolderRowMatched }) {
   const focused = useCommandState((state) => state.value) === row.key;
@@ -224,25 +248,23 @@ function RowTail({ row }: { row: FolderRowMatched }) {
   );
 }
 
-// The heading carries the repository hint while the focus is on a row of another repository.
-function RepoHeading({
-  row,
-  repoOfRow,
-}: {
-  row: FolderRowMatched;
-  repoOfRow: ReadonlyMap<string, string | null>;
-}) {
-  const focusInside = repoOfRow.get(useCommandState((state) => state.value)) === row.repoKey;
+// Aligned with the workspace heading above it; the count never changes while worktrees are shown or hidden.
+function RepoHeading({ row }: { row: FolderRowMatched }) {
   return (
     <div
       aria-hidden
-      className="flex items-center gap-2 pt-2 pr-3 pb-0.5 pl-7 text-[11px] font-medium text-muted-foreground"
+      data-repo-heading=""
+      className="flex items-center gap-2 pt-2 pr-3 pb-0.5 pl-3 text-[11px] font-medium text-muted-foreground"
     >
       <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.75} className="shrink-0" />
       <span className="min-w-0 truncate">
         <HighlightText text={row.repoName ?? ""} indices={row.repoNameIndices} />
       </span>
-      {row.repoHint && !focusInside ? <HintChip hint={row.repoHint} className="ml-auto" /> : null}
+      {row.worktreeCount > 0 ? (
+        <span className="ml-auto shrink-0 font-normal">
+          {`${row.worktreeCount} ${row.worktreeCount === 1 ? "worktree" : "worktrees"}`}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -250,9 +272,11 @@ function RepoHeading({
 function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
   return (
     <span
-      className={`flex shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground ${className ?? ""}`}
+      className={`flex shrink-0 items-center gap-1.5 text-[11px] leading-none font-normal text-muted-foreground ${className ?? ""}`}
     >
-      <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">Tab</kbd>
+      <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
+        Tab
+      </kbd>
       {hint.kind === "show"
         ? `show ${hint.count} ${hint.count === 1 ? "worktree" : "worktrees"}`
         : "hide worktrees"}

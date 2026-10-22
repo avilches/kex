@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { createElement, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FolderPalette } from "./FolderPalette";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
@@ -18,6 +18,8 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   pinned: over.pinned ?? false,
   cluster: over.cluster ?? 1,
   headed: over.headed ?? (over.cluster ?? 1) >= 2,
+  worktreeCount: over.worktreeCount ?? 0,
+  nested: over.nested ?? false,
   repoHint: over.repoHint ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
@@ -216,33 +218,34 @@ describe("FolderPalette", () => {
       });
       await settle();
     };
-    const headingHints = () =>
+    const repoHeadings = () =>
       [...document.querySelectorAll('[aria-hidden="true"]')].filter((el) =>
-        el.textContent?.includes("worktree"),
+        el.querySelector("svg") && !el.closest("[cmdk-item]"),
       );
 
-    it("shows the hint on the heading of the repository while the focus is outside it", async () => {
+    it("shows how many worktrees the repository has on its heading, with no Tab hint, wherever the focus is", async () => {
       mountGroups(
         [
           group({
             rows: [
               row({ path: "/other", key: "ws-1:/other" }),
-              base({ path: "/repo", label: "Workspace Root", cluster: 2, key: "ws-1:/repo" }),
-              base({ path: "/repo/src", cluster: 2, key: "ws-1:/repo/src" }),
+              base({ path: "/repo", label: "Workspace Root", cluster: 2, worktreeCount: 4, key: "ws-1:/repo" }),
+              base({ path: "/repo/src", cluster: 2, worktreeCount: 4, key: "ws-1:/repo/src" }),
             ],
           }),
         ],
         vi.fn(),
       );
       await settle();
-      const headings = headingHints();
-      expect(headings).toHaveLength(1);
-      expect(headings[0].textContent).toContain("repo");
-      expect(headings[0].textContent).toContain("show 2 worktrees");
-      expect(headings[0].querySelector("kbd")?.textContent).toBe("Tab");
-      const [, root] = itemEls();
-      expect(root.textContent).toContain("Workspace Root");
-      expect(root.textContent).not.toContain("show");
+      const [heading] = repoHeadings();
+      expect(heading.textContent).toContain("repo");
+      expect(heading.textContent).toContain("4 worktrees");
+      expect(heading.querySelector("kbd")).toBeNull();
+      expect(heading.className).toContain("pl-3");
+      await arrowDown();
+      await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
+      expect(repoHeadings()[0].textContent).toContain("4 worktrees");
+      expect(repoHeadings()[0].querySelector("kbd")).toBeNull();
     });
 
     it("moves the hint onto the row that has the focus, and off the heading", async () => {
@@ -266,7 +269,7 @@ describe("FolderPalette", () => {
       expect(root.querySelector("kbd")?.textContent).toBe("Tab");
       expect(other.textContent).not.toContain("show");
       expect(src.textContent).not.toContain("show");
-      expect(headingHints()).toHaveLength(0);
+      expect(repoHeadings()[0].querySelector("kbd")).toBeNull();
       await arrowDown();
       await waitFor(() => expect(itemEls()[2].textContent).toContain("show 2 worktrees"));
       expect(itemEls()[1].textContent).toContain("Workspace Root");
@@ -329,6 +332,84 @@ describe("FolderPalette", () => {
       );
       expect(heading).toBeDefined();
       expect(heading?.nextElementSibling?.textContent).toContain("/repo/cur");
+    });
+
+    it("indents the worktrees added with Tab under the folders of their repository", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              base({ path: "/repo/cur", label: "Current tab", cluster: 3, worktreeCount: 3, key: "ws-1:/repo/cur" }),
+              base({ path: "/repo/a", cluster: 3, worktreeCount: 3, nested: true, key: "ws-1:/repo/a" }),
+              base({ path: "/repo/b", cluster: 3, worktreeCount: 3, nested: true, key: "ws-1:/repo/b" }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const [cur, a, b] = itemEls();
+      expect(cur.className).toContain("pl-7");
+      expect(a.className).toContain("pl-12");
+      expect(b.className).toContain("pl-12");
+    });
+
+    it("draws the Tab key with a background that shows on the row that has the focus", async () => {
+      mountGroups(clustered, vi.fn());
+      await settle();
+      const kbd = itemEls()[0].querySelector("kbd");
+      expect(kbd?.className).toContain("bg-foreground/10");
+      expect(kbd?.className).not.toContain("bg-muted");
+    });
+
+    it("keeps the hint from making its row taller than the others, so the list does not shift", async () => {
+      mountGroups(clustered, vi.fn());
+      await settle();
+      const chip = itemEls()[0].querySelector("kbd");
+      expect(chip?.className).toContain("leading-none");
+      expect(chip?.parentElement?.className).toContain("leading-none");
+    });
+
+    describe("headings in view", () => {
+      const scrolled: Element[] = [];
+      const original = Element.prototype.scrollIntoView;
+      beforeEach(() => {
+        scrolled.length = 0;
+        Element.prototype.scrollIntoView = function (this: Element) {
+          scrolled.push(this);
+        };
+      });
+      afterEach(() => {
+        Element.prototype.scrollIntoView = original;
+      });
+
+      const withRepoFirst = () => [
+        group({
+          rows: [
+            base({ path: "/repo", label: "Workspace Root", cluster: 2, key: "ws-1:/repo" }),
+            base({ path: "/repo/src", cluster: 2, key: "ws-1:/repo/src" }),
+          ],
+        }),
+      ];
+
+      it("brings the workspace heading into view when the first row is selected, even under a repository heading", async () => {
+        mountGroups(withRepoFirst(), vi.fn());
+        await settle();
+        expect(scrolled.some((el) => el.hasAttribute("cmdk-group-heading"))).toBe(true);
+        expect(scrolled.some((el) => el.hasAttribute("data-repo-heading"))).toBe(true);
+      });
+
+      it("leaves the workspace heading alone when a later row is selected", async () => {
+        mountGroups(withRepoFirst(), vi.fn());
+        await settle();
+        scrolled.length = 0;
+        await act(async () => {
+          fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+        });
+        await settle();
+        expect(scrolled.some((el) => el.hasAttribute("cmdk-group-heading"))).toBe(false);
+        expect(scrolled.some((el) => el.hasAttribute("data-repo-heading"))).toBe(false);
+      });
     });
 
     it("puts a terminal icon before every folder and a repository icon before the repository name", async () => {
