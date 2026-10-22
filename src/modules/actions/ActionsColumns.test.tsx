@@ -376,6 +376,24 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
+  it("editing the command back to the preset's gives the preset back, whatever the name", () => {
+    const own: Action = { id: "ac-4", name: "My Zed", runInTerminal: false, command: "zed -n {workspace}", iconId: "zed", ownButton: false };
+    const { container, g, unmount } = mount([own]);
+    click(pencil(container));
+    typeField(commandField()!, "zed {workspace}");
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {workspace}", appId: "zed", iconId: "" }));
+    unmount();
+  });
+
+  it("an app whose command is a detected preset's is deleted without asking, even with no appId", () => {
+    const own: Action = { id: "ac-4", name: "My Zed", runInTerminal: false, command: "zed {workspace}", iconId: "zed", ownButton: false };
+    const { container, g, unmount } = mount([own]);
+    click(container.querySelector("button[aria-label='Remove action']"));
+    expect(g.onRemove).toHaveBeenCalledWith("ac-4");
+    expect(dialogButton("Delete")).toBeUndefined();
+    unmount();
+  });
+
   it("says so, and takes no Add, when no workspace is open", () => {
     const { container, unmount } = mount([saved], [], { workspace: { available: false } });
     expect(column(container, "workspace").textContent).toContain("does not report a workspace");

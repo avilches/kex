@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { updateAction } from "./actions";
 import { ownedAfterEdit } from "./appOwnership";
-import { uninstalledSuggestions, type AppSuggestion } from "./appSuggestions";
+import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./appSuggestions";
 import type { Action } from "./types";
 
 const preset: Action = {
@@ -13,43 +13,69 @@ const preset: Action = {
   ownButton: false,
 };
 
-const zed: AppSuggestion = { key: "sublime:ws", appId: "sublime", name: "Sublime Text {workspace}", iconId: "sublime", defaultCommand: "subl {workspace}" };
+const sublime: AppSuggestion = { key: "sublime:ws", appId: "sublime", name: "Sublime Text {workspace}", iconId: "sublime", defaultCommand: "subl {workspace}" };
+const zed: AppSuggestion = { key: "zed:ws", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
+const presets = [sublime, zed];
 
-describe("an edited preset and the Add combo", () => {
-  it("is offered again once its command changes, and not before", () => {
-    expect(uninstalledSuggestions([zed], [preset])).toEqual([]);
-    const stored = updateAction([preset], "a", ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }));
-    expect(stored[0]!.appId).toBeUndefined();
-    expect(stored[0]!.iconId).toBe("sublime");
-    expect(uninstalledSuggestions([zed], stored)).toEqual([zed]);
+// What the store keeps after an edit, the way Settings applies it.
+const apply = (list: Action[], next: Action): Action[] => updateAction(list, next.id, next);
+
+describe("ownedAfterEdit", () => {
+  it("makes a preset the user's own when its command changes, keeping the icon", () => {
+    const edited = ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }, presets);
+    expect(edited).toMatchObject({ appId: "", iconId: "sublime" });
+    const stored = apply([preset], edited)[0]!;
+    expect(stored.appId).toBeUndefined();
+    expect(stored.iconId).toBe("sublime");
   });
 
-  it("is offered again when only its name changes", () => {
-    const stored = updateAction([preset], "a", ownedAfterEdit(preset, { ...preset, name: "My Sublime" }));
-    expect(uninstalledSuggestions([zed], stored)).toEqual([zed]);
+  it("never lets a rename or the own-button choice change it", () => {
+    expect(ownedAfterEdit(preset, { ...preset, name: "My Sublime" }, presets).appId).toBe("sublime");
+    expect(ownedAfterEdit(preset, { ...preset, ownButton: true }, presets).appId).toBe("sublime");
+    expect(ownedAfterEdit(preset, { ...preset, command: "subl {workspace} " }, presets).appId).toBe("sublime");
+  });
+
+  it("gives the link back when the command is the preset's again, whatever the name", () => {
+    const own = apply([preset], ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }, presets))[0]!;
+    const back = ownedAfterEdit(own, { ...own, command: "subl {workspace}", name: "Anything" }, presets);
+    expect(back).toMatchObject({ appId: "sublime", iconId: "" });
+    const stored = apply([own], back)[0]!;
+    expect(stored.appId).toBe("sublime");
+    expect(stored.iconId).toBeUndefined();
+  });
+
+  it("does not link to another app's preset, nor without a preset list", () => {
+    const own: Action = { ...preset, appId: undefined, iconId: "sublime", command: "subl -n {workspace}" };
+    expect(ownedAfterEdit(own, { ...own, command: "zed {workspace}" }, presets).appId).toBeUndefined();
+    expect(ownedAfterEdit(own, { ...own, command: "subl {workspace}" }).appId).toBeUndefined();
+  });
+
+  it("leaves an action that is not an app of a preset alone", () => {
+    const own: Action = { ...preset, appId: undefined };
+    expect(ownedAfterEdit(own, { ...own, command: "x" }, presets)).toEqual({ ...own, command: "x" });
   });
 });
 
-describe("ownedAfterEdit", () => {
-  it("drops the appId when the name or the command changes", () => {
-    expect(ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }).appId).toBe("");
-    expect(ownedAfterEdit(preset, { ...preset, name: "Subl {workspace}" }).appId).toBe("");
+describe("an edited preset and the Add combo", () => {
+  it("is offered again once its command changes, and not before", () => {
+    expect(uninstalledSuggestions([sublime], [preset])).toEqual([]);
+    const stored = apply([preset], ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }, presets));
+    expect(uninstalledSuggestions([sublime], stored)).toEqual([sublime]);
   });
 
-  it("keeps the app icon as iconId, and the first one when it changes again", () => {
-    const edited = ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" });
-    expect(edited).toMatchObject({ appId: "", iconId: "sublime" });
-    const own: Action = { ...edited, appId: undefined };
-    expect(ownedAfterEdit(own, { ...own, command: "x" }).iconId).toBe("sublime");
+  it("is not offered again by a rename, and is hidden again when the command comes back", () => {
+    const renamed = apply([preset], ownedAfterEdit(preset, { ...preset, name: "My Sublime" }, presets));
+    expect(uninstalledSuggestions([sublime], renamed)).toEqual([]);
+    const own = apply([preset], ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }, presets));
+    const back = apply(own, ownedAfterEdit(own[0]!, { ...own[0]!, command: "subl {workspace}" }, presets));
+    expect(uninstalledSuggestions([sublime], back)).toEqual([]);
   });
+});
 
-  it("keeps it for the Button flag and for a value typed back to what it was", () => {
-    expect(ownedAfterEdit(preset, { ...preset, ownButton: true }).appId).toBe("sublime");
-    expect(ownedAfterEdit(preset, { ...preset, command: "subl {workspace} " }).appId).toBe("sublime");
-  });
-
-  it("leaves an action that is not a preset alone", () => {
-    const own: Action = { ...preset, appId: undefined };
-    expect(ownedAfterEdit(own, { ...own, command: "x" })).toEqual({ ...own, command: "x" });
+describe("presetOf", () => {
+  it("finds the preset of an app by its command alone", () => {
+    expect(presetOf({ runInTerminal: false, command: " subl {workspace} " }, presets)).toBe(sublime);
+    expect(presetOf({ runInTerminal: false, command: "subl" }, presets)).toBeUndefined();
+    expect(presetOf({ runInTerminal: true, command: "subl {workspace}" }, presets)).toBeUndefined();
   });
 });
