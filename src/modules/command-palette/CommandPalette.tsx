@@ -639,7 +639,7 @@ export function CommandPalette({
             </kbd>
             {footerEnterHint}
           </span>
-          <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
               {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
             </kbd>

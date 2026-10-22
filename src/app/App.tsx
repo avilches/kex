@@ -2894,7 +2894,9 @@ export default function App() {
     async (target: TerminalTarget) => {
       setCommandPaletteOpen(false);
       if (target.hibernated) await wakeWorkspace(target.workspaceId);
-      const ws = workspacesRef.current.find((w) => w.id === target.workspaceId);
+      const ws =
+        workspacesRef.current.find((w) => w.id === target.workspaceId) ??
+        workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
       if (!ws || ws.hibernated) return;
       const beside = target.besideTabId
         ? findTabPane(ws.paneTree, target.besideTabId)
@@ -3592,14 +3594,11 @@ export default function App() {
       let target = workspacesRef.current.find((w) => w.id === entry.workspaceId);
       if (target?.hibernated) target = undefined;
       if (!target) {
-        const stillExists = workspacesRef.current.some(
-          (w) => w.id === entry.workspaceId,
-        );
-        toast.info(
-          stillExists
-            ? "That workspace could not be woken, opened in the active one"
-            : "That workspace is gone, opened in the active one",
-        );
+        // The history is shared by every window: a record whose workspace is not in this
+        // window belongs to another one (or to a deleted workspace), and opens here quietly.
+        if (workspacesRef.current.some((w) => w.id === entry.workspaceId)) {
+          toast.info("That workspace could not be woken, opened in the active one");
+        }
         target = workspacesRef.current.find(
           (w) => w.id === activeWorkspaceIdRef.current,
         );
