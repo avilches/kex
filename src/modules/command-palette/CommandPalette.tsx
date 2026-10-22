@@ -505,6 +505,7 @@ export function CommandPalette({
                 <MergedList
                   rows={merged}
                   typing={parsed.term.length > 0}
+                  term={parsed.term}
                   userShortcuts={userShortcuts}
                   onRunCommand={runCommand}
                   onRunTab={(entry) => {

@@ -17,6 +17,7 @@ import { WorkspaceItem } from "./WorkspaceItem";
 type Props = {
   rows: MergedRow[];
   typing: boolean;
+  term: string;
   userShortcuts: Record<ShortcutId, KeyBinding[]>;
   onRunCommand: (item: PaletteItem) => void;
   onRunTab: (entry: TabEntry) => void;
@@ -37,6 +38,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <TabItem
         entry={row.entry}
         highlight={row.highlight}
+        term={p.term}
         onRun={() => p.onRunTab(row.entry)}
       />
     );

@@ -6,6 +6,7 @@ import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlightText } from "./HighlightText";
+import { foldText, substringIndices } from "./lib/fuzzy";
 import type { RowHighlight } from "./lib/mergeRows";
 import { tabDetailLines } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
@@ -24,13 +25,16 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
 export function TabItem({
   entry,
   highlight,
+  term = "",
   onRun,
 }: {
   entry: TabEntry;
   highlight?: RowHighlight;
+  term?: string;
   onRun: () => void;
 }) {
   const lines = tabDetailLines(entry);
+  const folded = foldText(term.trim());
   const note = entry.note?.replace(/\s+/g, " ").trim();
   const titleIndices =
     highlight?.field === "title" ? highlight.indices : undefined;
@@ -63,12 +67,18 @@ export function TabItem({
             key={line}
             className="truncate text-[10.5px] font-normal text-muted-foreground/80"
           >
-            {line}
+            <HighlightText
+              text={line}
+              indices={substringIndices(folded, line)}
+            />
           </span>
         ))}
         {note ? (
           <span className="truncate text-[10.5px] font-normal text-muted-foreground/60">
-            {note}
+            <HighlightText
+              text={note}
+              indices={substringIndices(folded, note)}
+            />
           </span>
         ) : null}
       </span>
