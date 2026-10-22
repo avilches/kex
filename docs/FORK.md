@@ -486,6 +486,8 @@ HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as
 
 - **Move a tab to another workspace** from its context menu ("Move to Workspace") or by dragging it (see `docs/WORKSPACES.md`). Not present upstream.
 
+- **Drag out to the OS** - explorer rows and the tabs of editor and markdown files can be dragged out of the window to Finder, the desktop or a browser, through `tauri-plugin-drag` (a native drag started when the pointer leaves the window). Not present upstream. Closes the "drag explorer->SO" item deferred in the 2026-06 sync. See `docs/ARCHITECTURE.md`.
+
 ### Hibernated workspaces
 
 A workspace can be hibernated (Cmd+Alt+Z, `workspace.hibernate`, or Hibernate / Restore in the workspace context menu): its terminals and editors are closed and its tabs stay in the persisted tree, shown as an overlay with a large sleeping icon, the workspace mark and name, how long it has been hibernated (`hibernatedAt`, two units at most) and a Restore button; the Sidebar is covered too. A review dialog warns about agents still working, unsaved documents and running commands that would not come back, with Save, Save all (only with more than 2 unsaved documents) and Run on start actions. The same shortcut restores a hibernated workspace, and so does a click on the sleeping icon at the right of its WorkspaceBar entry. Waking resumes agent sessions and "Run on start" commands. Details in `docs/WORKSPACES.md`. Not present upstream.

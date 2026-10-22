@@ -17,6 +17,7 @@ import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { closestCenter } from "@dnd-kit/core";
+import { pointerLeftWindow, renderDragIcon, startNativeFileDrag, tabNativeDragPath } from "@/modules/explorer/lib/nativeDragOut";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
 import {
@@ -290,6 +291,31 @@ export function WorkspaceDndProvider({
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [dragging]);
+
+  // Leaving the window with a file row or file tab held hands the gesture to
+  // the OS drag, so Finder, the desktop or a browser can receive the file.
+  const nativeDragPath =
+    draggingItem?.kind === "file"
+      ? draggingItem.path
+      : draggingItem?.kind === "tab"
+        ? tabNativeDragPath(draggingItem.tab)
+        : null;
+  const nativeDragIsDir = draggingItem?.kind === "file" && draggingItem.isDir;
+  useEffect(() => {
+    if (nativeDragPath === null) return;
+    const icon = renderDragIcon(nativeDragPath, nativeDragIsDir);
+    icon.catch(() => {});
+    let handedOff = false;
+    const onMove = (e: PointerEvent) => {
+      if (handedOff || e.buttons !== 1) return;
+      if (!pointerLeftWindow(e.clientX, e.clientY, window.innerWidth, window.innerHeight)) return;
+      handedOff = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape", key: "Escape", bubbles: true }));
+      void startNativeFileDrag(nativeDragPath, icon).catch((err) => console.error("native drag failed", err));
+    };
+    document.addEventListener("pointermove", onMove, true);
+    return () => document.removeEventListener("pointermove", onMove, true);
+  }, [nativeDragPath, nativeDragIsDir]);
 
   function handleDragCancel() {
     if (draggingItem === null) {

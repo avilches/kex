@@ -588,6 +588,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             // macOS: the predefined Quit menu item (Cmd+Q) terminates natively and
             // never fires ExitRequested (tauri#12978), so prevent_exit can't run our

@@ -58,3 +58,5 @@ autostart, updater, window-state, store, opener, os, log are wired in `lib.rs`) 
 1. `Cargo.toml` dependency
 2. `.plugin(...)` call in `lib.rs` `run()`
 3. capability entry in `default.json`
+
+`drag:default` (plugin `tauri-plugin-drag`) lets the webview start a native OS drag. It is the only IPC the drag-out feature adds (`plugin:drag|start_drag`, no Kex command); see the "Drag out to the OS" paragraph of `ARCHITECTURE.md`.

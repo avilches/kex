@@ -33,6 +33,7 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "dialog:default",
+    "drag:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text"
   ]

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { isOwnNativeDrag } from "@/modules/explorer/lib/nativeDragOut";
 import { parentDir } from "@/modules/explorer/lib/watch";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
@@ -48,20 +49,30 @@ export function useExplorerFileDrop({ rootPath, isDir, onCopied }: Options) {
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | null = null;
+    let own = false;
 
     void getCurrentWebview()
       .onDragDropEvent((e) => {
         const p = e.payload;
         const { rootPath, isDir, onCopied } = optsRef.current;
+        if (p.type === "enter") own = isOwnNativeDrag(p.paths);
         if (p.type === "enter" || p.type === "over") {
+          if (own) return;
           setTargetDir(dirAt(p.position.x, p.position.y, rootPath, isDir));
           return;
         }
         if (p.type === "leave") {
+          own = false;
           setTargetDir(null);
           return;
         }
         if (p.type === "drop") {
+          const wasOwn = own || isOwnNativeDrag(p.paths);
+          own = false;
+          if (wasOwn) {
+            setTargetDir(null);
+            return;
+          }
           const dir = dirAt(p.position.x, p.position.y, rootPath, isDir);
           setTargetDir(null);
           if (!dir || p.paths.length === 0) return;

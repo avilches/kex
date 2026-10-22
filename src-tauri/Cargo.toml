@@ -46,6 +46,7 @@ notify = "8.2.0"
 url = "2"
 sysinfo = "0.39"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-drag = "2.1.1"
 
 [dev-dependencies]
 proptest = "1"

@@ -1192,3 +1192,42 @@ Nunca confiar en un id propio para llegar a un elemento renderizado por un terce
 Radix): o se comprueba en el DOM real que el id sobrevive al spread del wrapper, o se consulta
 por un marcador que el propio tercero escribe. El no-op silencioso de getElementById se
 se disfrazaba de "el autofocus de Radix lo cubre" y costó varias rondas de pase GUI en encontrarlo.
+
+## Bug 24: arrastrar un fichero fuera de la ventana no arrancaba el drag del sistema (RESUELTO, TASK-6)
+
+### Sintoma
+
+El drag de una fila del explorer (o de un tab de fichero) se cancelaba al salir de la ventana y
+no llegaba nada a Finder, al escritorio ni a un navegador.
+
+### Pistas falsas investigadas (para no repetirlas)
+
+1. **Detectar la salida con `mouseleave` en `document.documentElement`**: nunca se disparaba con
+   `relatedTarget === null`. dnd-kit mantiene el puntero capturado mientras dura el drag, asi que
+   WKWebView no genera la salida de ventana; solo emite `pointerleave`/`mouseleave` entre elementos
+   internos, todos con `relatedTarget` distinto de null.
+2. **Suponer que el arrastre nativo no admite arrancar a mitad de gesto**: tampoco era eso. Con el
+   traspaso ya disparado, `startDrag` si arranca con el boton aun pulsado.
+
+### Causa raiz
+
+Dos causas, una encima de la otra. Primera, la deteccion de salida se apoyaba en un evento que la
+captura del puntero suprime; `pointermove` si sigue llegando con `clientX`/`clientY` fuera del
+viewport (se midio `x = -234` con una ventana de 1720 de ancho) y `buttons === 1`. Segunda,
+`tauri-plugin-drag` exige el icono como `data:image/png;base64,...`; con base64 a pelo lo trata
+como ruta y falla con `drag image not found`.
+
+### Fix
+
+- `pointerLeftWindow` sobre `pointermove` (capture) en `WorkspaceDndProvider`; al cumplirse se
+  cancela el drag de dnd-kit reenviando Escape y se llama a `startNativeFileDrag`.
+- El icono se rasteriza a PNG con un canvas al empezar el drag y se pasa con su prefijo data URI.
+- `isOwnNativeDrag` hace que `useExplorerFileDrop` y `useTerminalFileDrop` ignoren el mismo drag
+  cuando vuelve a caer sobre Kex.
+
+### Leccion
+
+Con dnd-kit activo no existen eventos de salida de ventana; se detecta por coordenadas en
+`pointermove`. Y para depurar el webview de un drag no basta la consola: la tecnica del `fetch` a
+un receptor local (memoria `reference_webview_debug_via_fetch`) dio el diagnostico en una sola
+prueba, y habria evitado la primera ronda a ciegas.
