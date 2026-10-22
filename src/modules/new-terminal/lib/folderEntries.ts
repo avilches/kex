@@ -28,11 +28,13 @@ export type FolderRow = {
   repoKey: string | null;
   // Name of that repository, shown on the small heading of a group of its folders.
   repoName: string | null;
-  // The current tab and home stay on top, outside any repository group.
+  // Home stays right after the current tab's repository, outside any repository group.
   pinned: boolean;
-  // How many folders of its repository sit together in its workspace; two or more
-  // put a heading with the repository name above the first of them.
+  // How many folders of its repository sit together in its workspace.
   cluster: number;
+  // Its repository group has a heading with the repository name above the first folder: two or
+  // more folders together, or the repository of the current tab, which opens the list.
+  headed: boolean;
   // What Tab does with the repository of this row; drawn on the row that has the focus,
   // or on the repository heading while the focus is elsewhere.
   repoHint: RepoHint | null;
@@ -160,6 +162,7 @@ function rowOf(
     repoName: repoNameOf(repoKey),
     pinned: extras.pinned ?? false,
     cluster: 1,
+    headed: false,
     repoHint: null,
     workspaceId,
     hibernated,
@@ -180,24 +183,30 @@ function missingWorktrees(b: Builder, key: string): RepoWorktree[] {
 
 type RawGroup = {
   head: Omit<FolderGroup, "rows">;
+  current: FolderRow | null;
   pinned: FolderRow[];
   root: FolderRow | null;
   loose: FolderRow[];
 };
 
-// Within a repository the workspace root goes first, then its main checkout, then the rest by path.
+// Within a repository the current tab goes first, then the workspace root, then its main
+// checkout, then the rest by path.
 function inCluster(a: FolderRow, b: FolderRow): number {
-  const rank = (r: FolderRow) => (r.label === "Workspace Root" ? 0 : r.path === r.repoKey ? 1 : 2);
+  const rank = (r: FolderRow) =>
+    r.label === "Current tab" ? 0 : r.label === "Workspace Root" ? 1 : r.path === r.repoKey ? 2 : 3;
   return rank(a) - rank(b) || compare(a.path, b.path);
 }
 
-// The folders of a workspace after its pinned rows: the workspace root first, then the loose
-// folders by repository and path; each repository gathers all its folders where its first one is.
-function clusteredRows(raw: RawGroup): FolderRow[] {
+// The workspace root first, then the loose folders by repository and path.
+function restOf(raw: RawGroup): FolderRow[] {
   const loose = [...raw.loose].sort(
     (a, b) => compare(a.repoKey ?? a.path, b.repoKey ?? b.path) || compare(a.path, b.path),
   );
-  const rest = raw.root ? [raw.root, ...loose] : loose;
+  return raw.root ? [raw.root, ...loose] : loose;
+}
+
+// Each repository gathers all its folders where its first one is.
+function clusterRows(rest: readonly FolderRow[]): FolderRow[] {
   const clusters = new Map<string, FolderRow[]>();
   for (const row of rest) {
     const id = row.repoKey ?? `\u0000${row.path}`;
@@ -209,12 +218,21 @@ function clusteredRows(raw: RawGroup): FolderRow[] {
 }
 
 function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): FolderGroup {
-  const clustered = clusteredRows(raw);
+  const rest = restOf(raw);
+  const currentKey = raw.current?.repoKey ?? null;
+  // The repository of the current tab opens the list, with the current tab first in it.
+  const mine = raw.current
+    ? [raw.current, ...rest.filter((r) => currentKey && r.repoKey === currentKey)].sort(inCluster)
+    : [];
+  const others = clusterRows(
+    currentKey ? rest.filter((r) => r.repoKey !== currentKey) : rest,
+  );
+  const clustered = [...mine, ...others];
   const size = new Map<string, number>();
   for (const row of clustered) {
     if (row.repoKey) size.set(row.repoKey, (size.get(row.repoKey) ?? 0) + 1);
   }
-  const withHeading = new Set([...size].filter(([, n]) => n >= 2).map(([key]) => key));
+  const withHeading = new Set([...size].filter(([key, n]) => n >= 2 || key === currentKey).map(([key]) => key));
   const hintOf = (key: string): RepoHint | null => {
     const missing = missingWorktrees(b, key).length;
     if (missing > 0) return { kind: "show", count: missing };
@@ -223,20 +241,22 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
   for (const row of clustered) {
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);
-    row.cluster = withHeading.has(row.repoKey) ? size.get(row.repoKey) ?? 1 : 1;
+    const rows = size.get(row.repoKey) ?? 1;
+    row.cluster = rows;
+    row.headed = withHeading.has(row.repoKey);
   }
   for (const row of raw.pinned) {
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);
   }
-  return { ...raw.head, rows: [...raw.pinned, ...clustered] };
+  return { ...raw.head, rows: [...mine, ...raw.pinned, ...others] };
 }
 
 // One path appears once in the whole palette: the seen set is shared across
 // groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
-// Order: the active workspace (current tab folder and home pinned on top, then the workspace
-// root and its other folders), then every other workspace in position order. The folders of
+// Order: the active workspace (the repository of the current tab with the current tab first, then
+// home, then the workspace root and its other folders), then every other workspace in position order. The folders of
 // one repository sit together under a small heading with its name, its main checkout first.
 // Worktrees are not listed until Tab asks for them on a row of their repository.
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
@@ -278,9 +298,10 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   if (activeWs) {
     const sleeping = !!activeWs.hibernated;
     const pinned: FolderRow[] = [];
+    const currentRows: FolderRow[] = [];
     const cwd = input.activeTabEntry?.cwd;
     if (cwd) {
-      pushUnique(b, pinned, rowOf(b, cwd, activeWs.id, sleeping, "Current tab", { pinned: true }));
+      pushUnique(b, currentRows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
     }
     const home = input.home?.replace(/[\\/]+$/, "");
     if (home) {
@@ -293,6 +314,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     }
     raws.push({
       head: headOf(activeWs, true),
+      current: currentRows[0] ?? null,
       pinned,
       root: rootRows[0] ?? null,
       loose: looseOf(activeWs),
@@ -307,7 +329,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     }
     const loose = looseOf(ws);
     if (rootRows.length + loose.length === 0) continue;
-    raws.push({ head: headOf(ws, false), pinned: [], root: rootRows[0] ?? null, loose });
+    raws.push({ head: headOf(ws, false), current: null, pinned: [], root: rootRows[0] ?? null, loose });
   }
 
   // Tab pressed on a repository: the worktrees missing from the list join the folders of the workspace it was pressed in.
@@ -364,7 +386,7 @@ export function filterFolderGroups(
       const path = foldText(r.path);
       const branch = foldText(r.branch ?? "");
       const label = foldText(r.label ?? "");
-      const repoName = r.cluster >= 2 ? foldText(r.repoName ?? "") : "";
+      const repoName = r.headed ? foldText(r.repoName ?? "") : "";
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;
       let labelIndices: number[] | undefined;

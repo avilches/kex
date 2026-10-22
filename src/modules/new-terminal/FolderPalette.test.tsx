@@ -17,6 +17,7 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   repoName: over.repoName ?? null,
   pinned: over.pinned ?? false,
   cluster: over.cluster ?? 1,
+  headed: over.headed ?? (over.cluster ?? 1) >= 2,
   repoHint: over.repoHint ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
@@ -308,6 +309,26 @@ describe("FolderPalette", () => {
       expect(itemEls()[0].textContent).not.toContain("worktrees");
       await arrowDown();
       await waitFor(() => expect(itemEls()[1].textContent).toContain("hide worktrees"));
+    });
+
+    it("opens a heading above the current tab when its repository has no other folder", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              row({ path: "/repo/cur", label: "Current tab", repoKey: "/repo", repoName: "repo", headed: true, cluster: 1, repoHint: show, key: "ws-1:/repo/cur" }),
+              row({ path: "/other", key: "ws-1:/other" }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const heading = [...document.querySelectorAll('[aria-hidden="true"]')].find((el) =>
+        el.textContent?.includes("repo"),
+      );
+      expect(heading).toBeDefined();
+      expect(heading?.nextElementSibling?.textContent).toContain("/repo/cur");
     });
 
     it("puts a terminal icon before every folder and a repository icon before the repository name", async () => {

@@ -678,12 +678,14 @@ src/
     └── new-terminal/              - "Ask me" mode for Open new terminals in (Settings > Terminal): FolderPalette,
                                      a Command-Palette-like dialog that picks the folder of a new terminal instead of
                                      deducing it. Pure core in `lib/folderEntries.ts` (tested): the active workspace
-                                     group pins the current tab folder and home on top, then the workspace root and
-                                     its tab folders; then one group per other workspace in position order (root,
-                                     then folders, hibernated included). The folders of one repository (several of a
-                                     workspace) sit together under a small heading with the repository name, its
-                                     workspace root first, then its main checkout, then by path (a git icon before
-                                     the name, a terminal icon before every folder); repositories and
+                                     group opens with the repository of the current tab (its heading, the current
+                                     tab first, then the rest of that repository, so the worktrees Tab adds appear
+                                     right under it), then home, then the workspace root and its tab folders; then one
+                                     group per other workspace in position order (root, then folders, hibernated
+                                     included). The folders of one repository (several of a workspace) sit together
+                                     under a small heading with the repository name, its workspace root first, then
+                                     its main checkout, then by path (a git icon before the name, the tab bar's
+                                     terminal icon before every folder); repositories and
                                      loose folders go alphabetically. A path appears once in the whole dialog, first
                                      occurrence keeps its label; the branch sits beside the folder, the right side
                                      carries the label; home shows as `~`; headings use the resolved workspace title

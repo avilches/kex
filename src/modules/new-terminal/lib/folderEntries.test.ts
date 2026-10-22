@@ -75,7 +75,7 @@ const listing = (roots: string[], list: RepoWorktree[]) =>
 const repoOfMap = (map: Record<string, string>) => (dir: string) => map[dir] ?? "";
 
 describe("buildFolderGroups", () => {
-  it("pins the current tab folder and home on top, then the workspace root, then the tab folders by path", () => {
+  it("opens with the current tab folder and home, then the workspace root, then the tab folders by path", () => {
     const entries = [
       entry({ workspaceId: "ws-1", cwd: "/Users/a/zeta" }),
       entry({ workspaceId: "ws-1", cwd: "/repo/src/b" }),
@@ -91,7 +91,7 @@ describe("buildFolderGroups", () => {
       [null, "/Users/a/alpha"],
       [null, "/Users/a/zeta"],
     ]);
-    expect(group.rows.map((r) => r.pinned)).toEqual([true, true, false, false, false, false]);
+    expect(group.rows.map((r) => r.pinned)).toEqual([false, true, false, false, false, false]);
   });
 
   it("carries the branch of every folder that has one", () => {
@@ -245,23 +245,50 @@ describe("repositories", () => {
     ]);
   });
 
-  it("never gathers pinned rows into a repository group", () => {
+  it("opens with the repository of the current tab, current tab first, and home right after it", () => {
     const entries = [
+      entry({ workspaceId: "ws-1", cwd: "/zzz" }),
+      entry({ workspaceId: "ws-1", cwd: "/repo/b" }),
       entry({ workspaceId: "ws-1", cwd: "/repo/cur" }),
       entry({ workspaceId: "ws-1", cwd: "/repo/a" }),
-      entry({ workspaceId: "ws-1", cwd: "/repo/b" }),
     ];
     const [group] = build({
       workspaces: [bare],
-      activeTabEntry: entries[0],
+      home: "/Users/a",
+      activeTabEntry: entries[2],
       entries,
+      repoOf: repoOfMap({ "/repo/cur": "/repo", "/repo/a": "/repo", "/repo/b": "/repo" }),
+    });
+    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
+      ["Current tab", "/repo/cur"],
+      [null, "/repo/a"],
+      [null, "/repo/b"],
+      ["Home", "/Users/a"],
+      [null, "/zzz"],
+    ]);
+    expect(group.rows.slice(0, 3).map((r) => [r.cluster, r.headed])).toEqual([
+      [3, true],
+      [3, true],
+      [3, true],
+    ]);
+  });
+
+  it("gives the repository of the current tab a heading even when the current tab is alone in it", () => {
+    const [group] = build({
+      workspaces: [bare],
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/cur" }),
       repoOf: () => "/repo",
     });
-    expect(group.rows.map((r) => [r.pinned, r.cluster])).toEqual([
-      [true, 1],
-      [false, 2],
-      [false, 2],
-    ]);
+    expect(group.rows[0]).toMatchObject({ label: "Current tab", cluster: 1, headed: true, repoName: "repo" });
+  });
+
+  it("leaves a folder alone in its repository without a heading, unless it is the current tab", () => {
+    const [group] = build({
+      workspaces: [bare],
+      entries: [entry({ workspaceId: "ws-1", cwd: "/lone" })],
+      repoOf: repoOfMap({ "/lone": "/lone" }),
+    });
+    expect(group.rows[0]).toMatchObject({ cluster: 1, headed: false });
   });
 
   it("does not list any worktree until Tab asks for them", () => {
@@ -360,7 +387,7 @@ describe("repositories", () => {
     it("turns the hint into hide for every row of the repository", () => {
       const group = open(new Map([["/repo", "ws-1"]]));
       const added = group.rows.slice(1, 4);
-      expect(added.map((r) => r.cluster)).toEqual([3, 3, 3]);
+      expect(added.map((r) => r.cluster)).toEqual([4, 4, 4]);
       expect(group.rows.slice(0, 4).map((r) => r.repoHint)).toEqual([
         { kind: "hide" },
         { kind: "hide" },

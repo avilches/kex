@@ -93,6 +93,26 @@ function inputEl(): HTMLInputElement {
   return el;
 }
 
+describe("palette focus", () => {
+  afterEach(() => cleanup());
+
+  it("takes the focus even while another cmdk input is still in the page, as the folder palette is when it closes for this one", async () => {
+    const decoy = document.createElement("input");
+    decoy.setAttribute("cmdk-input", "");
+    document.body.prepend(decoy);
+    try {
+      render(createElement(PaletteHarness));
+      await settle(30);
+      const own = document.querySelector<HTMLInputElement>('[data-palette="command"]');
+      expect(own).not.toBeNull();
+      expect(document.activeElement).toBe(own);
+      expect(document.activeElement).not.toBe(decoy);
+    } finally {
+      decoy.remove();
+    }
+  });
+});
+
 describe("palette select-all on reopen", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());

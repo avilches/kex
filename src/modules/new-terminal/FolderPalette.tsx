@@ -12,7 +12,12 @@ import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { GitBranchIcon, Home01Icon, SleepingIcon, TerminalIcon } from "@hugeicons/core-free-icons";
+import {
+  ComputerTerminal01Icon,
+  GitBranchIcon,
+  Home01Icon,
+  SleepingIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -139,9 +144,9 @@ export function FolderPalette({
                         className="pl-7 text-[12.5px]"
                       >
                         <HugeiconsIcon
-                          icon={TerminalIcon}
+                          icon={ComputerTerminal01Icon}
                           size={13}
-                          strokeWidth={1.75}
+                          strokeWidth={2}
                           className="shrink-0 text-muted-foreground"
                         />
                         <span className="min-w-0 flex-1 truncate">
@@ -198,10 +203,10 @@ function GroupHeading({
   );
 }
 
-// The first visible row of a repository's folders carries the heading, when it has two or more.
+// The first visible row of a repository's folders carries the heading, when the group has one.
 function startsRepo(rows: readonly FolderRow[], at: number): boolean {
   const row = rows[at];
-  if (row.pinned || row.cluster < 2) return false;
+  if (row.pinned || !row.headed) return false;
   const before = rows[at - 1];
   return !(before && !before.pinned && before.repoKey === row.repoKey);
 }
