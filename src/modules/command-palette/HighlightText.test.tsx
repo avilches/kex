@@ -12,6 +12,11 @@ describe("HighlightText", () => {
     expect(container.querySelectorAll("b")[0].textContent).toBe("Se");
   });
 
+  it("colors the matched runs with the theme primary", () => {
+    const { container } = render(<HighlightText text="Settings" indices={[0]} />);
+    expect(container.querySelector("b")?.className).toContain("text-primary");
+  });
+
   it("renders plain text without indices or on an empty match", () => {
     const { container } = render(<HighlightText text="Settings" indices={[]} />);
     expect(container.querySelector("b")).toBeNull();

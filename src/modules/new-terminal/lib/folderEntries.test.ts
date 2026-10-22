@@ -235,6 +235,18 @@ describe("filterFolderGroups", () => {
     expect(g1.rows.every((r) => r.indices === undefined)).toBe(true);
   });
 
+  it("ignores accents in both the folder and the query", () => {
+    const accented = build({
+      workspaces: [active],
+      home: null,
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/música/canción" }),
+      entries: [entry({ workspaceId: "ws-1", cwd: "/música/canción" })],
+    });
+    const [g] = filterFolderGroups(accented, "cancion");
+    expect(g.rows.length).toBeGreaterThan(0);
+    expect(filterFolderGroups(accented, "música").length).toBe(1);
+  });
+
   it("requires the whole word as a substring and highlights exactly that run", () => {
     const [only] = filterFolderGroups(groups, "home");
     expect(only.workspaceId).toBe("ws-2");
