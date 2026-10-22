@@ -93,7 +93,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
               filtered.map((g) => (
                 <CommandGroup
                   key={g.workspaceId}
-                  heading={<GroupHeading group={g} />}
+                  heading={<GroupHeading group={g} titleIndices={g.titleIndices} />}
                 >
                   {g.rows.map((row) => (
                     <CommandItem
@@ -116,7 +116,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                           {row.label === "Home" ? (
                             <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
                           ) : null}
-                          {row.label}
+                          <HighlightText text={row.label} indices={row.labelIndices} />
                         </span>
                       ) : null}
                     </CommandItem>
@@ -131,7 +131,13 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
   );
 }
 
-function GroupHeading({ group }: { group: FolderGroup }) {
+function GroupHeading({
+  group,
+  titleIndices,
+}: {
+  group: FolderGroup;
+  titleIndices: number[] | undefined;
+}) {
   return (
     <span className="flex items-center gap-2">
       <WorkspaceMark
@@ -141,7 +147,7 @@ function GroupHeading({ group }: { group: FolderGroup }) {
         size={14}
       />
       <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
-        {group.workspaceTitle}
+        <HighlightText text={group.workspaceTitle} indices={titleIndices} />
       </span>
       {group.hibernated ? (
         <span

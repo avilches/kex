@@ -33,10 +33,16 @@ export type FolderGroup = {
   rows: FolderRow[];
 };
 
-export type FolderRowMatched = FolderRow & { indices?: number[] };
+// Indices of the characters that matched, per piece of text the row shows.
+export type FolderRowMatched = FolderRow & {
+  indices?: number[];
+  branchIndices?: number[];
+  labelIndices?: number[];
+};
 
 export type FolderGroupMatched = Omit<FolderGroup, "rows"> & {
   rows: FolderRowMatched[];
+  titleIndices?: number[];
 };
 
 export type FolderGroupsInput = {
@@ -197,10 +203,21 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   return groups;
 }
 
-// Every word typed must appear as a plain substring of the path (case
-// insensitive); the returned indices are the characters that matched, so each
-// row shows why it is there. Groups keep their order, rows keep their order,
-// groups left with no rows disappear.
+function runOf(at: number, length: number): number[] {
+  return Array.from({ length }, (_, i) => at + i);
+}
+
+function merge(into: number[] | undefined, more: number[]): number[] {
+  const out = into ?? [];
+  for (const i of more) if (!out.includes(i)) out.push(i);
+  return out;
+}
+
+// Every word typed must appear as a plain substring (case insensitive) of something the
+// row shows: its path (never inside the home prefix), its branch, its label or the title
+// of its workspace. The returned indices are the characters that matched, per piece of
+// text, so each row shows why it is there. Groups keep their order, rows keep their
+// order, groups left with no rows disappear.
 export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
@@ -211,29 +228,46 @@ export function filterFolderGroups(
   }
   const out: FolderGroupMatched[] = [];
   for (const g of groups) {
+    const title = g.workspaceTitle.toLowerCase();
+    let titleIndices: number[] | undefined;
     const rows: FolderRowMatched[] = [];
     for (const r of g.rows) {
-      const lower = r.path.toLowerCase();
-      const indices: number[] = [];
+      const path = r.path.toLowerCase();
+      const branch = (r.branch ?? "").toLowerCase();
+      const label = (r.label ?? "").toLowerCase();
+      let indices: number[] | undefined;
+      let branchIndices: number[] | undefined;
+      let labelIndices: number[] | undefined;
+      let rowTitleIndices: number[] | undefined;
       let ok = true;
       for (const token of tokens) {
-        const at = lower.indexOf(token, r.matchOffset);
-        if (at < 0) {
+        const inPath = path.indexOf(token, r.matchOffset);
+        const inBranch = branch.indexOf(token);
+        const inLabel = label.indexOf(token);
+        const inTitle = title.indexOf(token);
+        if (inPath < 0 && inBranch < 0 && inLabel < 0 && inTitle < 0) {
           ok = false;
           break;
         }
-        for (let i = at; i < at + token.length; i++) {
-          if (!indices.includes(i)) indices.push(i);
+        if (inPath >= 0) {
+          indices = merge(indices, runOf(inPath, token.length).map((i) => i - r.displayShift));
         }
+        if (inBranch >= 0) branchIndices = merge(branchIndices, runOf(inBranch, token.length));
+        if (inLabel >= 0) labelIndices = merge(labelIndices, runOf(inLabel, token.length));
+        if (inTitle >= 0) rowTitleIndices = merge(rowTitleIndices, runOf(inTitle, token.length));
       }
       if (!ok) continue;
+      if (rowTitleIndices) titleIndices = merge(titleIndices, rowTitleIndices);
+      const sort = (list: number[] | undefined) => list?.sort((a, b) => a - b);
       rows.push({
         ...r,
-        indices: indices.map((i) => i - r.displayShift).sort((a, b) => a - b),
+        indices: sort(indices),
+        branchIndices: sort(branchIndices),
+        labelIndices: sort(labelIndices),
       });
     }
     if (rows.length > 0) {
-      out.push({ ...g, rows });
+      out.push({ ...g, rows, titleIndices: titleIndices?.sort((a, b) => a - b) });
     }
   }
   return out;

@@ -236,11 +236,50 @@ describe("filterFolderGroups", () => {
   });
 
   it("requires the whole word as a substring and highlights exactly that run", () => {
-    const [only] = filterFolderGroups(groups, "home");
+    const [only] = filterFolderGroups(groups, "s/home");
     expect(only.workspaceId).toBe("ws-2");
     expect(only.rows).toHaveLength(1);
-    // "/dotfiles/home": h o m e at indices 10..13.
-    expect(only.rows[0].indices).toEqual([10, 11, 12, 13]);
+    // "/dotfiles/home": s / h o m e at indices 8..13.
+    expect(only.rows[0].indices).toEqual([8, 9, 10, 11, 12, 13]);
+  });
+
+  describe("everything a row shows is searchable", () => {
+    const shown = build({
+      workspaces: [active, other],
+      workspaceEntries: [
+        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, hibernated: false, tabCount: 1, lastUsedAt: 0 },
+        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, hibernated: false, tabCount: 1, lastUsedAt: 0 },
+      ],
+      home: "/Users/a",
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
+      entries: [entry({ workspaceId: "ws-1", cwd: "/repo/src" }), entry({ workspaceId: "ws-2", cwd: "/dotfiles/x" })],
+      branchOf: (dir) => (dir === "/repo/src" ? "feat/login" : ""),
+    });
+
+    it("finds a row by its branch and highlights it", () => {
+      const [g] = filterFolderGroups(shown, "login");
+      expect(g.rows.map((r) => r.path)).toEqual(["/repo/src"]);
+      expect(g.rows[0].branchIndices).toEqual([5, 6, 7, 8, 9]);
+      expect(g.rows[0].indices).toBeUndefined();
+    });
+
+    it("finds a row by its label", () => {
+      const [g] = filterFolderGroups(shown, "root");
+      expect(g.rows.map((r) => r.label)).toEqual(["Workspace Root"]);
+      expect(g.rows[0].labelIndices).toEqual([10, 11, 12, 13]);
+    });
+
+    it("keeps the whole group when the workspace title matches", () => {
+      const groupsMatched = filterFolderGroups(shown, "dotf");
+      expect(groupsMatched.map((g) => g.workspaceId)).toEqual(["ws-2"]);
+      expect(groupsMatched[0].rows).toHaveLength(2);
+      expect(groupsMatched[0].titleIndices).toEqual([0, 1, 2, 3]);
+    });
+
+    it("combines words across path, branch and title", () => {
+      const [g] = filterFolderGroups(shown, "kex login src");
+      expect(g.rows.map((r) => r.path)).toEqual(["/repo/src"]);
+    });
   });
 
   it("matches every token somewhere in the path, highlighting all of them", () => {
