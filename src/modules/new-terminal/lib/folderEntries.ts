@@ -1,3 +1,4 @@
+import { foldText } from "@/modules/command-palette/lib/fuzzy";
 import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
@@ -205,7 +206,7 @@ export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
 ): FolderGroupMatched[] {
-  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = foldText(query.trim()).split(/\s+/).filter(Boolean);
   if (tokens.length === 0) {
     return groups.map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r })) }));
   }
@@ -213,7 +214,7 @@ export function filterFolderGroups(
   for (const g of groups) {
     const rows: FolderRowMatched[] = [];
     for (const r of g.rows) {
-      const lower = r.path.toLowerCase();
+      const lower = foldText(r.path);
       const indices: number[] = [];
       let ok = true;
       for (const token of tokens) {

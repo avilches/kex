@@ -18,7 +18,7 @@ export function HighlightText({
     if (!run) return;
     parts.push(
       runMatched ? (
-        <b key={start} className="font-semibold">
+        <b key={start} className="font-semibold text-primary">
           {run}
         </b>
       ) : (

@@ -39,7 +39,8 @@ import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
-import { terminalTargetOf } from "./lib/terminalTarget";
+import { type TerminalTarget, terminalTargetOf } from "./lib/terminalTarget";
+import { enterHintOf } from "./lib/enterHint";
 import { MergedList } from "./MergedList";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "./PaletteWidth";
 import type { PaletteItem } from "./types";
@@ -61,7 +62,7 @@ type Props = {
   onSelectWorkspace: (entry: WorkspaceEntry) => void;
   onRunClosed: (entry: ClosedTabEntry) => void;
   onMoveActiveTabToWorkspace: (target: string | "new") => void;
-  onTerminalTargetChange: (entry: TabEntry | null) => void;
+  onTerminalTargetChange: (target: TerminalTarget | null) => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -153,6 +154,7 @@ export function CommandPalette({
     () => (open && inCommands ? terminalTargetOf(value, merged) : null),
     [open, inCommands, value, merged],
   );
+  const footerEnterHint = inCommands ? enterHintOf(value, merged) : "Select";
   useEffect(() => {
     onTerminalTargetChange(terminalTarget);
     return () => onTerminalTargetChange(null);
@@ -630,17 +632,27 @@ export function CommandPalette({
             )}
           </CommandList>
         </ScrollArea>
-        {terminalTarget ? (
-          <div className="flex min-w-0 items-center gap-2 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+          <span className="flex shrink-0 items-center gap-1.5">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+              {"\u21b5"}
+            </kbd>
+            {footerEnterHint}
+          </span>
+          <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
             <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
               {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
             </kbd>
-            <span className="shrink-0">Open terminal</span>
-            <span className="min-w-0 flex-1 truncate text-right font-mono text-[10.5px]">
-              {terminalTarget.cwd}
+            <span className="shrink-0">
+              {terminalTarget ? "Open terminal" : "New terminal"}
             </span>
-          </div>
-        ) : null}
+            {terminalTarget ? (
+              <span className="min-w-0 truncate font-mono text-[10.5px]">
+                {terminalTarget.cwd}
+              </span>
+            ) : null}
+          </span>
+        </div>
       </Command>
     </CommandDialog>
   );
