@@ -1,0 +1,42 @@
+import { toast } from "sonner";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { readIntegrationSuggestions, updateIntegrationSuggestions } from "@/modules/settings/store";
+import { agentStatus, installAgent } from "../lib/agentIntegration";
+import { AgentIcon } from "../lib/agentIcon";
+import { createIntegrationSuggester } from "../lib/integrationSuggestionFlow";
+import { AGENT_LABELS, type AgentId } from "../lib/integrations";
+
+const TOAST_MS = 20_000;
+
+async function installFromToast(agent: AgentId): Promise<void> {
+  const name = AGENT_LABELS[agent];
+  try {
+    await installAgent(agent);
+    toast.success(`${name} integration installed`);
+  } catch (e) {
+    console.error(`[kex] installing the ${agent} integration failed:`, e);
+    toast.error(`Could not install the ${name} integration`);
+  }
+}
+
+export function showIntegrationSuggestion(agent: AgentId): void {
+  const name = AGENT_LABELS[agent];
+  toast(`${name} is running without the Kex integration`, {
+    description:
+      "Install it to see the spinner and attention dot in the tab, and to keep your session when you undo a closed tab or hibernate a workspace.",
+    icon: <AgentIcon agent={agent} size={18} />,
+    action: { label: "Install", onClick: () => void installFromToast(agent) },
+    cancel: { label: "View changes", onClick: () => void openSettingsWindow("general") },
+    duration: TOAST_MS,
+    closeButton: true,
+  });
+}
+
+// Called when Kex detects an agent starting in a terminal.
+export const suggestIntegration = createIntegrationSuggester({
+  now: Date.now,
+  status: agentStatus,
+  read: readIntegrationSuggestions,
+  update: updateIntegrationSuggestions,
+  show: showIntegrationSuggestion,
+});

@@ -180,4 +180,20 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
+### Install suggestion
+
+Nothing in the app told a new user that the integrations exist, so when the `started` signal names an agent
+(`claude`, `opencode`, `omp` or `pi`) whose integration is not installed, `suggestIntegration`
+(`IntegrationSuggestionToast.tsx`) shows a toast with Install and View changes (opens Settings > General); closing it
+is the "not now". The decision lives in pure functions (`lib/integrationSuggestion.ts`) and the flow in
+`lib/integrationSuggestionFlow.ts`, which looks at each agent once per app run:
+
+- First time: ask. The ask is counted when the toast shows, whatever the user does with it.
+- After an unanswered ask: ask once more after 15 days (`SUGGESTION_RETRY_MS`), then never again.
+- Installed at any moment (the toast, Settings, the bell, or already installed when the agent is detected): never ask
+  again, even if it is removed later. `installAgent` (`lib/agentIntegration.ts`) is the single install path and records
+  it.
+
+The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce }`.
+
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).

@@ -26,7 +26,7 @@ import {
   getSnapshot as getOscTitlesSnapshot,
   subscribe as subscribeOscTitles,
 } from "@/modules/terminal/lib/oscTitleStore";
-import { setAgentNotifications } from "@/modules/settings/store";
+import { installAgent } from "@/modules/agents/lib/agentIntegration";
 import { type AgentEntry, buildAgentEntries } from "../lib/notificationList";
 import { AgentIcon } from "../lib/agentIcon";
 import { useAgentStore } from "../store/agentStore";
@@ -156,8 +156,7 @@ export function NotificationBell({ onActivate }: Props) {
   const enableClaudeHooks = async () => {
     setInstalling("claude");
     try {
-      await invoke("agent_enable_claude_hooks");
-      await setAgentNotifications(true);
+      await installAgent("claude");
       setHooksReady(true);
     } catch (e) {
       console.error("[kex] agent_enable_claude_hooks failed:", e);

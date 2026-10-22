@@ -17,6 +17,7 @@ import {
   parseInstalledIntegrations,
   type IntegrationAgent,
 } from "@/modules/agents/lib/integrations";
+import { parseSuggestions, type SuggestionMap } from "@/modules/agents/lib/integrationSuggestion";
 import {
   parseAutoHibernate,
   type AutoHibernate,
@@ -196,6 +197,7 @@ export type Preferences = {
   paletteWidth: number;
   agentNotifications: boolean;
   installedIntegrations: IntegrationAgent[];
+  integrationSuggestions: SuggestionMap;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
@@ -268,6 +270,7 @@ const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_PALETTE_WIDTH = "paletteWidth";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
+const KEY_INTEGRATION_SUGGESTIONS = "integrationSuggestions";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -465,6 +468,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   paletteWidth: DEFAULT_PALETTE_WIDTH,
   agentNotifications: true,
   installedIntegrations: [],
+  integrationSuggestions: {},
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
@@ -710,6 +714,7 @@ export async function loadPreferences(): Promise<Preferences> {
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
     installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
+    integrationSuggestions: parseSuggestions(getGeneral<unknown>(KEY_INTEGRATION_SUGGESTIONS)),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -1304,6 +1309,25 @@ export function updateInstalledIntegrations(
   return run;
 }
 
+// Same read-change-write step for the record of which agents were already offered an install:
+// the main window (the toast) and the Settings window (an install there) both write it.
+let suggestionsQueue: Promise<unknown> = Promise.resolve();
+
+export function updateIntegrationSuggestions(
+  change: (current: SuggestionMap) => SuggestionMap,
+): Promise<void> {
+  const run = suggestionsQueue.then(async () => {
+    const current = parseSuggestions(await store.get<unknown>(KEY_INTEGRATION_SUGGESTIONS));
+    await writePref(KEY_INTEGRATION_SUGGESTIONS, change(current));
+  });
+  suggestionsQueue = run.catch(() => undefined);
+  return run;
+}
+
+export async function readIntegrationSuggestions(): Promise<SuggestionMap> {
+  return parseSuggestions(await store.get<unknown>(KEY_INTEGRATION_SUGGESTIONS));
+}
+
 
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
@@ -1342,6 +1366,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_PALETTE_WIDTH]: "paletteWidth",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
+  [KEY_INTEGRATION_SUGGESTIONS]: "integrationSuggestions",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",

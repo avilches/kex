@@ -4,6 +4,13 @@ export type IntegrationAgent = (typeof INTEGRATION_AGENTS)[number];
 /** Every agent Kex can install an integration for; Claude Code is not tracked in the stored list. */
 export type AgentId = "claude" | IntegrationAgent;
 
+export const AGENT_LABELS: Record<AgentId, string> = {
+  claude: "Claude Code",
+  opencode: "OpenCode",
+  omp: "OMP",
+  pi: "Pi",
+};
+
 /** How long Install and Uninstall show their busy state at least, so a fast write is still seen. */
 export const INTEGRATION_MIN_BUSY_MS = 500;
 
