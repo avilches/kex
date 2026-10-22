@@ -341,7 +341,7 @@ async fn open_settings_window(
 
     let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(780.0, 720.0)
+        .inner_size(900.0, 840.0)
         .resizable(false)
         .visible(false)
         .always_on_top(true)

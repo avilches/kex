@@ -309,6 +309,34 @@ describe("ActionsColumns", () => {
     own.unmount();
   });
 
+  it("the scope radio is two boxed options laid out like the column headers", () => {
+    const { container, unmount } = mount([saved], []);
+    click(pencil(container));
+    const text = document.querySelector("[aria-label='Where it is available']")!.textContent ?? "";
+    expect(text).toContain("Global");
+    expect(text).toContain("every workspace");
+    expect(text).toContain("This workspace");
+    expect(text).toContain("Dashboard");
+    unmount();
+  });
+
+  it("the preview keeps the Actions combo, and the open one has its group title and the line under the name", () => {
+    const combo = mount([saved], [savedApp]);
+    click(pencil(combo.container));
+    const preview = () => document.querySelector("[data-own-button-preview]")!;
+    expect(preview().querySelector("[data-preview-combo]")).not.toBeNull();
+    expect(preview().textContent).toContain("Global actions");
+    expect(preview().textContent).toContain("Dev");
+    expect(preview().textContent).toContain("Workspace");
+    click(dialogButton("Done"));
+    combo.unmount();
+    const button = mount([{ ...saved, ownButton: true }]);
+    click(pencil(button.container));
+    expect(preview().querySelector("[data-preview-combo]")).not.toBeNull();
+    expect(preview().textContent).not.toContain("Global actions");
+    button.unmount();
+  });
+
   it("the modal scope radio moves a saved Action to the other scope and stays open", () => {
     const { container, onMove, unmount } = mount([saved], []);
     click(pencil(container));

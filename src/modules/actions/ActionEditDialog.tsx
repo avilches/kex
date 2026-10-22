@@ -20,6 +20,7 @@ import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor"
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { OwnButtonChoice } from "./OwnButtonChoice";
+import { BOXED_RADIO } from "./lib/boxedRadio";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { ActionContext } from "./lib/useActionContext";
@@ -36,6 +37,8 @@ type Props = {
   saved: boolean;
   /** False while no workspace is open: the Action cannot move there. */
   workspaceAvailable: boolean;
+  /** Shown under This workspace, like the column header does. */
+  workspaceName: string | null;
   onScopeChange: (to: Scope) => void;
   onChange: (next: Action) => void;
   onClose: () => void;
@@ -48,16 +51,12 @@ const CWD_MODE_ICONS = {
   fixed: FolderOpenIcon,
 } as const;
 
-const SCOPES: readonly { value: Scope; label: string }[] = [
-  { value: "global", label: "Global" },
-  { value: "workspace", label: "This workspace" },
-];
 
 // The edit form of one Action, in a modal. Everything saves as it is typed (the name and the
 // command when the field loses focus, the rest at once), so Close only leaves; closing with
 // Escape or the backdrop flushes what is still being typed. A preset is edited like any other
 // Action: the host decides when a change makes it the user's own.
-export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, onScopeChange, onChange, onClose }: Props) {
+export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, workspaceName, onScopeChange, onChange, onClose }: Props) {
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [draft, setDraft] = useState(action.command);
@@ -101,7 +100,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-3rem)] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[480px]"
+        className="max-h-[calc(100vh-3rem)] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[560px]"
         onOpenAutoFocus={(e) => {
           if (saved) return;
           e.preventDefault();
@@ -118,20 +117,25 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           value={scope}
           onValueChange={(v) => onScopeChange(v as Scope)}
           aria-label="Where it is available"
-          className="flex w-auto items-center gap-4"
+          className="grid grid-cols-2 gap-2"
         >
-          {SCOPES.map((s) => (
-            <label
-              key={s.value}
-              className={cn(
-                "flex items-center gap-2 text-[12px]",
-                s.value === "workspace" && !workspaceAvailable ? "cursor-not-allowed opacity-50" : "cursor-pointer",
-              )}
-            >
-              <RadioGroupItem value={s.value} disabled={s.value === "workspace" && !workspaceAvailable} />
-              {s.label}
-            </label>
-          ))}
+          {(
+            [
+              { value: "global", title: "Global", subtitle: "every workspace" },
+              { value: "workspace", title: "This workspace", subtitle: workspaceName ?? "no workspace open" },
+            ] as const
+          ).map((s) => {
+            const disabled = s.value === "workspace" && !workspaceAvailable;
+            return (
+              <label key={s.value} className={cn(BOXED_RADIO, disabled && "cursor-not-allowed opacity-50")}>
+                <RadioGroupItem value={s.value} disabled={disabled} className="mt-0.5" />
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate text-[12.5px] font-semibold">{s.title}</span>
+                  <span className="truncate text-[10.5px] text-muted-foreground">{s.subtitle}</span>
+                </span>
+              </label>
+            );
+          })}
         </RadioGroup>
         <DialogDescription className="sr-only">
           Changes are saved as you type. Done leaves the editor.
@@ -250,7 +254,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
             {variablesOpen ? "Hide variables" : "Show variables"}
           </button>
           {variablesOpen && (
-            <div className="flex max-h-52 min-w-0 flex-col overflow-y-auto text-[11px] leading-snug">
+            <div className="flex min-w-0 flex-col text-[11px] leading-snug">
               {commandVariableDocs().map((v) => (
                 <button
                   key={v.name}
@@ -293,7 +297,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           ))}
         </div>
 
-        <OwnButtonChoice action={action} onChange={(own) => onChange({ ...action, ownButton: own })} />
+        <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
 
         <div className="flex justify-end border-t border-border pt-3">
           <Button size="sm" className="h-8 px-4 text-[12px]" onClick={onClose}>
