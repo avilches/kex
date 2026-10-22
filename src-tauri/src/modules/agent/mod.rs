@@ -207,72 +207,62 @@ pub fn agent_enable_claude_hooks() -> Result<(), String> {
     let path = settings_path()?;
     let dir = path.parent().unwrap();
     std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    apply_settings(&path, true)
+}
 
-    let existing_str = match std::fs::read_to_string(&path) {
+/// Reads the settings file, and when the hooks need to change writes the new text atomically.
+/// Writing nothing when nothing changes avoids reformatting the user's file on repeated runs
+/// (the startup reinstall path).
+fn apply_settings(path: &std::path::Path, install: bool) -> Result<(), String> {
+    let existing_str = match std::fs::read_to_string(path) {
         Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && !install => return Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("read {}: {e}", path.display())),
     };
+    let Some(out) = plan_settings(&existing_str, path, install)? else {
+        return Ok(());
+    };
+    // Atomic write via temp file so a crash mid-write never truncates the file.
+    let tmp = path.with_extension("json.kex-tmp");
+    std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename into {}: {e}", path.display())
+    })
+}
 
+/// The text the settings file would hold after installing or removing the hooks, or `None`
+/// when it already is as it should be. The real write and the preview both come from here, so
+/// what the user reviews is what lands on disk.
+fn plan_settings(
+    existing_str: &str,
+    path: &std::path::Path,
+    install: bool,
+) -> Result<Option<String>, String> {
     let existing = existing_config(
         if existing_str.is_empty() {
             None
         } else {
-            Some(&existing_str)
+            Some(existing_str)
         },
-        &path,
+        path,
     )?;
-    let merged = merge_hooks(existing.clone());
-
-    // Skip writing when nothing changed -- avoids reformatting the user's file
-    // on repeated runs (e.g. the startup auto-reinstall path).
-    if merged == existing {
-        return Ok(());
+    let next = if install {
+        merge_hooks(existing.clone())
+    } else {
+        remove_hooks(existing.clone())
+    };
+    if next == existing {
+        return Ok(None);
     }
-
-    // Detect the original indent so we don't change the user's preferred style.
-    let indent = detect_json_indent(existing_str.as_str());
-    let out = serialize_pretty(&merged, indent)?;
-
-    // Atomic write via temp file so a crash mid-write never truncates the file.
-    let tmp = path.with_extension("json.kex-tmp");
-    std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("rename into {}: {e}", path.display())
-    })?;
-    Ok(())
+    // Keep the user's own indent so the diff only shows the hooks.
+    serialize_pretty(&next, detect_json_indent(existing_str)).map(Some)
 }
 
 #[tauri::command]
 pub fn agent_disable_claude_hooks() -> Result<(), String> {
-    let path = settings_path()?;
-    let existing_str = match std::fs::read_to_string(&path) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(format!("read {}: {e}", path.display())),
-    };
-    let existing = existing_config(
-        if existing_str.is_empty() {
-            None
-        } else {
-            Some(&existing_str)
-        },
-        &path,
-    )?;
-    let cleaned = remove_hooks(existing.clone());
-    if cleaned == existing {
-        return Ok(());
-    }
-    let indent = detect_json_indent(existing_str.as_str());
-    let out = serialize_pretty(&cleaned, indent)?;
-    let tmp = path.with_extension("json.kex-tmp");
-    std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("rename into {}: {e}", path.display())
-    })?;
-    Ok(())
+    apply_settings(&settings_path()?, false)
 }
 
 #[tauri::command]
@@ -522,6 +512,109 @@ pub fn agent_pi_extension_status() -> bool {
     pi_extension_path()
         .ok()
         .is_some_and(|p| agent_file_matches(p, &agent_extension_script("pi")))
+}
+
+/// What one file would hold after an install or an uninstall. `None` in `before` means the
+/// file is not there; `None` in `after` means it would be deleted.
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePreview {
+    path: String,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+fn tilde(path: &std::path::Path) -> String {
+    dirs::home_dir()
+        .and_then(|home| {
+            path.strip_prefix(home)
+                .ok()
+                .map(|rest| format!("~/{}", rest.display()))
+        })
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+fn changed(
+    path: &std::path::Path,
+    before: Option<&str>,
+    after: Option<String>,
+) -> Vec<FilePreview> {
+    if before == after.as_deref() {
+        return Vec::new();
+    }
+    vec![FilePreview {
+        path: tilde(path),
+        before: before.map(str::to_string),
+        after,
+    }]
+}
+
+fn claude_preview(
+    settings_path: &std::path::Path,
+    script_path: &std::path::Path,
+    settings: Option<&str>,
+    script: Option<&str>,
+    install: bool,
+) -> Result<Vec<FilePreview>, String> {
+    let after = plan_settings(settings.unwrap_or(""), settings_path, install)?
+        .or_else(|| settings.map(str::to_string));
+    let mut files = changed(settings_path, settings, after);
+    if install {
+        files.extend(changed(
+            script_path,
+            script,
+            Some(SESSION_HOOK_SCRIPT.to_string()),
+        ));
+    }
+    Ok(files)
+}
+
+fn integration_preview(
+    target: &IntegrationTarget,
+    current: Option<&str>,
+    install: bool,
+) -> Result<Vec<FilePreview>, String> {
+    if install {
+        return Ok(changed(&target.path, current, Some(target.script.clone())));
+    }
+    match current {
+        None => Ok(Vec::new()),
+        Some(c) if is_kex_owned(c, target.owned_marker) => Ok(changed(&target.path, current, None)),
+        Some(_) => Err(format!(
+            "{} is not a Kex file, leaving it alone",
+            target.path.display()
+        )),
+    }
+}
+
+fn read_optional(path: &std::path::Path) -> Result<Option<String>, String> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(Some(s)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("read {}: {e}", path.display())),
+    }
+}
+
+/// Dry run of an install or an uninstall: the files that would change with their text before
+/// and after. Writes nothing.
+#[tauri::command]
+pub fn agent_integration_preview(agent: String, install: bool) -> Result<Vec<FilePreview>, String> {
+    if agent == "claude" {
+        let settings_path = settings_path()?;
+        let script_path = session_hook_script_path()?;
+        let settings = read_optional(&settings_path)?;
+        let script = read_optional(&script_path)?;
+        return claude_preview(
+            &settings_path,
+            &script_path,
+            settings.as_deref(),
+            script.as_deref(),
+            install,
+        );
+    }
+    let target = integration_target(&agent)?;
+    let current = read_optional(&target.path)?;
+    integration_preview(&target, current.as_deref(), install)
 }
 
 #[tauri::command]
@@ -870,6 +963,74 @@ mod tests {
         std::fs::write(&target.path, "export default () => {}").unwrap();
         assert!(remove_integration(&target).is_err());
         assert!(target.path.exists());
+    }
+
+    #[test]
+    fn integration_preview_matches_what_install_and_remove_do() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = target_in(dir.path(), "// kex-agent-status-v2\nnew");
+
+        let files = integration_preview(&target, None, true).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].before, None);
+        assert_eq!(files[0].after.as_deref(), Some(target.script.as_str()));
+
+        assert!(integration_preview(&target, Some(&target.script), true)
+            .unwrap()
+            .is_empty());
+
+        let files = integration_preview(&target, Some(&target.script), false).unwrap();
+        assert_eq!(files[0].before.as_deref(), Some(target.script.as_str()));
+        assert_eq!(files[0].after, None);
+
+        assert!(integration_preview(&target, None, false)
+            .unwrap()
+            .is_empty());
+        assert!(integration_preview(&target, Some("export default () => {}"), false).is_err());
+    }
+
+    #[test]
+    fn claude_preview_is_the_text_install_writes_and_touches_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = dir.path().join("settings.json");
+        let original = "{\n    \"theme\": \"dark\"\n}\n";
+        std::fs::write(&settings, original).unwrap();
+        let script = dir.path().join("trigger-event.sh");
+
+        let files = claude_preview(&settings, &script, Some(original), None, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&settings).unwrap(), original);
+        assert!(!script.exists());
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[1].before, None);
+        assert_eq!(files[1].after.as_deref(), Some(SESSION_HOOK_SCRIPT));
+
+        apply_settings(&settings, true).unwrap();
+        let written = std::fs::read_to_string(&settings).unwrap();
+        assert_eq!(files[0].after.as_deref(), Some(written.as_str()));
+
+        let removal = claude_preview(&settings, &script, Some(&written), None, false).unwrap();
+        assert_eq!(removal.len(), 1);
+        apply_settings(&settings, false).unwrap();
+        let cleaned = std::fs::read_to_string(&settings).unwrap();
+        assert_eq!(removal[0].after.as_deref(), Some(cleaned.as_str()));
+        assert!(cleaned.contains("\"theme\""));
+    }
+
+    #[test]
+    fn claude_preview_of_an_up_to_date_install_is_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = dir.path().join("settings.json");
+        apply_settings(&settings, true).unwrap();
+        let text = std::fs::read_to_string(&settings).unwrap();
+        let files = claude_preview(
+            &settings,
+            &dir.path().join("t.sh"),
+            Some(&text),
+            Some(SESSION_HOOK_SCRIPT),
+            true,
+        )
+        .unwrap();
+        assert!(files.is_empty());
     }
 
     #[test]
