@@ -61,7 +61,7 @@ type Props = {
 
 // The kind is chosen once, on creation, and a saved Action cannot switch it afterwards.
 function blankScript(): Action {
-  return { id: newActionId(), name: "", runInTerminal: true, command: "", cwdMode: "workspace", ownButton: false };
+  return { id: newActionId(), name: "", runInTerminal: true, command: "", cwdMode: "home", ownButton: false };
 }
 
 function blankApp(): Action {
@@ -79,7 +79,7 @@ function actionFromSuggestion(s: AppSuggestion): Action {
   };
 }
 
-const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "Workspace" };
+const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "This workspace" };
 
 // Both scopes side by side: Global on the left, the current workspace on the right, and a
 // drag from one column to the other moves the Action. An Action is edited in a modal, never
@@ -106,20 +106,31 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
 
   // A draft stays until the store shows an Action with its id.
   useEffect(() => {
+    if (moving.current && editing?.id === moving.current && scopes[editing.scope].actions.some((a) => a.id === moving.current)) {
+      moving.current = null;
+    }
     if (!draft || !scopes[draft.scope].actions.some((a) => a.id === draft.action.id)) return;
     handedOver.current.delete(draft.action.id);
     setDraft(null);
   });
 
+  // An Action being moved between scopes by the modal is in neither list for a moment: the
+  // modal keeps the last copy it saw until the new scope shows it.
+  const moving = useRef<string | null>(null);
+  const lastShown = useRef<Action | null>(null);
   const editedAction = (() => {
     if (!editing) return null;
     const saved = scopes[editing.scope].actions.find((a) => a.id === editing.id);
     if (saved) return saved;
-    return draft?.action.id === editing.id ? draft.action : null;
+    if (draft?.action.id === editing.id) return draft.action;
+    return moving.current === editing.id ? lastShown.current : null;
   })();
+  if (editedAction) lastShown.current = editedAction;
+  const editedSaved =
+    !!editing && (moving.current === editing.id || lists.global.some((a) => a.id === editing.id) || lists.workspace.some((a) => a.id === editing.id));
 
   const change = (scope: Scope, current: Action, next: Action) => {
-    if (removing.current.has(current.id)) return;
+    if (removing.current.has(current.id) || moving.current === current.id) return;
     const owned = ownedAfterEdit(current, next);
     const target = scopesRef.current[scope];
     if (target.actions.some((a) => a.id === current.id)) {
@@ -143,7 +154,24 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
     Promise.resolve(scopes[scope].onAdd(actionFromSuggestion(s))).catch(() => {});
   };
 
+  // The modal's scope radio: a saved Action moves like a drag does, an empty draft only changes
+  // where it will be added. A draft the store has not echoed yet stays where it was sent.
+  const switchScope = (to: Scope) => {
+    if (!editing || to === editing.scope || !scopes[to].available) return;
+    const { id, scope: from } = editing;
+    if (lists[from].some((a) => a.id === id)) {
+      moving.current = id;
+      onMove(from, to, id);
+    } else if (handedOver.current.has(id)) {
+      return;
+    } else {
+      setDraft((d) => (d?.action.id === id ? { scope: to, action: d.action } : d));
+    }
+    setEditing({ scope: to, id });
+  };
+
   const closeEditor = () => {
+    moving.current = null;
     setEditing(null);
     setDraft((d) => (d && !handedOver.current.has(d.action.id) ? null : d));
   };
@@ -220,7 +248,6 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
               onAddApp={(s) => addApp(scope, s)}
               onEdit={(id) => setEditing({ scope, id })}
               onRemove={(action) => remove(scope, action)}
-              onChange={(action, next) => change(scope, action, next)}
             />
           ))}
         </div>
@@ -239,7 +266,9 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
           action={editedAction}
           context={scopes[editing.scope].context}
           scope={editing.scope}
-          saved={scopes[editing.scope].actions.some((a) => a.id === editing.id)}
+          saved={editedSaved}
+          workspaceAvailable={workspace.available}
+          onScopeChange={switchScope}
           onChange={(next) => change(editing.scope, editedAction, next)}
           onClose={closeEditor}
         />
@@ -259,7 +288,6 @@ type ColumnProps = {
   onAddApp: (s: AppSuggestion) => void;
   onEdit: (id: string) => void;
   onRemove: (action: Action) => void;
-  onChange: (action: Action, next: Action) => void;
 };
 
 function Column({
@@ -273,7 +301,6 @@ function Column({
   onAddApp,
   onEdit,
   onRemove,
-  onChange,
 }: ColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnDropId(scope), disabled: !editor.available });
   const available = useMemo(() => uninstalledSuggestions(suggestions, editor.actions), [suggestions, editor.actions]);
@@ -318,7 +345,6 @@ function Column({
                         key={action.id}
                         action={action}
                         preset={action.appId !== undefined}
-                        onToggleButton={(own) => onChange(action, { ...action, ownButton: own })}
                         onEdit={() => onEdit(action.id)}
                         onRemove={() => onRemove(action)}
                       />

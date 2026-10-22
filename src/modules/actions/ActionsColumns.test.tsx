@@ -111,21 +111,21 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("the pencil opens a modal with Run in before the name for a script, and no Run in for an app", () => {
+  it("the pencil opens a modal with Run in folder before the name for a script, and no Run in for an app", () => {
     const script = mount([saved]);
     click(pencil(script.container));
-    const runIn = document.querySelector("[aria-label='Run in']")!;
+    const runIn = document.querySelector("[aria-label='Run in folder']")!;
     expect(runIn).not.toBeNull();
     expect(runIn.compareDocumentPosition(nameField()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(commandField()!.value).toBe("pnpm dev");
-    click(dialogButton("Close"));
+    click(dialogButton("Done"));
     expect(commandField()).toBeNull();
     script.unmount();
     const app = mount([savedApp]);
     click(pencil(app.container));
-    expect(document.querySelector("[aria-label='Run in']")).toBeNull();
+    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     expect(commandField()!.value).toBe("zed {filepath}");
-    click(dialogButton("Close"));
+    click(dialogButton("Done"));
     app.unmount();
   });
 
@@ -154,7 +154,7 @@ describe("ActionsColumns", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
     click(options()[0]);
-    click(dialogButton("Close"));
+    click(dialogButton("Done"));
     expect(commandField()).toBeNull();
     expect(g.onAdd).not.toHaveBeenCalled();
     unmount();
@@ -188,7 +188,7 @@ describe("ActionsColumns", () => {
     click(addTrigger(container, "global"));
     click(options().find((o) => o.textContent?.includes("Custom app")));
     expect(g.onAdd).not.toHaveBeenCalled();
-    expect(document.querySelector("[aria-label='Run in']")).toBeNull();
+    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     typeField(commandField()!, "code {filepath}");
     expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {filepath}" });
     unmount();
@@ -259,16 +259,6 @@ describe("ActionsColumns", () => {
     expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ command: "pnpm build" }));
   });
 
-  it("the Button checkbox of a row toggles the flag, and is never disabled", () => {
-    const own = (id: string): Action => ({ id, name: id, runInTerminal: true, command: "x", cwdMode: "workspace", ownButton: true });
-    const { container, g, unmount } = mount([own("a"), own("b"), own("c"), own("d"), saved]);
-    const boxes = [...container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
-    expect(boxes.some((b) => b.disabled)).toBe(false);
-    click(boxes[boxes.length - 1]);
-    expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ ownButton: true }));
-    unmount();
-  });
-
   it("editing a preset is the same modal; a changed command makes it the user's own", () => {
     const { container, g, unmount } = mount([preset]);
     click(pencil(container));
@@ -278,14 +268,83 @@ describe("ActionsColumns", () => {
     expect(g.onUpdate).toHaveBeenCalledTimes(1);
     const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
     expect(id).toBe("ac-3");
-    expect(next).toMatchObject({ command: "zed -n {workspace}", appId: "" });
+    expect(next).toMatchObject({ command: "zed -n {workspace}", appId: "", iconId: "zed" });
     unmount();
   });
 
-  it("toggling Button on a preset keeps it a preset", () => {
-    const { container, g, unmount } = mount([preset]);
-    click(container.querySelector("button[role='checkbox']"));
-    expect(g.onUpdate).toHaveBeenCalledWith("ac-3", expect.objectContaining({ ownButton: true, appId: "zed" }));
+  it("rows carry no Button checkbox, and a double click on the body opens the modal", () => {
+    const { container, unmount } = mount([saved]);
+    expect(container.querySelector("button[role='checkbox']")).toBeNull();
+    act(() => void container.querySelector("[data-action-row] .truncate")!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    expect(commandField()!.value).toBe("pnpm dev");
+    unmount();
+  });
+
+  it("a double click on a row button does not open the modal", () => {
+    const { container, unmount } = mount([preset]);
+    act(() => void container.querySelector("button[aria-label='Remove action']")!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    expect(commandField()).toBeNull();
+    unmount();
+  });
+
+  it("names the second column This workspace, with the workspace name under it", () => {
+    const { container, unmount } = mount([], []);
+    const workspace = column(container, "workspace").textContent ?? "";
+    expect(workspace).toContain("This workspace");
+    expect(workspace).toContain("Dashboard");
+    unmount();
+  });
+
+  it("the modal chooses own button or combo with a radio and shows how it will look", () => {
+    const view = mount([saved]);
+    click(pencil(view.container));
+    const preview = () => document.querySelector("[data-own-button-preview]")!.getAttribute("data-own-button-preview");
+    expect(preview()).toBe("combo");
+    click(document.querySelector("[aria-label='Where it shows in the header'] [role='radio'][value='button']"));
+    expect(view.g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ ownButton: true }));
+    view.unmount();
+    const own = mount([{ ...saved, ownButton: true }]);
+    click(pencil(own.container));
+    expect(preview()).toBe("button");
+    own.unmount();
+  });
+
+  it("the modal scope radio moves a saved Action to the other scope and stays open", () => {
+    const { container, onMove, unmount } = mount([saved], []);
+    click(pencil(container));
+    click(document.querySelector("[aria-label='Where it is available'] [role='radio'][value='workspace']"));
+    expect(onMove).toHaveBeenCalledWith("global", "workspace", "ac-1");
+    expect(commandField()!.value).toBe("pnpm dev");
+    unmount();
+  });
+
+  it("the scope radio of a new draft only changes where it will be added", () => {
+    const { container, g, w, onMove, unmount } = mount([], []);
+    click(addTrigger(container, "global"));
+    click(options()[0]);
+    click(document.querySelector("[aria-label='Where it is available'] [role='radio'][value='workspace']"));
+    expect(onMove).not.toHaveBeenCalled();
+    typeField(commandField()!, "pnpm test");
+    expect(g.onAdd).not.toHaveBeenCalled();
+    expect(w.onAdd).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("offers no workspace in the scope radio when no workspace is open", () => {
+    const { container, unmount } = mount([saved], [], { workspace: { available: false } });
+    click(pencil(container));
+    const radio = document.querySelector("[aria-label='Where it is available'] [role='radio'][value='workspace']") as HTMLButtonElement;
+    expect(radio.disabled).toBe(true);
+    unmount();
+  });
+
+  it("a new command runs in Home unless told otherwise, and the folder choice says so", () => {
+    const { container, g, unmount } = mount([], []);
+    click(addTrigger(container, "global"));
+    click(options()[0]);
+    expect(document.querySelector("[aria-label='Run in folder']")!.textContent).toContain("Home");
+    typeField(commandField()!, "pnpm test");
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ cwdMode: "home" });
     unmount();
   });
 
@@ -300,8 +359,8 @@ describe("ActionsColumns", () => {
   it("opens the Action a focus request names, in its scope's modal", () => {
     const view = mount([saved], [savedApp], { focusRequest: { scope: "workspace", id: "ac-2", nonce: 1 } });
     expect(commandField()!.value).toBe("zed {filepath}");
-    expect(document.body.textContent).toContain("Workspace");
-    click(dialogButton("Close"));
+    expect(document.body.textContent).toContain("This workspace");
+    click(dialogButton("Done"));
     expect(commandField()).toBeNull();
     view.unmount();
   });

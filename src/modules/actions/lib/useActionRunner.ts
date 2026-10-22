@@ -1,7 +1,8 @@
-import { useCallback, type MutableRefObject } from "react";
+import { useCallback, useEffect, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import { IS_WINDOWS } from "@/lib/platform";
 import { newTabId } from "@/lib/ids";
+import { cachedHomeDir, primeHomeDir } from "@/lib/homeDir";
 import { native } from "@/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -96,7 +97,12 @@ function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overl
     hibernated: !!ws.hibernated,
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
     vars: { ...buildCommandVars(focused, ws, info, getSystemInfo().host), ...overlay?.vars },
-    folders: { focusFolder: overlay?.focusFolder ?? deps.focusFolder.current, workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },
+    folders: {
+      focusFolder: overlay?.focusFolder ?? deps.focusFolder.current,
+      workspaceRoot: ws.workspaceRoot,
+      workspaceCwd: ws.cwd,
+      home: cachedHomeDir(),
+    },
     link: action.runInTerminal ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
     atPaneLimit: allPanes(ws.paneTree).length >= workspacePaneLimit,
@@ -118,6 +124,10 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     terminalHandles,
     scriptCommandSeen,
   } = deps;
+
+  useEffect(() => {
+    void primeHomeDir();
+  }, []);
 
   const scheduleWrite = useCallback(
     (tabId: string, input: string, delay: number) => {

@@ -83,10 +83,18 @@ describe("resolveScriptCwd", () => {
     ).toBe("/Users/me/project");
   });
 
-  it("an absent mode behaves as workspace and ignores the fixed folder", () => {
-    expect(resolveScriptCwd({ ...base, mode: undefined })).toBe(
-      "/Users/me/project",
-    );
+  it("an absent mode behaves as home and ignores the fixed folder", () => {
+    expect(resolveScriptCwd({ ...base, mode: undefined, home: "/Users/me" })).toBe("/Users/me");
+    expect(resolveScriptCwd({ ...base, mode: "home", home: "/Users/me", fixedFolder: "/x" })).toBe("/Users/me");
+  });
+
+  it("home with no known home leaves the folder to the terminal", () => {
+    expect(resolveScriptCwd({ ...base, mode: "home" })).toBeUndefined();
+    expect(resolveScriptCwd({ ...base, mode: "home", home: "  " })).toBeUndefined();
+  });
+
+  it("workspace mode keeps using the workspace folder", () => {
+    expect(resolveScriptCwd({ ...base, mode: "workspace", home: "/Users/me" })).toBe("/Users/me/project");
   });
 });
 

@@ -24,9 +24,9 @@ type Props = {
   onPickApp: (suggestion: AppSuggestion) => void;
 };
 
-// The one Add control of a column: a searchable combo whose first entry is Add Command, then
-// one alphabetical entry per detected app preset (icon, and under it what the preset points
-// at) and the custom app. Presets keep the combo open so several can be installed in a row;
+// The one Add control of a column: a searchable combo whose first entries are Add Command and
+// the custom app, then one alphabetical entry per detected app preset (icon, and under it what
+// the preset points at). Presets keep the combo open so several can be installed in a row;
 // the entries that open an editor close it. Installed presets never show up in the list.
 export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
   const [open, setOpen] = useState(false);
@@ -43,7 +43,7 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
       <PopoverContent align="start" container={host} className="pointer-events-auto w-[320px] p-0">
         <Command>
           <CommandInput placeholder="Search..." />
-          <CommandList className="max-h-64">
+          <CommandList className="max-h-[min(34rem,calc(var(--radix-popover-content-available-height,34rem)-3.5rem))]">
             <CommandEmpty>Nothing found.</CommandEmpty>
             <CommandGroup>
               <CommandItem
@@ -60,6 +60,20 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 </span>
                 <span className="min-w-0 flex-1 truncate">Add Command</span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">runs in a terminal</span>
+              </CommandItem>
+              <CommandItem
+                value={CUSTOM_APP_SUGGESTION.key}
+                onSelect={() => {
+                  setOpen(false);
+                  onPickApp(CUSTOM_APP_SUGGESTION);
+                }}
+                className="text-[12px]"
+              >
+                <span className="flex size-5 shrink-0 items-center justify-center">
+                  <ActionIcon action={{ runInTerminal: false }} size={13} />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{CUSTOM_APP_SUGGESTION.name}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">write the command yourself</span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -86,20 +100,6 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                   </CommandItem>
                 );
               })}
-              <CommandItem
-                value={CUSTOM_APP_SUGGESTION.key}
-                onSelect={() => {
-                  setOpen(false);
-                  onPickApp(CUSTOM_APP_SUGGESTION);
-                }}
-                className="text-[12px]"
-              >
-                <span className="flex size-5 shrink-0 items-center justify-center">
-                  <ActionIcon action={{ runInTerminal: false }} size={13} />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{CUSTOM_APP_SUGGESTION.name}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">write the command yourself</span>
-              </CommandItem>
             </CommandGroup>
           </CommandList>
         </Command>
