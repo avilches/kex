@@ -1,4 +1,4 @@
-import { type AgentId } from "./integrations";
+import type { AgentId } from "./integrations";
 
 export const AGENT_IDS = ["claude", "opencode", "omp", "pi"] as const satisfies readonly AgentId[];
 
