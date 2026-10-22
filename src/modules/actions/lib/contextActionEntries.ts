@@ -1,4 +1,4 @@
-import { actionAvailability, actionRowTitle, actionSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
+import { actionAvailability, actionRowTitle, scriptSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
 import type { Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -31,7 +31,7 @@ export function contextActionEntries(
     if (action.command.trim() === "") continue;
     if (actionTarget(action.command) !== TARGETS[kind]) continue;
     const name = action.name.trim() || "Action";
-    const subtitle = actionSubtitle(name, ctx);
+    const subtitle = scriptSubtitle({ ...action, name }, ctx);
     const reason = actionAvailability(action, ctx);
     rows.push({
       action,

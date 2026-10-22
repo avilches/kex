@@ -42,7 +42,7 @@ import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor"
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { splitActionName } from "./lib/actionName";
-import { actionSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
+import { scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
 import {
   actionProblems,
   CWD_MODE_LABELS,
@@ -97,7 +97,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
   const display = action.name.trim() || "Name";
   const { main: displayMain, variable: displayVariable } = splitActionName(display);
-  const subtitle = actionSubtitle(display, SETTINGS_LABELS);
+  const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
 
   // The latest values for the unmount flush, which closes over nothing else. An immutable
   // row holds nothing pending, so its flush saves nothing and is skipped.

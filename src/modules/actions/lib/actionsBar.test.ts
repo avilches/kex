@@ -24,6 +24,7 @@ import {
   resolveDrop,
   SETTINGS_LABELS,
   scriptsFirst,
+  scriptSubtitle,
   soleAppButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
@@ -387,6 +388,32 @@ describe("actionSubtitle", () => {
     expect(actionSubtitle("X {stage}", ctx)).toEqual({ text: "{stage}", startTrim: false });
     expect(actionSubtitle("dev", ctx)).toEqual({ text: null, startTrim: false });
     expect(actionSubtitle("PyCharm {workspace}", null)).toEqual({ text: WORKSPACE_UNSET, startTrim: false });
+  });
+});
+
+describe("scriptSubtitle", () => {
+  const script = (over: Partial<Action> = {}) => ({ name: "dev", runInTerminal: true, ...over });
+
+  it("says where a script runs when its name has no variable", () => {
+    expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Workspace", startTrim: false });
+    expect(scriptSubtitle(script({ cwdMode: "context" }), ctx)).toEqual({ text: "/p", startTrim: true });
+    expect(scriptSubtitle(script({ cwdMode: "fixed", cwd: "/srv/app" }), ctx)).toEqual({ text: "/srv/app", startTrim: true });
+  });
+
+  it("uses the generic words in Settings, which has no folder to show", () => {
+    expect(scriptSubtitle(script({ cwdMode: "context" }), SETTINGS_LABELS).text).toBe("Current folder");
+    expect(scriptSubtitle(script(), SETTINGS_LABELS).text).toBe("Workspace");
+  });
+
+  it("falls back to the generic words with no folder, and says when the root is missing", () => {
+    expect(scriptSubtitle(script({ cwdMode: "context" }), { ...ctx, vars: { ...vars, cwd: "" } }).text).toBe("Current folder");
+    expect(scriptSubtitle(script(), { ...ctx, vars: { ...vars, workspace: "" } }).text).toBe(WORKSPACE_UNSET);
+    expect(scriptSubtitle(script({ cwdMode: "fixed" }), ctx).text).toBeNull();
+  });
+
+  it("keeps the subtitle of the variable in the name, and leaves apps alone", () => {
+    expect(scriptSubtitle(script({ name: "Agent {cwd}", cwdMode: "fixed", cwd: "/x" }), ctx).text).toBe("/p");
+    expect(scriptSubtitle({ name: "dev", runInTerminal: false }, ctx).text).toBeNull();
   });
 });
 
