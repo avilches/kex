@@ -45,17 +45,18 @@ export function buildClosedTabEntries(
   for (const record of [...records].sort(sortClosed)) {
     const identity = `${record.kind}\0${record.path}`;
     if (live.has(identity) || seen.has(identity)) continue;
-    seen.add(identity);
     const ws = byId.get(record.workspaceId);
+    if (!ws) continue;
+    seen.add(identity);
     out.push({
       ...record,
       key: closedRowKey(record),
       title: pathBasename(record.path, { tolerateTrailingSlash: true }) || record.path,
       detail: record.path,
-      workspaceTitle: ws ? workspaceTitle(ws) : "",
-      workspaceColor: ws ? resolveWorkspaceColor(ws.color, ws.id) : null,
-      workspaceIcon: ws?.icon ?? null,
-      hibernated: !!ws?.hibernated,
+      workspaceTitle: workspaceTitle(ws),
+      workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
+      workspaceIcon: ws.icon ?? null,
+      hibernated: !!ws.hibernated,
     });
   }
   return out;

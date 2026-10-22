@@ -52,9 +52,14 @@ describe("buildClosedTabEntries", () => {
     expect(out[0]?.detail).toBe("/work/api/");
   });
 
-  it("leaves the workspace blank when it no longer exists", () => {
-    const out = buildClosedTabEntries([record("/work/api", { workspaceId: "gone" })], [], [], title);
-    expect(out[0]?.workspaceTitle).toBe("");
+  it("drops the entries of workspaces that are not in this window", () => {
+    const out = buildClosedTabEntries(
+      [record("/work/api", { workspaceId: "other-window" }), record("/work/ui")],
+      [workspace("ws-1")],
+      [],
+      title,
+    );
+    expect(out.map((e) => e.path)).toEqual(["/work/ui"]);
   });
 
   it("sorts by uses, then by last use", () => {
