@@ -79,8 +79,21 @@ export function normalizeActions(raw: unknown): Action[] {
 // Adds an action to a list it does not belong to. When its id is already taken there, it gets
 // a fresh one, so neither version is lost.
 export function adoptAction(list: readonly Action[], action: Action, makeId: () => string): Action[] {
-  const taken = list.some((a) => a.id === action.id);
-  return [...list, taken ? { ...action, id: makeId() } : action];
+  return adoptActionAt(list, action, makeId).list;
+}
+
+// The same, placed before the Action `beforeId` when the list has it, last otherwise.
+export function adoptActionAt(
+  list: readonly Action[],
+  action: Action,
+  makeId: () => string,
+  beforeId?: string,
+): { list: Action[]; stored: Action } {
+  const stored = list.some((a) => a.id === action.id) ? { ...action, id: makeId() } : action;
+  const next = [...list];
+  const at = beforeId ? next.findIndex((a) => a.id === beforeId) : -1;
+  next.splice(at === -1 ? next.length : at, 0, stored);
+  return { list: next, stored };
 }
 
 // Moves, never copies: the action leaves the workspace and joins the global list.

@@ -503,44 +503,75 @@ describe("resolveDrop", () => {
     global: over.global ?? false,
     action: over.script ? script({ id }) : app({ id }),
   });
-  const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true })];
-  const menu = [b("m1"), b("m2"), b("ms", { script: true }), b("mg", { global: true }), b("mg2", { global: true })];
+  const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true }), b("g2", { global: true })];
+  const menu = [
+    b("m1"),
+    b("m2"),
+    b("ms", { script: true }),
+    b("mg", { global: true }),
+    b("mg2", { global: true }),
+    b("mgs", { global: true, script: true }),
+  ];
   const row = (id: string) => `${MENU_DRAG_PREFIX}${id}`;
-  const drop = (active: string, over: string) => resolveDrop(bar, menu, active, over);
+  const drop = (active: string, over: string, after = false) => resolveDrop(bar, menu, active, over, after);
+  const base = { wasButton: true, button: true };
 
-  it("reorders a button over another of its scope and kind, in its place", () => {
-    expect(drop("w1", "w2")).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: true, beforeId: "w2" });
+  it("reorders a button over another of its scope and kind, never over the other kind", () => {
+    expect(drop("w1", "w2")).toEqual({ id: "w1", from: "workspace", to: "workspace", ...base, reorderOver: "w2" });
     expect(drop("w1", "ws")).toBeNull();
   });
 
-  it("moves a button to the other scope over a button or the frame of that scope", () => {
-    expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: true });
-    expect(drop("w1", DROP_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: true });
-    expect(drop("g1", DROP_WORKSPACE)).toEqual({ id: "g1", from: "global", to: "workspace", wasButton: true, button: true });
+  it("moves a button to the other scope before the button it lands on, or after it past the middle", () => {
+    expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g1" });
+    expect(drop("w1", "g1", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g2" });
+    expect(drop("w1", "g2", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
+    expect(drop("w1", DROP_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
+    expect(drop("g1", DROP_WORKSPACE)).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
     expect(drop("w1", DROP_WORKSPACE)).toBeNull();
   });
 
-  it("hides a button on the menu trigger, a menu section or a menu row, in the scope it lands in", () => {
-    expect(drop("w1", DROP_MENU)).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false });
-    expect(drop("w1", DROP_MENU_WORKSPACE)).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false });
-    expect(drop("w1", DROP_MENU_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: false });
-    expect(drop("w1", row("m1"))).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false, beforeId: "m1" });
-    expect(drop("w1", row("mg"))).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: false });
+  it("hides a button on the trigger, a section or a row, placing it among its kind in the menu", () => {
+    const hid = { wasButton: true, button: false };
+    expect(drop("w1", DROP_MENU)).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid });
+    expect(drop("w1", DROP_MENU_WORKSPACE)).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid });
+    expect(drop("w1", DROP_MENU_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", ...hid });
+    expect(drop("w1", row("m1"))).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid, reorderOver: "m1" });
+    expect(drop("w1", row("mg"))).toEqual({ id: "w1", from: "workspace", to: "global", ...hid, placeBefore: "mg" });
+    expect(drop("w1", row("mg"), true)).toEqual({ id: "w1", from: "workspace", to: "global", ...hid, placeBefore: "mg2" });
   });
 
-  it("reorders a menu row over another of its scope and kind and moves it across scopes", () => {
-    expect(drop(row("m1"), row("m2"))).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: false, beforeId: "m2" });
+  it("refuses a row of the other kind in a menu section that has some of its own kind", () => {
+    expect(drop("w1", row("ms"))).toBeNull();
+    expect(drop("w1", row("mgs"))).toBeNull();
+  });
+
+  it("lets a section with none of its kind take the Action on any of its rows", () => {
+    const noScripts = menu.filter((i) => i.id !== "mgs");
+    expect(resolveDrop(bar, noScripts, "ws", row("mg"))).toEqual({
+      id: "ws",
+      from: "workspace",
+      to: "global",
+      wasButton: true,
+      button: false,
+    });
+  });
+
+  it("reorders a menu row over another of its scope and kind and moves it across scopes in place", () => {
+    const own = { wasButton: false, button: false };
+    expect(drop(row("m1"), row("m2"))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...own, reorderOver: "m2" });
     expect(drop(row("m1"), row("ms"))).toBeNull();
-    expect(drop(row("m1"), row("mg"))).toEqual({ id: "m1", from: "workspace", to: "global", wasButton: false, button: false });
-    expect(drop(row("mg"), DROP_MENU_WORKSPACE)).toEqual({ id: "mg", from: "global", to: "workspace", wasButton: false, button: false });
+    expect(drop(row("m1"), row("mg"))).toEqual({ id: "m1", from: "workspace", to: "global", ...own, placeBefore: "mg" });
+    expect(drop(row("m1"), row("mg"), true)).toEqual({ id: "m1", from: "workspace", to: "global", ...own, placeBefore: "mg2" });
+    expect(drop(row("mg"), DROP_MENU_WORKSPACE)).toEqual({ id: "mg", from: "global", to: "workspace", ...own });
     expect(drop(row("m1"), DROP_MENU_WORKSPACE)).toBeNull();
   });
 
-  it("shows a menu row as a button over a button or a frame of the bar, even of the other scope", () => {
-    expect(drop(row("m1"), "w2")).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true, beforeId: "w2" });
-    expect(drop(row("m1"), "ws")).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true });
-    expect(drop(row("m1"), DROP_WORKSPACE)).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true });
-    expect(drop(row("m1"), DROP_GLOBAL)).toEqual({ id: "m1", from: "workspace", to: "global", wasButton: false, button: true });
+  it("shows a menu row as a button over a button or a frame of the bar, in any scope", () => {
+    const show = { wasButton: false, button: true };
+    expect(drop(row("m1"), "w2")).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, reorderOver: "w2" });
+    expect(drop(row("m1"), "ws")).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
+    expect(drop(row("m1"), DROP_WORKSPACE)).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
+    expect(drop(row("m1"), DROP_GLOBAL)).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
   });
 
   it("makes the menu trigger no target for a row, and ignores itself and the unknown", () => {

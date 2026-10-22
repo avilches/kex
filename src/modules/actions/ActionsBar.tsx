@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   type CollisionDetection,
+  type Collision,
+  type Modifier,
   DndContext,
   DragOverlay,
   MeasuringStrategy,
@@ -19,7 +21,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import {
   ArrowDown01Icon,
   CircleArrowDownDoubleIcon,
@@ -523,6 +525,19 @@ type BarProps = {
   onRestoreFocus: () => void;
 };
 
+// The ghost that follows the pointer sits next to it whatever the layout did since the drag
+// began: a section appearing in the menu moves the dragged row, and the overlay, which is
+// placed from the row, would otherwise carry that shift as an offset from the pointer.
+const followPointer: Modifier = ({ activatorEvent, activeNodeRect, overlayNodeRect, transform }) => {
+  const start = activatorEvent ? getEventCoordinates(activatorEvent) : null;
+  if (!start || !activeNodeRect) return transform;
+  return {
+    ...transform,
+    x: transform.x + start.x - activeNodeRect.left - 16,
+    y: transform.y + start.y - activeNodeRect.top - (overlayNodeRect?.height ?? 32) / 2,
+  };
+};
+
 const isZone = (id: string | number) => String(id).startsWith("zone:") || String(id).startsWith("mzone:");
 
 // The Header's actions: own buttons in the user's order, then the single Actions menu of
@@ -577,13 +592,49 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const workspaceButtons = model.buttons.filter((b) => !b.global);
   const globalButtons = model.buttons.filter((b) => b.global);
   const dragging = draggingId !== null;
-  // The pointer decides what is under the drag, a button or row before the frame around it;
-  // with none, a bar button falls back to the nearest button of its own scope.
+  const kindOf = (id: string) =>
+    (id.startsWith(MENU_DRAG_PREFIX)
+      ? menuItems.find((i) => i.id === id.slice(MENU_DRAG_PREFIX.length))
+      : model.buttons.find((b) => b.id === id)
+    )?.action.runInTerminal;
+  // The pointer decides what is under the drag, a button or row before the frame around it.
+  // Over a section of the menu the Action may only land among its own kind: the one under
+  // the pointer, else the nearest, and where the section has none of its kind the section
+  // itself, which takes it anywhere. With nothing under it a bar button falls back to the
+  // nearest button of its own scope.
   const collision: CollisionDetection = (args) => {
     const within = pointerWithin(args)
       .filter((c) => c.id !== args.active.id)
       .sort((a, b) => Number(isZone(a.id)) - Number(isZone(b.id)));
-    if (within.length > 0 || String(args.active.id).startsWith(MENU_DRAG_PREFIX)) return within;
+    const activeId = String(args.active.id);
+    const rowItem = (id: string | number) =>
+      String(id).startsWith(MENU_DRAG_PREFIX) ? menuItems.find((i) => i.id === String(id).slice(MENU_DRAG_PREFIX.length)) : undefined;
+    const hit = within.find((c) => rowItem(c.id) || c.id === DROP_MENU_WORKSPACE || c.id === DROP_MENU_GLOBAL);
+    if (hit) {
+      const scope = rowItem(hit.id)?.global ?? hit.id === DROP_MENU_GLOBAL;
+      const kind = kindOf(activeId);
+      const peers = menuItems.filter(
+        (i) => i.global === scope && i.action.runInTerminal === kind && `${MENU_DRAG_PREFIX}${i.id}` !== activeId,
+      );
+      const peerCollision = (id: string): Collision[] => {
+        const container = args.droppableContainers.find((c) => c.id === id);
+        return container ? [{ id, data: { droppableContainer: container, value: 0 } }] : [];
+      };
+      if (peers.length === 0) return peerCollision(scope ? DROP_MENU_GLOBAL : DROP_MENU_WORKSPACE);
+      const direct = within.find((c) => peers.some((p) => `${MENU_DRAG_PREFIX}${p.id}` === c.id));
+      if (direct) return [direct];
+      const y = args.pointerCoordinates?.y ?? 0;
+      let best: { id: string; distance: number } | undefined;
+      for (const p of peers) {
+        const id = `${MENU_DRAG_PREFIX}${p.id}`;
+        const rect = args.droppableRects.get(id);
+        if (!rect) continue;
+        const distance = Math.abs(rect.top + rect.height / 2 - y);
+        if (!best || distance < best.distance) best = { id, distance };
+      }
+      return best ? peerCollision(best.id) : within;
+    }
+    if (within.length > 0 || activeId.startsWith(MENU_DRAG_PREFIX)) return within;
     const scope = model.buttons.find((b) => b.id === args.active.id)?.global;
     const own = args.droppableContainers.filter((c) => model.buttons.some((b) => b.id === c.id && b.global === scope));
     return closestCenter({ ...args, droppableContainers: own });
@@ -596,13 +647,23 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     draggingRef.current = false;
     setDraggingId(null);
   };
-  const dragEnd = ({ active, over }: DragEndEvent) => {
+  const dragEnd = ({ active, over, activatorEvent, delta }: DragEndEvent) => {
     endDrag();
-    const drop = over ? resolveDrop(model.buttons, menuItems, String(active.id), String(over.id)) : null;
+    if (!over) return;
+    // Past the middle of what it lands on, along the axis that list runs: down in the menu,
+    // right in the bar.
+    const start = getEventCoordinates(activatorEvent);
+    const vertical = String(over.id).startsWith(MENU_DRAG_PREFIX);
+    const after = start
+      ? vertical
+        ? start.y + delta.y > over.rect.top + over.rect.height / 2
+        : start.x + delta.x > over.rect.left + over.rect.width / 2
+      : false;
+    const drop = resolveDrop(model.buttons, menuItems, String(active.id), String(over.id), after);
     if (!drop) return;
     if (drop.button !== drop.wasButton) controller.update(drop.from, drop.id, { ownButton: drop.button });
-    if (drop.to !== drop.from) controller.move(drop.from, drop.id);
-    if (drop.beforeId) controller.reorder(drop.from, drop.id, drop.beforeId);
+    if (drop.to !== drop.from) controller.move(drop.from, drop.id, drop.placeBefore);
+    if (drop.reorderOver) controller.reorder(drop.from, drop.id, drop.reorderOver);
   };
   const askDelete = (item: BarItem) => {
     if (item.action.appId) controller.remove(scopeOf(item), item.id);
@@ -666,7 +727,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
             {...controller}
           />
         </MenuDrop>
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} modifiers={[followPointer]}>
           {dragged && (
             <div className="flex h-8 items-center gap-1.5 rounded-md bg-popover px-2 text-[11px] shadow-lg ring-1 ring-foreground/10">
               <ActionIcon action={dragged.action} size={14} />

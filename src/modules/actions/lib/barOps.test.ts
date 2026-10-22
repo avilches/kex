@@ -66,9 +66,9 @@ describe("createBarOps", () => {
   it("moves to the other scope through the store that owns the Action", () => {
     const { d, ops } = setup([act("a", { ownButton: true })], [act("g1", { ownButton: true })]);
     ops.move("workspace", "a");
-    expect(d.promoteWorkspaceAction).toHaveBeenCalledWith("w1", "a");
-    ops.move("global", "g1");
-    expect(d.demoteGlobalAction).toHaveBeenCalledWith("w1", "g1");
+    expect(d.promoteWorkspaceAction).toHaveBeenCalledWith("w1", "a", undefined);
+    ops.move("global", "g1", "g2");
+    expect(d.demoteGlobalAction).toHaveBeenCalledWith("w1", "g1", "g2");
     expect(d.updateWorkspaceAction).not.toHaveBeenCalled();
   });
 

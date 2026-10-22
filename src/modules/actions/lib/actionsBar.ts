@@ -261,21 +261,35 @@ export const DROP_MENU_GLOBAL = "mzone:global";
 type Scope = "workspace" | "global";
 type Placed = Pick<BarItem, "id" | "global" | "action">;
 
-// Where a dragged Action ends up: its scope, whether it is a bar button, and the Action
-// whose place it takes when it lands on one of its own scope and kind.
-export type Drop = { id: string; from: Scope; to: Scope; wasButton: boolean; button: boolean; beforeId?: string };
+// Where a dragged Action ends up: its scope, whether it is a bar button, and its place. In
+// its own scope it takes the place of the Action it lands on (`reorderOver`, as a reorder
+// does); in another scope it is inserted before `placeBefore`, or goes last without one.
+export type Drop = {
+  id: string;
+  from: Scope;
+  to: Scope;
+  wasButton: boolean;
+  button: boolean;
+  reorderOver?: string;
+  placeBefore?: string;
+};
+
+const sameKind = (a: Placed, b: Placed) => a.action.runInTerminal === b.action.runInTerminal;
 
 // What dropping `activeId` (a bar button, or a menu row prefixed with MENU_DRAG_PREFIX) on
 // `overId` does. A button or the frame of the bar makes it a button of that scope; a row or
 // the frame of the menu makes it a menu entry of that scope; the menu trigger hides a button
-// in its own scope, and is no target for a row, which already lives there. Landing on an
-// Action of its own scope and kind also puts it in that place, so apps and scripts, which the
-// bar and the menu always draw apart, never get a position among each other.
+// in its own scope, and is no target for a row, which already lives there. Apps and scripts
+// are drawn apart, so on landing among Actions of its own kind it takes a place there (`after`
+// says the pointer is past the middle of the one it lands on), and on a row of the other kind
+// of a menu section that has some of its own kind it goes nowhere; a section with none of its
+// kind takes it anywhere, and it goes last.
 export function resolveDrop(
   buttons: readonly Placed[],
   menuItems: readonly Placed[],
   activeId: string,
   overId: string,
+  after = false,
 ): Drop | null {
   const fromMenu = activeId.startsWith(MENU_DRAG_PREFIX);
   const id = fromMenu ? activeId.slice(MENU_DRAG_PREFIX.length) : activeId;
@@ -286,6 +300,7 @@ export function resolveDrop(
   let to: Scope;
   let button: boolean;
   let over: Placed | undefined;
+  let list: readonly Placed[] = [];
   if (overId === DROP_MENU) {
     if (fromMenu) return null;
     to = fromScope;
@@ -301,19 +316,39 @@ export function resolveDrop(
     if (!over) return null;
     to = scopeOf(over.global);
     button = false;
+    list = menuItems;
   } else {
     over = buttons.find((i) => i.id === overId);
     if (!over) return null;
     to = scopeOf(over.global);
     button = true;
+    list = buttons;
   }
-  const beforeId =
-    over && to === fromScope && over.id !== from.id && over.action.runInTerminal === from.action.runInTerminal
-      ? over.id
-      : undefined;
   const wasButton = !fromMenu;
-  if (to === fromScope && button === wasButton && !beforeId) return null;
-  return { id: from.id, from: fromScope, to, wasButton, button, ...(beforeId ? { beforeId } : {}) };
+  let reorderOver: string | undefined;
+  let placeBefore: string | undefined;
+  if (over && over.id !== from.id) {
+    const peers = list.filter((i) => scopeOf(i.global) === to && sameKind(i, from) && i.id !== from.id);
+    if (sameKind(over, from)) {
+      if (to === fromScope) reorderOver = over.id;
+      else {
+        const next = peers[peers.findIndex((i) => i.id === over!.id) + 1];
+        placeBefore = after ? next?.id : over.id;
+      }
+    } else if (!button && peers.length > 0) {
+      return null;
+    }
+  }
+  if (to === fromScope && button === wasButton && !reorderOver) return null;
+  return {
+    id: from.id,
+    from: fromScope,
+    to,
+    wasButton,
+    button,
+    ...(reorderOver ? { reorderOver } : {}),
+    ...(placeBefore ? { placeBefore } : {}),
+  };
 }
 
 export type BarModel = {

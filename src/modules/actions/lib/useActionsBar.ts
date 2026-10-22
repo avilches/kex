@@ -18,8 +18,8 @@ export type BarController = {
   /** Merges a patch into an Action of the given scope. */
   update: (scope: BarScope, id: string, patch: Partial<Omit<Action, "id">>) => void;
   remove: (scope: BarScope, id: string) => void;
-  /** Moves an Action to the other scope. */
-  move: (scope: BarScope, id: string) => void;
+  /** Moves an Action to the other scope, before `beforeId` there or last. */
+  move: (scope: BarScope, id: string, beforeId?: string) => void;
 };
 
 type Input = {

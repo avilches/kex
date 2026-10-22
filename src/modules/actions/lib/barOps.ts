@@ -14,8 +14,8 @@ type Deps = {
   updateWorkspaceAction: (workspaceId: string, id: string, patch: Partial<Omit<Action, "id">>) => void;
   removeWorkspaceAction: (workspaceId: string, id: string) => void;
   reorderWorkspaceActions: (workspaceId: string, fromId: string, toId: string) => void;
-  promoteWorkspaceAction: (workspaceId: string, id: string) => void;
-  demoteGlobalAction: (workspaceId: string, id: string) => void;
+  promoteWorkspaceAction: (workspaceId: string, id: string, beforeId?: string) => void;
+  demoteGlobalAction: (workspaceId: string, id: string, beforeId?: string) => void;
   global: GlobalStore;
   unlink: (before: readonly Action[], after: readonly Action[]) => void;
   fail: (message: string, err: unknown) => void;
@@ -51,11 +51,11 @@ export function createBarOps(d: Deps): BarOps {
       const ws = d.workspaceId();
       if (ws) d.removeWorkspaceAction(ws, id);
     },
-    move: (scope, id) => {
+    move: (scope, id, beforeId) => {
       const ws = d.workspaceId();
       if (!ws) return;
-      if (scope === "workspace") d.promoteWorkspaceAction(ws, id);
-      else d.demoteGlobalAction(ws, id);
+      if (scope === "workspace") d.promoteWorkspaceAction(ws, id, beforeId);
+      else d.demoteGlobalAction(ws, id, beforeId);
     },
   };
 }

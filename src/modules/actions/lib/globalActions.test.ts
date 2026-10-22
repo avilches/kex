@@ -196,3 +196,20 @@ describe("createGlobalActions.change", () => {
     expect(ids(after)).toEqual(["a"]);
   });
 });
+
+describe("createGlobalActions add with a place", () => {
+  it("inserts before the named Action and writes that order", async () => {
+    const h = harness();
+    const a = h.store.add(act("a"));
+    const b = h.store.add(act("b"));
+    const c = h.store.add(act("c"), "b");
+    expect(h.store.get().map((x) => x.id)).toEqual(["a", "c", "b"]);
+    await h.finish(0);
+    await a;
+    await h.finish(1);
+    await b;
+    await h.finish(2);
+    await c;
+    expect(h.writes[h.writes.length - 1]!.map((x) => x.id)).toEqual(["a", "c", "b"]);
+  });
+});

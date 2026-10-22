@@ -1,4 +1,4 @@
-import { adoptAction, normalizeAction, normalizeActions, removeAction } from "./actions";
+import { adoptActionAt, normalizeAction, normalizeActions, removeAction } from "./actions";
 import type { Action } from "./types";
 
 type Deps = {
@@ -31,12 +31,10 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     return current ?? read();
   };
 
-  function add(action: Action): Promise<Action> {
+  function add(action: Action, beforeId?: string): Promise<Action> {
     const clean = normalizeAction(action);
     if (!clean) return Promise.reject(new Error("Invalid action"));
-    const next = adoptAction(get(), clean, makeId);
-    const stored = next[next.length - 1];
-    if (!stored) return Promise.reject(new Error("Invalid action"));
+    const { list: next, stored } = adoptActionAt(get(), clean, makeId, beforeId);
     if (pending === 0) base = read();
     current = next;
     pending++;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addAction,
+  adoptActionAt,
   normalizeActions,
   partitionForHeader,
   promoteToGlobal,
@@ -167,5 +168,22 @@ describe("updateAction appId", () => {
     const preset: Action = { id: "a1", name: "Zed", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
     expect(updateAction([preset], "a1", { appId: "" })[0]?.appId).toBeUndefined();
     expect(updateAction([preset], "a1", { ownButton: true })[0]?.appId).toBe("zed");
+  });
+});
+
+describe("adoptActionAt", () => {
+  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: "x", ownButton: false });
+
+  it("goes before the named Action, last when it is unknown or not given", () => {
+    const list = [mk("a"), mk("b")];
+    expect(adoptActionAt(list, mk("n"), () => "fresh", "b").list.map((x) => x.id)).toEqual(["a", "n", "b"]);
+    expect(adoptActionAt(list, mk("n"), () => "fresh", "ghost").list.map((x) => x.id)).toEqual(["a", "b", "n"]);
+    expect(adoptActionAt(list, mk("n"), () => "fresh").list.map((x) => x.id)).toEqual(["a", "b", "n"]);
+  });
+
+  it("returns the stored Action, with a fresh id when its own is taken", () => {
+    const { list, stored } = adoptActionAt([mk("a")], mk("a"), () => "fresh", "a");
+    expect(stored.id).toBe("fresh");
+    expect(list.map((x) => x.id)).toEqual(["fresh", "a"]);
   });
 });

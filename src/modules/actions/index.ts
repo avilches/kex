@@ -1,6 +1,7 @@
 export {
   addAction,
   adoptAction,
+  adoptActionAt,
   normalizeAction,
   normalizeActions,
   partitionForHeader,

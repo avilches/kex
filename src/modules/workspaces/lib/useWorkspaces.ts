@@ -6,7 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import {
   addAction,
-  adoptAction,
+  adoptActionAt,
   removeAction,
   reorderActions,
   updateAction,
@@ -1048,11 +1048,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // Two steps so an action added in the same tick can still be promoted: the updater only
   // takes the action out and queues it (a Map keyed by workspace and action, so a repeated
   // updater run is harmless), and the effect below writes the global list outside any updater.
-  const promotionsRef = useRef(new Map<string, { workspaceId: string; action: Action }>());
-  const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string) => {
+  const promotionsRef = useRef(new Map<string, { workspaceId: string; action: Action; beforeId?: string }>());
+  const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string, beforeId?: string) => {
     setWorkspaces((prev) => {
       const taken = takeWorkspaceAction(prev, workspaceId, actionId);
-      if (taken.action) promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action });
+      if (taken.action) promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action, beforeId });
       return taken.workspaces;
     });
   }, []);
@@ -1061,8 +1061,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (promotionsRef.current.size === 0) return;
     const queue = [...promotionsRef.current.values()];
     promotionsRef.current.clear();
-    for (const { workspaceId, action } of queue) {
-      globalActions.add(action).catch((err: unknown) => {
+    for (const { workspaceId, action, beforeId } of queue) {
+      globalActions.add(action, beforeId).catch((err: unknown) => {
         console.error("Could not save the global action", err);
         toast.error(`Could not make "${action.name}" global; it stays in the workspace`);
         setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
@@ -1073,7 +1073,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // The inverse of the promotion: the Action leaves the global list and joins the workspace,
   // keeping its id. The global write goes first, so a failed move leaves the actions alone.
   const demoteGlobalAction = useCallback(
-    (workspaceId: string, actionId: string) => {
+    (workspaceId: string, actionId: string, beforeId?: string) => {
       const action = globalActions.get().find((a) => a.id === actionId);
       if (!action) return;
       // Adoption can mint a fresh id and leave the old one behind: its link is dropped,
@@ -1082,7 +1082,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       if (clash) unlinkRemovedActions([action], []);
       void globalActions
         .change((list) => removeAction(list, actionId))
-        .then(() => setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptAction(list, action, newActionId))))
+        .then(() => setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptActionAt(list, action, newActionId, beforeId).list)))
         .catch((err: unknown) => {
           console.error("Could not move the global action back", err);
           toast.error(`Could not move "${action.name}" to the workspace`);
