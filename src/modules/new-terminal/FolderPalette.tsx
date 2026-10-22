@@ -8,9 +8,9 @@ import {
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
@@ -29,7 +29,6 @@ type Props = {
 
 export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
   const [query, setQuery] = useState("");
-  const [selectedKey, setSelectedKey] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fresh palette on every open: no query from the previous ask.
@@ -41,13 +40,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
     () => filterFolderGroups(groups, query),
     [groups, query],
   );
-  const flat = useMemo(() => filtered.flatMap((g) => g.rows), [filtered]);
-
-  useEffect(() => {
-    if (!flat.some((r) => r.key === selectedKey)) {
-      setSelectedKey(flat[0]?.key ?? "");
-    }
-  }, [flat, selectedKey]);
+  const empty = filtered.length === 0;
 
   // The new first row is selected on every keystroke, but a list scrolled down
   // for the previous query stays where it was and hides it.
@@ -57,8 +50,6 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
       ?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]")
       ?.scrollTo({ top: 0 });
   }, [query, open]);
-
-  const empty = flat.length === 0;
 
   return (
     <CommandDialog
@@ -73,8 +64,6 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
       <Command
         shouldFilter={false}
         loop
-        value={selectedKey}
-        onValueChange={setSelectedKey}
       >
         <CommandInput
           value={query}
@@ -138,7 +127,7 @@ function GroupHeading({ group }: { group: FolderGroup }) {
         icon={group.workspaceIcon ?? undefined}
         size={14}
       />
-      <span className="min-w-0 truncate text-foreground">
+      <span className="min-w-0 truncate text-[12.5px] font-semibold text-foreground">
         {group.workspaceTitle}
       </span>
       {group.hibernated ? (
