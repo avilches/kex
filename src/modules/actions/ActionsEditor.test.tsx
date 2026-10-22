@@ -383,16 +383,12 @@ describe("ActionsEditor", () => {
     unmount();
   });
 
-  it("disables the Button checkbox of the rest once three have one, never of those that do", () => {
+  it("never disables the Button checkbox, however many buttons there already are", () => {
     const own = (id: string): Action => ({ id, name: id, runInTerminal: true, command: "x", cwdMode: "workspace", ownButton: true });
-    const full = mount([own("a"), own("b"), own("c"), { ...own("d"), ownButton: false }]);
-    const boxes = [...full.container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
-    expect(boxes.map((b) => b.disabled)).toEqual([false, false, false, true]);
-    full.unmount();
-    const room = mount([own("a"), own("b"), { ...own("c"), ownButton: false }]);
-    const open = [...room.container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
-    expect(open.some((b) => b.disabled)).toBe(false);
-    room.unmount();
+    const view = mount([own("a"), own("b"), own("c"), own("d"), { ...own("e"), ownButton: false }]);
+    const boxes = [...view.container.querySelectorAll("button[role='checkbox']")] as HTMLButtonElement[];
+    expect(boxes.some((b) => b.disabled)).toBe(false);
+    view.unmount();
   });
 
   it("lists scripts before apps and refuses to drag one kind over the other", () => {

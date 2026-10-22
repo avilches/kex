@@ -227,35 +227,19 @@ export function scriptsFirst<T extends Pick<Action, "runInTerminal">>(actions: r
   return [...actions.filter((a) => a.runInTerminal), ...actions.filter((a) => !a.runInTerminal)];
 }
 
-export const MAX_BUTTONS_PER_SCOPE = 3;
-
-// Buttons trade places only inside one scope and one kind: the bar always draws apps before
-// scripts and the workspace before the global ones, so any other drop would not stick.
-export function canReorderButtons(a: Pick<BarItem, "global" | "action">, b: Pick<BarItem, "global" | "action">): boolean {
-  return a.global === b.global && a.action.runInTerminal === b.action.runInTerminal;
-}
-
-// The own buttons the bar may draw, in order: those the place shows, with no more than
-// MAX_BUTTONS_PER_SCOPE per scope, scripts and apps together; the rest live in the menu.
-// Each list comes already in bar order, the workspace one before the global one.
+// The own buttons the bar may draw, in order: those the place shows. Each list comes already
+// in bar order, the workspace one before the global one.
 export function ownButtonCandidates(
   local: readonly Action[],
   global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
   place: FocusPlace | undefined,
 ): Action[] {
-  const out: Action[] = [];
-  for (const scope of [local, global]) {
-    let taken = 0;
-    for (const action of scope) {
-      if (!action.ownButton || taken >= MAX_BUTTONS_PER_SCOPE) continue;
-      const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
-      if (!shownAtPlace(action, state, place)) continue;
-      taken += 1;
-      out.push(action);
-    }
-  }
-  return out;
+  return [...local, ...global].filter(
+    (action) =>
+      action.ownButton &&
+      shownAtPlace(action, action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle", place),
+  );
 }
 
 // A button of a detected app that is the only one of that app in the bar needs no words:
@@ -267,68 +251,73 @@ export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "runInTe
   return new Set([...count].filter(([, n]) => n === 1).map(([id]) => id));
 }
 
-// What dropping a dragged button on `overId` does. Over another button of its own scope it
-// is a reorder (same kind only); over a button of the other scope, or over the empty
-// placeholder of that scope, it moves to that scope; over the menu it stops being a button.
-export type DropAction =
-  | { kind: "reorder"; scope: "workspace" | "global"; fromId: string; toId: string }
-  | { kind: "move"; scope: "workspace" | "global"; id: string }
-  | { kind: "hide"; scope: "workspace" | "global"; id: string };
-
 export const MENU_DRAG_PREFIX = "menu:";
-
-// A row of the menu dragged out onto the bar becomes a button of its own scope, in the place
-// of the button it lands on when that is of its kind, or at the end of the scope on its
-// empty stand-in. A scope that is full takes nothing, and a row never crosses scopes here.
-export type ShowDrop = { kind: "show"; scope: "workspace" | "global"; id: string; beforeId?: string };
-
-export function resolveMenuDrop(
-  menuItems: readonly Pick<BarItem, "id" | "global" | "action">[],
-  buttons: readonly Pick<BarItem, "id" | "global" | "action">[],
-  full: { workspace: boolean; global: boolean },
-  activeId: string,
-  overId: string,
-): ShowDrop | null {
-  if (!activeId.startsWith(MENU_DRAG_PREFIX)) return null;
-  const id = activeId.slice(MENU_DRAG_PREFIX.length);
-  const from = menuItems.find((b) => b.id === id);
-  if (!from) return null;
-  const scope = from.global ? "global" : "workspace";
-  if (full[scope]) return null;
-  if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
-    return (overId === DROP_GLOBAL) === from.global ? { kind: "show", scope, id } : null;
-  }
-  const to = buttons.find((b) => b.id === overId);
-  if (!to || to.global !== from.global) return null;
-  return { kind: "show", scope, id, ...(to.action.runInTerminal === from.action.runInTerminal ? { beforeId: to.id } : {}) };
-}
-
 export const DROP_MENU = "zone:menu";
 export const DROP_WORKSPACE = "zone:workspace";
 export const DROP_GLOBAL = "zone:global";
+export const DROP_MENU_WORKSPACE = "mzone:workspace";
+export const DROP_MENU_GLOBAL = "mzone:global";
 
+type Scope = "workspace" | "global";
+type Placed = Pick<BarItem, "id" | "global" | "action">;
+
+// Where a dragged Action ends up: its scope, whether it is a bar button, and the Action
+// whose place it takes when it lands on one of its own scope and kind.
+export type Drop = { id: string; from: Scope; to: Scope; wasButton: boolean; button: boolean; beforeId?: string };
+
+// What dropping `activeId` (a bar button, or a menu row prefixed with MENU_DRAG_PREFIX) on
+// `overId` does. A button or the frame of the bar makes it a button of that scope; a row or
+// the frame of the menu makes it a menu entry of that scope; the menu trigger hides a button
+// in its own scope, and is no target for a row, which already lives there. Landing on an
+// Action of its own scope and kind also puts it in that place, so apps and scripts, which the
+// bar and the menu always draw apart, never get a position among each other.
 export function resolveDrop(
-  buttons: readonly Pick<BarItem, "id" | "global" | "action">[],
+  buttons: readonly Placed[],
+  menuItems: readonly Placed[],
   activeId: string,
   overId: string,
-): DropAction | null {
-  const from = buttons.find((b) => b.id === activeId);
+): Drop | null {
+  const fromMenu = activeId.startsWith(MENU_DRAG_PREFIX);
+  const id = fromMenu ? activeId.slice(MENU_DRAG_PREFIX.length) : activeId;
+  const from = (fromMenu ? menuItems : buttons).find((i) => i.id === id);
   if (!from || activeId === overId) return null;
-  const scope = from.global ? "global" : "workspace";
-  if (overId === DROP_MENU) return { kind: "hide", scope, id: from.id };
-  if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
-    return (overId === DROP_GLOBAL) === from.global ? null : { kind: "move", scope, id: from.id };
+  const scopeOf = (global: boolean): Scope => (global ? "global" : "workspace");
+  const fromScope = scopeOf(from.global);
+  let to: Scope;
+  let button: boolean;
+  let over: Placed | undefined;
+  if (overId === DROP_MENU) {
+    if (fromMenu) return null;
+    to = fromScope;
+    button = false;
+  } else if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
+    to = overId === DROP_GLOBAL ? "global" : "workspace";
+    button = true;
+  } else if (overId === DROP_MENU_WORKSPACE || overId === DROP_MENU_GLOBAL) {
+    to = overId === DROP_MENU_GLOBAL ? "global" : "workspace";
+    button = false;
+  } else if (overId.startsWith(MENU_DRAG_PREFIX)) {
+    over = menuItems.find((i) => i.id === overId.slice(MENU_DRAG_PREFIX.length));
+    if (!over) return null;
+    to = scopeOf(over.global);
+    button = false;
+  } else {
+    over = buttons.find((i) => i.id === overId);
+    if (!over) return null;
+    to = scopeOf(over.global);
+    button = true;
   }
-  const to = buttons.find((b) => b.id === overId);
-  if (!to) return null;
-  if (to.global !== from.global) return { kind: "move", scope, id: from.id };
-  return canReorderButtons(from, to) ? { kind: "reorder", scope, fromId: from.id, toId: to.id } : null;
+  const beforeId =
+    over && to === fromScope && over.id !== from.id && over.action.runInTerminal === from.action.runInTerminal
+      ? over.id
+      : undefined;
+  const wasButton = !fromMenu;
+  if (to === fromScope && button === wasButton && !beforeId) return null;
+  return { id: from.id, from: fromScope, to, wasButton, button, ...(beforeId ? { beforeId } : {}) };
 }
 
 export type BarModel = {
   buttons: BarItem[];
-  /** The scope already has the most buttons it may show: nothing more can become one. */
-  full: { workspace: boolean; global: boolean };
   /** The Actions that are not own buttons, scripts and apps mixed: the workspace
    * ones first, then the global ones, each scope in the user's order. */
   menu: { workspace: BarItem[]; global: BarItem[] };
@@ -377,10 +366,8 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const ordered = [...appsFirst(local).map((a) => [a, false] as const), ...appsFirst(global).map((a) => [a, true] as const)];
-  const isFull = (list: readonly Action[]) => list.filter((a) => a.ownButton).length >= MAX_BUTTONS_PER_SCOPE;
   const model: BarModel = {
     buttons: [],
-    full: { workspace: isFull(local), global: isFull(global) },
     menu: { workspace: [], global: [] },
     empty: local.length + global.length === 0,
   };

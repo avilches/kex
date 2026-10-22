@@ -11,11 +11,10 @@ const act = (id: string, over: Partial<Action> = {}): Action => ({
   ...over,
 });
 
-function setup(workspace: Action[], global: Action[]) {
+function setup(_workspace: Action[], global: Action[]) {
   let globalList = global;
   const d = {
     workspaceId: () => "w1" as string | undefined,
-    workspaceActions: () => workspace,
     updateWorkspaceAction: vi.fn(),
     removeWorkspaceAction: vi.fn(),
     reorderWorkspaceActions: vi.fn(),
@@ -64,29 +63,17 @@ describe("createBarOps", () => {
     await vi.waitFor(() => expect(d.fail).toHaveBeenCalledWith("Could not save the actions", expect.any(Error)));
   });
 
-  it("moves to the other scope and keeps the button when there is room", () => {
+  it("moves to the other scope through the store that owns the Action", () => {
     const { d, ops } = setup([act("a", { ownButton: true })], [act("g1", { ownButton: true })]);
     ops.move("workspace", "a");
-    expect(d.updateWorkspaceAction).not.toHaveBeenCalled();
     expect(d.promoteWorkspaceAction).toHaveBeenCalledWith("w1", "a");
     ops.move("global", "g1");
     expect(d.demoteGlobalAction).toHaveBeenCalledWith("w1", "g1");
+    expect(d.updateWorkspaceAction).not.toHaveBeenCalled();
   });
 
-  it("sends a moved button to the menu when the other scope already has three", () => {
-    const full = ["g1", "g2", "g3"].map((id) => act(id, { ownButton: true }));
-    const { d, ops } = setup([act("a", { ownButton: true }), act("b")], full);
-    ops.move("workspace", "a");
-    expect(d.updateWorkspaceAction).toHaveBeenCalledWith("w1", "a", { ownButton: false });
-    expect(d.promoteWorkspaceAction).toHaveBeenCalledWith("w1", "a");
-    ops.move("workspace", "b");
-    expect(d.updateWorkspaceAction).toHaveBeenCalledTimes(1);
-  });
-
-  it("does nothing without an active workspace or for an unknown Action", () => {
+  it("does nothing without an active workspace", () => {
     const { d, ops } = setup([act("a")], []);
-    ops.move("workspace", "nope");
-    expect(d.promoteWorkspaceAction).not.toHaveBeenCalled();
     d.workspaceId = () => undefined;
     ops.move("workspace", "a");
     ops.update("workspace", "a", {});

@@ -119,7 +119,7 @@ describe("OwnButton", () => {
 });
 
 describe("ActionsMenu", () => {
-  function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false)) {
+  function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false), extra: { dragging?: boolean; reorderMode?: boolean } = {}) {
     const handlers = { run: vi.fn(), stop: vi.fn(), focus };
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -130,6 +130,10 @@ describe("ActionsMenu", () => {
           label: "Actions",
           items,
           globalItems,
+          reorderMode: extra.reorderMode ?? false,
+          dragging: extra.dragging ?? false,
+          ops: { update: vi.fn(), move: vi.fn() },
+          onDelete: vi.fn(),
           onRestoreFocus: vi.fn(),
           onConfigure: vi.fn(),
           ...handlers,
@@ -195,6 +199,25 @@ describe("ActionsMenu", () => {
     const stop = document.querySelector("button[aria-label='Stop dev']") as HTMLElement;
     act(() => void stop.click());
     expect(view.handlers.stop).toHaveBeenCalledWith(script);
+    view.unmount();
+  });
+
+  it("during a drag shows both section titles, empty or not, and says where to drop in the empty one", () => {
+    const view = mountMenu([item(app)], [], vi.fn(() => false), { dragging: true });
+    view.open();
+    const menu = document.querySelector("[role='menu']")!;
+    expect(menu.textContent).toContain("Workspace actions");
+    expect(menu.textContent).toContain("Global actions");
+    expect(menu.textContent).toContain("Drop here");
+    view.unmount();
+  });
+
+  it("with the reorder modifier held a click on a row does nothing", () => {
+    const view = mountMenu([item(script)], [], vi.fn(() => false), { reorderMode: true });
+    view.open();
+    const row = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "dev") as HTMLElement;
+    act(() => void row.click());
+    expect(view.handlers.run).not.toHaveBeenCalled();
     view.unmount();
   });
 

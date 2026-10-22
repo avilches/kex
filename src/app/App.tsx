@@ -3656,7 +3656,6 @@ export default function App() {
     () =>
       createBarOps({
         workspaceId: () => activeWorkspaceIdRef.current ?? undefined,
-        workspaceActions: (id) => workspacesRef.current.find((w) => w.id === id)?.actions ?? [],
         updateWorkspaceAction,
         removeWorkspaceAction,
         reorderWorkspaceActions,

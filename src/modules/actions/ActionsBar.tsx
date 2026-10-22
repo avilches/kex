@@ -4,16 +4,21 @@ import {
   type CollisionDetection,
   DndContext,
   DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   pointerWithin,
-  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowDown01Icon,
@@ -25,6 +30,7 @@ import {
   Settings01Icon,
   StopIcon,
   Tick02Icon,
+  ViewIcon,
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -55,11 +61,12 @@ import { splitActionName } from "./lib/actionName";
 import {
   DROP_GLOBAL,
   DROP_MENU,
+  DROP_MENU_GLOBAL,
+  DROP_MENU_WORKSPACE,
   DROP_WORKSPACE,
   MENU_DRAG_PREFIX,
   menuEntries,
   resolveDrop,
-  resolveMenuDrop,
   WORKSPACE_UNSET,
   type BarItem,
 } from "./lib/actionsBar";
@@ -152,45 +159,28 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
 }
 
 type Ops = Pick<BarController, "update" | "move">;
+type ItemOps = { ops: Ops; onDelete: (item: BarItem) => void };
 
-// A button that can be dragged while the reorder modifier is held. Out of that mode it is a
-// plain wrapper: no listeners, no attributes. In it the click is swallowed, so grabbing a
-// button never runs it, and the children ignore the pointer so even a disabled button
-// (which the webview hides pointer events from) can be picked up. The right-click menu
-// is the third way, after Settings and dragging, to take an Action to the menu, to the
-// other scope or out of the app.
-function ReorderableButton({
+const scopeOf = (item: BarItem) => (item.global ? "global" : "workspace");
+
+// The right-click menu of an Action, the same on a bar button and on a row of the menu: show
+// or hide it in the bar, send it to the other scope, delete it.
+function ItemContextMenu({
   item,
-  reorderMode,
+  inBar,
   ops,
   onDelete,
-  ...h
-}: { item: BarItem; reorderMode: boolean; ops: Ops; onDelete: (item: BarItem) => void } & Handlers) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !reorderMode,
-  });
-  const scope = item.global ? "global" : "workspace";
+  children,
+}: { item: BarItem; inBar: boolean; children: React.ReactElement } & ItemOps) {
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={setNodeRef}
-          style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition, zIndex: isDragging ? 10 : undefined }}
-          {...(reorderMode ? attributes : {})}
-          {...listeners}
-          onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
-          className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&>*]:pointer-events-none", isDragging && "cursor-grabbing bg-accent opacity-80")}
-        >
-          <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
-        </div>
-      </ContextMenuTrigger>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-52">
-        <ContextMenuItem onSelect={() => ops.update(scope, item.id, { ownButton: false })}>
-          <HugeiconsIcon icon={ViewOffIcon} size={13} strokeWidth={2} />
-          Hide from bar
+        <ContextMenuItem onSelect={() => ops.update(scopeOf(item), item.id, { ownButton: !inBar })}>
+          <HugeiconsIcon icon={inBar ? ViewOffIcon : ViewIcon} size={13} strokeWidth={2} />
+          {inBar ? "Hide from bar" : "Show in bar"}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => ops.move(scope, item.id)}>
+        <ContextMenuItem onSelect={() => ops.move(scopeOf(item), item.id)}>
           <HugeiconsIcon icon={item.global ? CircleArrowDownDoubleIcon : CircleArrowUpDoubleIcon} size={13} strokeWidth={2} />
           {item.global ? "Move to Workspace Only" : "Move to Global"}
         </ContextMenuItem>
@@ -204,50 +194,129 @@ function ReorderableButton({
   );
 }
 
-// Where a dragged button can land when its own scope has no buttons, or the menu has no
-// Actions: a grey dashed stand-in that only exists during the drag.
-function DropPlaceholder({ id, label, children }: { id: string; label: string; children?: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+// A button that can be dragged while the reorder modifier is held. Out of that mode it is a
+// plain wrapper: no listeners, no attributes. In it the click is swallowed, so grabbing a
+// button never runs it, and the children ignore the pointer so even a disabled button
+// (which the webview hides pointer events from) can be picked up. What follows the pointer
+// is the drag overlay; the button itself stays dimmed in its place.
+function ReorderableButton({
+  item,
+  reorderMode,
+  ops,
+  onDelete,
+  ...h
+}: { item: BarItem; reorderMode: boolean } & ItemOps & Handlers) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !reorderMode,
+  });
+  return (
+    <ItemContextMenu item={item} inBar ops={ops} onDelete={onDelete}>
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition }}
+        {...(reorderMode ? attributes : {})}
+        {...listeners}
+        onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
+        className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&_*]:pointer-events-none", isDragging && "opacity-40")}
+      >
+        <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
+      </div>
+    </ItemContextMenu>
+  );
+}
+
+// One scope of the bar. During a drag it draws a dashed frame with its label, empty or not,
+// and is where a dragged Action lands when it is dropped on no button; out of a drag an
+// empty one takes no room. The frame is an outline so showing it moves nothing.
+function BarZone({
+  id,
+  label,
+  dragging,
+  empty,
+  children,
+}: {
+  id: string;
+  label: string;
+  dragging: boolean;
+  empty: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !dragging });
   return (
     <div
       ref={setNodeRef}
-      title={label}
-      aria-label={label}
       className={cn(
-        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-muted/40 px-3 text-[11px] text-muted-foreground transition-colors",
-        isOver && "border-foreground/50 bg-accent text-foreground",
+        "relative flex shrink-0 items-center gap-2 rounded-md",
+        empty && !dragging && "hidden",
+        dragging && "min-h-8 min-w-16 outline-1 outline-offset-2 outline-border outline-dashed",
+        dragging && isOver && "bg-accent/60 outline-foreground/50",
       )}
     >
+      {dragging && (
+        <span className="pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none text-muted-foreground">
+          {label}
+        </span>
+      )}
       {children}
     </div>
   );
 }
 
-// The menu is a drop target while a button is dragged: dropping there hides the button.
-// Without a menu a grey dashed "Actions" appears for the duration of the drag instead.
-function MenuDrop({ dragging, hasMenu, children }: { dragging: boolean; hasMenu: boolean; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: DROP_MENU, disabled: !dragging });
-  if (hasMenu) {
-    return (
-      <div ref={setNodeRef} className={cn("shrink-0 rounded-md transition-shadow", dragging && isOver && "ring-1 ring-foreground/40")}>
-        {children}
-      </div>
-    );
-  }
-  if (!dragging) return null;
+// A grey dashed stand-in for the menu while a button is dragged and the menu has no
+// Actions to open; it exists for the length of the drag only.
+function FakeMenu({ id }: { id: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <DropPlaceholder id={DROP_MENU} label="Hide from the bar">
+    <div
+      ref={setNodeRef}
+      title="Hide from the bar"
+      aria-label="Hide from the bar"
+      className={cn(
+        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-muted/40 px-3 text-[11px] text-muted-foreground transition-colors",
+        isOver && "border-foreground/50 bg-accent text-foreground",
+      )}
+    >
       <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} />
       <span>Actions</span>
-    </DropPlaceholder>
+    </div>
   );
 }
 
-function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
+// The menu trigger is a target while a button is dragged: dropping there hides the button.
+// While a menu row is dragged it is no target, the row is already in the menu.
+function MenuDrop({
+  dragging,
+  fromMenu,
+  hasMenu,
+  children,
+}: {
+  dragging: boolean;
+  fromMenu: boolean;
+  hasMenu: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: DROP_MENU, disabled: !dragging || fromMenu });
+  if (!hasMenu) return dragging && !fromMenu ? <FakeMenu id={DROP_MENU} /> : null;
+  return (
+    <div ref={setNodeRef} className={cn("shrink-0 rounded-md transition-shadow", dragging && !fromMenu && isOver && "ring-1 ring-foreground/40")}>
+      {children}
+    </div>
+  );
+}
+
+type RowProps = { item: BarItem; reorderMode: boolean } & ItemOps & Handlers;
+
+function MenuRow({ item, reorderMode, ops, onDelete, ...h }: RowProps) {
   const script = item.action.runInTerminal;
-  // Dragging a row out of the menu onto the bar makes it a button. Only the pointer
-  // listeners are taken, never the attributes, which would replace the menu item's role.
-  const { setNodeRef, listeners, isDragging } = useDraggable({ id: `${MENU_DRAG_PREFIX}${item.id}` });
+  // Dragged with the reorder modifier held: within its section, to the other section, or out
+  // onto the bar. The listeners go on a wrapper that takes the pointer in that mode, so a
+  // blocked row, which a menu item ignores, can be grabbed too; the wrapper's attributes are
+  // never taken, they would replace the role of the menu item inside.
+  const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
+    id: `${MENU_DRAG_PREFIX}${item.id}`,
+    disabled: !reorderMode,
+  });
   const blocked = item.state === "idle" && item.disabledReason !== null;
   const text = (
     <>
@@ -264,39 +333,84 @@ function MenuRow({ item, ...h }: { item: BarItem } & Handlers) {
     // The hover words: where the Action opens. A blocked row keeps its reason.
     title: item.title ?? undefined,
     disabled: !menuEntries(item)[0].enabled,
-    ref: setNodeRef,
-    ...listeners,
   };
   // An app is one menu item, icon and text lit together: the whole row is one click. A
   // script has two zones, the start or stop control and the name, siblings so that each
   // hover lights only its own; the name runs an idle script or brings a live one into view,
   // and either way the menu stays open.
-  if (script) {
-    return (
-      <div className="flex min-w-0 items-center pl-1.5">
-        <ScriptControl item={item} {...h} />
-        <DropdownMenuItem
-          {...common}
-          className={cn("flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1", isDragging && "opacity-50")}
-          onSelect={(e) => {
-            e.preventDefault();
-            nameClick(item, h);
-          }}
-        >
-          {text}
-        </DropdownMenuItem>
-      </div>
-    );
-  }
   return (
-    <DropdownMenuItem
-      {...common}
-      className={cn("flex min-h-9 min-w-0 items-center gap-2 overflow-hidden py-0.5 pr-3", isDragging && "opacity-50")}
-      onSelect={() => nameClick(item, h)}
+    <ItemContextMenu item={item} inBar={false} ops={ops} onDelete={onDelete}>
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Translate.toString(transform), transition }}
+        {...listeners}
+        onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
+        className={cn(
+          "flex min-w-0 items-center",
+          script && "pl-1.5",
+          reorderMode && "cursor-grab [&_*]:pointer-events-none",
+          isDragging && "opacity-40",
+        )}
+      >
+        {script ? (
+          <>
+            <ScriptControl item={item} {...h} />
+            <DropdownMenuItem
+              {...common}
+              className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
+              onSelect={(e) => {
+                e.preventDefault();
+                nameClick(item, h);
+              }}
+            >
+              {text}
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <DropdownMenuItem
+            {...common}
+            className="flex min-h-9 min-w-0 flex-1 items-center gap-2 overflow-hidden py-0.5 pr-3"
+            onSelect={() => nameClick(item, h)}
+          >
+            <span className="flex shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
+            {text}
+          </DropdownMenuItem>
+        )}
+      </div>
+    </ItemContextMenu>
+  );
+}
+
+// One scope of the menu. While dragging, both sections show their title and a dashed frame,
+// empty or not, and an empty one says where to drop.
+function MenuSection({
+  id,
+  label,
+  items,
+  dragging,
+  ...row
+}: { id: string; label: string; items: BarItem[]; dragging: boolean } & Omit<RowProps, "item">) {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !dragging });
+  if (items.length === 0 && !dragging) return null;
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-md",
+        dragging && "outline-1 -outline-offset-1 outline-border outline-dashed",
+        dragging && isOver && "bg-accent/50",
+      )}
     >
-      <span className="flex shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
-      {text}
-    </DropdownMenuItem>
+      <DropdownMenuLabel className="text-[10px] text-muted-foreground">{label}</DropdownMenuLabel>
+      <SortableContext items={items.map((i) => `${MENU_DRAG_PREFIX}${i.id}`)} strategy={verticalListSortingStrategy}>
+        {items.map((item) => (
+          <MenuRow key={item.id} item={item} {...row} />
+        ))}
+      </SortableContext>
+      {items.length === 0 && (
+        <div className="mx-2 mb-1 flex h-9 items-center justify-center text-[11px] text-muted-foreground">Drop here</div>
+      )}
+    </div>
   );
 }
 
@@ -304,20 +418,37 @@ type MenuProps = {
   label: string;
   items: BarItem[];
   globalItems: BarItem[];
+  /** The reorder modifier is held: rows can be dragged and a click does nothing. */
+  reorderMode: boolean;
+  /** Some drag is in flight. */
+  dragging: boolean;
   onRestoreFocus: () => void;
   onConfigure: () => void;
-} & Handlers;
+} & ItemOps &
+  Handlers;
 
 // The one menu of the bar: every non-own Action, the workspace scope first and the global
 // one after, each in the user's order, with the Settings entry at the bottom.
-export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfigure, ...props }: MenuProps) {
+export function ActionsMenu({
+  label,
+  items,
+  globalItems,
+  reorderMode,
+  dragging,
+  ops,
+  onDelete,
+  onRestoreFocus,
+  onConfigure,
+  ...props
+}: MenuProps) {
   // The menu is not modal, so focus can move to a script's terminal while it stays open;
   // once that happened, the focus leaving the menu is not a reason to dismiss it. A click
   // outside, Escape or a pick still close it.
   const holdOpen = useRef(false);
   if (items.length === 0 && globalItems.length === 0) return null;
   const h = {
-    ...props,
+    run: props.run,
+    stop: props.stop,
     focus: (action: Action) => {
       const done = props.focus(action);
       if (done) holdOpen.current = true;
@@ -325,6 +456,7 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
     },
   };
   const busy = items.some((i) => i.state !== "idle") || globalItems.some((i) => i.state !== "idle");
+  const row = { reorderMode, ops, onDelete, ...h };
   return (
     <DropdownMenu modal={false} onOpenChange={() => (holdOpen.current = false)}>
       <DropdownMenuTrigger asChild>
@@ -350,22 +482,10 @@ export function ActionsMenu({ label, items, globalItems, onRestoreFocus, onConfi
           onRestoreFocus();
         }}
       >
-        {items.length > 0 && (
-          <DropdownMenuLabel className="text-[10px] text-muted-foreground">Workspace actions</DropdownMenuLabel>
-        )}
-        {items.map((item) => (
-          <MenuRow key={item.id} item={item} {...h} />
-        ))}
-        {globalItems.length > 0 && (
-          <>
-            {items.length > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground">Global actions</DropdownMenuLabel>
-            {globalItems.map((item) => (
-              <MenuRow key={item.id} item={item} {...h} />
-            ))}
-          </>
-        )}
-        {(items.length > 0 || globalItems.length > 0) && <DropdownMenuSeparator />}
+        <MenuSection id={DROP_MENU_WORKSPACE} label="Workspace actions" items={items} dragging={dragging} {...row} />
+        {(items.length > 0 || dragging) && (globalItems.length > 0 || dragging) && <DropdownMenuSeparator />}
+        <MenuSection id={DROP_MENU_GLOBAL} label="Global actions" items={globalItems} dragging={dragging} {...row} />
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onConfigure} className="text-muted-foreground">
           <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
           Action Settings
@@ -403,10 +523,14 @@ type BarProps = {
   onRestoreFocus: () => void;
 };
 
+const isZone = (id: string | number) => String(id).startsWith("zone:") || String(id).startsWith("mzone:");
+
 // The Header's actions: own buttons in the user's order, then the single Actions menu of
 // the rest with its workspace and global sections. The bar takes all the room between the
 // title and the search box and measures it: as it shrinks, the last own buttons fold into
-// the menu instead of pushing the rest out.
+// the menu instead of pushing the rest out. With the reorder modifier held, buttons and menu
+// rows are dragged between the four places an Action can live: the workspace and the global
+// scope of the bar, and of the menu.
 export function ActionsBar({ workspace, controller, onConfigure, onAddAction, onRestoreFocus }: BarProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
@@ -443,22 +567,22 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const model = useActionsBarModel({ workspace, room });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BarItem | null>(null);
-  const dragged = draggingId ? model.buttons.find((b) => b.id === draggingId) : undefined;
   const menuItems = [...model.menu.workspace, ...model.menu.global];
-  const draggedFromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX)
-    ? menuItems.find((i) => i.id === draggingId.slice(MENU_DRAG_PREFIX.length))
+  const fromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX) ?? false;
+  const dragged = draggingId
+    ? fromMenu
+      ? menuItems.find((i) => i.id === draggingId.slice(MENU_DRAG_PREFIX.length))
+      : model.buttons.find((b) => b.id === draggingId)
     : undefined;
   const workspaceButtons = model.buttons.filter((b) => !b.global);
   const globalButtons = model.buttons.filter((b) => b.global);
-  const workspaceStandIn =
-    (!!dragged?.global && workspaceButtons.length === 0) ||
-    (!!draggedFromMenu && !draggedFromMenu.global && workspaceButtons.length === 0 && !model.full.workspace);
-  const globalStandIn =
-    (!!dragged && !dragged.global && globalButtons.length === 0) ||
-    (!!draggedFromMenu?.global && globalButtons.length === 0 && !model.full.global);
-  // The pointer decides what is under the drag; with none, the nearest button of its own scope.
+  const dragging = draggingId !== null;
+  // The pointer decides what is under the drag, a button or row before the frame around it;
+  // with none, a bar button falls back to the nearest button of its own scope.
   const collision: CollisionDetection = (args) => {
-    const within = pointerWithin(args).filter((c) => c.id !== args.active.id);
+    const within = pointerWithin(args)
+      .filter((c) => c.id !== args.active.id)
+      .sort((a, b) => Number(isZone(a.id)) - Number(isZone(b.id)));
     if (within.length > 0 || String(args.active.id).startsWith(MENU_DRAG_PREFIX)) return within;
     const scope = model.buttons.find((b) => b.id === args.active.id)?.global;
     const own = args.droppableContainers.filter((c) => model.buttons.some((b) => b.id === c.id && b.global === scope));
@@ -474,27 +598,21 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   };
   const dragEnd = ({ active, over }: DragEndEvent) => {
     endDrag();
-    if (!over) return;
-    const show = resolveMenuDrop(menuItems, model.buttons, model.full, String(active.id), String(over.id));
-    if (show) {
-      controller.update(show.scope, show.id, { ownButton: true });
-      if (show.beforeId) controller.reorder(show.scope, show.id, show.beforeId);
-      return;
-    }
-    const drop = resolveDrop(model.buttons, String(active.id), String(over.id));
+    const drop = over ? resolveDrop(model.buttons, menuItems, String(active.id), String(over.id)) : null;
     if (!drop) return;
-    if (drop.kind === "reorder") controller.reorder(drop.scope, drop.fromId, drop.toId);
-    else if (drop.kind === "move") controller.move(drop.scope, drop.id);
-    else controller.update(drop.scope, drop.id, { ownButton: false });
+    if (drop.button !== drop.wasButton) controller.update(drop.from, drop.id, { ownButton: drop.button });
+    if (drop.to !== drop.from) controller.move(drop.from, drop.id);
+    if (drop.beforeId) controller.reorder(drop.from, drop.id, drop.beforeId);
   };
   const askDelete = (item: BarItem) => {
-    if (item.action.appId) controller.remove(item.global ? "global" : "workspace", item.id);
+    if (item.action.appId) controller.remove(scopeOf(item), item.id);
     else setPendingDelete(item);
   };
+  const itemOps: ItemOps = { ops: controller, onDelete: askDelete };
   const renderButtons = (list: BarItem[]) => (
     <SortableContext items={list.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
       {list.map((item) => (
-        <ReorderableButton key={item.id} item={item} reorderMode={held} ops={controller} onDelete={askDelete} {...controller} />
+        <ReorderableButton key={item.id} item={item} reorderMode={held} {...itemOps} {...controller} />
       ))}
     </SortableContext>
   );
@@ -520,33 +638,39 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         autoScroll={false}
         onDragStart={dragStart}
         onDragEnd={dragEnd}
         onDragCancel={endDrag}
       >
-        {renderButtons(workspaceButtons)}
-        {workspaceStandIn && <DropPlaceholder id={DROP_WORKSPACE} label="Move to workspace only" />}
-        {(workspaceButtons.length > 0 || workspaceStandIn) && (globalButtons.length > 0 || globalStandIn) && (
+        <BarZone id={DROP_WORKSPACE} label="Workspace" dragging={dragging} empty={workspaceButtons.length === 0}>
+          {renderButtons(workspaceButtons)}
+        </BarZone>
+        {!dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
           <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
         )}
-        {renderButtons(globalButtons)}
-        {globalStandIn && <DropPlaceholder id={DROP_GLOBAL} label="Move to global" />}
-        <MenuDrop dragging={draggingId !== null} hasMenu={model.menu.workspace.length + model.menu.global.length > 0}>
+        <BarZone id={DROP_GLOBAL} label="Global" dragging={dragging} empty={globalButtons.length === 0}>
+          {renderButtons(globalButtons)}
+        </BarZone>
+        <MenuDrop dragging={dragging} fromMenu={fromMenu} hasMenu={menuItems.length > 0}>
           <ActionsMenu
             label="Actions"
             items={model.menu.workspace}
             globalItems={model.menu.global}
+            reorderMode={held}
+            dragging={dragging}
             onRestoreFocus={onRestoreFocus}
             onConfigure={onConfigure}
+            {...itemOps}
             {...controller}
           />
         </MenuDrop>
         <DragOverlay dropAnimation={null}>
-          {draggedFromMenu && (
+          {dragged && (
             <div className="flex h-8 items-center gap-1.5 rounded-md bg-popover px-2 text-[11px] shadow-lg ring-1 ring-foreground/10">
-              <ActionIcon action={draggedFromMenu.action} size={14} />
-              <span className="max-w-[120px] truncate">{splitActionName(draggedFromMenu.name).main}</span>
+              <ActionIcon action={dragged.action} size={14} />
+              <span className="max-w-[120px] truncate">{splitActionName(dragged.name).main}</span>
             </div>
           )}
         </DragOverlay>
@@ -561,7 +685,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => pendingDelete && controller.remove(pendingDelete.global ? "global" : "workspace", pendingDelete.id)}
+              onClick={() => pendingDelete && controller.remove(scopeOf(pendingDelete), pendingDelete.id)}
             >
               Delete
             </AlertDialogAction>

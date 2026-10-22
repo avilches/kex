@@ -7,21 +7,21 @@ import {
   actionTarget,
   appsFirst,
   buildActionsBarModel,
-  canReorderButtons,
   BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
   DROP_GLOBAL,
   DROP_MENU,
+  DROP_MENU_GLOBAL,
+  DROP_MENU_WORKSPACE,
   DROP_WORKSPACE,
+  MENU_DRAG_PREFIX,
   isCompactBar,
-  MAX_BUTTONS_PER_SCOPE,
   menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
   resolveDrop,
-  resolveMenuDrop,
   SETTINGS_LABELS,
   scriptsFirst,
   soleAppButtons,
@@ -299,28 +299,6 @@ describe("buildActionsBarModel", () => {
     expect(m.empty).toBe(false);
   });
 
-  it("allows at most three own buttons per scope, scripts and apps together", () => {
-    const scripts = ["s1", "s2", "s3"].map((id) => script({ id, name: id, ownButton: true }));
-    const m = buildActionsBarModel({
-      local: [...scripts, app({ id: "a1", ownButton: true })],
-      global: ["g1", "g2", "g3", "g4"].map((id) => app({ id, name: id, ownButton: true })),
-      context: ctx,
-      states: new Map(),
-      activeId: undefined,
-    });
-    expect(MAX_BUTTONS_PER_SCOPE).toBe(3);
-    expect(m.buttons.map((b) => [b.id, b.global])).toEqual([
-      ["a1", false],
-      ["s1", false],
-      ["s2", false],
-      ["g1", true],
-      ["g2", true],
-      ["g3", true],
-    ]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s3"]);
-    expect(m.menu.global.map((b) => b.id)).toEqual(["g4"]);
-  });
-
   it("draws a button as its icon alone only when it is the sole button of its app", () => {
     const zedWs = app({ id: "z1", appId: "zed", name: "Zed {workspace}", ownButton: true });
     const zedFile = app({ id: "z2", appId: "zed", name: "Zed {filepath}", command: "zed {filepath}", ownButton: true });
@@ -491,60 +469,6 @@ describe("appsFirst and scriptsFirst", () => {
   });
 });
 
-describe("canReorderButtons", () => {
-  const b = (action: Action, global = false) => ({ global, action });
-
-  it("allows a swap inside one scope and one kind only", () => {
-    expect(canReorderButtons(b(app({ id: "a1" })), b(app({ id: "a2" })))).toBe(true);
-    expect(canReorderButtons(b(script({ id: "s1" })), b(script({ id: "s2" })))).toBe(true);
-    expect(canReorderButtons(b(app()), b(script()))).toBe(false);
-    expect(canReorderButtons(b(app()), b(app({ id: "a2" }), true))).toBe(false);
-  });
-});
-
-describe("resolveMenuDrop", () => {
-  const b = (id: string, over: { global?: boolean; script?: boolean } = {}) => ({
-    id,
-    global: over.global ?? false,
-    action: over.script ? script({ id }) : app({ id }),
-  });
-  const menu = [b("m1"), b("ms", { script: true }), b("mg", { global: true })];
-  const buttons = [b("w1"), b("ws", { script: true }), b("g1", { global: true })];
-  const open = { workspace: false, global: false };
-
-  it("shows the row as a button over a button of its scope, in that button's place when the kind matches", () => {
-    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", "w1")).toEqual({ kind: "show", scope: "workspace", id: "m1", beforeId: "w1" });
-    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", "ws")).toEqual({ kind: "show", scope: "workspace", id: "m1" });
-  });
-
-  it("shows it at the end of an empty scope's stand-in, never across scopes", () => {
-    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", DROP_GLOBAL)).toEqual({ kind: "show", scope: "global", id: "mg" });
-    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", DROP_WORKSPACE)).toBeNull();
-    expect(resolveMenuDrop(menu, buttons, open, "menu:mg", "w1")).toBeNull();
-  });
-
-  it("refuses a full scope, the menu itself and anything that is not a menu row", () => {
-    expect(resolveMenuDrop(menu, buttons, { workspace: true, global: false }, "menu:m1", "w1")).toBeNull();
-    expect(resolveMenuDrop(menu, buttons, open, "menu:m1", DROP_MENU)).toBeNull();
-    expect(resolveMenuDrop(menu, buttons, open, "w1", "ws")).toBeNull();
-    expect(resolveMenuDrop(menu, buttons, open, "menu:ghost", "w1")).toBeNull();
-  });
-});
-
-describe("buildActionsBarModel full", () => {
-  it("is true for a scope that holds three own buttons, counting hidden ones", () => {
-    const own = (id: string) => app({ id, ownButton: true });
-    const m = buildActionsBarModel({
-      local: [own("a"), own("b"), own("c")],
-      global: [own("g1"), app({ id: "g2" })],
-      context: ctx,
-      states: new Map(),
-      activeId: undefined,
-    });
-    expect(m.full).toEqual({ workspace: true, global: false });
-  });
-});
-
 describe("Settings labels", () => {
   it("say what the variable stands for in the subtitle and the hover, never the raw template", () => {
     expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current Directory", startTrim: true });
@@ -558,35 +482,72 @@ describe("Settings labels", () => {
   });
 });
 
+describe("buildActionsBarModel without a limit", () => {
+  it("draws every own button the room allows, however many", () => {
+    const own = (id: string) => app({ id, name: id, ownButton: true });
+    const m = buildActionsBarModel({
+      local: ["a", "b", "c", "d", "e"].map(own),
+      global: ["g1", "g2", "g3", "g4"].map(own),
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(m.buttons).toHaveLength(9);
+    expect(m.menu.workspace).toEqual([]);
+  });
+});
+
 describe("resolveDrop", () => {
   const b = (id: string, over: { global?: boolean; script?: boolean } = {}) => ({
     id,
     global: over.global ?? false,
     action: over.script ? script({ id }) : app({ id }),
   });
-  const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true }), b("g2", { global: true })];
+  const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true })];
+  const menu = [b("m1"), b("m2"), b("ms", { script: true }), b("mg", { global: true }), b("mg2", { global: true })];
+  const row = (id: string) => `${MENU_DRAG_PREFIX}${id}`;
+  const drop = (active: string, over: string) => resolveDrop(bar, menu, active, over);
 
-  it("reorders over a button of the same scope and kind, never across kinds", () => {
-    expect(resolveDrop(bar, "w1", "w2")).toEqual({ kind: "reorder", scope: "workspace", fromId: "w1", toId: "w2" });
-    expect(resolveDrop(bar, "w1", "ws")).toBeNull();
+  it("reorders a button over another of its scope and kind, in its place", () => {
+    expect(drop("w1", "w2")).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: true, beforeId: "w2" });
+    expect(drop("w1", "ws")).toBeNull();
   });
 
-  it("moves over a button of the other scope or its empty stand-in", () => {
-    expect(resolveDrop(bar, "w1", "g1")).toEqual({ kind: "move", scope: "workspace", id: "w1" });
-    expect(resolveDrop(bar, "g1", "w2")).toEqual({ kind: "move", scope: "global", id: "g1" });
-    expect(resolveDrop(bar, "w1", DROP_GLOBAL)).toEqual({ kind: "move", scope: "workspace", id: "w1" });
-    expect(resolveDrop(bar, "g1", DROP_WORKSPACE)).toEqual({ kind: "move", scope: "global", id: "g1" });
+  it("moves a button to the other scope over a button or the frame of that scope", () => {
+    expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: true });
+    expect(drop("w1", DROP_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: true });
+    expect(drop("g1", DROP_WORKSPACE)).toEqual({ id: "g1", from: "global", to: "workspace", wasButton: true, button: true });
+    expect(drop("w1", DROP_WORKSPACE)).toBeNull();
   });
 
-  it("ignores a drop on its own scope's stand-in, on itself or on nothing known", () => {
-    expect(resolveDrop(bar, "w1", DROP_WORKSPACE)).toBeNull();
-    expect(resolveDrop(bar, "g1", DROP_GLOBAL)).toBeNull();
-    expect(resolveDrop(bar, "w1", "w1")).toBeNull();
-    expect(resolveDrop(bar, "w1", "ghost")).toBeNull();
-    expect(resolveDrop(bar, "ghost", "w1")).toBeNull();
+  it("hides a button on the menu trigger, a menu section or a menu row, in the scope it lands in", () => {
+    expect(drop("w1", DROP_MENU)).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false });
+    expect(drop("w1", DROP_MENU_WORKSPACE)).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false });
+    expect(drop("w1", DROP_MENU_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: false });
+    expect(drop("w1", row("m1"))).toEqual({ id: "w1", from: "workspace", to: "workspace", wasButton: true, button: false, beforeId: "m1" });
+    expect(drop("w1", row("mg"))).toEqual({ id: "w1", from: "workspace", to: "global", wasButton: true, button: false });
   });
 
-  it("hides the button when it lands on the menu", () => {
-    expect(resolveDrop(bar, "g2", DROP_MENU)).toEqual({ kind: "hide", scope: "global", id: "g2" });
+  it("reorders a menu row over another of its scope and kind and moves it across scopes", () => {
+    expect(drop(row("m1"), row("m2"))).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: false, beforeId: "m2" });
+    expect(drop(row("m1"), row("ms"))).toBeNull();
+    expect(drop(row("m1"), row("mg"))).toEqual({ id: "m1", from: "workspace", to: "global", wasButton: false, button: false });
+    expect(drop(row("mg"), DROP_MENU_WORKSPACE)).toEqual({ id: "mg", from: "global", to: "workspace", wasButton: false, button: false });
+    expect(drop(row("m1"), DROP_MENU_WORKSPACE)).toBeNull();
+  });
+
+  it("shows a menu row as a button over a button or a frame of the bar, even of the other scope", () => {
+    expect(drop(row("m1"), "w2")).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true, beforeId: "w2" });
+    expect(drop(row("m1"), "ws")).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true });
+    expect(drop(row("m1"), DROP_WORKSPACE)).toEqual({ id: "m1", from: "workspace", to: "workspace", wasButton: false, button: true });
+    expect(drop(row("m1"), DROP_GLOBAL)).toEqual({ id: "m1", from: "workspace", to: "global", wasButton: false, button: true });
+  });
+
+  it("makes the menu trigger no target for a row, and ignores itself and the unknown", () => {
+    expect(drop(row("m1"), DROP_MENU)).toBeNull();
+    expect(drop("w1", "w1")).toBeNull();
+    expect(drop("w1", "ghost")).toBeNull();
+    expect(drop("ghost", "w1")).toBeNull();
+    expect(drop(row("ghost"), "w1")).toBeNull();
   });
 });

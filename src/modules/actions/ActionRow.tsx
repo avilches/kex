@@ -42,7 +42,7 @@ import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor"
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { splitActionName } from "./lib/actionName";
-import { actionSubtitle, MAX_BUTTONS_PER_SCOPE, SETTINGS_LABELS } from "./lib/actionsBar";
+import { actionSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
 import {
   actionProblems,
   CWD_MODE_LABELS,
@@ -64,8 +64,6 @@ type Props = {
   immutable?: boolean;
   /** Turns an immutable row into the user's own editable action; only immutable rows offer it. */
   onEdit?: () => void;
-  /** The scope already has the most own buttons it may hold: this one cannot take one. */
-  buttonsFull?: boolean;
   /** Folded to its header row, like the file-type cards; drafts always stay expanded. */
   expanded: boolean;
   onToggleExpand: () => void;
@@ -80,7 +78,7 @@ const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
 export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
-  { action, context, saved, immutable, onEdit, buttonsFull, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
+  { action, context, saved, immutable, onEdit, expanded, onToggleExpand, onMoveToGlobal, onMoveToWorkspace, onChange, onRemove },
   ref,
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: action.id });
@@ -185,10 +183,9 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
           <Checkbox
             id={`${action.id}-own`}
             checked={action.ownButton}
-            disabled={buttonsFull && !action.ownButton}
             onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
           />
-          <label htmlFor={`${action.id}-own`} className={cn("text-[11px] text-muted-foreground", immutable ? "cursor-default" : "cursor-pointer")} title={buttonsFull && !action.ownButton ? `At most ${MAX_BUTTONS_PER_SCOPE} buttons: remove one first` : "Own button in the bar"}>
+          <label htmlFor={`${action.id}-own`} className={cn("text-[11px] text-muted-foreground", immutable ? "cursor-default" : "cursor-pointer")} title="Own button in the bar">
             Button
           </label>
         </span>

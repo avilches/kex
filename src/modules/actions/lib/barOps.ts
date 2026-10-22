@@ -1,5 +1,4 @@
 import { removeAction, reorderActions, updateAction } from "./actions";
-import { MAX_BUTTONS_PER_SCOPE } from "./actionsBar";
 import type { Action } from "./types";
 import type { BarController } from "./useActionsBar";
 
@@ -12,7 +11,6 @@ type GlobalStore = {
 
 type Deps = {
   workspaceId: () => string | undefined;
-  workspaceActions: (workspaceId: string) => readonly Action[];
   updateWorkspaceAction: (workspaceId: string, id: string, patch: Partial<Omit<Action, "id">>) => void;
   removeWorkspaceAction: (workspaceId: string, id: string) => void;
   reorderWorkspaceActions: (workspaceId: string, fromId: string, toId: string) => void;
@@ -24,9 +22,7 @@ type Deps = {
 };
 
 // What the Header does to an Action it draws: the workspace scope goes through the
-// workspace store, the global one through the serialized global store. A move into a scope
-// that already holds the most buttons it may show arrives as a menu entry, never as a
-// button the bar would have to hide.
+// workspace store, the global one through the serialized global store.
 export function createBarOps(d: Deps): BarOps {
   const global = (fn: (list: Action[]) => Action[], message: string, afterWrite?: (b: Action[], a: Action[]) => void) => {
     d.global
@@ -58,13 +54,6 @@ export function createBarOps(d: Deps): BarOps {
     move: (scope, id) => {
       const ws = d.workspaceId();
       if (!ws) return;
-      const source = scope === "workspace" ? d.workspaceActions(ws) : d.global.get();
-      const target = scope === "workspace" ? d.global.get() : d.workspaceActions(ws);
-      const action = source.find((a) => a.id === id);
-      if (!action) return;
-      if (action.ownButton && target.filter((a) => a.ownButton).length >= MAX_BUTTONS_PER_SCOPE) {
-        update(scope, id, { ownButton: false });
-      }
       if (scope === "workspace") d.promoteWorkspaceAction(ws, id);
       else d.demoteGlobalAction(ws, id);
     },

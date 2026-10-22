@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { newActionId } from "@/lib/ids";
 import { ActionRow, type ActionRowHandle } from "./ActionRow";
 import { AddApplicationMenu } from "./AddApplicationMenu";
-import { MAX_BUTTONS_PER_SCOPE, scriptsFirst } from "./lib/actionsBar";
+import { scriptsFirst } from "./lib/actionsBar";
 import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
@@ -88,8 +88,6 @@ export function ActionsEditor({
   // A draft stays rendered, under the same key, until the store shows an action with its id,
   // so the row keeps its DOM node and its focus while the write is on its way.
   const visible = scriptsFirst([...actions, ...drafts.filter((d) => !saved.has(d.id))]);
-
-  const buttonsFull = actions.filter((a) => a.ownButton).length >= MAX_BUTTONS_PER_SCOPE;
 
   const draftIds = new Set(drafts.map((d) => d.id));
 
@@ -186,7 +184,6 @@ export function ActionsEditor({
                 context={context}
                 saved={saved.has(action.id)}
                 immutable={saved.has(action.id) && action.appId !== undefined}
-                buttonsFull={buttonsFull}
                 expanded={isDraft || openId === action.id}
                 onToggleExpand={() => toggleRow(action.id)}
                 onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
