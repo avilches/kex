@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   type CollisionDetection,
@@ -13,6 +13,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragOverEvent,
+  type Over,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -69,6 +72,7 @@ import {
   MENU_DRAG_PREFIX,
   menuEntries,
   resolveDrop,
+  type Drop,
   WORKSPACE_UNSET,
   type BarItem,
 } from "./lib/actionsBar";
@@ -160,6 +164,27 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
   );
 }
 
+// Where the dragged Action would land, shown as a line on the edge of the Action it is over:
+// `after` is the lower or right edge. Absent when the drop goes nowhere or into a frame.
+type DropHint = { overId: string; after: boolean } | null;
+const DropHintContext = createContext<DropHint>(null);
+
+function DropLine({ id, vertical }: { id: string; vertical: boolean }) {
+  const hint = useContext(DropHintContext);
+  if (hint?.overId !== id) return null;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute rounded-full bg-foreground/70",
+        vertical
+          ? cn("inset-x-2 h-0.5", hint.after ? "bottom-0" : "top-0")
+          : cn("inset-y-1 w-0.5", hint.after ? "-right-1.5" : "-left-1.5"),
+      )}
+    />
+  );
+}
+
 type Ops = Pick<BarController, "update" | "move">;
 type ItemOps = { ops: Ops; onDelete: (item: BarItem) => void };
 
@@ -220,9 +245,10 @@ function ReorderableButton({
         {...(reorderMode ? attributes : {})}
         {...listeners}
         onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
-        className={cn("shrink-0 rounded-md", reorderMode && "cursor-grab [&_*]:pointer-events-none", isDragging && "opacity-40")}
+        className={cn("relative shrink-0 rounded-md", reorderMode && "cursor-grab [&_*]:pointer-events-none", isDragging && "opacity-40")}
       >
         <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
+        <DropLine id={item.id} vertical={false} />
       </div>
     </ItemContextMenu>
   );
@@ -348,7 +374,7 @@ function MenuRow({ item, reorderMode, ops, onDelete, ...h }: RowProps) {
         {...listeners}
         onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
         className={cn(
-          "flex min-w-0 items-center",
+          "relative flex min-w-0 items-center",
           script && "pl-1.5",
           reorderMode && "cursor-grab [&_*]:pointer-events-none",
           isDragging && "opacity-40",
@@ -378,6 +404,7 @@ function MenuRow({ item, reorderMode, ops, onDelete, ...h }: RowProps) {
             {text}
           </DropdownMenuItem>
         )}
+        <DropLine id={`${MENU_DRAG_PREFIX}${item.id}`} vertical />
       </div>
     </ItemContextMenu>
   );
@@ -646,20 +673,59 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const endDrag = () => {
     draggingRef.current = false;
     setDraggingId(null);
+    live.current = { activeId: null, over: null, point: null };
+    setHint(null);
+  };
+  const [hint, setHint] = useState<DropHint>(null);
+  // What dropping here would do, and on which edge of what it is over the line goes: past the
+  // middle of it along the axis its list runs (down in the menu, right in the bar), or, for a
+  // reorder inside one list, the edge the dragged Action ends up on.
+  const dropAt = (activeId: string, over: Pick<Over, "id" | "rect">, point: { x: number; y: number } | null) => {
+    const overId = String(over.id);
+    const vertical = overId.startsWith(MENU_DRAG_PREFIX);
+    const past = point
+      ? vertical
+        ? point.y > over.rect.top + over.rect.height / 2
+        : point.x > over.rect.left + over.rect.width / 2
+      : false;
+    const drop: Drop | null = resolveDrop(model.buttons, menuItems, activeId, overId, past);
+    if (!drop) return null;
+    let after = past;
+    if (drop.reorderOver) {
+      const order = vertical ? menuItems.map((i) => `${MENU_DRAG_PREFIX}${i.id}`) : model.buttons.map((b) => b.id);
+      after = order.indexOf(activeId) < order.indexOf(overId);
+    }
+    return { drop, after, overId };
+  };
+  // The line follows what the pointer is over, which dnd-kit reports when it changes
+  // (`onDragOver`) and not with every move, where it lags a move behind; the pointer comes
+  // from the moves. Both feed the same refresh.
+  const live = useRef<{ activeId: string | null; over: Over | null; point: { x: number; y: number } | null }>({
+    activeId: null,
+    over: null,
+    point: null,
+  });
+  const refreshHint = () => {
+    const { activeId, over, point } = live.current;
+    const at = activeId && over ? dropAt(activeId, over, point) : null;
+    const next: DropHint = at && !isZone(at.overId) ? { overId: at.overId, after: at.after } : null;
+    setHint((prev) => (prev?.overId === next?.overId && prev?.after === next?.after ? prev : next));
+  };
+  const dragOver = ({ active, over }: DragOverEvent) => {
+    live.current.activeId = String(active.id);
+    live.current.over = over;
+    refreshHint();
+  };
+  const dragMove = ({ active, activatorEvent, delta }: DragMoveEvent) => {
+    const start = getEventCoordinates(activatorEvent);
+    live.current.activeId = String(active.id);
+    live.current.point = start ? { x: start.x + delta.x, y: start.y + delta.y } : null;
+    refreshHint();
   };
   const dragEnd = ({ active, over, activatorEvent, delta }: DragEndEvent) => {
     endDrag();
-    if (!over) return;
-    // Past the middle of what it lands on, along the axis that list runs: down in the menu,
-    // right in the bar.
     const start = getEventCoordinates(activatorEvent);
-    const vertical = String(over.id).startsWith(MENU_DRAG_PREFIX);
-    const after = start
-      ? vertical
-        ? start.y + delta.y > over.rect.top + over.rect.height / 2
-        : start.x + delta.x > over.rect.left + over.rect.width / 2
-      : false;
-    const drop = resolveDrop(model.buttons, menuItems, String(active.id), String(over.id), after);
+    const drop = over ? dropAt(String(active.id), over, start ? { x: start.x + delta.x, y: start.y + delta.y } : null)?.drop : null;
     if (!drop) return;
     if (drop.button !== drop.wasButton) controller.update(drop.from, drop.id, { ownButton: drop.button });
     if (drop.to !== drop.from) controller.move(drop.from, drop.id, drop.placeBefore);
@@ -696,12 +762,14 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden"
     >
       <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
+      <DropHintContext.Provider value={hint}>
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-        autoScroll={false}
         onDragStart={dragStart}
+        onDragOver={dragOver}
+        onDragMove={dragMove}
         onDragEnd={dragEnd}
         onDragCancel={endDrag}
       >
@@ -736,6 +804,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
           )}
         </DragOverlay>
       </DndContext>
+      </DropHintContext.Provider>
       <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <AlertDialogContent className="w-[360px] rounded-2xl">
           <AlertDialogHeader>
