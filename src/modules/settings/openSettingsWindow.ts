@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { actionsSectionParam } from "@/modules/actions/lib/actionsTarget";
 
 export type SettingsSection =
   | "general"
@@ -31,9 +32,14 @@ export async function openFileTypesSettings(ext?: string): Promise<void> {
 
 // Opens Settings > Actions, on the Global or the current workspace tab.
 export async function openGlobalActionsSettings(): Promise<void> {
-  await invoke("open_settings_window", { section: "actions" });
+  await invoke("open_settings_window", { section: actionsSectionParam("global") });
 }
 
 export async function openWorkspaceActionsSettings(): Promise<void> {
-  await invoke("open_settings_window", { section: "actions:workspace" });
+  await invoke("open_settings_window", { section: actionsSectionParam("workspace") });
+}
+
+// Opens Settings > Actions on the tab of the scope with that Action open.
+export async function openActionSettings(scope: "global" | "workspace", id: string): Promise<void> {
+  await invoke("open_settings_window", { section: actionsSectionParam(scope, id) });
 }

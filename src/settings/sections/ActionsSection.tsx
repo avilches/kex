@@ -15,6 +15,7 @@ import {
   type Action,
 } from "@/modules/actions";
 import { useWorkspaceActionsFeed } from "@/modules/actions/lib/actionsFeed";
+import type { ActionsTarget } from "@/modules/actions/lib/actionsTarget";
 import { useExternalEditors } from "@/modules/external-editors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SectionHeader } from "../components/SectionHeader";
@@ -43,11 +44,18 @@ function editQuietly(fn: (list: Action[]) => Action[]) {
 
 type Tab = "global" | "workspace";
 
-export function ActionsSection() {
+/** A request to show a tab, and one Action on it, that a new `nonce` makes again. */
+export type ActionsRequest = ActionsTarget & { nonce: number };
+
+export function ActionsSection({ target = null }: { target?: ActionsRequest | null }) {
   const actions = usePreferencesStore((s) => s.actions);
   const { detectedEditors, isScanning, scan } = useExternalEditors();
   const { feed, send } = useWorkspaceActionsFeed();
-  const [tab, setTab] = useState<Tab>("global");
+  const [tab, setTab] = useState<Tab>(target?.tab ?? "global");
+  useEffect(() => {
+    if (target) setTab(target.tab);
+  }, [target]);
+  const focusRequest = target?.id ? { id: target.id, nonce: target.nonce } : undefined;
 
   const didScan = useRef(false);
   useEffect(() => {
@@ -93,6 +101,7 @@ export function ActionsSection() {
 
       {tab === "global" ? (
         <ActionsEditor
+          focusRequest={target?.tab === "global" ? focusRequest : undefined}
           actions={actions}
           suggestions={suggestionsFromDetected(detectedEditors)}
           context={null}
@@ -106,6 +115,7 @@ export function ActionsSection() {
       ) : feed ? (
         <ActionsEditor
           key={feed.workspaceId}
+          focusRequest={target?.tab === "workspace" ? focusRequest : undefined}
           actions={feed.actions}
           suggestions={suggestionsFromDetected(detectedEditors)}
           context={feed.context}

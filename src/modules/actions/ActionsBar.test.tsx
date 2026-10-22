@@ -121,6 +121,7 @@ describe("OwnButton", () => {
 describe("ActionsMenu", () => {
   function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false), extra: { dragging?: boolean; reorderMode?: boolean } = {}) {
     const handlers = { run: vi.fn(), stop: vi.fn(), focus };
+    const onEdit = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -132,8 +133,7 @@ describe("ActionsMenu", () => {
           globalItems,
           reorderMode: extra.reorderMode ?? false,
           dragging: extra.dragging ?? false,
-          ops: { update: vi.fn(), move: vi.fn() },
-          onDelete: vi.fn(),
+          onEdit,
           onRestoreFocus: vi.fn(),
           onConfigure: vi.fn(),
           ...handlers,
@@ -146,7 +146,7 @@ describe("ActionsMenu", () => {
         trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" }));
         trigger.click();
       });
-    return { container, handlers, open, unmount: () => act(() => root.unmount()) };
+    return { container, handlers, onEdit, open, unmount: () => act(() => root.unmount()) };
   }
 
   it("pools every non-own Action into one menu: workspace scope, then global", () => {
@@ -209,6 +209,22 @@ describe("ActionsMenu", () => {
     expect(menu.textContent).toContain("Workspace actions");
     expect(menu.textContent).toContain("Global actions");
     expect(menu.textContent).toContain("Drop here");
+    view.unmount();
+  });
+
+  it("right-click on a row offers Edit Action alone, which opens its card", () => {
+    const view = mountMenu([item(app)], []);
+    view.open();
+    const row = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "PyCharm") as HTMLElement;
+    act(() => {
+      row.parentElement!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    });
+    const entries = [...document.querySelectorAll("[role='menuitem']")].map((e) => e.textContent).filter((t) => t === "Edit Action");
+    expect(entries).toEqual(["Edit Action"]);
+    expect(document.body.textContent).not.toContain("Delete Action");
+    expect(document.body.textContent).not.toContain("Move to");
+    act(() => void ([...document.querySelectorAll("[role='menuitem']")].find((e) => e.textContent === "Edit Action") as HTMLElement).click());
+    expect(view.onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: "a1" }));
     view.unmount();
   });
 

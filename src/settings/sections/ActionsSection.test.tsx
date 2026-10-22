@@ -29,13 +29,13 @@ const send = vi.fn();
 const feed = vi.fn(() => ({ feed: null, send }));
 vi.mock("@/modules/actions/lib/actionsFeed", () => ({ useWorkspaceActionsFeed: () => feed() }));
 
-import { ActionsSection } from "./ActionsSection";
+import { ActionsSection, type ActionsRequest } from "./ActionsSection";
 
-function mount() {
+function mount(target?: ActionsRequest) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(ActionsSection)));
+  act(() => root.render(createElement(ActionsSection, { target })));
   return { container, unmount: () => act(() => root.unmount()) };
 }
 
@@ -125,5 +125,14 @@ describe("ActionsSection", () => {
     act(() => void (options().find((o) => o.textContent?.includes("ZedCurrent File")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(2);
     unmount();
+  });
+
+  it("opens the tab a target names, and moves to it when a new one arrives", () => {
+    const { container, unmount } = mount({ tab: "workspace", nonce: 0 });
+    expect(container.textContent).toContain("Actions of the current workspace");
+    unmount();
+    const global = mount({ tab: "global", nonce: 0 });
+    expect(global.container.textContent).toContain("Global actions are available");
+    global.unmount();
   });
 });

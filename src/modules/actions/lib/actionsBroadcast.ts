@@ -11,7 +11,9 @@ import {
   type ActionsPush,
 } from "./actionsLink";
 import { useActionContext, type ActionContext } from "./useActionContext";
+import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import type { Workspace } from "@/modules/workspaces/lib/types";
+import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 import type { Action } from "./types";
 
 export type WorkspaceActionsMutators = {
@@ -67,8 +69,16 @@ export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): vo
   contextRef.current = context;
   const workspaceRef = useRef(workspace);
   workspaceRef.current = workspace;
+  // The name the Header shows, with its {templates} expanded from the focused tab, not the raw title.
+  const shownTitle = useWorkspaceTitle({
+    id: workspace?.id,
+    title: workspace?.title ?? "",
+    cwd: workspace?.cwd,
+    workspaceRoot: workspace?.workspaceRoot,
+    focusedTab: workspace ? focusedTab(workspace.paneTree, workspace.activePaneId) : null,
+  });
   const titleRef = useRef("Untitled");
-  titleRef.current = (workspace?.title || "").trim() || "Untitled";
+  titleRef.current = shownTitle.trim() || "Untitled";
 
   const push = useRef(() => {
     const ws = workspaceRef.current;

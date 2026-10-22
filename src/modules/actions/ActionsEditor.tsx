@@ -2,6 +2,7 @@ import { ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   closestCenter,
+  type CollisionDetection,
   DndContext,
   PointerSensor,
   useSensor,
@@ -35,6 +36,8 @@ type Props = {
   onReorder: (fromId: string, toId: string) => void;
   onMoveToGlobal?: (id: string) => void;
   onMoveToWorkspace?: (id: string) => void;
+  /** Opens one Action, once, as soon as it is in the list; a new `nonce` asks again. */
+  focusRequest?: { id: string; nonce: number };
 };
 
 // The kind is chosen once, on creation, and a saved row cannot switch it afterwards.
@@ -73,6 +76,7 @@ export function ActionsEditor({
   onReorder,
   onMoveToGlobal,
   onMoveToWorkspace,
+  focusRequest,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [drafts, setDrafts] = useState<Action[]>([]);
@@ -146,10 +150,27 @@ export function ActionsEditor({
     else setDrafts((d) => d.filter((x) => x.id !== action.id));
   };
 
+  const handledFocus = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusRequest || handledFocus.current === focusRequest.nonce) return;
+    if (!actions.some((a) => a.id === focusRequest.id)) return;
+    handledFocus.current = focusRequest.nonce;
+    setOpenId(focusRequest.id);
+    requestAnimationFrame(() =>
+      document.querySelector(`[data-action-row="${CSS.escape(focusRequest.id)}"]`)?.scrollIntoView({ block: "nearest" }),
+    );
+  }, [focusRequest, actions]);
+
+  const kindOf = (id: string | number) => visible.find((a) => a.id === id)?.runInTerminal;
+  // Scripts and apps are two lists that never mix: a row only trades places with its own kind.
+  const collision: CollisionDetection = (args) => {
+    const kind = kindOf(args.active.id);
+    return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => kindOf(c.id) === kind) });
+  };
+
   const dragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
-    const kind = (id: string | number) => visible.find((a) => a.id === id)?.runInTerminal;
-    if (kind(active.id) !== kind(over.id)) return;
+    if (kindOf(active.id) !== kindOf(over.id)) return;
     onReorder(String(active.id), String(over.id));
   };
 
@@ -168,34 +189,36 @@ export function ActionsEditor({
         <AddApplicationMenu suggestions={availableSuggestions} onPick={addApplication} />
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
-        <SortableContext items={visible.map((a) => a.id)} strategy={verticalListSortingStrategy}>
-          <div className="flex max-h-[440px] flex-col gap-1.5 overflow-y-auto pr-0.5">
-            {visible.map((action) => {
-              const isDraft = draftIds.has(action.id);
-              return (
-              <ActionRow
-                key={action.id}
-                ref={(handle) => {
-                  if (handle) rows.current.set(action.id, handle);
-                  else rows.current.delete(action.id);
-                }}
-                action={action}
-                context={context}
-                saved={saved.has(action.id)}
-                immutable={saved.has(action.id) && action.appId !== undefined}
-                expanded={isDraft || openId === action.id}
-                onToggleExpand={() => toggleRow(action.id)}
-                onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
-                onMoveToWorkspace={onMoveToWorkspace && saved?.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
-                onEdit={action.appId !== undefined ? () => takeOwnership(action) : undefined}
-                onChange={(next) => change(action, next)}
-                onRemove={() => remove(action)}
-              />
-              );
-            })}
-          </div>
-        </SortableContext>
+      <DndContext sensors={sensors} collisionDetection={collision} onDragEnd={dragEnd}>
+        <div className="flex max-h-[440px] flex-col gap-1.5 overflow-y-auto pr-0.5">
+          {[visible.filter((a) => a.runInTerminal), visible.filter((a) => !a.runInTerminal)].map((group, i) => (
+            <SortableContext key={i} items={group.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+              {group.map((action) => {
+                const isDraft = draftIds.has(action.id);
+                return (
+                  <ActionRow
+                    key={action.id}
+                    ref={(handle) => {
+                      if (handle) rows.current.set(action.id, handle);
+                      else rows.current.delete(action.id);
+                    }}
+                    action={action}
+                    context={context}
+                    saved={saved.has(action.id)}
+                    immutable={saved.has(action.id) && action.appId !== undefined}
+                    expanded={isDraft || openId === action.id}
+                    onToggleExpand={() => toggleRow(action.id)}
+                    onMoveToGlobal={onMoveToGlobal && saved?.has(action.id) ? () => onMoveToGlobal(action.id) : undefined}
+                    onMoveToWorkspace={onMoveToWorkspace && saved?.has(action.id) ? () => onMoveToWorkspace(action.id) : undefined}
+                    onEdit={action.appId !== undefined ? () => takeOwnership(action) : undefined}
+                    onChange={(next) => change(action, next)}
+                    onRemove={() => remove(action)}
+                  />
+                );
+              })}
+            </SortableContext>
+          ))}
+        </div>
       </DndContext>
 
       {visible.length === 0 && <p className="text-[11px] text-muted-foreground">{emptyHint}</p>}

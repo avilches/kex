@@ -391,6 +391,21 @@ describe("ActionsEditor", () => {
     view.unmount();
   });
 
+  it("opens the Action a focus request names, once per request", () => {
+    const view = mount([saved, savedApp], { focusRequest: { id: "ac-2", nonce: 1 } });
+    const open = () => [...view.container.querySelectorAll("textarea[aria-label='Command']")] as HTMLTextAreaElement[];
+    expect(open().map((t) => t.value)).toEqual(["zed {filepath}"]);
+    click(view.container.querySelector("button[aria-label='Collapse action']"));
+    expect(open()).toHaveLength(0);
+    view.unmount();
+  });
+
+  it("opens nothing for a request whose Action is not in the list", () => {
+    const view = mount([saved], { focusRequest: { id: "ghost", nonce: 1 } });
+    expect(view.container.querySelectorAll("textarea[aria-label='Command']")).toHaveLength(0);
+    view.unmount();
+  });
+
   it("lists scripts before apps and refuses to drag one kind over the other", () => {
     const { container, unmount } = mount([savedApp, saved]);
     const names = [...container.querySelectorAll("span.truncate")].map((n) => n.textContent);

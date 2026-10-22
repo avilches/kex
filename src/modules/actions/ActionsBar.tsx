@@ -27,16 +27,12 @@ import {
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import {
   ArrowDown01Icon,
-  CircleArrowDownDoubleIcon,
-  CircleArrowUpDoubleIcon,
-  Delete02Icon,
+  PencilEdit02Icon,
   PlayIcon,
   Rocket01Icon,
   Settings01Icon,
   StopIcon,
   Tick02Icon,
-  ViewIcon,
-  ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -47,17 +43,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
@@ -191,36 +177,24 @@ function DropLine({ id, vertical }: { id: string; vertical: boolean }) {
 const ZONE = "outline-[1.5px] outline-dashed outline-foreground/30 bg-foreground/[0.04]";
 const ZONE_OVER = "outline-solid outline-foreground/60 bg-foreground/[0.12]";
 
-type Ops = Pick<BarController, "update" | "move">;
-type ItemOps = { ops: Ops; onDelete: (item: BarItem) => void };
+type ItemOps = { onEdit: (item: BarItem) => void };
 
 const scopeOf = (item: BarItem) => (item.global ? "global" : "workspace");
 
-// The right-click menu of an Action, the same on a bar button and on a row of the menu: show
-// or hide it in the bar, send it to the other scope, delete it.
+// The right-click menu of an Action, the same on a bar button and on a row of the menu: the
+// way to its card in Settings, where it is changed, moved or deleted.
 function ItemContextMenu({
   item,
-  inBar,
-  ops,
-  onDelete,
+  onEdit,
   children,
-}: { item: BarItem; inBar: boolean; children: React.ReactElement } & ItemOps) {
+}: { item: BarItem; children: React.ReactElement } & ItemOps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="min-w-52">
-        <ContextMenuItem onSelect={() => ops.update(scopeOf(item), item.id, { ownButton: !inBar })}>
-          <HugeiconsIcon icon={inBar ? ViewOffIcon : ViewIcon} size={13} strokeWidth={2} />
-          {inBar ? "Hide from bar" : "Show in bar"}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => ops.move(scopeOf(item), item.id)}>
-          <HugeiconsIcon icon={item.global ? CircleArrowDownDoubleIcon : CircleArrowUpDoubleIcon} size={13} strokeWidth={2} />
-          {item.global ? "Move to Workspace Only" : "Move to Global"}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onSelect={() => onDelete(item)}>
-          <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={2} />
-          Delete Action
+      <ContextMenuContent className="min-w-44">
+        <ContextMenuItem onSelect={() => onEdit(item)}>
+          <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={2} />
+          Edit Action
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -235,8 +209,7 @@ function ItemContextMenu({
 function ReorderableButton({
   item,
   reorderMode,
-  ops,
-  onDelete,
+  onEdit,
   ...h
 }: { item: BarItem; reorderMode: boolean } & ItemOps & Handlers) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -244,7 +217,7 @@ function ReorderableButton({
     disabled: !reorderMode,
   });
   return (
-    <ItemContextMenu item={item} inBar ops={ops} onDelete={onDelete}>
+    <ItemContextMenu item={item} onEdit={onEdit}>
       <div
         ref={setNodeRef}
         style={{ transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition }}
@@ -292,13 +265,8 @@ function BarZone({
         dragging && accepts && isOver && ZONE_OVER,
       )}
     >
-      {dragging && (
-        <span
-          className={cn(
-            "pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none",
-            accepts ? "text-foreground/70" : "text-muted-foreground",
-          )}
-        >
+      {dragging && accepts && (
+        <span className="pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none text-foreground/70">
           {label}
         </span>
       )}
@@ -358,7 +326,7 @@ function MenuDrop({
 
 type RowProps = { item: BarItem; reorderMode: boolean } & ItemOps & Handlers;
 
-function MenuRow({ item, reorderMode, ops, onDelete, ...h }: RowProps) {
+function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
   const script = item.action.runInTerminal;
   // Dragged with the reorder modifier held: within its section, to the other section, or out
   // onto the bar. The listeners go on a wrapper that takes the pointer in that mode, so a
@@ -390,7 +358,7 @@ function MenuRow({ item, reorderMode, ops, onDelete, ...h }: RowProps) {
   // hover lights only its own; the name runs an idle script or brings a live one into view,
   // and either way the menu stays open.
   return (
-    <ItemContextMenu item={item} inBar={false} ops={ops} onDelete={onDelete}>
+    <ItemContextMenu item={item} onEdit={onEdit}>
       <div
         ref={setNodeRef}
         style={{ transform: CSS.Translate.toString(transform), transition }}
@@ -487,8 +455,7 @@ export function ActionsMenu({
   globalItems,
   reorderMode,
   dragging,
-  ops,
-  onDelete,
+  onEdit,
   onRestoreFocus,
   onConfigure,
   ...props
@@ -508,7 +475,7 @@ export function ActionsMenu({
     },
   };
   const busy = items.some((i) => i.state !== "idle") || globalItems.some((i) => i.state !== "idle");
-  const row = { reorderMode, ops, onDelete, ...h };
+  const row = { reorderMode, onEdit, ...h };
   return (
     <DropdownMenu modal={false} onOpenChange={() => (holdOpen.current = false)}>
       <DropdownMenuTrigger asChild>
@@ -519,7 +486,6 @@ export function ActionsMenu({
         >
           <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
           <span>{label}</span>
-          <span className="text-[10px] text-muted-foreground/60">{items.length + globalItems.length}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
         </button>
       </DropdownMenuTrigger>
@@ -550,7 +516,7 @@ export function ActionsMenu({
 // With no Actions at all the bar shows the dashed add button; once there are Actions it
 // hides and comes back when the pointer crosses the bar, so the bar keeps its room for
 // buttons while the entry point stays one hover away. It leads straight to the editor.
-function AddActionMenu({ onAdd, reveal }: { onAdd: () => void; reveal: "always" | "hover" }) {
+function AddActionMenu({ onAdd, reveal, dragging }: { onAdd: () => void; reveal: "always" | "hover"; dragging: boolean }) {
   return (
     <button
       type="button"
@@ -560,6 +526,7 @@ function AddActionMenu({ onAdd, reveal }: { onAdd: () => void; reveal: "always" 
       className={cn(
         "flex h-7 shrink-0 items-center rounded-md border border-dashed border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
         reveal === "hover" && "hidden group-hover/ap:flex",
+        dragging && "hidden group-hover/ap:hidden",
       )}
     >
       <span>+</span>
@@ -631,7 +598,6 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   }, []);
   const model = useActionsBarModel({ workspace, room });
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<BarItem | null>(null);
   const menuItems = [...model.menu.workspace, ...model.menu.global];
   const fromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX) ?? false;
   const dragged = draggingId
@@ -774,11 +740,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     else if (drop.placeBefore !== undefined) controller.place(drop.from, drop.id, drop.placeBefore ?? undefined);
     if (drop.reorderOver) controller.reorder(drop.from, drop.id, drop.reorderOver);
   };
-  const askDelete = (item: BarItem) => {
-    if (item.action.appId) controller.remove(scopeOf(item), item.id);
-    else setPendingDelete(item);
-  };
-  const itemOps: ItemOps = { ops: controller, onDelete: askDelete };
+  const itemOps: ItemOps = { onEdit: (item) => controller.edit(scopeOf(item), item.id) };
   const renderButtons = (list: BarItem[]) => (
     <SortableContext items={list.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
       {list.map((item) => (
@@ -804,7 +766,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       }}
       className="group/ap flex h-full min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden"
     >
-      <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} />
+      <AddActionMenu onAdd={onAddAction} reveal={model.empty ? "always" : "hover"} dragging={dragging} />
       <DropHintContext.Provider value={hint}>
       <DndContext
         sensors={sensors}
@@ -864,23 +826,6 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
         </DragOverlay>
       </DndContext>
       </DropHintContext.Provider>
-      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <AlertDialogContent className="w-[360px] rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">Delete &quot;{pendingDelete?.name}&quot;?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[12px]">The Action is removed and cannot come back.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => pendingDelete && controller.remove(scopeOf(pendingDelete), pendingDelete.id)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -128,6 +128,7 @@ export const ActionRow = forwardRef<ActionRowHandle, Props>(function ActionRow(
   return (
     <div
       ref={setNodeRef}
+      data-action-row={action.id}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "flex flex-col gap-2 rounded-md border bg-card p-2",

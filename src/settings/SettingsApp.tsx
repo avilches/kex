@@ -12,7 +12,8 @@ import { type JSX, createElement, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
-import { ActionsSection } from "./sections/ActionsSection";
+import { parseActionsTarget } from "@/modules/actions/lib/actionsTarget";
+import { ActionsSection, type ActionsRequest } from "./sections/ActionsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileTypesSection } from "./sections/FileTypesSection";
@@ -68,6 +69,13 @@ function readInitialFileTypesExt(): string | undefined {
   return section === "filetypes" ? ext : undefined;
 }
 
+function readInitialActionsTarget(): ActionsRequest | null {
+  if (typeof window === "undefined") return null;
+  const { section, ext } = parseSectionParam(new URL(window.location.href).searchParams.get("section"));
+  const target = section === "actions" ? parseActionsTarget(ext) : null;
+  return target ? { ...target, nonce: 0 } : null;
+}
+
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsSection>(readInitialSection);
   const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
@@ -76,6 +84,7 @@ export function SettingsApp() {
   // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
   const fileTypesExtConsumed = useRef(false);
   const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
+  const [actionsTarget, setActionsTarget] = useState<ActionsRequest | null>(readInitialActionsTarget);
 
   useEffect(() => {
     if (!anchor) return;
@@ -122,6 +131,8 @@ export function SettingsApp() {
       const { section, ext } = parseSectionParam(raw);
       setActive(section);
       setAnchor(section === "appearance" ? ext : undefined);
+      const target = section === "actions" ? parseActionsTarget(ext) : null;
+      if (target) setActionsTarget((prev) => ({ ...target, nonce: (prev?.nonce ?? 0) + 1 }));
       if (ext && section === "filetypes") {
         fileTypesExtConsumed.current = false;
         setFileTypesExt(ext);
@@ -203,7 +214,7 @@ export function SettingsApp() {
                   }}
                 />
               ) : active === "actions" ? (
-                <ActionsSection />
+                <ActionsSection target={actionsTarget} />
               ) : (
                 ActiveSection && createElement(ActiveSection)
               )}

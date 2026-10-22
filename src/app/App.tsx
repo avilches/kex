@@ -82,6 +82,7 @@ import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import {
   openSettingsWindow,
+  openActionSettings,
   openGlobalActionsSettings,
   openWorkspaceActionsSettings,
 } from "@/modules/settings/openSettingsWindow";
@@ -3682,7 +3683,13 @@ export default function App() {
   );
 
   const actionsController = useMemo(
-    () => ({ run: runAction, stop: stopAction, focus: focusActionTab, ...barOps }),
+    () => ({
+      run: runAction,
+      stop: stopAction,
+      focus: focusActionTab,
+      edit: (scope: "workspace" | "global", id: string) => void openActionSettings(scope, id),
+      ...barOps,
+    }),
     [runAction, stopAction, focusActionTab, barOps],
   );
 
