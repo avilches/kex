@@ -186,6 +186,11 @@ function DropLine({ id, vertical }: { id: string; vertical: boolean }) {
   );
 }
 
+// How a drop zone looks during a drag: a soft tint and a dashed outline, firmer and solid
+// while the dragged Action is over it.
+const ZONE = "outline-[1.5px] outline-dashed outline-foreground/30 bg-foreground/[0.04]";
+const ZONE_OVER = "outline-solid outline-foreground/60 bg-foreground/[0.12]";
+
 type Ops = Pick<BarController, "update" | "move">;
 type ItemOps = { ops: Ops; onDelete: (item: BarItem) => void };
 
@@ -280,18 +285,18 @@ function BarZone({
       ref={setNodeRef}
       className={cn(
         "relative flex shrink-0 items-center gap-2 rounded-md",
-        empty && !dragging && "hidden",
-        dragging && "min-h-8 min-w-16 outline-2 outline-offset-2 outline-dashed",
-        dragging && !accepts && "opacity-40 outline-border",
-        dragging && accepts && "bg-foreground/[0.07] outline-foreground/45",
-        dragging && accepts && isOver && "bg-foreground/20 outline-solid outline-foreground/85",
+        empty && (!dragging || !accepts) && "hidden",
+        dragging && "min-h-8 min-w-16 outline-offset-2",
+        dragging && !accepts && "opacity-40 outline-[1.5px] outline-dashed outline-border",
+        dragging && accepts && ZONE,
+        dragging && accepts && isOver && ZONE_OVER,
       )}
     >
       {dragging && (
         <span
           className={cn(
             "pointer-events-none absolute -top-[5px] left-2 bg-card px-1 text-[8px] leading-none",
-            accepts ? "font-medium text-foreground/85" : "text-muted-foreground",
+            accepts ? "text-foreground/70" : "text-muted-foreground",
           )}
         >
           {label}
@@ -312,8 +317,8 @@ function FakeMenu({ id }: { id: string }) {
       title="Hide from the bar"
       aria-label="Hide from the bar"
       className={cn(
-        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border-2 border-dashed border-foreground/45 bg-foreground/[0.07] px-3 text-[11px] text-foreground/85 transition-colors",
-        isOver && "border-solid border-foreground/85 bg-foreground/20 text-foreground",
+        "flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-foreground/30 bg-foreground/[0.04] px-3 text-[11px] text-foreground/70 transition-colors",
+        isOver && "border-solid border-foreground/60 bg-foreground/[0.12] text-foreground",
       )}
     >
       <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} />
@@ -338,7 +343,14 @@ function MenuDrop({
   const { setNodeRef, isOver } = useDroppable({ id: DROP_MENU, disabled: !dragging || fromMenu });
   if (!hasMenu) return dragging && !fromMenu ? <FakeMenu id={DROP_MENU} /> : null;
   return (
-    <div ref={setNodeRef} className={cn("shrink-0 rounded-md transition-shadow", dragging && !fromMenu && isOver && "ring-1 ring-foreground/40")}>
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "shrink-0 rounded-md transition-colors",
+        dragging && !fromMenu && cn(ZONE, "outline-offset-2"),
+        dragging && !fromMenu && isOver && ZONE_OVER,
+      )}
+    >
       {children}
     </div>
   );
@@ -437,8 +449,8 @@ function MenuSection({
       ref={setNodeRef}
       className={cn(
         "rounded-md",
-        dragging && "bg-foreground/[0.07] outline-2 -outline-offset-2 outline-foreground/45 outline-dashed",
-        dragging && isOver && "bg-foreground/20 outline-solid outline-foreground/85",
+        dragging && cn(ZONE, "-outline-offset-2"),
+        dragging && isOver && ZONE_OVER,
       )}
     >
       <DropdownMenuLabel className="text-[10px] text-muted-foreground">{label}</DropdownMenuLabel>
@@ -448,7 +460,7 @@ function MenuSection({
         ))}
       </SortableContext>
       {items.length === 0 && (
-        <div className="mx-2 mb-1 flex h-9 items-center justify-center text-[11px] font-medium text-foreground/70">Drop here</div>
+        <div className="mx-2 mb-1 flex h-9 items-center justify-center text-[11px] text-foreground/60">Drop here</div>
       )}
     </div>
   );
