@@ -40,6 +40,8 @@ function CommandDialog({
   showCloseButton = false,
   modal = true,
   onFocusOutside,
+  onEscapeKeyDown,
+  onCloseAutoFocus,
   contentStyle,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
@@ -49,6 +51,8 @@ function CommandDialog({
   showCloseButton?: boolean
   modal?: boolean
   onFocusOutside?: (event: CustomEvent<{ originalEvent: FocusEvent }>) => void
+  onEscapeKeyDown?: (event: KeyboardEvent) => void
+  onCloseAutoFocus?: (event: Event) => void
   contentStyle?: React.CSSProperties
 }) {
   return (
@@ -60,6 +64,8 @@ function CommandDialog({
       <DialogContent
         modal={modal}
         onFocusOutside={onFocusOutside}
+        onEscapeKeyDown={onEscapeKeyDown}
+        onCloseAutoFocus={onCloseAutoFocus}
         style={contentStyle}
         className={cn(
           "top-1/3 translate-y-0 overflow-hidden rounded-4xl! p-0",

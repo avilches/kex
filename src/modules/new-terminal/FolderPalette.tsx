@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
+import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { Home01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -23,6 +24,8 @@ import {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Gives the focus back to the active tab when the palette is closed with Escape. */
+  restoreFocus: () => void;
   /** All groups for the open state; the component applies the search. */
   groups: readonly FolderGroup[];
   onPick: (row: FolderRow) => void;
@@ -30,9 +33,17 @@ type Props = {
   onToggleWorktrees: (row: FolderRow) => void;
 };
 
-export function FolderPalette({ open, onOpenChange, groups, onPick, onToggleWorktrees }: Props) {
+export function FolderPalette({
+  open,
+  onOpenChange,
+  restoreFocus,
+  groups,
+  onPick,
+  onToggleWorktrees,
+}: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
+  const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fresh palette on every open: no query from the previous ask.
@@ -74,6 +85,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick, onToggleWork
       description="Choose the folder for the new terminal."
       modal={false}
       onFocusOutside={(event) => event.preventDefault()}
+      {...focusHandlers}
       className={PALETTE_WIDTH_CLASS}
       contentStyle={contentStyle}
     >

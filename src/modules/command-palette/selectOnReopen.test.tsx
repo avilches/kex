@@ -57,6 +57,7 @@ function PaletteHarness() {
     <CommandPalette
       open={open}
       onOpenChange={setOpen}
+      restoreFocus={() => {}}
       initialMode="content"
       commandItems={[]}
       workspaceRoot={null}

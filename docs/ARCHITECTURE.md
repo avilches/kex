@@ -698,6 +698,9 @@ src/
                                      The selection is cmdk's own (a controlled value made its scroll lag a row). The
                                      dialog width is shared with the command palette (`paletteWidth` preference,
                                      dragged from either side edge by `usePaletteWidth`, double-click resets).
+                                     Closing either palette with Escape gives the focus back to the active tab
+                                     (editor, terminal, browser: `focusActiveTab`) through
+                                     `useRestoreFocusOnEscape`; picking a row or clicking elsewhere keeps deciding its own focus.
                                      `App.tsx` intercepts every terminal
                                      creation (`openNewTerminal` and both split callbacks): a free creation can land
                                      in another workspace (switches to it, waking it if needed, and inserts right

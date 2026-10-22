@@ -43,11 +43,14 @@ import { type TerminalTarget, terminalTargetOf } from "./lib/terminalTarget";
 import { enterHintOf } from "./lib/enterHint";
 import { MergedList } from "./MergedList";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "./PaletteWidth";
+import { useRestoreFocusOnEscape } from "./useRestoreFocusOnEscape";
 import type { PaletteItem } from "./types";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Gives the focus back to the active tab when the palette is closed with Escape. */
+  restoreFocus: () => void;
   initialMode?: "commands" | "content";
   commandItems: PaletteItem[];
   workspaceRoot: string | null;
@@ -80,6 +83,7 @@ let lastContentScrollTop = 0;
 export function CommandPalette({
   open,
   onOpenChange,
+  restoreFocus,
   initialMode,
   commandItems,
   workspaceRoot,
@@ -98,6 +102,7 @@ export function CommandPalette({
 }: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
+  const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
   const [value, setValue] = useState("");
   const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -396,6 +401,7 @@ export function CommandPalette({
       description="Run a command, switch theme, or search your workspace."
       modal={false}
       onFocusOutside={(event) => event.preventDefault()}
+      {...focusHandlers}
       className={PALETTE_WIDTH_CLASS}
       contentStyle={contentStyle}
     >

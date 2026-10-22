@@ -4117,6 +4117,7 @@ export default function App() {
           <CommandPalette
             open={commandPaletteOpen}
             onOpenChange={setCommandPaletteOpen}
+            restoreFocus={focusActiveTab}
             initialMode={paletteInitialMode}
             commandItems={commandPaletteItems}
             workspaceRoot={explorerRoot}
@@ -4137,6 +4138,7 @@ export default function App() {
           <FolderPalette
             open={folderPaletteOpen}
             onOpenChange={setFolderPaletteOpen}
+            restoreFocus={focusActiveTab}
             groups={folderGroups}
             onPick={onFolderPick}
             onToggleWorktrees={onFolderToggleWorktrees}

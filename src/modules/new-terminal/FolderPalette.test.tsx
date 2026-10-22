@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
-import { createElement } from "react";
+import { createElement, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FolderPalette } from "./FolderPalette";
@@ -75,6 +75,7 @@ function mount(onPick: (row: FolderRow) => void) {
     createElement(FolderPalette, {
       open: true,
       onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
       groups,
       onPick,
       onToggleWorktrees: vi.fn(),
@@ -138,6 +139,7 @@ describe("FolderPalette", () => {
       createElement(FolderPalette, {
         open: true,
         onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
         groups: [
           group({
             workspaceId: "ws-3",
@@ -160,6 +162,7 @@ describe("FolderPalette", () => {
       createElement(FolderPalette, {
         open: true,
         onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
         groups: [
           group({
             rows: [
@@ -200,6 +203,7 @@ describe("FolderPalette", () => {
         createElement(FolderPalette, {
           open: true,
           onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
           groups,
           onPick: vi.fn(),
           onToggleWorktrees,
@@ -286,6 +290,7 @@ describe("FolderPalette", () => {
       createElement(FolderPalette, {
         open: true,
         onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
         groups: [group({ rows: [row({ path: "/repo/src", branch: "feat/login", key: "ws-1:/repo/src" })] })],
         onPick: vi.fn(),
         onToggleWorktrees: vi.fn(),
@@ -298,5 +303,44 @@ describe("FolderPalette", () => {
     await settle();
     const bold = [...itemEls()[0].querySelectorAll("b")].map((b) => b.textContent);
     expect(bold).toEqual(["login"]);
+  });
+
+  describe("focus on close", () => {
+    function Stateful({ restore, onPick }: { restore: () => void; onPick: () => void }) {
+      const [open, setOpen] = useState(true);
+      return createElement(FolderPalette, {
+        open,
+        onOpenChange: setOpen,
+        restoreFocus: restore,
+        groups,
+        onPick,
+        onToggleWorktrees: vi.fn(),
+      });
+    }
+
+    it("gives the focus back to the tab when Escape closes it", async () => {
+      const restore = vi.fn();
+      render(createElement(Stateful, { restore, onPick: vi.fn() }));
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(document, { key: "Escape" });
+      });
+      await settle(80);
+      expect(document.querySelector('[cmdk-input=""]')).toBeNull();
+      expect(restore).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not touch the focus when picking a folder closes it", async () => {
+      const restore = vi.fn();
+      const onPick = vi.fn();
+      render(createElement(Stateful, { restore, onPick }));
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Enter" });
+      });
+      await settle(80);
+      expect(onPick).toHaveBeenCalledTimes(1);
+      expect(restore).not.toHaveBeenCalled();
+    });
   });
 });
