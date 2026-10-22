@@ -62,7 +62,6 @@ const other = ws({ id: "ws-2", title: "Dotfiles", color: "#4f8fff", workspaceRoo
 const empty = ws({ id: "ws-3", title: "No folders" });
 
 describe("buildFolderGroups", () => {
-
   it("lists the current tab, main checkout and workspace root first, then the rest of the cwds", () => {
     const entries = [
       entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/perf-lab/src-tauri", branch: "feat/perf", lastUsedAt: 5 }),
@@ -72,6 +71,7 @@ describe("buildFolderGroups", () => {
     const [group] = buildFolderGroups({
       workspaces: [active, other, empty],
       activeWorkspaceId: "ws-1",
+      home: null,
       activeTabEntry: entries[0],
       entries,
     });
@@ -93,6 +93,7 @@ describe("buildFolderGroups", () => {
     const [group] = buildFolderGroups({
       workspaces: [active, other, empty],
       activeWorkspaceId: "ws-1",
+      home: null,
       activeTabEntry: entries[0],
       entries,
     });
@@ -110,6 +111,7 @@ describe("buildFolderGroups", () => {
     const groups = buildFolderGroups({
       workspaces: [active, other, empty],
       activeWorkspaceId: "ws-1",
+      home: null,
       activeTabEntry: null,
       entries,
     });
@@ -122,11 +124,45 @@ describe("buildFolderGroups", () => {
     ]);
   });
 
+  it("dedupes across workspaces: a path already listed never comes back", () => {
+    const entries = [
+      // The dotfiles workspace root is also a tab cwd of the active workspace.
+      entry({ workspaceId: "ws-1", cwd: "/dotfiles", lastUsedAt: 4 }),
+      entry({ workspaceId: "ws-2", cwd: "/dotfiles/home", lastUsedAt: 2 }),
+    ];
+    const groups = buildFolderGroups({
+      workspaces: [active, other],
+      activeWorkspaceId: "ws-1",
+      home: null,
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
+      entries,
+    });
+    const kex = groups.find((g) => g.workspaceId === "ws-1");
+    const dotfiles = groups.find((g) => g.workspaceId === "ws-2");
+    // /dotfiles is taken by the active workspace's tab, so the other workspace
+    // keeps only the path that is really new.
+    expect(kex?.rows.map((r) => r.path)).toEqual(["/repo/src", "/repo", "/dotfiles"]);
+    expect(dotfiles?.rows.map((r) => r.path)).toEqual(["/dotfiles/home"]);
+  });
+
+  it("skips a workspace whose rows were all listed before", () => {
+    const entries = [entry({ workspaceId: "ws-1", cwd: "/dotfiles", lastUsedAt: 4 })];
+    const groups = buildFolderGroups({
+      workspaces: [active, other],
+      activeWorkspaceId: "ws-1",
+      home: null,
+      activeTabEntry: null,
+      entries,
+    });
+    expect(groups.map((g) => g.workspaceId)).toEqual(["ws-1"]);
+  });
+
   it("keeps hibernated workspaces with their tag", () => {
     const sleeping = ws({ id: "ws-4", title: "Sleeping", workspaceRoot: "/sleep", hibernated: true });
     const groups = buildFolderGroups({
       workspaces: [active, sleeping],
       activeWorkspaceId: "ws-1",
+      home: null,
       activeTabEntry: null,
       entries: [entry({ workspaceId: "ws-4", cwd: "/sleep/sub", hibernated: true })],
     });
@@ -143,6 +179,7 @@ describe("buildFolderGroups", () => {
     const groups = buildFolderGroups({
       workspaces: [active, noRoot],
       activeWorkspaceId: "ws-1",
+      home: null,
       activeTabEntry: null,
       entries: [entry({ workspaceId: "ws-5", kind: "browser", cwd: "" })],
     });
@@ -152,13 +189,16 @@ describe("buildFolderGroups", () => {
 });
 
 describe("filterFolderGroups", () => {
+  const withHome = ws({ id: "ws-6", title: "HomeWorkspace" });
   const groups = buildFolderGroups({
-    workspaces: [active, other],
+    workspaces: [active, other, withHome],
     activeWorkspaceId: "ws-1",
+    home: "/Users/avilches",
     activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src-tauri", branch: "main" }),
     entries: [
       entry({ workspaceId: "ws-1", cwd: "/repo/src-tauri" }),
       entry({ workspaceId: "ws-2", cwd: "/dotfiles/home" }),
+      entry({ workspaceId: "ws-6", cwd: "/Users/avilches/server.py" }),
     ],
   });
 
@@ -169,12 +209,32 @@ describe("filterFolderGroups", () => {
     expect(g1.rows.every((r) => r.indices === undefined)).toBe(true);
   });
 
-  it("filters rows and highlights the matched run, dropping empty groups", () => {
+  it("requires the whole word as a substring and highlights exactly that run", () => {
     const [only] = filterFolderGroups(groups, "home");
     expect(only.workspaceId).toBe("ws-2");
     expect(only.rows).toHaveLength(1);
     // "/dotfiles/home": h o m e at indices 10..13.
     expect(only.rows[0].indices).toEqual([10, 11, 12, 13]);
+  });
+
+  it("matches every token somewhere in the path, highlighting all of them", () => {
+    const [only] = filterFolderGroups(groups, "repo tauri");
+    expect(only.workspaceId).toBe("ws-1");
+    expect(only.rows).toHaveLength(1);
+    expect(only.rows[0].path).toBe("/repo/src-tauri");
+    // "repo" at 1..4, "tauri" at 10..14.
+    expect(only.rows[0].indices).toEqual([1, 2, 3, 4, 10, 11, 12, 13, 14]);
+  });
+
+  it("never matches inside the home prefix (ser does not hit Users)", () => {
+    const matched = filterFolderGroups(groups, "ser");
+    expect(matched.map((g) => g.rows.map((r) => r.path))).toEqual([["/Users/avilches/server.py"]]);
+    expect(matched[0].rows[0].indices).toEqual([16, 17, 18]);
+  });
+
+  it("drops rows missing any token", () => {
+    const matched = filterFolderGroups(groups, "dotfiles tauri");
+    expect(matched).toEqual([]);
   });
 
   it("keeps group order and row order (no reordering on search)", () => {
@@ -188,7 +248,8 @@ describe("folderRowNote", () => {
   it("joins label, branch and process", () => {
     expect(folderRowNote({
       key: "k", path: "/p", label: "Current tab", branch: "feat", process: "claude",
-      kind: "terminal", agent: "claude", workspaceId: "ws-1", hibernated: false,
+      matchOffset: 0,
+      workspaceId: "ws-1", hibernated: false,
     })).toBe("Current tab \u00b7 feat \u00b7 claude");
   });
 });

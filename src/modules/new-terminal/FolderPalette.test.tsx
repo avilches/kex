@@ -12,8 +12,7 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   label: over.label ?? null,
   branch: over.branch ?? null,
   process: over.process ?? null,
-  kind: over.kind ?? null,
-  agent: over.agent ?? "",
+  matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
   hibernated: over.hibernated ?? false,
 });
@@ -35,7 +34,7 @@ const groups: FolderGroup[] = [
     rows: [
       row({ path: "/repo/.claude/worktrees/perf-lab/src-tauri", label: "Current tab", branch: "feat/perf", key: "ws-1:/repo/.claude/worktrees/perf-lab/src-tauri" }),
       row({ path: "/repo", label: "Workspace root", key: "ws-1:/repo" }),
-      row({ path: "/repo/src", branch: "main", kind: "terminal", agent: "claude", key: "ws-1:/repo/src" }),
+      row({ path: "/repo/src", branch: "main", key: "ws-1:/repo/src" }),
     ],
   }),
   group({
