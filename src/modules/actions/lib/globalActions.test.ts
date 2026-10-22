@@ -74,6 +74,31 @@ describe("createGlobalActions", () => {
     expect(h.store.get()).toEqual([]);
   });
 
+  it("an app with the command of a global app overwrites it in place, with the incoming name", async () => {
+    const h = harness();
+    h.echo([act("a"), act("b")]);
+    const p = h.store.add({ ...act("n", "Fresh name"), command: "open a" });
+    expect(h.store.get().map((a) => [a.id, a.name])).toEqual([
+      ["a", "Fresh name"],
+      ["b", "b"],
+    ]);
+    await h.finish(0);
+    expect((await p).id).toBe("a");
+  });
+
+  it("a failed write after a merge brings the overwritten app back", async () => {
+    const h = harness({ failOn: 1 });
+    h.echo([act("a"), act("b")]);
+    const result = h.store.add({ ...act("n", "Fresh name"), command: "open a" });
+    const settled = expect(result).rejects.toThrow("disk full");
+    await h.finish(0);
+    await settled;
+    expect(h.store.get().map((a) => [a.id, a.name])).toEqual([
+      ["a", "a"],
+      ["b", "b"],
+    ]);
+  });
+
   it("a failed write does not drop an action added after it", async () => {
     const h = harness({ failOn: 1 });
     const failed = h.store.add(act("a"));
@@ -90,7 +115,7 @@ describe("createGlobalActions", () => {
   it("an id already global gets a fresh one and both survive", async () => {
     const h = harness();
     h.echo([act("a", "old")]);
-    const p = h.store.add(act("a", "mine"));
+    const p = h.store.add({ ...act("a", "mine"), command: "open mine" });
     expect(h.store.get().map((a) => [a.id, a.name])).toEqual([
       ["a", "old"],
       ["fresh-0", "mine"],

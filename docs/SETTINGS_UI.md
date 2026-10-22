@@ -74,7 +74,9 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   chincheta del explorer, Current tab folder, Absolute path), nombre, comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra);
   guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la
-  mueve de ambito (al final de su tipo). Una Action de preset se edita igual que cualquiera:
+  mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
+  exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega
+  (los scripts nunca se fusionan). Una Action de preset se edita igual que cualquiera:
   al cambiar su nombre o su comando deja de ser un preset (`ownedAfterEdit`, conserva el
   icono en `iconId`) y el preset vuelve al combo; Own button / Inside the combo no cuenta.
   El combo Add pone Add Command y Custom app arriba y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de

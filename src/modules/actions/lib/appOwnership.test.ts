@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { updateAction } from "./actions";
 import { ownedAfterEdit } from "./appOwnership";
+import { uninstalledSuggestions, type AppSuggestion } from "./appSuggestions";
 import type { Action } from "./types";
 
 const preset: Action = {
@@ -10,6 +12,23 @@ const preset: Action = {
   appId: "sublime",
   ownButton: false,
 };
+
+const zed: AppSuggestion = { key: "sublime:ws", appId: "sublime", name: "Sublime Text {workspace}", iconId: "sublime", defaultCommand: "subl {workspace}" };
+
+describe("an edited preset and the Add combo", () => {
+  it("is offered again once its command changes, and not before", () => {
+    expect(uninstalledSuggestions([zed], [preset])).toEqual([]);
+    const stored = updateAction([preset], "a", ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" }));
+    expect(stored[0]!.appId).toBeUndefined();
+    expect(stored[0]!.iconId).toBe("sublime");
+    expect(uninstalledSuggestions([zed], stored)).toEqual([zed]);
+  });
+
+  it("is offered again when only its name changes", () => {
+    const stored = updateAction([preset], "a", ownedAfterEdit(preset, { ...preset, name: "My Sublime" }));
+    expect(uninstalledSuggestions([zed], stored)).toEqual([zed]);
+  });
+});
 
 describe("ownedAfterEdit", () => {
   it("drops the appId when the name or the command changes", () => {

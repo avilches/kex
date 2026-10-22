@@ -89,23 +89,31 @@ export function normalizeActions(raw: unknown): Action[] {
 }
 
 // Adds an action to a list it does not belong to. When its id is already taken there, it gets
-// a fresh one, so neither version is lost.
+// a fresh one, so neither version is lost. An app whose command a list app already has is that
+// app: the incoming one overwrites it in place (the name is all that can differ), keeping the
+// id the list knows.
 export function adoptAction(list: readonly Action[], action: Action, makeId: () => string): Action[] {
   return adoptActionAt(list, action, makeId).list;
 }
 
-// The same, placed before the Action `beforeId` when the list has it, last otherwise.
+// The same, placed before the Action `beforeId` when the list has it, last otherwise; a merged
+// app keeps the place of the one it overwrote.
 export function adoptActionAt(
   list: readonly Action[],
   action: Action,
   makeId: () => string,
   beforeId?: string,
-): { list: Action[]; stored: Action } {
+): { list: Action[]; stored: Action; merged: boolean } {
+  const twin = action.runInTerminal ? undefined : list.find((a) => !a.runInTerminal && a.command.trim() === action.command.trim());
+  if (twin) {
+    const merged = { ...action, id: twin.id };
+    return { list: list.map((a) => (a === twin ? merged : a)), stored: merged, merged: true };
+  }
   const stored = list.some((a) => a.id === action.id) ? { ...action, id: makeId() } : action;
   const next = [...list];
   const at = beforeId ? next.findIndex((a) => a.id === beforeId) : -1;
   next.splice(at === -1 ? next.length : at, 0, stored);
-  return { list: next, stored };
+  return { list: next, stored, merged: false };
 }
 
 // Moves, never copies: the action leaves the workspace and joins the global list.

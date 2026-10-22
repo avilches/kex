@@ -34,7 +34,8 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
   function add(action: Action, beforeId?: string): Promise<Action> {
     const clean = normalizeAction(action);
     if (!clean) return Promise.reject(new Error("Invalid action"));
-    const { list: next, stored } = adoptActionAt(get(), clean, makeId, beforeId);
+    const prior = get();
+    const { list: next, stored, merged } = adoptActionAt(prior, clean, makeId, beforeId);
     if (pending === 0) base = read();
     current = next;
     pending++;
@@ -50,7 +51,11 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
       },
       (err: unknown) => {
         pending--;
-        current = removeAction(current ?? next, stored.id);
+        // A merged app overwrote one that was already there: that one comes back, not goes away.
+        const overwritten = merged ? prior.find((a) => a.id === stored.id) : undefined;
+        current = overwritten
+          ? (current ?? next).map((a) => (a.id === stored.id ? overwritten : a))
+          : removeAction(current ?? next, stored.id);
         throw err;
       },
     );
