@@ -393,7 +393,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ## Bloque G - OMP
 
 Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el campanazo
-> "Install OMP integration" (o Settings > General > OMP integration) antes de empezar.
+> "Install OMP integration" (o Settings > General > Agents > OMP) antes de empezar.
 
 ### G1 La extension carga sin config extra
 
@@ -430,7 +430,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ## Bloque H - Pi
 
 Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el campanazo
-> "Install Pi integration" (o Settings > General > Pi integration) antes de empezar.
+> "Install Pi integration" (o Settings > General > Agents > Pi) antes de empezar.
 
 ### H1 La extension carga sin config extra
 
@@ -467,9 +467,9 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 
 ### I2 Quitar
 
-- [ ] Settings > General > OMP integration > Remove: el fichero desaparece, la fila pasa a "Not installed" y la campana vuelve a ofrecer "Install OMP integration"
+- [ ] Settings > General > Agents > OMP > Uninstall: el fichero desaparece, la fila pasa a "Not installed" y la campana vuelve a ofrecer "Install OMP integration"
 - [ ] Reabrir Kex: no se reinstala solo
-- [ ] Repetir con un fichero propio en la ruta: Remove falla con el mensaje de error y no lo borra
+- [ ] Repetir con un fichero propio en la ruta: Uninstall falla con el mensaje de error y no lo borra
 
 ### I3 OMP no pierde el agente
 

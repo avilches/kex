@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { IntegrationAgent } from "./integrations";
+import type { AgentId, IntegrationAgent } from "./integrations";
 import { withIntegration } from "./integrations";
 
 const SETUP_COMMAND: Record<IntegrationAgent, string> = {
@@ -44,4 +44,12 @@ export async function syncIntegrations(
   const foreign = await invoke<string[]>("agent_sync_integrations", { agents: [...tracked] });
   if (foreign.length === 0) return;
   await update((current) => current.filter((a) => !foreign.includes(a)));
+}
+
+/** One file an install or an uninstall would change: `null` before means new, `null` after means deleted. */
+export type FilePreview = { path: string; before: string | null; after: string | null };
+
+// Dry run: nothing is written.
+export function previewIntegration(agent: AgentId, install: boolean): Promise<FilePreview[]> {
+  return invoke<FilePreview[]>("agent_integration_preview", { agent, install });
 }

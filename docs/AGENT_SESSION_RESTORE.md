@@ -32,13 +32,15 @@ config folder, and the agent's process loads it: `agent_setup_opencode` writes
 `<opencode config dir>/plugins/opencode-session.js` (`~/.config/opencode/` normally, the `OPENCODE_CONFIG_DIR`
 directory when set), `agent_setup_omp` writes `~/.omp/agent/extensions/kex-agent-status.ts` and `agent_setup_pi` the
 same file under `~/.pi/agent/extensions/`. Without Kex's per-terminal env vars the script does nothing. The install
-lives in the bell popover (a row per agent, shown only while the integration is missing) and in Settings > General
-(`IntegrationRow`: Install, Reinstall and Remove). `agent_*_status` tells whether the installed file is current.
+lives in the bell popover (a row per agent, shown only while the integration is missing) and in Settings > General >
+Agents (`AgentIntegrations`: one row per agent, Claude Code included, with Install or Uninstall and a "View changes"
+link that opens the `agent_integration_preview` dry run as a diff). `agent_*_status` tells whether the installed file is
+current.
 
 Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
-`omp` and `pi`) is written only after the file is on disk, and removed when the user presses Remove. On every startup
+`omp` and `pi`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup
 `syncIntegrations` calls `agent_sync_integrations` with that list, which rewrites each file to the version this build
-ships, so an app update reaches the agent without pressing Reinstall. The sync never creates a file and never turns a
+ships, so an app update reaches the agent without reinstalling. The sync never creates a file and never turns a
 newer one back to an older version. A file that does not start with Kex's marker is left alone and the agent drops out
 of the list; one that is merely missing (a dotfiles link or a synced folder not there yet) stays on it. A link is
 written through, not replaced.

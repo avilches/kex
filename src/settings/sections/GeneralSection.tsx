@@ -1,31 +1,23 @@
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type AutofocusMode,
-  setAgentNotifications,
   setAutofocusMode,
   setAutofocusNewTabs,
   setAutostart,
   setPerformanceProfiler,
   setPreviewOnClick,
 } from "@/modules/settings/store";
-import { cn } from "@/lib/utils";
-import {
-  CancelCircleIcon,
-  CheckmarkCircle02Icon,
-  CrosshairIcon,
-} from "@hugeicons/core-free-icons";
+import { CrosshairIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { IntegrationRow } from "./IntegrationRow";
+import { AgentIntegrations } from "./AgentIntegrations";
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
@@ -33,39 +25,6 @@ export function GeneralSection() {
   const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
-  const [hooksInstalled, setHooksInstalled] = useState<boolean | null>(null);
-  const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
-  const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    invoke<boolean>("agent_claude_hooks_status")
-      .then((on) => alive && setHooksInstalled(on))
-      .catch(() => alive && setHooksInstalled(false));
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const onChangeIntegration = async (install: boolean) => {
-    setAgentNotifsInstalling(true);
-    setAgentNotifsError(null);
-    try {
-      await invoke(install ? "agent_enable_claude_hooks" : "agent_disable_claude_hooks");
-      await setAgentNotifications(install);
-      setHooksInstalled(install);
-    } catch (e) {
-      setAgentNotifsError(
-        install
-          ? "Could not install the hooks in ~/.claude/settings.json."
-          : "Could not remove the hooks from ~/.claude/settings.json.",
-      );
-      console.error("[kex] agent hooks change failed:", e);
-    } finally {
-      setAgentNotifsInstalling(false);
-    }
-  };
-
   useEffect(() => {
     let alive = true;
     void isEnabled()
@@ -160,73 +119,7 @@ export function GeneralSection() {
         </SettingRow>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <FieldLabel>Agents</FieldLabel>
-        <SettingRow
-          title={
-            <span className="flex items-center gap-1.5">
-              Kex integration
-              {hooksInstalled !== null && (
-                <span
-                  className={cn(
-                    "flex items-center gap-1 text-[11px] font-normal",
-                    hooksInstalled ? "text-green-500" : "text-destructive",
-                  )}
-                >
-                  <HugeiconsIcon
-                    icon={hooksInstalled ? CheckmarkCircle02Icon : CancelCircleIcon}
-                    size={12}
-                    strokeWidth={2}
-                  />
-                  {hooksInstalled ? "Installed" : "Not installed"}
-                </span>
-              )}
-            </span>
-          }
-          description={
-            hooksInstalled
-              ? "Claude Code hooks are active: Kex restores your Claude sessions and notifies you in the tab bar when Claude needs input or finishes. Entries live in ~/.claude/settings.json."
-              : "Install the Claude Code hooks so Kex can restore your Claude sessions when you reopen it and notify you in the tab bar when Claude needs input or finishes. Adds entries to ~/.claude/settings.json."
-          }
-        >
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-2.5 text-[11px]"
-            disabled={agentNotifsInstalling || hooksInstalled === null}
-            onClick={() => void onChangeIntegration(!hooksInstalled)}
-          >
-            {hooksInstalled
-              ? agentNotifsInstalling
-                ? "Uninstalling..."
-                : "Uninstall"
-              : agentNotifsInstalling
-                ? "Installing..."
-                : "Install"}
-          </Button>
-        </SettingRow>
-        {agentNotifsError && (
-          <p className="text-[11px] text-destructive">{agentNotifsError}</p>
-        )}
-        <IntegrationRow
-          agent="opencode"
-          name="OpenCode"
-          kind="plugin"
-          file="~/.config/opencode/plugins/opencode-session.js"
-        />
-        <IntegrationRow
-          agent="omp"
-          name="OMP"
-          kind="extension"
-          file="~/.omp/agent/extensions/kex-agent-status.ts"
-        />
-        <IntegrationRow
-          agent="pi"
-          name="Pi"
-          kind="extension"
-          file="~/.pi/agent/extensions/kex-agent-status.ts"
-        />
-      </div>
+      <AgentIntegrations />
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Startup</FieldLabel>
