@@ -12,11 +12,12 @@ import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { Home01Icon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
   type FolderGroup,
   type FolderRow,
+  type RepoHint,
 } from "./lib/folderEntries";
 
 type Props = {
@@ -25,11 +26,11 @@ type Props = {
   /** All groups for the open state; the component applies the search. */
   groups: readonly FolderGroup[];
   onPick: (row: FolderRow) => void;
-  /** Tab on a row whose repository has worktrees that are not listed yet. */
-  onExpand: (row: FolderRow) => void;
+  /** Tab on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
+  onToggleWorktrees: (row: FolderRow) => void;
 };
 
-export function FolderPalette({ open, onOpenChange, groups, onPick, onExpand }: Props) {
+export function FolderPalette({ open, onOpenChange, groups, onPick, onToggleWorktrees }: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
   const listRef = useRef<HTMLDivElement>(null);
@@ -62,7 +63,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick, onExpand }: 
       '[cmdk-item][aria-selected="true"]',
     )?.dataset.folderRow;
     const row = key ? groups.flatMap((g) => g.rows).find((r) => r.key === key) : undefined;
-    if (row?.repoKey && row.hiddenWorktrees > 0) onExpand(row);
+    if (row?.repoKey && row.repoHint) onToggleWorktrees(row);
   };
 
   return (
@@ -105,37 +106,36 @@ export function FolderPalette({ open, onOpenChange, groups, onPick, onExpand }: 
                   key={g.workspaceId}
                   heading={<GroupHeading group={g} titleIndices={g.titleIndices} />}
                 >
-                  {g.rows.map((row) => (
-                    <CommandItem
-                      key={row.key}
-                      value={row.key}
-                      data-folder-row={row.key}
-                      onSelect={() => onPick(row)}
-                      className="pl-7 text-[12.5px]"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        <HighlightText text={row.display} indices={row.indices} />
-                        {row.branch ? (
-                          <span className="font-normal text-muted-foreground">
-                            {" \u00b7 "}
-                            <HighlightText text={row.branch} indices={row.branchIndices} />
+                  {g.rows.map((row, at) => (
+                    <Fragment key={row.key}>
+                      {startsRepo(g.rows, at) ? <RepoHeading row={row} /> : null}
+                      <CommandItem
+                        value={row.key}
+                        data-folder-row={row.key}
+                        onSelect={() => onPick(row)}
+                        className="pl-7 text-[12.5px]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          <HighlightText text={row.display} indices={row.indices} />
+                          {row.branch ? (
+                            <span className="font-normal text-muted-foreground">
+                              {" \u00b7 "}
+                              <HighlightText text={row.branch} indices={row.branchIndices} />
+                            </span>
+                          ) : null}
+                        </span>
+                        {row.hint ? (
+                          <HintChip hint={row.hint} className="ml-auto" />
+                        ) : row.label ? (
+                          <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                            {row.label === "Home" ? (
+                              <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+                            ) : null}
+                            <HighlightText text={row.label} indices={row.labelIndices} />
                           </span>
                         ) : null}
-                      </span>
-                      {row.hiddenWorktrees > 0 ? (
-                        <span className="ml-auto shrink-0 text-[11px] font-normal text-muted-foreground">
-                          <span className="font-medium">TAB</span>
-                          {`: show ${row.hiddenWorktrees} ${row.hiddenWorktrees === 1 ? "worktree" : "worktrees"}`}
-                        </span>
-                      ) : row.label ? (
-                        <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
-                          {row.label === "Home" ? (
-                            <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
-                          ) : null}
-                          <HighlightText text={row.label} indices={row.labelIndices} />
-                        </span>
-                      ) : null}
-                    </CommandItem>
+                      </CommandItem>
+                    </Fragment>
                   ))}
                 </CommandGroup>
               ))
@@ -174,6 +174,41 @@ function GroupHeading({
           <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
         </span>
       ) : null}
+    </span>
+  );
+}
+
+// The first visible row of a repository's folders carries the heading, when it has two or more.
+function startsRepo(rows: readonly FolderRow[], at: number): boolean {
+  const row = rows[at];
+  if (row.pinned || row.cluster < 2) return false;
+  const before = rows[at - 1];
+  return !(before && !before.pinned && before.repoKey === row.repoKey);
+}
+
+function RepoHeading({ row }: { row: FolderRow & { repoNameIndices?: number[] } }) {
+  return (
+    <div
+      aria-hidden
+      className="flex items-center gap-2 pt-2 pr-3 pb-0.5 pl-7 text-[11px] font-medium text-muted-foreground"
+    >
+      <span className="min-w-0 truncate">
+        <HighlightText text={row.repoName ?? ""} indices={row.repoNameIndices} />
+      </span>
+      {row.repoHint ? <HintChip hint={row.repoHint} className="ml-auto" /> : null}
+    </div>
+  );
+}
+
+function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
+  return (
+    <span
+      className={`flex shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground ${className ?? ""}`}
+    >
+      <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">Tab</kbd>
+      {hint.kind === "show"
+        ? `show ${hint.count} ${hint.count === 1 ? "worktree" : "worktrees"}`
+        : "hide worktrees"}
     </span>
   );
 }

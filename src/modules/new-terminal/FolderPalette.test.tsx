@@ -14,7 +14,11 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   label: over.label ?? null,
   branch: over.branch ?? null,
   repoKey: over.repoKey ?? null,
-  hiddenWorktrees: over.hiddenWorktrees ?? 0,
+  repoName: over.repoName ?? null,
+  pinned: over.pinned ?? false,
+  cluster: over.cluster ?? 1,
+  repoHint: over.repoHint ?? null,
+  hint: over.hint ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
   hibernated: over.hibernated ?? false,
@@ -73,7 +77,7 @@ function mount(onPick: (row: FolderRow) => void) {
       onOpenChange: vi.fn(),
       groups,
       onPick,
-      onExpand: vi.fn(),
+      onToggleWorktrees: vi.fn(),
     }),
   );
 }
@@ -143,7 +147,7 @@ describe("FolderPalette", () => {
           }),
         ],
         onPick: vi.fn(),
-        onExpand: vi.fn(),
+        onToggleWorktrees: vi.fn(),
       }),
     );
     await settle();
@@ -166,7 +170,7 @@ describe("FolderPalette", () => {
           }),
         ],
         onPick: vi.fn(),
-        onExpand: vi.fn(),
+        onToggleWorktrees: vi.fn(),
       }),
     );
     await settle();
@@ -178,73 +182,102 @@ describe("FolderPalette", () => {
   });
 
   describe("worktrees on Tab", () => {
-    const hinted = [
+    const show = { kind: "show", count: 2 } as const;
+    const base = (over: Partial<FolderRow>) =>
+      row({ repoKey: "/repo", repoName: "repo", repoHint: show, ...over });
+    // Two folders of one repository: the heading carries the hint, the rows keep their labels.
+    const clustered = [
       group({
         rows: [
-          row({ path: "/repo", label: "Current tab", branch: "main", repoKey: "/repo", hiddenWorktrees: 2, key: "ws-1:/repo" }),
-          row({ path: "/other", repoKey: null, key: "ws-1:/other" }),
-          row({ path: "/repo/src", repoKey: "/repo", hiddenWorktrees: 2, key: "ws-1:/repo/src" }),
+          base({ path: "/repo", label: "Workspace Root", cluster: 2, key: "ws-1:/repo" }),
+          base({ path: "/repo/src", cluster: 2, key: "ws-1:/repo/src" }),
+          row({ path: "/other", key: "ws-1:/other" }),
         ],
       }),
     ];
-    const mountHinted = (onExpand: (row: FolderRow) => void) =>
+    const mountGroups = (groups: FolderGroup[], onToggleWorktrees: (row: FolderRow) => void) =>
       render(
         createElement(FolderPalette, {
           open: true,
           onOpenChange: vi.fn(),
-          groups: hinted,
+          groups,
           onPick: vi.fn(),
-          onExpand,
+          onToggleWorktrees,
         }),
       );
 
-    it("shows the hint instead of the label on every row of a repository with more worktrees", async () => {
-      mountHinted(vi.fn());
+    it("puts the repository name and the hint on one small heading above its folders", async () => {
+      mountGroups(clustered, vi.fn());
       await settle();
+      const headings = [...document.querySelectorAll('[aria-hidden="true"]')].filter((el) =>
+        el.textContent?.includes("show 2 worktrees"),
+      );
+      expect(headings).toHaveLength(1);
+      expect(headings[0].textContent).toContain("repo");
+      expect(headings[0].querySelector("kbd")?.textContent).toBe("Tab");
       const [first, second, third] = itemEls();
-      expect(first.textContent).toContain("TAB: show 2 worktrees");
-      expect(first.textContent).not.toContain("Current tab");
-      expect(second.textContent).not.toContain("TAB");
-      expect(third.textContent).toContain("TAB: show 2 worktrees");
+      expect(first.textContent).toContain("Workspace Root");
+      expect(first.textContent).not.toContain("show");
+      expect(second.textContent).not.toContain("show");
+      expect(third.textContent).not.toContain("show");
     });
 
-    it("says worktree in the singular for one", async () => {
-      render(
-        createElement(FolderPalette, {
-          open: true,
-          onOpenChange: vi.fn(),
-          groups: [group({ rows: [row({ repoKey: "/repo", hiddenWorktrees: 1 })] })],
-          onPick: vi.fn(),
-          onExpand: vi.fn(),
-        }),
+    it("draws the hint on the row itself, in place of its label, when there is no heading", async () => {
+      mountGroups(
+        [group({ rows: [base({ label: "Current tab", pinned: true, hint: show })] })],
+        vi.fn(),
       );
       await settle();
-      expect(itemEls()[0].textContent).toContain("TAB: show 1 worktree");
-      expect(itemEls()[0].textContent).not.toContain("worktrees");
+      const [only] = itemEls();
+      expect(only.textContent).toContain("show 2 worktrees");
+      expect(only.textContent).not.toContain("Current tab");
+      expect(only.querySelector("kbd")?.textContent).toBe("Tab");
     });
 
-    it("Tab on the selected row asks to expand its repository", async () => {
-      const onExpand = vi.fn();
-      mountHinted(onExpand);
+    it("says worktree in the singular for one, and hide once they are shown", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              row({ path: "/a", key: "ws-1:/a", repoKey: "/a", hint: { kind: "show", count: 1 }, repoHint: { kind: "show", count: 1 } }),
+              row({ path: "/b", key: "ws-1:/b", repoKey: "/b", hint: { kind: "hide" }, repoHint: { kind: "hide" } }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const [a, b] = itemEls();
+      expect(a.textContent).toContain("show 1 worktree");
+      expect(a.textContent).not.toContain("worktrees");
+      expect(b.textContent).toContain("hide worktrees");
+    });
+
+    it("Tab on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {
+      const onToggle = vi.fn();
+      mountGroups(clustered, onToggle);
       await settle();
       await act(async () => {
         fireEvent.keyDown(inputEl(), { key: "Tab" });
       });
-      expect(onExpand).toHaveBeenCalledTimes(1);
-      expect(onExpand.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(onToggle.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
     });
 
-    it("Tab on a row with nothing to add does nothing", async () => {
-      const onExpand = vi.fn();
-      mountHinted(onExpand);
+    it("Tab on a row outside any repository does nothing", async () => {
+      const onToggle = vi.fn();
+      mountGroups(clustered, onToggle);
       await settle();
-      await act(async () => {
-        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
-      });
+      for (let i = 0; i < 2; i++) {
+        await act(async () => {
+          fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+        });
+        await settle();
+      }
       await act(async () => {
         fireEvent.keyDown(inputEl(), { key: "Tab" });
       });
-      expect(onExpand).not.toHaveBeenCalled();
+      expect(onToggle).not.toHaveBeenCalled();
     });
   });
 
@@ -255,7 +288,7 @@ describe("FolderPalette", () => {
         onOpenChange: vi.fn(),
         groups: [group({ rows: [row({ path: "/repo/src", branch: "feat/login", key: "ws-1:/repo/src" })] })],
         onPick: vi.fn(),
-        onExpand: vi.fn(),
+        onToggleWorktrees: vi.fn(),
       }),
     );
     await settle();

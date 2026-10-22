@@ -678,20 +678,23 @@ src/
     └── new-terminal/              - "Ask me" mode for Open new terminals in (Settings > Terminal): FolderPalette,
                                      a Command-Palette-like dialog that picks the folder of a new terminal instead of
                                      deducing it. Pure core in `lib/folderEntries.ts` (tested): the active workspace
-                                     group opens with the current tab folder, home and the workspace root, then its
-                                     tab folders; then one group per other workspace in position order (root, then
-                                     folders, hibernated included). The folders of a group sit together by repository
-                                     (its main checkout first) and alphabetically. A path appears once in the whole
-                                     dialog, first occurrence keeps its label; the branch sits beside the folder, the
-                                     right side carries the label; home shows as `~`; headings use the resolved
-                                     workspace title and `WorkspaceMark`. Worktrees are not listed by default:
-                                     `useRepoWorktrees` asks the worktree listing of every repository on screen once
-                                     per open, and a row whose repository has worktrees not in the list shows
-                                     `TAB: show N worktrees` in place of its label (on every row of that repository);
-                                     Tab adds the missing ones under the pressed row, main checkout first, then
-                                     alphabetical, and the hint goes away. Search is a plain substring match per word on
-                                     the path, the branch, the label and the workspace title, with the matched letters
-                                     highlighted in each; it never reorders.
+                                     group pins the current tab folder and home on top, then the workspace root and
+                                     its tab folders; then one group per other workspace in position order (root,
+                                     then folders, hibernated included). The folders of one repository (several of a
+                                     workspace) sit together under a small heading with the repository name, its
+                                     workspace root first, then its main checkout, then by path; repositories and
+                                     loose folders go alphabetically. A path appears once in the whole dialog, first
+                                     occurrence keeps its label; the branch sits beside the folder, the right side
+                                     carries the label; home shows as `~`; headings use the resolved workspace title
+                                     and `WorkspaceMark`. Worktrees are not listed by default: `useRepoWorktrees`
+                                     asks the worktree listing of every repository on screen once per open. When a
+                                     repository has worktrees not in the list, its heading shows `Tab show N
+                                     worktrees` (a row with no heading of its own, such as the pinned ones, draws it
+                                     in place of its label); Tab adds the missing ones to the workspace it was pressed
+                                     in, main checkout first, and the hint turns into `Tab hide worktrees`, which
+                                     takes them away again. Search is a plain substring match per word on the path,
+                                     the branch, the label, the repository name and the workspace title, with the
+                                     matched letters highlighted in each; it never reorders.
                                      The selection is cmdk's own (a controlled value made its scroll lag a row). The
                                      dialog width is shared with the command palette (`paletteWidth` preference,
                                      dragged from either side edge by `usePaletteWidth`, double-click resets).

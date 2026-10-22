@@ -8,6 +8,9 @@ export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" 
 /** One checkout of a repository, as the worktree listing reports it. */
 export type RepoWorktree = { path: string; branch: string | null; isMain: boolean };
 
+/** What Tab does on a repository: add the worktrees that are not listed, or take the added ones away. */
+export type RepoHint = { kind: "show"; count: number } | { kind: "hide" };
+
 export type FolderRow = {
   key: string;
   path: string;
@@ -23,8 +26,17 @@ export type FolderRow = {
   // The main checkout of the repository the folder belongs to; the repository itself
   // until its worktree listing arrives; null outside a repository.
   repoKey: string | null;
-  // Worktrees of its repository that are not in the list yet: Tab adds them.
-  hiddenWorktrees: number;
+  // Name of that repository, shown on the small heading of a group of its folders.
+  repoName: string | null;
+  // The current tab and home stay on top, outside any repository group.
+  pinned: boolean;
+  // How many folders of its repository sit together in its workspace; two or more
+  // put a heading with the repository name above the first of them.
+  cluster: number;
+  // What Tab does with the repository of this row, whether or not this row draws it.
+  repoHint: RepoHint | null;
+  // The hint when the row draws it itself, in place of its label: it has no repository heading to carry it.
+  hint: RepoHint | null;
   workspaceId: string;
   hibernated: boolean;
 };
@@ -44,6 +56,7 @@ export type FolderRowMatched = FolderRow & {
   indices?: number[];
   branchIndices?: number[];
   labelIndices?: number[];
+  repoNameIndices?: number[];
 };
 
 export type FolderGroupMatched = Omit<FolderGroup, "rows"> & {
@@ -67,7 +80,7 @@ export type FolderGroupsInput = {
   repoOf: (dir: string) => string;
   /** Every checkout of each repository, keyed by the repository top level that was asked. */
   worktreesByRepo: ReadonlyMap<string, readonly RepoWorktree[]>;
-  /** Repositories whose worktrees were added with Tab: repository key to the key of the row it was pressed on. */
+  /** Repositories whose worktrees were added with Tab: repository key to the workspace they were added to. */
   expansions: ReadonlyMap<string, string>;
 };
 
@@ -93,15 +106,9 @@ function compare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { sensitivity: "base" });
 }
 
-// Rows of one repository sit together, its main checkout first; repositories and
-// folders otherwise in alphabetical order.
-function byRepoThenPath(a: FolderRow, b: FolderRow): number {
-  const isMain = (r: FolderRow) => Number(r.path !== r.repoKey);
-  return (
-    compare(a.repoKey ?? a.path, b.repoKey ?? b.path) ||
-    isMain(a) - isMain(b) ||
-    compare(a.path, b.path)
-  );
+function repoNameOf(repoKey: string | null): string | null {
+  if (!repoKey) return null;
+  return repoKey.split(/[\\/]/).filter(Boolean).pop() ?? repoKey;
 }
 
 type Builder = {
@@ -129,16 +136,19 @@ function repoKeyOf(b: Builder, path: string): string | null {
   return b.keyOfRoot.get(root) ?? root;
 }
 
+type RowExtras = { branch: string | null; repoKey: string; pinned: boolean };
+
 function rowOf(
   b: Builder,
   path: string,
   workspaceId: string,
   hibernated: boolean,
   label: FolderRowLabel | null,
-  known?: { branch: string | null; repoKey: string },
+  extras: Partial<RowExtras> = {},
 ): FolderRow {
   const { input } = b;
   const display = displayOf(path, input.home);
+  const repoKey = extras.repoKey ?? repoKeyOf(b, path);
   return {
     key: `${workspaceId}:${path}`,
     path,
@@ -146,9 +156,13 @@ function rowOf(
     displayShift: path.length - display.length,
     matchOffset: matchOffsetOf(path, input.home),
     label,
-    branch: known ? known.branch : input.branchOf(path) || null,
-    repoKey: known ? known.repoKey : repoKeyOf(b, path),
-    hiddenWorktrees: 0,
+    branch: "branch" in extras ? (extras.branch ?? null) : input.branchOf(path) || null,
+    repoKey,
+    repoName: repoNameOf(repoKey),
+    pinned: extras.pinned ?? false,
+    cluster: 1,
+    repoHint: null,
+    hint: null,
     workspaceId,
     hibernated,
   };
@@ -160,28 +174,75 @@ function pushUnique(b: Builder, rows: FolderRow[], row: FolderRow) {
   rows.push(row);
 }
 
-// The folders of the tabs: no repeats, no label, each repository together and alphabetical.
-function tabRowsOf(b: Builder, entries: readonly TabEntry[]): FolderRow[] {
-  const rows: FolderRow[] = [];
-  for (const e of entries) {
-    if (!e.cwd) continue;
-    pushUnique(b, rows, rowOf(b, e.cwd, e.workspaceId, e.hibernated, null));
-  }
-  return rows.sort(byRepoThenPath);
-}
-
 // The worktrees of a repository that no row shows yet: its main checkout first, then the rest alphabetically.
 function missingWorktrees(b: Builder, key: string): RepoWorktree[] {
   const missing = (b.worktreesOfKey.get(key) ?? []).filter((w) => !b.seen.has(w.path));
   return missing.sort((x, y) => Number(y.isMain) - Number(x.isMain) || compare(x.path, y.path));
 }
 
+type RawGroup = {
+  head: Omit<FolderGroup, "rows">;
+  pinned: FolderRow[];
+  root: FolderRow | null;
+  loose: FolderRow[];
+};
+
+// Within a repository the workspace root goes first, then its main checkout, then the rest by path.
+function inCluster(a: FolderRow, b: FolderRow): number {
+  const rank = (r: FolderRow) => (r.label === "Workspace Root" ? 0 : r.path === r.repoKey ? 1 : 2);
+  return rank(a) - rank(b) || compare(a.path, b.path);
+}
+
+// The folders of a workspace after its pinned rows: the workspace root first, then the loose
+// folders by repository and path; each repository gathers all its folders where its first one is.
+function clusteredRows(raw: RawGroup): FolderRow[] {
+  const loose = [...raw.loose].sort(
+    (a, b) => compare(a.repoKey ?? a.path, b.repoKey ?? b.path) || compare(a.path, b.path),
+  );
+  const rest = raw.root ? [raw.root, ...loose] : loose;
+  const clusters = new Map<string, FolderRow[]>();
+  for (const row of rest) {
+    const id = row.repoKey ?? `\u0000${row.path}`;
+    const list = clusters.get(id);
+    if (list) list.push(row);
+    else clusters.set(id, [row]);
+  }
+  return [...clusters.values()].flatMap((rows) => rows.sort(inCluster));
+}
+
+function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): FolderGroup {
+  const clustered = clusteredRows(raw);
+  const size = new Map<string, number>();
+  for (const row of clustered) {
+    if (row.repoKey) size.set(row.repoKey, (size.get(row.repoKey) ?? 0) + 1);
+  }
+  const withHeading = new Set([...size].filter(([, n]) => n >= 2).map(([key]) => key));
+  const hintOf = (key: string): RepoHint | null => {
+    const missing = missingWorktrees(b, key).length;
+    if (missing > 0) return { kind: "show", count: missing };
+    return addedHere.has(key) ? { kind: "hide" } : null;
+  };
+  for (const row of clustered) {
+    if (!row.repoKey) continue;
+    row.repoHint = hintOf(row.repoKey);
+    row.cluster = withHeading.has(row.repoKey) ? size.get(row.repoKey) ?? 1 : 1;
+    row.hint = row.cluster < 2 ? row.repoHint : null;
+  }
+  for (const row of raw.pinned) {
+    if (!row.repoKey) continue;
+    row.repoHint = hintOf(row.repoKey);
+    row.hint = withHeading.has(row.repoKey) ? null : row.repoHint;
+  }
+  return { ...raw.head, rows: [...raw.pinned, ...clustered] };
+}
+
 // One path appears once in the whole palette: the seen set is shared across
 // groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
-// Order: the active workspace (current tab folder, home, workspace root, then its other
-// folders), then every other workspace in position order (root, then folders). Worktrees
-// of a repository are not listed until Tab asks for them on one of its rows.
+// Order: the active workspace (current tab folder and home pinned on top, then the workspace
+// root and its other folders), then every other workspace in position order. The folders of
+// one repository sit together under a small heading with its name, its main checkout first.
+// Worktrees are not listed until Tab asks for them on a row of their repository.
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const b = builderOf(input);
   const byWorkspace = new Map<string, TabEntry[]>();
@@ -195,7 +256,6 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     list.push(e);
   }
 
-  const groups: FolderGroup[] = [];
   const identity = new Map(input.workspaceEntries.map((e) => [e.workspaceId, e] as const));
   const headOf = (ws: Workspace, active: boolean) => {
     const e = identity.get(ws.id);
@@ -209,62 +269,71 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     };
   };
   const rootOf = (ws: Workspace) => ws.workspaceRoot ?? ws.fsRoot ?? null;
+  const looseOf = (ws: Workspace): FolderRow[] => {
+    const rows: FolderRow[] = [];
+    for (const e of byWorkspace.get(ws.id) ?? []) {
+      pushUnique(b, rows, rowOf(b, e.cwd, e.workspaceId, e.hibernated, null));
+    }
+    return rows;
+  };
 
+  const raws: RawGroup[] = [];
   const activeWs = input.workspaces.find((w) => w.id === input.activeWorkspaceId);
   if (activeWs) {
-    const rows: FolderRow[] = [];
     const sleeping = !!activeWs.hibernated;
+    const pinned: FolderRow[] = [];
     const cwd = input.activeTabEntry?.cwd;
     if (cwd) {
-      pushUnique(b, rows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
+      pushUnique(b, pinned, rowOf(b, cwd, activeWs.id, sleeping, "Current tab", { pinned: true }));
     }
     const home = input.home?.replace(/[\\/]+$/, "");
     if (home) {
-      pushUnique(b, rows, rowOf(b, home, activeWs.id, sleeping, "Home"));
+      pushUnique(b, pinned, rowOf(b, home, activeWs.id, sleeping, "Home", { pinned: true }));
     }
-    const root = rootOf(activeWs);
-    if (root) {
-      pushUnique(b, rows, rowOf(b, root, activeWs.id, sleeping, "Workspace Root"));
+    const rootPath = rootOf(activeWs);
+    const rootRows: FolderRow[] = [];
+    if (rootPath) {
+      pushUnique(b, rootRows, rowOf(b, rootPath, activeWs.id, sleeping, "Workspace Root"));
     }
-    rows.push(...tabRowsOf(b, byWorkspace.get(activeWs.id) ?? []));
-    groups.push({ ...headOf(activeWs, true), rows });
+    raws.push({
+      head: headOf(activeWs, true),
+      pinned,
+      root: rootRows[0] ?? null,
+      loose: looseOf(activeWs),
+    });
   }
-
   for (const ws of input.workspaces) {
     if (ws.id === input.activeWorkspaceId) continue;
-    const rows: FolderRow[] = [];
-    const root = rootOf(ws);
-    if (root) {
-      pushUnique(b, rows, rowOf(b, root, ws.id, !!ws.hibernated, "Workspace Root"));
+    const rootPath = rootOf(ws);
+    const rootRows: FolderRow[] = [];
+    if (rootPath) {
+      pushUnique(b, rootRows, rowOf(b, rootPath, ws.id, !!ws.hibernated, "Workspace Root"));
     }
-    rows.push(...tabRowsOf(b, byWorkspace.get(ws.id) ?? []));
-    if (rows.length === 0) continue;
-    groups.push({ ...headOf(ws, false), rows });
+    const loose = looseOf(ws);
+    if (rootRows.length + loose.length === 0) continue;
+    raws.push({ head: headOf(ws, false), pinned: [], root: rootRows[0] ?? null, loose });
   }
 
-  // Tab pressed on a row: the worktrees missing from the list go right under it.
-  for (const [key, afterRowKey] of input.expansions) {
-    for (const g of groups) {
-      const at = g.rows.findIndex((r) => r.key === afterRowKey);
-      if (at < 0) continue;
-      const added = missingWorktrees(b, key).map((w) =>
-        rowOf(b, w.path, g.workspaceId, g.hibernated, w.isMain ? "Main checkout" : null, {
-          branch: w.branch,
-          repoKey: key,
-        }),
-      );
-      for (const row of added) b.seen.add(row.path);
-      g.rows.splice(at + 1, 0, ...added);
-      break;
-    }
+  // Tab pressed on a repository: the worktrees missing from the list join the folders of the workspace it was pressed in.
+  const addedIn = new Map<string, Set<string>>();
+  for (const [key, workspaceId] of input.expansions) {
+    const raw = raws.find((g) => g.head.workspaceId === workspaceId);
+    if (!raw) continue;
+    const added = missingWorktrees(b, key).map((w) =>
+      rowOf(b, w.path, workspaceId, raw.head.hibernated, w.isMain ? "Main checkout" : null, {
+        branch: w.branch,
+        repoKey: key,
+      }),
+    );
+    if (added.length === 0) continue;
+    for (const row of added) b.seen.add(row.path);
+    raw.loose.push(...added);
+    const keys = addedIn.get(workspaceId) ?? new Set<string>();
+    keys.add(key);
+    addedIn.set(workspaceId, keys);
   }
 
-  for (const g of groups) {
-    for (const row of g.rows) {
-      if (row.repoKey) row.hiddenWorktrees = missingWorktrees(b, row.repoKey).length;
-    }
-  }
-  return groups;
+  return raws.map((raw) => finalize(b, raw, addedIn.get(raw.head.workspaceId) ?? new Set()));
 }
 
 function runOf(at: number, length: number): number[] {
@@ -278,10 +347,10 @@ function merge(into: number[] | undefined, more: number[]): number[] {
 }
 
 // Every word typed must appear as a plain substring (case and accent insensitive) of something the
-// row shows: its path (never inside the home prefix), its branch, its label (while the Tab hint
-// is not taking its place) or the title of its workspace. The returned indices are the characters
-// that matched, per piece of text, so each row shows why it is there. Groups keep their order,
-// rows keep their order, groups left with no rows disappear.
+// row shows: its path (never inside the home prefix), its branch, its label (while a Tab hint is
+// not taking its place), the name of its repository or the title of its workspace. The returned
+// indices are the characters that matched, per piece of text, so each row shows why it is there.
+// Groups keep their order, rows keep their order, groups left with no rows disappear.
 export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
@@ -298,18 +367,21 @@ export function filterFolderGroups(
     for (const r of g.rows) {
       const path = foldText(r.path);
       const branch = foldText(r.branch ?? "");
-      const label = r.hiddenWorktrees > 0 ? "" : foldText(r.label ?? "");
+      const label = r.hint ? "" : foldText(r.label ?? "");
+      const repoName = r.cluster >= 2 ? foldText(r.repoName ?? "") : "";
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;
       let labelIndices: number[] | undefined;
+      let repoNameIndices: number[] | undefined;
       let rowTitleIndices: number[] | undefined;
       let ok = true;
       for (const token of tokens) {
         const inPath = path.indexOf(token, r.matchOffset);
         const inBranch = branch.indexOf(token);
         const inLabel = label.indexOf(token);
+        const inRepo = repoName.indexOf(token);
         const inTitle = title.indexOf(token);
-        if (inPath < 0 && inBranch < 0 && inLabel < 0 && inTitle < 0) {
+        if (inPath < 0 && inBranch < 0 && inLabel < 0 && inRepo < 0 && inTitle < 0) {
           ok = false;
           break;
         }
@@ -318,6 +390,7 @@ export function filterFolderGroups(
         }
         if (inBranch >= 0) branchIndices = merge(branchIndices, runOf(inBranch, token.length));
         if (inLabel >= 0) labelIndices = merge(labelIndices, runOf(inLabel, token.length));
+        if (inRepo >= 0) repoNameIndices = merge(repoNameIndices, runOf(inRepo, token.length));
         if (inTitle >= 0) rowTitleIndices = merge(rowTitleIndices, runOf(inTitle, token.length));
       }
       if (!ok) continue;
@@ -328,6 +401,7 @@ export function filterFolderGroups(
         indices: sort(indices),
         branchIndices: sort(branchIndices),
         labelIndices: sort(labelIndices),
+        repoNameIndices: sort(repoNameIndices),
       });
     }
     if (rows.length > 0) {

@@ -3465,17 +3465,22 @@ export default function App() {
     [folderSources, folderPaletteDirs],
   );
   const folderWorktrees = useRepoWorktrees(folderPaletteOpen, folderRepoRoots);
-  // Repositories whose worktrees the user added with Tab, and the row each was pressed on.
+  // Repositories whose worktrees the user added with Tab, and the workspace they went to.
   const [folderExpansions, setFolderExpansions] = useState<ReadonlyMap<string, string>>(
     () => new Map(),
   );
   useEffect(() => {
     setFolderExpansions(new Map());
   }, [folderPaletteOpen]);
-  const onFolderExpand = useCallback((row: FolderRow) => {
-    if (!row.repoKey) return;
+  const onFolderToggleWorktrees = useCallback((row: FolderRow) => {
     const repoKey = row.repoKey;
-    setFolderExpansions((prev) => new Map(prev).set(repoKey, row.key));
+    if (!repoKey) return;
+    setFolderExpansions((prev) => {
+      const next = new Map(prev);
+      if (next.has(repoKey)) next.delete(repoKey);
+      else next.set(repoKey, row.workspaceId);
+      return next;
+    });
   }, []);
   const folderGroups = useMemo(
     () =>
@@ -4135,7 +4140,7 @@ export default function App() {
             onOpenChange={setFolderPaletteOpen}
             groups={folderGroups}
             onPick={onFolderPick}
-            onExpand={onFolderExpand}
+            onToggleWorktrees={onFolderToggleWorktrees}
           />
 
           <NewEditorDialog
