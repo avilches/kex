@@ -3594,11 +3594,7 @@ export default function App() {
       let target = workspacesRef.current.find((w) => w.id === entry.workspaceId);
       if (target?.hibernated) target = undefined;
       if (!target) {
-        // The history is shared by every window: a record whose workspace is not in this
-        // window belongs to another one (or to a deleted workspace), and opens here quietly.
-        if (workspacesRef.current.some((w) => w.id === entry.workspaceId)) {
-          toast.info("That workspace could not be woken, opened in the active one");
-        }
+        toast.info("That workspace could not be woken, opened in the active one");
         target = workspacesRef.current.find(
           (w) => w.id === activeWorkspaceIdRef.current,
         );
