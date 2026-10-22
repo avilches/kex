@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import {
@@ -38,6 +39,7 @@ import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
+import { terminalTargetOf } from "./lib/terminalTarget";
 import { MergedList } from "./MergedList";
 import type { PaletteItem } from "./types";
 
@@ -58,6 +60,7 @@ type Props = {
   onSelectWorkspace: (entry: WorkspaceEntry) => void;
   onRunClosed: (entry: ClosedTabEntry) => void;
   onMoveActiveTabToWorkspace: (target: string | "new") => void;
+  onTerminalTargetChange: (entry: TabEntry | null) => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -89,6 +92,7 @@ export function CommandPalette({
   onSelectWorkspace,
   onRunClosed,
   onMoveActiveTabToWorkspace,
+  onTerminalTargetChange,
 }: Props) {
   const [query, setQuery] = useState("");
   const [value, setValue] = useState("");
@@ -143,6 +147,15 @@ export function CommandPalette({
       mru,
     ],
   );
+  const terminalTarget = useMemo(
+    () => (open && inCommands ? terminalTargetOf(value, merged) : null),
+    [open, inCommands, value, merged],
+  );
+  useEffect(() => {
+    onTerminalTargetChange(terminalTarget);
+    return () => onTerminalTargetChange(null);
+  }, [terminalTarget, onTerminalTargetChange]);
+
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
   const listRef = useRef<HTMLDivElement>(null);
@@ -613,6 +626,17 @@ export function CommandPalette({
             )}
           </CommandList>
         </ScrollArea>
+        {terminalTarget ? (
+          <div className="flex min-w-0 items-center gap-2 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+            <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+              {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
+            </kbd>
+            <span className="shrink-0">Open terminal</span>
+            <span className="min-w-0 flex-1 truncate text-right font-mono text-[10.5px]">
+              {terminalTarget.cwd}
+            </span>
+          </div>
+        ) : null}
       </Command>
     </CommandDialog>
   );

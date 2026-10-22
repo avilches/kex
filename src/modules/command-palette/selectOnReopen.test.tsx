@@ -71,6 +71,7 @@ function PaletteHarness() {
       onSelectWorkspace={noop}
       onRunClosed={noop}
       onMoveActiveTabToWorkspace={noop}
+      onTerminalTargetChange={noop}
     />
   );
 }

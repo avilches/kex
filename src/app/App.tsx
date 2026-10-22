@@ -2879,12 +2879,36 @@ export default function App() {
     ],
   );
 
+  const paletteTerminalTargetRef = useRef<TabEntry | null>(null);
+  const onPaletteTerminalTargetChange = useCallback(
+    (entry: TabEntry | null) => {
+      paletteTerminalTargetRef.current = entry;
+    },
+    [],
+  );
+  const openTerminalBesidePaletteTarget = useCallback(
+    async (entry: TabEntry) => {
+      setCommandPaletteOpen(false);
+      if (entry.hibernated) await wakeWorkspace(entry.workspaceId);
+      const ws = workspacesRef.current.find((w) => w.id === entry.workspaceId);
+      const found = ws ? findTabPane(ws.paneTree, entry.tabId) : null;
+      if (!ws || ws.hibernated || !found) return;
+      const index = found.pane.tabs.findIndex((t) => t.id === entry.tabId);
+      const id = newTabId();
+      setActiveWorkspaceId(ws.id);
+      openTab(ws.id, found.pane.id, { id, kind: "terminal", cwd: entry.cwd }, index + 1);
+      activateTab(ws.id, id);
+    },
+    [wakeWorkspace, setActiveWorkspaceId, openTab, activateTab],
+  );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
       "tab.new": () => {
-        openNewTerminal();
+        const target = paletteTerminalTargetRef.current;
+        if (target) void openTerminalBesidePaletteTarget(target);
+        else openNewTerminal();
       },
       "workspace.new": () => addWorkspace(home ?? undefined),
       "workspace.close": () => {
@@ -3157,6 +3181,7 @@ export default function App() {
       focusSidebar,
       agentWorktree,
       openNewTerminal,
+      openTerminalBesidePaletteTarget,
       addWorkspace,
       openTab,
       openBrowserInTab,
@@ -4056,6 +4081,7 @@ export default function App() {
             onSelectWorkspace={onPaletteSelectWorkspace}
             onRunClosed={onPaletteRunClosed}
             onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
+            onTerminalTargetChange={onPaletteTerminalTargetChange}
           />
 
           <FolderPalette
