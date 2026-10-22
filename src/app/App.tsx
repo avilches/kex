@@ -1278,6 +1278,13 @@ export default function App() {
     [],
   );
 
+  // Two palettes never stack: opening the command palette drops a pending folder ask.
+  useEffect(() => {
+    if (!commandPaletteOpen) return;
+    setFolderPaletteOpen(false);
+    setFolderAskTarget(null);
+  }, [commandPaletteOpen]);
+
   // ── Open tab helpers ────────────────────────────────────────────────────
 
   const openFileInTab = useCallback(

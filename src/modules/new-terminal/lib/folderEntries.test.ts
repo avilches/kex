@@ -100,7 +100,7 @@ describe("buildFolderGroups", () => {
     const rootRows = group.rows.filter((r) => r.path === "/repo");
     expect(rootRows).toHaveLength(1);
     // The workspace root row comes before the plain tab rows, so it keeps the single label.
-    expect(rootRows[0].label).toBe("Workspace root");
+    expect(rootRows[0].label).toBe("Workspace Root");
   });
 
   it("groups every other workspace with its root and its tab cwds, skipping empty ones", () => {
@@ -119,7 +119,7 @@ describe("buildFolderGroups", () => {
     const dotfiles = groups[1];
     expect(dotfiles.active).toBe(false);
     expect(dotfiles.rows.map((r) => [r.label, r.path])).toEqual([
-      ["Workspace root", "/dotfiles"],
+      ["Workspace Root", "/dotfiles"],
       [null, "/dotfiles/home"],
     ]);
   });
@@ -169,7 +169,7 @@ describe("buildFolderGroups", () => {
     expect(groups[1].hibernated).toBe(true);
     // The whole workspace sleeps, so every row of it reads as hibernated.
     expect(groups[1].rows.map((r) => [r.label, r.hibernated])).toEqual([
-      ["Workspace root", true],
+      ["Workspace Root", true],
       [null, true],
     ]);
   });

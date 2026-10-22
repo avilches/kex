@@ -7,11 +7,11 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
   folderRowNote,
@@ -49,46 +49,14 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
     }
   }, [flat, selectedKey]);
 
-  // Arrows are ours, not cmdk's: the selection can only land on a rendered row
-  // (wrapping at the ends) and the row is scrolled into view below.
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (flat.length === 0) return;
-      setSelectedKey((prev) => {
-        const at = flat.findIndex((r) => r.key === prev);
-        const next =
-          (at + (e.key === "ArrowDown" ? 1 : -1) + flat.length) % flat.length;
-        return flat[next].key;
-      });
-    },
-    [flat],
-  );
-
-  // scrollIntoView against the Radix ScrollArea is not reliable for rows far
-  // from the viewport's current scroll (the cursor used to leave the visible
-  // area at both ends), so the viewport is scrolled explicitly.
+  // The new first row is selected on every keystroke, but a list scrolled down
+  // for the previous query stays where it was and hides it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the top whenever the typed text changes or the palette reopens
   useEffect(() => {
-    const root = listRef.current;
-    if (!root) return;
-    const viewport = root.querySelector<HTMLElement>(
-      "[data-slot=scroll-area-viewport]",
-    );
-    const item = root.querySelector<HTMLElement>(
-      `[data-folder-row="${selectedKey}"]`,
-    );
-    if (!viewport || !item) return;
-    const top =
-      item.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
-    if (top < 0) {
-      viewport.scrollBy({ top });
-    } else if (top + item.offsetHeight > viewport.clientHeight) {
-      viewport.scrollBy({ top: top + item.offsetHeight - viewport.clientHeight });
-    }
-  }, [selectedKey, query, open]);
+    listRef.current
+      ?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]")
+      ?.scrollTo({ top: 0 });
+  }, [query, open]);
 
   const empty = flat.length === 0;
 
@@ -104,9 +72,9 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
     >
       <Command
         shouldFilter={false}
+        loop
         value={selectedKey}
         onValueChange={setSelectedKey}
-        onKeyDown={onKeyDown}
       >
         <CommandInput
           value={query}
@@ -133,11 +101,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
               filtered.map((g) => (
                 <CommandGroup
                   key={g.workspaceId}
-                  heading={
-                    g.active
-                      ? `${g.workspaceTitle} \u00b7 current workspace`
-                      : g.workspaceTitle
-                  }
+                  heading={<GroupHeading group={g} />}
                 >
                   {g.rows.map((row) => (
                     <CommandItem
@@ -145,28 +109,11 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                       value={row.key}
                       data-folder-row={row.key}
                       onSelect={() => onPick(row)}
-                      className={cn(
-                        "text-[12.5px]",
-                        row.hibernated && "opacity-60",
-                      )}
+                      className="pl-7 text-[12.5px]"
                     >
                       <span className="min-w-0 flex-1 truncate">
                         <HighlightText text={row.path} indices={row.indices} />
                       </span>
-                      {row.hibernated ? (
-                        <span
-                          role="img"
-                          aria-label="Workspace is hibernated"
-                          className="shrink-0"
-                        >
-                          <HugeiconsIcon
-                            icon={SleepingIcon}
-                            size={12}
-                            strokeWidth={1.75}
-                            className="text-muted-foreground"
-                          />
-                        </span>
-                      ) : null}
                       <span className="ml-auto max-w-56 shrink-0 truncate text-[11px] font-normal text-muted-foreground">
                         {folderRowNote(row)}
                       </span>
@@ -179,5 +126,33 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
         </ScrollArea>
       </Command>
     </CommandDialog>
+  );
+}
+
+function GroupHeading({ group }: { group: FolderGroup }) {
+  return (
+    <span className="flex items-center gap-2">
+      <WorkspaceMark
+        id={group.workspaceId}
+        color={group.workspaceColor}
+        icon={group.workspaceIcon ?? undefined}
+        size={14}
+      />
+      <span className="min-w-0 truncate text-foreground">
+        {group.workspaceTitle}
+      </span>
+      {group.hibernated ? (
+        <span
+          role="img"
+          aria-label="Workspace is hibernated"
+          className="shrink-0"
+        >
+          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+        </span>
+      ) : null}
+      {group.active ? (
+        <span className="ml-auto shrink-0 font-normal">Current workspace</span>
+      ) : null}
+    </span>
   );
 }
