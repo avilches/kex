@@ -1,5 +1,5 @@
 import { INTEGRATION_MIN_BUSY_MS } from "@/modules/agents/lib/integrations";
-import { useClaudeIntegration, useIntegration } from "@/modules/agents/lib/useIntegration";
+import { useIntegration } from "@/modules/agents/lib/useIntegration";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Notification03Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { FieldLabel } from "../components/FieldLabel";
@@ -8,7 +8,7 @@ import { AgentIntegrationRow } from "./AgentIntegrationRow";
 const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS };
 
 export function AgentIntegrations() {
-  const claude = useClaudeIntegration(OPTIONS);
+  const claude = useIntegration("claude", OPTIONS);
   const opencode = useIntegration("opencode", OPTIONS);
   const omp = useIntegration("omp", OPTIONS);
   const pi = useIntegration("pi", OPTIONS);

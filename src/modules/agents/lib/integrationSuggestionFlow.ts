@@ -1,0 +1,37 @@
+import { isAgentId, type SuggestionMap, shouldSuggest, withAsked, withInstalled } from "./integrationSuggestion";
+import type { AgentId } from "./integrations";
+
+export type SuggestDeps = {
+  now: () => number;
+  /** Whether the integration is installed and current. */
+  status: (agent: AgentId) => Promise<boolean>;
+  read: () => Promise<SuggestionMap>;
+  update: (change: (map: SuggestionMap) => SuggestionMap) => Promise<void>;
+  show: (agent: AgentId) => void;
+};
+
+// Decides whether a detected agent deserves the install suggestion. Each agent is looked at
+// once per app run: a second tab starting the same agent never races the first one. The ask is
+// counted when the toast shows, whatever the user does with it, because closing it unanswered
+// is the same "not now" as pressing the button.
+export function createIntegrationSuggester(deps: SuggestDeps) {
+  const seen = new Set<AgentId>();
+  return async (agent: unknown): Promise<void> => {
+    if (!isAgentId(agent) || seen.has(agent)) return;
+    seen.add(agent);
+    try {
+      if (await deps.status(agent)) {
+        // Installed before this feature existed: it counts as installed once, so a later
+        // uninstall does not bring the suggestion back.
+        await deps.update((map) => withInstalled(map, agent));
+        return;
+      }
+      const map = await deps.read();
+      if (!shouldSuggest(map[agent], deps.now())) return;
+      await deps.update((current) => withAsked(current, agent, deps.now()));
+      deps.show(agent);
+    } catch (e) {
+      console.error("[kex] integration suggestion failed:", e);
+    }
+  };
+}

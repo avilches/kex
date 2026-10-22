@@ -17,6 +17,7 @@ import { stopOutcome } from "../lib/subagentGate";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
+import { suggestIntegration } from "./IntegrationSuggestionToast";
 
 type Activate = (workspaceId: string, tabId: string) => void;
 type AgentSessionMetaPayload = {
@@ -186,6 +187,7 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   switch (sig.kind) {
     case "started":
       ensureSessionIdle(tabId, ctx, sig.agent ?? "claude");
+      void suggestIntegration(sig.agent ?? "claude");
       return;
     case "UserPromptSubmit": {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
