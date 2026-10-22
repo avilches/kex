@@ -28,7 +28,7 @@ import {
 } from "./lib/actionDrop";
 import { scriptsFirst } from "./lib/actionsBar";
 import { ownedAfterEdit } from "./lib/appOwnership";
-import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
+import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action } from "./lib/types";
 
@@ -131,7 +131,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
 
   const change = (scope: Scope, current: Action, next: Action) => {
     if (removing.current.has(current.id) || moving.current === current.id) return;
-    const owned = ownedAfterEdit(current, next);
+    const owned = ownedAfterEdit(current, next, suggestions);
     const target = scopesRef.current[scope];
     if (target.actions.some((a) => a.id === current.id)) {
       target.onUpdate(current.id, owned);
@@ -345,7 +345,7 @@ function Column({
                       <ActionRow
                         key={action.id}
                         action={action}
-                        preset={action.appId !== undefined}
+                        preset={action.appId !== undefined || !!presetOf(action, suggestions)}
                         onEdit={() => onEdit(action.id)}
                         onRemove={() => onRemove(action)}
                       />

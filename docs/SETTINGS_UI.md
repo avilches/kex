@@ -67,7 +67,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
 - **Editor de Actions en Settings**: dos columnas, Global y This workspace (con el nombre del workspace debajo), cada una con
   un unico combo Add (Add Command primero, luego los presets de apps y la app propia). El
   combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
-  los ya instalados (coincidencia por `appId` + comando exacto). La fila es asa, icono,
+  los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el `appId` no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
   workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), Run in folder primero en los scripts (Home por defecto, Workspace root con la
@@ -77,8 +77,9 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
   exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega
   (los scripts nunca se fusionan). Una Action de preset se edita igual que cualquiera:
-  al cambiar su nombre o su comando deja de ser un preset (`ownedAfterEdit`, conserva el
-  icono en `iconId`) y el preset vuelve al combo; Own button / Inside the combo no cuenta.
+  una app es un preset solo por su comando: al cambiarlo deja de serlo (`ownedAfterEdit`,
+  conserva el icono en `iconId`) y el preset vuelve al combo, y si el comando vuelve a ser el
+  del preset lo recupera; el nombre y Own button / Inside the combo no cuentan.
   El combo Add pone Add Command y Custom app arriba y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono

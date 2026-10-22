@@ -24,16 +24,27 @@ export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
 
 const KNOWN = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 
-/** The presets still to install, one per app and starting point: a preset that some action
- * already holds (same app, same command) is installed, and installed presets stay out of
- * the combo, because the good next step is Edit on the action, not a second copy. */
+const sameCommand = (a: string, b: string): boolean => a.trim() === b.trim();
+
+/** An app is defined by its command alone: the name, the icon and the appId do not matter. */
+export function hasCommandOf(actions: readonly Action[], command: string): boolean {
+  return !!command.trim() && actions.some((a) => !a.runInTerminal && sameCommand(a.command, command));
+}
+
+/** The presets still to install, one per app and starting point: a preset whose command some
+ * app already has is installed, and installed presets stay out of the combo, because the good
+ * next step is Edit on that app, not a second copy. */
 export function uninstalledSuggestions(
   suggestions: readonly AppSuggestion[],
   actions: readonly Action[],
 ): AppSuggestion[] {
-  return suggestions.filter(
-    (s) => !(s.appId && actions.some((a) => a.appId === s.appId && a.command === s.defaultCommand)),
-  );
+  return suggestions.filter((s) => !(s.appId && hasCommandOf(actions, s.defaultCommand)));
+}
+
+/** The detected preset an app is, by its command, or undefined when it is the user's own. */
+export function presetOf(action: Pick<Action, "runInTerminal" | "command">, suggestions: readonly AppSuggestion[]): AppSuggestion | undefined {
+  if (action.runInTerminal) return undefined;
+  return suggestions.find((s) => s.appId && sameCommand(s.defaultCommand, action.command));
 }
 
 // Text goes through the template parser, where a brace is a variable; doubling keeps it literal.
