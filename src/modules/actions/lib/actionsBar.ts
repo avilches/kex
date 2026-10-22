@@ -162,7 +162,8 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 export function scriptSubtitle(action: Pick<Action, "name" | "runInTerminal" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
   const named = actionSubtitle(action.name, ctx);
   if (!action.runInTerminal || named.text !== null) return named;
-  const mode = action.cwdMode ?? "workspace";
+  const mode = action.cwdMode ?? "home";
+  if (mode === "home") return { text: "Home", startTrim: false };
   if (mode === "fixed") {
     return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
   }
@@ -194,6 +195,13 @@ export function actionRowTitle(
   return null;
 }
 
+// A command with no variables runs against the workspace root: an app is spawned from it, and a
+// script only when it was told to run there. A script in Home, in the tab's folder or in a
+// fixed folder never needs the root.
+export function needsWorkspaceRoot(action: Pick<Action, "runInTerminal" | "cwdMode">): boolean {
+  return !action.runInTerminal || action.cwdMode === "workspace";
+}
+
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
 // terminal, so a value that cannot be quoted safely also blocks them; an app is spawned
 // without a shell and never is. A command with no variables runs in the workspace itself,
@@ -203,7 +211,7 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
   if (ctx?.hibernated) return "workspace is hibernated";
   if (!ctx) return VARIABLE.test(action.command) ? "needs a workspace" : null;
   const used = commandVariablesUsed(action.command);
-  if (used.size === 0 && !ctx.vars.workspace) return WORKSPACE_UNSET;
+  if (used.size === 0 && needsWorkspaceRoot(action) && !ctx.vars.workspace) return WORKSPACE_UNSET;
   const problem = commandProblem(action.command, action.runInTerminal ? ctx.shell : undefined);
   if (problem) return problem;
   const missing = missingVariables(action.command, ctx.vars);

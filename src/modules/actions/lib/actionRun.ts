@@ -9,7 +9,7 @@ import {
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
-import { WORKSPACE_UNSET } from "./actionsBar";
+import { needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
 import type { Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -36,6 +36,7 @@ export type RunContext = {
     focusFolder?: string | null;
     workspaceRoot?: string | null;
     workspaceCwd?: string | null;
+    home?: string | null;
   };
   link: LinkedTab | null;
   scriptPaneExists: boolean;
@@ -108,7 +109,9 @@ function newTabPlacement(ctx: RunContext): NewTabPlacement {
 function planScript(action: Action, ctx: RunContext): RunPlan {
   const { link } = ctx;
   if (link?.exists && link.markRunning) return { kind: "already-running", tabId: link.tabId };
-  if (commandVariablesUsed(action.command).size === 0 && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
+  if (commandVariablesUsed(action.command).size === 0 && needsWorkspaceRoot(action) && !ctx.vars.workspace) {
+    return blocked(action, WORKSPACE_UNSET);
+  }
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
   const problem = commandProblem(action.command, ctx.shell, ctx.vars);
@@ -119,6 +122,7 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
     focusFolder: ctx.folders.focusFolder,
     workspaceRoot: ctx.folders.workspaceRoot,
     workspaceCwd: ctx.folders.workspaceCwd,
+    home: ctx.folders.home,
   });
   const cwdIssue = cwd ? scriptCwdProblem(cwd) : null;
   if (cwdIssue) return blocked(action, cwdIssue);

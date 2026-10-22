@@ -14,7 +14,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
@@ -24,24 +23,30 @@ import type { Action } from "./lib/types";
 const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
 
+const EDIT_BUTTON =
+  "flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground active:bg-muted/70";
+
 type ViewProps = {
   action: Action;
   /** The row as it floats under the pointer while it is dragged: nothing in it reacts. */
   overlay?: boolean;
   handleProps?: HTMLAttributes<HTMLSpanElement>;
-  onToggleButton?: (own: boolean) => void;
   onEdit?: () => void;
   remove?: React.ReactNode;
 };
 
-// One Action in a column: handle, icon, name over what it points at, the Button flag, edit and,
-// at the far right, delete. Everything else about the Action lives in the edit modal.
-export function ActionRowView({ action, overlay, handleProps, onToggleButton, onEdit, remove }: ViewProps) {
+// One Action in a column: handle, icon, name over what it points at, edit and, at the far
+// right, delete. A double click anywhere on the row but its buttons opens the edit modal, where
+// everything else about the Action lives.
+export function ActionRowView({ action, overlay, handleProps, onEdit, remove }: ViewProps) {
   const display = action.name.trim() || "Name";
   const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
   return (
     <div
       data-action-row={action.id}
+      onDoubleClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button")) onEdit?.();
+      }}
       className={cn(
         "flex min-w-0 items-center gap-1.5 rounded-md border bg-card py-1.5 pr-1 pl-1.5 text-[12px]",
         overlay ? "border-primary shadow-lg" : "border-border/60",
@@ -54,16 +59,8 @@ export function ActionRowView({ action, overlay, handleProps, onToggleButton, on
         <ActionIcon action={action} size={14} />
       </span>
       <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
-      <Checkbox
-        aria-label="Own button in the header bar"
-        title="Own button in the header bar"
-        checked={action.ownButton}
-        disabled={overlay}
-        onCheckedChange={(v) => onToggleButton?.(v === true)}
-        className="shrink-0"
-      />
-      <button type="button" title="Edit" aria-label="Edit action" onClick={onEdit} className={SMALL_BUTTON}>
-        <HugeiconsIcon icon={PencilEdit02Icon} size={12} strokeWidth={2} />
+      <button type="button" title="Edit" aria-label="Edit action" onClick={onEdit} className={EDIT_BUTTON}>
+        <HugeiconsIcon icon={PencilEdit02Icon} size={15} strokeWidth={2} />
       </button>
       {remove}
     </div>
@@ -74,12 +71,11 @@ type Props = {
   action: Action;
   /** A preset as Kex installs it: deleting it asks nothing, the Add menu offers it again. */
   preset: boolean;
-  onToggleButton: (own: boolean) => void;
   onEdit: () => void;
   onRemove: () => void;
 };
 
-export function ActionRow({ action, preset, onToggleButton, onEdit, onRemove }: Props) {
+export function ActionRow({ action, preset, onEdit, onRemove }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: action.id });
   const [removeOpen, setRemoveOpen] = useState(false);
   const display = action.name.trim() || "Name";
@@ -115,7 +111,6 @@ export function ActionRow({ action, preset, onToggleButton, onEdit, onRemove }: 
       <ActionRowView
         action={action}
         handleProps={{ ...attributes, ...listeners }}
-        onToggleButton={onToggleButton}
         onEdit={onEdit}
         remove={remove}
       />

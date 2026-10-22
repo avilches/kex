@@ -14,6 +14,7 @@ const script = (o: Partial<Action> = {}): Action => ({
   name: "Dev",
   runInTerminal: true,
   command: "npm run dev",
+  cwdMode: "workspace",
   ownButton: true,
   ...o,
 });
@@ -163,8 +164,21 @@ describe("planActionRun, scripts", () => {
 });
 
 describe("planActionRun, script folder", () => {
-  it("defaults to the workspace root", () => {
+  it("runs from the workspace root in workspace mode", () => {
     expect(planActionRun(script(), ctx())).toMatchObject({ cwd: "/w" });
+  });
+
+  it("defaults to home, which needs no workspace root", () => {
+    const home = ctx({ folders: { workspaceRoot: "/w", home: "/Users/me" } });
+    expect(planActionRun(script({ cwdMode: undefined }), home)).toMatchObject({ kind: "new-tab", cwd: "/Users/me" });
+    expect(planActionRun(script({ cwdMode: "home" }), home)).toMatchObject({ cwd: "/Users/me" });
+    const rootless = ctx({ vars: { workspace: "" }, folders: { home: "/Users/me" } });
+    expect(planActionRun(script({ cwdMode: "home" }), rootless)).toMatchObject({ kind: "new-tab", cwd: "/Users/me" });
+    expect(planActionRun(script({ cwdMode: "workspace" }), rootless)).toMatchObject({ kind: "blocked" });
+  });
+
+  it("lets the terminal start where it always does while home is not known yet", () => {
+    expect(planActionRun(script({ cwdMode: "home" }), ctx({ folders: { workspaceRoot: "/w" } }))).toMatchObject({ kind: "new-tab", cwd: undefined });
   });
 
   it("follows the last folder in context mode", () => {

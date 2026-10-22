@@ -61,19 +61,23 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   solo cuando hay acciones de los dos alcances), cada alcance en su orden; la ultima entrada
   es "Action Settings" con el engranaje, que abre Settings > Actions; el click en el nombre
   de un script en marcha lleva a su tab sin cerrar el menu. Un comando
-  sin variables (un script normal del workspace) sale en gris mientras el workspace no tenga
+  sin variables (una app, o un script con Run in Workspace root) sale en gris mientras el workspace no tenga
   raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
   propia variable.
-- **Editor de Actions en Settings**: dos columnas, Global y Workspace: <nombre>, cada una con
+- **Editor de Actions en Settings**: dos columnas, Global y This workspace (con el nombre del workspace debajo), cada una con
   un unico combo Add (Add Command primero, luego los presets de apps y la app propia). El
   combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
   los ya instalados (coincidencia por `appId` + comando exacto). La fila es asa, icono,
-  nombre con subtitulo, casilla Button, lapiz y la X de borrar a la derecha del todo; el
-  lapiz abre `ActionEditDialog` (Run in primero en los scripts, luego nombre, comando y
-  variables; guarda al escribir y solo tiene Close). Arrastrar una fila a la otra columna la
+  nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
+  Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
+  workspace, Run in folder primero en los scripts (Home por defecto, Workspace root con la
+  chincheta del explorer, Current tab folder, Absolute path), nombre, comando y variables, y
+  `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra);
+  guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la
   mueve de ambito (al final de su tipo). Una Action de preset se edita igual que cualquiera:
-  al cambiar su nombre o su comando deja de ser un preset (`ownedAfterEdit`) y el preset
-  vuelve al combo; el flag Button no cuenta. Borrar una de preset no pide confirmacion, una de
+  al cambiar su nombre o su comando deja de ser un preset (`ownedAfterEdit`, conserva el
+  icono en `iconId`) y el preset vuelve al combo; Own button / Inside the combo no cuenta.
+  El combo Add pone Add Command y Custom app arriba y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
   pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y

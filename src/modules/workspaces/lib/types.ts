@@ -4,7 +4,7 @@ import type { Action } from "@/modules/actions";
 import type { AutofocusMode } from "@/modules/settings/store";
 import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
-export type ScriptCwdMode = "workspace" | "context" | "fixed";
+export type ScriptCwdMode = "home" | "workspace" | "context" | "fixed";
 
 // What the sleeping overlay shows for a terminal tab besides its title: the agent and the
 // restore command are gone with the PTY, so they are captured when the workspace goes to sleep.

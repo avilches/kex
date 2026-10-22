@@ -25,7 +25,7 @@ Workspace           - a named environment (local or WSL distro)
 
 **Workspace fields.** A `Workspace` carries additional configuration:
 - `color?: string | null` - optional workspace accent color (hex string or null)
-- `actions?: Action[]` - the workspace-scoped Actions (name, command template, `runInTerminal`, and for scripts `cwdMode` of `workspace` | `context` | `fixed` with `cwd` used only in `fixed` mode); the global ones live in `settings-tools.json`. See ARCHITECTURE 3.12
+- `actions?: Action[]` - the workspace-scoped Actions (name, command template, `runInTerminal`, and for scripts `cwdMode` of `home` (default) | `workspace` | `context` | `fixed` with `cwd` used only in `fixed` mode); the global ones live in `settings-tools.json`. See ARCHITECTURE 3.12
 - `activeAction?: string` - id of the Action that `workspace.run` (F12) runs and stops
 - `scriptPaneId?: string` - the pane scripts open their tabs in; cleared at startup when that pane no longer exists
 - `explorerRootMode: "workspace" | "filesystem"` - which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.

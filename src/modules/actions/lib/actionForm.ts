@@ -36,9 +36,10 @@ export function commandVariableDocs(): readonly CommandVariableDoc[] {
 // A script row is a terminal command pointed at a folder; an app row is a background
 // program. The kind is chosen on creation by the add buttons and never switched later.
 export const CWD_MODE_LABELS: Record<ScriptCwdMode, string> = {
-  workspace: "Workspace root folder",
-  context: "Last folder from terminal or editor",
-  fixed: "Fixed folder",
+  home: "Home",
+  workspace: "Workspace root",
+  context: "Current tab folder (from terminal or editor)",
+  fixed: "Absolute path",
 };
 
 export type ActionProblem = { kind: "command" | "cwd" | "context"; message: string };

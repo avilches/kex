@@ -10,6 +10,8 @@ export type ScriptCwdInput = {
   focusFolder?: string | null;
   workspaceRoot?: string | null;
   workspaceCwd?: string | null;
+  /** The user's home folder; absent until it is known, and the terminal then starts where it always does. */
+  home?: string | null;
 };
 
 function present(value: string | null | undefined): string | undefined {
@@ -24,8 +26,10 @@ export function resolveScriptCwd(input: ScriptCwdInput): string | undefined {
       return present(input.focusFolder) ?? workspaceFolder;
     case "fixed":
       return present(input.fixedFolder) ?? workspaceFolder;
-    default:
+    case "workspace":
       return workspaceFolder;
+    default:
+      return present(input.home);
   }
 }
 

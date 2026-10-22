@@ -36,6 +36,7 @@ const script = (o: Partial<Action> = {}): Action => ({
   name: "dev",
   runInTerminal: true,
   command: "pnpm dev",
+  cwdMode: "workspace",
   ownButton: false,
   ...o,
 });
@@ -86,6 +87,13 @@ describe("actionAvailability", () => {
     expect(actionAvailability(app({ command: "make {cwd}" }), rootless)).toBeNull();
     expect(actionAvailability(script({ command: "notify {host}" }), rootless)).toBeNull();
     expect(actionAvailability(script({ command: "pnpm dev" }), ctx)).toBeNull();
+  });
+
+  it("never asks a script that runs in home, the tab's folder or a fixed folder for a workspace root", () => {
+    const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
+    for (const cwdMode of [undefined, "home", "context", "fixed"] as const) {
+      expect(actionAvailability(script({ command: "pnpm dev", cwdMode }), rootless)).toBeNull();
+    }
   });
 
   it("explains the missing variable of a script", () => {
@@ -395,19 +403,20 @@ describe("scriptSubtitle", () => {
   const script = (over: Partial<Action> = {}) => ({ name: "dev", runInTerminal: true, ...over });
 
   it("says where a script runs when its name has no variable", () => {
-    expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Workspace", startTrim: false });
+    expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Home", startTrim: false });
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), ctx)).toEqual({ text: "Workspace", startTrim: false });
     expect(scriptSubtitle(script({ cwdMode: "context" }), ctx)).toEqual({ text: "/p", startTrim: true });
     expect(scriptSubtitle(script({ cwdMode: "fixed", cwd: "/srv/app" }), ctx)).toEqual({ text: "/srv/app", startTrim: true });
   });
 
   it("uses the generic words in Settings, which has no folder to show", () => {
     expect(scriptSubtitle(script({ cwdMode: "context" }), SETTINGS_LABELS).text).toBe("Current folder");
-    expect(scriptSubtitle(script(), SETTINGS_LABELS).text).toBe("Workspace");
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), SETTINGS_LABELS).text).toBe("Workspace");
   });
 
   it("falls back to the generic words with no folder, and says when the root is missing", () => {
     expect(scriptSubtitle(script({ cwdMode: "context" }), { ...ctx, vars: { ...vars, cwd: "" } }).text).toBe("Current folder");
-    expect(scriptSubtitle(script(), { ...ctx, vars: { ...vars, workspace: "" } }).text).toBe(WORKSPACE_UNSET);
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), { ...ctx, vars: { ...vars, workspace: "" } }).text).toBe(WORKSPACE_UNSET);
     expect(scriptSubtitle(script({ cwdMode: "fixed" }), ctx).text).toBeNull();
   });
 

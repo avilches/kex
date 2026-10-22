@@ -43,15 +43,15 @@ function search(text: string) {
 }
 
 describe("AddActionMenu", () => {
-  it("lists Add Command first, then one entry per preset with its icon, then the custom app", () => {
+  it("lists Add Command first, the custom app second, then one entry per preset with its icon", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
       "Add Commandruns in a terminal",
+      "Custom appwrite the command yourself",
       "BBEditCurrent File",
       "ZedCurrent File",
       "ZedWorkspace",
-      "Custom appwrite the command yourself",
     ]);
     view.unmount();
   });

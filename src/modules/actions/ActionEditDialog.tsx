@@ -1,10 +1,17 @@
-import { ArrowDown01Icon, ArrowUp01Icon, FolderOpenIcon } from "@hugeicons/core-free-icons";
+import {
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+  ComputerTerminal01Icon,
+  FolderOpenIcon,
+  Home01Icon,
+  PinIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -12,6 +19,7 @@ import { INPUT_CLASS } from "@/settings/components/inputClass";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
+import { OwnButtonChoice } from "./OwnButtonChoice";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { ActionContext } from "./lib/useActionContext";
@@ -26,15 +34,30 @@ type Props = {
   scope: Scope;
   /** False while the action is a draft the store has not accepted yet. */
   saved: boolean;
+  /** False while no workspace is open: the Action cannot move there. */
+  workspaceAvailable: boolean;
+  onScopeChange: (to: Scope) => void;
   onChange: (next: Action) => void;
   onClose: () => void;
 };
+
+const CWD_MODE_ICONS = {
+  home: Home01Icon,
+  workspace: PinIcon,
+  context: ComputerTerminal01Icon,
+  fixed: FolderOpenIcon,
+} as const;
+
+const SCOPES: readonly { value: Scope; label: string }[] = [
+  { value: "global", label: "Global" },
+  { value: "workspace", label: "This workspace" },
+];
 
 // The edit form of one Action, in a modal. Everything saves as it is typed (the name and the
 // command when the field loses focus, the rest at once), so Close only leaves; closing with
 // Escape or the backdrop flushes what is still being typed. A preset is edited like any other
 // Action: the host decides when a change makes it the user's own.
-export function ActionEditDialog({ action, context, scope, saved, onChange, onClose }: Props) {
+export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, onScopeChange, onChange, onClose }: Props) {
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [draft, setDraft] = useState(action.command);
@@ -46,7 +69,7 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
   const problems = actionProblems({ ...action, command: command.shown }, context);
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
-  const cwdMode: ScriptCwdMode = action.cwdMode ?? "workspace";
+  const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
   const script = action.runInTerminal;
 
   // The latest values for the unmount flush, which closes over nothing else.
@@ -78,7 +101,7 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-3rem)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[460px]"
+        className="max-h-[calc(100vh-3rem)] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[480px]"
         onOpenAutoFocus={(e) => {
           if (saved) return;
           e.preventDefault();
@@ -90,25 +113,44 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
             <ActionIcon action={action} size={14} />
           </span>
           <DialogTitle className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</DialogTitle>
-          <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-            {scope === "global" ? "Global" : "Workspace"}
-          </span>
         </div>
+        <RadioGroup
+          value={scope}
+          onValueChange={(v) => onScopeChange(v as Scope)}
+          aria-label="Where it is available"
+          className="flex w-auto items-center gap-4"
+        >
+          {SCOPES.map((s) => (
+            <label
+              key={s.value}
+              className={cn(
+                "flex items-center gap-2 text-[12px]",
+                s.value === "workspace" && !workspaceAvailable ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+              )}
+            >
+              <RadioGroupItem value={s.value} disabled={s.value === "workspace" && !workspaceAvailable} />
+              {s.label}
+            </label>
+          ))}
+        </RadioGroup>
         <DialogDescription className="sr-only">
-          Changes are saved as you type. Close leaves the editor.
+          Changes are saved as you type. Done leaves the editor.
         </DialogDescription>
 
         {script && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Run in</span>
+            <span className="text-[11px] text-muted-foreground">Run in folder</span>
             <Select value={cwdMode} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
-              <SelectTrigger size="sm" aria-label="Run in" className="h-8 w-full text-[12px]">
+              <SelectTrigger size="sm" aria-label="Run in folder" className="h-8 w-full text-[12px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(CWD_MODE_LABELS) as ScriptCwdMode[]).map((mode) => (
                   <SelectItem key={mode} value={mode} className="text-[12px]">
-                    {CWD_MODE_LABELS[mode]}
+                    <span className="flex items-center gap-2">
+                      <HugeiconsIcon icon={CWD_MODE_ICONS[mode]} size={13} strokeWidth={2} className="shrink-0 text-muted-foreground" />
+                      {CWD_MODE_LABELS[mode]}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -208,7 +250,7 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
             {variablesOpen ? "Hide variables" : "Show variables"}
           </button>
           {variablesOpen && (
-            <div className="flex max-h-48 flex-col overflow-y-auto text-[11px] leading-snug">
+            <div className="flex max-h-52 min-w-0 flex-col overflow-y-auto text-[11px] leading-snug">
               {commandVariableDocs().map((v) => (
                 <button
                   key={v.name}
@@ -222,14 +264,14 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
                     setDraft(value);
                     saveCommand(value);
                   }}
-                  className="flex flex-col border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
+                  className="flex min-w-0 flex-col border-b border-border/30 py-1 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
                 >
-                  <span className="flex w-full items-center gap-2">
-                    <span className="shrink-0 font-mono text-foreground">{`{${v.name}}`}</span>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">{v.description}</span>
+                  <span className="grid w-full grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-2">
+                    <span className="font-mono text-foreground">{`{${v.name}}`}</span>
+                    <span className="text-muted-foreground">{v.description}</span>
                   </span>
                   {context?.vars[v.name] && (
-                    <span className="w-full truncate font-mono text-[10px] text-muted-foreground/80" title={context.vars[v.name]}>
+                    <span className="w-full truncate pl-[6.25rem] font-mono text-[10px] text-muted-foreground/80" title={context.vars[v.name]}>
                       {context.vars[v.name]}
                     </span>
                   )}
@@ -251,20 +293,11 @@ export function ActionEditDialog({ action, context, scope, saved, onChange, onCl
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={`${action.id}-own`}
-            checked={action.ownButton}
-            onCheckedChange={(v) => onChange({ ...action, ownButton: v === true })}
-          />
-          <label htmlFor={`${action.id}-own`} className="cursor-pointer text-[12px]">
-            Own button in the header bar
-          </label>
-        </div>
+        <OwnButtonChoice action={action} onChange={(own) => onChange({ ...action, ownButton: own })} />
 
         <div className="flex justify-end border-t border-border pt-3">
           <Button size="sm" className="h-8 px-4 text-[12px]" onClick={onClose}>
-            Close
+            Done
           </Button>
         </div>
       </DialogContent>

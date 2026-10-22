@@ -9,7 +9,9 @@ export type Action = {
   command: string;
   /** Detected app this action came from, for its icon and default command. */
   appId?: string;
-  /** Scripts only. */
+  /** App icon kept after the user edits a preset: the Action is theirs now, the icon stays. */
+  iconId?: string;
+  /** Scripts only; absent means home. */
   cwdMode?: ScriptCwdMode;
   /** Only used when cwdMode is "fixed". */
   cwd?: string;

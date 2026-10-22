@@ -1,7 +1,7 @@
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import type { Action } from "./types";
 
-const CWD_MODES: readonly ScriptCwdMode[] = ["workspace", "context", "fixed"];
+const CWD_MODES: readonly ScriptCwdMode[] = ["home", "workspace", "context", "fixed"];
 
 // Add and update keep memory equal to what normalizeActions would persist: an action that
 // would end up invalid (an empty command) is refused and the list keeps its previous value.
@@ -65,6 +65,7 @@ export function normalizeAction(raw: unknown): Action | null {
     ownButton: r.ownButton === true,
   };
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
+  if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;
   if (runInTerminal && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
     action.cwdMode = r.cwdMode as ScriptCwdMode;
     if (action.cwdMode === "fixed" && typeof r.cwd === "string" && r.cwd) action.cwd = r.cwd;

@@ -17,6 +17,13 @@ describe("ownedAfterEdit", () => {
     expect(ownedAfterEdit(preset, { ...preset, name: "Subl {workspace}" }).appId).toBe("");
   });
 
+  it("keeps the app icon as iconId, and the first one when it changes again", () => {
+    const edited = ownedAfterEdit(preset, { ...preset, command: "subl -n {workspace}" });
+    expect(edited).toMatchObject({ appId: "", iconId: "sublime" });
+    const own: Action = { ...edited, appId: undefined };
+    expect(ownedAfterEdit(own, { ...own, command: "x" }).iconId).toBe("sublime");
+  });
+
   it("keeps it for the Button flag and for a value typed back to what it was", () => {
     expect(ownedAfterEdit(preset, { ...preset, ownButton: true }).appId).toBe("sublime");
     expect(ownedAfterEdit(preset, { ...preset, command: "subl {workspace} " }).appId).toBe("sublime");
