@@ -17,6 +17,26 @@ function isCamelStart(target: string, i: number): boolean {
   return c >= 65 && c <= 90 && !(p >= 65 && p <= 90);
 }
 
+const COMBINING_MARK = /\p{M}/u;
+
+// Lowercases and drops the accents one character at a time, so the result keeps the length of the
+// input and match indices still point at the text that is displayed.
+export function foldText(text: string): string {
+  let out = "";
+  for (const ch of text.toLowerCase()) {
+    const d = ch.normalize("NFD");
+    out += d.length > 1 && COMBINING_MARK.test(d[1]) ? d[0] : ch;
+  }
+  return out;
+}
+
+// Where an already folded query sits inside a text, as the indices a highlight needs.
+export function substringIndices(foldedQuery: string, text: string): number[] {
+  if (!foldedQuery) return [];
+  const i = foldText(text).indexOf(foldedQuery);
+  return i < 0 ? [] : Array.from({ length: foldedQuery.length }, (_, k) => i + k);
+}
+
 export type FuzzyMatch = { score: number; indices: number[] };
 
 // With lowerInputs the strings arrive pre-lowercased, so the second toLowerCase is
@@ -30,8 +50,8 @@ function scoreSubsequence(
   if (query.length === 0) return { score: 0, indices: [] };
   if (query.length > target.length) return null;
 
-  const q = lowerInputs ? query.toLowerCase() : query;
-  const t = lowerInputs ? target.toLowerCase() : target;
+  const q = foldText(query);
+  const t = foldText(target);
 
   let score = 0;
   let qi = 0;

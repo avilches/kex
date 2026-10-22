@@ -51,6 +51,7 @@ function mount(rows: MergedRow[], typing: boolean) {
         <MergedList
           rows={rows}
           typing={typing}
+          term=""
           userShortcuts={{} as never}
           onRunCommand={vi.fn()}
           onRunTab={vi.fn()}

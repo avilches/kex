@@ -266,6 +266,7 @@ import {
 import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
+import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   planCommandEvent,
@@ -1269,6 +1270,8 @@ export default function App() {
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const commandPaletteOpenRef = useRef(false);
+  commandPaletteOpenRef.current = commandPaletteOpen;
   const [paletteInitialMode, setPaletteInitialMode] = useState<
     "commands" | "content"
   >("commands");
@@ -2880,12 +2883,45 @@ export default function App() {
     ],
   );
 
+  const paletteTerminalTargetRef = useRef<TerminalTarget | null>(null);
+  const onPaletteTerminalTargetChange = useCallback(
+    (target: TerminalTarget | null) => {
+      paletteTerminalTargetRef.current = target;
+    },
+    [],
+  );
+  const openTerminalAtPaletteTarget = useCallback(
+    async (target: TerminalTarget) => {
+      setCommandPaletteOpen(false);
+      if (target.hibernated) await wakeWorkspace(target.workspaceId);
+      const ws = workspacesRef.current.find((w) => w.id === target.workspaceId);
+      if (!ws || ws.hibernated) return;
+      const beside = target.besideTabId
+        ? findTabPane(ws.paneTree, target.besideTabId)
+        : null;
+      const pane = beside?.pane ?? findPane(ws.paneTree, ws.activePaneId);
+      if (!pane) return;
+      const index = beside
+        ? pane.tabs.findIndex((t) => t.id === target.besideTabId) + 1
+        : undefined;
+      const id = newTabId();
+      setActiveWorkspaceId(ws.id);
+      openTab(ws.id, pane.id, { id, kind: "terminal", cwd: target.cwd }, index);
+      activateTab(ws.id, id);
+    },
+    [wakeWorkspace, setActiveWorkspaceId, openTab, activateTab],
+  );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
       "tab.new": () => {
-        openNewTerminal();
+        const target = paletteTerminalTargetRef.current;
+        if (target) void openTerminalAtPaletteTarget(target);
+        else if (commandPaletteOpenRef.current) {
+          setCommandPaletteOpen(false);
+          window.setTimeout(() => openNewTerminal(), 0);
+        } else openNewTerminal();
       },
       "workspace.new": () => addWorkspace(home ?? undefined),
       "workspace.close": () => {
@@ -3158,6 +3194,7 @@ export default function App() {
       focusSidebar,
       agentWorktree,
       openNewTerminal,
+      openTerminalAtPaletteTarget,
       addWorkspace,
       openTab,
       openBrowserInTab,
@@ -4065,6 +4102,7 @@ export default function App() {
             onSelectWorkspace={onPaletteSelectWorkspace}
             onRunClosed={onPaletteRunClosed}
             onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
+            onTerminalTargetChange={onPaletteTerminalTargetChange}
           />
 
           <FolderPalette

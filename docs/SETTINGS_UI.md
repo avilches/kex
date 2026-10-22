@@ -75,7 +75,9 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Set a root to
   this workspace"), `{filepath}` solo el nombre del fichero y `{cwd}` la ruta con el
   principio recortado (el mismo truco de la fila "Copy absolute path", ahora compartido en
-  `src/components/StartTrimmed.tsx`). Las superficies donde se pinta el nombre: boton propio
+  `src/components/StartTrimmed.tsx`). Un script sin variable en el nombre dice donde corre
+  (`scriptSubtitle`, segun su Run in): "Workspace", "Current folder" (la ruta real fuera de
+  Settings) o la carpeta fija. Las superficies donde se pinta el nombre: boton propio
   del header, menu Unico del header, submenu contextual, combo de apps del editor y tarjeta
   plegada. El hover de una fila dice donde abre via `actionRowTitle`: `Open <nombre> in <ruta>`
   para workspace y carpeta, `Open <fichero> with <nombre>` para fichero. El ancho del boton

@@ -1,3 +1,4 @@
+import { foldText } from "@/modules/command-palette/lib/fuzzy";
 import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
@@ -213,7 +214,7 @@ function merge(into: number[] | undefined, more: number[]): number[] {
   return out;
 }
 
-// Every word typed must appear as a plain substring (case insensitive) of something the
+// Every word typed must appear as a plain substring (case and accent insensitive) of something the
 // row shows: its path (never inside the home prefix), its branch, its label or the title
 // of its workspace. The returned indices are the characters that matched, per piece of
 // text, so each row shows why it is there. Groups keep their order, rows keep their
@@ -222,19 +223,19 @@ export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
 ): FolderGroupMatched[] {
-  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = foldText(query.trim()).split(/\s+/).filter(Boolean);
   if (tokens.length === 0) {
     return groups.map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r })) }));
   }
   const out: FolderGroupMatched[] = [];
   for (const g of groups) {
-    const title = g.workspaceTitle.toLowerCase();
+    const title = foldText(g.workspaceTitle);
     let titleIndices: number[] | undefined;
     const rows: FolderRowMatched[] = [];
     for (const r of g.rows) {
-      const path = r.path.toLowerCase();
-      const branch = (r.branch ?? "").toLowerCase();
-      const label = (r.label ?? "").toLowerCase();
+      const path = foldText(r.path);
+      const branch = foldText(r.branch ?? "");
+      const label = foldText(r.label ?? "");
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;
       let labelIndices: number[] | undefined;

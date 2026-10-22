@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   fuzzyBest,
   fuzzyBestLower,
+  foldText,
+  substringIndices,
   fuzzyMatchLower,
   fuzzyScore,
   fuzzyScoreLower,
@@ -181,5 +183,24 @@ describe("passesQuality", () => {
   it("lets a one-character query through on any match", () => {
     expect(passesQuality(1, 1)).toBe(false);
     expect(passesQuality(1, 8)).toBe(true);
+  });
+});
+
+describe("accent folding", () => {
+  it("keeps the length so indices stay valid", () => {
+    expect(foldText("Canción Ñandú")).toBe("cancion nandu");
+    expect(foldText("Canción").length).toBe("Canción".length);
+  });
+
+  it("matches without typing the accent and reports the displayed positions", () => {
+    const m = fuzzyMatchLower("cancion", "Canción");
+    expect(m?.indices).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(fuzzyScore("accion", "Acción")).not.toBeNull();
+    expect(fuzzyMatchLower("canción", "cancion")).not.toBeNull();
+  });
+
+  it("finds a folded substring for highlighting", () => {
+    expect(substringIndices("nand", "Ñandú")).toEqual([0, 1, 2, 3]);
+    expect(substringIndices("zz", "Ñandú")).toEqual([]);
   });
 });

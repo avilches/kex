@@ -4,7 +4,7 @@ import {
   CLOSED_SEARCH_LIMIT,
   type ClosedTabEntry,
 } from "./closedEntries";
-import { fuzzyMatchLower, passesQuality } from "./fuzzy";
+import { foldText, fuzzyMatchLower, passesQuality } from "./fuzzy";
 import { type LearnedMap, learnedBoost } from "./learned";
 import { mruRank } from "./mru";
 import { buildSearchBlobs, commandRowKey } from "./rankCommands";
@@ -78,14 +78,14 @@ function asHighlight(
 
 function substringHit(query: string, field: string): Hit | null {
   if (!field) return null;
-  const i = field.toLowerCase().indexOf(query);
+  const i = foldText(field).indexOf(query);
   if (i < 0) return null;
   const indices = Array.from({ length: query.length }, (_, k) => i + k);
   return { points: 1 - i / (field.length + 1), indices };
 }
 
 function fuzzyHit(query: string, field: string): Hit | null {
-  const m = fuzzyMatchLower(query, field.toLowerCase());
+  const m = fuzzyMatchLower(query, field);
   if (m === null || !passesQuality(query.length, m.score)) return null;
   return { points: m.score, indices: m.indices };
 }
@@ -165,7 +165,7 @@ function closedPoints(entry: ClosedTabEntry, q: string): FieldScored | null {
 export function mergeRows(input: MergeInput): MergedRow[] {
   const { commands, tabs, workspaces, activeTabId, learned, mru } = input;
   const closed = input.closed ?? [];
-  const q = input.term.trim().toLowerCase();
+  const q = foldText(input.term.trim());
 
   if (!q) {
     const recents = tabs
@@ -200,7 +200,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   commands.forEach((item, i) => {
     const hit = commandHit(blobs[i], q);
     if (hit === null) return;
-    const p = blobs[i].some((f) => f.toLowerCase().includes(q))
+    const p = blobs[i].some((f) => foldText(f).includes(q))
       ? hit.points
       : hit.points - SCATTERED_PENALTY;
     const key = commandRowKey(item.id);
