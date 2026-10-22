@@ -9,12 +9,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
-import { RowTag, type RowTagKind } from "@/modules/command-palette/RowTag";
-import {
-  SleepingIcon,
-} from "@hugeicons/core-free-icons";
+import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterFolderGroups,
   folderRowNote,
@@ -30,19 +27,10 @@ type Props = {
   onPick: (row: FolderRow) => void;
 };
 
-function rowTagKind(row: FolderRow): RowTagKind {
-  if (row.label === "Workspace root") return "Workspace";
-  if (row.label === "Main checkout") return "Git";
-  if (!row.kind) return "Terminal";
-  if (row.kind === "terminal") return row.agent ? "Agent" : "Terminal";
-  if (row.kind === "editor" || row.kind === "markdown") return "File";
-  if (row.kind === "browser") return "Browser";
-  return "Git";
-}
-
 export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Fresh palette on every open: no query from the previous ask.
   useEffect(() => {
@@ -61,6 +49,47 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
     }
   }, [flat, selectedKey]);
 
+  // Arrows are ours, not cmdk's: the selection can only land on a rendered row
+  // (wrapping at the ends) and the row is scrolled into view below.
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (flat.length === 0) return;
+      setSelectedKey((prev) => {
+        const at = flat.findIndex((r) => r.key === prev);
+        const next =
+          (at + (e.key === "ArrowDown" ? 1 : -1) + flat.length) % flat.length;
+        return flat[next].key;
+      });
+    },
+    [flat],
+  );
+
+  // scrollIntoView against the Radix ScrollArea is not reliable for rows far
+  // from the viewport's current scroll (the cursor used to leave the visible
+  // area at both ends), so the viewport is scrolled explicitly.
+  useEffect(() => {
+    const root = listRef.current;
+    if (!root) return;
+    const viewport = root.querySelector<HTMLElement>(
+      "[data-slot=scroll-area-viewport]",
+    );
+    const item = root.querySelector<HTMLElement>(
+      `[data-folder-row="${selectedKey}"]`,
+    );
+    if (!viewport || !item) return;
+    const top =
+      item.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    if (top < 0) {
+      viewport.scrollBy({ top });
+    } else if (top + item.offsetHeight > viewport.clientHeight) {
+      viewport.scrollBy({ top: top + item.offsetHeight - viewport.clientHeight });
+    }
+  }, [selectedKey, query, open]);
+
   const empty = flat.length === 0;
 
   return (
@@ -75,9 +104,9 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
     >
       <Command
         shouldFilter={false}
-        loop
         value={selectedKey}
         onValueChange={setSelectedKey}
+        onKeyDown={onKeyDown}
       >
         <CommandInput
           value={query}
@@ -85,7 +114,10 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
           placeholder="New terminal in..."
           autoFocus
         />
-        <ScrollArea className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!">
+        <ScrollArea
+          ref={listRef}
+          className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
+        >
           <CommandList className="max-h-none overflow-visible pr-3">
             {empty ? (
               <CommandGroup heading="Folders">
@@ -111,13 +143,13 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                     <CommandItem
                       key={row.key}
                       value={row.key}
+                      data-folder-row={row.key}
                       onSelect={() => onPick(row)}
                       className={cn(
                         "text-[12.5px]",
                         row.hibernated && "opacity-60",
                       )}
                     >
-                      <RowTag kind={rowTagKind(row)} />
                       <span className="min-w-0 flex-1 truncate">
                         <HighlightText text={row.path} indices={row.indices} />
                       </span>

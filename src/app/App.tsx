@@ -3405,6 +3405,7 @@ export default function App() {
         ? buildFolderGroups({
             workspaces,
             activeWorkspaceId,
+            home: homeRef.current,
             activeTabEntry:
               folderTabEntries.find((e) => e.tabId === activeTabId) ?? null,
             entries: folderTabEntries,
