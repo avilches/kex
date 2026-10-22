@@ -10,7 +10,7 @@ export function mainCheckoutOf(path: string): string | null {
   return match ? path.slice(0, match.index) : null;
 }
 
-export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace root";
+export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root";
 
 export type FolderRow = {
   key: string;
@@ -29,6 +29,7 @@ export type FolderGroup = {
   workspaceId: string;
   workspaceTitle: string;
   workspaceColor: string | null;
+  workspaceIcon: string | null;
   active: boolean;
   hibernated: boolean;
   rows: FolderRow[];
@@ -138,7 +139,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     }
     const root = activeWs.workspaceRoot ?? activeWs.fsRoot ?? null;
     if (root) {
-      pushUnique(rows, seen, rowOf(root, activeWs.id, false, home, { label: "Workspace root" }));
+      pushUnique(rows, seen, rowOf(root, activeWs.id, false, home, { label: "Workspace Root" }));
     }
     for (const row of tabRowsOf(byWorkspace.get(activeWs.id) ?? [], seen, home)) {
       rows.push(row);
@@ -147,6 +148,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       workspaceId: activeWs.id,
       workspaceTitle: activeWs.title,
       workspaceColor: activeWs.color ?? null,
+      workspaceIcon: activeWs.icon ?? null,
       active: true,
       hibernated: !!activeWs.hibernated,
       rows,
@@ -158,7 +160,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const rows: FolderRow[] = [];
     const root = ws.workspaceRoot ?? ws.fsRoot ?? null;
     if (root) {
-      pushUnique(rows, seen, rowOf(root, ws.id, !!ws.hibernated, home, { label: "Workspace root" }));
+      pushUnique(rows, seen, rowOf(root, ws.id, !!ws.hibernated, home, { label: "Workspace Root" }));
     }
     for (const row of tabRowsOf(byWorkspace.get(ws.id) ?? [], seen, home)) {
       rows.push(row);
@@ -168,6 +170,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       workspaceId: ws.id,
       workspaceTitle: ws.title,
       workspaceColor: ws.color ?? null,
+      workspaceIcon: ws.icon ?? null,
       active: false,
       hibernated: !!ws.hibernated,
       rows,

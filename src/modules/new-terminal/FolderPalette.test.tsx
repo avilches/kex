@@ -21,6 +21,7 @@ const group = (over: Partial<FolderGroup> = {}): FolderGroup => ({
   workspaceId: over.workspaceId ?? "ws-1",
   workspaceTitle: over.workspaceTitle ?? "Kex",
   workspaceColor: over.workspaceColor ?? null,
+  workspaceIcon: over.workspaceIcon ?? null,
   active: over.active ?? false,
   hibernated: over.hibernated ?? false,
   rows: over.rows ?? [],
@@ -33,7 +34,7 @@ const groups: FolderGroup[] = [
     active: true,
     rows: [
       row({ path: "/repo/.claude/worktrees/perf-lab/src-tauri", label: "Current tab", branch: "feat/perf", key: "ws-1:/repo/.claude/worktrees/perf-lab/src-tauri" }),
-      row({ path: "/repo", label: "Workspace root", key: "ws-1:/repo" }),
+      row({ path: "/repo", label: "Workspace Root", key: "ws-1:/repo" }),
       row({ path: "/repo/src", branch: "main", key: "ws-1:/repo/src" }),
     ],
   }),
@@ -41,7 +42,7 @@ const groups: FolderGroup[] = [
     workspaceId: "ws-2",
     workspaceTitle: "Dotfiles",
     workspaceColor: "#4f8fff",
-    rows: [row({ path: "/dotfiles", label: "Workspace root", key: "ws-2:/dotfiles" })],
+    rows: [row({ path: "/dotfiles", label: "Workspace Root", key: "ws-2:/dotfiles" })],
   }),
 ];
 
@@ -81,7 +82,7 @@ describe("FolderPalette", () => {
     mount(onPick);
     await settle();
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Kex \u00b7 current workspace");
+    expect(text).toContain("Current workspace");
     expect(text).toContain("/repo/.claude/worktrees/perf-lab/src-tauri");
     expect(text).toContain("Current tab");
     expect(text).toContain("Dotfiles");
@@ -123,5 +124,26 @@ describe("FolderPalette", () => {
     expect(visible).toHaveLength(1);
     expect(visible[0].textContent).toContain("/dotfiles");
     expect(visible[0].textContent).not.toContain("worktrees");
+  });
+
+  it("marks a hibernated workspace in its heading and leaves its rows undimmed", async () => {
+    render(
+      createElement(FolderPalette, {
+        open: true,
+        onOpenChange: vi.fn(),
+        groups: [
+          group({
+            workspaceId: "ws-3",
+            workspaceTitle: "Sleepy",
+            hibernated: true,
+            rows: [row({ workspaceId: "ws-3", path: "/sleepy", hibernated: true })],
+          }),
+        ],
+        onPick: vi.fn(),
+      }),
+    );
+    await settle();
+    expect(document.querySelector('[aria-label="Workspace is hibernated"]')).not.toBeNull();
+    expect(itemEls()[0].className).not.toContain("opacity-60");
   });
 });
