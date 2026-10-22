@@ -15,6 +15,8 @@ export type BarController = {
   focus: (action: Action) => boolean;
   /** Moves an Action of the given scope to the place of another one of the same scope. */
   reorder: (scope: BarScope, fromId: string, toId: string) => void;
+  /** Puts an Action of the given scope right before `beforeId`, or last. */
+  place: (scope: BarScope, id: string, beforeId?: string) => void;
   /** Merges a patch into an Action of the given scope. */
   update: (scope: BarScope, id: string, patch: Partial<Omit<Action, "id">>) => void;
   remove: (scope: BarScope, id: string) => void;

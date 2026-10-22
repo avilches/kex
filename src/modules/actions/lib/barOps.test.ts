@@ -18,6 +18,7 @@ function setup(_workspace: Action[], global: Action[]) {
     updateWorkspaceAction: vi.fn(),
     removeWorkspaceAction: vi.fn(),
     reorderWorkspaceActions: vi.fn(),
+    placeWorkspaceAction: vi.fn(),
     promoteWorkspaceAction: vi.fn(),
     demoteGlobalAction: vi.fn(),
     global: {
@@ -54,6 +55,16 @@ describe("createBarOps", () => {
     await vi.waitFor(() => expect(d.unlink).toHaveBeenCalledTimes(1));
     expect(globalList().map((a) => a.id)).toEqual(["g2"]);
     expect(d.updateWorkspaceAction).not.toHaveBeenCalled();
+  });
+
+  it("places an Action before another in the scope that owns it", async () => {
+    const { d, ops, globalList } = setup([], [act("g1"), act("g2"), act("g3")]);
+    ops.place("workspace", "a", "b");
+    expect(d.placeWorkspaceAction).toHaveBeenCalledWith("w1", "a", "b");
+    ops.place("global", "g3", "g1");
+    await vi.waitFor(() => expect(globalList().map((a) => a.id)).toEqual(["g3", "g1", "g2"]));
+    ops.place("global", "g3");
+    await vi.waitFor(() => expect(globalList().map((a) => a.id)).toEqual(["g1", "g2", "g3"]));
   });
 
   it("reports a failed global write", async () => {

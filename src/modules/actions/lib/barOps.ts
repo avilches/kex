@@ -1,8 +1,8 @@
-import { removeAction, reorderActions, updateAction } from "./actions";
+import { removeAction, reorderActions, reorderBefore, updateAction } from "./actions";
 import type { Action } from "./types";
 import type { BarController } from "./useActionsBar";
 
-export type BarOps = Pick<BarController, "reorder" | "update" | "remove" | "move">;
+export type BarOps = Pick<BarController, "reorder" | "place" | "update" | "remove" | "move">;
 
 type GlobalStore = {
   get: () => Action[];
@@ -14,6 +14,7 @@ type Deps = {
   updateWorkspaceAction: (workspaceId: string, id: string, patch: Partial<Omit<Action, "id">>) => void;
   removeWorkspaceAction: (workspaceId: string, id: string) => void;
   reorderWorkspaceActions: (workspaceId: string, fromId: string, toId: string) => void;
+  placeWorkspaceAction: (workspaceId: string, id: string, beforeId?: string) => void;
   promoteWorkspaceAction: (workspaceId: string, id: string, beforeId?: string) => void;
   demoteGlobalAction: (workspaceId: string, id: string, beforeId?: string) => void;
   global: GlobalStore;
@@ -43,6 +44,11 @@ export function createBarOps(d: Deps): BarOps {
       if (scope === "global") return global((list) => reorderActions(list, fromId, toId), "Could not save the actions");
       const ws = d.workspaceId();
       if (ws) d.reorderWorkspaceActions(ws, fromId, toId);
+    },
+    place: (scope, id, beforeId) => {
+      if (scope === "global") return global((list) => reorderBefore(list, id, beforeId), "Could not save the actions");
+      const ws = d.workspaceId();
+      if (ws) d.placeWorkspaceAction(ws, id, beforeId);
     },
     remove: (scope, id) => {
       if (scope === "global") {

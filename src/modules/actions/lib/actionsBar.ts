@@ -253,17 +253,27 @@ export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "runInTe
 
 export const MENU_DRAG_PREFIX = "menu:";
 export const DROP_MENU = "zone:menu";
-export const DROP_WORKSPACE = "zone:workspace";
-export const DROP_GLOBAL = "zone:global";
+export const DROP_MENU_PREFIX = "mzone:";
 export const DROP_MENU_WORKSPACE = "mzone:workspace";
 export const DROP_MENU_GLOBAL = "mzone:global";
 
 type Scope = "workspace" | "global";
+
+// The bar has one zone per scope and kind: apps and scripts of the workspace, apps and
+// scripts of the global scope. Each one takes only its own kind.
+export const barZoneId = (scope: Scope, script: boolean) => `zone:${scope}:${script ? "scripts" : "apps"}`;
+
+export function parseBarZone(id: string): { scope: Scope; script: boolean } | null {
+  const m = /^zone:(workspace|global):(apps|scripts)$/.exec(id);
+  return m ? { scope: m[1] as Scope, script: m[2] === "scripts" } : null;
+}
+
 type Placed = Pick<BarItem, "id" | "global" | "action">;
 
-// Where a dragged Action ends up: its scope, whether it is a bar button, and its place. In
-// its own scope it takes the place of the Action it lands on (`reorderOver`, as a reorder
-// does); in another scope it is inserted before `placeBefore`, or goes last without one.
+// Where a dragged Action ends up: its scope, whether it is a bar button, and its place. Inside
+// one list (bar to bar, menu to menu, same scope) it takes the place of the Action it lands
+// on (`reorderOver`, as a reorder does). Across lists or scopes it goes before `placeBefore`,
+// last for null, and where it falls when absent.
 export type Drop = {
   id: string;
   from: Scope;
@@ -271,7 +281,7 @@ export type Drop = {
   wasButton: boolean;
   button: boolean;
   reorderOver?: string;
-  placeBefore?: string;
+  placeBefore?: string | null;
 };
 
 const sameKind = (a: Placed, b: Placed) => a.action.runInTerminal === b.action.runInTerminal;
@@ -305,8 +315,10 @@ export function resolveDrop(
     if (fromMenu) return null;
     to = fromScope;
     button = false;
-  } else if (overId === DROP_WORKSPACE || overId === DROP_GLOBAL) {
-    to = overId === DROP_GLOBAL ? "global" : "workspace";
+  } else if (parseBarZone(overId)) {
+    const zone = parseBarZone(overId)!;
+    if (zone.script !== from.action.runInTerminal) return null;
+    to = zone.scope;
     button = true;
   } else if (overId === DROP_MENU_WORKSPACE || overId === DROP_MENU_GLOBAL) {
     to = overId === DROP_MENU_GLOBAL ? "global" : "workspace";
@@ -326,16 +338,16 @@ export function resolveDrop(
   }
   const wasButton = !fromMenu;
   let reorderOver: string | undefined;
-  let placeBefore: string | undefined;
+  let placeBefore: string | null | undefined;
   if (over && over.id !== from.id) {
     const peers = list.filter((i) => scopeOf(i.global) === to && sameKind(i, from) && i.id !== from.id);
     if (sameKind(over, from)) {
-      if (to === fromScope) reorderOver = over.id;
+      if (to === fromScope && wasButton === button) reorderOver = over.id;
       else {
         const next = peers[peers.findIndex((i) => i.id === over!.id) + 1];
-        placeBefore = after ? next?.id : over.id;
+        placeBefore = after ? (next?.id ?? null) : over.id;
       }
-    } else if (!button && peers.length > 0) {
+    } else if (peers.length > 0) {
       return null;
     }
   }
@@ -347,7 +359,7 @@ export function resolveDrop(
     wasButton,
     button,
     ...(reorderOver ? { reorderOver } : {}),
-    ...(placeBefore ? { placeBefore } : {}),
+    ...(placeBefore !== undefined ? { placeBefore } : {}),
   };
 }
 

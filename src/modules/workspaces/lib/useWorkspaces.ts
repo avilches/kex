@@ -9,6 +9,7 @@ import {
   adoptActionAt,
   removeAction,
   reorderActions,
+  reorderBefore,
   updateAction,
   type Action,
 } from "@/modules/actions";
@@ -1041,6 +1042,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const placeWorkspaceAction = useCallback((workspaceId: string, id: string, beforeId?: string) => {
+    setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => reorderBefore(list, id, beforeId)));
+  }, []);
+
   const setActiveWorkspaceAction = useCallback((workspaceId: string, actionId: string | null) => {
     setWorkspaces((prev) => applySetActiveAction(prev, workspaceId, actionId));
   }, []);
@@ -1215,6 +1220,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     updateWorkspaceAction,
     removeWorkspaceAction,
     reorderWorkspaceActions,
+    placeWorkspaceAction,
     setActiveWorkspaceAction,
     promoteWorkspaceAction,
     demoteGlobalAction,

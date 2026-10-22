@@ -8,6 +8,7 @@ export {
   promoteToGlobal,
   removeAction,
   reorderActions,
+  reorderBefore,
   updateAction,
   type HeaderPartition,
 } from "./lib/actions";

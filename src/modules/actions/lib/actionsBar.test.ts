@@ -6,21 +6,21 @@ import {
   actionSubtitle,
   actionTarget,
   appsFirst,
+  barZoneId,
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
   describeMissing,
-  DROP_GLOBAL,
   DROP_MENU,
   DROP_MENU_GLOBAL,
   DROP_MENU_WORKSPACE,
-  DROP_WORKSPACE,
   MENU_DRAG_PREFIX,
   isCompactBar,
   menuEntries,
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  parseBarZone,
   resolveDrop,
   SETTINGS_LABELS,
   scriptsFirst,
@@ -524,10 +524,27 @@ describe("resolveDrop", () => {
   it("moves a button to the other scope before the button it lands on, or after it past the middle", () => {
     expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g1" });
     expect(drop("w1", "g1", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g2" });
-    expect(drop("w1", "g2", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
-    expect(drop("w1", DROP_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
-    expect(drop("g1", DROP_WORKSPACE)).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
-    expect(drop("w1", DROP_WORKSPACE)).toBeNull();
+    expect(drop("w1", "g2", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: null });
+    expect(drop("w1", barZoneId("global", false))).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
+    expect(drop("g1", barZoneId("workspace", false))).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
+    expect(drop("w1", barZoneId("workspace", false))).toBeNull();
+  });
+
+  it("takes a bar zone only for its own kind", () => {
+    expect(drop("w1", barZoneId("global", true))).toBeNull();
+    expect(drop("ws", barZoneId("global", false))).toBeNull();
+    expect(drop("ws", barZoneId("global", true))).toEqual({ id: "ws", from: "workspace", to: "global", ...base });
+    expect(drop(row("ms"), barZoneId("workspace", false))).toBeNull();
+    expect(drop(row("ms"), barZoneId("workspace", true))).toEqual({ id: "ms", from: "workspace", to: "workspace", wasButton: false, button: true });
+    expect(parseBarZone("zone:menu")).toBeNull();
+    expect(parseBarZone(barZoneId("global", true))).toEqual({ scope: "global", script: true });
+  });
+
+  it("refuses a button of the other kind in a bar scope that has some of its own kind", () => {
+    const withScript = [...bar, b("gs", { global: true, script: true })];
+    expect(resolveDrop(withScript, menu, "w1", "gs")).toBeNull();
+    expect(resolveDrop(withScript, menu, "ws", "g1")).toBeNull();
+    expect(resolveDrop(bar, menu, "ws", "g1")).toEqual({ id: "ws", from: "workspace", to: "global", ...base });
   });
 
   it("hides a button on the trigger, a section or a row, placing it among its kind in the menu", () => {
@@ -535,7 +552,8 @@ describe("resolveDrop", () => {
     expect(drop("w1", DROP_MENU)).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid });
     expect(drop("w1", DROP_MENU_WORKSPACE)).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid });
     expect(drop("w1", DROP_MENU_GLOBAL)).toEqual({ id: "w1", from: "workspace", to: "global", ...hid });
-    expect(drop("w1", row("m1"))).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid, reorderOver: "m1" });
+    expect(drop("w1", row("m1"))).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid, placeBefore: "m1" });
+    expect(drop("w1", row("m2"), true)).toEqual({ id: "w1", from: "workspace", to: "workspace", ...hid, placeBefore: null });
     expect(drop("w1", row("mg"))).toEqual({ id: "w1", from: "workspace", to: "global", ...hid, placeBefore: "mg" });
     expect(drop("w1", row("mg"), true)).toEqual({ id: "w1", from: "workspace", to: "global", ...hid, placeBefore: "mg2" });
   });
@@ -568,10 +586,12 @@ describe("resolveDrop", () => {
 
   it("shows a menu row as a button over a button or a frame of the bar, in any scope", () => {
     const show = { wasButton: false, button: true };
-    expect(drop(row("m1"), "w2")).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, reorderOver: "w2" });
-    expect(drop(row("m1"), "ws")).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
-    expect(drop(row("m1"), DROP_WORKSPACE)).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
-    expect(drop(row("m1"), DROP_GLOBAL)).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
+    expect(drop(row("m1"), "w2")).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, placeBefore: "w2" });
+    expect(drop(row("m1"), "w1", true)).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, placeBefore: "w2" });
+    expect(drop(row("m1"), "ws")).toBeNull();
+    expect(drop(row("m1"), "g1")).toEqual({ id: "m1", from: "workspace", to: "global", ...show, placeBefore: "g1" });
+    expect(drop(row("m1"), barZoneId("workspace", false))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
+    expect(drop(row("m1"), barZoneId("global", false))).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
   });
 
   it("makes the menu trigger no target for a row, and ignores itself and the unknown", () => {

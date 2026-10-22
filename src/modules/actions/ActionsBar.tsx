@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   type CollisionDetection,
@@ -64,13 +64,14 @@ import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { splitActionName } from "./lib/actionName";
 import {
-  DROP_GLOBAL,
   DROP_MENU,
+  DROP_MENU_PREFIX,
   DROP_MENU_GLOBAL,
   DROP_MENU_WORKSPACE,
-  DROP_WORKSPACE,
+  barZoneId,
   MENU_DRAG_PREFIX,
   menuEntries,
+  parseBarZone,
   resolveDrop,
   type Drop,
   WORKSPACE_UNSET,
@@ -254,23 +255,26 @@ function ReorderableButton({
   );
 }
 
-// One scope of the bar. During a drag it draws a dashed frame with its label, empty or not,
-// and is where a dragged Action lands when it is dropped on no button; out of a drag an
-// empty one takes no room. The frame is an outline so showing it moves nothing.
+// One scope and kind of the bar. During a drag it draws a dashed frame with its label, empty
+// or not, and is where a dragged Action of its kind lands when it is dropped on no button;
+// a frame of the other kind stays dim and takes nothing. Out of a drag an empty one takes
+// no room. The frame is an outline so showing it moves nothing.
 function BarZone({
   id,
   label,
   dragging,
+  accepts,
   empty,
   children,
 }: {
   id: string;
   label: string;
   dragging: boolean;
+  accepts: boolean;
   empty: boolean;
   children: React.ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: !dragging });
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !dragging || !accepts });
   return (
     <div
       ref={setNodeRef}
@@ -278,7 +282,8 @@ function BarZone({
         "relative flex shrink-0 items-center gap-2 rounded-md",
         empty && !dragging && "hidden",
         dragging && "min-h-8 min-w-16 outline-1 outline-offset-2 outline-border outline-dashed",
-        dragging && isOver && "bg-accent/60 outline-foreground/50",
+        dragging && !accepts && "opacity-40",
+        dragging && accepts && isOver && "bg-accent/60 outline-foreground/50",
       )}
     >
       {dragging && (
@@ -624,6 +629,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       ? menuItems.find((i) => i.id === id.slice(MENU_DRAG_PREFIX.length))
       : model.buttons.find((b) => b.id === id)
     )?.action.runInTerminal;
+  const dragKind = draggingId ? kindOf(draggingId) : undefined;
   // The pointer decides what is under the drag, a button or row before the frame around it.
   // Over a section of the menu the Action may only land among its own kind: the one under
   // the pointer, else the nearest, and where the section has none of its kind the section
@@ -634,36 +640,54 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       .filter((c) => c.id !== args.active.id)
       .sort((a, b) => Number(isZone(a.id)) - Number(isZone(b.id)));
     const activeId = String(args.active.id);
-    const rowItem = (id: string | number) =>
-      String(id).startsWith(MENU_DRAG_PREFIX) ? menuItems.find((i) => i.id === String(id).slice(MENU_DRAG_PREFIX.length)) : undefined;
-    const hit = within.find((c) => rowItem(c.id) || c.id === DROP_MENU_WORKSPACE || c.id === DROP_MENU_GLOBAL);
-    if (hit) {
-      const scope = rowItem(hit.id)?.global ?? hit.id === DROP_MENU_GLOBAL;
-      const kind = kindOf(activeId);
-      const peers = menuItems.filter(
-        (i) => i.global === scope && i.action.runInTerminal === kind && `${MENU_DRAG_PREFIX}${i.id}` !== activeId,
+    // The section under the pointer: a menu row or section, or a bar button or zone.
+    const sectionOf = (id: string | number): { global: boolean; menu: boolean } | null => {
+      const key = String(id);
+      if (key.startsWith(MENU_DRAG_PREFIX)) {
+        const item = menuItems.find((i) => i.id === key.slice(MENU_DRAG_PREFIX.length));
+        return item ? { global: item.global, menu: true } : null;
+      }
+      if (key === DROP_MENU_WORKSPACE || key === DROP_MENU_GLOBAL) return { global: key === DROP_MENU_GLOBAL, menu: true };
+      const zone = parseBarZone(key);
+      if (zone) return { global: zone.scope === "global", menu: false };
+      const button = model.buttons.find((b) => b.id === key);
+      return button ? { global: button.global, menu: false } : null;
+    };
+    const hit = within.find((c) => sectionOf(c.id));
+    const kind = kindOf(activeId);
+    if (hit && kind !== undefined) {
+      const section = sectionOf(hit.id)!;
+      const idOf = (i: BarItem) => (section.menu ? `${MENU_DRAG_PREFIX}${i.id}` : i.id);
+      const peers = (section.menu ? menuItems : model.buttons).filter(
+        (i) => i.global === section.global && i.action.runInTerminal === kind && idOf(i) !== activeId,
       );
       const peerCollision = (id: string): Collision[] => {
         const container = args.droppableContainers.find((c) => c.id === id);
         return container ? [{ id, data: { droppableContainer: container, value: 0 } }] : [];
       };
-      if (peers.length === 0) return peerCollision(scope ? DROP_MENU_GLOBAL : DROP_MENU_WORKSPACE);
-      const direct = within.find((c) => peers.some((p) => `${MENU_DRAG_PREFIX}${p.id}` === c.id));
+      if (peers.length === 0) {
+        const scope = section.global ? "global" : "workspace";
+        return peerCollision(section.menu ? `${DROP_MENU_PREFIX}${scope}` : barZoneId(scope, kind));
+      }
+      const direct = within.find((c) => peers.some((p) => idOf(p) === c.id));
       if (direct) return [direct];
-      const y = args.pointerCoordinates?.y ?? 0;
+      const pointer = args.pointerCoordinates;
       let best: { id: string; distance: number } | undefined;
       for (const p of peers) {
-        const id = `${MENU_DRAG_PREFIX}${p.id}`;
-        const rect = args.droppableRects.get(id);
-        if (!rect) continue;
-        const distance = Math.abs(rect.top + rect.height / 2 - y);
-        if (!best || distance < best.distance) best = { id, distance };
+        const rect = args.droppableRects.get(idOf(p));
+        if (!rect || !pointer) continue;
+        const distance = section.menu
+          ? Math.abs(rect.top + rect.height / 2 - pointer.y)
+          : Math.abs(rect.left + rect.width / 2 - pointer.x);
+        if (!best || distance < best.distance) best = { id: idOf(p), distance };
       }
       return best ? peerCollision(best.id) : within;
     }
     if (within.length > 0 || activeId.startsWith(MENU_DRAG_PREFIX)) return within;
-    const scope = model.buttons.find((b) => b.id === args.active.id)?.global;
-    const own = args.droppableContainers.filter((c) => model.buttons.some((b) => b.id === c.id && b.global === scope));
+    const origin = model.buttons.find((b) => b.id === args.active.id);
+    const own = args.droppableContainers.filter((c) =>
+      model.buttons.some((b) => b.id === c.id && b.global === origin?.global && b.action.runInTerminal === origin?.action.runInTerminal),
+    );
     return closestCenter({ ...args, droppableContainers: own });
   };
   const dragStart = ({ active }: DragStartEvent) => {
@@ -728,7 +752,8 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     const drop = over ? dropAt(String(active.id), over, start ? { x: start.x + delta.x, y: start.y + delta.y } : null)?.drop : null;
     if (!drop) return;
     if (drop.button !== drop.wasButton) controller.update(drop.from, drop.id, { ownButton: drop.button });
-    if (drop.to !== drop.from) controller.move(drop.from, drop.id, drop.placeBefore);
+    if (drop.to !== drop.from) controller.move(drop.from, drop.id, drop.placeBefore ?? undefined);
+    else if (drop.placeBefore !== undefined) controller.place(drop.from, drop.id, drop.placeBefore ?? undefined);
     if (drop.reorderOver) controller.reorder(drop.from, drop.id, drop.reorderOver);
   };
   const askDelete = (item: BarItem) => {
@@ -773,15 +798,31 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
         onDragEnd={dragEnd}
         onDragCancel={endDrag}
       >
-        <BarZone id={DROP_WORKSPACE} label="Workspace" dragging={dragging} empty={workspaceButtons.length === 0}>
-          {renderButtons(workspaceButtons)}
-        </BarZone>
-        {!dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
-          <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
-        )}
-        <BarZone id={DROP_GLOBAL} label="Global" dragging={dragging} empty={globalButtons.length === 0}>
-          {renderButtons(globalButtons)}
-        </BarZone>
+        {(["workspace", "global"] as const).map((scope, i) => {
+          const scoped = model.buttons.filter((b) => b.global === (scope === "global"));
+          return (
+            <Fragment key={scope}>
+              {i === 1 && !dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
+                <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+              )}
+              {([false, true] as const).map((script) => {
+                const list = scoped.filter((b) => b.action.runInTerminal === script);
+                return (
+                  <BarZone
+                    key={`${scope}-${script}`}
+                    id={barZoneId(scope, script)}
+                    label={`${scope === "global" ? "Global" : "Workspace"} ${script ? "scripts" : "apps"}`}
+                    dragging={dragging}
+                    accepts={dragKind === undefined || dragKind === script}
+                    empty={list.length === 0}
+                  >
+                    {renderButtons(list)}
+                  </BarZone>
+                );
+              })}
+            </Fragment>
+          );
+        })}
         <MenuDrop dragging={dragging} fromMenu={fromMenu} hasMenu={menuItems.length > 0}>
           <ActionsMenu
             label="Actions"

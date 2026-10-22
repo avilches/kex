@@ -349,6 +349,7 @@ export default function App() {
     updateWorkspaceAction,
     removeWorkspaceAction,
     reorderWorkspaceActions,
+    placeWorkspaceAction,
     promoteWorkspaceAction,
     demoteGlobalAction,
     dropDeadScriptPanes,
@@ -3660,6 +3661,7 @@ export default function App() {
         updateWorkspaceAction,
         removeWorkspaceAction,
         reorderWorkspaceActions,
+        placeWorkspaceAction,
         promoteWorkspaceAction,
         demoteGlobalAction,
         global: globalActions,
@@ -3669,7 +3671,7 @@ export default function App() {
           toast.error(message);
         },
       }),
-    [updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, promoteWorkspaceAction, demoteGlobalAction],
+    [updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, placeWorkspaceAction, promoteWorkspaceAction, demoteGlobalAction],
   );
 
   const actionsController = useMemo(

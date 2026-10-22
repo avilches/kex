@@ -38,6 +38,17 @@ export function reorderActions(list: readonly Action[], fromId: string, toId: st
   return next;
 }
 
+// Puts the Action right before `beforeId`, or last without one: a move between the bar and the
+// menu, where both ends are not one list the way a reorder is, has no "over" to swap with.
+export function reorderBefore(list: readonly Action[], id: string, beforeId?: string): Action[] {
+  const item = list.find((a) => a.id === id);
+  if (!item || beforeId === id) return list as Action[];
+  const rest = list.filter((a) => a.id !== id);
+  const at = beforeId ? rest.findIndex((a) => a.id === beforeId) : -1;
+  rest.splice(at === -1 ? rest.length : at, 0, item);
+  return rest;
+}
+
 export function normalizeAction(raw: unknown): Action | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;

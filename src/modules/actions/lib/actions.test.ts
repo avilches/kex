@@ -7,6 +7,7 @@ import {
   promoteToGlobal,
   removeAction,
   reorderActions,
+  reorderBefore,
   updateAction,
 } from "./actions";
 import type { Action } from "./types";
@@ -185,5 +186,23 @@ describe("adoptActionAt", () => {
     const { list, stored } = adoptActionAt([mk("a")], mk("a"), () => "fresh", "a");
     expect(stored.id).toBe("fresh");
     expect(list.map((x) => x.id)).toEqual(["fresh", "a"]);
+  });
+});
+
+describe("reorderBefore", () => {
+  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: "x", ownButton: false });
+  const ids = (l: Action[]) => l.map((a) => a.id);
+
+  it("puts the Action right before another whichever side it came from, or last", () => {
+    const list = [mk("a"), mk("b"), mk("c"), mk("d")];
+    expect(ids(reorderBefore(list, "a", "c"))).toEqual(["b", "a", "c", "d"]);
+    expect(ids(reorderBefore(list, "d", "b"))).toEqual(["a", "d", "b", "c"]);
+    expect(ids(reorderBefore(list, "a"))).toEqual(["b", "c", "d", "a"]);
+  });
+
+  it("leaves the list alone for an unknown Action or itself", () => {
+    const list = [mk("a"), mk("b")];
+    expect(reorderBefore(list, "ghost", "a")).toBe(list);
+    expect(reorderBefore(list, "a", "a")).toBe(list);
   });
 });
