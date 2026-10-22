@@ -5,7 +5,7 @@ import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 
 export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" | "Home";
 
-/** A checkout of the repository the current tab is in, as the worktree listing reports it. */
+/** One checkout of a repository, as the worktree listing reports it. */
 export type RepoWorktree = { path: string; branch: string | null; isMain: boolean };
 
 export type FolderRow = {
@@ -20,6 +20,11 @@ export type FolderRow = {
   matchOffset: number;
   label: FolderRowLabel | null;
   branch: string | null;
+  // The main checkout of the repository the folder belongs to; the repository itself
+  // until its worktree listing arrives; null outside a repository.
+  repoKey: string | null;
+  // Worktrees of its repository that are not in the list yet: Tab adds them.
+  hiddenWorktrees: number;
   workspaceId: string;
   hibernated: boolean;
 };
@@ -56,10 +61,14 @@ export type FolderGroupsInput = {
   activeTabEntry: TabEntry | null;
   /** One entry per tab of every workspace; browser tabs carry no folder. */
   entries: readonly TabEntry[];
-  /** Every checkout of the repository the current tab is in; empty outside a repository or until the answer arrives. */
-  worktrees: readonly RepoWorktree[];
   /** Branch of a folder; empty when it is not a repository or the answer has not arrived yet. */
   branchOf: (dir: string) => string;
+  /** Top level of the repository a folder is in; empty outside a repository or until the answer arrives. */
+  repoOf: (dir: string) => string;
+  /** Every checkout of each repository, keyed by the repository top level that was asked. */
+  worktreesByRepo: ReadonlyMap<string, readonly RepoWorktree[]>;
+  /** Repositories whose worktrees were added with Tab: repository key to the key of the row it was pressed on. */
+  expansions: ReadonlyMap<string, string>;
 };
 
 function matchOffsetOf(path: string, home: string | null): number {
@@ -80,14 +89,55 @@ function displayOf(path: string, home: string | null): string {
   return norm.startsWith(`${h}/`) ? `~${path.slice(h.length)}` : path;
 }
 
+function compare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+// Rows of one repository sit together, its main checkout first; repositories and
+// folders otherwise in alphabetical order.
+function byRepoThenPath(a: FolderRow, b: FolderRow): number {
+  const isMain = (r: FolderRow) => Number(r.path !== r.repoKey);
+  return (
+    compare(a.repoKey ?? a.path, b.repoKey ?? b.path) ||
+    isMain(a) - isMain(b) ||
+    compare(a.path, b.path)
+  );
+}
+
+type Builder = {
+  input: FolderGroupsInput;
+  seen: Set<string>;
+  // Repository key of every top level asked, and every worktree of a repository by its key.
+  keyOfRoot: Map<string, string>;
+  worktreesOfKey: Map<string, readonly RepoWorktree[]>;
+};
+
+function builderOf(input: FolderGroupsInput): Builder {
+  const keyOfRoot = new Map<string, string>();
+  const worktreesOfKey = new Map<string, readonly RepoWorktree[]>();
+  for (const [root, list] of input.worktreesByRepo) {
+    const key = list.find((w) => w.isMain)?.path ?? root;
+    keyOfRoot.set(root, key);
+    if (!worktreesOfKey.has(key)) worktreesOfKey.set(key, list);
+  }
+  return { input, seen: new Set(), keyOfRoot, worktreesOfKey };
+}
+
+function repoKeyOf(b: Builder, path: string): string | null {
+  const root = b.input.repoOf(path);
+  if (!root) return null;
+  return b.keyOfRoot.get(root) ?? root;
+}
+
 function rowOf(
+  b: Builder,
   path: string,
   workspaceId: string,
   hibernated: boolean,
-  input: FolderGroupsInput,
   label: FolderRowLabel | null,
-  branch: string | null = input.branchOf(path) || null,
+  known?: { branch: string | null; repoKey: string },
 ): FolderRow {
+  const { input } = b;
   const display = displayOf(path, input.home);
   return {
     key: `${workspaceId}:${path}`,
@@ -96,42 +146,44 @@ function rowOf(
     displayShift: path.length - display.length,
     matchOffset: matchOffsetOf(path, input.home),
     label,
-    branch,
+    branch: known ? known.branch : input.branchOf(path) || null,
+    repoKey: known ? known.repoKey : repoKeyOf(b, path),
+    hiddenWorktrees: 0,
     workspaceId,
     hibernated,
   };
 }
 
-function pushUnique(rows: FolderRow[], seen: Set<string>, row: FolderRow) {
-  if (seen.has(row.path)) return;
-  seen.add(row.path);
+function pushUnique(b: Builder, rows: FolderRow[], row: FolderRow) {
+  if (b.seen.has(row.path)) return;
+  b.seen.add(row.path);
   rows.push(row);
 }
 
-function byPath(a: FolderRow, b: FolderRow): number {
-  return a.path.localeCompare(b.path, undefined, { sensitivity: "base" });
-}
-
-// The folders of the tabs: alphabetical, no repeats, no label.
-function tabRowsOf(
-  entries: readonly TabEntry[],
-  seen: Set<string>,
-  input: FolderGroupsInput,
-): FolderRow[] {
+// The folders of the tabs: no repeats, no label, each repository together and alphabetical.
+function tabRowsOf(b: Builder, entries: readonly TabEntry[]): FolderRow[] {
   const rows: FolderRow[] = [];
   for (const e of entries) {
     if (!e.cwd) continue;
-    pushUnique(rows, seen, rowOf(e.cwd, e.workspaceId, e.hibernated, input, null));
+    pushUnique(b, rows, rowOf(b, e.cwd, e.workspaceId, e.hibernated, null));
   }
-  return rows.sort(byPath);
+  return rows.sort(byRepoThenPath);
+}
+
+// The worktrees of a repository that no row shows yet: its main checkout first, then the rest alphabetically.
+function missingWorktrees(b: Builder, key: string): RepoWorktree[] {
+  const missing = (b.worktreesOfKey.get(key) ?? []).filter((w) => !b.seen.has(w.path));
+  return missing.sort((x, y) => Number(y.isMain) - Number(x.isMain) || compare(x.path, y.path));
 }
 
 // One path appears once in the whole palette: the seen set is shared across
 // groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
-// Order: the active workspace (current tab folder, main checkout and its worktrees,
-// workspace root, home, then its other folders), then every other workspace in position order (root, then folders).
+// Order: the active workspace (current tab folder, home, workspace root, then its other
+// folders), then every other workspace in position order (root, then folders). Worktrees
+// of a repository are not listed until Tab asks for them on one of its rows.
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
+  const b = builderOf(input);
   const byWorkspace = new Map<string, TabEntry[]>();
   for (const e of input.entries) {
     if (!e.cwd) continue;
@@ -144,7 +196,6 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   }
 
   const groups: FolderGroup[] = [];
-  const seen = new Set<string>();
   const identity = new Map(input.workspaceEntries.map((e) => [e.workspaceId, e] as const));
   const headOf = (ws: Workspace, active: boolean) => {
     const e = identity.get(ws.id);
@@ -165,28 +216,17 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const sleeping = !!activeWs.hibernated;
     const cwd = input.activeTabEntry?.cwd;
     if (cwd) {
-      pushUnique(rows, seen, rowOf(cwd, activeWs.id, sleeping, input, "Current tab"));
-    }
-    // The main checkout right under the current tab, then the other worktrees alphabetically.
-    const main = input.worktrees.find((w) => w.isMain);
-    if (main) {
-      pushUnique(rows, seen, rowOf(main.path, activeWs.id, sleeping, input, "Main checkout", main.branch));
-    }
-    const linked = input.worktrees
-      .filter((w) => !w.isMain)
-      .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: "base" }));
-    for (const w of linked) {
-      pushUnique(rows, seen, rowOf(w.path, activeWs.id, sleeping, input, null, w.branch));
-    }
-    const root = rootOf(activeWs);
-    if (root) {
-      pushUnique(rows, seen, rowOf(root, activeWs.id, sleeping, input, "Workspace Root"));
+      pushUnique(b, rows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
     }
     const home = input.home?.replace(/[\\/]+$/, "");
     if (home) {
-      pushUnique(rows, seen, rowOf(home, activeWs.id, sleeping, input, "Home"));
+      pushUnique(b, rows, rowOf(b, home, activeWs.id, sleeping, "Home"));
     }
-    rows.push(...tabRowsOf(byWorkspace.get(activeWs.id) ?? [], seen, input));
+    const root = rootOf(activeWs);
+    if (root) {
+      pushUnique(b, rows, rowOf(b, root, activeWs.id, sleeping, "Workspace Root"));
+    }
+    rows.push(...tabRowsOf(b, byWorkspace.get(activeWs.id) ?? []));
     groups.push({ ...headOf(activeWs, true), rows });
   }
 
@@ -195,11 +235,34 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const rows: FolderRow[] = [];
     const root = rootOf(ws);
     if (root) {
-      pushUnique(rows, seen, rowOf(root, ws.id, !!ws.hibernated, input, "Workspace Root"));
+      pushUnique(b, rows, rowOf(b, root, ws.id, !!ws.hibernated, "Workspace Root"));
     }
-    rows.push(...tabRowsOf(byWorkspace.get(ws.id) ?? [], seen, input));
+    rows.push(...tabRowsOf(b, byWorkspace.get(ws.id) ?? []));
     if (rows.length === 0) continue;
     groups.push({ ...headOf(ws, false), rows });
+  }
+
+  // Tab pressed on a row: the worktrees missing from the list go right under it.
+  for (const [key, afterRowKey] of input.expansions) {
+    for (const g of groups) {
+      const at = g.rows.findIndex((r) => r.key === afterRowKey);
+      if (at < 0) continue;
+      const added = missingWorktrees(b, key).map((w) =>
+        rowOf(b, w.path, g.workspaceId, g.hibernated, w.isMain ? "Main checkout" : null, {
+          branch: w.branch,
+          repoKey: key,
+        }),
+      );
+      for (const row of added) b.seen.add(row.path);
+      g.rows.splice(at + 1, 0, ...added);
+      break;
+    }
+  }
+
+  for (const g of groups) {
+    for (const row of g.rows) {
+      if (row.repoKey) row.hiddenWorktrees = missingWorktrees(b, row.repoKey).length;
+    }
   }
   return groups;
 }
@@ -215,10 +278,10 @@ function merge(into: number[] | undefined, more: number[]): number[] {
 }
 
 // Every word typed must appear as a plain substring (case and accent insensitive) of something the
-// row shows: its path (never inside the home prefix), its branch, its label or the title
-// of its workspace. The returned indices are the characters that matched, per piece of
-// text, so each row shows why it is there. Groups keep their order, rows keep their
-// order, groups left with no rows disappear.
+// row shows: its path (never inside the home prefix), its branch, its label (while the Tab hint
+// is not taking its place) or the title of its workspace. The returned indices are the characters
+// that matched, per piece of text, so each row shows why it is there. Groups keep their order,
+// rows keep their order, groups left with no rows disappear.
 export function filterFolderGroups(
   groups: readonly FolderGroup[],
   query: string,
@@ -235,7 +298,7 @@ export function filterFolderGroups(
     for (const r of g.rows) {
       const path = foldText(r.path);
       const branch = foldText(r.branch ?? "");
-      const label = foldText(r.label ?? "");
+      const label = r.hiddenWorktrees > 0 ? "" : foldText(r.label ?? "");
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;
       let labelIndices: number[] | undefined;

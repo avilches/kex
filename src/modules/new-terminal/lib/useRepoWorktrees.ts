@@ -1,28 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { native } from "@/lib/native";
 import type { RepoWorktree } from "./folderEntries";
 
-// The checkouts of one repository, asked once per open palette. An unauthorized or
-// non-repository folder simply has none: the palette just lacks those rows.
-export function useRepoWorktrees(open: boolean, repoRoot: string): RepoWorktree[] {
-  const [list, setList] = useState<RepoWorktree[]>([]);
+const NONE: ReadonlyMap<string, readonly RepoWorktree[]> = new Map();
+
+// The checkouts of every repository the palette lists, asked once per open palette and per
+// top level. A folder git refuses to answer for (outside every workspace) simply has none:
+// its rows just never offer the Tab hint.
+export function useRepoWorktrees(
+  open: boolean,
+  repoRoots: readonly string[],
+): ReadonlyMap<string, readonly RepoWorktree[]> {
+  const [byRepo, setByRepo] = useState<ReadonlyMap<string, readonly RepoWorktree[]>>(NONE);
+  const asked = useRef(new Set<string>());
+  const session = useRef(0);
+  const key = [...new Set(repoRoots)].filter(Boolean).sort().join("\u0000");
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: every open or close starts a new session
   useEffect(() => {
-    if (!open || !repoRoot) {
-      setList([]);
-      return;
+    session.current++;
+    asked.current.clear();
+    setByRepo(NONE);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !key) return;
+    const mine = session.current;
+    for (const root of key.split("\u0000")) {
+      if (asked.current.has(root)) continue;
+      asked.current.add(root);
+      native
+        .gitListWorktrees(root)
+        .then((found) => {
+          if (mine !== session.current) return;
+          const list = found.map((w) => ({ path: w.path, branch: w.branch, isMain: w.isMain }));
+          setByRepo((prev) => new Map(prev).set(root, list));
+        })
+        .catch(() => {});
     }
-    let alive = true;
-    native
-      .gitListWorktrees(repoRoot)
-      .then((found) => {
-        if (alive) setList(found.map((w) => ({ path: w.path, branch: w.branch, isMain: w.isMain })));
-      })
-      .catch(() => {
-        if (alive) setList([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [open, repoRoot]);
-  return list;
+  }, [open, key]);
+
+  return byRepo;
 }

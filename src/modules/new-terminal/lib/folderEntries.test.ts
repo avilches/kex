@@ -57,13 +57,21 @@ const build = (over: Partial<FolderGroupsInput> = {}) =>
     home: null,
     activeTabEntry: null,
     entries: [],
-    worktrees: [],
     branchOf: () => "",
+    repoOf: () => "",
+    worktreesByRepo: new Map(),
+    expansions: new Map(),
     ...over,
   });
 
+const REPO_MAIN = { path: "/repo", branch: "main", isMain: true };
+const WT_ALPHA = { path: "/repo/.claude/worktrees/alpha", branch: "a", isMain: false };
+const WT_ZETA = { path: "/repo/.claude/worktrees/zeta", branch: "z", isMain: false };
+const wts = (root: string, list: { path: string; branch: string | null; isMain: boolean }[]) =>
+  new Map([[root, list]]);
+
 describe("buildFolderGroups", () => {
-  it("opens with the current tab folder, the workspace root and home, then the tab folders alphabetically", () => {
+  it("opens with the current tab folder, home and the workspace root, then the tab folders alphabetically", () => {
     const entries = [
       entry({ workspaceId: "ws-1", cwd: "/Users/a/zeta" }),
       entry({ workspaceId: "ws-1", cwd: "/repo/src/b", branch: "main" }),
@@ -77,8 +85,8 @@ describe("buildFolderGroups", () => {
     });
     expect(group.rows.map((r) => [r.label, r.path])).toEqual([
       ["Current tab", "/repo/src/b"],
-      ["Workspace Root", "/repo"],
       ["Home", "/Users/a"],
+      ["Workspace Root", "/repo"],
       [null, "/repo/src/a"],
       [null, "/Users/a/alpha"],
       [null, "/Users/a/zeta"],
@@ -104,34 +112,122 @@ describe("buildFolderGroups", () => {
     expect(group.rows.every((r) => !("process" in r))).toBe(true);
   });
 
-  it("puts the main checkout under the current tab, then the other worktrees alphabetically", () => {
+  it("does not list any worktree until Tab asks for them", () => {
     const [group] = build({
-      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/perf/src" }),
-      worktrees: [
-        { path: "/repo/.claude/worktrees/zeta", branch: "z", isMain: false },
-        { path: "/repo", branch: "main", isMain: true },
-        { path: "/repo/.claude/worktrees/alpha", branch: "a", isMain: false },
-      ],
+      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/perf" }),
+      repoOf: () => "/repo/.claude/worktrees/perf",
+      worktreesByRepo: wts("/repo/.claude/worktrees/perf", [REPO_MAIN, WT_ALPHA, WT_ZETA]),
     });
-    expect(group.rows.map((r) => [r.label, r.path, r.branch])).toEqual([
-      ["Current tab", "/repo/.claude/worktrees/perf/src", null],
-      ["Main checkout", "/repo", "main"],
-      [null, "/repo/.claude/worktrees/alpha", "a"],
-      [null, "/repo/.claude/worktrees/zeta", "z"],
-    ]);
+    expect(group.rows.map((r) => r.path)).toEqual(["/repo/.claude/worktrees/perf", "/repo"]);
   });
 
-  it("lists the worktrees even when the current tab is the main checkout, and never repeats it", () => {
+  it("groups the folders by repository first, then alphabetically", () => {
+    const entries = [
+      entry({ workspaceId: "ws-1", cwd: "/work/a" }),
+      entry({ workspaceId: "ws-1", cwd: "/work/b" }),
+      entry({ workspaceId: "ws-1", cwd: "/tmp/a-worktree-2" }),
+    ];
+    const roots: Record<string, string> = {
+      "/work/a": "/work/a",
+      "/work/b": "/work/b",
+      "/tmp/a-worktree-2": "/tmp/a-worktree-2",
+    };
     const [group] = build({
-      activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo" }),
-      worktrees: [
-        { path: "/repo", branch: "main", isMain: true },
-        { path: "/repo/.claude/worktrees/a", branch: "a", isMain: false },
-      ],
+      workspaces: [ws({ id: "ws-1", title: "Kex" })],
+      entries,
+      repoOf: (dir) => roots[dir] ?? "",
+      worktreesByRepo: new Map([
+        ["/work/a", [{ path: "/work/a", branch: "main", isMain: true }, { path: "/tmp/a-worktree-2", branch: "w2", isMain: false }]],
+        ["/tmp/a-worktree-2", [{ path: "/work/a", branch: "main", isMain: true }, { path: "/tmp/a-worktree-2", branch: "w2", isMain: false }]],
+        ["/work/b", [{ path: "/work/b", branch: "main", isMain: true }]],
+      ]),
     });
-    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
-      ["Current tab", "/repo"],
-      [null, "/repo/.claude/worktrees/a"],
+    expect(group.rows.map((r) => r.path)).toEqual(["/work/a", "/tmp/a-worktree-2", "/work/b"]);
+  });
+
+  it("offers the missing worktrees on every row of a repository, and none elsewhere", () => {
+    const entries = [
+      entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
+      entry({ workspaceId: "ws-1", cwd: "/other" }),
+      entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/alpha" }),
+    ];
+    const roots: Record<string, string> = {
+      "/repo": "/repo",
+      "/repo/src": "/repo",
+      "/repo/.claude/worktrees/alpha": "/repo/.claude/worktrees/alpha",
+      "/other": "/other",
+    };
+    const [group] = build({
+      entries,
+      repoOf: (dir) => roots[dir] ?? "",
+      worktreesByRepo: new Map([
+        ...wts("/repo", [REPO_MAIN, WT_ALPHA, WT_ZETA]),
+        ...wts("/repo/.claude/worktrees/alpha", [REPO_MAIN, WT_ALPHA, WT_ZETA]),
+        ...wts("/other", [{ path: "/other", branch: "main", isMain: true }]),
+      ]),
+    });
+    const hints = Object.fromEntries(group.rows.map((r) => [r.path, r.hiddenWorktrees]));
+    // /repo is a listed row too (the workspace root): main, alpha and the root/src rows are in the list,
+    // only zeta is missing.
+    expect(hints).toMatchObject({
+      "/repo/src": 1,
+      "/repo": 1,
+      "/repo/.claude/worktrees/alpha": 1,
+      "/other": 0,
+    });
+  });
+
+  it("adds the missing worktrees under the row Tab was pressed on: main checkout first, then alphabetical, no repeats", () => {
+    const entries = [
+      entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/alpha" }),
+      entry({ workspaceId: "ws-1", cwd: "/zzz" }),
+    ];
+    const roots: Record<string, string> = { "/repo/.claude/worktrees/alpha": "/repo/.claude/worktrees/alpha" };
+    const list = [
+      { path: "/repo/.claude/worktrees/zeta", branch: "z", isMain: false },
+      { path: "/repo", branch: "main", isMain: true },
+      { path: "/repo/.claude/worktrees/alpha", branch: "a", isMain: false },
+      { path: "/repo/.claude/worktrees/beta", branch: "b", isMain: false },
+    ];
+    const [group] = build({
+      workspaces: [ws({ id: "ws-1", title: "Kex" })],
+      activeTabEntry: entries[0],
+      entries,
+      repoOf: (dir) => roots[dir] ?? "",
+      worktreesByRepo: new Map([["/repo/.claude/worktrees/alpha", list]]),
+      expansions: new Map([["/repo", "ws-1:/repo/.claude/worktrees/alpha"]]),
+    });
+    expect(group.rows.map((r) => [r.label, r.path, r.branch])).toEqual([
+      ["Current tab", "/repo/.claude/worktrees/alpha", null],
+      ["Main checkout", "/repo", "main"],
+      [null, "/repo/.claude/worktrees/beta", "b"],
+      [null, "/repo/.claude/worktrees/zeta", "z"],
+      [null, "/zzz", null],
+    ]);
+    expect(group.rows.every((r) => r.hiddenWorktrees === 0)).toBe(true);
+    expect(new Set(group.rows.map((r) => r.path)).size).toBe(group.rows.length);
+  });
+
+  it("works for any repository: a second one is expanded without touching the first", () => {
+    const entries = [
+      entry({ workspaceId: "ws-1", cwd: "/one" }),
+      entry({ workspaceId: "ws-1", cwd: "/two" }),
+    ];
+    const roots: Record<string, string> = { "/one": "/one", "/two": "/two" };
+    const [group] = build({
+      workspaces: [ws({ id: "ws-1", title: "Kex" })],
+      entries,
+      repoOf: (dir) => roots[dir] ?? "",
+      worktreesByRepo: new Map([
+        ...wts("/one", [{ path: "/one", branch: "main", isMain: true }, { path: "/one-wt", branch: "x", isMain: false }]),
+        ...wts("/two", [{ path: "/two", branch: "main", isMain: true }, { path: "/two-wt", branch: "y", isMain: false }]),
+      ]),
+      expansions: new Map([["/two", "ws-1:/two"]]),
+    });
+    expect(group.rows.map((r) => [r.path, r.hiddenWorktrees])).toEqual([
+      ["/one", 1],
+      ["/two", 0],
+      ["/two-wt", 0],
     ]);
   });
 
@@ -319,6 +415,20 @@ describe("filterFolderGroups", () => {
     const [g1, g2] = filterFolderGroups(groups, "o");
     expect(g1.workspaceId).toBe("ws-1");
     expect(g2.workspaceId).toBe("ws-2");
+  });
+});
+
+describe("label and Tab hint", () => {
+  const withHint = build({
+    workspaces: [active],
+    activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
+    entries: [entry({ workspaceId: "ws-1", cwd: "/repo/src" })],
+    repoOf: () => "/repo",
+    worktreesByRepo: wts("/repo", [REPO_MAIN, WT_ALPHA]),
+  });
+
+  it("does not search the label of a row whose label the hint replaced", () => {
+    expect(filterFolderGroups(withHint, "current")).toEqual([]);
   });
 });
 

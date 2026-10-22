@@ -25,9 +25,11 @@ type Props = {
   /** All groups for the open state; the component applies the search. */
   groups: readonly FolderGroup[];
   onPick: (row: FolderRow) => void;
+  /** Tab on a row whose repository has worktrees that are not listed yet. */
+  onExpand: (row: FolderRow) => void;
 };
 
-export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
+export function FolderPalette({ open, onOpenChange, groups, onPick, onExpand }: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
   const listRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,17 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
       ?.scrollTo({ top: 0 });
   }, [query, open]);
 
+  // The row under the cursor is read from cmdk's own selection, which this palette never controls.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    const key = listRef.current?.querySelector<HTMLElement>(
+      '[cmdk-item][aria-selected="true"]',
+    )?.dataset.folderRow;
+    const row = key ? groups.flatMap((g) => g.rows).find((r) => r.key === key) : undefined;
+    if (row?.repoKey && row.hiddenWorktrees > 0) onExpand(row);
+  };
+
   return (
     <CommandDialog
       open={open}
@@ -64,10 +77,7 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
       contentStyle={contentStyle}
     >
       {handles}
-      <Command
-        shouldFilter={false}
-        loop
-      >
+      <Command shouldFilter={false} loop onKeyDown={onKeyDown}>
         <CommandInput
           value={query}
           onValueChange={setQuery}
@@ -107,11 +117,17 @@ export function FolderPalette({ open, onOpenChange, groups, onPick }: Props) {
                         <HighlightText text={row.display} indices={row.indices} />
                         {row.branch ? (
                           <span className="font-normal text-muted-foreground">
-                            {` · ${row.branch}`}
+                            {" \u00b7 "}
+                            <HighlightText text={row.branch} indices={row.branchIndices} />
                           </span>
                         ) : null}
                       </span>
-                      {row.label ? (
+                      {row.hiddenWorktrees > 0 ? (
+                        <span className="ml-auto shrink-0 text-[11px] font-normal text-muted-foreground">
+                          <span className="font-medium">TAB</span>
+                          {`: show ${row.hiddenWorktrees} ${row.hiddenWorktrees === 1 ? "worktree" : "worktrees"}`}
+                        </span>
+                      ) : row.label ? (
                         <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
                           {row.label === "Home" ? (
                             <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />

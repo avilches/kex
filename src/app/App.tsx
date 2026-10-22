@@ -3457,12 +3457,26 @@ export default function App() {
   );
   const folderActiveEntry =
     folderTabEntries.find((e) => e.tabId === activeTabId) ?? null;
-  const folderWorktrees = useRepoWorktrees(
-    folderPaletteOpen,
-    folderSources && folderActiveEntry?.cwd
-      ? folderSources.git(folderActiveEntry.cwd).repoRoot
-      : "",
+  const folderRepoRoots = useMemo(
+    () =>
+      folderSources
+        ? folderPaletteDirs.map((dir) => (dir ? folderSources.git(dir).repoRoot : ""))
+        : [],
+    [folderSources, folderPaletteDirs],
   );
+  const folderWorktrees = useRepoWorktrees(folderPaletteOpen, folderRepoRoots);
+  // Repositories whose worktrees the user added with Tab, and the row each was pressed on.
+  const [folderExpansions, setFolderExpansions] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    setFolderExpansions(new Map());
+  }, [folderPaletteOpen]);
+  const onFolderExpand = useCallback((row: FolderRow) => {
+    if (!row.repoKey) return;
+    const repoKey = row.repoKey;
+    setFolderExpansions((prev) => new Map(prev).set(repoKey, row.key));
+  }, []);
   const folderGroups = useMemo(
     () =>
       folderSources
@@ -3473,11 +3487,22 @@ export default function App() {
             home: homeRef.current,
             activeTabEntry: folderActiveEntry,
             entries: folderTabEntries,
-            worktrees: folderWorktrees,
             branchOf: (dir) => folderSources.git(dir).branch,
+            repoOf: (dir) => folderSources.git(dir).repoRoot,
+            worktreesByRepo: folderWorktrees,
+            expansions: folderExpansions,
           })
         : [],
-    [folderSources, workspaces, folderWorkspaceEntries, activeWorkspaceId, folderTabEntries, folderActiveEntry, folderWorktrees],
+    [
+      folderSources,
+      workspaces,
+      folderWorkspaceEntries,
+      activeWorkspaceId,
+      folderTabEntries,
+      folderActiveEntry,
+      folderWorktrees,
+      folderExpansions,
+    ],
   );
 
   const onFolderPick = useCallback(
@@ -4110,6 +4135,7 @@ export default function App() {
             onOpenChange={setFolderPaletteOpen}
             groups={folderGroups}
             onPick={onFolderPick}
+            onExpand={onFolderExpand}
           />
 
           <NewEditorDialog

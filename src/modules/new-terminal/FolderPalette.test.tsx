@@ -13,6 +13,8 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   displayShift: over.displayShift ?? 0,
   label: over.label ?? null,
   branch: over.branch ?? null,
+  repoKey: over.repoKey ?? null,
+  hiddenWorktrees: over.hiddenWorktrees ?? 0,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
   hibernated: over.hibernated ?? false,
@@ -71,6 +73,7 @@ function mount(onPick: (row: FolderRow) => void) {
       onOpenChange: vi.fn(),
       groups,
       onPick,
+      onExpand: vi.fn(),
     }),
   );
 }
@@ -140,6 +143,7 @@ describe("FolderPalette", () => {
           }),
         ],
         onPick: vi.fn(),
+        onExpand: vi.fn(),
       }),
     );
     await settle();
@@ -162,6 +166,7 @@ describe("FolderPalette", () => {
           }),
         ],
         onPick: vi.fn(),
+        onExpand: vi.fn(),
       }),
     );
     await settle();
@@ -170,5 +175,95 @@ describe("FolderPalette", () => {
     expect(home.textContent).toBe("~Home");
     expect(home.querySelector("svg")).not.toBeNull();
     expect(plain.textContent).toBe("/repo/src");
+  });
+
+  describe("worktrees on Tab", () => {
+    const hinted = [
+      group({
+        rows: [
+          row({ path: "/repo", label: "Current tab", branch: "main", repoKey: "/repo", hiddenWorktrees: 2, key: "ws-1:/repo" }),
+          row({ path: "/other", repoKey: null, key: "ws-1:/other" }),
+          row({ path: "/repo/src", repoKey: "/repo", hiddenWorktrees: 2, key: "ws-1:/repo/src" }),
+        ],
+      }),
+    ];
+    const mountHinted = (onExpand: (row: FolderRow) => void) =>
+      render(
+        createElement(FolderPalette, {
+          open: true,
+          onOpenChange: vi.fn(),
+          groups: hinted,
+          onPick: vi.fn(),
+          onExpand,
+        }),
+      );
+
+    it("shows the hint instead of the label on every row of a repository with more worktrees", async () => {
+      mountHinted(vi.fn());
+      await settle();
+      const [first, second, third] = itemEls();
+      expect(first.textContent).toContain("TAB: show 2 worktrees");
+      expect(first.textContent).not.toContain("Current tab");
+      expect(second.textContent).not.toContain("TAB");
+      expect(third.textContent).toContain("TAB: show 2 worktrees");
+    });
+
+    it("says worktree in the singular for one", async () => {
+      render(
+        createElement(FolderPalette, {
+          open: true,
+          onOpenChange: vi.fn(),
+          groups: [group({ rows: [row({ repoKey: "/repo", hiddenWorktrees: 1 })] })],
+          onPick: vi.fn(),
+          onExpand: vi.fn(),
+        }),
+      );
+      await settle();
+      expect(itemEls()[0].textContent).toContain("TAB: show 1 worktree");
+      expect(itemEls()[0].textContent).not.toContain("worktrees");
+    });
+
+    it("Tab on the selected row asks to expand its repository", async () => {
+      const onExpand = vi.fn();
+      mountHinted(onExpand);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      expect(onExpand).toHaveBeenCalledTimes(1);
+      expect(onExpand.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
+    });
+
+    it("Tab on a row with nothing to add does nothing", async () => {
+      const onExpand = vi.fn();
+      mountHinted(onExpand);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+      });
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      expect(onExpand).not.toHaveBeenCalled();
+    });
+  });
+
+  it("highlights the letters that match in the branch", async () => {
+    render(
+      createElement(FolderPalette, {
+        open: true,
+        onOpenChange: vi.fn(),
+        groups: [group({ rows: [row({ path: "/repo/src", branch: "feat/login", key: "ws-1:/repo/src" })] })],
+        onPick: vi.fn(),
+        onExpand: vi.fn(),
+      }),
+    );
+    await settle();
+    await act(async () => {
+      fireEvent.change(inputEl(), { target: { value: "login" } });
+    });
+    await settle();
+    const bold = [...itemEls()[0].querySelectorAll("b")].map((b) => b.textContent);
+    expect(bold).toEqual(["login"]);
   });
 });
