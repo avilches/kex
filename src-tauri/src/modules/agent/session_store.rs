@@ -298,9 +298,13 @@ fn build_plans_from(
                             MissingTranscriptPolicy::Ignore => {
                                 (record.cwd_launch.clone(), None, true, false)
                             }
-                            // ResumeAnyway only makes sense without a transcript source; with one,
-                            // the missing file leaves nothing to run and nothing to prune for.
-                            MissingTranscriptPolicy::ResumeAnyway => {
+                            MissingTranscriptPolicy::ResumeAnyway => (
+                                record.cwd_launch.clone(),
+                                Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
+                                true,
+                                true,
+                            ),
+                            MissingTranscriptPolicy::KeepWithoutPlan => {
                                 (record.cwd_launch.clone(), None, true, false)
                             }
                         }
@@ -330,12 +334,12 @@ fn build_plans_from(
 
         // Pruned only now, after the directory check: a plan blocked by its directory keeps
         // the entry so "Try again" can still find the session once the directory is back.
-        // The policy decides: ResumeAnyway rows never prune (their record cannot be
-        // re-recorded by anything). No-op without a `store_path` (preview must not mutate).
+        // The policy decides: ResumeAnyway and KeepWithoutPlan rows never prune (their record
+        // cannot be re-recorded by anything). No-op without a `store_path` (preview must not mutate).
         if transcript_missing
             && !matches!(
                 provider.missing_transcript,
-                MissingTranscriptPolicy::ResumeAnyway
+                MissingTranscriptPolicy::ResumeAnyway | MissingTranscriptPolicy::KeepWithoutPlan
             )
         {
             if let Some(path) = store_path {
@@ -2098,6 +2102,67 @@ mod tests {
         // Never pruned: the command re-appears every time the store is loaded.
         let second = load_restore_plan_from_path(&store_path);
         assert_eq!(second[0].resume_cmd, "codex resume 'abc-123'");
+    }
+
+    #[test]
+    fn a_codex_record_with_a_rollout_resumes_in_the_rollout_cwd() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("launch");
+        let stale = dir.path().join("stale");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&stale).unwrap();
+        let rollout = dir.path().join("rollout-2026-10-14T20-42-20-abc-123.jsonl");
+        std::fs::write(
+            &rollout,
+            format!(
+                "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"abc-123\",\"cwd\":\"{}\"}}}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(
+                Some("codex"),
+                &stale,
+                &rollout.display().to_string(),
+                Some("codex -m o3"),
+            ),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+        assert!(plans[0].worktree_cwd.is_none());
+    }
+
+    #[test]
+    fn a_codex_record_with_an_empty_transcript_path_and_no_rollout_still_resumes() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        let mut rec = record(Some("codex"), &project, "", None);
+        rec.session_id = "kex-test-no-rollout-7c4244dd".to_string();
+        tabs.insert("tab-1".to_string(), rec);
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(
+            plans[0].resume_cmd,
+            "codex resume 'kex-test-no-rollout-7c4244dd'"
+        );
+        assert_eq!(plans[0].cwd_launch, project.display().to_string());
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
     }
 
     #[test]

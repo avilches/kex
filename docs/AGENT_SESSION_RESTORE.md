@@ -237,7 +237,7 @@ Measured facts that drive the two provider rows:
   file, and the extension reports the session at startup, so the record exists but its file does not, which means no restore plan
   and nothing to resume.
 
-Both rows use `ResumeAnyway` with empty whitelists and the same suffix scan (`SessionsSource::OmpSessions` /
+Both rows use `KeepWithoutPlan` with empty whitelists and the same suffix scan (`SessionsSource::OmpSessions` /
 `PiSessions`, `CwdRead::HeaderLine(2)` / `HeaderLine(1)`).
 
 OMP draws its own OSC 133 marks as one unbroken `B C D;0` string around every message it shows and again when it
@@ -254,6 +254,45 @@ says the session lives.
 The OSC/`AgentDetector` layer still detects plain `omp` and `pi` invocations like any other agent (loaded via
 `DEFAULT_AGENTS`), which is what produces `Started`, the `exited` signal, the capture of the launch line and the
 print-mode gate.
+
+### Codex hooks
+
+Codex reports its sessions through the hooks described under "Hook layer": one Kex handler per event in Codex's
+`hooks.json` (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`), each
+trusted with its `[hooks.state."<key>"]` table in `config.toml`, because Codex skips a handler it has not trusted. Every
+handler runs `trigger-event.sh codex`, and the argument is what tags the frame: the script puts it in `agent`, so
+`pty/ipc.rs` needs nothing Codex-specific. Frames carry the same fields as Claude Code's (`session_id`,
+`transcript_path`, `cwd`, `hook_event_name`, `source`); `transcript_path` may be `null` and is then recorded as empty.
+`SessionStart` records the session (id, transcript path, cwd and the stashed launch line) and emits
+`kex:agent-session-meta` with `agent: codex`; the other events become `kex:agent-signal` frames tagged `codex`, exactly
+as for Claude.
+
+The provider row (`provider.rs`) reads Codex's own files and nothing else:
+
+- **Rollouts.** Codex writes one JSONL per session at
+  `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/rollout-<local timestamp>-<uuid>.jsonl`; the uuid is the session id.
+  `SessionsSource::CodexSessions` tries the recorded `transcript_path` first, then walks the three date levels newest
+  first and returns the `rollout-*-<id>.jsonl` of the first day that holds one. The depth is fixed, so a recent session
+  costs a handful of directory reads even when the tree holds thousands of rollouts; anything else in the tree (files
+  that do not start with `rollout-`, other extensions, directories) is ignored. `CODEX_HOME` is resolved like the
+  hooks folder (canonicalized when set). Kex reads it from its own environment, so a `CODEX_HOME` exported only in the
+  shell is not seen by a Kex started from the Dock; the recorded `transcript_path` covers that case when Codex sends it.
+- **Launch cwd.** Line 1 of a rollout is `{"type":"session_meta","payload":{"id":...,"cwd":...}}`;
+  `CwdRead::HeaderLine(1)` reads `payload.cwd` from it (the same reader takes OMP's and Pi's `{type:"session", cwd}`).
+- **Resume.** `codex resume '<id>'` on top of the stripped launch line (Codex's stripping whitelists are empty, so the
+  base collapses to the launcher, `codex-max` included).
+- **Missing rollout.** The policy is `ResumeAnyway`: a session may have no rollout yet, and `codex resume <id>` is the
+  only way back to it, so the plan still runs in the recorded launch directory and the record is never pruned.
+- **One-shot runs.** `codex exec ...` and its alias `codex e ...` are Codex's non-interactive mode and never become a
+  session to restore. The print-mode check (`Invocation::is_print_mode` in `launch_cmd.rs`) looks for that subcommand
+  as the first word after Codex's global options, skipping the value of the options that take one (`-c`, `-m`, `-p`,
+  `-s`, `-a`, `-C`, `-i`, `--add-dir`, `--enable`, `--disable`, `--local-provider` and their long forms), so
+  `codex -c model=o3 exec ...` is caught and `codex -m exec` is not. For Codex `-p` is `--profile`, so `codex -p work`
+  is an interactive session and is recorded. `codex`, `codex "prompt"` and `codex resume <id>` are recorded.
+
+Not done yet: whether Codex draws OSC 133 marks of its own (the rule OMP needed in `AgentDetector`, see above) and
+whether `live_model` can read the model from a rollout. Both need a measured Codex run and were left for a follow-up;
+until then `AgentDetector` treats Codex like any other agent and `live_model` reports nothing for it.
 
 ### Launch command capture
 
@@ -371,41 +410,45 @@ For each session in the store:
 
 1. **Resolve the provider row** (`provider::Provider::of`); `claude`, `codex`, `opencode`, `omp` and `pi` exist today. A record of an agent
    with no row produces no plan and no command (see above).
-2. **Find the transcript.** Only providers with a sessions source do this; codex and opencode have none and jump straight
-   to their resume template. OpenCode keeps its sessions in a SQLite database (Kex does not read it; the plugin
+2. **Find the transcript.** Only providers with a sessions source do this; opencode has none and jumps straight
+   to its resume template. OpenCode keeps its sessions in a SQLite database (Kex does not read it; the plugin
    supplies the session id and cwd directly), so there is nothing to seek on disk. Claude's source checks the stored `transcript_path` first, then scans
    `$CLAUDE_CONFIG_DIR/projects/**/<sessionId>.jsonl` (or `~/.claude/projects` when the override is unset).
    OMP's and Pi's sources (`OmpSessions`, `PiSessions`) keep the never-populated `transcript_path` shortcut for symmetry
    and scan `~/.omp/agent/sessions/**/<timestamp>_<sessionId>.jsonl` (Pi: `~/.pi/agent/sessions/**/...`), keeping the
-   lexicographically latest file (names carry a timestamp).
+   lexicographically latest file (names carry a timestamp). Codex's (`CodexSessions`) checks the recorded
+   `transcript_path`, then walks `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` newest first for
+   `rollout-*-<sessionId>.jsonl` (see "Codex hooks").
 3. **Transcript found - resume.** The launch cwd is read back with the row's cwd-read strategy (claude: if a
    `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its
    `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
    the first `cwd` field, and `cwd_launch` from the store when the transcript has none. omp and pi: the `cwd` of the
-   `session` header, JSONL line 2 for omp and line 1 for pi). For claude the plan also carries `worktreeCwd`: the
+   `session` header, JSONL line 2 for omp and line 1 for pi; codex: `payload.cwd` of the `session_meta` entry on line 1). For claude the plan also carries `worktreeCwd`: the
    `worktreePath` of the last `worktree-state` entry, only when that folder still exists. The resumed agent
    reports its folder after the first prompt (its resume `SessionStart` carries the launch folder, so that event
    is not forwarded as an agent cwd), so `applyStagedSnapshot` seeds `agentCwd`/`worktreeCwd` from the plan and
    New Terminal ("last folder") lands in the worktree from the start. The command is the row's
    resume template on top of the stripped launch line: `strip_for_resume_base(launch_cmd, agent) + --resume '<id>'`
    (shell-quoted), or the plain per-agent template when no launch command is known (`claude --resume '<id>'`,
-   `omp --resume '<id>'`, `pi --session '<id>'`).
+   `omp --resume '<id>'`, `pi --session '<id>'`, `codex resume '<id>'`).
 4. **Transcript missing - the row's missing-transcript policy decides.**
    - `Reattach` (claude): the session was opened but no message was ever sent (a transcript only appears on the
      first exchange). The plan is `strip_for_resume_base(...) + --session-id '<id>'` (or the plain template), which
      starts a new session reusing the same UUID, equivalent to rerunning the CLI with no `--resume`. The store
      entry is pruned once the directory check passes; if the new session produces messages, hooks re-record it with
      the new `transcript_path`.
-   - `ResumeAnyway` (codex, opencode, omp and pi): the plan for codex is
-      `launch base/launcher + resume '<id>'` (or the plain `codex resume '<id>'`); opencode's template names the recorded id directly,
-      `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<ses id>'`,
-      since its stripping whitelists are empty); omp's is `launch base/launcher + --resume '<id>'`
-      (or the plain `omp --resume '<id>'`), which accepts id, prefix or path; pi's is `launch base/launcher +
-      --session '<id>'` (or the plain `pi --session '<id>'`). For omp and pi this branch is
-      reachable when the sessions root no longer holds the file (neither cleans anything today, but a copy deleted
-      by the user is the case in point): without the file there is nothing to verify, the record is kept and no plan runs.
-      For codex/opencode the entry is never pruned, because nothing re-records codex sessions in this store, and
-      the plugin is silent on the resumed session of an opencode TUI (anomalyco/opencode#39711).
+   - `ResumeAnyway` (codex and opencode): the resume template runs anyway in the recorded launch directory. For
+      codex it is `launch base/launcher + resume '<id>'` (or the plain `codex resume '<id>'`), reached when the
+      session has no rollout yet or the lookup cannot see it; opencode has no source at all and always takes its
+      template, `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<ses id>'`, since its
+      stripping whitelists are empty). The entry is never pruned: nothing re-records a resumed codex session that
+      never reaches a new `SessionStart`, and the plugin is silent on the resumed session of an opencode TUI
+      (anomalyco/opencode#39711).
+   - `KeepWithoutPlan` (omp and pi): reachable when the sessions root no longer holds the file (neither cleans
+      anything today, but a copy deleted by the user, or a session closed before its first turn, is the case in
+      point). Without the file there is nothing to verify: the record is kept and no plan runs. With the file,
+      omp's command is `launch base/launcher + --resume '<id>'` (or the plain `omp --resume '<id>'`), which accepts
+      id, prefix or path, and pi's is `launch base/launcher + --session '<id>'` (or the plain `pi --session '<id>'`).
    - `Ignore` (reserved for providers whose sessions cannot be revived): no plan is emitted; the entry is pruned
      once its directory is usable.
 5. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable) *before* any
@@ -458,7 +501,9 @@ Code fires `SessionStart`, `UserPromptSubmit`, `Stop` and `SessionEnd` in print 
 create an agent session (a struck icon with `launchKnown: false`) that nothing ever closes. `record_session` still
 checks a stashed `launch_cmd` with `is_print_mode_cmd` as a second gate. OpenCode's non-interactive entry point is the
 subcommand `opencode run <prompt>`, which carries no `-p`/`--print` flag and therefore passes this gate: it is
-recorded and its restored session reopens the TUI on that session.
+recorded and its restored session reopens the TUI on that session. Codex's one-shot mode is the subcommand
+`codex exec` (alias `codex e`); for `codex` the check looks for that subcommand instead of `-p`, which there means
+`--profile` (see "Codex hooks").
 
 ### RestorePlan type
 

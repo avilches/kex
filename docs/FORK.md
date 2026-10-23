@@ -205,7 +205,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 - **OMP agent integration** (not present upstream): omp joins `DEFAULT_AGENTS` and gets a provider row
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
-  `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
+  `session` header on JSONL line 2; `--resume <id>`; `KeepWithoutPlan`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
   (`agent_setup_omp`, marker `kex-agent-status-v4`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
@@ -215,10 +215,17 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   against omp 18.11.3 in the wild, not docs.
 - **Pi agent integration** (not present upstream): same shape as OMP. `pi` joins `DEFAULT_AGENTS`; its provider row
   (`SessionsSource::PiSessions`, `~/.pi/agent/sessions`, header on JSONL line 1 via `CwdRead::HeaderLine(1)`, `--session <id>`,
-  `ResumeAnyway`) differs from OMP only in those measured facts (pi 1.3.0). The extension source is shared and stamped
+  `KeepWithoutPlan`) differs from OMP only in those measured facts (pi 1.3.0). The extension source is shared and stamped
   with the runtime name on install (`agent_setup_pi` writes `~/.pi/agent/extensions/kex-agent-status.ts`), the Pi icon is
   the monochrome mark of pi.dev drawn as an inline SVG (an `<img>` would not inherit `currentColor`), Pi ends a turn on `agent_settled` only, and Settings > General plus the bell popover gain a Pi row.
 
+- **Codex session restore from its rollouts** (not present upstream): the codex provider row gains
+  `SessionsSource::CodexSessions` (the recorded `transcript_path`, else a newest-first walk of
+  `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` for `rollout-*-<id>.jsonl`) and reads the launch cwd from the
+  `session_meta` entry on line 1; a session without a rollout still resumes (`ResumeAnyway`) and is never pruned.
+  `codex exec` and its alias `codex e` are filtered like `claude -p`, and `codex -p` (`--profile`) is no longer taken
+  for print mode. OMP and Pi move to the new `KeepWithoutPlan` policy, which is what `ResumeAnyway` used to mean for a
+  provider with a sessions source; their behavior does not change.
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to

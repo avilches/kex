@@ -907,6 +907,42 @@ mod tests {
     }
 
     #[test]
+    fn parse_a_codex_session_start_with_a_null_transcript_path() {
+        let json = r#"{
+          "hook_event_name": "SessionStart",
+          "agent": "codex",
+          "session_id": "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e",
+          "transcript_path": null,
+          "cwd": "/home/user/proj",
+          "source": "startup",
+          "model": "gpt-5-codex",
+          "permission_mode": "default"
+        }"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "SessionStart");
+        assert_eq!(p.agent.as_deref(), Some("codex"));
+        assert_eq!(p.session_id, "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e");
+        assert_eq!(p.transcript_path, "");
+        assert_eq!(p.cwd, "/home/user/proj");
+        assert_eq!(p.source.as_deref(), Some("startup"));
+        assert!(reports_agent_cwd(&p.event, "startup", &p.cwd));
+    }
+
+    #[test]
+    fn codex_frames_other_than_session_start_become_codex_signals() {
+        for event in ["UserPromptSubmit", "Stop", "PermissionRequest"] {
+            let json = format!(
+                r#"{{"hook_event_name":"{event}","agent":"codex","session_id":"s","transcript_path":"/x/rollout-1-s.jsonl","cwd":"/p"}}"#
+            );
+            let p = parse_payload(&json).unwrap();
+            assert_eq!(p.transcript_path, "/x/rollout-1-s.jsonl");
+            let sig = agent_signal(3, &p.event, p.agent.as_deref());
+            assert_eq!(sig["agent"], "codex", "{event}");
+            assert_eq!(sig["kind"], event);
+        }
+    }
+
+    #[test]
     fn parse_payload_leaves_the_agent_absent_for_claude_frames() {
         let json = r#"{"hook_event_name":"SessionStart","session_id":"abc","transcript_path":"","cwd":""}"#;
         let p = parse_payload(json).unwrap();

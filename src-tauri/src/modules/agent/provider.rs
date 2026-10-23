@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub struct Provider {
     pub name: &'static str,
     /// Where the provider keeps its transcripts, or `None` when it manages its own session
-    /// state and resume does not consult any file (codex).
+    /// state and resume does not consult any file (opencode).
     pub sessions: Option<SessionsSource>,
     /// How the launch directory is read back from a transcript. Only consulted when
     /// `sessions` is `Some`.
@@ -37,11 +37,12 @@ pub static PROVIDERS: &[Provider] = &[
     },
     Provider {
         name: "codex",
-        // codex keeps its sessions in its own store and `codex resume <id>` reopens one by
-        // id, so Kex never consults a transcript: the record is always resumable and never
-        // pruned.
-        sessions: None,
-        cwd_read: CwdRead::Unused,
+        // Rollouts live at `<CODEX_HOME>/sessions/YYYY/MM/DD/rollout-<stamp>-<id>.jsonl` with
+        // `{type:"session_meta", payload:{id, cwd}}` on line 1. A session may have no rollout
+        // yet, and `codex resume <id>` is the only way back, so it resumes anyway and the
+        // record is never pruned.
+        sessions: Some(SessionsSource::CodexSessions),
+        cwd_read: CwdRead::HeaderLine(1),
         resume: ResumeSpec::Subcommand { name: "resume" },
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
         keep_flags: &[],
@@ -70,7 +71,7 @@ pub static PROVIDERS: &[Provider] = &[
         sessions: Some(SessionsSource::OmpSessions),
         cwd_read: CwdRead::HeaderLine(2),
         resume: ResumeSpec::Flag { flag: "--resume" },
-        missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
+        missing_transcript: MissingTranscriptPolicy::KeepWithoutPlan,
         keep_flags: &[],
         keep_with_value: &[],
     },
@@ -83,7 +84,7 @@ pub static PROVIDERS: &[Provider] = &[
         sessions: Some(SessionsSource::PiSessions),
         cwd_read: CwdRead::HeaderLine(1),
         resume: ResumeSpec::Flag { flag: "--session" },
-        missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
+        missing_transcript: MissingTranscriptPolicy::KeepWithoutPlan,
         keep_flags: &[],
         keep_with_value: &[],
     },
@@ -125,6 +126,7 @@ pub enum SessionsSource {
     ClaudeProjects,
     OmpSessions,
     PiSessions,
+    CodexSessions,
 }
 
 impl SessionsSource {
@@ -137,6 +139,11 @@ impl SessionsSource {
             }
             Self::PiSessions => {
                 find_in_agent_sessions(&pi_sessions_root(), session_id, transcript_path)
+            }
+            Self::CodexSessions => {
+                let root =
+                    codex_sessions_root_from(std::env::var_os("CODEX_HOME"), dirs::home_dir())?;
+                find_in_codex_sessions(&root, session_id, transcript_path)
             }
         }
     }
@@ -230,14 +237,71 @@ fn pi_sessions_root() -> PathBuf {
         .join("sessions")
 }
 
+fn codex_sessions_root_from(
+    codex_home: Option<std::ffi::OsString>,
+    home: Option<PathBuf>,
+) -> Option<PathBuf> {
+    super::codex_integration::resolve_codex_dir(codex_home, home)
+        .ok()
+        .map(|dir| dir.join("sessions"))
+}
+
+/// The rollout of `session_id` under `<root>/YYYY/MM/DD/`. The depth is fixed and days are
+/// walked newest first, stopping at the first day that holds it, so a recent session costs
+/// a few directory reads even when the tree has thousands of rollouts.
+fn find_in_codex_sessions(root: &Path, session_id: &str, transcript_path: &str) -> Option<PathBuf> {
+    if !transcript_path.is_empty() && Path::new(transcript_path).is_file() {
+        return Some(PathBuf::from(transcript_path));
+    }
+    if session_id.is_empty() {
+        return None;
+    }
+    let suffix = format!("-{session_id}.jsonl");
+    for year in subdirs_newest_first(root) {
+        for month in subdirs_newest_first(&year) {
+            for day in subdirs_newest_first(&month) {
+                let Ok(files) = std::fs::read_dir(&day) else {
+                    continue;
+                };
+                let found = files
+                    .flatten()
+                    .filter(|f| f.file_type().map(|t| t.is_file()).unwrap_or(false))
+                    .filter_map(|f| {
+                        let name = f.file_name().into_string().ok()?;
+                        (name.starts_with("rollout-") && name.ends_with(&suffix))
+                            .then(|| (name, f.path()))
+                    })
+                    .max_by(|a, b| a.0.cmp(&b.0));
+                if let Some((_, path)) = found {
+                    return Some(path);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn subdirs_newest_first(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = entries
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .map(|e| e.path())
+        .collect();
+    dirs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+    dirs
+}
+
 pub enum CwdRead {
     /// Walk the entries: `worktreeSession.originalCwd` wins (where the command was launched
     /// from while the session is inside a Kex worktree, which is often deleted later), else
     /// the first `cwd` entry.
     ScanEntries,
-    /// Read the `cwd` of the `session` header entry (`HeaderLine(n)`, n is the 1-based JSONL
-    /// line: OMP 2 after an intro `title`, Pi 1). The file is written when the session is
-    /// created and the header never changes.
+    /// Read the `cwd` of the header entry (`HeaderLine(n)`, n is the 1-based JSONL line: OMP 2
+    /// after an intro `title`, Pi 1, Codex 1). OMP and Pi write `{type:"session", cwd}`, Codex
+    /// `{type:"session_meta", payload:{cwd}}`. The header never changes once written.
     HeaderLine(usize),
     /// Never consulted: only reachable when `sessions` is `None`.
     Unused,
@@ -328,15 +392,17 @@ fn scan_header_line(jsonl: &Path, line_no: usize) -> Option<String> {
             return None;
         }
     }
-    serde_json::from_str::<serde_json::Value>(&line)
-        .ok()
-        .filter(|obj| obj.get("type").and_then(|t| t.as_str()) == Some("session"))
-        .and_then(|obj| {
-            obj.get("cwd")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
+    let obj = serde_json::from_str::<serde_json::Value>(&line).ok()?;
+    let header = match obj.get("type").and_then(|t| t.as_str()) {
+        Some("session") => &obj,
+        Some("session_meta") => obj.get("payload")?,
+        _ => return None,
+    };
+    header
+        .get("cwd")
+        .and_then(|v| v.as_str())
         .filter(|c| !c.is_empty())
+        .map(str::to_string)
 }
 
 pub enum ResumeSpec {
@@ -355,9 +421,12 @@ pub enum MissingTranscriptPolicy {
     /// Nothing can bring the session back: no plan is emitted, and the record is pruned as
     /// soon as its launch directory is usable.
     Ignore,
-    /// Resume does not consult a transcript, so its absence is not an error to recover from
-    /// and the record is never pruned.
+    /// The resume command works by id whether or not the transcript was found, so the plan
+    /// still runs (in the recorded launch directory) and the record is never pruned.
     ResumeAnyway,
+    /// The transcript is the only proof that the session can be reopened: no plan runs while
+    /// it is missing, and the record is never pruned because the file may still appear.
+    KeepWithoutPlan,
 }
 
 pub fn shell_quote(s: &str) -> String {
@@ -599,6 +668,143 @@ mod tests {
         std::fs::write(
             &jsonl,
             "{\"type\":\"title\"}\n{\"type\":\"session\",\"cwd\":\"/tmp/p\"}\n",
+        )
+        .unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), None);
+    }
+
+    const CODEX_ID: &str = "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e";
+
+    fn write_rollout(root: &Path, day: &str, stamp: &str, id: &str) -> PathBuf {
+        let dir = root.join(day);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(format!("rollout-{stamp}-{id}.jsonl"));
+        std::fs::write(&file, "{}\n").unwrap();
+        file
+    }
+
+    #[test]
+    fn a_codex_record_finds_its_rollout_by_id_across_date_dirs() {
+        let root = tempfile::tempdir().unwrap();
+        write_rollout(
+            root.path(),
+            "2026/10/20",
+            "2026-10-20T09-00-00",
+            "01a13d02-0000-7000-8000-000000000000",
+        );
+        let want = write_rollout(root.path(), "2026/09/14", "2026-09-14T20-42-20", CODEX_ID);
+        write_rollout(
+            root.path(),
+            "2025/12/31",
+            "2025-12-31T23-59-59",
+            "01a13d02-1111-7000-8000-000000000000",
+        );
+
+        assert_eq!(
+            find_in_codex_sessions(root.path(), CODEX_ID, ""),
+            Some(want)
+        );
+    }
+
+    #[test]
+    fn a_codex_find_prefers_the_recorded_transcript_path() {
+        let root = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let recorded = other.path().join("rollout-x.jsonl");
+        std::fs::write(&recorded, "{}\n").unwrap();
+        write_rollout(root.path(), "2026/10/14", "2026-10-14T20-42-20", CODEX_ID);
+
+        let found = find_in_codex_sessions(root.path(), CODEX_ID, &recorded.display().to_string());
+
+        assert_eq!(found, Some(recorded));
+    }
+
+    #[test]
+    fn a_codex_find_ignores_unrelated_files() {
+        let root = tempfile::tempdir().unwrap();
+        let day = root.path().join("2026/10/14");
+        std::fs::create_dir_all(&day).unwrap();
+        std::fs::write(day.join(format!("{CODEX_ID}.jsonl")), "{}\n").unwrap();
+        std::fs::write(
+            day.join(format!("rollout-2026-10-14T20-42-20-{CODEX_ID}.json")),
+            "{}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            day.join(format!("rollout-2026-10-14T20-42-20-x{CODEX_ID}.jsonl")),
+            "{}\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(day.join(format!("rollout-2026-10-14T20-42-20-{CODEX_ID}.jsonl")))
+            .unwrap();
+        std::fs::write(root.path().join("2026/notes.txt"), "x").unwrap();
+        std::fs::write(
+            root.path()
+                .join(format!("rollout-2026-10-14T20-42-20-{CODEX_ID}.jsonl")),
+            "{}\n",
+        )
+        .unwrap();
+
+        assert_eq!(find_in_codex_sessions(root.path(), CODEX_ID, ""), None);
+    }
+
+    #[test]
+    fn a_codex_find_without_a_sessions_tree_finds_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        assert_eq!(
+            find_in_codex_sessions(&root.path().join("missing"), CODEX_ID, ""),
+            None
+        );
+    }
+
+    #[test]
+    fn the_codex_sessions_root_follows_codex_home() {
+        let home = tempfile::tempdir().unwrap();
+        let custom = tempfile::tempdir().unwrap();
+
+        let root = codex_sessions_root_from(
+            Some(custom.path().as_os_str().to_owned()),
+            Some(home.path().to_path_buf()),
+        );
+        assert_eq!(
+            root,
+            Some(
+                std::fs::canonicalize(custom.path())
+                    .unwrap()
+                    .join("sessions")
+            )
+        );
+
+        let root = codex_sessions_root_from(None, Some(home.path().to_path_buf()));
+        assert_eq!(root, Some(home.path().join(".codex").join("sessions")));
+    }
+
+    #[test]
+    fn a_codex_record_reads_the_cwd_of_the_session_meta_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(
+            &jsonl,
+            format!(
+                "{{\"timestamp\":\"t\",\"type\":\"session_meta\",\"payload\":{{\"id\":\"{CODEX_ID}\",\"cwd\":\"/tmp/proj\",\"originator\":\"codex_cli_rs\"}}}}\n{{\"type\":\"response_item\"}}\n"
+            ),
+        )
+        .unwrap();
+
+        let provider = Provider::of("codex").unwrap();
+        assert_eq!(
+            provider.cwd_read.read_launch_cwd(&jsonl),
+            Some("/tmp/proj".to_string())
+        );
+    }
+
+    #[test]
+    fn a_codex_record_ignores_a_rollout_without_session_meta_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(
+            &jsonl,
+            "{\"type\":\"response_item\",\"payload\":{\"cwd\":\"/tmp/p\"}}\n",
         )
         .unwrap();
         assert_eq!(scan_header_line(&jsonl, 1), None);
