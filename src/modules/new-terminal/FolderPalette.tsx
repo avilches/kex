@@ -248,7 +248,7 @@ function RowTail({ row }: { row: FolderRowMatched }) {
   );
 }
 
-// Aligned with the workspace heading above it; the count never changes while worktrees are shown or hidden.
+// Aligned with the workspace heading above it, the count right after the name; it never changes while worktrees are shown or hidden.
 function RepoHeading({ row }: { row: FolderRowMatched }) {
   return (
     <div
@@ -261,7 +261,7 @@ function RepoHeading({ row }: { row: FolderRowMatched }) {
         <HighlightText text={row.repoName ?? ""} indices={row.repoNameIndices} />
       </span>
       {row.worktreeCount > 0 ? (
-        <span className="ml-auto shrink-0 font-normal">
+        <span className="shrink-0 font-normal">
           {`${row.worktreeCount} ${row.worktreeCount === 1 ? "worktree" : "worktrees"}`}
         </span>
       ) : null}

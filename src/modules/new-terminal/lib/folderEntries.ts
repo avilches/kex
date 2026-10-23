@@ -87,6 +87,8 @@ export type FolderGroupsInput = {
   worktreesByRepo: ReadonlyMap<string, readonly RepoWorktree[]>;
   /** Repositories whose worktrees were added with Tab: repository key to the workspace they were added to. */
   expansions: ReadonlyMap<string, string>;
+  /** A worktree that stays listed after its repository was collapsed: repository key to the workspace and path of the worktree. */
+  kept: ReadonlyMap<string, { workspaceId: string; path: string }>;
 };
 
 function matchOffsetOf(path: string, home: string | null): number {
@@ -348,23 +350,32 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   }
 
   // Tab pressed on a repository: the worktrees missing from the list join the folders of the workspace it was pressed in.
+  // A collapsed repository still lists the one worktree that had the focus when it was collapsed.
   const addedIn = new Map<string, Set<string>>();
-  for (const [key, workspaceId] of input.expansions) {
+  const addNested = (key: string, workspaceId: string, only: string | null) => {
     const raw = raws.find((g) => g.head.workspaceId === workspaceId);
-    if (!raw) continue;
-    const added = missingWorktrees(b, key).map((w) =>
-      rowOf(b, w.path, workspaceId, raw.head.hibernated, w.isMain ? "Main checkout" : null, {
-        branch: w.branch,
-        repoKey: key,
-        nested: true,
-      }),
-    );
-    if (added.length === 0) continue;
+    if (!raw) return null;
+    const added = missingWorktrees(b, key)
+      .filter((w) => only === null || w.path === only)
+      .map((w) =>
+        rowOf(b, w.path, workspaceId, raw.head.hibernated, w.isMain ? "Main checkout" : null, {
+          branch: w.branch,
+          repoKey: key,
+          nested: true,
+        }),
+      );
     for (const row of added) b.seen.add(row.path);
     raw.loose.push(...added);
+    return added.length;
+  };
+  for (const [key, workspaceId] of input.expansions) {
+    if (!addNested(key, workspaceId, null)) continue;
     const keys = addedIn.get(workspaceId) ?? new Set<string>();
     keys.add(key);
     addedIn.set(workspaceId, keys);
+  }
+  for (const [key, { workspaceId, path }] of input.kept) {
+    if (!input.expansions.has(key)) addNested(key, workspaceId, path);
   }
 
   return raws.map((raw) => finalize(b, raw, addedIn.get(raw.head.workspaceId) ?? new Set()));
