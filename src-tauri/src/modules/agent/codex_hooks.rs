@@ -97,20 +97,62 @@ pub fn install(
             .get("matcher")
             .and_then(Value::as_str)
             .map(str::to_string);
-        entries.push(TrustEntry {
-            source_path: source_path.to_string(),
+        entries.push(kex_trust_entry(
+            source_path,
             event,
             group_index,
             handler_index,
-            command: hook_command(script_path),
-            timeout_sec: Some(HOOK_TIMEOUT_SEC),
-            is_async: false,
             matcher,
-            status_message: None,
-            additional_context_limit: None,
-        });
+            script_path,
+        ));
     }
     Ok((render(&root), entries))
+}
+
+/// The trust identity of a Kex handler at the given position.
+pub fn kex_trust_entry(
+    source_path: &str,
+    event: CodexHookEvent,
+    group_index: usize,
+    handler_index: usize,
+    matcher: Option<String>,
+    script_path: &str,
+) -> TrustEntry {
+    TrustEntry {
+        source_path: source_path.to_string(),
+        event,
+        group_index,
+        handler_index,
+        command: hook_command(script_path),
+        timeout_sec: Some(HOOK_TIMEOUT_SEC),
+        is_async: false,
+        matcher,
+        status_message: None,
+        additional_context_limit: None,
+    }
+}
+
+/// Where every Kex handler sits now, in any event, as `(event, group, handler)`.
+pub fn kex_positions(hooks_json: &str) -> Result<Vec<(CodexHookEvent, usize, usize)>, String> {
+    let root = parse(hooks_json)?;
+    let mut out = Vec::new();
+    let Some(events) = root.get("hooks").and_then(Value::as_object) else {
+        return Ok(out);
+    };
+    for (name, groups) in events {
+        let Some(event) = CodexHookEvent::from_hooks_json_name(name) else {
+            continue;
+        };
+        for (gi, group) in groups.as_array().into_iter().flatten().enumerate() {
+            let handlers = group.get("hooks").and_then(Value::as_array);
+            for (hi, handler) in handlers.into_iter().flatten().enumerate() {
+                if is_kex_handler(handler) {
+                    out.push((event, gi, hi));
+                }
+            }
+        }
+    }
+    Ok(out)
 }
 
 // Refreshes the first Kex handler in place (dropping duplicates) or appends a new group.

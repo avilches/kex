@@ -38,14 +38,38 @@ link that opens the `agent_integration_preview` dry run as a diff). `agent_*_sta
 current.
 
 Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
-`omp` and `pi`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup
+`omp`, `pi` and `codex`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup
 `syncIntegrations` calls `agent_sync_integrations` with that list, which rewrites each file to the version this build
 ships, so an app update reaches the agent without reinstalling. The sync never creates a file and never turns a
 newer one back to an older version. A file that does not start with Kex's marker is left alone and the agent drops out
 of the list; one that is merely missing (a dotfiles link or a synced folder not there yet) stays on it. A link is
 written through, not replaced.
 `agent_remove_integration` deletes only a file that starts with Kex's marker (`// kex-opencode-v`,
-`// kex-agent-status-v`) and refuses any other name than the three agents.
+`// kex-agent-status-v`) and refuses any other name than those three agents and `codex`.
+
+Codex is wired through its own hooks instead (`codex_integration.rs`, built on the pure `codex_hooks.rs` and
+`codex_trust.rs`). The Codex folder is `CODEX_HOME` when set (canonicalized, as Codex does) and `~/.codex` otherwise;
+Kex never creates it, so `agent_setup_codex` fails with a clear error until Codex has been run once. Setup writes
+`trigger-event.sh` (the same script and installer as Claude Code), adds one Kex handler per event (`SessionStart`,
+`UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`, command
+`[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" codex || true  # kex-session-hook`) to
+`hooks.json`, and trusts each one with a `[hooks.state."<hooks.json path>:<event>:<group>:<handler>"]` table in
+`config.toml`, computed from the positions the handlers really landed on. Both files are shared with Orca and Kaji, so:
+
+- Only handlers carrying `# kex-session-hook` and only Kex's trust tables are touched. Kex's tables are the keys its
+  handlers held before the edit plus any table on that `hooks.json` holding the exact hash of a Kex handler at its
+  position (a leftover after positions moved); a stale one is removed on reinstall and all of them on uninstall.
+  A table the user set to `enabled = false` keeps it while its key stays the same.
+- `hooks.json` is re-serialized (`serde_json` keeps key order, but whitespace and `\/` escapes are normalized), so other
+  tools' handlers stay equal as JSON, not as bytes; the "View changes" preview says so in its `note`. `config.toml` is
+  edited textually and keeps every other byte.
+- A `hooks.json` or `config.toml` that cannot be parsed is never written: setup, uninstall and the preview fail with
+  "leaving it alone", `agent_codex_status` reports `malformed`, and the startup sync drops `codex` from
+  `installedIntegrations`, as it does with a file that lost its marker. A `hooks.json` without Kex handlers is dropped
+  the same way; a missing `hooks.json` or Codex folder keeps it tracked and nothing is created.
+- Both files are read, planned and re-read just before writing; if another tool wrote in between the plan starts over
+  (three attempts). On install the trust tables go in before the handlers, on uninstall they come out after them, so
+  Codex never sees a Kex handler without its trust.
 
 ### KEX_TAB_ID
 

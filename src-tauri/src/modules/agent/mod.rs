@@ -1,4 +1,5 @@
 pub mod codex_hooks;
+pub mod codex_integration;
 pub mod codex_trust;
 pub mod launch_cmd;
 pub mod live_model;
@@ -180,31 +181,35 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
         .join("settings.json"))
 }
 
+/// Writes trigger-event.sh, shared by the Claude Code and Codex hooks, only when it differs.
+fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), String> {
+    let current = std::fs::read_to_string(script_path).unwrap_or_default();
+    if current == SESSION_HOOK_SCRIPT {
+        return Ok(());
+    }
+    let script_dir = script_path
+        .parent()
+        .ok_or_else(|| "session hook script path has no parent".to_string())?;
+    std::fs::create_dir_all(script_dir)
+        .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
+    let script_tmp = script_path.with_extension("sh.kex-tmp");
+    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
+        .map_err(|e| format!("write session hook tmp: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("chmod session hook: {e}"))?;
+    }
+    std::fs::rename(&script_tmp, script_path).map_err(|e| {
+        let _ = std::fs::remove_file(&script_tmp);
+        format!("rename session hook: {e}")
+    })
+}
+
 #[tauri::command]
 pub fn agent_enable_claude_hooks() -> Result<(), String> {
-    // Update session hook script only when the installed version is outdated.
-    let script_path = session_hook_script_path()?;
-    let current = std::fs::read_to_string(&script_path).unwrap_or_default();
-    if current != SESSION_HOOK_SCRIPT {
-        let script_dir = script_path
-            .parent()
-            .ok_or_else(|| "session hook script path has no parent".to_string())?;
-        std::fs::create_dir_all(script_dir)
-            .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
-        let script_tmp = script_path.with_extension("sh.kex-tmp");
-        std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
-            .map_err(|e| format!("write session hook tmp: {e}"))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| format!("chmod session hook: {e}"))?;
-        }
-        std::fs::rename(&script_tmp, &script_path).map_err(|e| {
-            let _ = std::fs::remove_file(&script_tmp);
-            format!("rename session hook: {e}")
-        })?;
-    }
+    install_session_hook_script(&session_hook_script_path()?)?;
 
     let path = settings_path()?;
     let dir = path.parent().unwrap();
@@ -390,13 +395,29 @@ fn marker_version(content: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
+/// What one integration needs from the startup sync. Codex has two files of its own, so it is
+/// handled by `codex_integration` instead of a single `IntegrationTarget`.
+enum Integration {
+    File(IntegrationTarget),
+    Codex(codex_integration::CodexPaths),
+}
+
+fn resolve_integration(agent: &str) -> Result<Integration, String> {
+    if agent == "codex" {
+        return codex_integration::CodexPaths::from_env().map(Integration::Codex);
+    }
+    integration_target(agent).map(Integration::File)
+}
+
 #[derive(Debug, PartialEq)]
-enum SyncOutcome {
+pub enum SyncOutcome {
     Updated,
     /// The file is not there: nothing is recreated and the agent stays tracked.
     Gone,
     /// A file with the same name that Kex did not write: left untouched.
     Foreign,
+    /// A shared file Kex cannot parse: left untouched and the agent stops being tracked.
+    Malformed,
 }
 
 fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
@@ -434,9 +455,13 @@ fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
 pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
     let mut dropped = Vec::new();
     for agent in agents {
-        match integration_target(&agent).and_then(|t| sync_integration(&t)) {
+        let outcome = resolve_integration(&agent).and_then(|i| match i {
+            Integration::File(t) => sync_integration(&t),
+            Integration::Codex(p) => codex_integration::sync(&p),
+        });
+        match outcome {
             Ok(SyncOutcome::Updated | SyncOutcome::Gone) => {}
-            Ok(SyncOutcome::Foreign) => dropped.push(agent),
+            Ok(SyncOutcome::Foreign | SyncOutcome::Malformed) => dropped.push(agent),
             Err(e) => log::warn!("[agent] sync {agent} failed: {e}"),
         }
     }
@@ -444,10 +469,13 @@ pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
 }
 
 /// Deletes the integration file, but only when it is Kex's own: a same-named file the user
-/// wrote by hand is left alone.
+/// wrote by hand is left alone. For Codex, removes Kex's handlers and trust tables only.
 #[tauri::command]
 pub fn agent_remove_integration(agent: String) -> Result<(), String> {
-    remove_integration(&integration_target(&agent)?)
+    match resolve_integration(&agent)? {
+        Integration::File(t) => remove_integration(&t),
+        Integration::Codex(p) => codex_integration::remove(&p),
+    }
 }
 
 fn remove_integration(target: &IntegrationTarget) -> Result<(), String> {
@@ -516,14 +544,30 @@ pub fn agent_pi_extension_status() -> bool {
         .is_some_and(|p| agent_file_matches(p, &agent_extension_script("pi")))
 }
 
+#[tauri::command]
+pub fn agent_setup_codex() -> Result<(), String> {
+    codex_integration::setup(&codex_integration::CodexPaths::from_env()?)
+}
+
+#[tauri::command]
+pub fn agent_codex_status() -> codex_integration::CodexStatus {
+    codex_integration::CodexPaths::from_env()
+        .map_or(codex_integration::CodexStatus::Unavailable, |p| {
+            codex_integration::status(&p)
+        })
+}
+
 /// What one file would hold after an install or an uninstall. `None` in `before` means the
-/// file is not there; `None` in `after` means it would be deleted.
+/// file is not there; `None` in `after` means it would be deleted. `note` explains a change
+/// the diff alone would not, such as a shared file being reformatted.
 #[derive(Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilePreview {
     path: String,
     before: Option<String>,
     after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
 }
 
 fn tilde(path: &std::path::Path) -> String {
@@ -548,6 +592,7 @@ fn changed(
         path: tilde(path),
         before: before.map(str::to_string),
         after,
+        note: None,
     }]
 }
 
@@ -614,9 +659,13 @@ pub fn agent_integration_preview(agent: String, install: bool) -> Result<Vec<Fil
             install,
         );
     }
-    let target = integration_target(&agent)?;
-    let current = read_optional(&target.path)?;
-    integration_preview(&target, current.as_deref(), install)
+    match resolve_integration(&agent)? {
+        Integration::File(target) => {
+            let current = read_optional(&target.path)?;
+            integration_preview(&target, current.as_deref(), install)
+        }
+        Integration::Codex(paths) => codex_integration::preview(&paths, install),
+    }
 }
 
 #[tauri::command]

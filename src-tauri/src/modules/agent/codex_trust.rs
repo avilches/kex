@@ -194,6 +194,22 @@ pub fn read_trusted_hash(content: &str, key: &str) -> Option<String> {
         .find_map(|b| block_value(content, &b, "trusted_hash").and_then(|v| parse_basic_value(&v)))
 }
 
+/// Every `[hooks.state."<key>"]` table in file order, with its `trusted_hash` when it has one.
+pub fn hook_state_tables(content: &str) -> Vec<(String, Option<String>)> {
+    find_blocks(content)
+        .into_iter()
+        .map(|b| {
+            let hash = block_value(content, &b, "trusted_hash").and_then(|v| parse_basic_value(&v));
+            (b.key, hash)
+        })
+        .collect()
+}
+
+/// The source path, event, group and handler index a trust key names.
+pub fn parse_trust_key(key: &str) -> Option<(String, CodexHookEvent, usize, usize)> {
+    split_key(key).map(|(path, event, group, handler)| (path.to_string(), event, group, handler))
+}
+
 /// Replaces `path` through a temp file in the same directory and a rename. A symlinked
 /// config is written through to its target so dotfiles links stay links.
 pub fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {
