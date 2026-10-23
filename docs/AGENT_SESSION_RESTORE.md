@@ -299,8 +299,14 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
   shell is not seen by a Kex started from the Dock; the recorded `transcript_path` covers that case when Codex sends it.
 - **Launch cwd.** Line 1 of a rollout is `{"type":"session_meta","payload":{"id":...,"cwd":...}}`;
   `CwdRead::HeaderLine(1)` reads `payload.cwd` from it (the same reader takes OMP's and Pi's `{type:"session", cwd}`).
-- **Resume.** `codex resume '<id>'` on top of the stripped launch line (Codex's stripping whitelists are empty, so the
-  base collapses to the launcher, `codex-max` included).
+- **Resume.** `codex resume '<id>'` on top of the stripped launch line. The codex row keeps `-p`/`--profile`,
+  `-c`/`--config` (repeatable), `-m`/`--model`, `--local-provider` and `--oss`, so `codex -p work -m o3` resumes as
+  `codex -p work -m o3 resume '<id>'` (Codex 0.163 parses those options before the subcommand; that it applies them to
+  the resumed session is read from its CLI, not measured live). Each of those value options takes exactly one token
+  (`single_value_opts`, the same `CODEX_VALUE_OPTS` list the `exec` detection uses), so a prompt or the `resume <id>`
+  of an already resumed line is never taken for a value and a second strip gives the same base. The sandbox and
+  approval options (`-s`/`--sandbox`, `-a`/`--ask-for-approval`, `--yolo`,
+  `--dangerously-bypass-approvals-and-sandbox`) are dropped on purpose: a restore must not silently re-grant them.
 - **Missing rollout.** The policy is `ResumeAnyway`: a session may have no rollout yet, and `codex resume <id>` is the
   only way back to it, so the plan still runs in the recorded launch directory and the record is never pruned.
 - **One-shot runs.** `codex exec ...` and its alias `codex e ...` are Codex's non-interactive mode and never become a
@@ -379,8 +385,8 @@ Anything it cannot resolve with certainty is not guessed, and what happens depen
 The process the shell runs is not a source for the command: a wrapper such as `claude-max` ends with `exec claude`,
 so the process shows a plain `claude` and its cleaned environment is gone.
 
-The stripping whitelists are empty for `codex`, `opencode`, `omp` and `pi`, so the stripped base collapses to the
-launcher (pinned by tests). The plain templates used when no launch command is known are `claude --resume '<id>'`,
+The stripping whitelists are empty for `opencode`, `omp` and `pi`, so the stripped base collapses to the
+launcher (pinned by tests); `codex` keeps its profile, config, model and local provider options (see Codex above). The plain templates used when no launch command is known are `claude --resume '<id>'`,
 `codex resume '<id>'`, `opencode --session '<id>'`, `omp --resume '<id>'` (id, prefix or path) and `pi --session '<id>'`
 (id or path).
 
@@ -504,7 +510,8 @@ with a `cd dir && claude ...` prefix (the bug of TASK-826) is healed on read ins
 It returns `None` when the agent has no provider row or no agent is launched in the text, and the planner then uses
 the plain per-agent template. The
 launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through the whitelist
-stored in the agent's provider row (`CLAUDE_KEEP_FLAGS` / `CLAUDE_KEEP_WITH_VALUE` in `provider.rs`). It keeps flags
+stored in the agent's provider row (`CLAUDE_KEEP_FLAGS` / `CLAUDE_KEEP_WITH_VALUE` in `provider.rs`; the lists
+below are Claude's, Codex's are described in its section). It keeps flags
 that remain meaningful for an
 interactive resume and drops one-time flags (e.g. `--worktree`, `--from-pr`, `--tmux`, `--model`, `--effort`).
 Redirections after the launcher (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value; `<(cmd)` and `>(cmd)` are values, not redirections, and are kept.
@@ -523,7 +530,8 @@ Flags kept with their value(s):
 to be replayed on resume. Any flag not in either list is dropped along with any immediately-following non-flag value
 tokens.
 
-Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A positional prompt that follows a whitelisted value flag is still read as one more value of that flag. A stored command that was cut is refused (see above).
+Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A positional prompt that follows a whitelisted value flag is still read as one more value of that flag, except for
+the options a row lists in `single_value_opts` (Codex), which take exactly one token. A stored command that was cut is refused (see above).
 
 ### Print-mode filtering
 

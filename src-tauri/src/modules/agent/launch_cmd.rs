@@ -117,7 +117,7 @@ impl Invocation {
 }
 
 /// Codex options that consume the next token, so a value is never read as the subcommand.
-const CODEX_VALUE_OPTS: &[&str] = &[
+pub const CODEX_VALUE_OPTS: &[&str] = &[
     "-c",
     "--config",
     "-i",

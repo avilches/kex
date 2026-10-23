@@ -1,6 +1,8 @@
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
+use super::launch_cmd::CODEX_VALUE_OPTS;
+
 /// Everything an agent CLI must tell the session store: where its transcripts live, how to
 /// read the launch directory back from one, how a recorded session is reopened, and what to
 /// do when the transcript has vanished. `session_store` stays agent-agnostic and only
@@ -21,6 +23,9 @@ pub struct Provider {
     pub keep_flags: &'static [&'static str],
     /// Same, but the flag consumes the non-flag tokens that follow it.
     pub keep_with_value: &'static [&'static str],
+    /// Options that take exactly one value: a kept one consumes a single token, so a prompt or
+    /// a subcommand after it (`codex -m o3 resume <id>`) is never taken for a value.
+    pub single_value_opts: &'static [&'static str],
 }
 
 pub static PROVIDERS: &[Provider] = &[
@@ -34,6 +39,7 @@ pub static PROVIDERS: &[Provider] = &[
         },
         keep_flags: CLAUDE_KEEP_FLAGS,
         keep_with_value: CLAUDE_KEEP_WITH_VALUE,
+        single_value_opts: &[],
     },
     Provider {
         name: "codex",
@@ -45,8 +51,20 @@ pub static PROVIDERS: &[Provider] = &[
         cwd_read: CwdRead::HeaderLine(1),
         resume: ResumeSpec::Subcommand { name: "resume" },
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
-        keep_flags: &[],
-        keep_with_value: &[],
+        // Profile, config overrides, model and local provider describe the session; the
+        // sandbox and approval options (`-s`, `-a`, `--yolo`, the bypass) are dropped on purpose
+        // so a restore never silently re-grants what the user chose for one run.
+        keep_flags: &["--oss"],
+        keep_with_value: &[
+            "-p",
+            "--profile",
+            "-c",
+            "--config",
+            "-m",
+            "--model",
+            "--local-provider",
+        ],
+        single_value_opts: CODEX_VALUE_OPTS,
     },
     Provider {
         name: "opencode",
@@ -60,6 +78,7 @@ pub static PROVIDERS: &[Provider] = &[
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
         keep_flags: &[],
         keep_with_value: &[],
+        single_value_opts: &[],
     },
     Provider {
         name: "omp",
@@ -74,6 +93,7 @@ pub static PROVIDERS: &[Provider] = &[
         missing_transcript: MissingTranscriptPolicy::KeepWithoutPlan,
         keep_flags: &[],
         keep_with_value: &[],
+        single_value_opts: &[],
     },
     Provider {
         name: "pi",
@@ -87,6 +107,7 @@ pub static PROVIDERS: &[Provider] = &[
         missing_transcript: MissingTranscriptPolicy::KeepWithoutPlan,
         keep_flags: &[],
         keep_with_value: &[],
+        single_value_opts: &[],
     },
 ];
 
@@ -527,6 +548,23 @@ mod tests {
             provider.resume_cmd(Some("codex-max"), "abc-123"),
             "codex-max resume 'abc-123'"
         );
+    }
+
+    #[test]
+    fn codex_keeps_only_options_known_to_take_one_value() {
+        let provider = Provider::of("codex").unwrap();
+        for flag in provider.keep_with_value {
+            assert!(provider.single_value_opts.contains(flag), "{flag}");
+        }
+        for dangerous in ["-s", "--sandbox", "-a", "--ask-for-approval"] {
+            assert!(
+                !provider.keep_with_value.contains(&dangerous),
+                "{dangerous}"
+            );
+        }
+        for dangerous in ["--yolo", "--dangerously-bypass-approvals-and-sandbox"] {
+            assert!(!provider.keep_flags.contains(&dangerous), "{dangerous}");
+        }
     }
 
     #[test]

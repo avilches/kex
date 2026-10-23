@@ -159,10 +159,8 @@ fn known_agents(agent: &str) -> Vec<String> {
 /// Tokens keep their quotes, so a quoted value with spaces stays one value. Assignments and
 /// wrappers before the launcher (`FOO=1 claude`, `env X=1 claude-max`) are kept as written.
 fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
-    let (keep_flags, keep_with_value) = match Provider::of(agent) {
-        Some(provider) => (provider.keep_flags, provider.keep_with_value),
-        None => return None,
-    };
+    let provider = Provider::of(agent)?;
+    let (keep_flags, keep_with_value) = (provider.keep_flags, provider.keep_with_value);
 
     // A record written before the launch line was reduced to the agent segment can still
     // carry `cd dir && claude ...`; reducing it again here heals it on read.
@@ -191,7 +189,12 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         if keep_with_value.contains(&flag) {
             result.push(token);
             i += 1;
-            if !has_eq {
+            if !has_eq && provider.single_value_opts.contains(&flag) {
+                if let Some(value) = tokens.get(i) {
+                    result.push(value);
+                    i += 1;
+                }
+            } else if !has_eq {
                 // Consume all immediately-following non-flag tokens as values.
                 while i < tokens.len()
                     && !tokens[i].starts_with('-')
@@ -850,6 +853,54 @@ mod tests {
         assert_eq!(base.as_deref(), Some("claude --add-dir /a"));
         let base = strip_for_resume_base("claude --safe-mode > out.log --add-dir /a", "claude");
         assert_eq!(base.as_deref(), Some("claude --safe-mode --add-dir /a"));
+    }
+
+    #[test]
+    fn codex_resume_keeps_profile_config_model_and_provider_options() {
+        let base = strip_for_resume_base(
+            "codex -p work -c effort=high --config a.b=1 --oss --local-provider ollama -m o3 'fix it'",
+            "codex",
+        );
+        assert_eq!(
+            base.as_deref(),
+            Some("codex -p work -c effort=high --config a.b=1 --oss --local-provider ollama -m o3")
+        );
+        let base = strip_for_resume_base(
+            "codex --profile work --model=o3 --config=x=1 --search 'go'",
+            "codex",
+        );
+        assert_eq!(
+            base.as_deref(),
+            Some("codex --profile work --model=o3 --config=x=1")
+        );
+    }
+
+    #[test]
+    fn codex_resume_never_regrants_sandbox_or_approval_bypasses() {
+        for line in [
+            "codex --dangerously-bypass-approvals-and-sandbox -p work",
+            "codex --yolo -p work",
+            "codex -s danger-full-access -p work",
+            "codex --sandbox danger-full-access -p work",
+            "codex -a never -p work",
+            "codex --ask-for-approval never -p work",
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some("codex -p work"),
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
+    fn codex_resume_line_is_stable_under_a_second_strip() {
+        let base = strip_for_resume_base("codex -p work -c a=b --oss 'fix it'", "codex").unwrap();
+        let resume = Provider::of("codex")
+            .unwrap()
+            .resume_cmd(Some(&base), "id-1");
+        assert_eq!(resume, "codex -p work -c a=b --oss resume 'id-1'");
+        assert_eq!(strip_for_resume_base(&resume, "codex").unwrap(), base);
     }
 
     #[test]
@@ -2136,7 +2187,7 @@ mod tests {
         let plans = load_restore_plan_from_path(&store_path);
 
         assert_eq!(plans.len(), 1);
-        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
+        assert_eq!(plans[0].resume_cmd, "codex -m o3 resume 'abc-123'");
         assert_eq!(plans[0].cwd_launch, launch.display().to_string());
         assert!(plans[0].worktree_cwd.is_none());
     }
@@ -2184,7 +2235,7 @@ mod tests {
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
-        assert_eq!(plans[0].resume_cmd, "codex-max resume 'abc-123'");
+        assert_eq!(plans[0].resume_cmd, "codex-max --model g5 resume 'abc-123'");
     }
 
     #[test]
