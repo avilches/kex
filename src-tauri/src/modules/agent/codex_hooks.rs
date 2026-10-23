@@ -31,9 +31,9 @@ pub enum Status {
     Malformed,
 }
 
-// Single place to change when the command gains an agent tag.
+// The "codex" argument is how trigger-event.sh tags the frame's agent.
 fn hook_command(script_path: &str) -> String {
-    format!(r#"[ -n "$KEX_TAB_ID" ] && "{script_path}" || true  # {SESSION_HOOK_MARKER}"#)
+    format!(r#"[ -n "$KEX_TAB_ID" ] && "{script_path}" codex || true  # {SESSION_HOOK_MARKER}"#)
 }
 
 fn kex_handler(script_path: &str) -> Value {
@@ -346,6 +346,13 @@ mod tests {
     fn remove_drops_events_that_only_held_kex() {
         let (installed, _) = install("", DEFAULT_SCRIPT_PATH, SRC).unwrap();
         assert_eq!(value(&remove(&installed).unwrap()), json!({ "hooks": {} }));
+    }
+
+    #[test]
+    fn the_handler_command_tags_the_agent_as_codex() {
+        assert!(
+            hook_command(DEFAULT_SCRIPT_PATH).contains(&format!("{DEFAULT_SCRIPT_PATH}\" codex"))
+        );
     }
 
     #[test]

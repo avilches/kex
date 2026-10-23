@@ -22,8 +22,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
-// v7: the script tags its frames with agent "claude" (see trigger-event.sh).
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v7";
+// v8: the script tags its frames with its first argument, defaulting to "claude" (see trigger-event.sh).
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v8";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -53,7 +53,7 @@ fn agent_extension_script(agent: &str) -> String {
     AGENT_EXTENSION_TEMPLATE.replace("__KEX_AGENT__", agent)
 }
 
-// All 10 events handled by trigger-event.sh in v7.
+// All 10 events handled by trigger-event.sh in v8.
 const SESSION_HOOK_EVENTS: [&str; 10] = [
     "SessionStart",
     "UserPromptSubmit",
@@ -688,6 +688,69 @@ fn serialize_pretty(value: &Value, indent: usize) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    fn run_trigger_script(arg: Option<&str>, tab_id: Option<&str>) -> Option<String> {
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixListener;
+        use std::process::{Command, Stdio};
+
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("trigger-event.sh");
+        std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
+        let sock = dir.path().join("s.sock");
+        let listener = UnixListener::bind(&sock).unwrap();
+        listener.set_nonblocking(true).unwrap();
+
+        let mut cmd = Command::new("bash");
+        cmd.arg(&script)
+            .args(arg)
+            .env("HOME", dir.path())
+            .env("KEX_TERMINAL", "1")
+            .env("KEX_IPC", &sock)
+            .env_remove("KEX_TAB_ID")
+            .stdin(Stdio::piped());
+        if let Some(t) = tab_id {
+            cmd.env("KEX_TAB_ID", t);
+        }
+        let mut child = cmd.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(br#"{"hook_event_name":"Stop","session_id":"s1"}"#)
+            .unwrap();
+        child.wait().unwrap();
+
+        let (stream, _) = listener.accept().ok()?;
+        stream.set_nonblocking(false).unwrap();
+        let mut line = String::new();
+        BufReader::new(stream).read_line(&mut line).unwrap();
+        Some(line)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_tags_codex_when_given_the_codex_argument() {
+        let frame = run_trigger_script(Some("codex"), Some("tab-1")).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["agent"], "codex");
+        assert_eq!(v["session_id"], "s1");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_defaults_to_claude_without_an_argument() {
+        let frame = run_trigger_script(None, Some("tab-1")).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["agent"], "claude");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_without_a_tab_id_sends_nothing() {
+        assert!(run_trigger_script(Some("codex"), None).is_none());
+    }
 
     #[test]
     fn preserves_unrelated_settings_and_foreign_hooks() {

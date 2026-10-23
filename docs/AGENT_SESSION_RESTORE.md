@@ -61,15 +61,16 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v7`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v8`) handles all 10 registered Claude Code
 hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
    managed by Kex).
-2. Uses `jq` to re-serialize the payload tagged with `"agent": "claude"` (everything the script serves is a Claude
-   Code hook; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract `hook_event_name`,
-   only to pick the handler. The re-serialization is what conditions the reinstall check in
-   `agent_claude_hooks_status`: users with a `kex-session-v6` file see the install button again.
+2. Uses `jq` to re-serialize the payload tagged with `"agent"` set to the script's first argument, `claude` when
+   there is none (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
+   pass `codex`; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract
+   `hook_event_name`, only to pick the handler. The marker conditions the reinstall check in
+   `agent_claude_hooks_status`: users with a `kex-session-v7` file see the install button again.
    The script no longer writes the payload to disk: an earlier
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew

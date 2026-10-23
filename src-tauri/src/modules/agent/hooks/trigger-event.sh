@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# kex-session-v7
+# kex-session-v8
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 
 PAYLOAD="$(cat)"
-# Tag the agent into the frame so Kex's dispatcher can attribute it without guessing:
-# everything wired through this script is a Claude Code hook, while OpenCode's plugin
-# writes the socket itself with "agent":"opencode".
-PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c '. + {"agent": "claude"}')"
+# Tag the agent into the frame so Kex's dispatcher can attribute it without guessing.
+# The hook command passes the agent as the first argument (Codex's handlers pass "codex");
+# Claude Code's command has none, so it defaults to "claude". OpenCode's plugin writes
+# the socket itself with "agent":"opencode".
+AGENT="${1:-claude}"
+PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" '. + {"agent": $agent}')"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Caps the per-tab spool file so a tab that never reopens in Kex (and so
