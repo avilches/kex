@@ -515,6 +515,126 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 
 - [ ] En OMP u OpenCode con una herramienta en modo "ask", pedir un subagente que la use: el tab pasa a atencion aunque la pregunta la haga el subagente
 
+## Bloque K - Codex
+
+Este bloque prueba la integracion de Codex: Kex escribe sus handlers en `hooks.json`, los marca como confiables en
+`config.toml` (Codex no ejecuta un handler que no sea de confianza) y restaura las sesiones desde los rollouts.
+Diseno en `docs/AGENT_SESSION_RESTORE.md`, seccion "Codex hooks".
+
+**Que NO estaba verificado contra un Codex real cuando se escribio este bloque.** La maquina de desarrollo no tenia
+credenciales de Codex (`codex login status` decia "Not logged in" y `codex exec` arrancaba pero fallaba con
+`401 Unauthorized`), asi que no se pudo ejecutar ninguna sesion con modelo. Lo comprobado fue solo lo que no necesita
+turno: los tests unitarios de Rust y de frontend, y el calculo del hash de confianza, que reproduce los 10 hashes reales
+de un `config.toml` de Orca. Por tanto, los pasos K3 a K12 describen lo que el codigo hace por diseno, no algo visto
+funcionando con Codex, y quien los ejecute con una cuenta de Codex es quien los verifica por primera vez: debe anotar
+cualquier diferencia, en especial los eventos que Codex emite de verdad y la forma de su payload. Los pasos K1, K2, K13
+y K14 (instalar, estados bloqueados, convivencia y quitar) no necesitan sesion y se pueden probar sin login. K15 lista
+lo que sigue abierto.
+
+Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con una copia: `CODEX_HOME=/tmp/codex-copy`
+(Kex lee `CODEX_HOME` de su propio entorno, asi que hay que arrancar Kex desde una shell que lo exporte, no desde el Dock).
+
+### K1 Instalar desde Settings y desde el campanazo
+
+- [ ] Con `~/.codex` existente (ejecutar `codex` una vez antes) y sin handlers de Kex: Settings > General > Agents > Codex muestra "Install" y los ficheros `~/.codex/hooks.json, ~/.codex/config.toml`; el campanazo ofrece "Install Codex integration"
+- [ ] "View changes" abre el diff con una pestana por fichero (`hooks.json`, `config.toml` y `trigger-event.sh` si no estaba instalado). Sobre el diff de `hooks.json` aparece la nota "Kex rewrites hooks.json as formatted JSON: ..."; la de `config.toml` no lleva nota
+- [ ] Instalar. Esperado en `hooks.json`: seis handlers (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`) cuyo comando es `[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" codex || true  # kex-session-hook`
+- [ ] Esperado en `config.toml`: seis tablas `[hooks.state."<ruta de hooks.json>:<evento>:<grupo>:<handler>"]` con `trusted_hash = "sha256:..."`
+- [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v8`
+- [ ] Reiniciar Kex: el campanazo ya no ofrece Codex y la fila de Settings dice "Installed"
+- [ ] Instalar otra vez (o reiniciar): idempotente, ni `hooks.json` ni `config.toml` cambian (`shasum` antes y despues)
+
+### K2 Estados bloqueados
+
+- [ ] Malformed: con `CODEX_HOME` apuntando a una copia, romper la sintaxis de `hooks.json` a mano (quitar una llave). La fila de Settings dice "Cannot read config", explica que Kex no puede leerlo y lo deja intacto, y solo ofrece "Check again" (sin Install, Uninstall ni View changes). El campanazo muestra una fila "Codex integration unavailable" sin boton
+- [ ] Arreglar el fichero y pulsar "Check again": la fila vuelve a su estado normal sin reiniciar. Repetir rompiendo `config.toml`
+- [ ] Con un `hooks.json` roto, reiniciar Kex con Codex marcado como instalado: el fichero no se reescribe y Codex deja de figurar como instalado (se pierde de `installedIntegrations` en `settings-general.json`)
+- [ ] Unavailable: con `CODEX_HOME` apuntando a una carpeta que no existe (o sin `~/.codex`), la fila dice "Not found" y solo ofrece "Check again"; el campanazo no muestra Codex. Kex no crea la carpeta
+- [ ] Outdated: cambiar a mano el comando de un handler de Kex en `hooks.json`. La fila vuelve a ofrecer Install, que lo repara (y el siguiente arranque de Kex tambien lo repara solo, porque Codex sigue en `installedIntegrations`)
+
+### K3 SessionStart: aparece el icono
+
+- [ ] Abrir `codex` en un terminal de Kex (con la confianza ya instalada)
+- [ ] Esperado: el icono de Codex aparece en el tab antes de escribir ningun prompt
+- [ ] `agent-sessions.json`: entrada del tab con `agent: "codex"`, `session_id` UUID, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "codex"`; `transcript_path` apunta a `<CODEX_HOME o ~/.codex>/sessions/AAAA/MM/DD/rollout-...-<uuid>.jsonl` o va vacio (ver K15)
+- [ ] El icono no sale tachado ("Launch command unknown")
+- [ ] Si Codex pregunta si confiar en los hooks al arrancar, anotarlo: Kex ya los dejo de confianza y no deberia
+
+### K4 Estados working, attention e idle
+
+- [ ] Escribir un prompt: el spinner del tab gira mientras Codex trabaja
+- [ ] Al terminar el turno el tab pasa a atencion una sola vez (punto ambar) y se apaga al enfocarlo
+- [ ] Una accion que pida permiso (un comando fuera del sandbox, con aprobaciones activadas): el tab pasa a atencion mientras el permiso espera, y vuelve a trabajando al aprobarlo
+
+### K5 Subagentes
+
+- [ ] Pedir a Codex una tarea que lance subagentes, si la version instalada los anuncia (`SubagentStart` / `SubagentStop`)
+- [ ] Esperado: una fila hija del tab en el WorkspaceBar por subagente, que desaparece al terminar; el tab sigue con spinner mientras haya alguno y pasa a atencion solo cuando acaba el ultimo
+- [ ] Si Codex no emite esos eventos no hay filas hijas, y eso no es un fallo de Kex; anotar la version de Codex
+
+### K6 Menu del tab
+
+- [ ] Tab de Codex con rollout: el bloque del agente ofrece "Copy Session ID", "Run on Start" y las acciones de transcript ("Open Transcript Folder", "Reveal Transcript in Finder")
+- [ ] Tab de Codex cuyo frame llego con `transcript_path` vacio o `null`: "Copy Session ID" y "Run on Start" siguen, y las acciones de transcript no aparecen (ni "Transcript not created yet")
+- [ ] "Run on Start" muestra `codex resume '<uuid>'`, o `<launcher> resume '<uuid>'` si se lanzo con un wrapper reconocido
+
+### K7 Cerrar Kex con Codex abierto y reabrir
+
+- [ ] Con una sesion de Codex que ya intercambio al menos un mensaje, cerrar Kex (Cmd+Q) y reabrirlo
+- [ ] Esperado: el tab se abre en el directorio del rollout y Kex escribe `codex resume '<uuid>'` (precedido de las variables o el wrapper del lanzamiento original, pero sin flags: la lista de flags conservados de Codex esta vacia)
+- [ ] La sesion continua: es la misma conversacion, no una nueva, y el `session_id` de `agent-sessions.json` no cambia
+- [ ] `codex -p work` (perfil, no print mode) tambien se restaura; `codex resume <id>` lanzado a mano tambien
+
+### K8 Hibernar y despertar
+
+- [ ] Con un tab de Codex en un workspace, hibernarlo (Cmd+Alt+Z) y despertarlo
+- [ ] Esperado: al despertar el icono aparece antes de escribir nada y Kex escribe `codex resume '<uuid>'`
+
+### K9 `codex exec` no se restaura
+
+- [ ] En un tab, `codex exec "di hola"` y luego `codex e "di hola"`: no sale icono de agente (ni tachado) y `agent-sessions.json` no gana entrada
+- [ ] Con el log en nivel debug, al acabar el comando aparece `print run ended`
+- [ ] `codex -c model=o3 exec "hola"` tambien se filtra; `codex -m exec` (un modelo llamado exec) no es un exec
+
+### K10 Sesion sin rollout
+
+- [ ] Abrir `codex` y cerrar el tab sin escribir ningun prompt, luego reabrir Kex
+- [ ] Esperado por diseno: la entrada del store sigue ahi y Kex escribe `codex resume '<uuid>'` en el directorio grabado. Lo que Codex responde a un id sin rollout no estaba verificado: si dice que no encuentra la sesion, anotarlo; el arreglo previsto es pasar la fila de Codex a `KeepWithoutPlan` (una linea en `provider.rs`)
+
+### K11 Rollout buscado por id
+
+- [ ] Con `CODEX_HOME` exportado solo en la shell y Kex arrancado desde el Dock: la busqueda por id no ve la carpeta, pero el `transcript_path` del frame (si Codex lo envio) basta para restaurar; si iba vacio la restauracion sigue funcionando (`ResumeAnyway`) con el directorio de lanzamiento grabado
+- [ ] Con muchos rollouts en `sessions/`, reabrir Kex no se nota mas lento (el recorrido es de tres niveles de fecha, del mas reciente al mas antiguo, y para en el primer dia que contiene el id)
+
+### K12 Confianza revocada o retocada
+
+- [ ] Con Codex instalado, borrar a mano una tabla `[hooks.state."...:SessionStart:..."]` de `config.toml`. Esperado: la fila pasa a ofrecer Install (estado outdated); Codex no ejecuta ese handler hasta que se repare, y el siguiente arranque de Kex lo repara solo
+- [ ] Poner `enabled = false` en una de las tablas de Kex y reinstalar: la tabla conserva `enabled = false` mientras su clave no cambie
+- [ ] Mover un grupo de `hooks.json` para que cambie la posicion de un handler de Kex y reinstalar: la tabla de la posicion vieja se elimina y aparece la de la nueva
+
+### K13 Convivencia con Orca y Kaji
+
+- [ ] Con los handlers de Orca y de Kaji ya en `hooks.json` y sus tablas `[hooks.state."..."]` en `config.toml`, guardar una copia de ambos ficheros y luego instalar Codex desde Kex
+- [ ] Esperado: cada handler ajeno sigue igual como JSON (comparar con `jq -S .` los que no llevan `# kex-session-hook`, antes y despues), en el mismo orden dentro de su evento, y `config.toml` solo gana las tablas de Kex (`diff` muestra lineas anadidas, ninguna cambiada ni borrada). `hooks.json` se reformatea (espacios y `\/`), que es lo que avisa la nota de "View changes"
+- [ ] Desinstalar desde Settings: `hooks.json` queda sin ningun handler con `# kex-session-hook`, las tablas de Kex desaparecen de `config.toml`, y los handlers y las tablas de Orca y Kaji siguen identicos
+- [ ] Si Orca o Kaji escriben el fichero mientras Kex instala, el plan se rehace (hasta tres intentos) sin perder lo suyo
+
+### K14 Desinstalar
+
+- [ ] Settings > General > Agents > Codex > Uninstall: la fila pasa a "Not installed", el campanazo vuelve a ofrecer "Install Codex integration", y reabrir Kex no lo reinstala
+- [ ] `~/.config/kex/hooks/trigger-event.sh` no se borra (lo comparte Claude Code)
+
+### K15 Comprobaciones que siguen abiertas
+
+Necesitan un Codex con sesion iniciada y no se pudieron medir. Cada una puede cambiar el codigo:
+
+- [ ] **Marcas OSC 133 propias (regla de TASK-851).** Lanzar `codex`, escribir un mensaje y esperar la respuesta: el icono del tab debe seguir ahi y "Run on Start" mantener su comando. Si el tab pierde el agente tras el primer mensaje, Codex dibuja sus propias marcas y `AgentDetector` necesita la regla que OMP ya tiene; salir con `/exit` o Ctrl+D debe apagar el icono. Hoy `AgentDetector` trata a Codex como a cualquier agente
+- [ ] **`codex resume <id>` de una sesion sin rollout** (ver K10)
+- [ ] **Lista de flags de `codex exec`.** Las opciones de Codex que llevan valor (`-c`, `-m`, `-p`, `-s`, `-a`, `-C`, `-i`, `--add-dir`, `--enable`, `--disable`, `--local-provider`) salieron de la ayuda de la CLI, no de una medicion. Probar `codex <opcion> <valor> exec ...` con cada una y comprobar que se filtra
+- [ ] **Payload con `transcript_path` nulo.** Mirar el JSON real que Codex manda en `SessionStart`: si `transcript_path` viene `null` antes del primer mensaje, debe quedar vacio en el store y el menu ocultar las acciones de transcript (K6). Anotar tambien si manda `source` y con que valores
+- [ ] **Modelo en vivo.** `live_model` no sabe leer un rollout de Codex, asi que la barra del tab no muestra el modelo. Pendiente de medir
+- [ ] **El hash de confianza con un Codex actual.** Confirmar que tras instalar, Codex ejecuta los seis handlers sin pedir confianza. Si no, el algoritmo de `codex_trust.rs` se ha desviado del de Codex y el unico sintoma es que no llegan eventos
+
 ---
 
 ## Checklist de diagnostico rapido (en caso de que no restaure)
