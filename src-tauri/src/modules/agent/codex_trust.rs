@@ -194,6 +194,37 @@ pub fn read_trusted_hash(content: &str, key: &str) -> Option<String> {
         .find_map(|b| block_value(content, &b, "trusted_hash").and_then(|v| parse_basic_value(&v)))
 }
 
+/// Checks an edited file before it is written: it must still be valid TOML and every entry
+/// must read back with its hash, both textually and as parsed TOML. The textual editor only
+/// sees `[hooks.state."<key>"]` headers, so a table written in another valid form (an inline
+/// table, a quoted `"hooks"`) would otherwise end up duplicated.
+pub fn verify_hook_trust(content: &str, entries: &[TrustEntry]) -> Result<(), String> {
+    let parsed: toml::Table = content
+        .parse()
+        .map_err(|e| format!("the edited config.toml would not be valid TOML: {e}"))?;
+    let state = parsed
+        .get("hooks")
+        .and_then(|h| h.get("state"))
+        .and_then(toml::Value::as_table);
+    for entry in entries {
+        let hash = trusted_hash(entry);
+        let wanted = lookup_key(&entry.key());
+        let parsed_ok = state.is_some_and(|tables| {
+            tables.iter().any(|(key, table)| {
+                lookup_key(key) == wanted
+                    && table.get("trusted_hash").and_then(toml::Value::as_str) == Some(&hash)
+            })
+        });
+        if !parsed_ok || read_trusted_hash(content, &entry.key()).as_deref() != Some(&hash) {
+            return Err(format!(
+                "the trust of {} would not read back from the edited config.toml",
+                entry.key()
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Every `[hooks.state."<key>"]` table in file order, with its `trusted_hash` when it has one.
 pub fn hook_state_tables(content: &str) -> Vec<(String, Option<String>)> {
     find_blocks(content)
@@ -878,6 +909,24 @@ mod tests {
         let lower = "c:/users/me/.codex/hooks.json:stop:1:0".to_string();
         assert_eq!(read_trusted_hash(&out, &lower), Some(trusted_hash(&e)));
         assert_eq!(remove_hook_trust(&out, &[e.key()]), "a = 1\n");
+    }
+
+    #[test]
+    fn verify_accepts_a_clean_edit_and_rejects_what_would_not_read_back() {
+        let e = entry("/h/hooks.json", CodexHookEvent::Stop, 1);
+        let out = upsert_hook_trust("a = 1\n", std::slice::from_ref(&e));
+        assert!(verify_hook_trust(&out, std::slice::from_ref(&e)).is_ok());
+        assert!(verify_hook_trust("a = 1\n", std::slice::from_ref(&e)).is_err());
+
+        let inline = format!(
+            "[hooks.state]\n\"{}\" = {{ trusted_hash = \"{}\" }}\n",
+            e.key(),
+            trusted_hash(&e)
+        );
+        let edited = upsert_hook_trust(&inline, std::slice::from_ref(&e));
+        assert!(verify_hook_trust(&edited, std::slice::from_ref(&e))
+            .unwrap_err()
+            .contains("not be valid TOML"));
     }
 
     #[test]

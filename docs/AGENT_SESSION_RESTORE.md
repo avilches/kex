@@ -72,8 +72,12 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   whitespace and `\/` escapes are normalized), so other tools' handlers stay equal as JSON, not as bytes; the "View
   changes" preview says so in its `note`. `config.toml` is edited textually and keeps every other byte.
 - A `hooks.json` or `config.toml` that cannot be parsed is never written: setup, uninstall and the preview fail with
-  "leaving it alone", `agent_codex_status` reports `malformed`, and the startup sync drops `codex` from
-  `installedIntegrations`, as it does with a file that lost its marker. A `hooks.json` without Kex handlers is dropped
+  "leaving it alone". The edited `config.toml` is checked the same way before anything is written: it must parse as
+  TOML and every Kex table must read back with its hash, so a trust table in a form the textual editor does not see
+  (an inline table under `[hooks.state]`, a quoted `["hooks".state."..."]` header) is never duplicated into a file
+  Codex would refuse; neither file is written and the integration counts as malformed. In those cases
+  `agent_codex_status` reports `malformed`, and the startup sync drops `codex` from `installedIntegrations`, as it
+  does with a file that lost its marker. A `hooks.json` without Kex handlers is dropped
   the same way; a missing `hooks.json` or Codex folder keeps it tracked and nothing is created.
 - Both files are read, planned and re-read just before writing; if another tool wrote in between the plan starts over
   (three attempts). On install the trust tables go in before the handlers, on uninstall they come out after them, so

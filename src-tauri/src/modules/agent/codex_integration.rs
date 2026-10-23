@@ -147,7 +147,15 @@ fn plan_config(config: &str, plan: &HooksPlan, source: &str) -> Result<String, S
         .filter(|k| !current.contains(k))
         .collect();
     let cleaned = codex_trust::remove_hook_trust(config, &stale);
-    Ok(codex_trust::upsert_hook_trust(&cleaned, &plan.entries))
+    let after = codex_trust::upsert_hook_trust(&cleaned, &plan.entries);
+    codex_trust::verify_hook_trust(&after, &plan.entries).map_err(left_alone)?;
+    Ok(after)
+}
+
+// The whole install planned against the current text: an error means Kex leaves both alone.
+fn plan_install(hooks: &str, config: &str, source: &str) -> Result<(), String> {
+    let plan = plan_hooks(hooks, source, true)?;
+    plan_config(config, &plan, source).map(|_| ())
 }
 
 // Uninstalling a missing file leaves it missing instead of creating an empty one.
@@ -233,10 +241,9 @@ pub fn sync(paths: &CodexPaths) -> Result<SyncOutcome, String> {
         HooksStatus::NotInstalled => return Ok(SyncOutcome::Foreign),
         HooksStatus::UpToDate | HooksStatus::Outdated => {}
     }
-    if let Some(config) = read_optional(&paths.config)? {
-        if check_config(&config).is_err() {
-            return Ok(SyncOutcome::Malformed);
-        }
+    let config = read_optional(&paths.config)?;
+    if plan_install(&hooks, config.as_deref().unwrap_or(""), &paths.source()).is_err() {
+        return Ok(SyncOutcome::Malformed);
     }
     super::install_session_hook_script(&paths.script)?;
     apply(paths, true, false)?;
@@ -261,7 +268,7 @@ pub fn status(paths: &CodexPaths) -> CodexStatus {
 }
 
 fn status_of(hooks: &str, config: &str, script: Option<&str>, source: &str) -> CodexStatus {
-    if check_config(config).is_err() {
+    if plan_install(hooks, config, source).is_err() {
         return CodexStatus::Malformed;
     }
     match codex_hooks::status(hooks, DEFAULT_SCRIPT_PATH) {

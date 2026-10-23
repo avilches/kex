@@ -388,6 +388,51 @@ fn malformed_config_toml_is_left_intact() {
     assert_eq!(read(&env.paths.config), "model = \n[[broken");
 }
 
+// Forms of a trust table that are valid TOML but that Kex's textual editor does not see as
+// the table of that key, so editing around them would duplicate it.
+fn unseen_trust_forms(config: &str, key: &str, hash: &str) -> Vec<String> {
+    let inline = config.replacen(
+        "[hooks.state]\n",
+        &format!("[hooks.state]\n\"{key}\" = {{ enabled = true, trusted_hash = \"{hash}\" }}\n"),
+        1,
+    );
+    assert_ne!(inline, config);
+    let quoted = format!(
+        "{config}\n[\"hooks\".state.\"{key}\"]\nenabled = true\ntrusted_hash = \"{hash}\"\n"
+    );
+    vec![inline, quoted]
+}
+
+#[test]
+fn a_trust_table_kex_cannot_see_is_never_duplicated() {
+    for form in 0..2 {
+        let env = codex_env();
+        let src = source(&env);
+        let (hooks, entries) =
+            codex_hooks::install(&read(&env.paths.hooks), DEFAULT_SCRIPT_PATH, &src).unwrap();
+        let stop = entries.iter().find(|e| e.event.label() == "stop").unwrap();
+        let config = unseen_trust_forms(&read(&env.paths.config), &stop.key(), &trusted_hash(stop))
+            .swap_remove(form);
+        assert!(config.parse::<toml::Table>().is_ok());
+        std::fs::write(&env.paths.config, &config).unwrap();
+        std::fs::write(&env.paths.hooks, &hooks).unwrap();
+
+        let err = codex_integration::setup(&env.paths).unwrap_err();
+        assert!(err.contains("leaving it alone"), "{err}");
+        assert!(codex_integration::preview(&env.paths, true).is_err());
+        assert_eq!(
+            codex_integration::sync(&env.paths).unwrap(),
+            SyncOutcome::Malformed
+        );
+        assert_eq!(
+            codex_integration::status(&env.paths),
+            CodexStatus::Malformed
+        );
+        assert_eq!(read(&env.paths.config), config);
+        assert_eq!(read(&env.paths.hooks), hooks);
+    }
+}
+
 #[test]
 fn a_missing_codex_dir_is_never_created() {
     let tmp = TempDir::new().unwrap();
