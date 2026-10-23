@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { IS_WINDOWS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentId, IntegrationBlock } from "@/modules/agents/lib/integrations";
@@ -9,14 +10,18 @@ import { IntegrationDiffDialog } from "./IntegrationDiffDialog";
 
 const CHANGE_ANIMATION_MS = 700;
 
-const BLOCK_LABEL: Record<IntegrationBlock, string> = {
-  malformed: "Cannot read config",
-  unavailable: "Not found",
-};
+// On Windows the backend reports Codex unavailable before looking for its folder (HOOKS_SUPPORTED).
+function blockLabel(block: IntegrationBlock): string {
+  if (block === "malformed") return "Cannot read config";
+  return IS_WINDOWS ? "Not supported" : "Not found";
+}
 
 function blockText(block: IntegrationBlock, name: string, files: string[]): string {
-  return block === "malformed"
-    ? `Kex cannot parse ${files.join(" or ")} and leaves them untouched. Fix it and check again.`
+  if (block === "malformed") {
+    return `Kex cannot parse ${files.join(" or ")} and leaves them untouched. Fix it and check again.`;
+  }
+  return IS_WINDOWS
+    ? `The ${name} integration is not supported on Windows yet.`
     : `The ${name} folder does not exist yet. Install ${name} and run it once, then check again.`;
 }
 
@@ -71,7 +76,7 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
                   )}
                   <span className="relative size-1.5 rounded-full bg-current" />
                 </span>
-                {installed ? "Installed" : blocked ? BLOCK_LABEL[blocked] : "Not installed"}
+                {installed ? "Installed" : blocked ? blockLabel(blocked) : "Not installed"}
               </span>
             )}
           </span>

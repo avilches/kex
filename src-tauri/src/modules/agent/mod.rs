@@ -418,6 +418,8 @@ pub enum SyncOutcome {
     Foreign,
     /// A shared file Kex cannot parse: left untouched and skipped, but still tracked.
     Malformed,
+    /// The integration does not run on this platform: skipped, still tracked.
+    Unsupported,
 }
 
 fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
@@ -461,7 +463,7 @@ pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
             Integration::Codex(p) => codex_integration::sync(&p),
         });
         match outcome {
-            Ok(SyncOutcome::Updated | SyncOutcome::Gone) => {}
+            Ok(SyncOutcome::Updated | SyncOutcome::Gone | SyncOutcome::Unsupported) => {}
             // Another tool may be halfway through writing the shared file: dropping the agent
             // here would stop refreshing an install that is still there once it settles.
             Ok(SyncOutcome::Malformed) => {

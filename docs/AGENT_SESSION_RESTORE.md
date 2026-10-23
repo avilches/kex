@@ -39,9 +39,9 @@ it). `agent_*_status` tells whether the installed file is current. The frontend 
 `IntegrationStatus` (`installed`, `missing`, `malformed`, `unavailable`; `lib/integrations.ts`): the boolean of the
 file-based agents maps to the first two, and `agent_codex_status` maps `upToDate` to installed and `notInstalled` and
 `outdated` to missing, so Install refreshes an outdated Codex install like a stale OMP file. `malformed` and
-`unavailable` block Install: the Settings row says "Cannot read config" or "Not found", explains it and offers only
-"Check again" (no Install, Uninstall or View changes); the bell shows a malformed Codex as a row without a button and
-hides an unavailable one.
+`unavailable` block Install: the Settings row says "Cannot read config" or "Not found" ("Not supported" on Windows),
+explains it and offers only "Check again" (no Install, Uninstall or View changes); the bell shows a malformed Codex as
+a row without a button and hides an unavailable one.
 
 Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
 `omp`, `pi` and `codex`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup
@@ -81,6 +81,9 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   halfway through a write, and dropping it would stop refreshing an install that is still there. A `hooks.json`
   without Kex handlers is different: it drops `codex` from the list, as a file that lost its marker does for the
   other agents. A missing `hooks.json` or Codex folder keeps it tracked and nothing is created.
+- Windows is not supported yet (`codex_integration::HOOKS_SUPPORTED` is `cfg!(unix)`): the handler command is POSIX
+  shell and how Codex runs a hook there has not been measured. `agent_codex_status` reports `unavailable`, setup and
+  the install preview fail, the startup sync skips `codex` and keeps it tracked, and nothing is written.
 - Both files are read, planned and re-read just before writing; if another tool wrote in between the plan starts over
   (three attempts). On install the trust tables go in before the handlers, on uninstall they come out after them, so
   Codex never sees a Kex handler without its trust.

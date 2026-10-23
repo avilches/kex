@@ -16,11 +16,19 @@ const REFORMAT_NOTE: &str = "Kex rewrites hooks.json as formatted JSON: indentat
 
 const WRITE_ATTEMPTS: usize = 3;
 
+/// The handler command is POSIX shell (`[ ]`, `$HOME`, `||`) and how Codex runs a hook on
+/// Windows has not been measured, so there Codex is reported unavailable and never written.
+pub const HOOKS_SUPPORTED: bool = cfg!(unix);
+
+const UNSUPPORTED: &str = "the Codex integration is not supported on this platform yet";
+
 pub struct CodexPaths {
     pub dir: PathBuf,
     pub hooks: PathBuf,
     pub config: PathBuf,
     pub script: PathBuf,
+    /// `HOOKS_SUPPORTED` for the commands; a field so tests on any platform can turn it off.
+    pub hooks_supported: bool,
 }
 
 impl CodexPaths {
@@ -30,12 +38,16 @@ impl CodexPaths {
             config: dir.join("config.toml"),
             dir,
             script,
+            hooks_supported: true,
         }
     }
 
     pub fn from_env() -> Result<Self, String> {
         let dir = resolve_codex_dir(std::env::var_os("CODEX_HOME"), dirs::home_dir())?;
-        Ok(Self::new(dir, super::session_hook_script_path()?))
+        Ok(Self {
+            hooks_supported: HOOKS_SUPPORTED,
+            ..Self::new(dir, super::session_hook_script_path()?)
+        })
     }
 
     // Codex puts the hooks.json path it loaded, built the same way, in every trust key.
@@ -64,7 +76,7 @@ pub fn resolve_codex_dir(
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CodexStatus {
-    /// The Codex folder does not exist.
+    /// The Codex folder does not exist, or the platform is not supported (`HOOKS_SUPPORTED`).
     Unavailable,
     NotInstalled,
     UpToDate,
@@ -213,6 +225,9 @@ fn apply(paths: &CodexPaths, install: bool, create: bool) -> Result<(), String> 
 
 /// Installs or refreshes Kex's handlers and trusts them. The Codex folder must already exist.
 pub fn setup(paths: &CodexPaths) -> Result<(), String> {
+    if !paths.hooks_supported {
+        return Err(UNSUPPORTED.into());
+    }
     if !paths.dir.is_dir() {
         return Err(missing_dir(paths));
     }
@@ -230,6 +245,9 @@ pub fn remove(paths: &CodexPaths) -> Result<(), String> {
 
 /// The startup sync: refreshes an install that is still there, never creates a Codex file.
 pub fn sync(paths: &CodexPaths) -> Result<SyncOutcome, String> {
+    if !paths.hooks_supported {
+        return Ok(SyncOutcome::Unsupported);
+    }
     if !paths.dir.is_dir() {
         return Ok(SyncOutcome::Gone);
     }
@@ -251,7 +269,7 @@ pub fn sync(paths: &CodexPaths) -> Result<SyncOutcome, String> {
 }
 
 pub fn status(paths: &CodexPaths) -> CodexStatus {
-    if !paths.dir.is_dir() {
+    if !paths.hooks_supported || !paths.dir.is_dir() {
         return CodexStatus::Unavailable;
     }
     let (Ok(hooks), Ok(config)) = (read_optional(&paths.hooks), read_optional(&paths.config))
@@ -296,6 +314,9 @@ fn status_of(hooks: &str, config: &str, script: Option<&str>, source: &str) -> C
 
 /// Dry run of `setup` (install) or `remove`: the same plan, nothing written.
 pub fn preview(paths: &CodexPaths, install: bool) -> Result<Vec<FilePreview>, String> {
+    if install && !paths.hooks_supported {
+        return Err(UNSUPPORTED.into());
+    }
     if !paths.dir.is_dir() {
         return if install {
             Err(missing_dir(paths))

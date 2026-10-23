@@ -434,6 +434,37 @@ fn a_trust_table_kex_cannot_see_is_never_duplicated() {
 }
 
 #[test]
+fn an_unsupported_platform_reports_unavailable_and_writes_nothing() {
+    let mut env = codex_env();
+    codex_integration::setup(&env.paths).unwrap();
+    let hooks = read(&env.paths.hooks);
+    let config = read(&env.paths.config);
+    std::fs::remove_file(&env.paths.script).unwrap();
+    env.paths.hooks_supported = false;
+
+    assert_eq!(
+        codex_integration::status(&env.paths),
+        CodexStatus::Unavailable
+    );
+    let err = codex_integration::setup(&env.paths).unwrap_err();
+    assert!(err.contains("not supported"), "{err}");
+    assert!(codex_integration::preview(&env.paths, true).is_err());
+    assert_eq!(
+        codex_integration::sync(&env.paths).unwrap(),
+        SyncOutcome::Unsupported
+    );
+    assert_eq!(read(&env.paths.hooks), hooks);
+    assert_eq!(read(&env.paths.config), config);
+    assert!(!env.paths.script.exists());
+}
+
+#[test]
+fn the_commands_support_hooks_exactly_on_unix() {
+    assert_eq!(codex_integration::HOOKS_SUPPORTED, cfg!(unix));
+    assert_eq!(CodexPaths::from_env().unwrap().hooks_supported, cfg!(unix));
+}
+
+#[test]
 fn a_missing_codex_dir_is_never_created() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().join(".codex");
@@ -479,6 +510,8 @@ fn codex_home_wins_over_home() {
 // The commands read HOME and CODEX_HOME, which are process-wide.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+// Elsewhere the commands report Codex unavailable before reading either variable.
+#[cfg(unix)]
 #[test]
 fn the_commands_follow_home_and_codex_home() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());

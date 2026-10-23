@@ -15,6 +15,14 @@ vi.mock("@/modules/settings/store", async (orig) => ({
   },
 }));
 
+let windows = false;
+vi.mock("@/lib/platform", async (orig) => ({
+  ...(await orig<typeof import("@/lib/platform")>()),
+  get IS_WINDOWS() {
+    return windows;
+  },
+}));
+
 import { useIntegration } from "@/modules/agents/lib/useIntegration";
 import { AgentIntegrationRow } from "./AgentIntegrationRow";
 
@@ -194,6 +202,20 @@ describe("AgentIntegrationRow", () => {
     expect(await screen.findByText("Not found")).toBeTruthy();
     expect(screen.getByText(/Install Codex and run it once/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+  });
+
+  it("on Windows says the Codex integration is not supported instead of a missing folder", async () => {
+    codexStatus = "unavailable";
+    windows = true;
+    try {
+      render(<CodexRow />);
+      expect(await screen.findByText("Not supported")).toBeTruthy();
+      expect(screen.getByText(/not supported on Windows yet/)).toBeTruthy();
+      expect(screen.queryByText(/folder does not exist/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+    } finally {
+      windows = false;
+    }
   });
 
   it("previews both Codex files with the note of the reformatted one", async () => {
