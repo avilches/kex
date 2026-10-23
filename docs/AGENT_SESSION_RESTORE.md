@@ -299,9 +299,22 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
   `codex -c model=o3 exec ...` is caught and `codex -m exec` is not. For Codex `-p` is `--profile`, so `codex -p work`
   is an interactive session and is recorded. `codex`, `codex "prompt"` and `codex resume <id>` are recorded.
 
-Not done yet: whether Codex draws OSC 133 marks of its own (the rule OMP needed in `AgentDetector`, see above) and
-whether `live_model` can read the model from a rollout. Both need a measured Codex run and were left for a follow-up;
-until then `AgentDetector` treats Codex like any other agent and `live_model` reports nothing for it.
+**Measured and assumed.** The Codex integration was written on a machine without Codex credentials, so no session with
+a model ever ran against it. Measured: the trust hash (the algorithm reproduces the 10 real `trusted_hash` values of an
+Orca `config.toml`), the rollout file layout and the `session_meta` line, and the behaviour of every Kex-side piece under
+unit tests. Assumed from Codex's documentation and Orca's code, and not yet seen live: the events Codex really fires
+and their payloads (including whether `transcript_path` is `null` before the first message and whether `SubagentStart` /
+`SubagentStop` exist in a given version), what `codex resume <id>` does for a session with no rollout (hence
+`ResumeAnyway`; `KeepWithoutPlan` is the one-line fallback), the list of options that take a value in the `codex exec`
+gate, whether Codex draws OSC 133 marks of its own (the rule OMP needed in `AgentDetector`, see above; until measured
+`AgentDetector` treats Codex like any other agent) and whether `live_model` can read the model from a rollout (it
+reports nothing for Codex). The manual steps that settle each one are in `RESTORE_SESSION_TESTS.md`, Bloque K, K15.
+
+`MissingTranscriptPolicy` has four values: `Reattach` (claude), `ResumeAnyway` (codex, opencode: always run the resume
+template in the recorded directory and never prune), `KeepWithoutPlan` (omp, pi: keep the record, plan nothing) and
+`Ignore` (no row uses it today). `KeepWithoutPlan` was introduced with the Codex rollout lookup, because
+`ResumeAnyway` used to mean "no plan, never prune" for a provider with a sessions source (omp, pi) and "always resume"
+for one without (codex, opencode); with codex gaining a source the two had to be told apart.
 
 ### Launch command capture
 
@@ -355,8 +368,10 @@ Anything it cannot resolve with certainty is not guessed, and what happens depen
 The process the shell runs is not a source for the command: a wrapper such as `claude-max` ends with `exec claude`,
 so the process shows a plain `claude` and its cleaned environment is gone.
 
-The stripping whitelists are empty for `omp`, so the stripped base collapses to the launcher (same repo-wide
-behavior as opencode, pinned by tests). `omp --resume` accepts id, prefix or path; Pi's is `pi --session`, also id or path.
+The stripping whitelists are empty for `codex`, `opencode`, `omp` and `pi`, so the stripped base collapses to the
+launcher (pinned by tests). The plain templates used when no launch command is known are `claude --resume '<id>'`,
+`codex resume '<id>'`, `opencode --session '<id>'`, `omp --resume '<id>'` (id, prefix or path) and `pi --session '<id>'`
+(id or path).
 
 ### CLAUDE_CONFIG_DIR support
 

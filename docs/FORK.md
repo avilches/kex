@@ -226,13 +226,28 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `codex exec` and its alias `codex e` are filtered like `claude -p`, and `codex -p` (`--profile`) is no longer taken
   for print mode. OMP and Pi move to the new `KeepWithoutPlan` policy, which is what `ResumeAnyway` used to mean for a
   provider with a sessions source; their behavior does not change.
+- **Codex agent integration** (not present upstream): Codex is wired through its own hooks. `codex_hooks.rs`,
+  `codex_trust.rs` and `codex_integration.rs` (`modules/agent/`) add one Kex handler per event (`SessionStart`,
+  `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`) to Codex's `hooks.json` and trust
+  each with a `[hooks.state."<key>"]` table in `config.toml`, because Codex does not run an untrusted handler. The
+  commands are `agent_setup_codex`, `agent_codex_status` and the `codex` cases of `agent_sync_integrations`,
+  `agent_remove_integration` and `agent_integration_preview`. Both files are shared with Orca and Kaji, so only
+  `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is re-serialized (the diff dialog
+  carries a note saying so), and a file that cannot be parsed is never written: Settings > General > Agents shows
+  "Cannot read config" or "Not found" with only "Check again", and the bell shows a row without button or hides it.
+  `trigger-event.sh` is `kex-session-v8` and takes the agent name as its first argument. The Codex icon is an original
+  inline monochrome mark, and the tab menu hides the transcript actions when the frame named no rollout. The
+  `MissingTranscriptPolicy::KeepWithoutPlan` value came with it (see the rollouts entry). Nothing was run against a
+  logged-in Codex when this was written, so the open checks (OSC 133 marks of its own, `codex resume` of a session
+  with no rollout, the value-taking options of the `codex exec` gate, a `null` `transcript_path`) are listed in
+  `docs/RESTORE_SESSION_TESTS.md`, Bloque K, K15.
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to
   `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it turns the session lifecycle
   (`session.created`, `session.status`, `session.idle`, `permission.asked`, `question.asked`, `session.error`) into the
   same IPC frames Claude's hooks send, with `agent: opencode`, gated on Kex's env vars and inert outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
-  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude`. A TUI restored with
+  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude` (it is `kex-session-v8` now: the tag is the script's first argument, `claude` when absent, which is how Codex's handlers tag theirs). A TUI restored with
   `--session` fires no `session.created` (anomalyco/opencode#39711), so the plugin registers the session on the first
   event that names it; opencode records are never pruned.
 - **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
