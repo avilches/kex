@@ -416,7 +416,7 @@ pub enum SyncOutcome {
     Gone,
     /// A file with the same name that Kex did not write: left untouched.
     Foreign,
-    /// A shared file Kex cannot parse: left untouched and the agent stops being tracked.
+    /// A shared file Kex cannot parse: left untouched and skipped, but still tracked.
     Malformed,
 }
 
@@ -450,7 +450,8 @@ fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
 /// update reaches the agent without pressing Reinstall. It only rewrites files that still
 /// exist and are Kex's own, and returns the agents whose file is not Kex's any more, which
 /// the caller stops tracking. A missing file is not reported: a dotfiles link or a synced
-/// folder can be absent for a moment, and the sync never creates a file anyway.
+/// folder can be absent for a moment, and the sync never creates a file anyway. Nor is a
+/// shared file that does not parse right now: it is skipped and left as it is.
 #[tauri::command]
 pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
     let mut dropped = Vec::new();
@@ -461,7 +462,12 @@ pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
         });
         match outcome {
             Ok(SyncOutcome::Updated | SyncOutcome::Gone) => {}
-            Ok(SyncOutcome::Foreign | SyncOutcome::Malformed) => dropped.push(agent),
+            // Another tool may be halfway through writing the shared file: dropping the agent
+            // here would stop refreshing an install that is still there once it settles.
+            Ok(SyncOutcome::Malformed) => {
+                log::warn!("[agent] sync {agent}: a config file does not parse, skipped");
+            }
+            Ok(SyncOutcome::Foreign) => dropped.push(agent),
             Err(e) => log::warn!("[agent] sync {agent} failed: {e}"),
         }
     }

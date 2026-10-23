@@ -508,9 +508,15 @@ fn the_commands_follow_home_and_codex_home() {
     assert_eq!(agent_codex_status(), CodexStatus::NotInstalled);
     assert!(!read(&codex_home.join("hooks.json")).contains(SESSION_HOOK_MARKER));
 
+    // A file that does not parse right now (another tool mid-edit) keeps Codex tracked.
     std::fs::write(codex_home.join("hooks.json"), "{ nope").unwrap();
+    assert!(agent_sync_integrations(vec!["codex".into(), "omp".into()]).is_empty());
+    assert_eq!(read(&codex_home.join("hooks.json")), "{ nope");
+    assert_eq!(agent_codex_status(), CodexStatus::Malformed);
+
+    std::fs::write(codex_home.join("hooks.json"), fixture("hooks.json")).unwrap();
     assert_eq!(
-        agent_sync_integrations(vec!["codex".into(), "omp".into()]),
+        agent_sync_integrations(vec!["codex".into()]),
         vec!["codex".to_string()]
     );
     std::env::remove_var("CODEX_HOME");
