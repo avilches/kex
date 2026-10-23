@@ -232,10 +232,13 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   each with a `[hooks.state."<key>"]` table in `config.toml`, because Codex does not run an untrusted handler. The
   commands are `agent_setup_codex`, `agent_codex_status` and the `codex` cases of `agent_sync_integrations`,
   `agent_remove_integration` and `agent_integration_preview`. Both files are shared with Orca and Kaji, so only
-  `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is re-serialized (the diff dialog
-  carries a note saying so), and a file that cannot be parsed is never written: Settings > General > Agents shows
+  `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is re-serialized only for a
+  semantic change (the diff dialog carries a note saying so), the edited `config.toml` must parse and read back before
+  anything is written, and a file that cannot be parsed is never written: Settings > General > Agents shows
   "Cannot read config" or "Not found" with only "Check again", and the bell shows a row without button or hides it.
-  `trigger-event.sh` is `kex-session-v8` and takes the agent name as its first argument. The Codex icon is an original
+  The integration is reported unavailable on Windows until its POSIX hook command is measured there. Resume keeps
+  `-p`/`--profile`, `-c`/`--config`, `-m`/`--model`, `--local-provider` and `--oss`, never the sandbox or approval
+  bypasses. `trigger-event.sh` is `kex-session-v8` and takes the agent name as its first argument. The Codex icon is an original
   inline monochrome mark, and the tab menu hides the transcript actions when the frame named no rollout. The
   `MissingTranscriptPolicy::KeepWithoutPlan` value came with it (see the rollouts entry). Nothing was run against a
   logged-in Codex when this was written, so the open checks (OSC 133 marks of its own, `codex resume` of a session
