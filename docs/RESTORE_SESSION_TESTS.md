@@ -633,6 +633,7 @@ Necesitan un Codex con sesion iniciada y no se pudieron medir. Cada una puede ca
 - [ ] **Lista de flags de `codex exec`.** Las opciones de Codex que llevan valor (`-c`, `-m`, `-p`, `-s`, `-a`, `-C`, `-i`, `--add-dir`, `--enable`, `--disable`, `--local-provider`) salieron de la ayuda de la CLI, no de una medicion. Probar `codex <opcion> <valor> exec ...` con cada una y comprobar que se filtra
 - [ ] **Payload con `transcript_path` nulo.** Mirar el JSON real que Codex manda en `SessionStart`: si `transcript_path` viene `null` antes del primer mensaje, debe quedar vacio en el store y el menu ocultar las acciones de transcript (K6). Anotar tambien si manda `source` y con que valores
 - [ ] **Modelo en vivo.** `live_model` no sabe leer un rollout de Codex, asi que la barra del tab no muestra el modelo. Pendiente de medir
+- [ ] **Codex no pide confiar en los hooks al arrancar (K3).** Con la integracion instalada, abrir `codex` por primera vez: no debe preguntar si confia en los hooks de Kex. Si lo pregunta, la tabla `[hooks.state]` que escribe Kex no le basta y hay que revisar el punto siguiente
 - [ ] **El hash de confianza con un Codex actual.** Confirmar que tras instalar, Codex ejecuta los seis handlers sin pedir confianza. Si no, el algoritmo de `codex_trust.rs` se ha desviado del de Codex y el unico sintoma es que no llegan eventos
 
 ---

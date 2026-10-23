@@ -81,6 +81,9 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   halfway through a write, and dropping it would stop refreshing an install that is still there. A `hooks.json`
   without Kex handlers is different: it drops `codex` from the list, as a file that lost its marker does for the
   other agents. A missing `hooks.json` or Codex folder keeps it tracked and nothing is created.
+  With `hooks.json` present and `config.toml` missing the sync refreshes the handlers but does not create
+  `config.toml`, so they stay untrusted and Codex skips them; `agent_codex_status` reports `outdated` (no trust
+  tables), Settings shows the row as not installed, and Install recovers it, since setup does create the file.
 - Windows is not supported yet (`codex_integration::HOOKS_SUPPORTED` is `cfg!(unix)`): the handler command is POSIX
   shell and how Codex runs a hook there has not been measured. `agent_codex_status` reports `unavailable`, setup and
   the install preview fail, the startup sync skips `codex` and keeps it tracked, and nothing is written.
@@ -278,8 +281,9 @@ Codex reports its sessions through the hooks described under "Hook layer": one K
 `hooks.json` (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`), each
 trusted with its `[hooks.state."<key>"]` table in `config.toml`, because Codex skips a handler it has not trusted. Every
 handler runs `trigger-event.sh codex`, and the argument is what tags the frame: the script puts it in `agent`, so
-`pty/ipc.rs` needs nothing Codex-specific. Frames carry the same fields as Claude Code's (`session_id`,
-`transcript_path`, `cwd`, `hook_event_name`, `source`); `transcript_path` may be `null` and is then recorded as empty.
+`pty/ipc.rs` needs nothing Codex-specific. According to Codex's documentation, not yet confirmed against a live
+Codex, frames carry the same fields as Claude Code's (`session_id`, `transcript_path`, `cwd`, `hook_event_name`,
+`source`) and `transcript_path` may be `null`; Kex records a `null` one as empty either way (K15 settles both).
 `SessionStart` records the session (id, transcript path, cwd and the stashed launch line) and emits
 `kex:agent-session-meta` with `agent: codex`; the other events become `kex:agent-signal` frames tagged `codex`, exactly
 as for Claude. `SubagentStart` / `SubagentStop` feed the same subagent gate; Codex's `Stop` carries no subagent list, so
