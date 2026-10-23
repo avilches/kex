@@ -28,6 +28,7 @@ pub enum Status {
     NotInstalled,
     UpToDate,
     Outdated,
+    Malformed,
 }
 
 // Single place to change when the command gains an agent tag.
@@ -138,13 +139,11 @@ fn place(groups: &mut Vec<Value>, script_path: &str) -> (usize, usize) {
     })
 }
 
-/// Returns the input untouched when it is malformed or holds nothing of Kex's.
-pub fn remove(hooks_json: &str) -> String {
-    let Ok(mut root) = parse(hooks_json) else {
-        return hooks_json.to_string();
-    };
+/// Returns the input untouched when nothing of Kex's is present; malformed JSON is an error.
+pub fn remove(hooks_json: &str) -> Result<String, String> {
+    let mut root = parse(hooks_json)?;
     let Some(events) = root.get_mut("hooks").and_then(Value::as_object_mut) else {
-        return hooks_json.to_string();
+        return Ok(hooks_json.to_string());
     };
     let mut changed = false;
     for event in KEX_EVENTS {
@@ -152,38 +151,42 @@ pub fn remove(hooks_json: &str) -> String {
         let Some(groups) = events.get_mut(name).and_then(Value::as_array_mut) else {
             continue;
         };
-        let mut event_changed = false;
-        for group in groups.iter_mut() {
+        let mut emptied = Vec::new();
+        for (gi, group) in groups.iter_mut().enumerate() {
             if let Some(handlers) = group.get_mut("hooks").and_then(Value::as_array_mut) {
                 let n = handlers.len();
                 handlers.retain(|h| !is_kex_handler(h));
-                event_changed |= handlers.len() != n;
+                if handlers.len() != n {
+                    changed = true;
+                    if handlers.is_empty() {
+                        emptied.push(gi);
+                    }
+                }
             }
         }
-        if !event_changed {
-            continue;
+        // Group indexes are part of Codex trust keys, so only trailing groups Kex emptied can
+        // go; one followed by another group stays as an inert empty group to keep it in place.
+        while groups
+            .len()
+            .checked_sub(1)
+            .is_some_and(|last| emptied.contains(&last))
+        {
+            groups.pop();
         }
-        changed = true;
-        // Only groups Kex just emptied go away; a foreign empty group is not ours to drop.
-        groups.retain(|g| {
-            g.get("hooks")
-                .and_then(Value::as_array)
-                .is_none_or(|h| !h.is_empty())
-        });
-        if groups.is_empty() {
+        if groups.is_empty() && !emptied.is_empty() {
             events.remove(name);
         }
     }
-    if changed {
+    Ok(if changed {
         render(&root)
     } else {
         hooks_json.to_string()
-    }
+    })
 }
 
 pub fn status(hooks_json: &str, script_path: &str) -> Status {
     let Ok(root) = parse(hooks_json) else {
-        return Status::NotInstalled;
+        return Status::Malformed;
     };
     let expected = kex_handler(script_path);
     let mut present = 0;
@@ -299,7 +302,7 @@ mod tests {
     #[test]
     fn remove_only_removes_kex() {
         let (installed, _) = install(FIXTURE, DEFAULT_SCRIPT_PATH, SRC).unwrap();
-        let removed = remove(&installed);
+        let removed = remove(&installed).unwrap();
         assert!(!removed.contains(SESSION_HOOK_MARKER));
         assert_eq!(value(&removed), value(FIXTURE));
         assert_eq!(status(&removed, DEFAULT_SCRIPT_PATH), Status::NotInstalled);
@@ -307,13 +310,42 @@ mod tests {
 
     #[test]
     fn remove_without_kex_returns_input_unchanged() {
-        assert_eq!(remove(FIXTURE), FIXTURE);
+        assert_eq!(remove(FIXTURE).unwrap(), FIXTURE);
+    }
+
+    fn kex_group() -> Value {
+        json!({ "hooks": [kex_handler(DEFAULT_SCRIPT_PATH)] })
+    }
+
+    fn orca_group() -> Value {
+        json!({ "hooks": [{ "type": "command", "command": "orca", "timeout": 3 }] })
+    }
+
+    #[test]
+    fn remove_keeps_foreign_group_positions_after_a_kex_group() {
+        let src = json!({ "hooks": { "Stop": [kex_group(), orca_group()] } }).to_string();
+        let removed = value(&remove(&src).unwrap());
+        let groups = removed["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[1], orca_group());
+
+        let base = json!({ "hooks": { "Stop": [orca_group()] } }).to_string();
+        let (installed, _) = install(&base, DEFAULT_SCRIPT_PATH, SRC).unwrap();
+        let back = value(&remove(&installed).unwrap());
+        assert_eq!(back["hooks"]["Stop"], json!([orca_group()]));
+    }
+
+    #[test]
+    fn remove_never_drops_preexisting_empty_foreign_groups() {
+        let src = json!({ "hooks": { "Stop": [json!({ "hooks": [] }), kex_group()] } }).to_string();
+        let removed = value(&remove(&src).unwrap());
+        assert_eq!(removed["hooks"]["Stop"], json!([{ "hooks": [] }]));
     }
 
     #[test]
     fn remove_drops_events_that_only_held_kex() {
         let (installed, _) = install("", DEFAULT_SCRIPT_PATH, SRC).unwrap();
-        assert_eq!(value(&remove(&installed)), json!({ "hooks": {} }));
+        assert_eq!(value(&remove(&installed).unwrap()), json!({ "hooks": {} }));
     }
 
     #[test]
@@ -336,13 +368,19 @@ mod tests {
         assert!(install("[]", DEFAULT_SCRIPT_PATH, SRC).is_err());
         assert!(install(r#"{"hooks":[]}"#, DEFAULT_SCRIPT_PATH, SRC).is_err());
         assert!(install(r#"{"hooks":{"Stop":{}}}"#, DEFAULT_SCRIPT_PATH, SRC).is_err());
-        assert_eq!(remove("{not json"), "{not json");
+        assert!(remove("{not json").is_err());
+        assert_eq!(status("{not json", DEFAULT_SCRIPT_PATH), Status::Malformed);
     }
 
     #[test]
     fn entries_feed_the_trust_module() {
+        use crate::modules::agent::codex_trust::{
+            read_trusted_hash, trusted_hash, upsert_hook_trust,
+        };
         let (_, entries) = install(FIXTURE, DEFAULT_SCRIPT_PATH, SRC).unwrap();
-        let trust = crate::modules::agent::codex_trust::upsert_hook_trust("", &entries);
-        assert!(trust.contains("trusted_hash"));
+        let trust = upsert_hook_trust("", &entries);
+        for e in &entries {
+            assert_eq!(read_trusted_hash(&trust, &e.key()), Some(trusted_hash(e)));
+        }
     }
 }
