@@ -265,7 +265,10 @@ handler runs `trigger-event.sh codex`, and the argument is what tags the frame: 
 `transcript_path`, `cwd`, `hook_event_name`, `source`); `transcript_path` may be `null` and is then recorded as empty.
 `SessionStart` records the session (id, transcript path, cwd and the stashed launch line) and emits
 `kex:agent-session-meta` with `agent: codex`; the other events become `kex:agent-signal` frames tagged `codex`, exactly
-as for Claude.
+as for Claude. `SubagentStart` / `SubagentStop` feed the same subagent gate; Codex's `Stop` carries no subagent list, so
+the ones it reported are kept until their own `SubagentStop`, as for OMP. The tab menu block offers Copy Session ID and
+Run on Start, and the transcript actions only when the frame named a rollout (`hasTranscriptActions`): with an empty
+path there is nothing to reveal, so it hides them, as for OpenCode, instead of "Transcript not created yet".
 
 The provider row (`provider.rs`) reads Codex's own files and nothing else:
 

@@ -126,6 +126,22 @@ describe("handleSignal with background subagents", () => {
     expect(session().subagents).toEqual({});
   });
 
+  test("Codex subagents go through the same gate as Claude's", () => {
+    handleSignal(sig("UserPromptSubmit", { agent: "codex" }), ctx());
+    handleSignal(sig("SubagentStart", { agent: "codex", agentId: "c1", agentType: "worker" }), ctx());
+    expect(session().agent).toBe("codex");
+    expect(Object.keys(session().subagents)).toEqual(["c1"]);
+    handleSignal(sig("Stop", { agent: "codex" }), ctx());
+    expect(session().status).toBe("working");
+    expect(routeAgentNotification).not.toHaveBeenCalled();
+    handleSignal(sig("SubagentStop", { agent: "codex", agentId: "c1" }), ctx());
+    expect(session().subagents).toEqual({});
+    handleSignal(sig("UserPromptSubmit", { agent: "codex" }), ctx());
+    handleSignal(sig("Stop", { agent: "codex" }), ctx());
+    expect(session().status).toBe("attention");
+    expect(routeAgentNotification).toHaveBeenCalledTimes(1);
+  });
+
   test("a subagent description reaches the row label", () => {
     handleSignal(sig("SubagentStart", { agent: "omp", agentId: "a1", agentType: "task", agentDescription: "Contar archivos" }), ctx());
     expect(session().subagents.a1.description).toBe("Contar archivos");

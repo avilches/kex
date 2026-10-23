@@ -140,4 +140,31 @@ describe("TabAgentMenuItems", () => {
     fireEvent.click(screen.getByText("Copy Session ID"));
     expect(writeClipboardText).toHaveBeenCalledWith("ses_abc");
   });
+
+  it("shows Codex's block with its session id and transcript actions for a rollout", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "codex");
+    useAgentStore.getState().setMeta("tab-1", {
+      sessionId: "019a-codex",
+      transcriptPath: "/c/sessions/2026/10/23/rollout-x-019a-codex.jsonl",
+    });
+    const reveal = vi.fn();
+    open(reveal, <div>Run on Start</div>);
+    expect(screen.getByText("Codex")).toBeTruthy();
+    expect(screen.getByText("Run on Start")).toBeTruthy();
+    fireEvent.click(screen.getByText("Open Transcript Folder"));
+    expect(reveal).toHaveBeenCalledWith("/c/sessions/2026/10/23");
+  });
+
+  it("offers no transcript actions for a Codex session without a rollout path", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "codex");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "019a-codex" });
+    open(noop, <div>Run on Start</div>);
+    expect(screen.getByText("Codex")).toBeTruthy();
+    expect(screen.queryByText("Transcript not created yet")).toBeNull();
+    expect(screen.queryByText("Open Transcript Folder")).toBeNull();
+    expect(screen.getByText("Run on Start")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Copy Session ID"));
+    expect(writeClipboardText).toHaveBeenCalledWith("019a-codex");
+  });
 });
