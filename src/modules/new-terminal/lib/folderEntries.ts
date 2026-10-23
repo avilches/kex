@@ -34,6 +34,8 @@ export type FolderRow = {
   cluster: number;
   // How many worktrees its repository has, main checkout included; 0 until the listing arrives.
   worktreeCount: number;
+  // Its repository's worktree listing has not arrived yet.
+  worktreesLoading: boolean;
   // Added with Tab: drawn nested under the repository's folders.
   nested: boolean;
   // Its repository group has a heading with the repository name above the first folder: two or
@@ -170,6 +172,7 @@ function rowOf(
     cluster: 1,
     headed: false,
     worktreeCount: 0,
+    worktreesLoading: false,
     nested: extras.nested ?? false,
     repoHint: null,
     workspaceId,
@@ -261,6 +264,7 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
     row.cluster = rows;
     row.headed = withHeading.has(row.repoKey);
     row.worktreeCount = b.worktreesOfKey.get(row.repoKey)?.length ?? 0;
+    row.worktreesLoading = !b.worktreesOfKey.has(row.repoKey);
   }
   for (const row of raw.pinned) {
     if (!row.repoKey) continue;

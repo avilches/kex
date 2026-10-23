@@ -19,6 +19,7 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   cluster: over.cluster ?? 1,
   headed: over.headed ?? (over.cluster ?? 1) >= 2,
   worktreeCount: over.worktreeCount ?? 0,
+  worktreesLoading: over.worktreesLoading ?? false,
   nested: over.nested ?? false,
   repoHint: over.repoHint ?? null,
   matchOffset: over.matchOffset ?? 0,
@@ -246,6 +247,24 @@ describe("FolderPalette", () => {
       await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
       expect(repoHeadings()[0].textContent).toContain("4 worktrees");
       expect(repoHeadings()[0].querySelector("kbd")).toBeNull();
+    });
+
+    it("shows a spinner on the heading while the worktree listing has not arrived", async () => {
+      mountGroups(
+        [
+          group({
+            rows: [
+              base({ path: "/repo", label: "Workspace Root", cluster: 2, worktreesLoading: true, key: "ws-1:/repo" }),
+              base({ path: "/repo/src", cluster: 2, worktreesLoading: true, key: "ws-1:/repo/src" }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const [heading] = repoHeadings();
+      expect(heading.querySelector('[role="status"]')).not.toBeNull();
+      expect(heading.textContent).not.toContain("worktree");
     });
 
     it("moves the hint onto the row that has the focus, and off the heading", async () => {

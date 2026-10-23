@@ -5,8 +5,8 @@ import type { RepoWorktree } from "./folderEntries";
 const NONE: ReadonlyMap<string, readonly RepoWorktree[]> = new Map();
 
 // The checkouts of every repository the palette lists, asked once per open palette and per
-// top level. A folder git refuses to answer for (outside every workspace) simply has none:
-// its rows just never offer the Tab hint.
+// top level. A folder the listing refuses to answer for (outside every workspace) is answered with
+// an empty listing: its rows never offer the Tab hint, and its heading stops showing the spinner.
 export function useRepoWorktrees(
   open: boolean,
   repoRoots: readonly string[],
@@ -36,7 +36,10 @@ export function useRepoWorktrees(
           const list = found.map((w) => ({ path: w.path, branch: w.branch, isMain: w.isMain }));
           setByRepo((prev) => new Map(prev).set(root, list));
         })
-        .catch(() => {});
+        .catch(() => {
+          if (mine !== session.current) return;
+          setByRepo((prev) => new Map(prev).set(root, []));
+        });
     }
   }, [open, key]);
 

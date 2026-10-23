@@ -372,6 +372,27 @@ describe("repositories", () => {
         kept,
       })[0];
 
+    it("flags the rows as loading until the listing of their repository arrives", () => {
+      const common = {
+        workspaces: [bare],
+        activeTabEntry: entries[0],
+        entries,
+        repoOf: repoOfMap({ "/repo/.claude/worktrees/alpha": "/repo/.claude/worktrees/alpha" }),
+      };
+      const waiting = build({ ...common })[0];
+      expect(waiting.rows[0].worktreesLoading).toBe(true);
+      const answered = build({
+        ...common,
+        worktreesByRepo: listing(["/repo/.claude/worktrees/alpha"], list),
+      })[0];
+      expect(answered.rows[0].worktreesLoading).toBe(false);
+      const refused = build({
+        ...common,
+        worktreesByRepo: listing(["/repo/.claude/worktrees/alpha"], []),
+      })[0];
+      expect(refused.rows[0].worktreesLoading).toBe(false);
+    });
+
     it("offers them first: the rows of the repository carry the show hint", () => {
       const group = open(new Map());
       expect(group.rows[0].repoHint).toEqual({ kind: "show", count: 3 });
