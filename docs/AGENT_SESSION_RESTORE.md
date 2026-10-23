@@ -426,8 +426,12 @@ Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello
 
 Sessions started with `-p` / `--print` are non-interactive and transient. `agent_detect.rs` looks for the flag in
 the arguments of the agent segment only, and not after `--` (`ls -p; claude` and `time -p claude` are not print mode) and returns before
-arming the detector, so nothing is stashed. `record_session` checks the stashed `launch_cmd` once more via
-`is_print_mode_cmd` and skips recording if the flag is present. OpenCode's non-interactive entry point is the
+arming the detector, so nothing is stashed. It emits `PrintRun` instead, and `session.rs` marks the tab
+(`session_store::mark_print_run`); the shell's `OSC 133;D` (or the PTY closing, or the next agent start) emits
+`PrintRunEnded` and clears the mark. While the mark is set `ipc.rs` drops every hook frame of the tab, because Claude
+Code fires `SessionStart`, `UserPromptSubmit`, `Stop` and `SessionEnd` in print mode too, and each of them would
+create an agent session (a struck icon with `launchKnown: false`) that nothing ever closes. `record_session` still
+checks a stashed `launch_cmd` with `is_print_mode_cmd` as a second gate. OpenCode's non-interactive entry point is the
 subcommand `opencode run <prompt>`, which carries no `-p`/`--print` flag and therefore passes this gate: it is
 recorded and its restored session reopens the TUI on that session.
 

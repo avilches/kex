@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
@@ -35,6 +35,30 @@ pub fn stash_cmd(tab_id: &str, cmd: String) {
 
 fn take_stashed_cmd(tab_id: &str) -> Option<String> {
     pending_cmds().lock().ok()?.remove(tab_id)
+}
+
+// Tabs whose shell is running a `-p` / `--print` agent line. The detector never arms for it, so
+// nothing else would tell the hook frames of that run apart from an interactive session's.
+static PRINT_RUNS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn print_runs() -> &'static Mutex<HashSet<String>> {
+    PRINT_RUNS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+pub fn mark_print_run(tab_id: &str) {
+    if let Ok(mut set) = print_runs().lock() {
+        set.insert(tab_id.to_string());
+    }
+}
+
+pub fn clear_print_run(tab_id: &str) {
+    if let Ok(mut set) = print_runs().lock() {
+        set.remove(tab_id);
+    }
+}
+
+pub fn is_print_run(tab_id: &str) -> bool {
+    print_runs().lock().is_ok_and(|set| set.contains(tab_id))
 }
 
 /// Forgets the command stashed for a tab without recording anything.
@@ -978,6 +1002,16 @@ mod tests {
             "/tmp/p",
             false
         ));
+    }
+
+    #[test]
+    fn a_print_run_is_tracked_per_tab_until_cleared() {
+        assert!(!is_print_run("tab-print-a"));
+        mark_print_run("tab-print-a");
+        assert!(is_print_run("tab-print-a"));
+        assert!(!is_print_run("tab-print-b"));
+        clear_print_run("tab-print-a");
+        assert!(!is_print_run("tab-print-a"));
     }
 
     #[test]

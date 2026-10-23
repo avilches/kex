@@ -467,6 +467,13 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         );
         return;
     };
+    if session_store::is_print_run(tab_id) {
+        log::debug!(
+            "[ipc] {} dropped: tab={tab_id} is running a print-mode agent",
+            p.event
+        );
+        return;
+    }
     if reports_agent_cwd(&p.event, p.source.as_deref().unwrap_or(""), &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
         let _ = app.emit(

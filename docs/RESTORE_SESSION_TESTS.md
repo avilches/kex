@@ -455,6 +455,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 - [ ] Lanzar `pi` en un tab y cerrarlo sin escribir ningun prompt
 - [ ] Esperado: ningun `.jsonl` nuevo bajo `~/.pi/agent/sessions/` (Pi si deja un directorio de grupo vacio, medido en pi 1.3.0). `agent-sessions.json` si tiene una entrada para el tab (la sesion se registra al arrancar), pero sin fichero: al reabrir Kex no se restaura nada
 - [ ] Y: con `pi -p "hola"` (modo no interactivo) tampoco se graba nada
+- [ ] Y: con `claude -p "hola"` el tab no muestra ningun icono de agente (ni tachado) ni durante ni despues, y `agent-sessions.json` no gana ninguna entrada; el log dice `UserPromptSubmit dropped` / `SessionStart dropped` y `print run ended`
 
 ## Bloque I - Integraciones: instalar, actualizar, quitar
 
