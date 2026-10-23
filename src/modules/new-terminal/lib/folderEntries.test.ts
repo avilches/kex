@@ -63,6 +63,7 @@ const build = (over: Partial<FolderGroupsInput> = {}) =>
     repoOf: () => "",
     worktreesByRepo: new Map(),
     expansions: new Map(),
+    kept: new Map(),
     ...over,
   });
 
@@ -357,7 +358,10 @@ describe("repositories", () => {
       linked("/repo/.claude/worktrees/alpha", "a"),
       linked("/repo/.claude/worktrees/beta", "b"),
     ];
-    const open = (expansions: Map<string, string>) =>
+    const open = (
+      expansions: Map<string, string>,
+      kept: Map<string, { workspaceId: string; path: string }> = new Map(),
+    ) =>
       build({
         workspaces: [bare],
         activeTabEntry: entries[0],
@@ -365,6 +369,7 @@ describe("repositories", () => {
         repoOf: repoOfMap({ "/repo/.claude/worktrees/alpha": "/repo/.claude/worktrees/alpha" }),
         worktreesByRepo: listing(["/repo/.claude/worktrees/alpha"], list),
         expansions,
+        kept,
       })[0];
 
     it("offers them first: the rows of the repository carry the show hint", () => {
@@ -420,6 +425,24 @@ describe("repositories", () => {
       const hidden = open(new Map());
       expect(after.rows.length).toBeGreaterThan(before.rows.length);
       expect(hidden.rows.map((r) => r.path)).toEqual(before.rows.map((r) => r.path));
+    });
+
+    it("keeps only the worktree that had the focus when the repository is collapsed", () => {
+      const kept = new Map([["/repo", { workspaceId: "ws-1", path: "/repo/.claude/worktrees/beta" }]]);
+      const group = open(new Map(), kept);
+      expect(group.rows.map((r) => [r.path, r.nested])).toEqual([
+        ["/repo/.claude/worktrees/alpha", false],
+        ["/repo/.claude/worktrees/beta", true],
+        ["/zzz", false],
+      ]);
+      expect(group.rows[0].repoHint).toEqual({ kind: "show", count: 2 });
+    });
+
+    it("lists it once when the repository is expanded again", () => {
+      const kept = new Map([["/repo", { workspaceId: "ws-1", path: "/repo/.claude/worktrees/beta" }]]);
+      const paths = open(new Map([["/repo", "ws-1"]]), kept).rows.map((r) => r.path);
+      expect(new Set(paths).size).toBe(paths.length);
+      expect(paths).toContain("/repo/.claude/worktrees/beta");
     });
 
     it("adds them to the workspace it was pressed in", () => {

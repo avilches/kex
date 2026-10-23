@@ -3471,19 +3471,35 @@ export default function App() {
   const [folderExpansions, setFolderExpansions] = useState<ReadonlyMap<string, string>>(
     () => new Map(),
   );
+  // The worktree that had the focus when its repository was collapsed stays listed.
+  const [folderKept, setFolderKept] = useState<
+    ReadonlyMap<string, { workspaceId: string; path: string }>
+  >(() => new Map());
   useEffect(() => {
     setFolderExpansions(new Map());
+    setFolderKept(new Map());
   }, [folderPaletteOpen]);
-  const onFolderToggleWorktrees = useCallback((row: FolderRow) => {
-    const repoKey = row.repoKey;
-    if (!repoKey) return;
-    setFolderExpansions((prev) => {
-      const next = new Map(prev);
-      if (next.has(repoKey)) next.delete(repoKey);
-      else next.set(repoKey, row.workspaceId);
-      return next;
-    });
-  }, []);
+  const onFolderToggleWorktrees = useCallback(
+    (row: FolderRow) => {
+      const repoKey = row.repoKey;
+      if (!repoKey) return;
+      const collapsing = folderExpansions.has(repoKey);
+      setFolderExpansions((prev) => {
+        const next = new Map(prev);
+        if (collapsing) next.delete(repoKey);
+        else next.set(repoKey, row.workspaceId);
+        return next;
+      });
+      if (!collapsing) return;
+      setFolderKept((prev) => {
+        const next = new Map(prev);
+        if (row.nested) next.set(repoKey, { workspaceId: row.workspaceId, path: row.path });
+        else next.delete(repoKey);
+        return next;
+      });
+    },
+    [folderExpansions],
+  );
   const folderGroups = useMemo(
     () =>
       folderSources
@@ -3498,6 +3514,7 @@ export default function App() {
             repoOf: (dir) => folderSources.git(dir).repoRoot,
             worktreesByRepo: folderWorktrees,
             expansions: folderExpansions,
+            kept: folderKept,
           })
         : [],
     [
@@ -3509,6 +3526,7 @@ export default function App() {
       folderActiveEntry,
       folderWorktrees,
       folderExpansions,
+      folderKept,
     ],
   );
 

@@ -686,7 +686,7 @@ src/
                                      group per other workspace in position order (root, then folders, hibernated
                                      included). The folders of one repository (several of a workspace) sit together
                                      under a small heading aligned with the workspace heading (a git icon, the
-                                     repository name and how many worktrees it has, which never changes), its
+                                     repository name and, right after it, how many worktrees it has, which never changes), its
                                      workspace root first, then its main checkout, then by path (the tab bar's
                                      terminal icon before every folder); repositories and
                                      loose folders go alphabetically. A path appears once in the whole dialog, first
@@ -701,7 +701,9 @@ src/
                                      row keeps its height); Tab adds the missing ones to the workspace it was pressed in,
                                      nested (indented) under the repository's folders, main checkout first, and the
                                      hint turns into `Tab hide worktrees`, which
-                                     takes them away again. Search is a plain substring match per word on the path,
+                                     takes them away again, except the nested worktree that had the focus, which stays
+                                     (`kept`) until the next hide pressed on a row that is not a nested worktree of
+                                     that repository, or another worktree of it, replaces it. Search is a plain substring match per word on the path,
                                      the branch, the label, the repository name and the workspace title, with the
                                      matched letters highlighted in each; it never reorders.
                                      The selection is cmdk's own (a controlled value made its scroll lag a row);
