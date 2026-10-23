@@ -923,6 +923,49 @@ mod tests {
     }
 
     #[test]
+    fn a_codex_session_start_records_the_full_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-codex-rec", "codex -p work".to_string());
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-codex-rec",
+            "codex",
+            "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e",
+            "",
+            "/tmp/p",
+            false
+        ));
+
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let rec = &store.tabs["tab-codex-rec"];
+        assert_eq!(rec.agent.as_deref(), Some("codex"));
+        assert_eq!(rec.session_id, "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e");
+        assert_eq!(rec.transcript_path, "");
+        assert_eq!(rec.cwd_launch, "/tmp/p");
+        assert_eq!(rec.launch_cmd.as_deref(), Some("codex -p work"));
+    }
+
+    #[test]
+    fn a_codex_exec_run_is_not_recorded() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        for (tab, line) in [
+            ("tab-codex-exec", "codex exec 'fix it'"),
+            ("tab-codex-e", "cd x && codex -c a=b e hi"),
+        ] {
+            stash_cmd(tab, line.to_string());
+            assert!(!record_session_at_path_with(
+                &path, tab, "codex", "s1", "", "/tmp/p", false
+            ));
+        }
+        assert!(!path.exists(), "a one-shot codex run writes nothing");
+    }
+
+    #[test]
     fn a_clear_or_compact_keeps_the_launch_command_of_the_running_process() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
