@@ -12,6 +12,7 @@ export function AgentIntegrations() {
   const opencode = useIntegration("opencode", OPTIONS);
   const omp = useIntegration("omp", OPTIONS);
   const pi = useIntegration("pi", OPTIONS);
+  const codex = useIntegration("codex", OPTIONS);
 
   return (
     <div className="flex flex-col gap-2">
@@ -52,6 +53,12 @@ export function AgentIntegrations() {
           name="Pi"
           files={["~/.pi/agent/extensions/kex-agent-status.ts"]}
           state={pi}
+        />
+        <AgentIntegrationRow
+          agent="codex"
+          name="Codex"
+          files={["~/.codex/hooks.json", "~/.codex/config.toml"]}
+          state={codex}
         />
       </div>
       <p className="text-[10.5px] text-muted-foreground">

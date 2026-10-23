@@ -96,6 +96,8 @@ export function IntegrationDiffDialog({
           <span className="font-mono text-[11px] text-muted-foreground">{file.path}</span>
         )}
 
+        {file?.note && <p className="text-[11px] text-muted-foreground">{file.note}</p>}
+
         <div className="min-h-24 overflow-auto rounded-lg border border-border/60 bg-background py-2 font-mono text-[11.5px] leading-relaxed">
           {loaded === null && (
             <div className="flex items-center gap-2 px-3 text-muted-foreground">

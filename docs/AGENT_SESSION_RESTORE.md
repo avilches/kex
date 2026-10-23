@@ -34,8 +34,14 @@ directory when set), `agent_setup_omp` writes `~/.omp/agent/extensions/kex-agent
 same file under `~/.pi/agent/extensions/`. Without Kex's per-terminal env vars the script does nothing. The install
 lives in the bell popover (a row per agent, shown only while the integration is missing) and in Settings > General >
 Agents (`AgentIntegrations`: one row per agent, Claude Code included, with Install or Uninstall and a "View changes"
-link that opens the `agent_integration_preview` dry run as a diff). `agent_*_status` tells whether the installed file is
-current.
+link that opens the `agent_integration_preview` dry run as a diff, with one tab per file and the file's `note` above
+it). `agent_*_status` tells whether the installed file is current. The frontend folds every status into one
+`IntegrationStatus` (`installed`, `missing`, `malformed`, `unavailable`; `lib/integrations.ts`): the boolean of the
+file-based agents maps to the first two, and `agent_codex_status` maps `upToDate` to installed and `notInstalled` and
+`outdated` to missing, so Install refreshes an outdated Codex install like a stale OMP file. `malformed` and
+`unavailable` block Install: the Settings row says "Cannot read config" or "Not found", explains it and offers only
+"Check again" (no Install, Uninstall or View changes); the bell shows a malformed Codex as a row without a button and
+hides an unavailable one.
 
 Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
 `omp`, `pi` and `codex`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup

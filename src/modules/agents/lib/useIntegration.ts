@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { agentStatus, installAgent, removeAgent } from "./agentIntegration";
-import type { AgentId } from "./integrations";
+import { type AgentId, blockOf, type IntegrationBlock, type IntegrationStatus } from "./integrations";
 
 export type IntegrationState = {
   /** null while the first check is pending or when it failed. */
   ready: boolean | null;
+  /** Set when Install cannot run at all, and why; the UI explains it instead of offering Install. */
+  blocked: IntegrationBlock | null;
   busy: boolean;
   failed: boolean;
   install: () => Promise<void>;
@@ -20,7 +22,7 @@ type Options = {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}): IntegrationState {
-  const [ready, setReady] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const agentRef = useRef(agent);
@@ -28,18 +30,18 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
 
   const refresh = useCallback(() => {
     agentStatus(agentRef.current)
-      .then(setReady)
-      .catch(() => setReady(null));
+      .then(setStatus)
+      .catch(() => setStatus(null));
   }, []);
 
   useEffect(refresh, [refresh]);
 
-  const run = async (action: (agent: AgentId) => Promise<void>, expected: boolean) => {
+  const run = async (action: (agent: AgentId) => Promise<void>, expected: IntegrationStatus) => {
     setBusy(true);
     setFailed(false);
     try {
       await Promise.all([action(agentRef.current), wait(minBusyMs)]);
-      setReady(expected);
+      setStatus(expected);
     } catch (e) {
       console.error(`[kex] integration ${agentRef.current} failed:`, e);
       setFailed(true);
@@ -50,11 +52,12 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
   };
 
   return {
-    ready,
+    ready: status === null ? null : status === "installed",
+    blocked: blockOf(status),
     busy,
     failed,
-    install: () => run(installAgent, true),
-    remove: () => run(removeAgent, false),
+    install: () => run(installAgent, "installed"),
+    remove: () => run(removeAgent, "missing"),
     refresh,
   };
 }
