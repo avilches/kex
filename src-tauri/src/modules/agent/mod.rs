@@ -1,3 +1,4 @@
+pub mod codex_trust;
 pub mod launch_cmd;
 pub mod live_model;
 pub mod os_notify;

@@ -2409,6 +2409,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "sha2",
  "shared_child",
  "sysinfo",
  "tauri",
