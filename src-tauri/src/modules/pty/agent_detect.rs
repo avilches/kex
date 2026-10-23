@@ -24,6 +24,10 @@ pub enum Transition {
     // First real interactive prompt (OSC 133;B) seen on this PTY. Independent
     // of agent detection: fires for every shell, armed or not, exactly once.
     ShellReady,
+    // A `-p` / `--print` agent line is running: the agent is never armed, but its hooks still
+    // report to the tab's socket and must be ignored until the shell's `D` ends the command.
+    PrintRun,
+    PrintRunEnded,
     Notification {
         message: String,
     },
@@ -68,7 +72,9 @@ impl Transition {
                 tool_name: None,
                 prompt: None,
             },
-            Transition::ShellReady => unreachable!("ShellReady is handled before into_signal"),
+            Transition::ShellReady | Transition::PrintRun | Transition::PrintRunEnded => {
+                unreachable!("{self:?} is handled before into_signal")
+            }
         }
     }
 }
@@ -78,6 +84,7 @@ pub struct AgentDetector {
     state: State,
     osc: Vec<u8>,
     armed: bool,
+    print_run: bool,
     shell_ready_emitted: bool,
     /// The previous thing in the stream was a `C` mark without command text, with nothing
     /// (text, another escape sequence) between it and the next byte.
@@ -95,6 +102,7 @@ impl AgentDetector {
             state: State::Ground,
             osc: Vec::new(),
             armed: false,
+            print_run: false,
             shell_ready_emitted: false,
             last_mark_bare_c: false,
         }
@@ -168,6 +176,9 @@ impl AgentDetector {
             self.disarm();
             emit(Transition::Exited);
         }
+        if std::mem::take(&mut self.print_run) {
+            emit(Transition::PrintRunEnded);
+        }
     }
 
     fn disarm(&mut self) {
@@ -225,8 +236,11 @@ impl AgentDetector {
                 };
                 if inv.is_print_mode() {
                     log::debug!("[shell] osc133 C: skip arm (print mode) cmd={line}");
+                    self.print_run = true;
+                    emit(Transition::PrintRun);
                     return;
                 }
+                self.print_run = false;
                 // A cut line still names the agent, but replaying its text would be wrong.
                 let cmd_string = if inv.complete {
                     inv.command()
@@ -249,6 +263,10 @@ impl AgentDetector {
                 log::debug!("[shell] osc133 D: exited");
                 self.disarm();
                 emit(Transition::Exited);
+            }
+            Some(b'D') if std::mem::take(&mut self.print_run) => {
+                log::debug!("[shell] osc133 D: print run ended");
+                emit(Transition::PrintRunEnded);
             }
             _ => {}
         }
@@ -317,10 +335,52 @@ mod tests {
 
     #[test]
     fn does_not_arm_in_print_mode() {
+        for line in [
+            "claude -p hello",
+            "claude --print",
+            "claude --model opus -p",
+        ] {
+            let mut d = AgentDetector::new();
+            assert_eq!(
+                run(&mut d, &osc(&format!("133;C;{line}"))),
+                vec![Transition::PrintRun],
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_print_run_ends_with_the_shells_d_mark() {
         let mut d = AgentDetector::new();
-        assert!(run(&mut d, &osc("133;C;claude -p hello")).is_empty());
-        assert!(run(&mut d, &osc("133;C;claude --print")).is_empty());
-        assert!(run(&mut d, &osc("133;C;claude --model opus -p")).is_empty());
+        run(&mut d, &osc("133;C;claude -p hello"));
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::PrintRunEnded]);
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+    }
+
+    #[test]
+    fn d_without_a_print_run_says_nothing() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+    }
+
+    #[test]
+    fn an_agent_start_closes_the_print_run_it_follows() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude -p hello"));
+        assert_eq!(
+            run(&mut d, &osc("133;C;claude")),
+            vec![started_cmd("claude", "claude")]
+        );
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+    }
+
+    #[test]
+    fn the_pty_closing_ends_a_print_run() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude -p hello"));
+        let mut out = Vec::new();
+        d.finish(|t| out.push(t));
+        assert_eq!(out, vec![Transition::PrintRunEnded]);
     }
 
     #[test]
@@ -384,7 +444,10 @@ mod tests {
     #[test]
     fn print_mode_is_checked_on_the_agent_segment_only() {
         let mut d = AgentDetector::new();
-        assert!(run(&mut d, &osc("133;C;cd x && claude -p hi")).is_empty());
+        assert_eq!(
+            run(&mut d, &osc("133;C;cd x && claude -p hi")),
+            vec![Transition::PrintRun]
+        );
         assert_eq!(
             run(&mut d, &osc("133;C;ls -p; claude --safe-mode")),
             vec![started_cmd("claude", "claude --safe-mode")]

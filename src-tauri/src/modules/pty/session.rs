@@ -242,6 +242,22 @@ pub fn spawn(
                                     app_reader.emit(SHELL_READY_EVENT, ShellReadyPayload { id });
                                 return;
                             }
+                            // A print-mode run is not an agent session: its hook frames are
+                            // dropped by the IPC listener while the mark is set.
+                            match t {
+                                Transition::PrintRun => {
+                                    session_store::mark_print_run(&tab_id_for_reader);
+                                    return;
+                                }
+                                Transition::PrintRunEnded => {
+                                    session_store::clear_print_run(&tab_id_for_reader);
+                                    return;
+                                }
+                                Transition::Started { .. } => {
+                                    session_store::clear_print_run(&tab_id_for_reader);
+                                }
+                                _ => {}
+                            }
                             // Stash launch command for record_session (called on SessionStart IPC).
                             if let Transition::Started { ref cmd_string, .. } = t {
                                 if !cmd_string.is_empty() {
@@ -283,8 +299,11 @@ pub fn spawn(
                     }
                 }
             }
-            agent_detect.finish(|t| {
-                let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
+            agent_detect.finish(|t| match t {
+                Transition::PrintRunEnded => session_store::clear_print_run(&tab_id_for_reader),
+                t => {
+                    let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
+                }
             });
             pending_r.1.notify_one();
             if dropped_bytes > 0 {
