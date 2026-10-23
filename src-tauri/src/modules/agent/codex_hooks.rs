@@ -1,10 +1,11 @@
 //! Kex's handlers inside Codex's `hooks.json`, as pure text-to-text functions.
 //!
 //! The file is shared with other tools, so a handler is Kex's only if its command carries
-//! `# kex-session-hook`; everything else is never modified. The result is re-serialized
-//! (serde_json with `preserve_order`, already enabled in Cargo.toml): key order is kept but
-//! whitespace and `\/` escapes are normalized, so other tools' handlers stay equal as JSON,
-//! not as bytes. That is enough because Codex trusts a handler by its parsed identity.
+//! `# kex-session-hook`; everything else is never modified. A file that already holds Kex's
+//! current handlers comes back byte for byte. Otherwise it is re-serialized (serde_json with
+//! `preserve_order`): key order is kept but whitespace and `\/` escapes are normalized, so
+//! other tools' handlers stay equal as JSON, not as bytes. That is enough because Codex
+//! trusts a handler by its parsed identity.
 
 use serde_json::{json, Map, Value};
 
@@ -82,7 +83,8 @@ pub fn install(
     script_path: &str,
     source_path: &str,
 ) -> Result<(String, Vec<TrustEntry>), String> {
-    let mut root = parse(hooks_json)?;
+    let original = parse(hooks_json)?;
+    let mut root = original.clone();
     let events = events_map(&mut root)?;
     let mut entries = Vec::new();
     for event in KEX_EVENTS {
@@ -106,7 +108,14 @@ pub fn install(
             script_path,
         ));
     }
-    Ok((render(&root), entries))
+    // Map equality ignores key order, so a file another tool wrote in its own style
+    // (Kaji sorts keys and escapes slashes) is only rewritten for a real change.
+    let text = if root == original {
+        hooks_json.to_string()
+    } else {
+        render(&root)
+    };
+    Ok((text, entries))
 }
 
 /// The trust identity of a Kex handler at the given position.
@@ -318,6 +327,53 @@ mod tests {
         let (twice, e2) = install(&once, DEFAULT_SCRIPT_PATH, SRC).unwrap();
         assert_eq!(once, twice);
         assert_eq!(e1, e2);
+    }
+
+    fn sorted(v: &Value) -> Value {
+        match v {
+            Value::Object(map) => {
+                let mut keys: Vec<&String> = map.keys().collect();
+                keys.sort();
+                Value::Object(
+                    keys.into_iter()
+                        .map(|k| (k.clone(), sorted(&map[k])))
+                        .collect(),
+                )
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+            other => other.clone(),
+        }
+    }
+
+    // How Kaji (Swift's JSONSerialization) writes the file: sorted keys, " : " and \/ escapes.
+    fn swift_style(v: &Value) -> String {
+        serde_json::to_string_pretty(&sorted(v))
+            .unwrap()
+            .lines()
+            .map(|line| line.replacen("\": ", "\" : ", 1))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .replace('/', "\\/")
+    }
+
+    #[test]
+    fn install_keeps_the_bytes_when_only_formatting_differs() {
+        let (installed, entries) = install(FIXTURE, DEFAULT_SCRIPT_PATH, SRC).unwrap();
+        let swift = swift_style(&value(&installed));
+        assert_eq!(value(&swift), value(&installed));
+        assert_ne!(swift, installed);
+        let (out, again) = install(&swift, DEFAULT_SCRIPT_PATH, SRC).unwrap();
+        assert_eq!(out, swift);
+        assert_eq!(again, entries);
+    }
+
+    #[test]
+    fn install_still_rewrites_a_swift_style_file_with_a_real_change() {
+        let (stale, _) = install(FIXTURE, "/old/trigger.sh", SRC).unwrap();
+        let swift = swift_style(&value(&stale));
+        let (out, _) = install(&swift, DEFAULT_SCRIPT_PATH, SRC).unwrap();
+        assert_ne!(out, swift);
+        assert_eq!(status(&out, DEFAULT_SCRIPT_PATH), Status::UpToDate);
     }
 
     #[test]

@@ -66,9 +66,11 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   handlers held before the edit plus any table on that `hooks.json` holding the exact hash of a Kex handler at its
   position (a leftover after positions moved); a stale one is removed on reinstall and all of them on uninstall.
   A table the user set to `enabled = false` keeps it while its key stays the same.
-- `hooks.json` is re-serialized (`serde_json` keeps key order, but whitespace and `\/` escapes are normalized), so other
-  tools' handlers stay equal as JSON, not as bytes; the "View changes" preview says so in its `note`. `config.toml` is
-  edited textually and keeps every other byte.
+- `hooks.json` is written only for a semantic change: when the parsed result equals the parsed file (key order
+  ignored) the bytes are kept, so the startup sync never rewrites a file Kaji reformatted in its Swift style (sorted
+  keys, `" : "`, `\/`) and the preview shows nothing. A real change re-serializes it (`serde_json` keeps key order, but
+  whitespace and `\/` escapes are normalized), so other tools' handlers stay equal as JSON, not as bytes; the "View
+  changes" preview says so in its `note`. `config.toml` is edited textually and keeps every other byte.
 - A `hooks.json` or `config.toml` that cannot be parsed is never written: setup, uninstall and the preview fail with
   "leaving it alone", `agent_codex_status` reports `malformed`, and the startup sync drops `codex` from
   `installedIntegrations`, as it does with a file that lost its marker. A `hooks.json` without Kex handlers is dropped

@@ -161,6 +161,81 @@ fn setup_and_sync_are_idempotent_and_sync_never_creates_files() {
     assert!(!env.paths.hooks.exists());
 }
 
+fn sorted(v: &Value) -> Value {
+    match v {
+        Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            Value::Object(
+                keys.into_iter()
+                    .map(|k| (k.clone(), sorted(&map[k])))
+                    .collect(),
+            )
+        }
+        Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+        other => other.clone(),
+    }
+}
+
+// The style the real hooks.json has once Kaji (Swift) rewrites it.
+fn swift_style(text: &str) -> String {
+    serde_json::to_string_pretty(&sorted(&json(text)))
+        .unwrap()
+        .lines()
+        .map(|line| line.replacen("\": ", "\" : ", 1))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .replace('/', "\\/")
+}
+
+#[cfg(unix)]
+fn stamp(path: &Path) -> (std::time::SystemTime, u64) {
+    use std::os::unix::fs::MetadataExt;
+    let meta = std::fs::metadata(path).unwrap();
+    (meta.modified().unwrap(), meta.ino())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_reformatted_hooks_json_is_never_rewritten_for_formatting_alone() {
+    let env = codex_env();
+    codex_integration::setup(&env.paths).unwrap();
+    let swift = swift_style(&read(&env.paths.hooks));
+    assert_eq!(json(&swift), json(&read(&env.paths.hooks)));
+    std::fs::write(&env.paths.hooks, &swift).unwrap();
+    let before = stamp(&env.paths.hooks);
+
+    assert_eq!(
+        codex_integration::sync(&env.paths).unwrap(),
+        SyncOutcome::Updated
+    );
+    codex_integration::setup(&env.paths).unwrap();
+
+    assert_eq!(read(&env.paths.hooks), swift);
+    assert_eq!(stamp(&env.paths.hooks), before);
+    assert!(codex_integration::preview(&env.paths, true)
+        .unwrap()
+        .is_empty());
+    assert_eq!(codex_integration::status(&env.paths), CodexStatus::UpToDate);
+}
+
+#[test]
+fn a_reformatted_hooks_json_with_a_real_change_is_still_rewritten() {
+    let env = codex_env();
+    let src = source(&env);
+    let (old_hooks, old_entries) =
+        codex_hooks::install(&read(&env.paths.hooks), "/old/trigger.sh", &src).unwrap();
+    let swift = swift_style(&old_hooks);
+    std::fs::write(&env.paths.hooks, &swift).unwrap();
+    let config = upsert_hook_trust(&read(&env.paths.config), &old_entries);
+    std::fs::write(&env.paths.config, &config).unwrap();
+
+    codex_integration::sync(&env.paths).unwrap();
+
+    assert_ne!(read(&env.paths.hooks), swift);
+    assert_eq!(codex_integration::status(&env.paths), CodexStatus::UpToDate);
+}
+
 #[test]
 fn sync_drops_codex_when_its_handlers_are_gone() {
     let env = codex_env();
