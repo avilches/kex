@@ -61,6 +61,19 @@ describe("AgentIcon", () => {
     expect(paths.every((p) => !p.getAttribute("fill"))).toBe(true);
   });
 
+  it("draws Codex as an inline monochrome svg, never an image", () => {
+    for (const agent of ["codex", "Codex"]) {
+      const root = render(<AgentIcon agent={agent} size={14} />);
+      const svg = root.querySelector("svg");
+      expect(svg?.getAttribute("fill")).toBe("currentColor");
+      expect(svg?.getAttribute("aria-label")).toBe("codex");
+      expect(root.querySelector("img")).toBeNull();
+      const paths = Array.from(root.querySelectorAll("path"));
+      expect(paths.every((p) => !p.getAttribute("fill"))).toBe(true);
+      host?.remove();
+    }
+  });
+
   it("keeps drawing the other known agents as images", () => {
     const root = render(<AgentIcon agent="omp" size={14} />);
     expect(root.querySelector("img")).not.toBeNull();
