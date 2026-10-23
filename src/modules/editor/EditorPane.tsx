@@ -53,8 +53,8 @@ import { ReloadConflictOverlay } from "./ReloadConflictOverlay";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
-  findNext: () => void;
-  findPrevious: () => void;
+  findNext: (q: string) => void;
+  findPrevious: (q: string) => void;
   clearQuery: () => void;
   /** True when the view existed and took focus. */
   focus: () => boolean;

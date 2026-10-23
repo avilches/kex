@@ -190,8 +190,8 @@ export function MarkdownTab(props: Props): JSX.Element {
     registerMarkdownHandleRef.current?.(props.tabId, {
       search: {
         setQuery: (q) => activeSearch()?.setQuery(q),
-        findNext: () => activeSearch()?.findNext(),
-        findPrevious: () => activeSearch()?.findPrevious(),
+        findNext: (q) => activeSearch()?.findNext(q),
+        findPrevious: (q) => activeSearch()?.findPrevious(q),
         clearQuery: () => activeSearch()?.clearQuery(),
       },
       save: () => saveRef.current(),

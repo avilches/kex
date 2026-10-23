@@ -141,8 +141,8 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
         if (forward) target.addon.findNext(q, opts);
         else target.addon.findPrevious(q, opts);
       } else if (target.kind === "editor") {
-        if (forward) target.handle.findNext();
-        else target.handle.findPrevious();
+        if (forward) target.handle.findNext(q);
+        else target.handle.findPrevious(q);
       }
       // git-history: the list filters live; Enter has no next/prev semantics.
     };
