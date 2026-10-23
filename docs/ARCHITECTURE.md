@@ -686,7 +686,7 @@ src/
                                      group per other workspace in position order (root, then folders, hibernated
                                      included). The folders of one repository (several of a workspace) sit together
                                      under a small heading aligned with the workspace heading (a git icon, the
-                                     repository name and, right after it, how many worktrees it has, which never changes), its
+                                     repository name and, right after it, how many worktrees it has, which never changes; a spinner takes its place while the listing loads), its
                                      workspace root first, then its main checkout, then by path (the tab bar's
                                      terminal icon before every folder); repositories and
                                      loose folders go alphabetically. A path appears once in the whole dialog, first

@@ -8,6 +8,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
@@ -260,7 +261,11 @@ function RepoHeading({ row }: { row: FolderRowMatched }) {
       <span className="min-w-0 truncate">
         <HighlightText text={row.repoName ?? ""} indices={row.repoNameIndices} />
       </span>
-      {row.worktreeCount > 0 ? (
+      {row.worktreesLoading ? (
+        <span role="status" aria-label="Loading worktrees" className="shrink-0">
+          <Spinner size={11} />
+        </span>
+      ) : row.worktreeCount > 0 ? (
         <span className="shrink-0 font-normal">
           {`${row.worktreeCount} ${row.worktreeCount === 1 ? "worktree" : "worktrees"}`}
         </span>
