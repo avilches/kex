@@ -37,11 +37,12 @@ pub static PROVIDERS: &[Provider] = &[
     },
     Provider {
         name: "codex",
-        // codex keeps its sessions in its own store and only `resume --last` is defined, so
-        // Kex never consults a transcript: the record is always resumable and never pruned.
+        // codex keeps its sessions in its own store and `codex resume <id>` reopens one by
+        // id, so Kex never consults a transcript: the record is always resumable and never
+        // pruned.
         sessions: None,
         cwd_read: CwdRead::Unused,
-        resume: ResumeSpec::Last,
+        resume: ResumeSpec::Subcommand { name: "resume" },
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
         keep_flags: &[],
         keep_with_value: &[],
@@ -99,7 +100,9 @@ impl Provider {
         let launcher = base.unwrap_or(self.name);
         match self.resume {
             ResumeSpec::Flag { flag } => format!("{launcher} {flag} {}", shell_quote(session_id)),
-            ResumeSpec::Last => format!("{launcher} resume --last"),
+            ResumeSpec::Subcommand { name } => {
+                format!("{launcher} {name} {}", shell_quote(session_id))
+            }
         }
     }
 
@@ -339,9 +342,9 @@ fn scan_header_line(jsonl: &Path, line_no: usize) -> Option<String> {
 pub enum ResumeSpec {
     /// `<stripped launch line> <flag> '<session id>'`
     Flag { flag: &'static str },
-    /// The provider only offers resuming its most recent session (`<stripped launch line>
-    /// resume --last`), so the record's session id is not part of the command.
-    Last,
+    /// `<stripped launch line> <name> '<session id>'`: the id is a positional argument of a
+    /// subcommand (`codex resume <id>`).
+    Subcommand { name: &'static str },
 }
 
 pub enum MissingTranscriptPolicy {
@@ -447,10 +450,13 @@ mod tests {
     #[test]
     fn resume_cmd_codex() {
         let provider = Provider::of("codex").unwrap();
-        assert_eq!(provider.resume_cmd(None, "any"), "codex resume --last");
+        assert_eq!(
+            provider.resume_cmd(None, "abc-123"),
+            "codex resume 'abc-123'"
+        );
         assert_eq!(
             provider.resume_cmd(Some("codex-max"), "abc-123"),
-            "codex-max resume --last"
+            "codex-max resume 'abc-123'"
         );
     }
 

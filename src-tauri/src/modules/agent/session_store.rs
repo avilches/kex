@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     fn strip_keeps_another_known_agent_launcher_like_before() {
-        let base = strip_for_resume_base("codex resume --last", "claude");
+        let base = strip_for_resume_base("codex resume abc-123", "claude");
         assert_eq!(base.as_deref(), Some("codex"));
     }
 
@@ -2036,7 +2036,7 @@ mod tests {
     }
 
     #[test]
-    fn a_codex_record_always_resumes_last_and_survives_a_restore() {
+    fn a_codex_record_resumes_by_id_and_survives_a_restore() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
         std::fs::create_dir_all(&project).unwrap();
@@ -2049,16 +2049,16 @@ mod tests {
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
-        assert_eq!(plans[0].resume_cmd, "codex resume --last");
+        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
         assert!(plans[0].error_reason.is_empty());
 
         // Never pruned: the command re-appears every time the store is loaded.
         let second = load_restore_plan_from_path(&store_path);
-        assert_eq!(second[0].resume_cmd, "codex resume --last");
+        assert_eq!(second[0].resume_cmd, "codex resume 'abc-123'");
     }
 
     #[test]
-    fn a_codex_record_with_a_launch_cmd_resumes_last_on_the_stripped_base() {
+    fn a_codex_record_with_a_launch_cmd_resumes_by_id_on_the_stripped_base() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
         std::fs::create_dir_all(&project).unwrap();
@@ -2076,7 +2076,7 @@ mod tests {
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
-        assert_eq!(plans[0].resume_cmd, "codex-max resume --last");
+        assert_eq!(plans[0].resume_cmd, "codex-max resume 'abc-123'");
     }
 
     #[test]
@@ -2094,7 +2094,7 @@ mod tests {
         let plans = load_restore_plan_from_path(&store_path);
         assert!(plans[0].resume_cmd.is_empty());
         assert!(
-            plans[0].attempted_cmd.contains("resume --last"),
+            plans[0].attempted_cmd.contains("resume 'abc-123'"),
             "{}",
             plans[0].attempted_cmd
         );

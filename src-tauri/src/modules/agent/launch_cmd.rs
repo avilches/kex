@@ -729,8 +729,8 @@ mod tests {
     #[test]
     fn the_last_agent_segment_wins() {
         assert_eq!(
-            cmd("claude --a && codex resume --last").as_deref(),
-            Some("codex resume --last")
+            cmd("claude --a && codex resume abc-123").as_deref(),
+            Some("codex resume abc-123")
         );
     }
 

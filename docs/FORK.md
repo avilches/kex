@@ -233,7 +233,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   missing-transcript policy, launch-line whitelists) moved from `session_store.rs` hardcode into one
   `Provider` table in `modules/agent/provider.rs`, shaped after Orca's `extractAgentProviderSession` /
   `getAgentResumeArgv` so adding a second TUI agent (OMP, Pi) is a row addition. Behavior changes: codex records
-  always resume with `resume --last` on the stripped launch line (they used to build a broken `codex --resume <id>`
+  always resume with `resume '<id>'` on the stripped launch line (they used to build a broken `codex --resume <id>`
   when a launch command was known) and their entries are never pruned; a record whose agent has no provider row
   (e.g. a hand-edited `gemini` record) no longer restores with an empty command but produces no plan and is pruned
   once its directory is usable. The restore log line for a missing transcript now reads "transcript not found"

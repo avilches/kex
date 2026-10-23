@@ -371,8 +371,8 @@ For each session in the store:
      starts a new session reusing the same UUID, equivalent to rerunning the CLI with no `--resume`. The store
      entry is pruned once the directory check passes; if the new session produces messages, hooks re-record it with
      the new `transcript_path`.
-   - `ResumeAnyway` (codex, opencode, omp and pi): the plan is `resume --last` on the
-      stripped launch line (or `codex resume --last`) for codex; opencode's template names the recorded id directly,
+   - `ResumeAnyway` (codex, opencode, omp and pi): the plan for codex is
+      `launch base/launcher + resume '<id>'` (or the plain `codex resume '<id>'`); opencode's template names the recorded id directly,
       `launch base/launcher + --session '<ses id>'` (or the plain `opencode --session '<ses id>'`,
       since its stripping whitelists are empty); omp's is `launch base/launcher + --resume '<id>'`
       (or the plain `omp --resume '<id>'`), which accepts id, prefix or path; pi's is `launch base/launcher +
