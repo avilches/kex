@@ -84,4 +84,11 @@ describe("contextActionEntries", () => {
     );
     expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "Set a root to this workspace"]);
   });
+
+  it("never offers an agent, whatever its command reads like", () => {
+    const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude {cwd}", cwdMode: "context", ownButton: false };
+    const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx());
+    expect(groups.workspace.map((e) => e.action.kind)).toEqual(["app"]);
+    expect(groups.global).toEqual([]);
+  });
 });

@@ -1,5 +1,5 @@
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import { isApp, isScript, type Action, type ActionKind } from "./types";
+import { isAgent, isApp, isScript, type Action, type ActionKind } from "./types";
 
 const KINDS: readonly ActionKind[] = ["app", "script", "agent"];
 
@@ -135,16 +135,19 @@ export type HeaderPartition = {
   ownButtons: Action[];
   scripts: Action[];
   apps: Action[];
+  agents: Action[];
 };
 
 export function partitionForHeader(actions: readonly Action[]): HeaderPartition {
   const ownButtons: Action[] = [];
   const scripts: Action[] = [];
   const apps: Action[] = [];
+  const agents: Action[] = [];
   for (const a of actions) {
     if (a.ownButton) ownButtons.push(a);
     else if (isScript(a)) scripts.push(a);
+    else if (isAgent(a)) agents.push(a);
     else apps.push(a);
   }
-  return { ownButtons, scripts, apps };
+  return { ownButtons, scripts, apps, agents };
 }

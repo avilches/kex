@@ -15,8 +15,9 @@ import type { Action } from "./types";
 const spawn = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const toastError = vi.hoisted(() => vi.fn());
 const ptyStop = vi.hoisted(() => vi.fn(() => Promise.resolve(0)));
+const fsStat = vi.hoisted(() => vi.fn((_path: string): Promise<{ kind: string }> => Promise.resolve({ kind: "dir" })));
 vi.mock("@/lib/native", () => ({
-  native: { actionSpawn: spawn, fsStat: () => Promise.resolve({ kind: "dir" }), ptyStop },
+  native: { actionSpawn: spawn, fsStat, ptyStop },
 }));
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
 vi.mock("@/modules/terminal/lib/useTerminalSession", () => ({ requestLeafFocus: vi.fn() }));
@@ -193,6 +194,19 @@ describe("useActionRunner", () => {
     deps.terminalHandles.current.set(tabs[0].id, { write });
     act(() => void vi.advanceTimersByTime(500));
     expect(write).toHaveBeenCalledWith("claude\r");
+  });
+
+  it("tells the user when the folder an agent starts in is gone", async () => {
+    fsStat.mockImplementationOnce(() => Promise.reject(new Error("missing")));
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "fixed", cwd: "/gone", ownButton: true };
+    const { result } = setup(ws());
+    act(() => result.current.runAction(agent));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(fsStat).toHaveBeenCalledWith("/gone");
+    expect(toastError).toHaveBeenCalledWith("Claude not run: the folder /gone does not exist", { duration: 6000 });
   });
 
   it("stops by sending Ctrl+C to the tab it runs in", () => {

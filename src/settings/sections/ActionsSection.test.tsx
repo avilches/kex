@@ -15,8 +15,10 @@ let detected = [
 ];
 
 vi.mock("@/modules/actions/lib/globalActionsBinding", () => ({ globalActions: { change: (fn: never) => change(fn) } }));
+let agents: { id: string; name: string; binary: string; argsBeforePath: string[]; kind: "agent" }[] = [];
+
 vi.mock("@/modules/external-editors", () => ({
-  useExternalEditors: () => ({ detectedEditors: detected, isScanning: false, scan }),
+  useExternalEditors: () => ({ detectedEditors: detected, detectedAgents: agents, isScanning: false, scan }),
   EditorIcon: () => null,
 }));
 vi.mock("@/modules/settings/preferences", () => ({
@@ -59,6 +61,18 @@ describe("ActionsSection", () => {
       { id: "pycharm", name: "PyCharm", binary: "pycharm", argsBeforePath: [] },
       { id: "zed", name: "Zed", binary: "zed", argsBeforePath: [] },
     ];
+    agents = [];
+  });
+
+  it("offers the detected agents in the Add combo and adds one as an agent Action", () => {
+    agents = [{ id: "claude", name: "Claude Code", binary: "/usr/local/bin/claude", argsBeforePath: [], kind: "agent" }];
+    const { container, unmount } = mount();
+    openAdd(container);
+    const item = options().find((o) => o.textContent === "Claude CodeWorkspace");
+    act(() => void (item as HTMLElement).click());
+    const next = change.mock.calls[0]![0]([]);
+    expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace" });
+    unmount();
   });
 
   it("creates nothing by itself and does not keep the chip section", () => {

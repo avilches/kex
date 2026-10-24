@@ -7,7 +7,8 @@ import {
   type CommandShell,
   type CommandVariable,
 } from "./commandTemplate";
-import { usesTerminal, type Action } from "./types";
+import { agentCommandProblem } from "./actionsBar";
+import { isAgent, usesTerminal, type Action } from "./types";
 
 export { COMMAND_VARIABLES } from "./commandTemplate";
 
@@ -50,20 +51,23 @@ function formatNames(names: readonly string[]): string {
 
 // What is wrong with a row right now. Command and folder problems stop the action from
 // ever working; a context problem only says it cannot run where the user is at the moment,
-// so it is shown as a note and does not block saving.
+// so it is shown as a note and does not block saving. An agent command is literal text, so
+// only a control character and its folder can be wrong.
 export function actionProblems(
   action: Action,
   context: { vars: Record<string, string>; shell: CommandShell } | null,
 ): ActionProblem[] {
   const out: ActionProblem[] = [];
   const shell = usesTerminal(action) ? context?.shell ?? "posix" : undefined;
-  const problem = action.command.trim() ? commandProblem(action.command, shell) : null;
+  const agent = isAgent(action);
+  const check = agent ? agentCommandProblem : (command: string) => commandProblem(command, shell);
+  const problem = action.command.trim() ? check(action.command) : null;
   if (problem) out.push({ kind: "command", message: problem });
   if (usesTerminal(action) && action.cwdMode === "fixed" && action.cwd) {
     const cwd = scriptCwdProblem(action.cwd);
     if (cwd) out.push({ kind: "cwd", message: cwd });
   }
-  if (!problem && context && action.command.trim()) {
+  if (!agent && !problem && context && action.command.trim()) {
     const missing = missingVariables(action.command, context.vars);
     if (missing.length > 0) {
       out.push({ kind: "context", message: `${formatNames(missing)} has no value in the current tab` });

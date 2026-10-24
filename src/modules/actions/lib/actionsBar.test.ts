@@ -25,7 +25,7 @@ import {
   SETTINGS_LABELS,
   scriptsFirst,
   scriptSubtitle,
-  soleAppButtons,
+  soleIconButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
 import type { BarItem } from "./actionsBar";
@@ -322,7 +322,7 @@ describe("buildActionsBarModel", () => {
       ["u1", false],
       ["s1", false],
     ]);
-    expect(soleAppButtons([zedWs, zedFile, code]).has("code")).toBe(true);
+    expect(soleIconButtons([zedWs, zedFile, code])).toEqual(new Set(["c1"]));
   });
 
   it("an own button of either scope still competes for the same bar room", () => {
@@ -562,19 +562,19 @@ describe("resolveDrop", () => {
     expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g1" });
     expect(drop("w1", "g1", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g2" });
     expect(drop("w1", "g2", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: null });
-    expect(drop("w1", barZoneId("global", false))).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
-    expect(drop("g1", barZoneId("workspace", false))).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
-    expect(drop("w1", barZoneId("workspace", false))).toBeNull();
+    expect(drop("w1", barZoneId("global", "app"))).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
+    expect(drop("g1", barZoneId("workspace", "app"))).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
+    expect(drop("w1", barZoneId("workspace", "app"))).toBeNull();
   });
 
   it("takes a bar zone only for its own kind", () => {
-    expect(drop("w1", barZoneId("global", true))).toBeNull();
-    expect(drop("ws", barZoneId("global", false))).toBeNull();
-    expect(drop("ws", barZoneId("global", true))).toEqual({ id: "ws", from: "workspace", to: "global", ...base });
-    expect(drop(row("ms"), barZoneId("workspace", false))).toBeNull();
-    expect(drop(row("ms"), barZoneId("workspace", true))).toEqual({ id: "ms", from: "workspace", to: "workspace", wasButton: false, button: true });
+    expect(drop("w1", barZoneId("global", "script"))).toBeNull();
+    expect(drop("ws", barZoneId("global", "app"))).toBeNull();
+    expect(drop("ws", barZoneId("global", "script"))).toEqual({ id: "ws", from: "workspace", to: "global", ...base });
+    expect(drop(row("ms"), barZoneId("workspace", "app"))).toBeNull();
+    expect(drop(row("ms"), barZoneId("workspace", "script"))).toEqual({ id: "ms", from: "workspace", to: "workspace", wasButton: false, button: true });
     expect(parseBarZone("zone:menu")).toBeNull();
-    expect(parseBarZone(barZoneId("global", true))).toEqual({ scope: "global", script: true });
+    expect(parseBarZone(barZoneId("global", "script"))).toEqual({ scope: "global", kind: "script" });
   });
 
   it("refuses a button of the other kind in a bar scope that has some of its own kind", () => {
@@ -627,8 +627,8 @@ describe("resolveDrop", () => {
     expect(drop(row("m1"), "w1", true)).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, placeBefore: "w2" });
     expect(drop(row("m1"), "ws")).toBeNull();
     expect(drop(row("m1"), "g1")).toEqual({ id: "m1", from: "workspace", to: "global", ...show, placeBefore: "g1" });
-    expect(drop(row("m1"), barZoneId("workspace", false))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
-    expect(drop(row("m1"), barZoneId("global", false))).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
+    expect(drop(row("m1"), barZoneId("workspace", "app"))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
+    expect(drop(row("m1"), barZoneId("global", "app"))).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
   });
 
   it("makes the menu trigger no target for a row, and ignores itself and the unknown", () => {
@@ -637,5 +637,103 @@ describe("resolveDrop", () => {
     expect(drop("w1", "ghost")).toBeNull();
     expect(drop("ghost", "w1")).toBeNull();
     expect(drop(row("ghost"), "w1")).toBeNull();
+  });
+});
+
+describe("agents", () => {
+  const agent = (o: Partial<Action> = {}): Action => ({
+    id: "g1",
+    name: "Claude Code",
+    kind: "agent" as const,
+    command: "claude",
+    appId: "claude",
+    cwdMode: "context",
+    ownButton: true,
+    ...o,
+  });
+
+  it("orders the Header apps, agents, scripts and Settings scripts, apps, agents", () => {
+    const mixed = [agent({ id: "g1" }), script({ id: "s1" }), app({ id: "a1" }), agent({ id: "g2" }), script({ id: "s2" })];
+    expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "g1", "g2", "s1", "s2"]);
+    expect(scriptsFirst(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "g1", "g2"]);
+  });
+
+  it("never reports a state other than idle, even with a mark under its id", () => {
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map([["g1", "running"]]), activeId: undefined });
+    expect(m.buttons[0]).toMatchObject({ state: "idle", stoppable: false });
+  });
+
+  it("is always shown in the Header, whatever its command reads like", () => {
+    const m = buildActionsBarModel({
+      local: [agent({ command: "claude {filepath}" })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+      place: { file: false, folder: false },
+    });
+    expect(m.buttons.map((b) => b.id)).toEqual(["g1"]);
+    expect(m.buttons[0]?.disabledReason).toBeNull();
+  });
+
+  it("shows the folder it starts in on its second line", () => {
+    const sub = (o: Partial<Action>, c: Parameters<typeof scriptSubtitle>[1] = ctx) => scriptSubtitle(agent(o), c);
+    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true });
+    expect(sub({ cwdMode: "context" })).toEqual({ text: "/p", startTrim: true });
+    expect(sub({ cwdMode: "home" }).text).toBe("Home");
+    expect(sub({ cwdMode: "fixed", cwd: "/srv" })).toEqual({ text: "/srv", startTrim: true });
+    expect(sub({ cwdMode: "context" }, SETTINGS_LABELS).text).toBe("Current directory");
+    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS).text).toBe("Workspace");
+  });
+
+  it("is grey with the root message when it starts in a rootless workspace", () => {
+    const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
+    const m = buildActionsBarModel({ local: [agent({ cwdMode: "workspace" })], context: rootless, states: new Map(), activeId: undefined });
+    expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: WORKSPACE_UNSET });
+    expect(actionAvailability(agent({ cwdMode: "context" }), rootless)).toBeNull();
+  });
+
+  it("reads braces and quotes literally, and refuses a control character", () => {
+    expect(actionAvailability(agent({ command: "claude {x} 'a" }), ctx)).toBeNull();
+    expect(actionAvailability(agent({ command: "claude\nrm" }), ctx)).toMatch(/control character/);
+  });
+
+  it("is titled Run with its name", () => {
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map(), activeId: undefined });
+    expect(m.buttons[0]?.title).toBe("Run Claude Code");
+  });
+
+  it("is drawn as its icon alone when it is the sole one of its agent, apart from apps", () => {
+    const m = buildActionsBarModel({
+      local: [agent({ id: "g1" }), agent({ id: "g2", appId: "codex", command: "codex" }), agent({ id: "g3", appId: "codex", command: "codex" })],
+      global: [app({ id: "c1", appId: "claude", ownButton: true })],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+    });
+    expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
+      ["g1", true],
+      ["g2", false],
+      ["g3", false],
+      ["c1", true],
+    ]);
+  });
+
+  it("has a bar zone of its own per scope that takes no app and no script", () => {
+    const bar = [
+      { id: "a", global: false, action: app({ id: "a" }) },
+      { id: "s", global: false, action: script({ id: "s" }) },
+      { id: "g", global: false, action: agent({ id: "g" }) },
+      { id: "gg", global: true, action: agent({ id: "gg" }) },
+    ];
+    expect(parseBarZone(barZoneId("global", "agent"))).toEqual({ scope: "global", kind: "agent" });
+    expect(resolveDrop(bar, [], "a", barZoneId("global", "agent"))).toBeNull();
+    expect(resolveDrop(bar, [], "s", barZoneId("global", "agent"))).toBeNull();
+    expect(resolveDrop(bar, [], "g", barZoneId("global", "script"))).toBeNull();
+    expect(resolveDrop(bar, [], "g", barZoneId("global", "app"))).toBeNull();
+    expect(resolveDrop(bar, [], "g", barZoneId("global", "agent"))).toMatchObject({ id: "g", to: "global", button: true });
+    expect(resolveDrop(bar, [], "a", "g")).toBeNull();
+    expect(resolveDrop(bar, [], "g", "s")).toBeNull();
+    expect(resolveDrop([...bar, { id: "ga", global: true, action: app({ id: "ga" }) }], [], "a", "gg")).toBeNull();
+    expect(resolveDrop(bar, [], "a", "gg")).toEqual({ id: "a", from: "workspace", to: "global", wasButton: true, button: true });
   });
 });

@@ -9,7 +9,7 @@ import {
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
-import { needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
+import { agentCommandProblem, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -143,13 +143,11 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
   return { kind: "new-tab", placement: newTabPlacement(ctx), input, cwd, title: label(action) };
 }
 
-// eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
-
 // An agent is typed verbatim: braces are literal, so no template is read. Every click is a
 // new tab, so no link, running mark or earlier tab is looked at either.
 function planAgent(action: Action, ctx: RunContext): RunPlan {
-  if (CONTROL.test(action.command)) return blocked(action, "the command has a control character");
+  const problem = agentCommandProblem(action.command);
+  if (problem) return blocked(action, problem);
   if (action.cwdMode === "workspace" && !ctx.folders.workspaceRoot?.trim()) return blocked(action, WORKSPACE_UNSET);
   const cwd = resolveScriptCwd({
     mode: action.cwdMode,

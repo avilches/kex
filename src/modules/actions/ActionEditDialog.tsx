@@ -24,7 +24,9 @@ import { BOXED_RADIO } from "./lib/boxedRadio";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { ActionContext } from "./lib/useActionContext";
-import { isScript, type Action } from "./lib/types";
+import { isAgent, usesTerminal, type Action, type ActionKind } from "./lib/types";
+
+const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
 
 const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
@@ -69,7 +71,8 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
-  const script = isScript(action);
+  const terminal = usesTerminal(action);
+  const agent = isAgent(action);
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, name, nameFocused, onChange });
@@ -94,7 +97,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
     [],
   );
 
-  const title = `${saved ? "Edit" : "New"} ${script ? "script" : "application"}`;
+  const title = `${saved ? "Edit" : "New"} ${KIND_WORDS[action.kind]}`;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -141,7 +144,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           Changes are saved as you type. Done leaves the editor.
         </DialogDescription>
 
-        {script && (
+        {terminal && (
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-muted-foreground">Run in folder</span>
             <Select value={cwdMode} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
@@ -244,16 +247,18 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
             />
           </label>
           {command.required && <div className="text-[11px] text-destructive">Command is required</div>}
-          <button
-            type="button"
-            aria-expanded={variablesOpen}
-            onClick={() => setVariablesOpen((o) => !o)}
-            className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          >
-            <HugeiconsIcon icon={variablesOpen ? ArrowUp01Icon : ArrowDown01Icon} size={12} strokeWidth={2} />
-            {variablesOpen ? "Hide variables" : "Show variables"}
-          </button>
-          {variablesOpen && (
+          {!agent && (
+            <button
+              type="button"
+              aria-expanded={variablesOpen}
+              onClick={() => setVariablesOpen((o) => !o)}
+              className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            >
+              <HugeiconsIcon icon={variablesOpen ? ArrowUp01Icon : ArrowDown01Icon} size={12} strokeWidth={2} />
+              {variablesOpen ? "Hide variables" : "Show variables"}
+            </button>
+          )}
+          {!agent && variablesOpen && (
             <div className="flex min-w-0 flex-col text-[11px] leading-snug">
               {commandVariableDocs().map((v) => (
                 <button

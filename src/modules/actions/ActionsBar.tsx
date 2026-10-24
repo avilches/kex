@@ -55,6 +55,7 @@ import {
   DROP_MENU_GLOBAL,
   DROP_MENU_WORKSPACE,
   barZoneId,
+  HEADER_KINDS,
   MENU_DRAG_PREFIX,
   menuEntries,
   parseBarZone,
@@ -63,7 +64,9 @@ import {
   WORKSPACE_UNSET,
   type BarItem,
 } from "./lib/actionsBar";
-import { isScript, type Action } from "./lib/types";
+import { isScript, usesTerminal, type Action, type ActionKind } from "./lib/types";
+
+const ZONE_WORDS: Record<ActionKind, string> = { app: "apps", agent: "agents", script: "scripts" };
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -114,7 +117,7 @@ function ownButtonTitle(item: BarItem): string {
   const { main } = splitActionName(item.name);
   if (item.disabledReason) return `${main}: ${item.disabledReason}`;
   if (isScript(item.action) && item.state !== "idle") return `Show ${main}`;
-  return item.title ?? `${isScript(item.action) ? "Run" : "Open"} ${main}`;
+  return item.title ?? `${usesTerminal(item.action) ? "Run" : "Open"} ${main}`;
 }
 
 export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
@@ -353,7 +356,7 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
     title: item.title ?? undefined,
     disabled: !menuEntries(item)[0].enabled,
   };
-  // An app is one menu item, icon and text lit together: the whole row is one click. A
+  // An app or an agent is one menu item, icon and text lit together: the whole row is one click. A
   // script has two zones, the start or stop control and the name, siblings so that each
   // hover lights only its own; the name runs an idle script or brings a live one into view,
   // and either way the menu stays open.
@@ -608,15 +611,11 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const workspaceButtons = model.buttons.filter((b) => !b.global);
   const globalButtons = model.buttons.filter((b) => b.global);
   const dragging = draggingId !== null;
-  const scriptOf = (id: string) =>
+  const kindOf = (id: string): ActionKind | undefined =>
     (id.startsWith(MENU_DRAG_PREFIX)
       ? menuItems.find((i) => i.id === id.slice(MENU_DRAG_PREFIX.length))
       : model.buttons.find((b) => b.id === id)
-    )?.action;
-  const kindOf = (id: string) => {
-    const a = scriptOf(id);
-    return a ? isScript(a) : undefined;
-  };
+    )?.action.kind;
   const dragKind = draggingId ? kindOf(draggingId) : undefined;
   // The pointer decides what is under the drag, a button or row before the frame around it.
   // Over a section of the menu the Action may only land among its own kind: the one under
@@ -647,7 +646,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       const section = sectionOf(hit.id)!;
       const idOf = (i: BarItem) => (section.menu ? `${MENU_DRAG_PREFIX}${i.id}` : i.id);
       const peers = (section.menu ? menuItems : model.buttons).filter(
-        (i) => i.global === section.global && isScript(i.action) === kind && idOf(i) !== activeId,
+        (i) => i.global === section.global && i.action.kind === kind && idOf(i) !== activeId,
       );
       const peerCollision = (id: string): Collision[] => {
         const container = args.droppableContainers.find((c) => c.id === id);
@@ -674,7 +673,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     if (within.length > 0 || activeId.startsWith(MENU_DRAG_PREFIX)) return within;
     const origin = model.buttons.find((b) => b.id === args.active.id);
     const own = args.droppableContainers.filter((c) =>
-      model.buttons.some((b) => b.id === c.id && b.global === origin?.global && isScript(b.action) === (origin ? isScript(origin.action) : undefined)),
+      model.buttons.some((b) => b.id === c.id && b.global === origin?.global && b.action.kind === origin?.action.kind),
     );
     return closestCenter({ ...args, droppableContainers: own });
   };
@@ -789,15 +788,15 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
               {i === 1 && !dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
                 <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
               )}
-              {([false, true] as const).map((script) => {
-                const list = scoped.filter((b) => isScript(b.action) === script);
+              {HEADER_KINDS.map((kind) => {
+                const list = scoped.filter((b) => b.action.kind === kind);
                 return (
                   <BarZone
-                    key={`${scope}-${script}`}
-                    id={barZoneId(scope, script)}
-                    label={`${scope === "global" ? "Global" : "Workspace"} ${script ? "scripts" : "apps"}`}
+                    key={`${scope}-${kind}`}
+                    id={barZoneId(scope, kind)}
+                    label={`${scope === "global" ? "Global" : "Workspace"} ${ZONE_WORDS[kind]}`}
                     dragging={dragging}
-                    accepts={dragKind === undefined || dragKind === script}
+                    accepts={dragKind === undefined || dragKind === kind}
                     empty={list.length === 0}
                   >
                     {renderButtons(list)}

@@ -47,3 +47,18 @@ describe("parseColumnDropId", () => {
     expect(parseColumnDropId("row")).toBeNull();
   });
 });
+
+describe("agents in the Settings columns", () => {
+  const g = (id: string): Action => ({ id, name: id, command: id, kind: "agent", ownButton: false });
+  const three = { global: [a("s", true), a("p", false), g("g1"), g("g2")], workspace: [] };
+
+  it("reorder only among agents, never with an app or a script", () => {
+    expect(resolveDrop(three, both, "g1", "g2")).toEqual({ kind: "reorder", scope: "global", fromId: "g1", toId: "g2" });
+    expect(resolveDrop(three, both, "g1", "p")).toBeNull();
+    expect(resolveDrop(three, both, "g1", "s")).toBeNull();
+    expect(resolveDrop(three, both, "p", "g1")).toBeNull();
+    expect(resolveDrop(three, both, "s", "g1")).toBeNull();
+    expect(isDropCandidate(three, "p", "g1")).toBe(false);
+    expect(isDropCandidate(three, "g2", "g1")).toBe(true);
+  });
+});

@@ -1,11 +1,12 @@
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   ActionsColumns,
   addAction,
+  agentSuggestionsFromDetected,
   globalActions,
   removeAction,
   reorderActions,
@@ -47,7 +48,11 @@ export type ActionsRequest = ActionsTarget & { nonce: number };
 
 export function ActionsSection({ target = null }: { target?: ActionsRequest | null }) {
   const actions = usePreferencesStore((s) => s.actions);
-  const { detectedEditors, isScanning, scan } = useExternalEditors();
+  const { detectedEditors, detectedAgents, isScanning, scan } = useExternalEditors();
+  const suggestions = useMemo(
+    () => [...suggestionsFromDetected(detectedEditors), ...agentSuggestionsFromDetected(detectedAgents)],
+    [detectedEditors, detectedAgents],
+  );
   const { feed, send } = useWorkspaceActionsFeed();
   const focusRequest = target?.id ? { scope: target.tab, id: target.id, nonce: target.nonce } : undefined;
 
@@ -72,13 +77,13 @@ export function ActionsSection({ target = null }: { target?: ActionsRequest | nu
 
       <p className="-mt-2 text-[11.5px] text-muted-foreground">
         Global actions are available in every workspace; the ones of the current workspace only in it. A script runs in a
-        terminal and can be stopped; an app opens in the background.
+        terminal and can be stopped; an app opens in the background; an agent starts in a new terminal tab on every click.
       </p>
 
       <ActionsColumns
         key={workspaceId}
         focusRequest={focusRequest}
-        suggestions={suggestionsFromDetected(detectedEditors)}
+        suggestions={suggestions}
         workspaceName={feed?.workspaceName ?? null}
         global={{
           actions,

@@ -26,11 +26,11 @@ import {
   resolveDrop,
   type Scope,
 } from "./lib/actionDrop";
-import { scriptsFirst } from "./lib/actionsBar";
+import { SETTINGS_KINDS } from "./lib/actionsBar";
 import { ownedAfterEdit } from "./lib/appOwnership";
 import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
-import { isScript, type Action } from "./lib/types";
+import type { Action, ActionKind } from "./lib/types";
 
 export type ScopeEditor = {
   /** The saved Actions of the scope. A new command only lives in the editor until it has one. */
@@ -68,16 +68,21 @@ function blankApp(): Action {
   return { id: newActionId(), name: "", kind: "app", command: "", ownButton: false };
 }
 
+// A preset carries its own kind: an app preset is an app, an agent preset an agent that starts
+// where the preset says.
 function actionFromSuggestion(s: AppSuggestion): Action {
   return {
     id: newActionId(),
     name: s.name,
-    kind: "app",
+    kind: s.kind,
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
+    ...(s.kind === "agent" && s.cwdMode ? { cwdMode: s.cwdMode } : {}),
     ownButton: false,
   };
 }
+
+const GROUP_LABELS: Record<ActionKind, string> = { script: "Scripts", app: "Applications", agent: "Agents" };
 
 const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "This workspace" };
 
@@ -311,11 +316,7 @@ function Column({
 }: ColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnDropId(scope), disabled: !editor.available });
   const available = useMemo(() => uninstalledSuggestions(suggestions, editor.actions), [suggestions, editor.actions]);
-  const ordered = scriptsFirst(editor.actions);
-  const groups = [
-    { label: "Scripts", items: ordered.filter((a) => isScript(a)) },
-    { label: "Applications", items: ordered.filter((a) => !isScript(a)) },
-  ];
+  const groups = SETTINGS_KINDS.map((kind) => ({ label: GROUP_LABELS[kind], items: editor.actions.filter((a) => a.kind === kind) }));
   return (
     <div
       ref={setNodeRef}

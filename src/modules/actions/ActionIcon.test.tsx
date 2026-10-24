@@ -31,4 +31,18 @@ describe("ActionIcon", () => {
     expect(custom.container.querySelector("svg")).not.toBeNull();
     custom.unmount();
   });
+
+  it("draws an agent with its logo, and the generic robot without one", () => {
+    const claude = render({ action: { appId: "claude", kind: "agent" } });
+    expect(claude.container.querySelector("img")?.getAttribute("alt")).toBe("claude");
+    expect(claude.container.querySelector("img")?.getAttribute("src")).not.toContain("/assets/editors/");
+    claude.unmount();
+    const pi = render({ action: { iconId: "pi", kind: "agent" } });
+    expect(pi.container.querySelector("svg[aria-label='pi']")).not.toBeNull();
+    pi.unmount();
+    const plain = render({ action: { kind: "agent" } });
+    expect(plain.container.querySelector("img")).toBeNull();
+    expect(plain.container.querySelector("svg")).not.toBeNull();
+    plain.unmount();
+  });
 });

@@ -90,6 +90,11 @@ describe("agentSuggestionsFromDetected", () => {
     expect(list.every((s) => !/[{}]/.test(s.defaultCommand + s.name))).toBe(true);
   });
 
+  it("uses the agent id as the command, so a Windows binary gives no .exe", () => {
+    const list = agentSuggestionsFromDetected([ag("claude", "C:\\Users\\me\\bin\\claude.exe")]);
+    expect(list.map((s) => s.defaultCommand)).toEqual(["claude", "claude"]);
+  });
+
   it("skips disabled agents", () => {
     expect(agentSuggestionsFromDetected([ag("claude", "claude", false)])).toEqual([]);
   });

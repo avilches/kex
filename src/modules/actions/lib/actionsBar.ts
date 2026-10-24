@@ -1,7 +1,7 @@
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
 import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
-import { isApp, isScript, usesTerminal, type Action } from "./types";
+import { isAgent, isApp, isScript, usesTerminal, type Action, type ActionKind } from "./types";
 
 export const COMPACT_WIDTH = 720;
 
@@ -29,14 +29,20 @@ export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly =
   return PADDING + label + (isScript(action) ? RUN_ZONE : ICON);
 }
 
+// Only a script has a running state: an agent opens a new tab per click and keeps no link.
+export function stateOf(action: Action, states: ReadonlyMap<string, ScriptState> | undefined): ScriptState | "idle" {
+  return isScript(action) ? (states?.get(action.id) ?? "idle") : "idle";
+}
+
 // Whether the bar renders this Action where the user is: hidden ones take no room,
-// so they must not consume a slot of the fold either.
+// so they must not consume a slot of the fold either. An agent has no template, so its
+// target is the workspace and it shows everywhere.
 export function shownAtPlace(
   action: Action,
   state: ScriptState | "idle",
   place: FocusPlace | undefined,
 ): boolean {
-  return !place || state !== "idle" || actionShownAt(actionTarget(action.command), place);
+  return !place || state !== "idle" || isAgent(action) || actionShownAt(actionTarget(action.command), place);
 }
 
 // How many of the own buttons, taken in the user's order, fit in the room the bar has. The
@@ -51,10 +57,10 @@ export function ownButtonsThatFit(
 ): number {
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
-  const sole = soleAppButtons(actions);
+  const sole = soleIconButtons(actions);
   for (const action of actions) {
-    if (!shownAtPlace(action, isScript(action) ? (states?.get(action.id) ?? "idle") : "idle", place)) continue;
-    left -= ownButtonWidth(action, isApp(action) && action.appId !== undefined && sole.has(action.appId)) + BAR_GAP;
+    if (!shownAtPlace(action, stateOf(action, states), place)) continue;
+    left -= ownButtonWidth(action, sole.has(action.id)) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
   }
@@ -118,6 +124,14 @@ const VARIABLE = /\{[?!]?[a-z]/;
 
 export const WORKSPACE_UNSET = "Set a root to this workspace";
 
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+
+/** An agent command is typed verbatim as one line, so a control character (a newline too) refuses it. */
+export function agentCommandProblem(command: string): string | null {
+  return CONTROL.test(command) ? "the command has a control character" : null;
+}
+
 // Settings has no focused tab to read values from, so under an app name and on its hover it
 // says what the variable stands for in words. The bar never uses this: it shows real values.
 export const SETTINGS_LABELS: BarContext = {
@@ -163,6 +177,7 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
 export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
+  if (isAgent(action)) return agentSubtitle(action, ctx);
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -175,6 +190,25 @@ export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" 
     return cwd ? { text: cwd, startTrim: true } : { text: "Current folder", startTrim: false };
   }
   return { text: ctx && !ctx.vars.workspace ? WORKSPACE_UNSET : "Workspace", startTrim: false };
+}
+
+// An agent has no template, so its name has no variable: the line always says the folder it
+// starts in, the real one in the bar and the words for it in Settings.
+function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
+  const mode = action.cwdMode ?? "home";
+  const real = ctx && !ctx.labels ? ctx : null;
+  if (mode === "home") return { text: "Home", startTrim: false };
+  if (mode === "fixed") return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
+  if (mode === "context") {
+    return real?.vars.cwd ? { text: real.vars.cwd, startTrim: true } : { text: "Current directory", startTrim: false };
+  }
+  if (ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
+  return real ? { text: real.vars.workspace, startTrim: true } : { text: "Workspace", startTrim: false };
+}
+
+// An agent has nothing to open: its hover says it runs, or why it cannot.
+function agentTitle(label: string, disabledReason: string | null): string {
+  return disabledReason ? `${label}: ${disabledReason}` : `Run ${label}`;
 }
 
 // The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
@@ -212,6 +246,11 @@ export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): bo
 export function actionAvailability(action: Action, ctx: BarContext | null): string | null {
   if (action.command.trim() === "") return "it has no command";
   if (ctx?.hibernated) return "workspace is hibernated";
+  if (isAgent(action)) {
+    const problem = agentCommandProblem(action.command);
+    if (problem) return problem;
+    return ctx && action.cwdMode === "workspace" && !ctx.vars.workspace ? WORKSPACE_UNSET : null;
+  }
   if (!ctx) return VARIABLE.test(action.command) ? "needs a workspace" : null;
   const used = commandVariablesUsed(action.command);
   if (used.size === 0 && needsWorkspaceRoot(action) && !ctx.vars.workspace) return WORKSPACE_UNSET;
@@ -248,14 +287,21 @@ export type BarItem = {
   iconOnly: boolean;
 };
 
-// The Header shows apps before scripts, each keeping the user's order; Settings keeps
-// the opposite, scripts first, so the list there never interleaves the two kinds.
+export const HEADER_KINDS: readonly ActionKind[] = ["app", "agent", "script"];
+export const SETTINGS_KINDS: readonly ActionKind[] = ["script", "app", "agent"];
+
+function byKinds<T extends Pick<Action, "kind">>(actions: readonly T[], kinds: readonly ActionKind[]): T[] {
+  return kinds.flatMap((kind) => actions.filter((a) => a.kind === kind));
+}
+
+// The Header shows apps, then agents, then scripts, each keeping the user's order; Settings
+// lists scripts, apps and agents, so neither interleaves the kinds.
 export function appsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
-  return [...actions.filter((a) => !isScript(a)), ...actions.filter((a) => isScript(a))];
+  return byKinds(actions, HEADER_KINDS);
 }
 
 export function scriptsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
-  return [...actions.filter((a) => isScript(a)), ...actions.filter((a) => !isScript(a))];
+  return byKinds(actions, SETTINGS_KINDS);
 }
 
 // The own buttons the bar may draw, in order: those the place shows. Each list comes already
@@ -269,17 +315,21 @@ export function ownButtonCandidates(
   return [...local, ...global].filter(
     (action) =>
       action.ownButton &&
-      shownAtPlace(action, isScript(action) ? (states.get(action.id) ?? "idle") : "idle", place),
+      shownAtPlace(action, stateOf(action, states), place),
   );
 }
 
-// A button of a detected app that is the only one of that app in the bar needs no words:
-// its icon says which app it is. With several of the same app, the name and the line under
-// it tell them apart.
-export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "kind">[]): Set<string> {
+// A button of a detected app or agent that is the only one of it in the bar needs no words:
+// its icon says which one it is. With several of the same, the name and the line under it
+// tell them apart. Apps and agents count apart; the result is the ids drawn icon-only.
+export function soleIconButtons(buttons: readonly Pick<Action, "id" | "appId" | "kind">[]): Set<string> {
+  const keyOf = (a: Pick<Action, "appId" | "kind">) => ((isApp(a) || isAgent(a)) && a.appId ? `${a.kind}:${a.appId}` : null);
   const count = new Map<string, number>();
-  for (const a of buttons) if (isApp(a) && a.appId) count.set(a.appId, (count.get(a.appId) ?? 0) + 1);
-  return new Set([...count].filter(([, n]) => n === 1).map(([id]) => id));
+  for (const a of buttons) {
+    const key = keyOf(a);
+    if (key) count.set(key, (count.get(key) ?? 0) + 1);
+  }
+  return new Set(buttons.filter((a) => count.get(keyOf(a) ?? "") === 1).map((a) => a.id));
 }
 
 export const MENU_DRAG_PREFIX = "menu:";
@@ -290,13 +340,13 @@ export const DROP_MENU_GLOBAL = "mzone:global";
 
 type Scope = "workspace" | "global";
 
-// The bar has one zone per scope and kind: apps and scripts of the workspace, apps and
-// scripts of the global scope. Each one takes only its own kind.
-export const barZoneId = (scope: Scope, script: boolean) => `zone:${scope}:${script ? "scripts" : "apps"}`;
+// The bar has one zone per scope and kind: apps, agents and scripts of the workspace, and
+// the same of the global scope. Each one takes only its own kind.
+export const barZoneId = (scope: Scope, kind: ActionKind) => `zone:${scope}:${kind}s`;
 
-export function parseBarZone(id: string): { scope: Scope; script: boolean } | null {
-  const m = /^zone:(workspace|global):(apps|scripts)$/.exec(id);
-  return m ? { scope: m[1] as Scope, script: m[2] === "scripts" } : null;
+export function parseBarZone(id: string): { scope: Scope; kind: ActionKind } | null {
+  const m = /^zone:(workspace|global):(app|agent|script)s$/.exec(id);
+  return m ? { scope: m[1] as Scope, kind: m[2] as ActionKind } : null;
 }
 
 type Placed = Pick<BarItem, "id" | "global" | "action">;
@@ -315,7 +365,7 @@ export type Drop = {
   placeBefore?: string | null;
 };
 
-const sameKind = (a: Placed, b: Placed) => isScript(a.action) === isScript(b.action);
+const sameKind = (a: Placed, b: Placed) => a.action.kind === b.action.kind;
 
 // What dropping `activeId` (a bar button, or a menu row prefixed with MENU_DRAG_PREFIX) on
 // `overId` does. A button or the frame of the bar makes it a button of that scope; a row or
@@ -348,7 +398,7 @@ export function resolveDrop(
     button = false;
   } else if (parseBarZone(overId)) {
     const zone = parseBarZone(overId)!;
-    if (zone.script !== isScript(from.action)) return null;
+    if (zone.kind !== from.action.kind) return null;
     to = zone.scope;
     button = true;
   } else if (overId === DROP_MENU_WORKSPACE || overId === DROP_MENU_GLOBAL) {
@@ -396,7 +446,7 @@ export function resolveDrop(
 
 export type BarModel = {
   buttons: BarItem[];
-  /** The Actions that are not own buttons, scripts and apps mixed: the workspace
+  /** The Actions that are not own buttons, apps, agents and scripts in that order: the workspace
    * ones first, then the global ones, each scope in the user's order. */
   menu: { workspace: BarItem[]; global: BarItem[] };
   empty: boolean;
@@ -415,14 +465,14 @@ type BuildInput = {
   place?: FocusPlace;
 };
 
-// Own buttons first in the user's order (workspace Actions, then global, scripts and apps
-// mixed), then the one menu for the rest: workspace Actions, then global, again in the
+// Own buttons first (workspace Actions, then global, each by kind in the user's order),
+// then the one menu for the rest: workspace Actions, then global, again in the
 // user's order. A running script is never disabled whatever its variables are now: it has
 // to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
 // place to live.
 export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
   const toItem = (action: Action, isGlobal: boolean): BarItem => {
-    const state = isScript(action) ? (states.get(action.id) ?? "idle") : "idle";
+    const state = stateOf(action, states);
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name: label }, context);
@@ -438,7 +488,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       disabledReason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      title: actionRowTitle(label, isScript(action), disabledReason, context),
+      title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, context),
       iconOnly: false,
     };
   };
@@ -461,8 +511,8 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     else if (isGlobal) model.menu.global.push(item);
     else model.menu.workspace.push(item);
   }
-  const sole = soleAppButtons(model.buttons.map((b) => b.action));
-  for (const b of model.buttons) b.iconOnly = isApp(b.action) && b.action.appId !== undefined && sole.has(b.action.appId);
+  const sole = soleIconButtons(model.buttons.map((b) => b.action));
+  for (const b of model.buttons) b.iconOnly = sole.has(b.action.id);
   return model;
 }
 

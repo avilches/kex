@@ -1,6 +1,6 @@
 import { Add01Icon, ChevronDownIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -15,8 +15,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useDialogScrollHost } from "@/components/dialogScrollHost";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { actionRowTitle, actionSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
+import { actionRowTitle, scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
+import type { ActionKind } from "./lib/types";
+
+const GROUPS: readonly { kind: ActionKind; heading: string }[] = [
+  { kind: "app", heading: "Applications" },
+  { kind: "agent", heading: "Agents" },
+];
 
 type Props = {
   suggestions: readonly AppSuggestion[];
@@ -25,8 +31,9 @@ type Props = {
 };
 
 // The one Add control of a column: a searchable combo whose first entries are Add Command and
-// the custom app, then one alphabetical entry per detected app preset (icon, and under it what
-// the preset points at). Presets keep the combo open so several can be installed in a row;
+// the custom app, then one alphabetical entry per detected app preset and, in their own
+// section, per detected agent preset (icon, and under it what the preset points at or the
+// folder it starts in). Presets keep the combo open so several can be installed in a row;
 // the entries that open an editor close it. Installed presets never show up in the list.
 export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
   const [open, setOpen] = useState(false);
@@ -76,31 +83,35 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 <span className="shrink-0 text-[11px] text-muted-foreground">write the command yourself</span>
               </CommandItem>
             </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup heading="Applications">
-              {[...suggestions].sort(compareByName).map((s) => {
-                const sub = actionSubtitle(s.name, SETTINGS_LABELS);
-                return (
-                  <CommandItem
-                    key={s.key}
-                    value={s.key}
-                    keywords={[s.name, s.defaultCommand]}
-                    onSelect={() => onPickApp(s)}
-                    title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
-                    className="text-[12px]"
-                  >
-                    <span className="flex size-5 shrink-0 items-center justify-center">
-                      <ActionIcon action={{ appId: s.appId, kind: "app" }} size={13} />
-                    </span>
-                    <ActionNameLines
-                      name={s.name}
-                      value={sub?.text ?? undefined}
-                      startTrim={sub?.startTrim}
-                    />
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
+            {GROUPS.map((group) => {
+              const items = suggestions.filter((s) => s.kind === group.kind).sort(compareByName);
+              if (items.length === 0) return null;
+              return (
+                <Fragment key={group.kind}>
+                  <CommandSeparator />
+                  <CommandGroup heading={group.heading}>
+                    {items.map((s) => {
+                      const sub = scriptSubtitle({ name: s.name, kind: s.kind, cwdMode: s.cwdMode }, SETTINGS_LABELS);
+                      return (
+                        <CommandItem
+                          key={s.key}
+                          value={s.key}
+                          keywords={[s.name, s.defaultCommand]}
+                          onSelect={() => onPickApp(s)}
+                          title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
+                          className="text-[12px]"
+                        >
+                          <span className="flex size-5 shrink-0 items-center justify-center">
+                            <ActionIcon action={{ appId: s.appId, kind: s.kind }} size={13} />
+                          </span>
+                          <ActionNameLines name={s.name} value={sub.text ?? undefined} startTrim={sub.startTrim} />
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </Fragment>
+              );
+            })}
           </CommandList>
         </Command>
       </PopoverContent>

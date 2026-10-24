@@ -95,6 +95,24 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
+  it("offers the agent presets in their own section, with the folder they start in under the name", () => {
+    const claude: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
+    const ctxVariant: AppSuggestion = { ...claude, key: "claude:context", cwdMode: "context" };
+    const view = mount([...suggestions, ctxVariant, claude]);
+    click(view.trigger);
+    const groups = [...document.querySelectorAll("[cmdk-group]")];
+    const agents = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Agents")!;
+    expect([...agents.querySelectorAll("[cmdk-item]")].map((o) => o.textContent)).toEqual([
+      "Claude CodeWorkspace",
+      "Claude CodeCurrent directory",
+    ]);
+    const apps = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Applications")!;
+    expect(apps.textContent).not.toContain("Claude");
+    click(agents.querySelectorAll("[cmdk-item]")[1]!);
+    expect(view.onPickApp).toHaveBeenCalledWith(ctxVariant);
+    view.unmount();
+  });
+
   it("shows an empty state when nothing matches", () => {
     const view = mount();
     click(view.trigger);

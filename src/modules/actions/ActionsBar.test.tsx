@@ -116,6 +116,32 @@ describe("OwnButton", () => {
     expect(handlers.run).not.toHaveBeenCalled();
     unmount();
   });
+
+  it("gives an agent no run or stop zone and never a Show title: each click runs it again", () => {
+    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
+    const focus = vi.fn(() => true);
+    const { container, handlers, unmount } = mount(item(agent, { title: "Run Claude Code", subtitle: "/p" }), focus);
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+    expect(byLabel(container, "Stop Claude Code")).toBeNull();
+    expect(container.querySelector(".text-destructive")).toBeNull();
+    const button = container.querySelector("button")!;
+    expect(button.title).toBe("Run Claude Code");
+    expect(button.querySelector("img")).not.toBeNull();
+    expect(button.textContent).toContain("/p");
+    click(button);
+    click(button);
+    expect(handlers.run).toHaveBeenCalledTimes(2);
+    expect(focus).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("draws a sole agent button as its icon alone", () => {
+    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const { container, unmount } = mount(item(agent, { iconOnly: true }));
+    expect(container.querySelector("button")?.textContent).toBe("");
+    expect(container.querySelector("button")?.getAttribute("aria-label")).toBe("Claude Code");
+    unmount();
+  });
 });
 
 describe("ActionsMenu", () => {

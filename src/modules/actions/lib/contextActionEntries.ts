@@ -1,5 +1,5 @@
 import { actionAvailability, actionRowTitle, appsFirst, scriptSubtitle, type BarContext } from "./actionsBar";
-import { isScript, type Action } from "./types";
+import { isAgent, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -21,7 +21,7 @@ export type ContextActionGroups = { workspace: ContextActionEntry[]; global: Con
 function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
   for (const action of appsFirst(actions)) {
-    if (action.command.trim() === "") continue;
+    if (action.command.trim() === "" || isAgent(action)) continue;
     const name = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name }, ctx);
     const reason = actionAvailability(action, ctx);
@@ -37,9 +37,10 @@ function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEn
   return rows;
 }
 
-/** Every Action, grouped and ordered as the Header combo does (workspace first, global
- * after, apps before scripts), including the ones that have their own button there. The
- * ones whose variables cannot be filled from the row are muted entries with why. */
+/** Every Action but the agents (their target is the workspace, so they live in the Header
+ * only), grouped and ordered as the Header combo does (workspace first, global after, apps
+ * before scripts), including the ones that have their own button there. The ones whose
+ * variables cannot be filled from the row are muted entries with why. */
 export function contextActionEntries(
   local: readonly Action[],
   global: readonly Action[],

@@ -14,6 +14,8 @@ const preset: Action = { id: "ac-3", name: "Zed {workspace}", kind: "app", comma
 
 const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
 const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" };
+const claudeWs: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
+const claudeCtx: AppSuggestion = { ...claudeWs, key: "claude:context", cwdMode: "context" };
 
 type Handlers = { onAdd: ReturnType<typeof vi.fn>; onUpdate: ReturnType<typeof vi.fn>; onRemove: ReturnType<typeof vi.fn>; onReorder: ReturnType<typeof vi.fn> };
 
@@ -191,6 +193,49 @@ describe("ActionsColumns", () => {
     expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     typeField(commandField()!, "code {filepath}");
     expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "app", command: "code {filepath}" });
+    unmount();
+  });
+
+  it("lists scripts, apps and agents in three groups of each column", () => {
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
+    const { container, unmount } = mount([agent, savedApp, saved]);
+    const text = column(container, "global").textContent ?? "";
+    expect(text.indexOf("Scripts")).toBeLessThan(text.indexOf("Applications"));
+    expect(text.indexOf("Applications")).toBeLessThan(text.indexOf("Agents"));
+    expect(text.indexOf("Zed")).toBeLessThan(text.indexOf("Agents"));
+    expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Claude Code"));
+    expect(text).toContain("Current directory");
+    unmount();
+  });
+
+  it("an agent preset goes straight to the store as an agent with its start folder", () => {
+    const { container, g, unmount } = mount([], [], { suggestions: [claudeWs, claudeCtx] });
+    click(addTrigger(container, "global"));
+    const entries = options().filter((o) => o.textContent?.startsWith("Claude Code"));
+    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace", "Claude CodeCurrent directory"]);
+    click(entries[1]);
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({
+      name: "Claude Code",
+      kind: "agent",
+      command: "claude",
+      appId: "claude",
+      cwdMode: "context",
+    });
+    expect(commandField()).toBeNull();
+    unmount();
+  });
+
+  it("the modal of an agent has Run in folder, name and command, and no variables", () => {
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", appId: "claude", cwdMode: "workspace", ownButton: true };
+    const { container, unmount } = mount([agent]);
+    click(pencil(container));
+    expect(document.querySelector("[role='dialog']")?.textContent).toContain("Edit agent");
+    expect(document.querySelector("[aria-label='Run in folder']")).not.toBeNull();
+    expect(nameField()!.value).toBe("Claude Code");
+    expect(commandField()!.value).toBe("claude {x}");
+    expect(dialogButton("Show variables")).toBeUndefined();
+    expect(document.querySelector("[role='dialog']")?.textContent).not.toMatch(/has no value|Stop/);
+    click(dialogButton("Done"));
     unmount();
   });
 
