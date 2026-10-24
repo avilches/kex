@@ -294,7 +294,7 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
 }
 
 #[cfg(target_os = "windows")]
-fn where_binary(name: &str) -> Option<String> {
+pub(crate) fn where_binary(name: &str) -> Option<String> {
     if name.is_empty() {
         return None;
     }

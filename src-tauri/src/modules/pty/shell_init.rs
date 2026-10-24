@@ -143,6 +143,11 @@ pub fn build_command(
     }
 }
 
+#[cfg(unix)]
+pub(crate) fn login_shell_path() -> String {
+    unix::Shell::detect().1
+}
+
 pub fn detect_shell_name() -> String {
     #[cfg(unix)]
     {
