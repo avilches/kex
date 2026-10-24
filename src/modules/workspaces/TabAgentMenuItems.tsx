@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Copy01Icon,
   FolderOpenIcon,
+  PlugSocketIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import {
@@ -10,7 +11,11 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
+import { installWithToast } from "@/modules/agents/components/IntegrationSuggestionToast";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { agentStatus } from "@/modules/agents/lib/agentIntegration";
+import { AGENT_LABELS, type IntegrationStatus } from "@/modules/agents/lib/integrations";
+import { isAgentId } from "@/modules/agents/lib/integrationSuggestion";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { revealInFinder } from "@/modules/explorer/lib/contextActions";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -18,6 +23,7 @@ import { native } from "@/lib/native";
 import { IS_MAC } from "@/lib/platform";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { agentDisplayName, hasTranscriptActions, showsAgentMenu } from "./lib/agentMenu";
+import { agentMenuIntegration } from "./lib/agentMenuIntegration";
 import { parentDir } from "./lib/transcriptPath";
 
 const REVEAL_TRANSCRIPT_LABEL = IS_MAC
@@ -84,6 +90,23 @@ function useFileExists(path: string | undefined): boolean | null {
   return exists;
 }
 
+// The integration is read when the menu opens, because its content only mounts while the menu
+// is open: no work for closed tabs. A failed read stays null, which the menu treats as installed.
+function useIntegrationStatus(agent: string | undefined): IntegrationStatus | null {
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
+  useEffect(() => {
+    setStatus(null);
+    const key = agent?.toLowerCase();
+    if (!key || !isAgentId(key)) return;
+    let cancelled = false;
+    agentStatus(key)
+      .then((s) => { if (!cancelled) setStatus(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [agent]);
+  return status;
+}
+
 export function CopyTabIdItem({ tabId }: { tabId: string }) {
   return (
     <ValueItem
@@ -113,6 +136,10 @@ export function TabAgentMenuItems({
   const meta = session?.meta;
   const transcriptPath = meta?.transcriptPath;
   const transcriptExists = useFileExists(transcriptPath);
+  const integration = agentMenuIntegration(
+    session?.agent ?? "",
+    useIntegrationStatus(session?.agent),
+  );
   if (!session || !showsAgentMenu(session)) {
     return process || children ? (
       <>
@@ -131,14 +158,23 @@ export function TabAgentMenuItems({
         <AgentIcon agent={session.agent} size={14} />
         <span className="min-w-0">
           <span className="block font-medium text-foreground">{agentDisplayName(session.agent)}</span>
-          {meta?.model && (
+          {integration.mode === "full" && meta?.model && (
             <span className="block truncate font-mono text-[10px] font-normal">{meta.model}</span>
           )}
         </span>
       </ContextMenuLabel>
       {process}
       {children}
-      {sessionId && (
+      {integration.mode === "install" && (
+        <ContextMenuItem onSelect={() => void installWithToast(integration.agent)}>
+          <HugeiconsIcon icon={PlugSocketIcon} size={14} strokeWidth={2} />
+          <span className="min-w-0">
+            Install {AGENT_LABELS[integration.agent]} integration
+            <ValueHint value="Session, model and transcript need it" />
+          </span>
+        </ContextMenuItem>
+      )}
+      {integration.mode === "full" && sessionId && (
         <ValueItem
           icon={Copy01Icon}
           label="Copy Session ID"
@@ -146,7 +182,7 @@ export function TabAgentMenuItems({
           onSelect={() => void writeClipboardText(sessionId)}
         />
       )}
-      {!hasTranscriptActions(session) ? null : hasTranscript ? (
+      {integration.mode !== "full" || !hasTranscriptActions(session) ? null : hasTranscript ? (
         <>
           <ValueItem
             icon={FolderOpenIcon}

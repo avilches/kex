@@ -769,12 +769,27 @@ writes a fresh record under the new tab id, and is cleaned up the same way any o
 
 ---
 
+## What the integration adds
+
+A tab running an agent is restored on relaunch even with no integration, but not the same way:
+
+| | Without the integration | With it |
+|---|---|---|
+| Restore on relaunch | "Run on Start" retypes the command seen in the shell (`claude`, `claude --model opus`) and opens a **new** session | A `SessionStart` record holds the `session_id`, and Kex types `claude --resume '<id>'`, which **continues the conversation** (`useTerminalSession.ts`: `plan?.resumeCmd || persistentCommand`) |
+| Spinner, attention dot, finish notification | No spinner and no end-of-turn signal: channel 1 only reports that the agent started and exited, plus a generic attention when the agent itself emits `OSC 9` (Claude Code does when it has no hooks) | All of them (channel 2, the hooks) |
+| Session id, model, transcript, agent cwd and worktree | Never filled: they only arrive over the hook socket (`pty/ipc.rs`) | Filled |
+| Tab menu | Agent name, Install, Run on Start | The full block above |
+
 ## Terminal path bar UI
 
 Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
 surfaced in the tab context menu (`TabAgentMenuItems`, rendered by `TabContextMenuItems`): Copy Tab ID for every tab, and
 for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
-with a `transcriptPath`). The two copy entries show the id they copy below their label. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
+with a `transcriptPath`). The two copy entries show the id they copy below their label. Those entries and the model line only exist because the integration reports them, so
+while an agent's integration is missing (`agentMenuIntegration`, pure, in `workspaces/lib/`; the status is read with `agentStatus` each time the menu opens) the block shows the agent name,
+"Install <Agent> integration" (the same `installWithToast` path as the install toast) and Run on Start, and hides the session id, the model and the transcript
+entries, which can never be filled without it. With the status not yet known, or already installed, the block is the usual one and never offers Install; when Install
+cannot run (`malformed`, `uneditable`, `unavailable`) the dead entries are hidden and nothing is offered. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
 `Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger keeps the play icon and ends with the state: a check when it is on for a plain terminal (nothing when off), and the agent icon (struck through when it is off) for an agent. The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.

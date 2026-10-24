@@ -9,7 +9,8 @@ const TOAST_MS = 20_000;
 // Sonner anchors the toast to the right edge, so a wider one grows to the left.
 const TOAST_WIDTH = "min(480px, calc(100vw - 32px))";
 
-async function installFromToast(agent: AgentId): Promise<void> {
+// Shared by the toast and the tab menu: one install path, one pair of result toasts.
+export async function installWithToast(agent: AgentId): Promise<void> {
   const name = AGENT_LABELS[agent];
   try {
     await installAgent(agent);
@@ -26,7 +27,7 @@ export function showIntegrationSuggestion(agent: AgentId): void {
     description:
       "Install it to see the spinner and attention dot in the tab, and to keep your session when you undo a closed tab or hibernate a workspace.",
     icon: <AgentIcon agent={agent} size={18} />,
-    action: { label: "Install", onClick: () => void installFromToast(agent) },
+    action: { label: "Install", onClick: () => void installWithToast(agent) },
     id: `integration-${agent}`,
     style: { width: TOAST_WIDTH },
     duration: TOAST_MS,

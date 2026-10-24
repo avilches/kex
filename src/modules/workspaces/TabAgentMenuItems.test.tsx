@@ -8,6 +8,16 @@ vi.mock("@/modules/explorer/lib/contextActions", () => ({ revealInFinder: vi.fn(
 const writeClipboardText = vi.fn((_value: string) => Promise.resolve(true));
 vi.mock("@/lib/clipboard", () => ({ writeClipboardText: (v: string) => writeClipboardText(v) }));
 
+const agentStatus = vi.fn((_agent: string) => Promise.resolve("installed" as string));
+vi.mock("@/modules/agents/lib/agentIntegration", () => ({
+  agentStatus: (a: string) => agentStatus(a),
+  installAgent: vi.fn(() => Promise.resolve()),
+}));
+const installWithToast = vi.fn((_agent: string) => Promise.resolve());
+vi.mock("@/modules/agents/components/IntegrationSuggestionToast", () => ({
+  installWithToast: (a: string) => installWithToast(a),
+}));
+
 import {
   ContextMenu,
   ContextMenuContent,
@@ -52,6 +62,9 @@ describe("TabAgentMenuItems", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {} });
     writeClipboardText.mockClear();
+    agentStatus.mockClear();
+    agentStatus.mockImplementation(() => Promise.resolve("installed"));
+    installWithToast.mockClear();
   });
   afterEach(cleanup);
 
@@ -166,5 +179,75 @@ describe("TabAgentMenuItems", () => {
 
     fireEvent.click(screen.getByText("Copy Session ID"));
     expect(writeClipboardText).toHaveBeenCalledWith("019a-codex");
+  });
+});
+
+describe("TabAgentMenuItems without the integration", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {} });
+    agentStatus.mockClear();
+    installWithToast.mockClear();
+    writeClipboardText.mockClear();
+  });
+  afterEach(cleanup);
+
+  function withoutIntegration(status: string) {
+    agentStatus.mockImplementation(() => Promise.resolve(status));
+    useAgentStore.getState().start("tab-1", "ws-1", "claude");
+    useAgentStore.getState().setMeta("tab-1", {
+      model: "claude-opus-4",
+      sessionId: "sess-1",
+      transcriptPath: "/t/dir/s.jsonl",
+    });
+    open(noop, <div>Run on Start</div>);
+  }
+
+  it("offers Install in place of what only the integration can fill, and keeps Run on Start", async () => {
+    withoutIntegration("missing");
+    expect(await screen.findByText(/Install Claude Code integration/)).toBeTruthy();
+    expect(screen.getByText("Claude")).toBeTruthy();
+    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.queryByText("claude-opus-4")).toBeNull();
+    expect(screen.queryByText("Copy Session ID")).toBeNull();
+    expect(screen.queryByText("Open Transcript Folder")).toBeNull();
+    expect(screen.queryByText("Transcript not created yet")).toBeNull();
+  });
+
+  it("installs through the shared install path when chosen", async () => {
+    withoutIntegration("missing");
+    fireEvent.click(await screen.findByText(/Install Claude Code integration/));
+    expect(installWithToast).toHaveBeenCalledWith("claude");
+  });
+
+  it("never offers to install what is already installed", async () => {
+    withoutIntegration("installed");
+    expect(await screen.findByText("Copy Session ID")).toBeTruthy();
+    expect(screen.queryByText(/integration/)).toBeNull();
+    expect(screen.getByText("claude-opus-4")).toBeTruthy();
+  });
+
+  it("shows the usual block until the status is known, without offering Install", () => {
+    agentStatus.mockImplementation(() => new Promise(() => {}));
+    useAgentStore.getState().start("tab-1", "ws-1", "claude");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "sess-1" });
+    open();
+    expect(screen.getByText("Copy Session ID")).toBeTruthy();
+    expect(screen.queryByText(/Install/)).toBeNull();
+  });
+
+  it("hides the dead entries and offers nothing when Install cannot run", async () => {
+    withoutIntegration("malformed");
+    await screen.findByText("Run on Start");
+    expect(screen.queryByText(/Install/)).toBeNull();
+    expect(screen.queryByText("Copy Session ID")).toBeNull();
+    expect(screen.queryByText("Transcript not created yet")).toBeNull();
+  });
+
+  it("does not read the status of an agent that has no integration", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "gemini");
+    open();
+    expect(agentStatus).not.toHaveBeenCalled();
+    expect(screen.getByText("Gemini")).toBeTruthy();
+    expect(screen.queryByText(/Install/)).toBeNull();
   });
 });
