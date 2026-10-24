@@ -1,4 +1,4 @@
-import { actionAvailability, actionRowTitle, scriptSubtitle, actionTarget, type BarContext, type ActionTarget } from "./actionsBar";
+import { actionAvailability, actionRowTitle, appsFirst, scriptSubtitle, type BarContext } from "./actionsBar";
 import type { Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -16,20 +16,12 @@ export type ContextActionEntry = {
   title: string | null;
 };
 
-const TARGETS: Record<ContextActionKind, ActionTarget> = { folder: "folder", file: "file" };
+export type ContextActionGroups = { workspace: ContextActionEntry[]; global: ContextActionEntry[] };
 
-/** The Actions offered on a row: folder rows offer only folder Actions, file rows only
- * file Actions, and the workspace Actions stay in the Header at all times. A row whose
- * remaining variables cannot be filled is a muted entry with why. */
-export function contextActionEntries(
-  actions: readonly Action[],
-  kind: ContextActionKind,
-  ctx: BarContext,
-): ContextActionEntry[] {
+function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
-  for (const action of actions) {
+  for (const action of appsFirst(actions)) {
     if (action.command.trim() === "") continue;
-    if (actionTarget(action.command) !== TARGETS[kind]) continue;
     const name = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name }, ctx);
     const reason = actionAvailability(action, ctx);
@@ -43,4 +35,15 @@ export function contextActionEntries(
     });
   }
   return rows;
+}
+
+/** Every Action, grouped and ordered as the Header combo does (workspace first, global
+ * after, apps before scripts), including the ones that have their own button there. The
+ * ones whose variables cannot be filled from the row are muted entries with why. */
+export function contextActionEntries(
+  local: readonly Action[],
+  global: readonly Action[],
+  ctx: BarContext,
+): ContextActionGroups {
+  return { workspace: entriesOf(local, ctx), global: entriesOf(global, ctx) };
 }

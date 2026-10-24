@@ -7,6 +7,8 @@ import { IS_WINDOWS } from "@/lib/platform";
 import { pathDirname } from "@/lib/pathUtils";
 import {
   ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -20,13 +22,14 @@ import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
 import { buildCommandVars } from "@/modules/actions/lib/commandVars";
 import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
-import { contextActionEntries, type ContextActionEntry, type ContextActionKind } from "@/modules/actions/lib/contextActionEntries";
+import { contextActionEntries, type ContextActionEntry, type ContextActionGroups, type ContextActionKind } from "@/modules/actions/lib/contextActionEntries";
 import { WORKSPACE_UNSET } from "@/modules/actions/lib/actionsBar";
 import { ActionIcon } from "@/modules/actions/ActionIcon";
 import { ActionNameLines } from "@/modules/actions/ActionNameLines";
 import type { Action } from "@/modules/actions/lib/types";
 
 const NONE: readonly Action[] = [];
+const EMPTY_GROUPS: ContextActionGroups = { workspace: [], global: [] };
 
 type MenuWorkspace = Pick<Workspace, "actions" | "cwd" | "workspaceRoot" | "hibernated"> | null;
 
@@ -41,7 +44,7 @@ function rowTab(kind: ContextActionKind, path: string): Tab | null {
 }
 
 export type ContextActions = {
-  entries: ContextActionEntry[];
+  groups: ContextActionGroups;
   overlay: RunOverlay | null;
 };
 
@@ -60,18 +63,18 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
     [tab, ws, info.branch, info.repoRoot, sys.host],
   );
   const shell = scriptShellFor(IS_WINDOWS, envKind);
-  const entries = useMemo(
+  const groups = useMemo(
     () =>
       vars
-        ? contextActionEntries([...(ws?.actions ?? []), ...global], kind, { vars, shell, hibernated: !!ws?.hibernated })
-        : [],
-    [vars, global, kind, shell, ws?.actions, ws?.hibernated],
+        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell, hibernated: !!ws?.hibernated })
+        : EMPTY_GROUPS,
+    [vars, global, shell, ws?.actions, ws?.hibernated],
   );
   const overlay = useMemo<RunOverlay | null>(
     () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),
     [vars],
   );
-  return { entries, overlay };
+  return { groups, overlay };
 }
 
 type ActionMenuApi = {
@@ -94,17 +97,40 @@ export function ActionMenuProvider({
   return <ApiCtx.Provider value={{ run, ws }}>{children}</ApiCtx.Provider>;
 }
 
-// The Actions entry of a context menu: a submenu with the folder Actions of a folder row
-// or the file Actions of a file row (the workspace Actions live in the Header alone), the
-// unfillable ones muted with why, each running against the folder or file of the row.
-// Nothing is rendered while there are no Actions or the row has no path.
+function EntryItem({ entry, overlay, run }: { entry: ContextActionEntry; overlay: RunOverlay; run: (action: Action, overlay?: RunOverlay) => void }) {
+  return (
+    <ContextMenuItem
+      title={entry.reason ?? entry.title ?? undefined}
+      disabled={!entry.enabled}
+      className={COMPACT_ITEM}
+      onSelect={() => run(entry.action, overlay)}
+    >
+      <ActionIcon action={entry.action} size={14} />
+      <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
+        <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
+      </span>
+      {!entry.enabled && entry.reason && entry.subtitle !== WORKSPACE_UNSET && (
+        <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>
+      )}
+    </ContextMenuItem>
+  );
+}
+
+// The Actions entry of a context menu: a submenu with every Action, laid out like the Header
+// combo (workspace ones first, global after, apps before scripts), the unfillable ones muted
+// with why, each running against the folder or file of the row. Nothing is rendered while
+// there are no Actions or the row has no path.
 export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind; path: string }) {
   const api = useContext(ApiCtx);
   const run = api?.run;
   const ws = api?.ws ?? null;
   const path = given || (kind === "folder" ? (ws?.workspaceRoot ?? ws?.cwd ?? "") : "");
-  const { entries, overlay } = useContextActions(ws, kind, path);
-  if (!run || !overlay || entries.length === 0) return null;
+  const { groups, overlay } = useContextActions(ws, kind, path);
+  if (!run || !overlay || groups.workspace.length + groups.global.length === 0) return null;
+  const sections = [
+    { label: "Workspace actions", entries: groups.workspace },
+    { label: "Global actions", entries: groups.global },
+  ].filter((section) => section.entries.length > 0);
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger className="gap-2">
@@ -112,22 +138,14 @@ export function RowActionsMenu({ kind, path: given }: { kind: ContextActionKind;
         Actions
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className={cn(COMPACT_CONTENT, "min-w-64")}>
-        {entries.map((entry) => (
-          <ContextMenuItem
-            key={entry.action.id}
-            title={entry.reason ?? entry.title ?? undefined}
-            disabled={!entry.enabled}
-            className={COMPACT_ITEM}
-            onSelect={() => run(entry.action, overlay)}
-          >
-            <ActionIcon action={entry.action} size={14} />
-            <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
-              <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
-            </span>
-            {!entry.enabled && entry.reason && entry.subtitle !== WORKSPACE_UNSET && (
-              <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>
-            )}
-          </ContextMenuItem>
+        {sections.map((section, i) => (
+          <div key={section.label}>
+            {i > 0 && <ContextMenuSeparator />}
+            <ContextMenuLabel className="px-2 py-1 text-[10px]">{section.label}</ContextMenuLabel>
+            {section.entries.map((entry) => (
+              <EntryItem key={entry.action.id} entry={entry} overlay={overlay} run={run} />
+            ))}
+          </div>
         ))}
       </ContextMenuSubContent>
     </ContextMenuSub>
