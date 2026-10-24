@@ -304,13 +304,16 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
 - **Launch cwd.** Line 1 of a rollout is `{"type":"session_meta","payload":{"id":...,"cwd":...}}`;
   `CwdRead::HeaderLine(1)` reads `payload.cwd` from it (the same reader takes OMP's and Pi's `{type:"session", cwd}`).
 - **Resume.** `codex resume '<id>'` on top of the stripped launch line. The codex row keeps `-p`/`--profile`,
-  `-c`/`--config` (repeatable), `-m`/`--model`, `--local-provider` and `--oss`, so `codex -p work -m o3` resumes as
+  `-m`/`--model`, `--local-provider` and `--oss`, so `codex -p work -m o3` resumes as
   `codex -p work -m o3 resume '<id>'` (Codex 0.163 parses those options before the subcommand; that it applies them to
   the resumed session is read from its CLI, not measured live). Each of those value options takes exactly one token
   (`single_value_opts`, the same `CODEX_VALUE_OPTS` list the `exec` detection uses), so a prompt or the `resume <id>`
   of an already resumed line is never taken for a value and a second strip gives the same base. The sandbox and
   approval options (`-s`/`--sandbox`, `-a`/`--ask-for-approval`, `--yolo`,
-  `--dangerously-bypass-approvals-and-sandbox`) are dropped on purpose: a restore must not silently re-grant them.
+  `--dangerously-bypass-approvals-and-sandbox`) are dropped on purpose: a restore must not silently re-grant them. So
+  is `-c`/`--config` in every spelling (`-c v`, `-c=v`, `--config v`, `--config=v`), because an override such as
+  `-c sandbox_mode="danger-full-access"` or `-c approval_policy=never` sets the same thing; a profile (`-p`) is kept
+  because it lives in the user's own `config.toml`, not on the command line.
 - **Missing rollout.** The policy is `ResumeAnyway`: a session may have no rollout yet, and `codex resume <id>` is the
   only way back to it, so the plan still runs in the recorded launch directory and the record is never pruned.
 - **One-shot runs.** `codex exec ...` and its alias `codex e ...` are Codex's non-interactive mode and never become a
@@ -390,7 +393,7 @@ The process the shell runs is not a source for the command: a wrapper such as `c
 so the process shows a plain `claude` and its cleaned environment is gone.
 
 The stripping whitelists are empty for `opencode`, `omp` and `pi`, so the stripped base collapses to the
-launcher (pinned by tests); `codex` keeps its profile, config, model and local provider options (see Codex above). The plain templates used when no launch command is known are `claude --resume '<id>'`,
+launcher (pinned by tests); `codex` keeps its profile, model and local provider options (see Codex above). The plain templates used when no launch command is known are `claude --resume '<id>'`,
 `codex resume '<id>'`, `opencode --session '<id>'`, `omp --resume '<id>'` (id, prefix or path) and `pi --session '<id>'`
 (id or path).
 

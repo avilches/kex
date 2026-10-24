@@ -856,35 +856,41 @@ mod tests {
     }
 
     #[test]
-    fn codex_resume_keeps_profile_config_model_and_provider_options() {
+    fn codex_resume_keeps_profile_model_and_provider_options() {
         let base = strip_for_resume_base(
-            "codex -p work -c effort=high --config a.b=1 --oss --local-provider ollama -m o3 'fix it'",
+            "codex -p work --oss --local-provider ollama -m o3 'fix it'",
             "codex",
         );
         assert_eq!(
             base.as_deref(),
-            Some("codex -p work -c effort=high --config a.b=1 --oss --local-provider ollama -m o3")
+            Some("codex -p work --oss --local-provider ollama -m o3")
         );
-        let base = strip_for_resume_base(
-            "codex --profile work --model=o3 --config=x=1 --search 'go'",
-            "codex",
-        );
-        assert_eq!(
-            base.as_deref(),
-            Some("codex --profile work --model=o3 --config=x=1")
-        );
+        let base = strip_for_resume_base("codex --profile work --model=o3 --search 'go'", "codex");
+        assert_eq!(base.as_deref(), Some("codex --profile work --model=o3"));
     }
 
     #[test]
     fn codex_resume_never_regrants_sandbox_or_approval_bypasses() {
-        for line in [
-            "codex --dangerously-bypass-approvals-and-sandbox -p work",
-            "codex --yolo -p work",
-            "codex -s danger-full-access -p work",
-            "codex --sandbox danger-full-access -p work",
-            "codex -a never -p work",
-            "codex --ask-for-approval never -p work",
+        let mut lines = vec![
+            "codex --dangerously-bypass-approvals-and-sandbox -p work".to_string(),
+            "codex --yolo -p work".to_string(),
+            "codex -s danger-full-access -p work".to_string(),
+            "codex --sandbox danger-full-access -p work".to_string(),
+            "codex -a never -p work".to_string(),
+            "codex --ask-for-approval never -p work".to_string(),
+        ];
+        // A config override can set the sandbox or the approval policy as well as an option can.
+        for value in [
+            r#"sandbox_mode="danger-full-access""#,
+            "approval_policy=never",
+            "effort=high",
         ] {
+            lines.push(format!("codex -c {value} -p work"));
+            lines.push(format!("codex -c={value} -p work"));
+            lines.push(format!("codex --config {value} -p work"));
+            lines.push(format!("codex --config={value} -p work"));
+        }
+        for line in &lines {
             assert_eq!(
                 strip_for_resume_base(line, "codex").as_deref(),
                 Some("codex -p work"),
@@ -895,11 +901,12 @@ mod tests {
 
     #[test]
     fn codex_resume_line_is_stable_under_a_second_strip() {
-        let base = strip_for_resume_base("codex -p work -c a=b --oss 'fix it'", "codex").unwrap();
+        let base =
+            strip_for_resume_base("codex -p work -c a=b -m o3 --oss 'fix it'", "codex").unwrap();
         let resume = Provider::of("codex")
             .unwrap()
             .resume_cmd(Some(&base), "id-1");
-        assert_eq!(resume, "codex -p work -c a=b --oss resume 'id-1'");
+        assert_eq!(resume, "codex -p work -m o3 --oss resume 'id-1'");
         assert_eq!(strip_for_resume_base(&resume, "codex").unwrap(), base);
     }
 

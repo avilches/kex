@@ -51,19 +51,10 @@ pub static PROVIDERS: &[Provider] = &[
         cwd_read: CwdRead::HeaderLine(1),
         resume: ResumeSpec::Subcommand { name: "resume" },
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
-        // Profile, config overrides, model and local provider describe the session; the
-        // sandbox and approval options (`-s`, `-a`, `--yolo`, the bypass) are dropped on purpose
-        // so a restore never silently re-grants what the user chose for one run.
+        // Profile, model and local provider describe the session. The sandbox and approval
+        // options, and `-c` which can set either, are dropped so a restore never re-grants them.
         keep_flags: &["--oss"],
-        keep_with_value: &[
-            "-p",
-            "--profile",
-            "-c",
-            "--config",
-            "-m",
-            "--model",
-            "--local-provider",
-        ],
+        keep_with_value: &["-p", "--profile", "-m", "--model", "--local-provider"],
         single_value_opts: CODEX_VALUE_OPTS,
     },
     Provider {
@@ -556,7 +547,14 @@ mod tests {
         for flag in provider.keep_with_value {
             assert!(provider.single_value_opts.contains(flag), "{flag}");
         }
-        for dangerous in ["-s", "--sandbox", "-a", "--ask-for-approval"] {
+        for dangerous in [
+            "-s",
+            "--sandbox",
+            "-a",
+            "--ask-for-approval",
+            "-c",
+            "--config",
+        ] {
             assert!(
                 !provider.keep_with_value.contains(&dangerous),
                 "{dangerous}"
