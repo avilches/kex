@@ -114,11 +114,11 @@ describe("TabAgentMenuItems", () => {
     expect(reveal).toHaveBeenCalledWith("/t/dir");
   });
 
-  it("places the extra items inside the agent block, after the transcript actions", () => {
+  it("places the extra items inside the agent block, right after the process entry", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "omp");
     open(noop, <div>Run on Start</div>);
     const html = document.body.innerHTML;
-    expect(html.indexOf("Transcript not created yet")).toBeLessThan(html.indexOf("Run on Start"));
+    expect(html.indexOf("Run on Start")).toBeLessThan(html.indexOf("Transcript not created yet"));
     expect(screen.getByText("Run on Start")).toBeTruthy();
   });
 

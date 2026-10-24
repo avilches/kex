@@ -123,11 +123,11 @@ describe("RunOnStartMenu pending restore", () => {
     unmount();
   });
 
-  it("shows the Enabled switch when nothing is pending", async () => {
+  it("shows the Enable button when nothing is pending", async () => {
     const unmount = mount();
     await openMenu();
     await openSub();
-    expect(document.body.textContent).toContain("Enabled");
+    expect(document.body.textContent).toContain("Enable");
     expect(document.body.textContent).not.toContain("Restore pending");
     unmount();
   });
