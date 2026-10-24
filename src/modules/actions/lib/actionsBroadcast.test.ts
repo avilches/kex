@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { ACTIONS_ATTACH_EVENT, ACTIONS_PUSH_EVENT } from "./actionsLink";
+import { ACTIONS_ATTACH_EVENT, ACTIONS_OWNER_EVENT, ACTIONS_PUSH_EVENT } from "./actionsLink";
 import { useWorkspaceActionsBroadcast } from "./actionsBroadcast";
 
 const hoisted = vi.hoisted(() => ({
@@ -21,7 +21,13 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getAllWebviewWindows: () => Promise.resolve([{ label: "settings" }]),
+  getCurrentWebviewWindow: () => ({ label: "w-test" }),
 }));
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const workspace = (title: string): Workspace => ({
   id: "w1",
@@ -38,10 +44,36 @@ async function pushedName(title: string): Promise<string> {
   hoisted.emit.mockClear();
   renderHook(() => useWorkspaceActionsBroadcast({ workspace: workspace(title), mutators }));
   await waitFor(() => expect(hoisted.handlers[ACTIONS_ATTACH_EVENT]).toBeDefined());
+  act(() => {
+    window.dispatchEvent(new Event("focus"));
+  });
   act(() => hoisted.handlers[ACTIONS_ATTACH_EVENT]!());
   await waitFor(() => expect(hoisted.emit.mock.calls.some((c) => c[0] === ACTIONS_PUSH_EVENT)).toBe(true));
   return (hoisted.emit.mock.calls.find((c) => c[0] === ACTIONS_PUSH_EVENT)![1] as { workspaceName: string }).workspaceName;
 }
+
+describe("which main window feeds Settings", () => {
+  it("stays silent until it has the focus, and again once another window claims it", async () => {
+    hoisted.emit.mockClear();
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    renderHook(() => useWorkspaceActionsBroadcast({ workspace: workspace("Plain"), mutators }));
+    await waitFor(() => expect(hoisted.handlers[ACTIONS_ATTACH_EVENT]).toBeDefined());
+    act(() => hoisted.handlers[ACTIONS_ATTACH_EVENT]!());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(hoisted.emit.mock.calls.some((c) => c[0] === ACTIONS_PUSH_EVENT)).toBe(false);
+
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() => expect(hoisted.emit.mock.calls.some((c) => c[0] === ACTIONS_PUSH_EVENT)).toBe(true));
+
+    hoisted.emit.mockClear();
+    act(() => (hoisted.handlers[ACTIONS_OWNER_EVENT] as unknown as (e: { payload: string }) => void)({ payload: "w-other" }));
+    act(() => hoisted.handlers[ACTIONS_ATTACH_EVENT]!());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(hoisted.emit.mock.calls.some((c) => c[0] === ACTIONS_PUSH_EVENT)).toBe(false);
+  });
+});
 
 describe("the workspace name pushed to Settings", () => {
   it("has its {templates} expanded, as the Header shows it", async () => {
