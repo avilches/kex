@@ -113,7 +113,7 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
 
 0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
-   Prueba: un release de usar y tirar con `build.minify: false` y volcados del siguiente congelón.
+   Prueba: `pnpm build:local --performance` y volcados del siguiente congelón.
 
 1. **El spinner `braille`** (el usuario lo tiene): un único `setInterval` de 80 ms re-renderiza todos los spinners y
    cambia un carácter en cada uno, lo que fuerza estilos y layout en las filas `flex` de la barra de workspaces y de las
@@ -147,8 +147,9 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
   `src-tauri/Cargo.toml`, que deja de recortar solo las macros y los scripts de build; el ejecutable final sigue
   recortado (11,0 MB, frente a 13,8 MB sin recortar). La causa exacta no se investigó: se comprobó el efecto, no el
   motivo. Si reaparece el error, mira primero que esa sección siga en `Cargo.toml`.
-- Para nombres de función legibles en un release hay que compilar con `build.minify: false` en `vite.config.ts`, solo en
-  un worktree de usar y tirar. En el release normal las funciones locales salen con el nombre mutilado.
+- Para nombres de función legibles en un release, `pnpm build:local --performance` compila sin minify (el bundle del
+  frontend pasa de unos 11,7 MB a 16). En el release normal las funciones locales salen con el nombre mutilado. Instala
+  en `/Applications` como el build normal: vuelve a un `pnpm build:local` a secas cuando termines de investigar.
 - Instrumentar siempre en un worktree propio y no dejar ese código en `main`. Un volcado de `sample` desde un agente
   funciona sin permisos especiales.
 - Un volcado sano sirve de poco por sí solo: hace falta uno lento y uno sano del mismo estado para comparar.

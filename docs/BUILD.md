@@ -144,6 +144,8 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 `pnpm buildlocal` (runs `scripts/build-local-app.sh`, macOS only) builds just the `.app` bundle and installs it straight into `/Applications`, replacing whatever is there. It skips the signing key entirely by disabling updater artifacts for that one build (`tauri build -b app -c '{"bundle":{"createUpdaterArtifacts":false}}'`), and skips the dmg step, so it's a much faster loop for trying a local change than the full production build. It does not quit or relaunch Kex: this script may itself be running inside a Kex terminal tab, so killing the app would kill the shell running it. Quit and reopen Kex yourself once it prints that the copy is done.
 
+`pnpm build:local --performance` does the same build without minifying the JavaScript (`KEX_BUILD_PERFORMANCE=1`, read by `vite.config.ts`), so the in-app profiler and native samples show readable function names. The frontend bundle grows from about 11.7 MB to 16 MB; use it only to investigate performance (`performance/CLAUDE.md`), and go back to a plain `pnpm build:local` afterwards.
+
 ### Version mismatch gotcha
 
 If `pnpm tauri build` fails with "Found version mismatched Tauri packages", the Rust crate and the NPM package for a plugin resolved to different minor versions. Fix: update the NPM package to match the crate version shown in the error, e.g.:
