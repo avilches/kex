@@ -295,7 +295,8 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
 
 - **Rollouts.** Codex writes one JSONL per session at
   `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/rollout-<local timestamp>-<uuid>.jsonl`; the uuid is the session id.
-  `SessionsSource::CodexSessions` tries the recorded `transcript_path` first, then walks the three date levels newest
+  `SessionsSource::CodexSessions` tries the recorded `transcript_path` first (only when its file name is
+  `rollout-*.jsonl`; any other name falls back to the id lookup), then walks the three date levels newest
   first and returns the `rollout-*-<id>.jsonl` of the first day that holds one. The depth is fixed, so a recent session
   costs a handful of directory reads even when the tree holds thousands of rollouts; anything else in the tree (files
   that do not start with `rollout-`, other extensions, directories) is ignored. `CODEX_HOME` is resolved like the

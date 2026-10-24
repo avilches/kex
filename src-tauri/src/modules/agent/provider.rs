@@ -292,8 +292,9 @@ fn find_in_codex_sessions(
     session_id: &str,
     transcript_path: &str,
 ) -> Option<PathBuf> {
-    if !transcript_path.is_empty() && Path::new(transcript_path).is_file() {
-        return Some(PathBuf::from(transcript_path));
+    let recorded = Path::new(transcript_path);
+    if is_rollout_name(recorded) && recorded.is_file() {
+        return Some(recorded.to_path_buf());
     }
     let root = root?;
     if session_id.is_empty() {
@@ -322,6 +323,13 @@ fn find_in_codex_sessions(
         }
     }
     None
+}
+
+// The recorded path comes from a hook frame; only a file that looks like a rollout is read.
+fn is_rollout_name(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("rollout-") && n.ends_with(".jsonl"))
 }
 
 fn subdirs_newest_first(dir: &Path) -> Vec<PathBuf> {
@@ -792,6 +800,31 @@ mod tests {
             find_in_codex_sessions(Some(root.path()), CODEX_ID, &recorded.display().to_string());
 
         assert_eq!(found, Some(recorded));
+    }
+
+    #[test]
+    fn a_recorded_transcript_path_that_is_not_a_rollout_falls_back_to_the_id_lookup() {
+        let root = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let want = write_rollout(root.path(), "2026/10/14", "2026-10-14T20-42-20", CODEX_ID);
+        for name in [
+            "notes.jsonl",
+            "rollout-x.json",
+            "x-rollout-1.jsonl",
+            "rollout-x.jsonl.bak",
+        ] {
+            let recorded = other.path().join(name);
+            std::fs::write(&recorded, "{}\n").unwrap();
+            assert_eq!(
+                find_in_codex_sessions(
+                    Some(root.path()),
+                    CODEX_ID,
+                    &recorded.display().to_string()
+                ),
+                Some(want.clone()),
+                "{name}"
+            );
+        }
     }
 
     #[test]
