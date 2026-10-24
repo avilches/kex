@@ -355,9 +355,29 @@ describe("repositories", () => {
     ]);
     const ofRepo = group.rows.filter((r) => r.repoKey === "/repo" && !r.pinned);
     expect(ofRepo.map((r) => [r.cluster, r.headed])).toEqual([
+      [3, false],
       [3, true],
       [3, true],
-      [3, true],
+    ]);
+  });
+
+  it("puts the repository heading on the first folder after the fixed rows, not on the current tab", () => {
+    const cur = entry({ workspaceId: "ws-1", cwd: "/repo" });
+    const wt = entry({ workspaceId: "ws-1", cwd: "/repo/.claude/worktrees/x" });
+    const scripts = entry({ workspaceId: "ws-1", cwd: "/repo/scripts" });
+    const [group] = build({
+      workspaces: [ws({ id: "ws-1", title: "Kex", workspaceRoot: "/docs" })],
+      home: "/Users/a",
+      activeTabEntry: cur,
+      entries: [cur, wt, scripts],
+      repoOf: repoOfMap({ "/repo": "/repo", "/repo/.claude/worktrees/x": "/repo", "/repo/scripts": "/repo", "/docs": "/docs" }),
+    });
+    expect(group.rows.map((r) => [r.path, r.headed])).toEqual([
+      ["/repo", false],
+      ["/docs", false],
+      ["/Users/a", false],
+      ["/repo/.claude/worktrees/x", true],
+      ["/repo/scripts", true],
     ]);
   });
 

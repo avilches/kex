@@ -282,6 +282,9 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
     row.worktreeCount = b.worktreesOfKey.get(row.repoKey)?.length ?? 0;
     row.worktreesLoading = !b.worktreesOfKey.has(row.repoKey);
   }
+  // The heading goes once, right above the first folder of the repository after the fixed rows; the
+  // current tab carries it only when the repository has nothing else to show.
+  if (first && mineRest.length > 0) first.headed = false;
   for (const row of raw.pinned) {
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);

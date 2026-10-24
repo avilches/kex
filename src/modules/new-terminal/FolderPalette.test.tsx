@@ -342,6 +342,30 @@ describe("FolderPalette", () => {
       await waitFor(() => expect(itemEls()[1].textContent).toContain("hide worktrees"));
     });
 
+    it("draws the repository heading once, above the folders that follow the fixed rows", async () => {
+      const inRepo = { repoKey: "/repo", repoName: "repo", repoHint: show, cluster: 3 } as const;
+      mountGroups(
+        [
+          group({
+            active: true,
+            rows: [
+              row({ path: "/repo", label: "Current tab", headed: false, key: "ws-1:/repo", ...inRepo }),
+              row({ path: "/docs", label: "Workspace Root", slot: "root", pinned: true, key: "ws-1:/docs" }),
+              row({ path: "/Users/a", label: "Home", slot: "home", pinned: true, key: "ws-1:/Users/a" }),
+              row({ path: "/repo/wt", headed: true, key: "ws-1:/repo/wt", ...inRepo }),
+              row({ path: "/repo/scripts", headed: true, key: "ws-1:/repo/scripts", ...inRepo }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const headings = repoHeadings();
+      expect(headings).toHaveLength(1);
+      expect(headings[0].nextElementSibling?.textContent).toContain("/repo/wt");
+      expect(itemEls()[0].previousElementSibling).not.toBe(headings[0]);
+    });
+
     it("opens a heading above the current tab when its repository has no other folder", async () => {
       mountGroups(
         [
