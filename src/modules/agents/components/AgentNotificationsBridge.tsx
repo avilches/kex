@@ -17,6 +17,7 @@ import { stopOutcome } from "../lib/subagentGate";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
+import { useIntegrationWarningStore } from "../store/integrationWarningStore";
 import { suggestIntegration } from "./IntegrationSuggestionToast";
 
 type Activate = (workspaceId: string, tabId: string) => void;
@@ -177,6 +178,7 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const store = useAgentStore.getState();
   if (endsAgentSession(sig.kind)) {
     store.finish(tabId);
+    useIntegrationWarningStore.getState().clearTab(tabId);
     if (detachesRecord(sig.kind, isHibernating(tabId))) {
       invoke("agent_detach_session", { tabId }).catch(() => {});
       // The agent is gone: what it last sent as OSC title must not keep naming the tab.
@@ -187,7 +189,7 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   switch (sig.kind) {
     case "started":
       ensureSessionIdle(tabId, ctx, sig.agent ?? "claude");
-      void suggestIntegration(sig.agent ?? "claude");
+      void suggestIntegration(sig.agent ?? "claude", tabId);
       return;
     case "UserPromptSubmit": {
       ensureSession(tabId, ctx, sig.agent ?? "claude");

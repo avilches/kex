@@ -4,14 +4,18 @@ import { readIntegrationSuggestions, updateIntegrationSuggestions } from "@/modu
 import { agentStatus, installAgent } from "../lib/agentIntegration";
 import { AgentIcon } from "../lib/agentIcon";
 import { createIntegrationSuggester } from "../lib/integrationSuggestionFlow";
+import { useIntegrationWarningStore } from "../store/integrationWarningStore";
 import { AGENT_LABELS, type AgentId } from "../lib/integrations";
 
 const TOAST_MS = 20_000;
+// Sonner anchors the toast to the right edge, so a wider one grows to the left.
+const TOAST_WIDTH = "min(480px, calc(100vw - 32px))";
 
 async function installFromToast(agent: AgentId): Promise<void> {
   const name = AGENT_LABELS[agent];
   try {
     await installAgent(agent);
+    useIntegrationWarningStore.getState().clearAgent(agent);
     toast.success(`${name} integration installed`);
   } catch (e) {
     console.error(`[kex] installing the ${agent} integration failed:`, e);
@@ -27,6 +31,8 @@ export function showIntegrationSuggestion(agent: AgentId): void {
     icon: <AgentIcon agent={agent} size={18} />,
     action: { label: "Install", onClick: () => void installFromToast(agent) },
     cancel: { label: "View changes", onClick: () => void openSettingsWindow("general") },
+    id: `integration-${agent}`,
+    style: { width: TOAST_WIDTH },
     duration: TOAST_MS,
     closeButton: true,
   });
@@ -39,4 +45,5 @@ export const suggestIntegration = createIntegrationSuggester({
   read: readIntegrationSuggestions,
   update: updateIntegrationSuggestions,
   show: showIntegrationSuggestion,
+  warn: (tabId, agent) => useIntegrationWarningStore.getState().warn(tabId, agent),
 });

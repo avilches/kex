@@ -7,6 +7,7 @@ export type SuggestDeps = {
   read: () => Promise<SuggestionMap>;
   update: (change: (map: SuggestionMap) => SuggestionMap) => Promise<void>;
   show: (agent: AgentId) => void;
+  warn: (tabId: string, agent: AgentId) => void;
 };
 
 // Decides whether a detected agent deserves the install suggestion. Each agent is looked at
@@ -15,19 +16,23 @@ export type SuggestDeps = {
 // is the same "not now" as pressing the button.
 export function createIntegrationSuggester(deps: SuggestDeps) {
   const seen = new Set<AgentId>();
-  return async (agent: unknown): Promise<void> => {
-    if (!isAgentId(agent) || seen.has(agent)) return;
+  return async (agent: unknown, tabId: string): Promise<void> => {
+    if (!isAgentId(agent)) return;
+    const first = !seen.has(agent);
     seen.add(agent);
     try {
       const status = await deps.status(agent);
       if (status === "installed") {
         // Installed before this feature existed: it counts as installed once, so a later
         // uninstall does not bring the suggestion back.
-        await deps.update((map) => withInstalled(map, agent));
+        if (first) await deps.update((map) => withInstalled(map, agent));
         return;
       }
       // Install would fail anyway; the ask is kept for a later run where it can work.
       if (status !== "missing") return;
+      // The tab marker does not depend on the ask policy: every tab running the agent shows it.
+      deps.warn(tabId, agent);
+      if (!first) return;
       const map = await deps.read();
       if (!shouldSuggest(map[agent], deps.now())) return;
       await deps.update((current) => withAsked(current, agent, deps.now()));
