@@ -46,10 +46,10 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect, 
   const customHex =
     value != null && !(COLOR_SWATCHES as readonly string[]).includes(value) ? value : "";
 
-  const swatchSize = layout === "row" ? "size-[18px] shrink-0" : "size-5";
+  const swatchSize = layout === "row" ? "size-4 shrink-0" : "size-5";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn("flex gap-2", layout === "row" ? "flex-col-reverse" : "flex-col")}>
       <div className={layout === "row" ? "flex gap-1" : "grid grid-cols-7 gap-1"}>
         <button
           type="button"
