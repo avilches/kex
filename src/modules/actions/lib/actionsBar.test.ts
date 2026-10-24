@@ -20,6 +20,7 @@ import {
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  paletteActions,
   parseBarZone,
   resolveDrop,
   SETTINGS_LABELS,
@@ -637,5 +638,34 @@ describe("resolveDrop", () => {
     expect(drop("w1", "ghost")).toBeNull();
     expect(drop("ghost", "w1")).toBeNull();
     expect(drop(row("ghost"), "w1")).toBeNull();
+  });
+});
+
+describe("paletteActions", () => {
+  const build = (states = new Map<string, "running">()) =>
+    buildActionsBarModel({
+      local: [script({ id: "s1", name: "dev" }), app({ id: "a1", command: "code {filepath}" })],
+      global: [script({ id: "g1", name: "lint" })],
+      context: ctx,
+      states,
+      activeId: undefined,
+    });
+
+  it("lists the Actions that can run, workspace ones before global ones", () => {
+    expect(paletteActions(build()).map((i) => i.id)).toEqual(["s1", "g1"]);
+  });
+
+  it("leaves out the ones that cannot run now", () => {
+    expect(paletteActions(build()).map((i) => i.id)).not.toContain("a1");
+  });
+
+  it("keeps a running script so it can be shown or stopped", () => {
+    const model = buildActionsBarModel({
+      local: [script({ id: "s1", command: "pnpm dev {filepath}" })],
+      context: ctx,
+      states: new Map([["s1", "running" as const]]),
+      activeId: undefined,
+    });
+    expect(paletteActions(model).map((i) => i.id)).toEqual(["s1"]);
   });
 });

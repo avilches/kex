@@ -60,6 +60,10 @@ function PaletteHarness() {
       restoreFocus={() => {}}
       initialMode="content"
       commandItems={[]}
+      actionsWorkspace={null}
+      onRunAction={noop}
+      onStopAction={noop}
+      onEditAction={noop}
       workspaceRoot={null}
       onOpenContentHit={noop}
       insertCommand={null}

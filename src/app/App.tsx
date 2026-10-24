@@ -4177,6 +4177,15 @@ export default function App() {
             restoreFocus={focusActiveTab}
             initialMode={paletteInitialMode}
             commandItems={commandPaletteItems}
+            actionsWorkspace={activeWorkspace ?? null}
+            onRunAction={(item) => {
+              if (item.state !== "idle" && focusActionTab(item.action)) return;
+              runAction(item.action);
+            }}
+            onStopAction={(item) => stopAction(item.action)}
+            onEditAction={(item) =>
+              void openActionSettings(item.global ? "global" : "workspace", item.id)
+            }
             workspaceRoot={explorerRoot}
             onOpenContentHit={openContentHit}
             insertCommand={insertHistoryCommand}
