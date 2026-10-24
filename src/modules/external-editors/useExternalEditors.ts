@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { native } from "@/lib/native";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
 import { planAgentSeed } from "@/modules/actions/lib/agentSeed";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { setAgentActionsSeeded, setDetectedEditors } from "@/modules/settings/store";
@@ -61,7 +61,8 @@ export async function runEditorScan(): Promise<void> {
   scanning = true;
   notifyScanning();
   try {
-    const result = await native.editorScan();
+    // Before hydration the store holds defaults, and seeding on them would overwrite the saved lists.
+    const [result] = await Promise.all([native.editorScan(), whenHydrated()]);
     const existing: DetectedEditor[] = usePreferencesStore.getState().detectedEditors;
     const merged = mergeEnabled(result, existing);
     await setDetectedEditors(merged);

@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   writes: [] as Action[][],
   failActions: false,
   failFlag: false,
+  hydration: Promise.resolve() as Promise<void>,
 }));
 
 vi.mock("@/lib/native", () => ({ native: { editorScan: h.scan } }));
@@ -19,6 +20,7 @@ vi.mock("@/modules/settings/preferences", async () => {
       agentActionsSeeded: false,
       detectedEditors: [] as DetectedEditor[],
     })),
+    whenHydrated: () => h.hydration,
   };
 });
 
@@ -59,6 +61,7 @@ beforeEach(() => {
   h.writes.length = 0;
   h.failActions = false;
   h.failFlag = false;
+  h.hydration = Promise.resolve();
   usePreferencesStore.setState({ actions: [], agentActionsSeeded: false, detectedEditors: [] });
 });
 
@@ -131,5 +134,37 @@ describe("agent seeding on scan", () => {
     await runEditorScan();
     expect(seededCommands()).toEqual(["claude"]);
     expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
+  });
+
+  it("waits for hydration when the scan resolves first, and keeps the saved global Actions", async () => {
+    const saved: Action = { id: "act-1", name: "Build", kind: "script", command: "pnpm build", ownButton: false };
+    let hydrate!: () => void;
+    h.hydration = new Promise<void>((r) => {
+      hydrate = r;
+    });
+    h.scan.mockResolvedValue([agent("claude")]);
+    const run = runEditorScan();
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(h.writes).toEqual([]);
+    usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: false });
+    hydrate();
+    await run;
+    expect(seededCommands()).toEqual(["pnpm build", "claude"]);
+  });
+
+  it("does not reseed when the hydrated flag says the agents were already seeded", async () => {
+    const saved: Action = { id: "act-1", name: "Build", kind: "script", command: "pnpm build", ownButton: false };
+    let hydrate!: () => void;
+    h.hydration = new Promise<void>((r) => {
+      hydrate = r;
+    });
+    h.scan.mockResolvedValue([agent("claude")]);
+    const run = runEditorScan();
+    await new Promise<void>((r) => setTimeout(r, 0));
+    usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: true });
+    hydrate();
+    await run;
+    expect(h.writes).toEqual([]);
+    expect(seededCommands()).toEqual(["pnpm build"]);
   });
 });

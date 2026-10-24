@@ -9,6 +9,7 @@ import type { Action } from "@/modules/actions";
 const change = vi.fn(async (fn: (l: Action[]) => Action[]) => ({ before: [] as Action[], after: fn([]) }));
 const scan = vi.fn();
 let actions: Action[] = [];
+let hydrated = true;
 let detected = [
   { id: "pycharm", name: "PyCharm", binary: "pycharm", argsBeforePath: [] as string[] },
   { id: "zed", name: "Zed", binary: "zed", argsBeforePath: [] as string[] },
@@ -22,7 +23,7 @@ vi.mock("@/modules/external-editors", () => ({
   EditorIcon: () => null,
 }));
 vi.mock("@/modules/settings/preferences", () => ({
-  usePreferencesStore: (sel: (s: { actions: Action[] }) => unknown) => sel({ actions }),
+  usePreferencesStore: (sel: (s: { actions: Action[]; hydrated: boolean }) => unknown) => sel({ actions, hydrated }),
 }));
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a) } }));
@@ -57,6 +58,7 @@ describe("ActionsSection", () => {
     toastError.mockClear();
     scan.mockClear();
     actions = [];
+    hydrated = true;
     detected = [
       { id: "pycharm", name: "PyCharm", binary: "pycharm", argsBeforePath: [] },
       { id: "zed", name: "Zed", binary: "zed", argsBeforePath: [] },
@@ -123,6 +125,18 @@ describe("ActionsSection", () => {
     expect(toastError).toHaveBeenCalled();
     expect(commandField()!.value).toBe("pnpm dev");
     unmount();
+  });
+
+  it("starts its own scan only once preferences are hydrated", () => {
+    detected = [];
+    hydrated = false;
+    const first = mount();
+    expect(scan).not.toHaveBeenCalled();
+    first.unmount();
+    hydrated = true;
+    const second = mount();
+    expect(scan).toHaveBeenCalledTimes(1);
+    second.unmount();
   });
 
   it("scans for apps from the header button", () => {

@@ -48,6 +48,7 @@ export type ActionsRequest = ActionsTarget & { nonce: number };
 
 export function ActionsSection({ target = null }: { target?: ActionsRequest | null }) {
   const actions = usePreferencesStore((s) => s.actions);
+  const hydrated = usePreferencesStore((s) => s.hydrated);
   const { detectedEditors, detectedAgents, isScanning, scan } = useExternalEditors();
   const suggestions = useMemo(
     () => [...suggestionsFromDetected(detectedEditors), ...agentSuggestionsFromDetected(detectedAgents)],
@@ -58,11 +59,11 @@ export function ActionsSection({ target = null }: { target?: ActionsRequest | nu
 
   const didScan = useRef(false);
   useEffect(() => {
-    if (!didScan.current && detectedEditors.length === 0 && !isScanning) {
+    if (hydrated && !didScan.current && detectedEditors.length === 0 && !isScanning) {
       didScan.current = true;
       scan();
     }
-  }, [detectedEditors.length, isScanning, scan]);
+  }, [hydrated, detectedEditors.length, isScanning, scan]);
 
   const workspaceId = feed?.workspaceId;
   return (
