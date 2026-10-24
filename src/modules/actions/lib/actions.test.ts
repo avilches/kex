@@ -90,8 +90,8 @@ describe("normalizeActions", () => {
     expect(out.map((x) => x.kind)).toEqual(["app", "script", "agent"]);
   });
 
-  it("drops an entry with no valid kind, including an old runInTerminal one", () => {
-    expect(normalizeActions([{ id: "a", name: "a", command: "x", runInTerminal: true, ownButton: false }])).toEqual([]);
+  it("drops an entry with no valid kind", () => {
+    expect(normalizeActions([{ id: "a", name: "a", command: "x", terminal: true, ownButton: false }])).toEqual([]);
     expect(normalizeActions([act("b", { kind: "bogus" as never })])).toEqual([]);
   });
 

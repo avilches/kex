@@ -539,6 +539,10 @@ Upstream ships its agent instructions as `AGENTS.md` at the repo root. The fork 
 
 Diagnostic for a window that feels slow, off by default and with no cost while off. The `performanceProfiler` preference (Settings > General > Diagnostics, or the palette entry "Enable performance profiler", `profiler.toggle`, no shortcut) persists across restarts; while it is on, every window wraps `requestAnimationFrame` and writes one `[profiler]` JSON line to `Kex.log` every 10 seconds, and turning it off restores the original function. `performance/kexperf.py` takes native samples of the WebContent process that belongs to a running Kex, automatically when it stays hot, and summarizes them. See `performance/CLAUDE.md` and `docs/BUILD.md`, "Profiling a slow window".
 
+### Agent Actions
+
+An Action has a `kind` of `app`, `script` or `agent` (it replaced the former boolean flag, with no migration). An agent Action opens a new terminal tab on every click and types its command verbatim plus Enter: no template, no variables, no running state, and Kex never closes the tab. The editor scan also detects coding agents, the Add combo offers a Workspace and a Current directory preset per agent, and the first detection seeds the Current directory variant of each enabled agent as a global Action with its own button, once, guarded by the `agentActionsSeeded` preference. Not present upstream. See `docs/ARCHITECTURE.md` section 3.12.
+
 ## Roadmap (planned, not yet built)
 
 These phases are designed but not fully implemented:
