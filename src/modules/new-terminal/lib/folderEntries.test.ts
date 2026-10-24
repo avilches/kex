@@ -114,7 +114,7 @@ describe("buildFolderGroups", () => {
     ]);
   });
 
-  it("keeps one row and the first label when a tab folder coincides with the root or home", () => {
+  it("shows the root and home as fixed rows when the current tab, or another tab, is on the same folder", () => {
     const entries = [
       entry({ workspaceId: "ws-1", cwd: "/repo" }),
       entry({ workspaceId: "ws-1", cwd: "/Users/a" }),
@@ -122,6 +122,7 @@ describe("buildFolderGroups", () => {
     const [group] = build({ home: "/Users/a", activeTabEntry: entries[0], entries });
     expect(group.rows.map((r) => [r.label, r.path])).toEqual([
       ["Current tab", "/repo"],
+      ["Workspace Root", "/repo"],
       ["Home", "/Users/a"],
     ]);
   });
@@ -244,7 +245,7 @@ describe("fixed rows", () => {
     expect(noRepo.rows.map((r) => r.slot)).toEqual([null, "root", "home"]);
   });
 
-  it("does not repeat the current tab: a fixed row on the same folder is left out", () => {
+  it("shows a fixed row even when the current tab is on the same folder", () => {
     const atRoot = entry({ workspaceId: "ws-1", cwd: "/repo" });
     const group = inRepo({
       activeTabEntry: atRoot,
@@ -254,6 +255,8 @@ describe("fixed rows", () => {
     });
     expect(group.rows.map((r) => [r.slot, r.label, r.path])).toEqual([
       [null, "Current tab", "/repo"],
+      ["root", "Workspace Root", "/repo"],
+      ["main", "Main checkout", "/repo"],
       ["home", "Home", "/Users/a"],
     ]);
   });

@@ -347,12 +347,12 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       extras: Partial<RowExtras> = {},
     ) => rowOf(b, path, activeWs.id, sleeping, label, { pinned: true, slot, ...extras });
     const rootPath = rootOf(activeWs);
-    if (rootPath && rootPath !== cwd) pinned.push(slotRow(rootPath, "Workspace Root", "root"));
+    if (rootPath) pinned.push(slotRow(rootPath, "Workspace Root", "root"));
     const currentRepo = currentRows[0]?.repoKey;
     const mainCheckout = currentRepo
       ? b.worktreesOfKey.get(currentRepo)?.find((w) => w.isMain)
       : undefined;
-    if (currentRepo && mainCheckout && mainCheckout.path !== cwd) {
+    if (currentRepo && mainCheckout) {
       pinned.push(
         slotRow(mainCheckout.path, "Main checkout", "main", {
           branch: mainCheckout.branch,
@@ -361,7 +361,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       );
     }
     const home = input.home?.replace(/[\\/]+$/, "");
-    if (home && home !== cwd) pinned.push(slotRow(home, "Home", "home"));
+    if (home) pinned.push(slotRow(home, "Home", "home"));
     for (const row of pinned) b.seen.add(row.path);
     raws.push({
       head: headOf(activeWs, true),
