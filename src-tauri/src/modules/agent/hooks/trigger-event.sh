@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# kex-session-v9
+# kex-session-v10
+# Some Claude Code versions treat an empty hook stdout as a failure, so `{}` goes out first,
+# before any early exit or socket work; Claude reads it as "no output" (no context, no warning).
+printf '{}\n'
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 

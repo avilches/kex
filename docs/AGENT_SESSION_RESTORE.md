@@ -134,11 +134,14 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v9`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v10`) handles all 10 registered Claude Code
 hook events the same way:
 
-1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
-   managed by Kex).
+0. Prints `{}` and a newline on stdout before anything else, early exits and a failed socket send included: some
+   Claude Code versions treat an empty hook stdout as a failure, and Claude reads `{}` as "no output" (it adds
+   nothing to the context of `SessionStart` and `UserPromptSubmit`).
+1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits (tab is not managed by
+   Kex), still after printing `{}`.
 2. Uses `jq` to re-serialize the payload tagged with `"agent"` set to the script's first argument, `claude` when
    there is none (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
    pass `codex`; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract

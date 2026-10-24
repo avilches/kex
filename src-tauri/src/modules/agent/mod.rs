@@ -26,7 +26,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
 // v8: the script tags its frames with its first argument, defaulting to "claude" (see trigger-event.sh).
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v9";
+// v10: the script prints `{}` on stdout before anything else.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v10";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -817,6 +818,60 @@ mod tests {
         let mut line = String::new();
         BufReader::new(stream).read_line(&mut line).unwrap();
         Some(line)
+    }
+
+    #[cfg(unix)]
+    fn trigger_script_stdout(env: &[(&str, &str)], remove: &[&str]) -> String {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("trigger-event.sh");
+        std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
+        let mut cmd = Command::new("bash");
+        cmd.arg(&script)
+            .env("HOME", dir.path())
+            .env_remove("KEX_TERMINAL")
+            .env_remove("KEX_TAB_ID")
+            .env_remove("KEX_IPC")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped());
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+        for k in remove {
+            cmd.env_remove(k);
+        }
+        let mut child = cmd.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(STOP_FRAME.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        String::from_utf8(out.stdout).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prints_an_empty_object_even_when_the_socket_is_unreachable() {
+        let out = trigger_script_stdout(
+            &[
+                ("KEX_TERMINAL", "1"),
+                ("KEX_TAB_ID", "tab-1"),
+                ("KEX_IPC", "/nonexistent/kex.sock"),
+            ],
+            &[],
+        );
+        assert_eq!(out, "{}\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prints_an_empty_object_on_the_early_exits() {
+        assert_eq!(trigger_script_stdout(&[], &[]), "{}\n");
+        assert_eq!(trigger_script_stdout(&[("KEX_TERMINAL", "1")], &[]), "{}\n");
     }
 
     #[cfg(unix)]
