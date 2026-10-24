@@ -31,7 +31,7 @@ import {
   type RunContext,
 } from "./actionRun";
 import { getActionTab, linkActionTab } from "./actionStateStore";
-import type { Action } from "./types";
+import { isScript, type Action } from "./types";
 
 // Values a run takes from where it was launched instead of the focused tab: the context
 // menus (explorer rows, breadcrumbs, tabs) run an Action against their own folder or file.
@@ -105,7 +105,7 @@ function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overl
       workspaceCwd: ws.cwd,
       home: cachedHomeDir(),
     },
-    link: action.runInTerminal ? linkFor(action.id, deps) : null,
+    link: isScript(action) ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
     atPaneLimit: allPanes(ws.paneTree).length >= workspacePaneLimit,
   };
@@ -299,7 +299,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     if (!ws) return;
     const action = pickRunnableAction(ws.actions ?? [], ws.activeAction);
     if (!action) return;
-    const tabId = action.runInTerminal ? getActionTab(action.id) : undefined;
+    const tabId = isScript(action) ? getActionTab(action.id) : undefined;
     if (tabId && getScriptRunningSnapshot().get(tabId)) stopAction(action);
     else runAction(action);
   }, [activeWorkspace, runAction, stopAction]);

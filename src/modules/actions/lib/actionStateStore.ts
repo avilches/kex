@@ -3,7 +3,7 @@ import {
   clearScriptRunningEntry,
   type ScriptState,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import type { Action } from "./types";
+import { isScript, type Action } from "./types";
 
 // Which tab each script Action last ran in. Runtime only: nothing here is persisted, so a
 // restart starts with no links and the first run opens a tab.
@@ -62,7 +62,7 @@ export function actionsToUnlink(before: readonly Action[], after: readonly Actio
   return before
     .filter((a) => {
       const next = now.get(a.id);
-      return !next || next.runInTerminal !== a.runInTerminal;
+      return !next || next.kind !== a.kind;
     })
     .map((a) => a.id);
 }
@@ -95,7 +95,7 @@ export function scriptActionOf(
   if (!id) return undefined;
   for (const list of lists) {
     const action = list.find((a) => a.id === id);
-    if (action?.runInTerminal) return { name: action.name, command: action.command };
+    if (action && isScript(action)) return { name: action.name, command: action.command };
   }
   return undefined;
 }

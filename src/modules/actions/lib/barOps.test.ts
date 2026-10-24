@@ -5,7 +5,7 @@ import type { Action } from "./types";
 const act = (id: string, over: Partial<Action> = {}): Action => ({
   id,
   name: id,
-  runInTerminal: false,
+  kind: "app",
   command: "x {workspace}",
   ownButton: false,
   ...over,

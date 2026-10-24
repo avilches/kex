@@ -3,13 +3,13 @@ import { contextActionEntries } from "./contextActionEntries";
 import type { Action } from "./types";
 
 let n = 0;
-const action = (command: string, runInTerminal = false, name = "A"): Action => ({
+const action = (command: string, script = false, name = "A"): Action => ({
   id: `a${n++}`,
   name,
-  runInTerminal,
+  kind: script ? "script" : "app",
   command,
   ownButton: false,
-  ...(runInTerminal ? { cwdMode: "workspace" as const } : {}),
+  ...(script ? { cwdMode: "workspace" as const } : {}),
 });
 
 const vars = (over: Record<string, string> = {}) => ({

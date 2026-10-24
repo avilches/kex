@@ -77,12 +77,12 @@ describe("ActionsSection", () => {
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ name: "PyCharm {workspace}", appId: "pycharm", runInTerminal: false, ownButton: false });
+    expect(next[0]).toMatchObject({ name: "PyCharm {workspace}", appId: "pycharm", kind: "app", ownButton: false });
     unmount();
   });
 
   it("keeps offering every app, so two actions can share one", () => {
-    actions = [{ id: "ac-1", name: "PyCharm {filepath}", runInTerminal: false, command: "pycharm {filepath}", appId: "pycharm", ownButton: false }];
+    actions = [{ id: "ac-1", name: "PyCharm {filepath}", kind: "app", command: "pycharm {filepath}", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
     openAdd(container);
     expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);
@@ -142,7 +142,7 @@ describe("ActionsSection", () => {
       feed: {
         workspaceId: "ws-1",
         workspaceName: "Dashboard",
-        actions: [{ id: "ac-9", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false }],
+        actions: [{ id: "ac-9", name: "Dev", kind: "script", command: "pnpm dev", cwdMode: "workspace", ownButton: false }],
         context: null,
       },
       send,

@@ -15,7 +15,7 @@ import { useWorkspaces } from "./useWorkspaces";
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ destroy: vi.fn() }) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve()) }));
 
-const script: Action = { id: "ac-s", name: "Dev", runInTerminal: true, command: "npm run dev", ownButton: true };
+const script: Action = { id: "ac-s", name: "Dev", kind: "script", command: "npm run dev", ownButton: true };
 
 const workspace = (): Workspace => ({
   id: "w1",
@@ -46,7 +46,7 @@ describe("deleting or retyping a running Action", () => {
 
   it("clears them when a script is turned into an app", () => {
     const { result } = start();
-    act(() => result.current.updateWorkspaceAction("w1", script.id, { runInTerminal: false }));
+    act(() => result.current.updateWorkspaceAction("w1", script.id, { kind: "app" }));
     expect(getActionTab(script.id)).toBeUndefined();
     expect(getScriptRunningSnapshot().has("tab-1")).toBe(false);
   });

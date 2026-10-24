@@ -125,7 +125,7 @@ describe("undo close workspace", () => {
       color: "#ff0000",
       icon: "rocket",
       groupId: "g1",
-      actions: [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }],
+      actions: [{ id: "ac-1", name: "dev", kind: "script", command: "pnpm dev", ownButton: false }],
     });
     view = mount([makeWs("a", [term("a1")]), rich]);
 

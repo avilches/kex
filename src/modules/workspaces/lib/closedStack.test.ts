@@ -174,7 +174,7 @@ describe("captureClosedWorkspace", () => {
   });
 
   it("keeps an empty workspace that still has actions", () => {
-    const ws = { ...makeWs("w1", "p1"), actions: [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }] };
+    const ws = { ...makeWs("w1", "p1"), actions: [{ id: "ac-1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false }] };
     expect(captureClosedWorkspace([], ws, 0)).toEqual([wsEntry(ws, 0)]);
   });
 

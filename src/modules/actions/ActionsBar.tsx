@@ -63,7 +63,7 @@ import {
   WORKSPACE_UNSET,
   type BarItem,
 } from "./lib/actionsBar";
-import type { Action } from "./lib/types";
+import { isScript, type Action } from "./lib/types";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
@@ -113,12 +113,12 @@ function nameClick(item: BarItem, { run, focus }: Handlers) {
 function ownButtonTitle(item: BarItem): string {
   const { main } = splitActionName(item.name);
   if (item.disabledReason) return `${main}: ${item.disabledReason}`;
-  if (item.action.runInTerminal && item.state !== "idle") return `Show ${main}`;
-  return item.title ?? `${item.action.runInTerminal ? "Run" : "Open"} ${main}`;
+  if (isScript(item.action) && item.state !== "idle") return `Show ${main}`;
+  return item.title ?? `${isScript(item.action) ? "Run" : "Open"} ${main}`;
 }
 
 export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
-  const script = item.action.runInTerminal;
+  const script = isScript(item.action);
   const disabled = item.disabledReason !== null;
   const iconOnly = item.iconOnly && !script;
   return (
@@ -327,7 +327,7 @@ function MenuDrop({
 type RowProps = { item: BarItem; reorderMode: boolean } & ItemOps & Handlers;
 
 function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
-  const script = item.action.runInTerminal;
+  const script = isScript(item.action);
   // Dragged with the reorder modifier held: within its section, to the other section, or out
   // onto the bar. The listeners go on a wrapper that takes the pointer in that mode, so a
   // blocked row, which a menu item ignores, can be grabbed too; the wrapper's attributes are
@@ -608,11 +608,15 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
   const workspaceButtons = model.buttons.filter((b) => !b.global);
   const globalButtons = model.buttons.filter((b) => b.global);
   const dragging = draggingId !== null;
-  const kindOf = (id: string) =>
+  const scriptOf = (id: string) =>
     (id.startsWith(MENU_DRAG_PREFIX)
       ? menuItems.find((i) => i.id === id.slice(MENU_DRAG_PREFIX.length))
       : model.buttons.find((b) => b.id === id)
-    )?.action.runInTerminal;
+    )?.action;
+  const kindOf = (id: string) => {
+    const a = scriptOf(id);
+    return a ? isScript(a) : undefined;
+  };
   const dragKind = draggingId ? kindOf(draggingId) : undefined;
   // The pointer decides what is under the drag, a button or row before the frame around it.
   // Over a section of the menu the Action may only land among its own kind: the one under
@@ -643,7 +647,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
       const section = sectionOf(hit.id)!;
       const idOf = (i: BarItem) => (section.menu ? `${MENU_DRAG_PREFIX}${i.id}` : i.id);
       const peers = (section.menu ? menuItems : model.buttons).filter(
-        (i) => i.global === section.global && i.action.runInTerminal === kind && idOf(i) !== activeId,
+        (i) => i.global === section.global && isScript(i.action) === kind && idOf(i) !== activeId,
       );
       const peerCollision = (id: string): Collision[] => {
         const container = args.droppableContainers.find((c) => c.id === id);
@@ -670,7 +674,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     if (within.length > 0 || activeId.startsWith(MENU_DRAG_PREFIX)) return within;
     const origin = model.buttons.find((b) => b.id === args.active.id);
     const own = args.droppableContainers.filter((c) =>
-      model.buttons.some((b) => b.id === c.id && b.global === origin?.global && b.action.runInTerminal === origin?.action.runInTerminal),
+      model.buttons.some((b) => b.id === c.id && b.global === origin?.global && isScript(b.action) === (origin ? isScript(origin.action) : undefined)),
     );
     return closestCenter({ ...args, droppableContainers: own });
   };
@@ -786,7 +790,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
                 <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
               )}
               {([false, true] as const).map((script) => {
-                const list = scoped.filter((b) => b.action.runInTerminal === script);
+                const list = scoped.filter((b) => isScript(b.action) === script);
                 return (
                   <BarZone
                     key={`${scope}-${script}`}

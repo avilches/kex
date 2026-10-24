@@ -257,7 +257,7 @@ describe("emptyWorkspaceToClose", () => {
   const emptyTree: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
 
   it.each([
-    ["an Action", { actions: [{ id: "ac-1", name: "Dev", runInTerminal: false, command: "code {cwd}", ownButton: false }] }],
+    ["an Action", { actions: [{ id: "ac-1", name: "Dev", kind: "app" as const, command: "code {cwd}", ownButton: false }] }],
     ["a title", { title: "Backend" }],
     ["a color", { color: "#ff0000" }],
     ["an icon", { icon: "rocket" }],
@@ -651,7 +651,7 @@ describe("runOnce", () => {
 });
 
 describe("workspace actions", () => {
-  const action = (id: string): Action => ({ id, name: id, runInTerminal: true, command: `run ${id}`, ownButton: false });
+  const action = (id: string): Action => ({ id, name: id, kind: "script" as const, command: `run ${id}`, ownButton: false });
 
   it("changes the list of the matching workspace only", () => {
     const out = applyWorkspaceActions([ws(), ws({ id: "w2" })], "w1", (list) => addAction(list, action("a")));

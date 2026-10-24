@@ -70,7 +70,7 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 className="text-[12px]"
               >
                 <span className="flex size-5 shrink-0 items-center justify-center">
-                  <ActionIcon action={{ runInTerminal: false }} size={13} />
+                  <ActionIcon action={{ kind: "app" }} size={13} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{CUSTOM_APP_SUGGESTION.name}</span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">write the command yourself</span>
@@ -90,7 +90,7 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                     className="text-[12px]"
                   >
                     <span className="flex size-5 shrink-0 items-center justify-center">
-                      <ActionIcon action={{ appId: s.appId, runInTerminal: false }} size={13} />
+                      <ActionIcon action={{ appId: s.appId, kind: "app" }} size={13} />
                     </span>
                     <ActionNameLines
                       name={s.name}

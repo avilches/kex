@@ -7,7 +7,7 @@ import {
   type CommandShell,
   type CommandVariable,
 } from "./commandTemplate";
-import type { Action } from "./types";
+import { usesTerminal, type Action } from "./types";
 
 export { COMMAND_VARIABLES } from "./commandTemplate";
 
@@ -56,10 +56,10 @@ export function actionProblems(
   context: { vars: Record<string, string>; shell: CommandShell } | null,
 ): ActionProblem[] {
   const out: ActionProblem[] = [];
-  const shell = action.runInTerminal ? context?.shell ?? "posix" : undefined;
+  const shell = usesTerminal(action) ? context?.shell ?? "posix" : undefined;
   const problem = action.command.trim() ? commandProblem(action.command, shell) : null;
   if (problem) out.push({ kind: "command", message: problem });
-  if (action.runInTerminal && action.cwdMode === "fixed" && action.cwd) {
+  if (usesTerminal(action) && action.cwdMode === "fixed" && action.cwd) {
     const cwd = scriptCwdProblem(action.cwd);
     if (cwd) out.push({ kind: "cwd", message: cwd });
   }
@@ -67,7 +67,7 @@ export function actionProblems(
     const missing = missingVariables(action.command, context.vars);
     if (missing.length > 0) {
       out.push({ kind: "context", message: `${formatNames(missing)} has no value in the current tab` });
-    } else if (action.runInTerminal) {
+    } else if (usesTerminal(action)) {
       const unsafe = unsafeVariables(action.command, context.vars, context.shell);
       if (unsafe.length > 0) {
         out.push({

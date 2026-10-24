@@ -38,7 +38,7 @@ export function resolveDrop(
   const to = column ?? over?.scope;
   if (!to || !available[to]) return null;
   if (to !== from.scope) return { kind: "move", from: from.scope, to, id: activeId };
-  if (!over || over.action.runInTerminal !== from.action.runInTerminal) return null;
+  if (!over || over.action.kind !== from.action.kind) return null;
   return { kind: "reorder", scope: to, fromId: activeId, toId: overId };
 }
 
@@ -51,5 +51,5 @@ export function isDropCandidate(lists: ScopedLists, containerId: string, activeI
   if (column) return column !== active.scope;
   const over = locateAction(lists, containerId);
   if (!over) return false;
-  return over.scope !== active.scope || over.action.runInTerminal === active.action.runInTerminal;
+  return over.scope !== active.scope || over.action.kind === active.action.kind;
 }

@@ -16,17 +16,17 @@ function render(props: Parameters<typeof ActionIcon>[0]) {
 
 describe("ActionIcon", () => {
   it("draws the icon of the detected app an action came from", () => {
-    const { container, unmount } = render({ action: { appId: "pycharm", runInTerminal: false } });
+    const { container, unmount } = render({ action: { appId: "pycharm", kind: "app" } });
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/pycharm.svg");
     unmount();
   });
 
   it("draws a glyph, not an image, for a script and for a custom app", () => {
-    const script = render({ action: { runInTerminal: true } });
+    const script = render({ action: { kind: "script" } });
     expect(script.container.querySelector("img")).toBeNull();
     expect(script.container.querySelector("svg")).not.toBeNull();
     script.unmount();
-    const custom = render({ action: { runInTerminal: false } });
+    const custom = render({ action: { kind: "app" } });
     expect(custom.container.querySelector("img")).toBeNull();
     expect(custom.container.querySelector("svg")).not.toBeNull();
     custom.unmount();

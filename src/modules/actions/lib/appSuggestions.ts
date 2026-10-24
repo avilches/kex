@@ -1,7 +1,7 @@
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
-import type { Action } from "./types";
+import { isApp, type Action } from "./types";
 
 export type AppSuggestion = {
   /** Unique within a list: the app id, plus the variable the preset points at. */
@@ -28,7 +28,7 @@ const sameCommand = (a: string, b: string): boolean => a.trim() === b.trim();
 
 /** An app is defined by its command alone: the name, the icon and the appId do not matter. */
 export function hasCommandOf(actions: readonly Action[], command: string): boolean {
-  return !!command.trim() && actions.some((a) => !a.runInTerminal && sameCommand(a.command, command));
+  return !!command.trim() && actions.some((a) => isApp(a) && sameCommand(a.command, command));
 }
 
 /** The presets still to install, one per app and starting point: a preset whose command some
@@ -42,8 +42,8 @@ export function uninstalledSuggestions(
 }
 
 /** The detected preset an app is, by its command, or undefined when it is the user's own. */
-export function presetOf(action: Pick<Action, "runInTerminal" | "command">, suggestions: readonly AppSuggestion[]): AppSuggestion | undefined {
-  if (action.runInTerminal) return undefined;
+export function presetOf(action: Pick<Action, "kind" | "command">, suggestions: readonly AppSuggestion[]): AppSuggestion | undefined {
+  if (!isApp(action)) return undefined;
   return suggestions.find((s) => s.appId && sameCommand(s.defaultCommand, action.command));
 }
 

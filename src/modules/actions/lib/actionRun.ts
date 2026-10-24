@@ -10,7 +10,7 @@ import {
   missingVariables,
 } from "./commandTemplate";
 import { needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
-import type { Action } from "./types";
+import { isAgent, isScript, type Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
 // context, asks for a plan and carries it out.
@@ -150,7 +150,8 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
 export function planActionRun(action: Action, ctx: RunContext): RunPlan {
   if (ctx.hibernated) return { kind: "blocked", reason: "", silent: true };
   if (action.command.trim() === "") return blocked(action, "it has no command");
-  return action.runInTerminal ? planScript(action, ctx) : planApp(action, ctx);
+  if (isAgent(action)) return blocked(action, "agents cannot run yet");
+  return isScript(action) ? planScript(action, ctx) : planApp(action, ctx);
 }
 
 export type StopPlan =

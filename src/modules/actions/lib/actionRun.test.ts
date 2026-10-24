@@ -12,13 +12,13 @@ import type { Action } from "./types";
 const script = (o: Partial<Action> = {}): Action => ({
   id: "ac-1",
   name: "Dev",
-  runInTerminal: true,
+  kind: "script",
   command: "npm run dev",
   cwdMode: "workspace",
   ownButton: true,
   ...o,
 });
-const app = (o: Partial<Action> = {}): Action => script({ runInTerminal: false, command: "code {workspace}", name: "VS Code", ...o });
+const app = (o: Partial<Action> = {}): Action => script({ kind: "app", command: "code {workspace}", name: "VS Code", ...o });
 
 const ctx = (o: Partial<RunContext> = {}): RunContext => ({
   hibernated: false,

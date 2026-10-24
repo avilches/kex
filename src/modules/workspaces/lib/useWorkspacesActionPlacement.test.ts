@@ -21,7 +21,7 @@ vi.mock("@/modules/settings/store", async (importOriginal) => {
   };
 });
 
-const act1 = (id: string): Action => ({ id, name: id, runInTerminal: false, command: `open ${id}`, ownButton: false });
+const act1 = (id: string): Action => ({ id, name: id, kind: "app", command: `open ${id}`, ownButton: false });
 
 const workspace = (actions: Action[]): Workspace => ({
   id: "w1",

@@ -89,7 +89,7 @@ describe("useActionStates snapshot", () => {
 });
 
 describe("actionsToUnlink", () => {
-  const a = { id: "a", name: "A", runInTerminal: true, command: "x", ownButton: true };
+  const a = { id: "a", name: "A", kind: "script" as const, command: "x", ownButton: true };
   const b = { ...a, id: "b" };
 
   it("lists Actions that disappeared", () => {
@@ -98,7 +98,7 @@ describe("actionsToUnlink", () => {
   });
 
   it("lists Actions that switched between script and app", () => {
-    expect(actionsToUnlink([a], [{ ...a, runInTerminal: false }])).toEqual(["a"]);
+    expect(actionsToUnlink([a], [{ ...a, kind: "app" as const }])).toEqual(["a"]);
   });
 
   it("ignores edits that keep the Action what it was", () => {
@@ -108,7 +108,7 @@ describe("actionsToUnlink", () => {
 });
 
 describe("unlinkRemovedActions", () => {
-  const a = { id: "a", name: "A", runInTerminal: true, command: "x", ownButton: true };
+  const a = { id: "a", name: "A", kind: "script" as const, command: "x", ownButton: true };
 
   it("drops the link and the running mark of a deleted Action, so nothing stays stuck", () => {
     linkActionTab("a", "t1");
@@ -121,7 +121,7 @@ describe("unlinkRemovedActions", () => {
   it("drops the link when the Action stops being a script", () => {
     linkActionTab("a", "t1");
     setScriptRunning("t1", "running");
-    unlinkRemovedActions([a], [{ ...a, runInTerminal: false }]);
+    unlinkRemovedActions([a], [{ ...a, kind: "app" as const }]);
     expect(getActionTab("a")).toBeUndefined();
     expect(getScriptRunningSnapshot().has("t1")).toBe(false);
   });
@@ -145,8 +145,8 @@ describe("unlinkRemovedActions", () => {
 });
 
 describe("scriptActionOf", () => {
-  const dev = { id: "a1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false };
-  const app = { id: "a2", name: "Zed", runInTerminal: false, command: "zed .", ownButton: false };
+  const dev = { id: "a1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false };
+  const app = { id: "a2", name: "Zed", kind: "app" as const, command: "zed .", ownButton: false };
   const links = new Map([["a1", "t1"], ["a2", "t2"]]);
 
   it("finds the script that ran in a tab in any of the lists", () => {

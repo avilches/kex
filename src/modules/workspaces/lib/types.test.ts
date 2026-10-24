@@ -16,7 +16,7 @@ describe("actionsToDelete", () => {
     paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
     activePaneId: "p1",
   };
-  const action = (command: string): Action => ({ id: "ac-1", name: "A", runInTerminal: false, command, ownButton: false });
+  const action = (command: string): Action => ({ id: "ac-1", name: "A", kind: "app", command, ownButton: false });
 
   it("counts the Actions that have a command", () => {
     const ws = { ...base, actions: [action("code {cwd}"), action("pnpm dev")] };

@@ -23,8 +23,8 @@ const runCtx = (over: Partial<RunContext> = {}): RunContext => ({
   ...over,
 });
 
-const app = (command: string): Action => ({ id: "a1", name: "app", runInTerminal: false, command, ownButton: false });
-const script = (command: string): Action => ({ id: "s1", name: "script", runInTerminal: true, command, ownButton: false });
+const app = (command: string): Action => ({ id: "a1", name: "app", kind: "app", command, ownButton: false });
+const script = (command: string): Action => ({ id: "s1", name: "script", kind: "script", command, ownButton: false });
 
 describe("buildCommandVars", () => {
   it("gives a value to every variable a command can use", () => {
@@ -71,7 +71,7 @@ describe("every offered variable is substituted when an Action runs", () => {
         const action = make(`tool {${name}}`);
         const reason = actionAvailability(action, { vars, shell: "posix" });
         const plan = planActionRun(action, runCtx());
-        expect(reason === null, `${name} ${action.runInTerminal ? "script" : "app"}`).toBe(plan.kind !== "blocked");
+        expect(reason === null, `${name} ${action.kind}`).toBe(plan.kind !== "blocked");
       }
     }
   });

@@ -63,14 +63,14 @@ describe("sanitizeWorkspace", () => {
       paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
       activePaneId: "p1",
       actions: [
-        { id: "ac-1", name: " Dev ", runInTerminal: true, command: " npm run dev ", ownButton: true },
-        { id: "ac-2", name: "Empty", runInTerminal: true, command: " ", ownButton: false },
+        { id: "ac-1", name: " Dev ", kind: "script", command: " npm run dev ", ownButton: true },
+        { id: "ac-2", name: "Empty", kind: "script", command: " ", ownButton: false },
       ],
       activeAction: "ac-2",
     } as Workspace;
     const out = sanitizeWorkspace(w);
     expect(out.actions).toEqual([
-      { id: "ac-1", name: "Dev", runInTerminal: true, command: "npm run dev", ownButton: true },
+      { id: "ac-1", name: "Dev", kind: "script", command: "npm run dev", ownButton: true },
     ]);
     expect(out.activeAction).toBeUndefined();
   });

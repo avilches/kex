@@ -11,7 +11,7 @@ import { splitActionName } from "./lib/actionName";
 import type { Action } from "./lib/types";
 
 type Props = {
-  action: Pick<Action, "id" | "name" | "appId" | "iconId" | "runInTerminal" | "ownButton" | "cwdMode" | "cwd">;
+  action: Pick<Action, "id" | "name" | "appId" | "iconId" | "kind" | "ownButton" | "cwdMode" | "cwd">;
   scope: Scope;
   onChange: (own: boolean) => void;
 };

@@ -7,7 +7,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 const act = (id: string, name = id): Action => ({
   id,
   name,
-  runInTerminal: false,
+  kind: "app",
   command: `open ${id}`,
   ownButton: false,
 });

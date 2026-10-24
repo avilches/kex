@@ -1,10 +1,12 @@
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 
+export type ActionKind = "app" | "script" | "agent";
+
 export type Action = {
   id: string;
   name: string;
-  /** true: a script, typed into a terminal and stoppable. false: an app, spawned in the background. */
-  runInTerminal: boolean;
+  /** app: spawned in the background. script: typed into a terminal and stoppable. agent: a coding agent started in a terminal. */
+  kind: ActionKind;
   /** Command template, expanded against the current context at run time. */
   command: string;
   /** Detected app this action came from, for its icon and default command. */
@@ -18,3 +20,8 @@ export type Action = {
   /** Own button in the Header, or grouped in a shared menu. */
   ownButton: boolean;
 };
+
+export const isApp = (a: Pick<Action, "kind">): boolean => a.kind === "app";
+export const isScript = (a: Pick<Action, "kind">): boolean => a.kind === "script";
+export const isAgent = (a: Pick<Action, "kind">): boolean => a.kind === "agent";
+export const usesTerminal = (a: Pick<Action, "kind">): boolean => a.kind !== "app";

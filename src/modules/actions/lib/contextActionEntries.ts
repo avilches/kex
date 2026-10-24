@@ -1,5 +1,5 @@
 import { actionAvailability, actionRowTitle, appsFirst, scriptSubtitle, type BarContext } from "./actionsBar";
-import type { Action } from "./types";
+import { isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -31,7 +31,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEn
       reason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      title: actionRowTitle(name, action.runInTerminal, null, ctx),
+      title: actionRowTitle(name, isScript(action), null, ctx),
     });
   }
   return rows;

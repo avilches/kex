@@ -24,8 +24,8 @@ vi.mock("@/modules/workspace", () => ({
   useWorkspaceEnvStore: { getState: () => ({ env: { kind: "local" } }) },
 }));
 
-const script: Action = { id: "ac-s", name: "Dev", runInTerminal: true, command: "npm run dev", cwdMode: "workspace", ownButton: true };
-const app: Action = { id: "ac-a", name: "Code", runInTerminal: false, command: "code {workspace}", ownButton: true };
+const script: Action = { id: "ac-s", name: "Dev", kind: "script", command: "npm run dev", cwdMode: "workspace", ownButton: true };
+const app: Action = { id: "ac-a", name: "Code", kind: "app", command: "code {workspace}", ownButton: true };
 
 const termTab = (id: string, cwd?: string): Tab => ({ id, kind: "terminal", cwd });
 const ws = (o: Partial<Workspace> = {}): Workspace => ({

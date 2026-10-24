@@ -15,7 +15,7 @@ import type { Action } from "./types";
 const act = (id: string, o: Partial<Action> = {}): Action => ({
   id,
   name: id,
-  runInTerminal: true,
+  kind: "script" as const,
   command: `run ${id}`,
   ownButton: false,
   ...o,
@@ -46,7 +46,7 @@ describe("addAction / updateAction / removeAction", () => {
   it("keeps in memory exactly what normalize would persist", () => {
     const [added] = addAction([], act("a", { name: " A ", command: " ls " }));
     expect(added).toEqual(act("a", { name: "A", command: "ls" }));
-    const [app] = updateAction([act("a", { cwdMode: "fixed", cwd: "/x" })], "a", { runInTerminal: false });
+    const [app] = updateAction([act("a", { cwdMode: "fixed", cwd: "/x" })], "a", { kind: "app" as const });
     expect(app).not.toHaveProperty("cwdMode");
     expect(app).not.toHaveProperty("cwd");
   });
@@ -85,8 +85,25 @@ describe("normalizeActions", () => {
     expect(out[0]!.name).toBe("a");
   });
 
+  it("keeps each of the three kinds", () => {
+    const out = normalizeActions([act("a", { kind: "app" as const }), act("b", { kind: "script" as const }), act("c", { kind: "agent" })]);
+    expect(out.map((x) => x.kind)).toEqual(["app", "script", "agent"]);
+  });
+
+  it("drops an entry with no valid kind, including an old runInTerminal one", () => {
+    expect(normalizeActions([{ id: "a", name: "a", command: "x", runInTerminal: true, ownButton: false }])).toEqual([]);
+    expect(normalizeActions([act("b", { kind: "bogus" as never })])).toEqual([]);
+  });
+
+  it("scripts and agents keep their cwd mode and folder", () => {
+    for (const kind of ["script", "agent"] as const) {
+      const [x] = normalizeActions([act("a", { kind, cwdMode: "fixed", cwd: "/x" })]);
+      expect(x).toMatchObject({ cwdMode: "fixed", cwd: "/x" });
+    }
+  });
+
   it("apps never carry a cwd mode or folder", () => {
-    const [app] = normalizeActions([act("a", { runInTerminal: false, cwdMode: "fixed", cwd: "/x" })]);
+    const [app] = normalizeActions([act("a", { kind: "app" as const, cwdMode: "fixed", cwd: "/x" })]);
     expect(app).not.toHaveProperty("cwdMode");
     expect(app).not.toHaveProperty("cwd");
   });
@@ -119,8 +136,8 @@ describe("normalizeActions", () => {
   });
 
   it("drops malformed entries", () => {
-    const out = normalizeActions([null, 3, { id: "a" }, { id: 7, command: "x" }, { id: "b", command: "x" }]);
-    expect(out).toEqual([{ id: "b", name: "x", runInTerminal: false, command: "x", ownButton: false }]);
+    const out = normalizeActions([null, 3, { id: "a" }, { id: 7, command: "x" }, { id: "b", kind: "app", command: "x" }]);
+    expect(out).toEqual([{ id: "b", name: "x", kind: "app", command: "x", ownButton: false }]);
   });
 });
 
@@ -153,9 +170,9 @@ describe("partitionForHeader", () => {
   it("keeps own-button actions in user order and groups the rest by kind", () => {
     const list = [
       act("s1"),
-      act("a1", { runInTerminal: false, ownButton: true }),
+      act("a1", { kind: "app" as const, ownButton: true }),
       act("s2", { ownButton: true }),
-      act("a2", { runInTerminal: false }),
+      act("a2", { kind: "app" as const }),
     ];
     const p = partitionForHeader(list);
     expect(p.ownButtons.map((a) => a.id)).toEqual(["a1", "s2"]);
@@ -166,7 +183,7 @@ describe("partitionForHeader", () => {
 
 describe("updateAction appId", () => {
   it("an empty appId clears the preset link, which a missing key cannot do", () => {
-    const preset: Action = { id: "a1", name: "Zed", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+    const preset: Action = { id: "a1", name: "Zed", kind: "app" as const, command: "zed {workspace}", appId: "zed", ownButton: false };
     expect(updateAction([preset], "a1", { appId: "" })[0]?.appId).toBeUndefined();
     expect(updateAction([preset], "a1", { ownButton: true })[0]?.appId).toBe("zed");
   });
@@ -176,7 +193,7 @@ describe("adoptActionAt, apps with the same command", () => {
   const app = (id: string, command: string, o: Partial<Action> = {}): Action => ({
     id,
     name: id,
-    runInTerminal: false,
+    kind: "app" as const,
     command,
     ownButton: false,
     ...o,
@@ -196,7 +213,7 @@ describe("adoptActionAt, apps with the same command", () => {
   it("never merges a different command, nor a script", () => {
     const list = [app("a", "code .")];
     expect(adoptActionAt(list, app("n", "code -n ."), () => "fresh").merged).toBe(false);
-    const script = { ...app("s", "code ."), runInTerminal: true };
+    const script = { ...app("s", "code ."), kind: "script" as const };
     expect(adoptActionAt(list, script, () => "fresh").list).toHaveLength(2);
     expect(adoptActionAt([script], app("n", "code ."), () => "fresh").list).toHaveLength(2);
     expect(adoptActionAt([script], { ...script, id: "t" }, () => "fresh").list).toHaveLength(2);
@@ -210,7 +227,7 @@ describe("adoptActionAt, apps with the same command", () => {
 });
 
 describe("adoptActionAt", () => {
-  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: `open ${id}`, ownButton: false });
+  const mk = (id: string): Action => ({ id, name: id, kind: "app" as const, command: `open ${id}`, ownButton: false });
 
   it("goes before the named Action, last when it is unknown or not given", () => {
     const list = [mk("a"), mk("b")];
@@ -227,7 +244,7 @@ describe("adoptActionAt", () => {
 });
 
 describe("reorderBefore", () => {
-  const mk = (id: string): Action => ({ id, name: id, runInTerminal: false, command: "x", ownButton: false });
+  const mk = (id: string): Action => ({ id, name: id, kind: "app" as const, command: "x", ownButton: false });
   const ids = (l: Action[]) => l.map((a) => a.id);
 
   it("puts the Action right before another whichever side it came from, or last", () => {

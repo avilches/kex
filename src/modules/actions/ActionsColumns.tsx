@@ -30,7 +30,7 @@ import { scriptsFirst } from "./lib/actionsBar";
 import { ownedAfterEdit } from "./lib/appOwnership";
 import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
-import type { Action } from "./lib/types";
+import { isScript, type Action } from "./lib/types";
 
 export type ScopeEditor = {
   /** The saved Actions of the scope. A new command only lives in the editor until it has one. */
@@ -61,18 +61,18 @@ type Props = {
 
 // The kind is chosen once, on creation, and a saved Action cannot switch it afterwards.
 function blankScript(): Action {
-  return { id: newActionId(), name: "", runInTerminal: true, command: "", cwdMode: "home", ownButton: false };
+  return { id: newActionId(), name: "", kind: "script", command: "", cwdMode: "home", ownButton: false };
 }
 
 function blankApp(): Action {
-  return { id: newActionId(), name: "", runInTerminal: false, command: "", ownButton: false };
+  return { id: newActionId(), name: "", kind: "app", command: "", ownButton: false };
 }
 
 function actionFromSuggestion(s: AppSuggestion): Action {
   return {
     id: newActionId(),
     name: s.name,
-    runInTerminal: false,
+    kind: "app",
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
     ownButton: false,
@@ -313,8 +313,8 @@ function Column({
   const available = useMemo(() => uninstalledSuggestions(suggestions, editor.actions), [suggestions, editor.actions]);
   const ordered = scriptsFirst(editor.actions);
   const groups = [
-    { label: "Scripts", items: ordered.filter((a) => a.runInTerminal) },
-    { label: "Applications", items: ordered.filter((a) => !a.runInTerminal) },
+    { label: "Scripts", items: ordered.filter((a) => isScript(a)) },
+    { label: "Applications", items: ordered.filter((a) => !isScript(a)) },
   ];
   return (
     <div

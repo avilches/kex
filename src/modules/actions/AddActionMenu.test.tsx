@@ -110,15 +110,15 @@ describe("uninstalledSuggestions", () => {
   });
 
   it("hides a preset an app already has by its command, whatever its name, icon or appId", () => {
-    const installed = [{ id: "ac-1", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false }];
+    const installed = [{ id: "ac-1", name: "Zed {workspace}", kind: "app" as const, command: "zed {workspace}", appId: "zed", ownButton: false }];
     expect(uninstalledSuggestions(suggestions, installed).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
     expect(uninstalledSuggestions(suggestions, [{ ...installed[0], appId: undefined, name: "Mine" }]).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
     expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: " zed {workspace}  " }]).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
   });
 
   it("hides nothing for a different command, nor for a script that has the command", () => {
-    const installed = [{ id: "ac-1", name: "Zed", runInTerminal: false, command: "zed -n {workspace}", appId: "zed", ownButton: false }];
+    const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed -n {workspace}", appId: "zed", ownButton: false }];
     expect(uninstalledSuggestions(suggestions, installed)).toEqual(suggestions);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {workspace}", runInTerminal: true }])).toEqual(suggestions);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {workspace}", kind: "script" as const }])).toEqual(suggestions);
   });
 });

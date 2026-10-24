@@ -44,7 +44,7 @@ describe("createCloseWorkspaceFlow", () => {
   });
 
   it("asks when the workspace has actions to delete", async () => {
-    const actions = [{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }];
+    const actions = [{ id: "ac-1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false }];
     const { flow, calls } = setup(ws([], { actions }));
     await flow.request("w1");
     expect(calls).toContain("pending:w1");
@@ -52,7 +52,7 @@ describe("createCloseWorkspaceFlow", () => {
   });
 
   it("ignores actions with an empty command", async () => {
-    const actions = [{ ...{ id: "ac-1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: false }, command: "  " }];
+    const actions = [{ ...{ id: "ac-1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false }, command: "  " }];
     const { flow, calls } = setup(ws([], { actions }));
     await flow.request("w1");
     expect(calls).toContain("close:w1");

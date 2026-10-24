@@ -8,7 +8,7 @@ const preset: Action = {
   id: "a",
   name: "Sublime Text {workspace}",
   command: "subl {workspace}",
-  runInTerminal: false,
+  kind: "app",
   appId: "sublime",
   ownButton: false,
 };
@@ -74,8 +74,8 @@ describe("an edited preset and the Add combo", () => {
 
 describe("presetOf", () => {
   it("finds the preset of an app by its command alone", () => {
-    expect(presetOf({ runInTerminal: false, command: " subl {workspace} " }, presets)).toBe(sublime);
-    expect(presetOf({ runInTerminal: false, command: "subl" }, presets)).toBeUndefined();
-    expect(presetOf({ runInTerminal: true, command: "subl {workspace}" }, presets)).toBeUndefined();
+    expect(presetOf({ kind: "app", command: " subl {workspace} " }, presets)).toBe(sublime);
+    expect(presetOf({ kind: "app", command: "subl" }, presets)).toBeUndefined();
+    expect(presetOf({ kind: "script", command: "subl {workspace}" }, presets)).toBeUndefined();
   });
 });

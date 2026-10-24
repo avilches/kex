@@ -1,7 +1,7 @@
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
 import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
-import type { Action } from "./types";
+import { isApp, isScript, usesTerminal, type Action } from "./types";
 
 export const COMPACT_WIDTH = 720;
 
@@ -22,11 +22,11 @@ const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
 
-export function ownButtonWidth(action: Pick<Action, "name" | "runInTerminal">, iconOnly = false): number {
+export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly = false): number {
   if (iconOnly) return PADDING + ICON;
   const { main } = splitActionName(action.name.trim() || "Action");
   const label = Math.min(LABEL_CAP, main.length * CHAR_WIDTH);
-  return PADDING + label + (action.runInTerminal ? RUN_ZONE : ICON);
+  return PADDING + label + (isScript(action) ? RUN_ZONE : ICON);
 }
 
 // Whether the bar renders this Action where the user is: hidden ones take no room,
@@ -53,8 +53,8 @@ export function ownButtonsThatFit(
   let shown = 0;
   const sole = soleAppButtons(actions);
   for (const action of actions) {
-    if (!shownAtPlace(action, action.runInTerminal ? (states?.get(action.id) ?? "idle") : "idle", place)) continue;
-    left -= ownButtonWidth(action, !action.runInTerminal && action.appId !== undefined && sole.has(action.appId)) + BAR_GAP;
+    if (!shownAtPlace(action, isScript(action) ? (states?.get(action.id) ?? "idle") : "idle", place)) continue;
+    left -= ownButtonWidth(action, isApp(action) && action.appId !== undefined && sole.has(action.appId)) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
   }
@@ -162,9 +162,9 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // A script with no variable in its name says where it runs: the workspace, the last folder
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
-export function scriptSubtitle(action: Pick<Action, "name" | "runInTerminal" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
+export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
   const named = actionSubtitle(action.name, ctx);
-  if (!action.runInTerminal || named.text !== null) return named;
+  if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
   if (mode === "home") return { text: "Home", startTrim: false };
   if (mode === "fixed") {
@@ -201,8 +201,8 @@ export function actionRowTitle(
 // A command with no variables runs against the workspace root: an app is spawned from it, and a
 // script only when it was told to run there. A script in Home, in the tab's folder or in a
 // fixed folder never needs the root.
-export function needsWorkspaceRoot(action: Pick<Action, "runInTerminal" | "cwdMode">): boolean {
-  return !action.runInTerminal || action.cwdMode === "workspace";
+export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): boolean {
+  return isApp(action) || action.cwdMode === "workspace";
 }
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
@@ -215,12 +215,12 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
   if (!ctx) return VARIABLE.test(action.command) ? "needs a workspace" : null;
   const used = commandVariablesUsed(action.command);
   if (used.size === 0 && needsWorkspaceRoot(action) && !ctx.vars.workspace) return WORKSPACE_UNSET;
-  const problem = commandProblem(action.command, action.runInTerminal ? ctx.shell : undefined);
+  const problem = commandProblem(action.command, usesTerminal(action) ? ctx.shell : undefined);
   if (problem) return problem;
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.includes("workspace")) return WORKSPACE_UNSET;
   if (missing.length > 0) return describeMissing(missing);
-  if (action.runInTerminal) {
+  if (usesTerminal(action)) {
     const unsafe = unsafeVariables(action.command, ctx.vars, ctx.shell);
     if (unsafe.length > 0) return `${unsafe.map((n) => `{${n}}`).join(", ")} holds characters that are unsafe to type into a terminal`;
   }
@@ -250,12 +250,12 @@ export type BarItem = {
 
 // The Header shows apps before scripts, each keeping the user's order; Settings keeps
 // the opposite, scripts first, so the list there never interleaves the two kinds.
-export function appsFirst<T extends Pick<Action, "runInTerminal">>(actions: readonly T[]): T[] {
-  return [...actions.filter((a) => !a.runInTerminal), ...actions.filter((a) => a.runInTerminal)];
+export function appsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
+  return [...actions.filter((a) => !isScript(a)), ...actions.filter((a) => isScript(a))];
 }
 
-export function scriptsFirst<T extends Pick<Action, "runInTerminal">>(actions: readonly T[]): T[] {
-  return [...actions.filter((a) => a.runInTerminal), ...actions.filter((a) => !a.runInTerminal)];
+export function scriptsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
+  return [...actions.filter((a) => isScript(a)), ...actions.filter((a) => !isScript(a))];
 }
 
 // The own buttons the bar may draw, in order: those the place shows. Each list comes already
@@ -269,16 +269,16 @@ export function ownButtonCandidates(
   return [...local, ...global].filter(
     (action) =>
       action.ownButton &&
-      shownAtPlace(action, action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle", place),
+      shownAtPlace(action, isScript(action) ? (states.get(action.id) ?? "idle") : "idle", place),
   );
 }
 
 // A button of a detected app that is the only one of that app in the bar needs no words:
 // its icon says which app it is. With several of the same app, the name and the line under
 // it tell them apart.
-export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "runInTerminal">[]): Set<string> {
+export function soleAppButtons(buttons: readonly Pick<Action, "appId" | "kind">[]): Set<string> {
   const count = new Map<string, number>();
-  for (const a of buttons) if (!a.runInTerminal && a.appId) count.set(a.appId, (count.get(a.appId) ?? 0) + 1);
+  for (const a of buttons) if (isApp(a) && a.appId) count.set(a.appId, (count.get(a.appId) ?? 0) + 1);
   return new Set([...count].filter(([, n]) => n === 1).map(([id]) => id));
 }
 
@@ -315,7 +315,7 @@ export type Drop = {
   placeBefore?: string | null;
 };
 
-const sameKind = (a: Placed, b: Placed) => a.action.runInTerminal === b.action.runInTerminal;
+const sameKind = (a: Placed, b: Placed) => isScript(a.action) === isScript(b.action);
 
 // What dropping `activeId` (a bar button, or a menu row prefixed with MENU_DRAG_PREFIX) on
 // `overId` does. A button or the frame of the bar makes it a button of that scope; a row or
@@ -348,7 +348,7 @@ export function resolveDrop(
     button = false;
   } else if (parseBarZone(overId)) {
     const zone = parseBarZone(overId)!;
-    if (zone.script !== from.action.runInTerminal) return null;
+    if (zone.script !== isScript(from.action)) return null;
     to = zone.scope;
     button = true;
   } else if (overId === DROP_MENU_WORKSPACE || overId === DROP_MENU_GLOBAL) {
@@ -422,7 +422,7 @@ type BuildInput = {
 // place to live.
 export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
   const toItem = (action: Action, isGlobal: boolean): BarItem => {
-    const state = action.runInTerminal ? (states.get(action.id) ?? "idle") : "idle";
+    const state = isScript(action) ? (states.get(action.id) ?? "idle") : "idle";
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name: label }, context);
@@ -438,7 +438,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       disabledReason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      title: actionRowTitle(label, action.runInTerminal, disabledReason, context),
+      title: actionRowTitle(label, isScript(action), disabledReason, context),
       iconOnly: false,
     };
   };
@@ -462,7 +462,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     else model.menu.workspace.push(item);
   }
   const sole = soleAppButtons(model.buttons.map((b) => b.action));
-  for (const b of model.buttons) b.iconOnly = !b.action.runInTerminal && b.action.appId !== undefined && sole.has(b.action.appId);
+  for (const b of model.buttons) b.iconOnly = isApp(b.action) && b.action.appId !== undefined && sole.has(b.action.appId);
   return model;
 }
 

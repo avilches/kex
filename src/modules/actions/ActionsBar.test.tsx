@@ -8,8 +8,8 @@ import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const script: Action = { id: "s1", name: "dev", runInTerminal: true, command: "pnpm dev", ownButton: true };
-const app: Action = { id: "a1", name: "PyCharm", runInTerminal: false, command: "pycharm {workspace}", ownButton: true };
+const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", ownButton: true };
+const app: Action = { id: "a1", name: "PyCharm", kind: "app", command: "pycharm {workspace}", ownButton: true };
 
 const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   id: action.id,

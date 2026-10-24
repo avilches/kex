@@ -24,7 +24,7 @@ import { BOXED_RADIO } from "./lib/boxedRadio";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { ActionContext } from "./lib/useActionContext";
-import type { Action } from "./lib/types";
+import { isScript, type Action } from "./lib/types";
 
 const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
@@ -69,7 +69,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
-  const script = action.runInTerminal;
+  const script = isScript(action);
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, name, nameFocused, onChange });

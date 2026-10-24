@@ -1,5 +1,7 @@
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import type { Action } from "./types";
+import { isApp, isScript, type Action, type ActionKind } from "./types";
+
+const KINDS: readonly ActionKind[] = ["app", "script", "agent"];
 
 const CWD_MODES: readonly ScriptCwdMode[] = ["home", "workspace", "context", "fixed"];
 
@@ -55,18 +57,19 @@ export function normalizeAction(raw: unknown): Action | null {
   if (typeof r.id !== "string" || !r.id) return null;
   if (typeof r.command !== "string" || !r.command.trim()) return null;
   const name = typeof r.name === "string" ? r.name.trim() : "";
-  const runInTerminal = r.runInTerminal === true;
+  if (!KINDS.includes(r.kind as ActionKind)) return null;
+  const kind = r.kind as ActionKind;
   const command = r.command.trim();
   const action: Action = {
     id: r.id,
     name: name || command,
-    runInTerminal,
+    kind,
     command,
     ownButton: r.ownButton === true,
   };
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
   if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;
-  if (runInTerminal && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
+  if (kind !== "app" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
     action.cwdMode = r.cwdMode as ScriptCwdMode;
     if (action.cwdMode === "fixed" && typeof r.cwd === "string" && r.cwd) action.cwd = r.cwd;
   }
@@ -104,7 +107,7 @@ export function adoptActionAt(
   makeId: () => string,
   beforeId?: string,
 ): { list: Action[]; stored: Action; merged: boolean } {
-  const twin = action.runInTerminal ? undefined : list.find((a) => !a.runInTerminal && a.command.trim() === action.command.trim());
+  const twin = isApp(action) ? list.find((a) => isApp(a) && a.command.trim() === action.command.trim()) : undefined;
   if (twin) {
     const merged = { ...action, id: twin.id };
     return { list: list.map((a) => (a === twin ? merged : a)), stored: merged, merged: true };
@@ -140,7 +143,7 @@ export function partitionForHeader(actions: readonly Action[]): HeaderPartition 
   const apps: Action[] = [];
   for (const a of actions) {
     if (a.ownButton) ownButtons.push(a);
-    else if (a.runInTerminal) scripts.push(a);
+    else if (isScript(a)) scripts.push(a);
     else apps.push(a);
   }
   return { ownButtons, scripts, apps };

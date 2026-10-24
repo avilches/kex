@@ -34,7 +34,7 @@ import type { Action } from "./types";
 const script = (o: Partial<Action> = {}): Action => ({
   id: "s1",
   name: "dev",
-  runInTerminal: true,
+  kind: "script" as const,
   command: "pnpm dev",
   cwdMode: "workspace",
   ownButton: false,
@@ -43,7 +43,7 @@ const script = (o: Partial<Action> = {}): Action => ({
 const app = (o: Partial<Action> = {}): Action => ({
   id: "a1",
   name: "PyCharm",
-  runInTerminal: false,
+  kind: "app" as const,
   command: "pycharm {workspace}",
   ownButton: false,
   ...o,
@@ -401,7 +401,7 @@ describe("actionSubtitle", () => {
 });
 
 describe("scriptSubtitle", () => {
-  const script = (over: Partial<Action> = {}) => ({ name: "dev", runInTerminal: true, ...over });
+  const script = (over: Partial<Action> = {}) => ({ name: "dev", kind: "script" as const, ...over });
 
   it("says where a script runs when its name has no variable", () => {
     expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Home", startTrim: false });
@@ -423,7 +423,7 @@ describe("scriptSubtitle", () => {
 
   it("keeps the subtitle of the variable in the name, and leaves apps alone", () => {
     expect(scriptSubtitle(script({ name: "Agent {cwd}", cwdMode: "fixed", cwd: "/x" }), ctx).text).toBe("/p");
-    expect(scriptSubtitle({ name: "dev", runInTerminal: false }, ctx).text).toBeNull();
+    expect(scriptSubtitle({ name: "dev", kind: "app" as const }, ctx).text).toBeNull();
   });
 });
 

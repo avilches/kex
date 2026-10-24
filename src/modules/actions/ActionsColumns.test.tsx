@@ -8,9 +8,9 @@ import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const saved: Action = { id: "ac-1", name: "Dev", runInTerminal: true, command: "pnpm dev", cwdMode: "workspace", ownButton: false };
-const savedApp: Action = { id: "ac-2", name: "Zed", runInTerminal: false, command: "zed {filepath}", ownButton: false };
-const preset: Action = { id: "ac-3", name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed", ownButton: false };
+const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm dev", cwdMode: "workspace", ownButton: false };
+const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {filepath}", ownButton: false };
+const preset: Action = { id: "ac-3", name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
 
 const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
 const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}" };
@@ -145,7 +145,7 @@ describe("ActionsColumns", () => {
     expect(g.onAdd).not.toHaveBeenCalled();
     typeField(commandField()!, "pnpm test");
     expect(w.onAdd).toHaveBeenCalledTimes(1);
-    expect(w.onAdd.mock.calls[0]![0]).toMatchObject({ command: "pnpm test", runInTerminal: true });
+    expect(w.onAdd.mock.calls[0]![0]).toMatchObject({ command: "pnpm test", kind: "script" });
     expect(g.onAdd).not.toHaveBeenCalled();
     unmount();
   });
@@ -178,7 +178,7 @@ describe("ActionsColumns", () => {
     click(addTrigger(container, "global"));
     click(options().find((o) => o.textContent?.includes("ZedWorkspace")));
     expect(g.onAdd).toHaveBeenCalledTimes(1);
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed {workspace}", runInTerminal: false, command: "zed {workspace}", appId: "zed" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed" });
     expect(commandField()).toBeNull();
     unmount();
   });
@@ -190,7 +190,7 @@ describe("ActionsColumns", () => {
     expect(g.onAdd).not.toHaveBeenCalled();
     expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     typeField(commandField()!, "code {filepath}");
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ runInTerminal: false, command: "code {filepath}" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "app", command: "code {filepath}" });
     unmount();
   });
 
@@ -377,7 +377,7 @@ describe("ActionsColumns", () => {
   });
 
   it("editing the command back to the preset's gives the preset back, whatever the name", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", runInTerminal: false, command: "zed -n {workspace}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {workspace}", iconId: "zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(pencil(container));
     typeField(commandField()!, "zed {workspace}");
@@ -386,7 +386,7 @@ describe("ActionsColumns", () => {
   });
 
   it("an app whose command is a detected preset's is deleted without asking, even with no appId", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", runInTerminal: false, command: "zed {workspace}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {workspace}", iconId: "zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(g.onRemove).toHaveBeenCalledWith("ac-4");

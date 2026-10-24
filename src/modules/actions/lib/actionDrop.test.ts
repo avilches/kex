@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { columnDropId, isDropCandidate, parseColumnDropId, resolveDrop } from "./actionDrop";
 import type { Action } from "./types";
 
-const a = (id: string, runInTerminal: boolean): Action => ({ id, name: id, command: id, runInTerminal, ownButton: false });
+const a = (id: string, script: boolean): Action => ({ id, name: id, command: id, kind: script ? "script" : "app", ownButton: false });
 const lists = {
   global: [a("g-s1", true), a("g-s2", true), a("g-a1", false)],
   workspace: [a("w-s1", true), a("w-a1", false)],

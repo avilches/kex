@@ -10,13 +10,13 @@ import type { Action } from "./types";
 const script: Action = {
   id: "ac-1",
   name: "Dev",
-  runInTerminal: true,
+  kind: "script",
   command: "pnpm dev",
   cwdMode: "fixed",
   cwd: "/work/kex",
   ownButton: true,
 };
-const app: Action = { id: "ac-2", name: "PyCharm", runInTerminal: false, command: "pycharm {cwd}", appId: "pycharm", ownButton: false };
+const app: Action = { id: "ac-2", name: "PyCharm", kind: "app", command: "pycharm {cwd}", appId: "pycharm", ownButton: false };
 
 describe("commandVariableDocs", () => {
   it("lists only the variables a command can have a value for, with their descriptions", () => {
