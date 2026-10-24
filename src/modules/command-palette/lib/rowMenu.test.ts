@@ -1,0 +1,92 @@
+import { describe, expect, it } from "vitest";
+import {
+  folderMenuItems,
+  placeMenuTop,
+  stepEnabled,
+  tabMenuItems,
+} from "./rowMenu";
+import type { TabEntry } from "./tabEntries";
+
+const entry = (over: Partial<TabEntry> & { locked?: boolean } = {}): TabEntry =>
+  ({
+    tabId: "tab-1",
+    kind: "terminal",
+    cwd: "/repo",
+    detail: "/repo",
+    hibernated: false,
+    agentSession: undefined,
+    tab: { id: "tab-1", kind: "terminal", cwd: "/repo", locked: over.locked },
+    ...over,
+  }) as TabEntry;
+
+describe("tabMenuItems", () => {
+  it("offers go, terminal, copy and close with their shortcuts", () => {
+    const items = tabMenuItems(entry());
+    expect(items.map((i) => i.id)).toEqual(["go", "terminal", "copy", "close"]);
+    expect(items[0]).toMatchObject({ label: "Go to Tab", enter: true });
+    expect(items[1].shortcutId).toBe("tab.new");
+    expect(items[2].shortcutId).toBe("path.copy");
+    expect(items[3].shortcutId).toBe("tab.close");
+    expect(items.every((i) => !i.disabled)).toBe(true);
+  });
+
+  it("says restore for a hibernated tab and cannot close it", () => {
+    const items = tabMenuItems(entry({ hibernated: true }));
+    expect(items[0].label).toBe("Restore and go to Tab");
+    expect(items[3].disabled).toBe(true);
+  });
+
+  it("cannot close a locked tab", () => {
+    expect(tabMenuItems(entry({ locked: true }))[3].disabled).toBe(true);
+  });
+
+  it("disables the terminal without a folder and the copy without a path", () => {
+    const items = tabMenuItems(
+      entry({
+        cwd: "",
+        kind: "git-history",
+        tab: { id: "t", kind: "git-history" } as TabEntry["tab"],
+      }),
+    );
+    expect(items[1].disabled).toBe(true);
+    expect(items[2].disabled).toBe(true);
+  });
+});
+
+describe("folderMenuItems", () => {
+  it("lists the worktrees action only for a repository", () => {
+    expect(folderMenuItems({ path: "/a/b", worktrees: null }).map((i) => i.id)).toEqual([
+      "pick",
+      "copy",
+    ]);
+    const items = folderMenuItems({ path: "/a/b", worktrees: { kind: "show", count: 2 } });
+    expect(items.map((i) => i.id)).toEqual(["pick", "worktrees", "copy"]);
+    expect(items[0].label).toBe("New Tab in b");
+    expect(items[1]).toMatchObject({ label: "Show 2 worktrees", shortcutId: "tab.new" });
+    expect(folderMenuItems({ path: "/a/b", worktrees: { kind: "hide" } })[1].label).toBe(
+      "Hide worktrees",
+    );
+  });
+});
+
+describe("stepEnabled", () => {
+  const items = [{ disabled: false }, { disabled: true }, { disabled: false }] as never[];
+  it("skips disabled items and wraps", () => {
+    expect(stepEnabled(items, 0, 1)).toBe(2);
+    expect(stepEnabled(items, 2, 1)).toBe(0);
+    expect(stepEnabled(items, 0, -1)).toBe(2);
+    expect(stepEnabled([{ disabled: true }] as never[], 0, 1)).toBe(-1);
+  });
+});
+
+describe("placeMenuTop", () => {
+  it("goes below the row when it fits", () => {
+    expect(placeMenuTop({ rowTop: 100, rowBottom: 130 }, 400, 120)).toBe(132);
+  });
+  it("flips above when it does not fit below", () => {
+    expect(placeMenuTop({ rowTop: 150, rowBottom: 180 }, 200, 120)).toBe(28);
+  });
+  it("pins to the bottom edge when it fits in neither", () => {
+    expect(placeMenuTop({ rowTop: 20, rowBottom: 50 }, 150, 120)).toBe(30);
+  });
+});

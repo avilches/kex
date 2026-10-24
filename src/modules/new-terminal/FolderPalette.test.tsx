@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { createElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
 import { FolderPalette } from "./FolderPalette";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 
@@ -201,14 +202,18 @@ describe("FolderPalette", () => {
         ],
       }),
     ];
-    const mountGroups = (groups: FolderGroup[], onToggleWorktrees: (row: FolderRow) => void) =>
+    const mountGroups = (
+      groups: FolderGroup[],
+      onToggleWorktrees: (row: FolderRow) => void,
+      onPick: (row: FolderRow) => void = vi.fn(),
+    ) =>
       render(
         createElement(FolderPalette, {
           open: true,
           onOpenChange: vi.fn(),
         restoreFocus: vi.fn(),
           groups,
-          onPick: vi.fn(),
+          onPick,
           onToggleWorktrees,
         }),
       );
@@ -285,7 +290,7 @@ describe("FolderPalette", () => {
       await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
       const [other, root, src] = itemEls();
       expect(root.textContent).not.toContain("Workspace Root");
-      expect(root.querySelector("kbd")?.textContent).toBe("Tab");
+      expect(root.querySelector("kbd")?.textContent).toMatch(/T$/);
       expect(other.textContent).not.toContain("show");
       expect(src.textContent).not.toContain("show");
       expect(repoHeadings()[0].querySelector("kbd")).toBeNull();
@@ -373,7 +378,7 @@ describe("FolderPalette", () => {
       expect(b.className).toContain("pl-12");
     });
 
-    it("draws the Tab key with a background that shows on the row that has the focus", async () => {
+    it("draws the shortcut key with a background that shows on the row that has the focus", async () => {
       mountGroups(clustered, vi.fn());
       await settle();
       const kbd = itemEls()[0].querySelector("kbd");
@@ -443,18 +448,20 @@ describe("FolderPalette", () => {
       expect(heading?.querySelector("svg")).not.toBeNull();
     });
 
-    it("Tab on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {
+    it("Cmd+T on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {
       const onToggle = vi.fn();
       mountGroups(clustered, onToggle);
       await settle();
+      let taken = false;
       await act(async () => {
-        fireEvent.keyDown(inputEl(), { key: "Tab" });
+        taken = runPaletteShortcut("newTab");
       });
+      expect(taken).toBe(true);
       expect(onToggle).toHaveBeenCalledTimes(1);
       expect(onToggle.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
     });
 
-    it("Tab on a row outside any repository does nothing", async () => {
+    it("Cmd+T on a row outside any repository does nothing", async () => {
       const onToggle = vi.fn();
       mountGroups(clustered, onToggle);
       await settle();
@@ -465,9 +472,44 @@ describe("FolderPalette", () => {
         await settle();
       }
       await act(async () => {
-        fireEvent.keyDown(inputEl(), { key: "Tab" });
+        runPaletteShortcut("newTab");
       });
       expect(onToggle).not.toHaveBeenCalled();
+    });
+
+    it("Tab opens the menu of the row and no longer toggles the worktrees", async () => {
+      const onToggle = vi.fn();
+      mountGroups(clustered, onToggle);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent);
+      expect(items[0]).toContain("New Tab in repo");
+      expect(items[1]).toContain("worktrees");
+      expect(items[2]).toContain("Copy Absolute Path");
+      expect(onToggle).not.toHaveBeenCalled();
+    });
+
+    it("Enter on the menu picks the folder and Escape closes only the menu", async () => {
+      const onPick = vi.fn();
+      mountGroups(clustered, vi.fn(), onPick);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Escape" });
+      });
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Enter" });
+      });
+      expect(onPick).toHaveBeenCalledTimes(1);
+      expect(onPick.mock.calls[0][0]).toMatchObject({ path: "/repo" });
     });
   });
 

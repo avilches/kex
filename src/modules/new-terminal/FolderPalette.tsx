@@ -11,6 +11,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
+import { registerPaletteControl } from "@/modules/command-palette/lib/paletteControl";
+import {
+  folderMenuItems,
+  worktreesLabel,
+} from "@/modules/command-palette/lib/rowMenu";
+import { anchorOf, RowMenu, useRowMenu } from "@/modules/command-palette/RowMenu";
+import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { getShortcutLabel } from "@/modules/shortcuts";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -21,7 +30,15 @@ import {
   SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Fragment, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   filterFolderGroups,
   type FolderGroup,
@@ -38,7 +55,7 @@ type Props = {
   /** All groups for the open state; the component applies the search. */
   groups: readonly FolderGroup[];
   onPick: (row: FolderRow) => void;
-  /** Tab on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
+  /** Cmd+T on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
   onToggleWorktrees: (row: FolderRow) => void;
 };
 
@@ -75,18 +92,88 @@ export function FolderPalette({
       ?.scrollTo({ top: 0 });
   }, [query, open]);
 
-  // Tab acts on the row cmdk has selected, which this palette never controls (a controlled
-  // selection made the scroll lag a row); the hints below read it with useCommandState.
-  const selectedRowKey = () =>
-    listRef.current?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]')?.dataset
-      .folderRow ?? "";
+  // The menu and Cmd+T act on the row cmdk has selected, which this palette never controls (a
+  // controlled selection made the scroll lag a row); the hints below read it with useCommandState.
+  const selectedRowEl = () =>
+    listRef.current?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]') ?? null;
+  const rowOf = useCallback(
+    (key: string | undefined) =>
+      key ? groups.flatMap((g) => g.rows).find((r) => r.key === key) : undefined,
+    [groups],
+  );
+
+  const rowMenu = useRowMenu();
+  const { close: closeRowMenu, open: openRowMenu } = rowMenu;
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  const toggleWorktrees = useCallback(
+    (row: FolderRow | undefined) => {
+      if (row?.repoKey && row.repoHint) onToggleWorktrees(row);
+    },
+    [onToggleWorktrees],
+  );
+  const copyPath = useCallback(
+    (row: FolderRow | undefined) => {
+      if (!row) return;
+      onOpenChange(false);
+      void copyToClipboard(row.path, "Copied absolute path");
+    },
+    [onOpenChange],
+  );
+
+  const openMenuOn = (row: FolderRow | undefined, el: HTMLElement | null) => {
+    const box = boxRef.current;
+    if (!row || !box || !el) return;
+    openRowMenu(
+      row.key,
+      folderMenuItems({
+        path: row.path,
+        worktrees: row.repoKey && row.repoHint ? row.repoHint : null,
+      }),
+      anchorOf(box, el),
+    );
+  };
+
+  const runMenuItem = (id: string, row: FolderRow | undefined) => {
+    closeRowMenu();
+    if (!row) return;
+    if (id === "pick") onPick(row);
+    else if (id === "worktrees") toggleWorktrees(row);
+    else if (id === "copy") copyPath(row);
+  };
+
+  const latest = useRef({ toggleWorktrees, copyPath, rowOf });
+  latest.current = { toggleWorktrees, copyPath, rowOf };
+  // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
+  useEffect(() => {
+    if (!open) return;
+    return registerPaletteControl((action) => {
+      if (action === "closeTab") return false;
+      const { toggleWorktrees: toggle, copyPath: copy, rowOf: find } = latest.current;
+      const row = find(selectedRowEl()?.dataset.folderRow);
+      if (action === "newTab") toggle(row);
+      else copy(row);
+      return true;
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) closeRowMenu();
+  }, [open, closeRowMenu]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: typing closes the menu
+  useEffect(() => {
+    closeRowMenu();
+  }, [query, closeRowMenu]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (rowMenu.menu) {
+      const row = rowOf(rowMenu.menu.rowKey);
+      if (rowMenu.handleKey(e, (item) => runMenuItem(item.id, row))) return;
+    }
     if (e.key !== "Tab" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
     e.preventDefault();
-    const key = selectedRowKey();
-    const row = key ? groups.flatMap((g) => g.rows).find((r) => r.key === key) : undefined;
-    if (row?.repoKey && row.repoHint) onToggleWorktrees(row);
+    const el = selectedRowEl();
+    openMenuOn(rowOf(el?.dataset.folderRow), el);
   };
 
   return (
@@ -110,6 +197,15 @@ export function FolderPalette({
           placeholder="New terminal in..."
           autoFocus
         />
+        <div
+          ref={boxRef}
+          className={cn("relative", rowMenu.menu && "min-h-[150px]")}
+          onPointerDownCapture={(e) => {
+            if (rowMenu.menu && !(e.target as HTMLElement).closest("[data-row-menu]")) {
+              closeRowMenu();
+            }
+          }}
+        >
         <ScrollArea
           ref={listRef}
           className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
@@ -140,6 +236,10 @@ export function FolderPalette({
                         value={row.key}
                         data-folder-row={row.key}
                         onSelect={() => onPick(row)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          openMenuOn(row, e.currentTarget);
+                        }}
                         className={cn("text-[12.5px]", row.nested ? "pl-12" : "pl-7")}
                       >
                         <HugeiconsIcon
@@ -166,6 +266,15 @@ export function FolderPalette({
             )}
           </CommandList>
         </ScrollArea>
+        {rowMenu.menu ? (
+          <RowMenu
+            menu={rowMenu.menu}
+            onRun={(id) => runMenuItem(id, rowOf(rowMenu.menu?.rowKey))}
+            onActive={rowMenu.setActive}
+          />
+        ) : null}
+        </div>
+        <FolderFooter groups={groups} />
       </Command>
     </CommandDialog>
   );
@@ -275,16 +384,43 @@ function RepoHeading({ row }: { row: FolderRowMatched }) {
 }
 
 function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   return (
     <span
       className={`flex shrink-0 items-center gap-1.5 text-[11px] leading-none font-normal text-muted-foreground ${className ?? ""}`}
     >
       <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
-        Tab
+        {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
       </kbd>
-      {hint.kind === "show"
-        ? `show ${hint.count} ${hint.count === 1 ? "worktree" : "worktrees"}`
-        : "hide worktrees"}
+      {worktreesLabel(hint).toLowerCase()}
     </span>
+  );
+}
+
+// What each key does on the highlighted row.
+function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const value = useCommandState((state) => state.value);
+  const row = value ? groups.flatMap((g) => g.rows).find((r) => r.key === value) : undefined;
+  if (!row) return null;
+  const kbd = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]";
+  return (
+    <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <kbd className={kbd}>{"\u21b5"}</kbd>
+        <span className="shrink-0">New Tab in</span>
+        <span className="min-w-0 truncate font-mono text-[10.5px]">{row.display}</span>
+      </span>
+      {row.repoKey && row.repoHint ? (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}</kbd>
+          {worktreesLabel(row.repoHint)}
+        </span>
+      ) : null}
+      <span className="flex shrink-0 items-center gap-1.5">
+        <kbd className={kbd}>Tab</kbd>
+        Menu
+      </span>
+    </div>
   );
 }

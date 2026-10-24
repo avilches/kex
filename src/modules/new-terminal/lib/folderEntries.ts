@@ -8,7 +8,7 @@ export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" 
 /** One checkout of a repository, as the worktree listing reports it. */
 export type RepoWorktree = { path: string; branch: string | null; isMain: boolean };
 
-/** What Tab does on a repository: add the worktrees that are not listed, or take the added ones away. */
+/** What the new-tab shortcut does on a repository: add the worktrees that are not listed, or take the added ones away. */
 export type RepoHint = { kind: "show"; count: number } | { kind: "hide" };
 
 export type FolderRow = {
@@ -36,12 +36,12 @@ export type FolderRow = {
   worktreeCount: number;
   // Its repository's worktree listing has not arrived yet.
   worktreesLoading: boolean;
-  // Added with Tab: drawn nested under the repository's folders.
+  // Added with the new-tab shortcut: drawn nested under the repository's folders.
   nested: boolean;
   // Its repository group has a heading with the repository name above the first folder: two or
   // more folders together, or the repository of the current tab, which opens the list.
   headed: boolean;
-  // What Tab does with the repository of this row; drawn on the row that has the focus,
+  // What the new-tab shortcut does with the repository of this row; drawn on the row that has the focus,
   // or on the repository heading while the focus is elsewhere.
   repoHint: RepoHint | null;
   workspaceId: string;
@@ -201,7 +201,7 @@ type RawGroup = {
 };
 
 // Within a repository the current tab goes first, then the workspace root, then its main
-// checkout, then the rest by path, and the worktrees added with Tab last.
+// checkout, then the rest by path, and the worktrees added with the new-tab shortcut last.
 function inCluster(a: FolderRow, b: FolderRow): number {
   const rank = (r: FolderRow) =>
     r.nested
@@ -279,7 +279,7 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
 // Order: the active workspace (the repository of the current tab with the current tab first, then
 // home, then the workspace root and its other folders), then every other workspace in position order. The folders of
 // one repository sit together under a small heading with its name, its main checkout first.
-// Worktrees are not listed until Tab asks for them on a row of their repository.
+// Worktrees are not listed until the new-tab shortcut asks for them on a row of their repository.
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const b = builderOf(input);
   const byWorkspace = new Map<string, TabEntry[]>();
