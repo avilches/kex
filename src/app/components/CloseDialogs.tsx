@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
@@ -70,8 +72,15 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
 
   return (
     <>
-      <AlertDialogHeader>
+      <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
         <AlertDialogTitle className="flex items-center gap-2">
+          <HugeiconsIcon icon={Alert02Icon} size={18} className="shrink-0 text-destructive" />
+          Close terminal?
+        </AlertDialogTitle>
+        <div
+          className="flex min-w-0 items-center gap-2 text-sm font-medium"
+          style={tab?.color ? { color: tab.color } : undefined}
+        >
           {tab && (
             <span className="flex shrink-0 items-center">
               {titleInfo?.agentSession && !tab.icon ? (
@@ -81,8 +90,8 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
               )}
             </span>
           )}
-          <span className="truncate">Close terminal {name}?</span>
-        </AlertDialogTitle>
+          <span className="min-w-0 truncate" title={name}>{name}</span>
+        </div>
         <AlertDialogDescription>The running process will be killed</AlertDialogDescription>
       </AlertDialogHeader>
       {current?.command && (

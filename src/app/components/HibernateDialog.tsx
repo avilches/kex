@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PlayIcon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
@@ -141,20 +141,22 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   return (
     <AlertDialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
-        <AlertDialogHeader>
+        <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
           <AlertDialogTitle className="flex items-center gap-2">
+            {closing && <HugeiconsIcon icon={Alert02Icon} size={18} className="shrink-0 text-destructive" />}
+            {closing ? "Close workspace?" : "Hibernate workspace?"}
+          </AlertDialogTitle>
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {titleWs && (
               <WorkspaceMark id={titleWs.id} color={titleWs.color} icon={titleWs.icon} size={18} />
             )}
-            <span className="truncate">
-              {`${closing ? "Close" : "Hibernate"} ${titleWsName ? `"${titleWsName}"` : "this workspace"}?`}
-            </span>
+            <span className="min-w-0 truncate" title={titleWsName}>{titleWsName || "this workspace"}</span>
             {titleGroup && (
               <span className="max-w-[40%] shrink-0 truncate text-[12px] font-normal text-muted-foreground">
                 {titleGroup}
               </span>
             )}
-          </AlertDialogTitle>
+          </div>
         </AlertDialogHeader>
         {agents.length > 0 && (
           <section className="flex flex-col gap-1">
