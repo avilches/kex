@@ -1186,6 +1186,20 @@ function hibernatedOverlay(): HTMLElement {
     h("span", { class: "text-[15px] text-foreground" }, "kex"),
     h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
     h(
+      "div",
+      {
+        class: "flex w-80 flex-col gap-0.5 border-l border-border/60 pl-2",
+        "data-surface": "hibernated-session-preview",
+      },
+      h("span", { class: "text-[12px] text-foreground" }, "fixing the build"),
+      h(
+        "span",
+        { class: "line-clamp-2 text-[11.5px] leading-snug text-foreground/80" },
+        "The build is green again: the missing import is back and all tests pass.",
+      ),
+      h("span", { class: "truncate text-[11px] opacity-60" }, "~/code/kex · 2h ago"),
+    ),
+    h(
       "span",
       {
         class:

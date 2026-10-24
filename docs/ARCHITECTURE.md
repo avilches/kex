@@ -456,6 +456,11 @@ workspace restores the same layout and tabs. Limitations: scripts launched from 
 not relaunched on wake, unsaved editor edits are discarded, and an agent that cannot be resumed
 follows the existing restore error path. Rendering details are in `docs/WORKSPACES.md`.
 
+Each sleeping agent tab previews its conversation with the last assistant message the Stop hook
+carried, persisted in `agent-sessions.json` (`SessionRecord.last_message`). That file is not
+encrypted, so the text is clipped to 280 characters: enough to recognise the session, little of
+what the assistant may have printed. The transcript `.jsonl` is not read for it.
+
 Startup: there is no startup preference. `initWorkspaceState()` restores every saved workspace as it was:
 the ones that were hibernated (manually or by auto-hibernate) stay hibernated, the rest mount normally. Their
 `lastActiveAt` is seeded into `activityStamps`, so auto-hibernate keeps counting their inactivity from the

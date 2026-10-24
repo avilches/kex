@@ -714,6 +714,51 @@ fn set_last_message_at_path(
     true
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPreview {
+    pub tab_id: String,
+    pub cwd: String,
+    pub last_message: Option<String>,
+    /// Seconds since the epoch of the last Stop, or of the SessionStart for an agent that has
+    /// not finished a turn (or whose Stop carries no message).
+    pub updated_at: u64,
+}
+
+// The overlay asks for the tabs of one workspace; anything far beyond that is not a caller of ours.
+const MAX_PREVIEW_TABS: usize = 256;
+
+/// What a sleeping tab's session said last, where it ran and when, for the tabs that have a
+/// record. Reads only agent-sessions.json (no transcript) and never mutates it.
+pub fn session_previews(tab_ids: &[String]) -> Vec<SessionPreview> {
+    match store_path() {
+        Some(path) => session_previews_from_path(&path, tab_ids),
+        None => vec![],
+    }
+}
+
+fn session_previews_from_path(path: &Path, tab_ids: &[String]) -> Vec<SessionPreview> {
+    let Some(store) = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|c| serde_json::from_str::<SessionStore>(&c).ok())
+    else {
+        return vec![];
+    };
+    tab_ids
+        .iter()
+        .take(MAX_PREVIEW_TABS)
+        .filter_map(|id| {
+            let record = store.tabs.get(id)?;
+            Some(SessionPreview {
+                tab_id: id.clone(),
+                cwd: record.cwd_launch.clone(),
+                last_message: record.last_message.clone(),
+                updated_at: record.updated_at,
+            })
+        })
+        .collect()
+}
+
 /// Remove a tab entry from agent-sessions.json.
 /// Called when the agent exits (exited signal) or the user detaches manually.
 pub fn detach_session(tab_id: &str) -> Result<(), String> {
@@ -2334,6 +2379,39 @@ mod tests {
 
         record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s.jsonl", "/tmp/p");
         assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
+    }
+
+    #[test]
+    fn session_previews_return_the_recorded_tabs_in_the_order_asked() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-a", "claude", "a", "/tmp/a.jsonl", "/tmp/a");
+        record_session_at_path(&path, "tab-b", "opencode", "b", "", "/tmp/b");
+        set_last_message_at_path(&path, "tab-a", "a", "all green", 500);
+        let before = std::fs::read_to_string(&path).unwrap();
+
+        let previews = session_previews_from_path(
+            &path,
+            &["tab-b".into(), "tab-missing".into(), "tab-a".into()],
+        );
+
+        assert_eq!(previews.len(), 2);
+        assert_eq!(previews[0].tab_id, "tab-b");
+        assert_eq!(previews[0].cwd, "/tmp/b");
+        assert_eq!(previews[0].last_message, None);
+        assert_eq!(previews[1].tab_id, "tab-a");
+        assert_eq!(previews[1].last_message.as_deref(), Some("all green"));
+        assert_eq!(previews[1].updated_at, 500);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn session_previews_are_empty_without_a_readable_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        assert!(session_previews_from_path(&path, &["tab-1".into()]).is_empty());
+        std::fs::write(&path, "{ not json").unwrap();
+        assert!(session_previews_from_path(&path, &["tab-1".into()]).is_empty());
     }
 
     #[test]

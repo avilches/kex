@@ -509,7 +509,8 @@ and the time. The same write stamps `updated_at` with the end of the turn, so it
 answered". A resume of the same session keeps it; a new session id starts without it, like `title`. Kex does not read
 the `.jsonl` transcript to fill it or to show more than this one message: the hook already carries the text, and a
 transcript reader would have to follow the `uuid`/`parentUuid` chain to skip branches abandoned by `/rewind`, as Orca
-does, which is not worth it for a single line.
+does, which is not worth it for a single line. `agent_session_previews` returns it, with `cwd_launch` and `updated_at`,
+for the rows of a hibernated workspace (`HibernatedOverlay`).
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
