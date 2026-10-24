@@ -145,7 +145,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
           <AlertDialogTitle className="flex items-center gap-2">
             {closing ? "Close workspace?" : "Hibernate workspace?"}
           </AlertDialogTitle>
-          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+          <div className="flex w-full min-w-0 items-center gap-2 text-sm font-medium">
             {titleWs && (
               <WorkspaceMark id={titleWs.id} color={titleWs.color} icon={titleWs.icon} size={18} />
             )}

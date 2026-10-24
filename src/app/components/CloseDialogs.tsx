@@ -74,10 +74,7 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
         <AlertDialogTitle className="flex items-center gap-2">
           Close terminal?
         </AlertDialogTitle>
-        <div
-          className="flex min-w-0 items-center gap-2 text-sm font-medium"
-          style={tab?.color ? { color: tab.color } : undefined}
-        >
+        <div className="flex w-full min-w-0 items-center gap-2 text-sm font-medium">
           {tab && (
             <span className="flex shrink-0 items-center">
               {titleInfo?.agentSession && !tab.icon ? (
