@@ -66,9 +66,10 @@ import {
 } from "./lib/actionsBar";
 import { isScript, usesTerminal, type Action, type ActionKind } from "./lib/types";
 
-const ZONE_WORDS: Record<ActionKind, string> = { app: "apps", agent: "agents", script: "scripts" };
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
+
+const ZONE_WORDS: Record<ActionKind, string> = { app: "apps", agent: "agents", script: "scripts" };
 
 type Handlers = Pick<BarController, "run" | "stop" | "focus">;
 

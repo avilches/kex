@@ -45,8 +45,8 @@ export function mergeEnabled(
 
 // The plan is computed from the live flag and the live Actions right before the writes, which go
 // through the serialized queue. A partial failure leaves the flag false and the next scan only
-// adds what is still missing. Two windows scanning inside the same store echo delay can still
-// both seed: the preferences store has no cross-window compare-and-set to close that.
+// adds what is still missing. With several windows scanning at startup each write replaces the
+// whole list, so the last writer wins and the result is one copy with no duplicates.
 async function seedAgentActions(agents: DetectedEditor[]): Promise<void> {
   const seeded = usePreferencesStore.getState().agentActionsSeeded;
   if (seeded || !agents.some((a) => a.enabled !== false)) return;

@@ -13,7 +13,7 @@ export type Action = {
   appId?: string;
   /** App icon kept after the user edits a preset: the Action is theirs now, the icon stays. */
   iconId?: string;
-  /** Scripts only; absent means home. */
+  /** Scripts and agents; absent means home. */
   cwdMode?: ScriptCwdMode;
   /** Only used when cwdMode is "fixed". */
   cwd?: string;
