@@ -127,9 +127,9 @@ export function openWithoutRestoringFlow(s: HeldSession, d: RestoreActionDeps): 
   return leaveBlock(s, d, async () => {}, true);
 }
 
-// PowerShell 5.1 has no `&&`. The leading space keeps the line out of shell history.
+// PowerShell 5.1 has no `&&`.
 export function restoreCommandLine(dir: string, command: string, isWindows: boolean): string {
-  return ` cd ${quoteShellPath(dir)}${isWindows ? "; " : " && "}${command}\r`;
+  return `cd ${quoteShellPath(dir)}${isWindows ? "; " : " && "}${command}\r`;
 }
 
 export type PendingOutcome =
