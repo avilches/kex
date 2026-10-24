@@ -1,15 +1,11 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use kex_lib::modules::agent::codex_hooks::{self, DEFAULT_SCRIPT_PATH, SESSION_HOOK_MARKER};
 use kex_lib::modules::agent::codex_integration::{self, CodexPaths, CodexStatus};
 use kex_lib::modules::agent::codex_trust::{
     hook_state_tables, read_trusted_hash, trusted_hash, upsert_hook_trust,
 };
-use kex_lib::modules::agent::{
-    agent_codex_status, agent_remove_integration, agent_setup_codex, agent_sync_integrations,
-    SyncOutcome,
-};
+use kex_lib::modules::agent::{agent_remove_integration, SyncOutcome};
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -603,52 +599,58 @@ fn codex_home_wins_over_home() {
     assert_eq!(resolved, tmp.path().join("home").join(".codex"));
 }
 
-// The commands read HOME and CODEX_HOME, which are process-wide.
-static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-// Elsewhere the commands report Codex unavailable before reading either variable.
+// Elsewhere the commands report Codex unavailable before reading HOME or CODEX_HOME.
 #[cfg(unix)]
-#[test]
-fn the_commands_follow_home_and_codex_home() {
-    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let tmp = TempDir::new().unwrap();
-    let home = std::fs::canonicalize(tmp.path()).unwrap();
-    std::env::set_var("HOME", &home);
-    std::env::remove_var("CODEX_HOME");
+mod commands {
+    use super::*;
+    use kex_lib::modules::agent::{agent_codex_status, agent_setup_codex, agent_sync_integrations};
+    use std::sync::Mutex;
 
-    assert!(agent_setup_codex().is_err());
-    assert!(!home.join(".codex").exists());
-    assert_eq!(agent_codex_status(), CodexStatus::Unavailable);
+    // The commands read HOME and CODEX_HOME, which are process-wide.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-    let codex_home = home.join("elsewhere");
-    std::fs::create_dir_all(&codex_home).unwrap();
-    std::fs::write(codex_home.join("hooks.json"), fixture("hooks.json")).unwrap();
-    std::env::set_var("CODEX_HOME", &codex_home);
+    #[test]
+    fn the_commands_follow_home_and_codex_home() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let tmp = TempDir::new().unwrap();
+        let home = std::fs::canonicalize(tmp.path()).unwrap();
+        std::env::set_var("HOME", &home);
+        std::env::remove_var("CODEX_HOME");
 
-    agent_setup_codex().unwrap();
-    assert_eq!(agent_codex_status(), CodexStatus::UpToDate);
-    assert!(home.join(".config/kex/hooks/trigger-event.sh").exists());
-    assert!(!home.join(".codex").exists());
-    let config = read(&codex_home.join("config.toml"));
-    assert!(config.contains(&format!("{}/hooks.json:stop:", codex_home.display())));
+        assert!(agent_setup_codex().is_err());
+        assert!(!home.join(".codex").exists());
+        assert_eq!(agent_codex_status(), CodexStatus::Unavailable);
 
-    assert!(agent_sync_integrations(vec!["codex".into()]).is_empty());
-    agent_remove_integration("codex".into()).unwrap();
-    assert_eq!(agent_codex_status(), CodexStatus::NotInstalled);
-    assert!(!read(&codex_home.join("hooks.json")).contains(SESSION_HOOK_MARKER));
+        let codex_home = home.join("elsewhere");
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(codex_home.join("hooks.json"), fixture("hooks.json")).unwrap();
+        std::env::set_var("CODEX_HOME", &codex_home);
 
-    // A file that does not parse right now (another tool mid-edit) keeps Codex tracked.
-    std::fs::write(codex_home.join("hooks.json"), "{ nope").unwrap();
-    assert!(agent_sync_integrations(vec!["codex".into(), "omp".into()]).is_empty());
-    assert_eq!(read(&codex_home.join("hooks.json")), "{ nope");
-    assert_eq!(agent_codex_status(), CodexStatus::Malformed);
+        agent_setup_codex().unwrap();
+        assert_eq!(agent_codex_status(), CodexStatus::UpToDate);
+        assert!(home.join(".config/kex/hooks/trigger-event.sh").exists());
+        assert!(!home.join(".codex").exists());
+        let config = read(&codex_home.join("config.toml"));
+        assert!(config.contains(&format!("{}/hooks.json:stop:", codex_home.display())));
 
-    std::fs::write(codex_home.join("hooks.json"), fixture("hooks.json")).unwrap();
-    assert_eq!(
-        agent_sync_integrations(vec!["codex".into()]),
-        vec!["codex".to_string()]
-    );
-    std::env::remove_var("CODEX_HOME");
+        assert!(agent_sync_integrations(vec!["codex".into()]).is_empty());
+        agent_remove_integration("codex".into()).unwrap();
+        assert_eq!(agent_codex_status(), CodexStatus::NotInstalled);
+        assert!(!read(&codex_home.join("hooks.json")).contains(SESSION_HOOK_MARKER));
+
+        // A file that does not parse right now (another tool mid-edit) keeps Codex tracked.
+        std::fs::write(codex_home.join("hooks.json"), "{ nope").unwrap();
+        assert!(agent_sync_integrations(vec!["codex".into(), "omp".into()]).is_empty());
+        assert_eq!(read(&codex_home.join("hooks.json")), "{ nope");
+        assert_eq!(agent_codex_status(), CodexStatus::Malformed);
+
+        std::fs::write(codex_home.join("hooks.json"), fixture("hooks.json")).unwrap();
+        assert_eq!(
+            agent_sync_integrations(vec!["codex".into()]),
+            vec!["codex".to_string()]
+        );
+        std::env::remove_var("CODEX_HOME");
+    }
 }
 
 #[test]
