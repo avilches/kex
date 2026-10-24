@@ -7,6 +7,9 @@ import { ENTER_KEY, IS_MAC, MOD_PROP } from "@/lib/platform";
 export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
+  | "palette.folderRoot"
+  | "palette.folderMain"
+  | "palette.folderHome"
   | "tab.new"
   | "tab.newBrowser"
   | "tab.newEditor"
@@ -76,7 +79,8 @@ export type ShortcutGroup =
   | "Panes"
   | "Terminal"
   | "View"
-  | "Editor";
+  | "Editor"
+  | "Palette";
 
 export type KeyBinding = {
   key: string;
@@ -148,6 +152,26 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Next Tab (then Workspace)",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
+  },
+  // Only live while the new-terminal palette is open (shortcutsDisabled), so Cmd+1..9 keep
+  // jumping to a workspace everywhere else; they sit before workspace.selectByIndex to win there.
+  {
+    id: "palette.folderRoot",
+    label: "New Terminal: Workspace Root",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
+  },
+  {
+    id: "palette.folderMain",
+    label: "New Terminal: Main Checkout",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "2" }],
+  },
+  {
+    id: "palette.folderHome",
+    label: "New Terminal: Home",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "3" }],
   },
   {
     id: "workspace.selectByIndex",
@@ -505,6 +529,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Terminal",
   "View",
   "Editor",
+  "Palette",
 ];
 
 export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {

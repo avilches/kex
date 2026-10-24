@@ -273,8 +273,15 @@ function findConflict(
   currentId: ShortcutId,
   userShortcuts: Record<ShortcutId, KeyBinding[]>,
 ): Shortcut | null {
+  const current = SHORTCUTS.find((c) => c.id === currentId);
   for (const s of SHORTCUTS) {
     if (s.id === currentId) continue;
+    // A palette shortcut is only live while its palette is open, so it never competes with the index jumps.
+    if (
+      (s.group === "Palette" && current?.id.endsWith("selectByIndex")) ||
+      (current?.group === "Palette" && s.id.endsWith("selectByIndex"))
+    )
+      continue;
     const bindings =
       s.id in userShortcuts ? userShortcuts[s.id] : s.defaultBindings;
     if (bindings.some((b) => bindingsEqual(b, binding))) return s;

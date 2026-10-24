@@ -684,17 +684,27 @@ src/
     └── new-terminal/              - "Ask me" mode for Open new terminals in (Settings > Terminal): FolderPalette,
                                      a Command-Palette-like dialog that picks the folder of a new terminal instead of
                                      deducing it. Pure core in `lib/folderEntries.ts` (tested): the active workspace
-                                     group opens with the repository of the current tab (its heading, the current
-                                     tab first, then the rest of that repository, so the worktrees Tab adds appear
-                                     right under it), then home, then the workspace root and its tab folders; then one
+                                     group opens with the current tab, then up to three fixed rows, each with its own
+                                     shortcut that always picks it (`palette.folderRoot` Cmd+1 the workspace root,
+                                     `palette.folderMain` Cmd+2 the main checkout of the current tab's repository,
+                                     `palette.folderHome` Cmd+3 home; reassignable in Settings > Shortcuts > Palette).
+                                     A fixed row that does not exist is left out and the others keep their key; one that
+                                     sits on the same folder as the current tab is left out too, but a fixed row on
+                                     the same folder as another fixed row (root and main checkout, usually) is shown
+                                     twice, so a working key never points at a missing row. The key is drawn on the
+                                     row and the footer lists the other fixed rows. The shortcuts are live only while
+                                     the folder palette is open (`shortcutsDisabled`), so Cmd+1..9 still jump to a
+                                     workspace everywhere else, and reach the palette through `lib/paletteControl.ts`.
+                                     Below them come the rest of the current tab's repository (its heading, so the
+                                     worktrees Tab adds appear right under it) and the other folders; then one
                                      group per other workspace in position order (root, then folders, hibernated
                                      included). The folders of one repository (several of a workspace) sit together
                                      under a small heading aligned with the workspace heading (a git icon, the
                                      repository name and, right after it, how many worktrees it has, which never changes; a spinner takes its place while the listing loads), its
-                                     workspace root first, then its main checkout, then by path (the tab bar's
+                                     main checkout first, then by path (the tab bar's
                                      terminal icon before every folder); repositories and
-                                     loose folders go alphabetically. A path appears once in the whole dialog, first
-                                     occurrence keeps its label; the branch sits beside the folder, the right side
+                                     loose folders go alphabetically. Apart from the fixed rows, a path appears once
+                                     in the whole dialog, first occurrence keeps its label; the branch sits beside the folder, the right side
                                      carries the label; home shows as `~`; headings use the resolved workspace title
                                      and `WorkspaceMark`. Worktrees are not listed by default: `useRepoWorktrees`
                                      asks the worktree listing of every repository on screen once per open. When a

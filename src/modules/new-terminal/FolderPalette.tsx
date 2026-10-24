@@ -24,7 +24,7 @@ import {
 } from "@/modules/command-palette/RowMenu";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getShortcutLabel } from "@/modules/shortcuts";
+import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -49,8 +49,21 @@ import {
   type FolderGroup,
   type FolderRow,
   type FolderRowMatched,
+  type FolderSlot,
   type RepoHint,
 } from "./lib/folderEntries";
+
+const SLOT_SHORTCUT = {
+  root: "palette.folderRoot",
+  main: "palette.folderMain",
+  home: "palette.folderHome",
+} as const satisfies Record<FolderSlot, ShortcutId>;
+
+const SLOT_ACTION = {
+  folderRoot: "root",
+  folderMain: "main",
+  folderHome: "home",
+} as const satisfies Record<string, FolderSlot>;
 
 type Props = {
   open: boolean;
@@ -151,14 +164,20 @@ export function FolderPalette({
     else if (id === "copy") copyPath(row);
   };
 
-  const latest = useRef({ toggleWorktrees, copyPath, rowOf });
-  latest.current = { toggleWorktrees, copyPath, rowOf };
+  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick });
+  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick };
   // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action) => {
       if (action === "closeTab") return false;
       const { toggleWorktrees: toggle, copyPath: copy, rowOf: find } = latest.current;
+      if (action in SLOT_ACTION) {
+        const slot = SLOT_ACTION[action as keyof typeof SLOT_ACTION];
+        const fixed = latest.current.groups.flatMap((g) => g.rows).find((r) => r.slot === slot);
+        if (fixed) latest.current.onPick(fixed);
+        return true;
+      }
       const row = find(selectedRowEl()?.dataset.folderRow);
       if (action === "newTab") toggle(row);
       else copy(row);
@@ -357,13 +376,24 @@ function KeepHeadingsVisible({ listRef }: { listRef: RefObject<HTMLElement | nul
 
 // The right end of a row: the Tab hint while the row has the focus, otherwise its label.
 function RowTail({ row }: { row: FolderRowMatched }) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const focused = useCommandState((state) => state.value) === row.key;
   if (focused && row.repoHint) return <HintChip hint={row.repoHint} className="ml-auto" />;
   if (!row.label) return null;
+  const slotKey = row.slot ? getShortcutLabel(SLOT_SHORTCUT[row.slot], userShortcuts) : null;
   return (
-    <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
-      {row.label === "Home" ? <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} /> : null}
-      <HighlightText text={row.label} indices={row.labelIndices} />
+    <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+      <span className="flex items-center gap-1">
+        {row.label === "Home" ? (
+          <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+        ) : null}
+        <HighlightText text={row.label} indices={row.labelIndices} />
+      </span>
+      {slotKey ? (
+        <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
+          {slotKey}
+        </kbd>
+      ) : null}
     </span>
   );
 }
@@ -411,7 +441,8 @@ function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
 function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const value = useCommandState((state) => state.value);
-  const row = value ? groups.flatMap((g) => g.rows).find((r) => r.key === value) : undefined;
+  const all = groups.flatMap((g) => g.rows);
+  const row = value ? all.find((r) => r.key === value) : undefined;
   if (!row) return null;
   const kbd = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]";
   return (
@@ -421,6 +452,16 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
         <span className="shrink-0">New Tab in</span>
         <span className="min-w-0 truncate font-mono text-[10.5px]">{row.display}</span>
       </span>
+      {(["root", "main", "home"] as const).map((slot) => {
+        const fixed = all.find((r) => r.slot === slot);
+        if (!fixed || fixed.key === row.key) return null;
+        return (
+          <span key={slot} className="flex shrink-0 items-center gap-1.5">
+            <kbd className={kbd}>{getShortcutLabel(SLOT_SHORTCUT[slot], userShortcuts)}</kbd>
+            {fixed.label}
+          </span>
+        );
+      })}
       {row.repoKey && row.repoHint ? (
         <span className="flex shrink-0 items-center gap-1.5">
           <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}</kbd>
