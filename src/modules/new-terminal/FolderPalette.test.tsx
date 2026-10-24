@@ -586,13 +586,71 @@ describe("FolderPalette", () => {
       expect(keys("Current tab")).toBeUndefined();
     });
 
-    it("lists the keys of the other fixed rows in the footer", async () => {
+    it("lists the keys of the three fixed rows in the footer, whichever row has the focus", async () => {
       mountFixed(fixed);
       await settle();
-      const footer = document.querySelector("[cmdk-root] > div:last-child")?.textContent ?? "";
-      expect(footer).toContain("Workspace Root");
-      expect(footer).toContain("Main checkout");
-      expect(footer).toContain("Home");
+      const footerKeys = () =>
+        [...(document.querySelector("[cmdk-root] > div:last-child")?.querySelectorAll("kbd") ?? [])].map(
+          (el) => el.textContent,
+        );
+      const before = footerKeys();
+      expect(before.some((k) => k?.endsWith("1"))).toBe(true);
+      expect(before.some((k) => k?.endsWith("2"))).toBe(true);
+      expect(before.some((k) => k?.endsWith("3"))).toBe(true);
+      for (let i = 0; i < 2; i++) {
+        await act(async () => {
+          fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+        });
+        await settle();
+        expect(footerKeys().filter((k) => /[123]$/.test(k ?? ""))).toHaveLength(3);
+      }
+    });
+
+    it("puts the worktrees key before the fixed keys in the footer, so they never shift", async () => {
+      mountFixed([
+        group({
+          active: true,
+          rows: [
+            row({ path: "/repo", label: "Current tab", key: "ws-1:/repo", repoKey: "/repo", repoHint: { kind: "show", count: 1 } }),
+            row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h#home" }),
+          ],
+        }),
+      ]);
+      await settle();
+      const keys = [...(document.querySelector("[cmdk-root] > div:last-child")?.querySelectorAll("kbd") ?? [])].map(
+        (el) => el.textContent ?? "",
+      );
+      const worktrees = keys.findIndex((k) => /T$/i.test(k));
+      const home = keys.findIndex((k) => k.endsWith("3"));
+      expect(worktrees).toBeGreaterThan(-1);
+      expect(worktrees).toBeLessThan(home);
+    });
+
+    it("keeps the fixed key beside the worktrees hint on the focused fixed row", async () => {
+      mountFixed([
+        group({
+          active: true,
+          rows: [
+            row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h#home", repoKey: "/r", repoHint: { kind: "show", count: 1 } }),
+          ],
+        }),
+      ]);
+      await settle();
+      const kbds = [...(itemEls()[0]?.querySelectorAll("kbd") ?? [])].map((el) => el.textContent ?? "");
+      expect(kbds).toHaveLength(2);
+      expect(kbds.some((k) => k.endsWith("3"))).toBe(true);
+    });
+
+    it("draws a pin before the workspace root and a house before home", async () => {
+      mountFixed(fixed);
+      await settle();
+      const labelIcons = (slot: string) =>
+        document
+          .querySelector(`[data-folder-row$="#${slot}"]`)
+          ?.querySelectorAll("span.ml-auto svg").length;
+      expect(labelIcons("root")).toBe(1);
+      expect(labelIcons("home")).toBe(1);
+      expect(labelIcons("main")).toBe(0);
     });
   });
 

@@ -692,7 +692,10 @@ src/
                                      that exists is always shown, even on the same folder as the current tab or as
                                      another fixed row (root and main checkout, usually), so a working key never
                                      points at a missing row. The key is drawn on the
-                                     row and the footer lists the other fixed rows. The shortcuts are live only while
+                                     row (beside the worktrees hint while the row has the focus, which no longer hides it; the workspace
+                                     root wears the explorer's pin and home a house) and the footer always lists all
+                                     the fixed rows that exist, after the worktrees key, so none of them moves as
+                                     the focus does. The shortcuts are live only while
                                      the folder palette is open (`shortcutsDisabled`), so Cmd+1..9 still jump to a
                                      workspace everywhere else, and reach the palette through `lib/paletteControl.ts`.
                                      Below them come the rest of the current tab's repository (its heading, so the
