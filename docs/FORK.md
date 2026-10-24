@@ -301,8 +301,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 - **`agentNotifications` setting** (formerly `claudeHooksEnabled`) - boolean persisted in the app settings store.
   Controls both notification routing and hook lifecycle. Enabling it calls `agent_enable_claude_hooks`; disabling it
   calls `agent_disable_claude_hooks` (removes Kex hooks from `~/.claude/settings.json`). On every startup, the app
-  silently calls `agent_enable_claude_hooks` when this is true (idempotent). Controlled via Settings > General >
-  Coding agent notifications; also accessible from the notification bell popup ("Enable Claude Code alerts").
+  silently calls `agent_enable_claude_hooks` when this is true (idempotent). It has no switch of its own in Settings:
+  it follows installing or uninstalling the Claude Code integration (Settings > General > Agents, the bell, or the
+  install toast).
 - **Minimal `~/.claude/settings.json` writes** - `agent_enable_claude_hooks` now uses `serde_json` with
   `preserve_order` (insertion-order key serialization via IndexMap) and detects the original indent style, so
   reformatting is kept to the minimum necessary. If our hooks are already present, settings.json is not touched at

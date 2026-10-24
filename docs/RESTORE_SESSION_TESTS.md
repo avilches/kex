@@ -289,18 +289,19 @@ Partiendo de C4 o C5 (tab en estado `⚠`):
 
 - [ ] Verificar cada caso
 
-### D3 Dot de estado
+### D3 Indicador de estado
 
-| Estado del agente | Color del dot | Animacion |
-|-------------------|---------------|-----------|
-| Trabajando (OSC "working") | verde `bg-green-500` | pulsando |
-| Esperando input / tarea terminada (OSC "attention"/"finished") | amarillo `bg-amber-400` | pulsando |
-| Sesion restaurada (antes del primer OSC) | verde `bg-green-500` | pulsando |
-| Error de restore | rojo `bg-destructive` | estatico |
-| Sin agente | sin dot | - |
+El indicador va a la derecha del tab, sobre el boton de cerrar (que lo sustituye al pasar el raton).
 
-- [ ] Verificar cada color
-- [ ] El dot tiene 6px de tamaño - confirmar que es visible
+| Estado del agente | Indicador |
+|-------------------|-----------|
+| Trabajando | rueda (spinner), estilo `arc`, `braille` o `cursor` segun Settings > Appearance |
+| Esperando al usuario (permiso, pregunta o fin de turno) | punto ambar fijo de 6 px |
+| Restaurando la sesion | rueda |
+| Error de restore, o sesion interrumpida al cerrar Kex | punto rojo fijo de 6 px |
+| Sin agente | ninguno |
+
+- [ ] Verificar cada caso. Ningun punto pulsa; solo gira la rueda
 
 ### D4 Tooltip (bug conocido)
 
@@ -677,6 +678,55 @@ app mantiene el registro en memoria mientras corre). Usar OMP o Pi para probar s
 - [ ] Con Claude Code: como `agentNotifications` esta activado por defecto, Kex instala los hooks solo al arrancar y el recordatorio no sale. Para verlo hay que desactivar el ajuste (o borrar a mano las entradas `kex-session-hook` de `~/.claude/settings.json` con el ajuste apagado), reabrir Kex y lanzar `claude`
 - [ ] `claude -p "hola"` (modo no interactivo) no dispara el recordatorio: el detector lo salta
 - [ ] Lanzar un agente sin integracion en Kex (por ejemplo `gemini`): no sale nada
+
+## Bloque M - Avisos de atencion: toast, aviso del sistema y campana
+
+Prueba lo que ve el usuario cuando un agente necesita algo. Diseno y tabla completa en `docs/NOTIFICATIONS.md`,
+seccion "Resumen: todos los avisos". Necesita la integracion del agente instalada (Claude Code lo esta por defecto).
+Usar Claude Code: para forzar un aviso de atencion basta pedirle algo que requiera permiso (por ejemplo `escribe un
+fichero /tmp/x`) con los permisos en modo "preguntar".
+
+### M1 Si estas mirando el tab, no se avisa
+
+- [ ] Tab del agente activo y ventana de Kex con foco. Pedir algo que pida permiso
+- [ ] Esperado: no sale toast, ni aviso del sistema, ni fila nueva en la campana, ni punto ambar en el tab
+
+### M2 Toast de atencion (ventana con foco, otro tab)
+
+- [ ] Lanzar la peticion y cambiar a otro tab del mismo workspace antes de que termine
+- [ ] Esperado: sale un toast "<nombre> needs your input" con boton "Open", el tab del agente lleva punto ambar y la campana suma una fila
+- [ ] "Open" lleva al tab y el punto ambar desaparece (mirar el tab lo apaga)
+- [ ] Dejar el toast sin tocar: se va solo a los 15 s
+- [ ] Un fin de turno normal (sin pedir permiso) produce el mismo aviso, con el mismo titulo "needs your input" (no "finished")
+
+### M3 Aviso del sistema (ventana sin foco)
+
+- [ ] Lanzar la peticion y pasar a otra aplicacion antes de que termine
+- [ ] Esperado: notificacion del sistema "<nombre> needs your input". En macOS, un clic en ella trae Kex al frente y activa ese tab; sacarla de otro modo (volver a Kex a mano) no navega
+- [ ] No sale toast dentro de Kex mientras la ventana no tiene foco
+
+### M4 Error
+
+- [ ] Provocar un fallo del agente (por ejemplo cortar la red a mitad de turno)
+- [ ] Esperado: aviso del sistema o fila de campana "<nombre> stopped with an error", y nunca toast dentro de Kex
+
+### M5 Campana
+
+- [ ] Abrir con el icono del header y con Cmd+Shift+I (o el atajo reasignado en Settings > Shortcuts)
+- [ ] Una fila por tab con el mismo indicador que el tab; el numero de la campana cuenta los pendientes y se pone a cero al abrir
+- [ ] "Clear all" borra las filas y apaga los puntos ambar; los tabs con spinner siguen girando
+
+### M6 Spinner y subagentes
+
+- [ ] Mandar un prompt: el tab gira. Pulsar ESC una vez: deja de girar
+- [ ] Mandar un prompt que lance un subagente en segundo plano y esperar a que el agente principal termine su turno: el tab SIGUE girando y no sale el punto ambar hasta que acaba el subagente y llega su propio fin de turno
+- [ ] Cambiar Settings > Appearance > spinner (`arc`, `braille`, `cursor`): el tab cambia de rueda sin reiniciar
+
+### M7 Apagar los avisos
+
+- [ ] No hay ningun interruptor de avisos en Settings. Comprobarlo: Settings > General no tiene "Coding agent notifications"
+- [ ] Desinstalar la integracion de Claude Code (Settings > General > Agents > Uninstall) pone `agentNotifications` a `false`: dejan de salir toast, aviso del sistema y filas de campana, y tambien el spinner y los puntos, porque sin hooks Kex ya no se entera de nada
+- [ ] Reinstalarla lo devuelve a `true`
 
 ---
 

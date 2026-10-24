@@ -14,6 +14,42 @@ end up emitting `kex:agent-signal` to the frontend, but never touch each other:
 
 ---
 
+## Resumen: todos los avisos
+
+Una sola tabla con cada cosa que Kex le enseña al usuario sobre un agente. El detalle de cada fila esta en las secciones
+de abajo; las pruebas manuales, en el bloque M de `docs/RESTORE_SESSION_TESTS.md`.
+
+Salvo la ultima fila, todo lo que sigue necesita que la integracion del agente este instalada (ver "Install reminder"),
+porque son los hooks y las extensiones los que avisan de que el agente trabaja, pide permiso o termina.
+
+| Aviso | Que es | Cuando aparece | Cuando desaparece |
+|---|---|---|---|
+| Spinner del tab | Rueda en el tab del agente (estilo `arc`, `braille` o `cursor`, en Settings > Appearance) | El agente trabaja: `UserPromptSubmit`, o un `Stop` con subagentes en segundo plano todavia vivos | Cuando el agente termina el turno (`Stop`), con ESC o CTRL+C, o al salir el agente |
+| Punto ambar del tab | Punto fijo de 6 px, no pulsa | El agente necesita al usuario: `Notification`, `PermissionRequest` o `Stop` (fin de turno), siempre que el tab no se este mirando | Al mirar el tab (tab activo y ventana con foco), en cuanto llega un prompt nuevo, o al salir el agente. "Clear all" de la campana tambien lo apaga |
+| Punto rojo del tab | Punto fijo de 6 px | La restauracion de la sesion fallo, o la sesion estaba trabajando cuando se cerro Kex (interrumpida) | Un fallo de restauracion, al abrir una shell normal o reintentar; una sesion interrumpida, con la siguiente actividad del agente |
+| Fila en la campana | Una fila por tab con algo accionable, con el mismo indicador que el tab. El numero de la campana cuenta los pendientes (atencion y error sin leer) | Con el spinner, el punto ambar o el rojo | Cuando el indicador desaparece. Se marca como leido al abrir el popover |
+| Toast de atencion | Aviso dentro de Kex con el titulo "<nombre> needs your input", 15 s, boton "Open" que lleva al tab | Solo para atencion (`Notification`, `PermissionRequest`, `Stop`), con la ventana de Kex con foco pero mirando otro tab | Se cierra solo a los 15 s o con la X. Un fallo (`StopFailure`) no saca toast, solo aviso del sistema o campana |
+| Aviso del sistema operativo | Notificacion del SO con el titulo "<nombre> needs your input" o, si el turno fallo, "<nombre> stopped with an error"; en macOS, al hacer clic activa la ventana y el tab | La ventana de Kex NO tiene foco | Lo gestiona el SO |
+| Toast de instalacion | "<Agente> is running without the Kex integration", boton Install, 20 s | Al detectar el agente sin integracion; como mucho dos veces por agente, la segunda a los 15 dias | Se cierra a los 20 s, con la X, o al instalar |
+
+Reglas que atraviesan todas las filas:
+
+- **Si el tab se esta mirando, no se avisa de nada.** Tab activo y ventana con foco: ni toast, ni aviso del SO, ni
+  fila en la campana (`route.ts` y `isTabSeen`).
+- **No hay ningun interruptor de avisos en Settings.** `agentNotifications` existe en `settings-general.json` y vale
+  `true` por defecto, pero no se edita desde la interfaz: solo cambia como efecto de instalar o desinstalar la
+  integracion de Claude Code. Con el valor a `false`, `route.ts` no manda ningun toast, ni aviso del SO, ni fila de
+  campana; el spinner y los puntos del tab siguen funcionando.
+- **El spinner y los puntos no son avisos "enrutados":** los pinta el estado de la sesion (`agentStore`), asi que
+  salen aunque estes mirando el tab. El filtro de arriba solo afecta a los toast, al SO y a la campana.
+- **Un fin de turno no se llama "finished".** `route()` acepta `"finished"` pero nada lo usa: `Stop` se enruta como
+  atencion, asi que el titulo es siempre "needs your input" (y `<nombre>` es el nombre que le puso el usuario al tab, o
+  el titulo OSC, o el nombre del agente).
+- **La campana** se abre con el icono del header o con el atajo `notifications.toggle` (Cmd+Shift+I por defecto,
+  reasignable en Settings > Shortcuts).
+
+---
+
 ## OSC sequence reference (channel 1: PTY bytes)
 
 | Sequence | Sent by | Cuando | `agent_detect.rs` (Rust) | `osc-handlers.ts` (xterm.js) | `AgentNotificationsBridge` (TS) |
@@ -116,7 +152,7 @@ Los eventos de atención (`Notification`, `PermissionRequest`, `Stop`) se enruta
 
 No hay texto de estado en la fila (no cabe): solo el nombre y el indicador. El nombre es el título OSC del tab (`oscTitleStore`) con fallback al nombre del agente. Orden: `attention` primero, luego `working`, luego `error`; dentro de cada grupo, mas reciente arriba. El badge cuenta las entradas `pending` (attention + error sin leer), una vez por agente.
 
-El popover se abre con la campana o con el shortcut `notifications.toggle` (Cmd+I por defecto, configurable en Settings → VIEW); su estado `open` vive en `bellStore` para que el shortcut global lo pueda alternar. El pie del popover tiene un botón **Clear all** (`agentStore.clearAll`) que borra las notificaciones y apaga todos los dots naranja (las sesiones `attention` pasan a `idle`; las `working` siguen). Al final del popover hay una fila "Install ... integration" por agente, y solo aparece mientras esa integración falta: la de Claude Code cuando sus hooks no están activos, y las de OpenCode, OMP, Pi y Codex cuando su fichero no está instalado. Un Codex cuya config Kex no puede leer o editar sale como una fila sin botón que lo explica, y uno sin carpeta de Codex no sale. Una vez instalada, Settings > General > Agents es el único sitio para desinstalar.
+El popover se abre con la campana o con el shortcut `notifications.toggle` (Cmd+Shift+I por defecto, configurable en Settings > Shortcuts, grupo View); su estado `open` vive en `bellStore` para que el shortcut global lo pueda alternar. El pie del popover tiene un botón **Clear all** (`agentStore.clearAll`) que borra las notificaciones y apaga todos los dots naranja (las sesiones `attention` pasan a `idle`; las `working` siguen). Al final del popover hay una fila "Install ... integration" por agente, y solo aparece mientras esa integración falta: la de Claude Code cuando sus hooks no están activos, y las de OpenCode, OMP, Pi y Codex cuando su fichero no está instalado. Un Codex cuya config Kex no puede leer o editar sale como una fila sin botón que lo explica, y uno sin carpeta de Codex no sale. Una vez instalada, Settings > General > Agents es el único sitio para desinstalar.
 
 ---
 
@@ -223,6 +259,22 @@ When it appears, per agent:
 | Integration already installed when the agent is detected | No, and it is recorded as installed, so removing it later does not bring the toast back |
 | Status is not `missing` (`malformed`, `uneditable`, `unavailable`: a Codex config Kex cannot parse or edit safely, or a Codex folder that does not exist yet) | No, and no ask is recorded: Install would fail, so the next app run looks again |
 | Second tab starting the same agent in the same app run | No: each agent is looked at once per run |
+
+Cuanto molesta, en cifras. Por agente, y solo si su integracion falta:
+
+- Como mucho **dos toasts en toda la vida del usuario**: el primero la primera vez que se detecta el agente, y el segundo
+  a los 15 dias o mas del primero, la siguiente vez que lo lance. No hay un tercero, ni "mas tarde" indefinido.
+- Dentro de una misma ejecucion de Kex, **uno como mucho**, aunque abra diez tabs con ese agente.
+- Cada toast dura 20 s y se va solo, o antes con la X. No se queda en pantalla ni vuelve a salir por pasar el raton por
+  ningun sitio (ya no hay icono en el tab).
+- Con cinco agentes sin integracion, el peor caso son cinco toasts distintos, uno por agente, repartidos en el tiempo
+  segun cuando los lance; cada uno con el mismo limite de dos.
+- La pregunta se anota **al mostrar el toast, no al verlo**. Si Kex esta en segundo plano, o el usuario no estaba mirando
+  la esquina inferior derecha, cuenta igual como pregunta hecha. Es la parte que mas puede "gastar" una de las dos
+  oportunidades sin que el usuario se entere.
+- "Para siempre" solo lo da instalarla: al instalar (por cualquier via) no vuelve a preguntar nunca, ni siquiera tras
+  desinstalarla. No hay un boton de "no volver a preguntar": cerrar el toast cuenta como "mas tarde", y a la segunda
+  vez ya no hay mas.
 
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
 (`lib/agentIntegration.ts`), the single install path, which records `installedOnce` after the write succeeded (a failure
