@@ -437,7 +437,7 @@ Upstream Terax keeps a workspace whose last tab closed, as an empty chip in the 
 
 ### Actions: scripts and apps in the Header
 
-Kex replaces the upstream "Open in editor" button and its own earlier Scripts and Run button with one entity, the **Action**: a saved command template that is either a script (typed into a terminal, can be stopped) or an app (spawned in the background). Not present in upstream Terax. Architecture and details are in `ARCHITECTURE.md` 3.11 (app detection) and 3.12 (Actions).
+Kex replaces the upstream "Open in editor" button and its own earlier Scripts and Run button with one entity, the **Action**: a saved command template that is a script (typed into a terminal, can be stopped), an app (spawned in the background) or an agent (see Agent Actions below). Not present in upstream Terax. Architecture and details are in `ARCHITECTURE.md` 3.11 (app detection) and 3.12 (Actions).
 
 - **Model**: `Action` in `src/modules/actions/lib/types.ts`, in two scopes: workspace Actions (`Workspace.actions`, with `activeAction` for F12) and global Actions (`actions` in `settings-tools.json`). Settings > Actions holds the single editor as two columns, Global and the current workspace, each Action is edited in a modal, and dragging a row to the other column moves it.
 - **Templates**: the command uses the title variables (`{cwd}`, `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{file}`, `{path}`, `{host}`), expanded from raw values by `commandTemplate.ts`. An app command is split into arguments before substitution and spawned without a shell (`action_spawn`); a script command is quoted for the target shell and typed into a terminal, and a value with `$`, quotes, a backtick or a backslash is refused for scripts.
