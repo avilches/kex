@@ -1,5 +1,4 @@
 import {
-  AiBrain01Icon,
   ColorsIcon,
   ComputerTerminal01Icon,
   DocumentCodeIcon,
@@ -7,6 +6,7 @@ import {
   KeyboardIcon,
   Layers01Icon,
   PaintBoardIcon,
+  RoboticIcon,
   Settings01Icon,
   SourceCodeIcon,
 } from "@hugeicons/core-free-icons";
@@ -24,7 +24,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: "general", label: "General", icon: Settings01Icon },
   { id: "workspaces", label: "Workspaces", icon: Layers01Icon },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon },
-  { id: "agents", label: "Agents", icon: AiBrain01Icon },
+  { id: "agents", label: "Agents", icon: RoboticIcon },
   { id: "actions", label: "Actions", icon: DocumentCodeIcon },
   { id: "editor", label: "Editor", icon: SourceCodeIcon },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon },
