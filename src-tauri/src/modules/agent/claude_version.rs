@@ -25,13 +25,18 @@ const EVENT_SINCE: [(&str, Version); 10] = [
 // What an unknown version gets: the events that exist since 1.0.x.
 const BASELINE: Version = (1, 0, 85);
 
-/// Reads `2.1.310` out of the text `claude --version` prints (`2.1.310 (Claude Code)`).
+/// Reads `2.1.310` out of the text `claude --version` prints (`2.1.310 (Claude Code)`); a
+/// suffix on the patch number (`2.1.310-beta`) is ignored.
 pub fn parse_version(output: &str) -> Option<Version> {
     let token = output.split_whitespace().next()?;
     let mut parts = token.split('.');
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;
-    let patch = parts.next()?.parse().ok()?;
+    let patch_text = parts.next()?;
+    let digits = patch_text
+        .find(|c: char| !c.is_ascii_digit())
+        .map_or(patch_text, |end| &patch_text[..end]);
+    let patch = digits.parse().ok()?;
     if parts.next().is_some() {
         return None;
     }
@@ -56,15 +61,46 @@ pub fn known_events() -> impl Iterator<Item = &'static str> {
 
 const VERSION_TIMEOUT: Duration = Duration::from_millis(2000);
 
-fn candidates() -> Vec<std::path::PathBuf> {
-    let mut list = vec![std::path::PathBuf::from("claude")];
-    if let Some(home) = dirs::home_dir() {
-        list.push(home.join(".local/bin/claude"));
-        list.push(home.join(".claude/local/claude"));
+// A GUI app has a minimal PATH, so the usual install folders are tried too. Whatever is not
+// found here (nvm, fnm, asdf) leaves the version unknown and falls back to the 6 events of 1.0.x.
+fn candidates_for(home: Option<&std::path::Path>, windows: bool) -> Vec<std::path::PathBuf> {
+    let names: &[&str] = if windows {
+        &["claude.cmd", "claude.exe"]
+    } else {
+        &["claude"]
+    };
+    let mut list: Vec<std::path::PathBuf> = names.iter().map(std::path::PathBuf::from).collect();
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(home) = home {
+        for sub in [
+            ".local/bin",
+            ".claude/local",
+            ".npm-global/bin",
+            ".bun/bin",
+            ".volta/bin",
+            ".local/share/pnpm",
+        ] {
+            dirs.push(home.join(sub));
+        }
+        if windows {
+            dirs.push(home.join("AppData/Roaming/npm"));
+            dirs.push(home.join(".local/bin"));
+        }
     }
-    list.push("/opt/homebrew/bin/claude".into());
-    list.push("/usr/local/bin/claude".into());
+    if !windows {
+        dirs.push("/opt/homebrew/bin".into());
+        dirs.push("/usr/local/bin".into());
+    }
+    for dir in dirs {
+        for name in names {
+            list.push(dir.join(name));
+        }
+    }
     list
+}
+
+fn candidates() -> Vec<std::path::PathBuf> {
+    candidates_for(dirs::home_dir().as_deref(), cfg!(windows))
 }
 
 fn run_with_timeout(program: &std::path::Path, timeout: Duration) -> Option<String> {
@@ -96,6 +132,32 @@ fn run_with_timeout(program: &std::path::Path, timeout: Duration) -> Option<Stri
             }
         }
     }
+}
+
+const CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Whether an answer taken `age` ago can still be used.
+pub fn cache_is_fresh(age: Duration, ttl: Duration) -> bool {
+    age < ttl
+}
+
+static CACHE: std::sync::Mutex<Option<(Instant, Option<String>)>> = std::sync::Mutex::new(None);
+
+/// Like `detect_claude_version`, but remembers the answer for a minute so frequent status
+/// polls do not spawn a process each time. `refresh` skips the cache and renews it.
+pub fn detect_claude_version_cached(refresh: bool) -> Option<String> {
+    if !refresh {
+        if let Some((at, value)) = CACHE.lock().ok().and_then(|g| g.clone()) {
+            if cache_is_fresh(at.elapsed(), CACHE_TTL) {
+                return value;
+            }
+        }
+    }
+    let value = detect_claude_version();
+    if let Ok(mut guard) = CACHE.lock() {
+        *guard = Some((Instant::now(), value.clone()));
+    }
+    value
 }
 
 /// Blocking: runs `claude --version` with a short timeout. Call it off the UI thread. `None`
@@ -216,6 +278,12 @@ mod tests {
     fn parses_what_claude_prints() {
         assert_eq!(parse_version("2.1.310 (Claude Code)\n"), Some((2, 1, 310)));
         assert_eq!(parse_version("1.0.23"), Some((1, 0, 23)));
+        assert_eq!(parse_version("2.1.310-beta"), Some((2, 1, 310)));
+        assert_eq!(
+            parse_version("2.1.310-beta (Claude Code)"),
+            Some((2, 1, 310))
+        );
+        assert_eq!(parse_version("2.1.-beta"), None);
         assert_eq!(parse_version("2.1.310.4"), None);
         assert_eq!(parse_version("command not found"), None);
         assert_eq!(parse_version(""), None);
@@ -244,5 +312,43 @@ mod tests {
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         let out = run_with_timeout(&script, Duration::from_secs(2)).unwrap();
         assert_eq!(parse_version(&out), Some((2, 1, 310)));
+    }
+
+    #[test]
+    fn the_cache_expires_at_the_ttl() {
+        let ttl = Duration::from_secs(60);
+        assert!(cache_is_fresh(Duration::from_secs(59), ttl));
+        assert!(!cache_is_fresh(ttl, ttl));
+        assert!(!cache_is_fresh(Duration::from_secs(61), ttl));
+    }
+
+    #[test]
+    fn unix_candidates_cover_node_managers_and_system_folders() {
+        let home = std::path::Path::new("/h");
+        let list = candidates_for(Some(home), false);
+        for want in [
+            "claude",
+            "/h/.npm-global/bin/claude",
+            "/h/.bun/bin/claude",
+            "/h/.volta/bin/claude",
+            "/h/.local/share/pnpm/claude",
+            "/h/.local/bin/claude",
+            "/opt/homebrew/bin/claude",
+        ] {
+            assert!(list.contains(&std::path::PathBuf::from(want)), "{want}");
+        }
+    }
+
+    #[test]
+    fn windows_candidates_use_cmd_and_exe() {
+        let list = candidates_for(Some(std::path::Path::new("/h")), true);
+        assert!(list.contains(&std::path::PathBuf::from("claude.cmd")));
+        assert!(list.contains(&std::path::PathBuf::from("claude.exe")));
+        assert!(list.contains(
+            &std::path::Path::new("/h")
+                .join("AppData/Roaming/npm")
+                .join("claude.cmd")
+        ));
+        assert!(!list.iter().any(|p| p.ends_with("claude")));
     }
 }

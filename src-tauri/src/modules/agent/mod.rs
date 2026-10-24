@@ -209,16 +209,18 @@ fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), Stri
 }
 
 /// `claude --version` runs on the blocking pool so the UI thread and the async runtime stay free.
-async fn detect_version() -> Option<String> {
-    tauri::async_runtime::spawn_blocking(claude_version::detect_claude_version)
-        .await
-        .ok()
-        .flatten()
+async fn detect_version(refresh: bool) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_version::detect_claude_version_cached(refresh)
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 #[tauri::command]
 pub async fn agent_enable_claude_hooks() -> Result<(), String> {
-    let version = detect_version().await;
+    let version = detect_version(true).await;
     install_session_hook_script(&session_hook_script_path()?)?;
 
     let path = settings_path()?;
@@ -681,7 +683,11 @@ pub async fn agent_integration_preview(
     install: bool,
 ) -> Result<Vec<FilePreview>, String> {
     if agent == "claude" {
-        let version = if install { detect_version().await } else { None };
+        let version = if install {
+            detect_version(false).await
+        } else {
+            None
+        };
         let settings_path = settings_path()?;
         let script_path = session_hook_script_path()?;
         let settings = read_optional(&settings_path)?;
@@ -716,7 +722,7 @@ pub async fn agent_session_set_snapshot(
 
 #[tauri::command]
 pub async fn agent_claude_hooks_status() -> bool {
-    let version = detect_version().await;
+    let version = detect_version(false).await;
     let Some(content) = settings_path()
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
@@ -727,11 +733,13 @@ pub async fn agent_claude_hooks_status() -> bool {
         return false;
     };
     // Every event this Claude version knows must have the session hook.
-    let all_hooks_present = claude_version::hook_events_for(version.as_deref()).iter().all(|event| {
-        root["hooks"][event]
-            .as_array()
-            .is_some_and(|arr| arr.iter().any(is_session_hook))
-    });
+    let all_hooks_present = claude_version::hook_events_for(version.as_deref())
+        .iter()
+        .all(|event| {
+            root["hooks"][event]
+                .as_array()
+                .is_some_and(|arr| arr.iter().any(is_session_hook))
+        });
     if !all_hooks_present {
         return false;
     }
@@ -1200,7 +1208,8 @@ mod tests {
         let written = std::fs::read_to_string(&settings).unwrap();
         assert_eq!(files[0].after.as_deref(), Some(written.as_str()));
 
-        let removal = claude_preview(&settings, &script, Some(&written), None, false, None).unwrap();
+        let removal =
+            claude_preview(&settings, &script, Some(&written), None, false, None).unwrap();
         assert_eq!(removal.len(), 1);
         apply_settings(&settings, false, None).unwrap();
         let cleaned = std::fs::read_to_string(&settings).unwrap();
@@ -1317,7 +1326,9 @@ mod tests {
     #[test]
     fn a_claude_update_adds_the_new_events_on_the_next_install() {
         let path = std::path::Path::new("/x/s.json");
-        let old = plan_settings("", path, true, Some("2.0.50")).unwrap().unwrap();
+        let old = plan_settings("", path, true, Some("2.0.50"))
+            .unwrap()
+            .unwrap();
         assert!(!old.contains("MessageDisplay") && !old.contains("StopFailure"));
         assert!(old.contains("PermissionRequest"));
         let new = plan_settings(&old, path, true, LATEST).unwrap().unwrap();
@@ -1329,7 +1340,9 @@ mod tests {
     fn a_claude_downgrade_drops_the_events_it_does_not_know() {
         let path = std::path::Path::new("/x/s.json");
         let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
-        let down = plan_settings(&full, path, true, Some("1.0.90")).unwrap().unwrap();
+        let down = plan_settings(&full, path, true, Some("1.0.90"))
+            .unwrap()
+            .unwrap();
         let root: Value = serde_json::from_str(&down).unwrap();
         assert!(root["hooks"].get("MessageDisplay").is_none());
         assert!(hooked(&root, "Stop"));
