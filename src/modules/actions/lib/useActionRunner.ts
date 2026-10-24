@@ -9,7 +9,7 @@ import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { requestLeafFocus } from "@/modules/terminal/lib/useTerminalSession";
 import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptFolderMissingMessage, scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
-import { planDelayedWrite } from "@/modules/workspaces/lib/scriptRunState";
+import { planDelayedWrite, SCRIPT_WRITE_MAX_ATTEMPTS } from "@/modules/workspaces/lib/scriptRunState";
 import { allPanes, findPane, focusedTab, focusedTabId } from "@/modules/workspaces/lib/splitNode";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -74,6 +74,17 @@ const WRITE_DELAY_NEW_MS = 150;
 const WRITE_DELAY_REUSED_MS = 50;
 const WRITE_RETRY_MS = 100;
 
+function warnMissingFolder(cwd: string | undefined, title: string) {
+  if (!cwd) return;
+  void native
+    .fsStat(cwd)
+    .catch(() => null)
+    .then((stat) => {
+      const msg = scriptFolderMissingMessage(cwd, stat);
+      if (msg) toast.error(msg.replace("Script not run", `${title} not run`), { duration: 6000 });
+    });
+}
+
 function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   const tabId = getActionTab(actionId);
   if (!tabId) return null;
@@ -130,6 +141,17 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   useEffect(() => {
     void primeHomeDir();
   }, []);
+
+  const scheduleAgentWrite = useCallback(
+    (tabId: string, input: string, delay: number) => {
+      const attempt = (n: number) => {
+        if (terminalHandles.current.has(tabId)) terminalHandles.current.get(tabId)?.write(input);
+        else if (n < SCRIPT_WRITE_MAX_ATTEMPTS) setTimeout(() => attempt(n + 1), WRITE_RETRY_MS);
+      };
+      setTimeout(() => attempt(0), delay);
+    },
+    [terminalHandles],
+  );
 
   const scheduleWrite = useCallback(
     (tabId: string, input: string, delay: number) => {
@@ -202,6 +224,15 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     [activateTab, focusPane, openTab, setScriptPaneId, splitPaneAndOpenTab],
   );
 
+  const openAgentTab = useCallback(
+    (ws: Workspace, tab: Tab) => {
+      openTab(ws.id, ws.activePaneId, tab);
+      activateTab(ws.id, tab.id);
+      requestLeafFocus(tab.id);
+    },
+    [activateTab, openTab],
+  );
+
   const runAction = useCallback(
     (action: Action, overlay?: RunOverlay) => {
       const ws = activeWorkspace;
@@ -229,18 +260,17 @@ export function useActionRunner(deps: ActionRunnerDeps) {
           setScriptCommand(plan.tabId, action.command);
           scheduleWrite(plan.tabId, plan.input, WRITE_DELAY_REUSED_MS);
           return;
+        case "new-agent-tab": {
+          const tabId = newTabId();
+          warnMissingFolder(plan.cwd, plan.title);
+          openAgentTab(ws, { id: tabId, kind: "terminal", cwd: plan.cwd, title: plan.title });
+          scheduleAgentWrite(tabId, plan.input, WRITE_DELAY_NEW_MS);
+          return;
+        }
         case "new-tab": {
           const tabId = newTabId();
           const tab: Tab = { id: tabId, kind: "terminal", cwd: plan.cwd, title: plan.title };
-          if (plan.cwd) {
-            void native
-              .fsStat(plan.cwd)
-              .catch(() => null)
-              .then((stat) => {
-                const msg = scriptFolderMissingMessage(plan.cwd as string, stat);
-                if (msg) toast.error(msg.replace("Script not run", `${plan.title} not run`), { duration: 6000 });
-              });
-          }
+          warnMissingFolder(plan.cwd, plan.title);
           openScriptTab(ws, tab, plan.placement);
           linkActionTab(action.id, tabId);
           setScriptRunning(tabId, "running");
@@ -251,7 +281,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeWorkspace, openScriptTab, revealActionTab, scheduleWrite, deps.focusFolder, findTabGlobal],
+    [activeWorkspace, openAgentTab, openScriptTab, revealActionTab, scheduleAgentWrite, scheduleWrite, deps.focusFolder, findTabGlobal],
   );
 
   const stopAction = useCallback(

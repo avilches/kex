@@ -175,6 +175,26 @@ describe("useActionRunner", () => {
     expect(getActionTab(script.id)).toBeUndefined();
   });
 
+  it("opens a new tab per click of an agent, with no link and no running mark", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const { deps, result, write } = setup(ws());
+    act(() => result.current.runAction(agent));
+    act(() => result.current.runAction(agent));
+    expect(deps.openTab).toHaveBeenCalledTimes(2);
+    const tabs = deps.openTab.mock.calls.map((c) => (c as unknown[])[2] as Tab);
+    expect(tabs[0].id).not.toBe(tabs[1].id);
+    expect(tabs[0]).toMatchObject({ kind: "terminal", title: "Claude", cwd: "/w" });
+    expect(deps.openTab).toHaveBeenCalledWith("w1", "p1", tabs[0]);
+    expect(deps.activateTab).toHaveBeenCalledWith("w1", tabs[1].id);
+    expect(deps.setScriptPaneId).not.toHaveBeenCalled();
+    expect(deps.splitPaneAndOpenTab).not.toHaveBeenCalled();
+    expect(getActionTab(agent.id)).toBeUndefined();
+    expect(getScriptRunningSnapshot().has(tabs[0].id)).toBe(false);
+    deps.terminalHandles.current.set(tabs[0].id, { write });
+    act(() => void vi.advanceTimersByTime(500));
+    expect(write).toHaveBeenCalledWith("claude\r");
+  });
+
   it("stops by sending Ctrl+C to the tab it runs in", () => {
     linkActionTab(script.id, "tab-old");
     setScriptRunning("tab-old", "running");

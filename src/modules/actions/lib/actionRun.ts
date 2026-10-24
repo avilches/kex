@@ -50,6 +50,7 @@ export type RunPlan =
   | { kind: "spawn-app"; argv: string[] }
   | { kind: "already-running"; tabId: string }
   | { kind: "reuse-tab"; tabId: string; input: string }
+  | { kind: "new-agent-tab"; input: string; cwd: string | undefined; title: string }
   | {
       kind: "new-tab";
       placement: NewTabPlacement;
@@ -142,6 +143,27 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
   return { kind: "new-tab", placement: newTabPlacement(ctx), input, cwd, title: label(action) };
 }
 
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+
+// An agent is typed verbatim: braces are literal, so no template is read. Every click is a
+// new tab, so no link, running mark or earlier tab is looked at either.
+function planAgent(action: Action, ctx: RunContext): RunPlan {
+  if (CONTROL.test(action.command)) return blocked(action, "the command has a control character");
+  if (action.cwdMode === "workspace" && !ctx.folders.workspaceRoot?.trim()) return blocked(action, WORKSPACE_UNSET);
+  const cwd = resolveScriptCwd({
+    mode: action.cwdMode,
+    fixedFolder: action.cwd,
+    focusFolder: ctx.folders.focusFolder,
+    workspaceRoot: ctx.folders.workspaceRoot,
+    workspaceCwd: ctx.folders.workspaceCwd,
+    home: ctx.folders.home,
+  });
+  const cwdIssue = cwd ? scriptCwdProblem(cwd) : null;
+  if (cwdIssue) return blocked(action, cwdIssue);
+  return { kind: "new-agent-tab", input: `${action.command}\r`, cwd, title: label(action) };
+}
+
 /**
  * What running an Action does. A script reuses the tab it last ran in only while that tab is
  * a terminal with nothing running in it; otherwise it gets a new one, so a busy or vanished
@@ -150,7 +172,7 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
 export function planActionRun(action: Action, ctx: RunContext): RunPlan {
   if (ctx.hibernated) return { kind: "blocked", reason: "", silent: true };
   if (action.command.trim() === "") return blocked(action, "it has no command");
-  if (isAgent(action)) return blocked(action, "agents cannot run yet");
+  if (isAgent(action)) return planAgent(action, ctx);
   return isScript(action) ? planScript(action, ctx) : planApp(action, ctx);
 }
 
