@@ -17,11 +17,10 @@ import { DialogScrollHost } from "@/components/dialogScrollHost";
 import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE } from "@/modules/workspaces/lib/workspaceIcon";
-import { useIconSearch } from "@/modules/workspaces/lib/useIconCatalog";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
+import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
 import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
@@ -104,140 +103,6 @@ function ColorPicker({
       noneSelected={wsColor === null}
       onSelect={(color) => onSetColor(wsId, color)}
     />
-  );
-}
-
-const PALETTE_PAGES = Math.ceil(WORKSPACE_ICON_PALETTE.length / PALETTE_PAGE_SIZE);
-
-function IconPicker({
-  wsId,
-  wsIcon,
-  onSetIcon,
-}: {
-  wsId: string;
-  wsIcon: string | undefined;
-  onSetIcon: (id: string, icon: string | null) => void;
-}) {
-  const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
-  const [query, setQuery] = useState(currentEntry?.label ?? "");
-  const [page, setPage] = useState(() => {
-    if (!wsIcon) return 0;
-    const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === wsIcon);
-    return idx === -1 ? 0 : Math.floor(idx / PALETTE_PAGE_SIZE);
-  });
-
-  const { results: filtered, loading: searchLoading } = useIconSearch(query, 60);
-
-  function selectIcon(name: string | null) {
-    onSetIcon(wsId, name);
-    if (name) {
-      const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === name);
-      if (idx !== -1) setPage(Math.floor(idx / PALETTE_PAGE_SIZE));
-    }
-    const entry = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
-    setQuery(entry?.label ?? "");
-  }
-
-  const pageIcons = WORKSPACE_ICON_PALETTE.slice(
-    page * PALETTE_PAGE_SIZE,
-    page * PALETTE_PAGE_SIZE + PALETTE_PAGE_SIZE,
-  );
-
-  return (
-    <div className="flex gap-3">
-      {/* Left: search input + results below */}
-      <div className="flex flex-col gap-1.5">
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search icon..."
-            className={cn(INPUT_CLASS, "w-28 pr-6")}
-          />
-          {wsIcon != null && (
-            <button
-              type="button"
-              title="Remove icon"
-              onClick={() => { onSetIcon(wsId, null); setQuery(""); }}
-              className="absolute right-1.5 flex size-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-0.5">
-          {filtered.map((entry) => (
-            <button
-              key={entry.name}
-              type="button"
-              title={entry.label}
-              onClick={() => selectIcon(entry.name)}
-              className={cn(
-                "size-8 flex items-center justify-center rounded border-2 text-foreground transition-colors",
-                wsIcon === entry.name
-                  ? "border-foreground bg-muted"
-                  : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
-              )}
-            >
-              <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
-            </button>
-          ))}
-          {query.trim() && searchLoading && (
-            <span className="text-[11px] text-muted-foreground">Loading icons...</span>
-          )}
-          {query.trim() && !searchLoading && filtered.length === 0 && (
-            <span className="text-[11px] text-muted-foreground">No icons found</span>
-          )}
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="w-px self-stretch bg-border/60" />
-
-      {/* Right: paginated palette */}
-      <div className="relative flex flex-wrap gap-0.5 pb-5">
-        {/* No-icon button */}
-        <button
-          type="button"
-          title="No icon"
-          onClick={() => { onSetIcon(wsId, null); setQuery(""); }}
-          className={cn(
-            "size-8 flex items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
-            wsIcon == null
-              ? "border-foreground"
-              : "border-transparent hover:border-muted-foreground/50",
-          )}
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-        </button>
-        {/* 32 icons for the current page */}
-        {pageIcons.map((entry) => (
-          <button
-            key={entry.name}
-            type="button"
-            title={entry.label}
-            onClick={() => selectIcon(entry.name)}
-            className={cn(
-              "size-8 flex items-center justify-center rounded border-2 text-foreground transition-colors",
-              wsIcon === entry.name
-                ? "border-foreground bg-muted"
-                : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
-            )}
-          >
-            <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
-          </button>
-        ))}
-        {/* Page indicator + next button, bottom-right */}
-        <button
-          type="button"
-          onClick={() => setPage((p) => (p + 1) % PALETTE_PAGES)}
-          className="absolute bottom-0 right-8 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          More {page + 1}/{PALETTE_PAGES}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -411,10 +276,9 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
           {/* Icon */}
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium">Icon</span>
-            <IconPicker
-              wsId={ws.id}
-              wsIcon={ws.icon}
-              onSetIcon={props.onSetIcon}
+            <IconPaletteGrid
+              value={ws.icon}
+              onSelect={(icon) => props.onSetIcon(ws.id, icon)}
             />
           </div>
         </div>

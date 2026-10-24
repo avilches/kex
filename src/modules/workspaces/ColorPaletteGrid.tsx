@@ -46,13 +46,13 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect }
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         <button
           type="button"
           title="No color"
           onClick={() => onSelect(null)}
           className={cn(
-            "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
+            "flex size-5 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
             noneSelected
               ? "border-foreground"
               : "border-transparent hover:border-muted-foreground/50",
@@ -67,7 +67,7 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect }
             title={hex}
             onClick={() => onSelect(hex)}
             className={cn(
-              "size-6 rounded-full border-2 transition-opacity",
+              "size-5 rounded-full border-2 transition-opacity",
               value === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
             )}
             style={{ backgroundColor: hex }}
