@@ -140,15 +140,18 @@ export type ActionSubtitle = {
 };
 
 // The line under the name says what the Action points at in words, not the raw template:
-// a workspace Action stays "Workspace" (the root itself reads on the hover title), a file
-// Action the file name alone, a folder path its value with the start cut. A variable with
+// a workspace Action shows its root like a folder one (Settings, with no real values, says
+// "Workspace"), a file Action the file name alone, a folder path its value with the start cut. A variable with
 // no readable part keeps the template; a workspace one without a root says so.
 export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubtitle {
   const { variable } = splitActionName(name);
   if (!variable) return { text: null, startTrim: false };
   const varName = variable.slice(1, -1);
   const value = ctx?.vars[varName];
-  if (varName === "workspace") return { text: value ? "Workspace" : WORKSPACE_UNSET, startTrim: false };
+  if (varName === "workspace") {
+    if (!value) return { text: WORKSPACE_UNSET, startTrim: false };
+    return ctx?.labels ? { text: value, startTrim: false } : { text: value, startTrim: true };
+  }
   if (value && (varName === "filepath" || varName === "filename")) {
     return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false };
   }

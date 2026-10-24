@@ -373,8 +373,9 @@ describe("actionShownAt", () => {
 });
 
 describe("actionSubtitle", () => {
-  it("says Workspace for the workspace variable and the file name alone for the file", () => {
-    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: "Workspace", startTrim: false });
+  it("shows the root for the workspace variable, Workspace in Settings, and the file name alone for the file", () => {
+    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: vars.workspace, startTrim: true });
+    expect(actionSubtitle("PyCharm {workspace}", SETTINGS_LABELS)).toEqual({ text: "Workspace", startTrim: false });
     expect(actionSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toEqual({
       text: "a.ts",
       startTrim: false,
