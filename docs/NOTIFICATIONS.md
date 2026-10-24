@@ -199,9 +199,11 @@ is the "not now". The decision lives in pure functions (`lib/integrationSuggesti
 The toast is 480px wide (capped to the viewport) so the text fits. Independently of the ask policy, every tab where an
 agent starts without its integration gets an amber exclamation icon in the tab strip (`integrationWarningStore`, filled
 by the suggester's `warn` for each `started` signal and cleared when the session ends or the integration is installed);
-hovering it shows the toast again, with the same Install and View changes buttons. The re-shown toast carries a fixed id
-per agent, so repeated hovers update it instead of stacking, and it does not count as an ask.
+hovering it opens a small card (`IntegrationTabMarker.tsx`) saying "<Agent> agent detected. Open settings to install
+integration", with a cog button that opens Settings > General and a "Don't remind me again" link. The marker is
+independent of the toast and of the ask policy. The link stores `markerDismissed` for that agent in
+`integrationSuggestions`: the marker then never shows again for it, in any tab. The toast carries a fixed id per agent.
 
-The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce }`.
+The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce, markerDismissed }`.
 
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).

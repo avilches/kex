@@ -30,10 +30,11 @@ export function createIntegrationSuggester(deps: SuggestDeps) {
       }
       // Install would fail anyway; the ask is kept for a later run where it can work.
       if (status !== "missing") return;
-      // The tab marker does not depend on the ask policy: every tab running the agent shows it.
-      deps.warn(tabId, agent);
-      if (!first) return;
       const map = await deps.read();
+      // The tab marker does not depend on the ask policy: every tab running the agent shows
+      // it until the user dismisses it for good.
+      if (!map[agent]?.markerDismissed) deps.warn(tabId, agent);
+      if (!first) return;
       if (!shouldSuggest(map[agent], deps.now())) return;
       await deps.update((current) => withAsked(current, agent, deps.now()));
       deps.show(agent);
