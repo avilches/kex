@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   ACTIONS_ATTACH_EVENT,
   ACTIONS_DETACH_EVENT,
   ACTIONS_EDIT_EVENT,
+  ACTIONS_OWNER_EVENT,
   ACTIONS_PUSH_EVENT,
   pushKey,
   type ActionsEdit,
@@ -57,12 +58,14 @@ type Props = {
 };
 
 // Broadcasting the workspace Actions to the Settings window: pushes flow only while some
-// window is attached, and only when the payload's key changes. The workspace stays the
+// window is attached, only from the main window that had the focus last (there can be
+// several, and Settings edits one workspace at a time), and only when the payload's key changes. The workspace stays the
 // single source of truth: what the Settings window sees of an edit is its own push back.
 export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): void {
   const context = useActionContext(workspace);
   const attached = useRef(0);
   const lastKey = useRef<string | null>(null);
+  const isOwner = useRef(false);
   const mutatorsRef = useRef(mutators);
   mutatorsRef.current = mutators;
   const contextRef = useRef<ActionContext | null>(context);
@@ -82,7 +85,7 @@ export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): vo
 
   const push = useRef(() => {
     const ws = workspaceRef.current;
-    if (!ws || attached.current === 0) return;
+    if (!ws || attached.current === 0 || !isOwner.current) return;
     void getAllWebviewWindows().then((windows) => {
       // A destroyed window never reports detach, so the count alone cannot be trusted:
       // the Settings window must exist as long as it counts itself attached.
@@ -121,11 +124,23 @@ export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): vo
       attached.current = Math.max(0, attached.current - 1);
       lastKey.current = null;
     }).then((u) => unlisten.push(u));
+    const label = getCurrentWebviewWindow().label;
+    const claim = () => {
+      isOwner.current = true;
+      void emit(ACTIONS_OWNER_EVENT, label);
+      pushNow.current();
+    };
+    void listen<string>(ACTIONS_OWNER_EVENT, (e) => {
+      isOwner.current = e.payload === label;
+    }).then((u) => unlisten.push(u));
+    window.addEventListener("focus", claim);
+    if (document.hasFocus()) claim();
     void listen<ActionsEdit>(ACTIONS_EDIT_EVENT, (e) => {
       lastKey.current = null;
       applyEdit(mutatorsRef.current, e.payload);
     }).then((u) => unlisten.push(u));
     return () => {
+      window.removeEventListener("focus", claim);
       for (const u of unlisten) u();
     };
   }, []);

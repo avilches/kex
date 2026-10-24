@@ -28,6 +28,8 @@ export type ActionsEdit =
 export const ACTIONS_ATTACH_EVENT = "kex:actions-attach";
 export const ACTIONS_DETACH_EVENT = "kex:actions-detach";
 export const ACTIONS_PUSH_EVENT = "kex:actions-push";
+/** A main window announces (with its label) that it now owns what Settings edits. */
+export const ACTIONS_OWNER_EVENT = "kex:actions-owner";
 export const ACTIONS_EDIT_EVENT = "kex:actions-edit";
 
 /** The serialized push payload only changes when its content does, so a push is never sent twice. */

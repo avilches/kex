@@ -6,6 +6,12 @@ export type GitInfo = { branch: string; repoRoot: string };
 
 type Place = Pick<Workspace, "cwd" | "workspaceRoot">;
 
+// An agent that moved into a worktree works there while its terminal tab keeps the folder
+// it was opened in, so the tab stands in the worktree for everything an Action reads.
+export function inWorktree(tab: Tab | null, worktree: string | null | undefined): Tab | null {
+  return tab && tab.kind === "terminal" && worktree ? { ...tab, cwd: worktree } : tab;
+}
+
 // The one place the values a command can read are put together. The Header bar decides
 // whether an Action is available from it and the runner expands the command from it, so
 // the two can never disagree about what has a value.

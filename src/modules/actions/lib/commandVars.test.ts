@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COMMAND_VARIABLES } from "./actionForm";
 import { actionAvailability } from "./actionsBar";
 import { planActionRun, type RunContext } from "./actionRun";
-import { buildCommandVars } from "./commandVars";
+import { buildCommandVars, inWorktree } from "./commandVars";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import type { Action } from "./types";
 
@@ -85,5 +85,21 @@ describe("every offered variable is substituted when an Action runs", () => {
       expect(reason, name).not.toBeNull();
       expect(plan.kind, name).toBe("blocked");
     }
+  });
+});
+
+describe("inWorktree", () => {
+  const term: Tab = { id: "t1", kind: "terminal", cwd: "/p" };
+
+  it("moves a terminal tab to the agent worktree, so {cwd} and {dir} read it", () => {
+    const v = buildCommandVars(inWorktree(term, "/p/.claude/worktrees/x"), { workspaceRoot: "/p" }, { branch: "", repoRoot: "" }, "h");
+    expect(v.cwd).toBe("/p/.claude/worktrees/x");
+    expect(v.dir).toBe("x");
+  });
+
+  it("leaves the tab alone with no worktree, and any non-terminal tab", () => {
+    expect(inWorktree(term, null)).toBe(term);
+    expect(inWorktree(editor, "/w")).toBe(editor);
+    expect(inWorktree(null, "/w")).toBeNull();
   });
 });

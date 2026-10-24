@@ -39,6 +39,7 @@ import { TabCopyPathItems } from "./TabCopyPathItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 import { tabFilePath } from "./lib/tabPath";
 
@@ -83,6 +84,7 @@ export function TabContextMenuItems({
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
   const focusFilePath = tabFilePath(tab);
+  const worktree = useAgentStore((s) => s.sessions[tab.id]?.meta?.worktreeCwd ?? null);
   const focusTarget =
     focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
   const runOnStart =
@@ -91,7 +93,7 @@ export function TabContextMenuItems({
     ) : null;
   const rowActions =
     tab.kind === "terminal" ? (
-      <RowActionsMenu kind="folder" path={tab.cwd ?? ""} />
+      <RowActionsMenu kind="folder" path={worktree ?? tab.cwd ?? ""} />
     ) : focusFilePath ? (
       <RowActionsMenu kind="file" path={focusFilePath} />
     ) : null;
