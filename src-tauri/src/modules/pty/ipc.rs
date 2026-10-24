@@ -204,9 +204,27 @@ struct Payload {
     delta: Option<String>,
 }
 
+/// Codex documents PascalCase event names, which is unmeasured, so its snake_case spelling is
+/// read as the same event. Other agents' names are matched exactly.
+fn canonical_event(agent: Option<&str>, event: &str) -> String {
+    if agent != Some("codex") {
+        return event.to_string();
+    }
+    match event {
+        "session_start" => "SessionStart",
+        "user_prompt_submit" => "UserPromptSubmit",
+        "stop" => "Stop",
+        "permission_request" => "PermissionRequest",
+        "subagent_start" => "SubagentStart",
+        "subagent_stop" => "SubagentStop",
+        other => other,
+    }
+    .to_string()
+}
+
 fn parse_payload(json: &str) -> Option<Payload> {
     let v: serde_json::Value = serde_json::from_str(json).ok()?;
-    let event = v["hook_event_name"].as_str()?.to_string();
+    let event = canonical_event(v["agent"].as_str(), v["hook_event_name"].as_str()?);
     Some(Payload {
         event,
         session_id: v["session_id"].as_str().unwrap_or("").to_string(),
@@ -939,6 +957,33 @@ mod tests {
             let sig = agent_signal(3, &p.event, p.agent.as_deref());
             assert_eq!(sig["agent"], "codex", "{event}");
             assert_eq!(sig["kind"], event);
+        }
+    }
+
+    #[test]
+    fn codex_snake_case_events_are_read_as_their_canonical_names() {
+        for (snake, canonical) in [
+            ("session_start", "SessionStart"),
+            ("user_prompt_submit", "UserPromptSubmit"),
+            ("stop", "Stop"),
+            ("permission_request", "PermissionRequest"),
+            ("subagent_start", "SubagentStart"),
+            ("subagent_stop", "SubagentStop"),
+            ("Stop", "Stop"),
+        ] {
+            let json = format!(
+                r#"{{"hook_event_name":"{snake}","agent":"codex","session_id":"s","cwd":"/p"}}"#
+            );
+            assert_eq!(parse_payload(&json).unwrap().event, canonical, "{snake}");
+        }
+    }
+
+    #[test]
+    fn claude_and_opencode_event_names_are_never_rewritten() {
+        for agent in [None, Some("claude"), Some("opencode")] {
+            let tag = agent.map_or(String::new(), |a| format!(r#","agent":"{a}""#));
+            let json = format!(r#"{{"hook_event_name":"session_start","session_id":"s"{tag}}}"#);
+            assert_eq!(parse_payload(&json).unwrap().event, "session_start");
         }
     }
 

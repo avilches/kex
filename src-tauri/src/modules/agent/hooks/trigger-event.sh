@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kex-session-v8
+# kex-session-v9
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 
@@ -11,6 +11,24 @@ PAYLOAD="$(cat)"
 AGENT="${1:-claude}"
 PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" '. + {"agent": $agent}')"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
+
+# Codex documents PascalCase event names, which is unmeasured, so its snake_case spelling
+# is sent as the same event. Claude Code's names are matched exactly.
+if [ "$AGENT" = "codex" ]; then
+    CANONICAL=""
+    case "$EVENT" in
+        session_start) CANONICAL=SessionStart ;;
+        user_prompt_submit) CANONICAL=UserPromptSubmit ;;
+        stop) CANONICAL=Stop ;;
+        permission_request) CANONICAL=PermissionRequest ;;
+        subagent_start) CANONICAL=SubagentStart ;;
+        subagent_stop) CANONICAL=SubagentStop ;;
+    esac
+    if [ -n "$CANONICAL" ]; then
+        EVENT="$CANONICAL"
+        PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg event "$EVENT" '.hook_event_name = $event')"
+    fi
+fi
 
 # Caps the per-tab spool file so a tab that never reopens in Kex (and so
 # never drains it) can't grow the file without bound.

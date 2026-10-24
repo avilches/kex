@@ -113,7 +113,7 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v8`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v9`) handles all 10 registered Claude Code
 hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
@@ -121,8 +121,11 @@ hook events the same way:
 2. Uses `jq` to re-serialize the payload tagged with `"agent"` set to the script's first argument, `claude` when
    there is none (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
    pass `codex`; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract
-   `hook_event_name`, only to pick the handler. The marker conditions the reinstall check in
-   `agent_claude_hooks_status`: users with a `kex-session-v7` file see the install button again.
+   `hook_event_name`, only to pick the handler. For `codex` only, a snake_case name (`session_start`,
+   `user_prompt_submit`, `stop`, `permission_request`, `subagent_start`, `subagent_stop`) is turned into its PascalCase
+   form, in the variable and in the payload it sends; Claude Code's names are matched exactly. The marker conditions
+   the reinstall check in `agent_claude_hooks_status`: users with an older `kex-session-v` file see the install button
+   again.
    The script no longer writes the payload to disk: an earlier
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
@@ -289,7 +292,10 @@ Codex reports its sessions through the hooks described under "Hook layer": one K
 `hooks.json` (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`), each
 trusted with its `[hooks.state."<key>"]` table in `config.toml`, because Codex skips a handler it has not trusted. Every
 handler runs `trigger-event.sh codex`, and the argument is what tags the frame: the script puts it in `agent`, so
-`pty/ipc.rs` needs nothing Codex-specific. According to Codex's documentation, not yet confirmed against a live
+`pty/ipc.rs` handles a Codex frame like Claude's. Codex documents PascalCase event names, which is unmeasured, so both
+the script and `pty/ipc.rs` (`canonical_event`) read a frame tagged `codex` whose `hook_event_name` is snake_case
+(`session_start`, `stop`, ...) as the PascalCase event; a frame of any other agent is matched exactly. According to
+Codex's documentation, not yet confirmed against a live
 Codex, frames carry the same fields as Claude Code's (`session_id`, `transcript_path`, `cwd`, `hook_event_name`,
 `source`) and `transcript_path` may be `null`; Kex records a `null` one as empty either way (K15 settles both).
 `SessionStart` records the session (id, transcript path, cwd and the stashed launch line) and emits

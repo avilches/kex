@@ -540,7 +540,7 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 - [ ] "View changes" abre el diff con una pestana por fichero (`hooks.json`, `config.toml` y `trigger-event.sh` si no estaba instalado). Sobre el diff de `hooks.json` aparece la nota "Kex rewrites hooks.json as formatted JSON: ..."; la de `config.toml` no lleva nota
 - [ ] Instalar. Esperado en `hooks.json`: seis handlers (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`) cuyo comando es `[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" codex || true  # kex-session-hook`
 - [ ] Esperado en `config.toml`: seis tablas `[hooks.state."<ruta de hooks.json>:<evento>:<grupo>:<handler>"]` con `trusted_hash = "sha256:..."`
-- [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v8`
+- [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v9`
 - [ ] Reiniciar Kex: el campanazo ya no ofrece Codex y la fila de Settings dice "Installed"
 - [ ] Instalar otra vez (o reiniciar): idempotente, ni `hooks.json` ni `config.toml` cambian (`shasum` antes y despues)
 

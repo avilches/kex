@@ -240,7 +240,8 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   does not edit) or "Not found" with only "Check again", and the bell shows a row without button or hides it.
   The integration is reported unavailable on Windows until its POSIX hook command is measured there. Resume keeps
   `-p`/`--profile`, `-m`/`--model`, `--local-provider` and `--oss`, never the sandbox or approval options nor
-  `-c`/`--config`, which can set either. `trigger-event.sh` is `kex-session-v8` and takes the agent name as its first argument. The Codex icon is an original
+  `-c`/`--config`, which can set either. `trigger-event.sh` is `kex-session-v9`, takes the agent name as its first argument and, for `codex` only, reads a
+  snake_case event name as its PascalCase form (as `pty/ipc.rs` does), because Codex's casing is unmeasured. The Codex icon is an original
   inline monochrome mark, and the tab menu hides the transcript actions when the frame named no rollout. The
   `MissingTranscriptPolicy::KeepWithoutPlan` value came with it (see the rollouts entry). Nothing was run against a
   logged-in Codex when this was written, so the open checks (OSC 133 marks of its own, `codex resume` of a session
@@ -252,7 +253,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it turns the session lifecycle
   (`session.created`, `session.status`, `session.idle`, `permission.asked`, `question.asked`, `session.error`) into the
   same IPC frames Claude's hooks send, with `agent: opencode`, gated on Kex's env vars and inert outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
-  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude` (it is `kex-session-v8` now: the tag is the script's first argument, `claude` when absent, which is how Codex's handlers tag theirs). A TUI restored with
+  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude` (it is `kex-session-v9` now: the tag is the script's first argument, `claude` when absent, which is how Codex's handlers tag theirs). A TUI restored with
   `--session` fires no `session.created` (anomalyco/opencode#39711), so the plugin registers the session on the first
   event that names it; opencode records are never pruned.
 - **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
