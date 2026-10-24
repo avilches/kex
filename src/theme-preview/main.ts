@@ -1239,18 +1239,10 @@ function dialogCheckbox(label: string, checked = false): HTMLElement {
   );
 }
 
-function dialogName(
-  mark: Node,
-  name: string,
-  color?: string,
-  trailing?: string,
-): HTMLElement {
+function dialogName(mark: Node, name: string, trailing?: string): HTMLElement {
   return h(
     "div",
-    {
-      class: "flex min-w-0 items-center gap-2 text-sm font-medium",
-      ...(color ? { style: `color:${color}` } : {}),
-    },
+    { class: "flex w-full min-w-0 items-center gap-2 text-sm font-medium" },
     h("span", { class: "flex shrink-0 items-center" }, mark),
     h("span", { class: "min-w-0 truncate", title: name }, name),
     ...(trailing
@@ -1344,7 +1336,10 @@ function dialogFrame(opts: {
         },
         h(
           "div",
-          { class: "grid grid-cols-[minmax(0,1fr)] gap-1.5" },
+          {
+            class:
+              "grid grid-cols-[minmax(0,1fr)] place-items-start gap-1.5 text-left",
+          },
           h("h2", { class: "font-heading text-lg font-medium" }, opts.title),
           ...(opts.name ? [opts.name] : []),
           ...(opts.description
@@ -1386,7 +1381,7 @@ function dialogsView(): HTMLElement {
     dialogFrame({
       id: "close-terminal",
       title: "Close terminal?",
-      name: dialogName(tinted("#e5a50a", term()), "claude: refactor close dialogs", "#e5a50a"),
+      name: dialogName(tinted("#e5a50a", term()), "claude: refactor close dialogs"),
       description: "The running process will be killed",
       body: [
         h(
@@ -1402,7 +1397,7 @@ function dialogsView(): HTMLElement {
     dialogFrame({
       id: "close-terminal (long name)",
       title: "Close terminal?",
-      name: dialogName(tinted("#3b82f6", term()), longName, "#3b82f6"),
+      name: dialogName(tinted("#3b82f6", term()), longName),
       description: "The running process will be killed",
       body: [dialogCheckbox("Don't ask me again", true)],
       footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
@@ -1410,7 +1405,7 @@ function dialogsView(): HTMLElement {
     dialogFrame({
       id: "close-workspace",
       title: "Close workspace?",
-      name: dialogName(dot("#22c55e"), "Kex", undefined, "In progress"),
+      name: dialogName(dot("#22c55e"), "Kex", "In progress"),
       body: [
         dialogSection(
           "Agents that will be killed",
