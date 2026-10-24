@@ -3,6 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { openFilePaths } from "@/modules/explorer/lib/openFiles";
 import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import { domFocusHoldsOsRefocus } from "@/app/lib/osRefocus";
 import {
@@ -391,6 +392,10 @@ export default function App() {
     : null;
 
   useTerminalMetricsSampler(activeWorkspace?.paneTree ?? null);
+  const openFiles = useMemo(
+    () => openFilePaths(activeWorkspace?.paneTree),
+    [activeWorkspace?.paneTree],
+  );
 
   const activeTabId = activePane?.activeTabId ?? null;
   const activeTab = activeTabId
@@ -4018,6 +4023,7 @@ export default function App() {
                             )
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
+                        openFiles={openFiles}
                         workspaceCwd={explorerRoot}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
@@ -4130,6 +4136,7 @@ export default function App() {
                             )
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
+                        openFiles={openFiles}
                         workspaceCwd={explorerRoot}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
