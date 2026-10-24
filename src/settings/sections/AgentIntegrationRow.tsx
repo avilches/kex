@@ -87,51 +87,53 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
           </span>
           <span className="truncate font-mono text-[10.5px] text-muted-foreground">
             {files.join(", ")}
-            <button
-              type="button"
-              className="ml-2 cursor-pointer font-sans text-primary hover:underline disabled:opacity-60"
-              disabled={ready === null || blocked !== null}
-              onClick={() => setPreviewing(true)}
-            >
-              View changes
-            </button>
           </span>
         </div>
-        {blocked ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 min-w-[92px] px-2.5 text-[11px] active:scale-[0.96]"
-            onClick={refresh}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="cursor-pointer text-[11px] text-primary hover:underline disabled:cursor-default disabled:opacity-60 disabled:hover:no-underline"
+            disabled={ready === null || blocked !== null}
+            onClick={() => setPreviewing(true)}
           >
-            Check again
-          </Button>
-        ) : (
-          <Button
-            key={String(installed)}
-            size="sm"
-            variant={installed ? "outline" : "default"}
-            className={cn(
-              "h-8 min-w-[92px] px-2.5 text-[11px] transition-colors active:scale-[0.96]",
-              installed &&
-                "text-muted-foreground hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive",
-              justChanged && "animate-in fade-in slide-in-from-bottom-1 duration-300",
-            )}
-            disabled={busy || ready === null}
-            onClick={act}
-          >
-            {busy ? (
-              <>
-                <Spinner size={12} />
-                {installed ? "Removing" : "Installing"}
-              </>
-            ) : installed ? (
-              "Uninstall"
-            ) : (
-              "Install"
-            )}
-          </Button>
-        )}
+            Preview
+          </button>
+          {blocked ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 min-w-[92px] px-2.5 text-[11px] active:scale-[0.96]"
+              onClick={refresh}
+            >
+              Check again
+            </Button>
+          ) : (
+            <Button
+              key={String(installed)}
+              size="sm"
+              variant={installed ? "outline" : "default"}
+              className={cn(
+                "h-8 min-w-[92px] px-2.5 text-[11px] transition-colors active:scale-[0.96]",
+                installed &&
+                  "text-muted-foreground hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive",
+                justChanged && "animate-in fade-in slide-in-from-bottom-1 duration-300",
+              )}
+              disabled={busy || ready === null}
+              onClick={act}
+            >
+              {busy ? (
+                <>
+                  <Spinner size={12} />
+                  {installed ? "Removing" : "Installing"}
+                </>
+              ) : installed ? (
+                "Uninstall"
+              ) : (
+                "Install"
+              )}
+            </Button>
+          )}
+        </div>
       </div>
       {blocked && (
         <p className="px-3 pb-2 text-[11px] text-muted-foreground">
