@@ -22,7 +22,7 @@ end up emitting `kex:agent-signal` to the frontend, but never touch each other:
 | `OSC 7;file://<host><path>` | Shell (Kex init scripts) | Segunda instrucción de `_kex_precmd`: justo después de `D`, antes del prompt | | Updates `panel.cwd`. Ignorado si `state.inCommand` | |
 | `OSC 133;A` | Shell (Kex init scripts) | Última instrucción de `_kex_precmd`: el prompt está a punto de renderizarse | | `state.inCommand=false`, crea marker de posición del prompt | |
 | `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: el shell renderizó el prompt | | `state.inCommand=true` | |
-| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `find_agent_invocation(cmd)` encuentra un segmento cuya palabra de orden es un agente: `armed=true`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
+| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `find_agent_invocation(cmd)` encuentra un segmento cuya palabra de orden es un agente: `armed=true`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → `ensureSessionIdle` y `suggestIntegration` (ver "Install reminder") |
 | `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
 
 `OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY: a partir de ahí, `armed` en `agent_detect.rs` ya no avanza (solo `OSC 9` y `OSC 133;D` lo tocan); el estado working/attention real durante la sesión se conoce a través del canal 2, más abajo.
@@ -116,7 +116,7 @@ Los eventos de atención (`Notification`, `PermissionRequest`, `Stop`) se enruta
 
 No hay texto de estado en la fila (no cabe): solo el nombre y el indicador. El nombre es el título OSC del tab (`oscTitleStore`) con fallback al nombre del agente. Orden: `attention` primero, luego `working`, luego `error`; dentro de cada grupo, mas reciente arriba. El badge cuenta las entradas `pending` (attention + error sin leer), una vez por agente.
 
-El popover se abre con la campana o con el shortcut `notifications.toggle` (Cmd+I por defecto, configurable en Settings → VIEW); su estado `open` vive en `bellStore` para que el shortcut global lo pueda alternar. El pie del popover tiene un botón **Clear all** (`agentStore.clearAll`) que borra las notificaciones y apaga todos los dots naranja (las sesiones `attention` pasan a `idle`; las `working` siguen). La sección de instalación de hooks solo aparece cuando los hooks no están activos.
+El popover se abre con la campana o con el shortcut `notifications.toggle` (Cmd+I por defecto, configurable en Settings → VIEW); su estado `open` vive en `bellStore` para que el shortcut global lo pueda alternar. El pie del popover tiene un botón **Clear all** (`agentStore.clearAll`) que borra las notificaciones y apaga todos los dots naranja (las sesiones `attention` pasan a `idle`; las `working` siguen). Al final del popover hay una fila "Install ... integration" por agente, y solo aparece mientras esa integración falta: la de Claude Code cuando sus hooks no están activos, y las de OpenCode, OMP, Pi y Codex cuando su fichero no está instalado. Un Codex cuya config Kex no puede leer o editar sale como una fila sin botón que lo explica, y uno sin carpeta de Codex no sale. Una vez instalada, Settings > General > Agents es el único sitio para desinstalar.
 
 ---
 
@@ -190,10 +190,17 @@ How Kex reminds the user to install an agent integration. Without it the spinner
 notification and the session restore do not work for that agent, and nothing else in the app says so: Settings > General
 > Agents and the bell only help a user who already went looking.
 
-There are two reminders, both driven by the `started` signal (channel 2 above) that names an agent with an integration
-(`claude`, `opencode`, `omp`, `pi` or `codex`). `handleSignal` in `AgentNotificationsBridge.tsx` calls
-`suggestIntegration(agent, tabId)` and nothing else in the app does. An agent Kex does not detect as started (a launcher
-script it cannot recognise) triggers neither.
+There are two reminders, both driven by the `started` signal. That signal comes from channel 1, not from the hooks: it
+is emitted by `agent_detect.rs` when the `OSC 133;C` command line names one of `DEFAULT_AGENTS` (`claude`, `codex`,
+`opencode`, `omp`, `pi`), which is why it works before any integration exists and why it needs no hook to fire.
+`handleSignal` in `AgentNotificationsBridge.tsx` calls `suggestIntegration(agent, tabId)` and nothing else in the app does.
+A launcher script whose command line does not name one of those agents triggers neither reminder, and neither does a
+print-mode run (`claude -p`), which `agent_detect.rs` skips.
+
+Claude Code is the exception in practice. `agentNotifications` is on by default and `main.tsx` calls
+`agent_enable_claude_hooks` on every startup while it is on, so for Claude Code the reminder only appears for a user who
+turned that setting off, or whose `~/.claude/settings.json` could not be written. The other agents are never installed
+by Kex on its own, so they are where the reminder does its work.
 
 ### 1. The toast (asked at most twice per agent)
 
@@ -212,19 +219,25 @@ When it appears, per agent:
 | Asked twice | Never again |
 | Integration installed at any moment | Never again, even if it is removed later |
 | Integration already installed when the agent is detected | No, and it is recorded as installed, so removing it later does not bring the toast back |
-| Status is not `missing` (`malformed`, `uneditable`, `unavailable`: Codex config Kex cannot parse or edit safely) | No, and no ask is recorded: Install would fail, so the next app run looks again |
+| Status is not `missing` (`malformed`, `uneditable`, `unavailable`: a Codex config Kex cannot parse or edit safely, or a Codex folder that does not exist yet) | No toast, no tab icon, and no ask is recorded: Install would fail, so the next app run looks again |
 | Second tab starting the same agent in the same app run | No: each agent is looked at once per run |
 
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
-(`lib/agentIntegration.ts`), the single install path, which records `installedOnce` only after the write succeeded.
+(`lib/agentIntegration.ts`), the single install path, which records `installedOnce` after the write succeeded (a failure
+to record it is only logged, since the install itself worked). The startup repair of Claude Code hooks in `main.tsx`
+calls `agent_enable_claude_hooks` directly and records nothing; the next `started` signal then finds the status
+`installed` and records it.
 
 ### 2. The tab warning (every tab, until dismissed)
 
 Independent of the ask policy and of the toast, each tab where an agent starts without its integration gets an amber exclamation icon in
 the tab strip, so a user who dismissed the toast still sees why that tab has no spinner. It is
 `integrationWarningStore` (`tabId -> agent`), filled by the suggester's `warn` on every `started` signal with status
-`missing`, and cleared when the session ends (`clearTab`) or the integration is installed (`clearAgent`, which removes it
-from every tab of that agent).
+`missing` unless the agent's marker was dismissed, and cleared when the agent exits (`clearTab`, called for the `exited`
+signal in `handleSignal`), when the toast installs it (`clearAgent`, which removes it from every tab of that agent) or
+when the user dismisses it. Installing from Settings or the bell does not clear it: those paths do not call `clearAgent`,
+so a tab already marked keeps the icon until its agent exits. The next `started` signal sees `installed` and does not
+mark again.
 
 Hovering the icon opens a small card (`IntegrationTabMarker.tsx`, a controlled Popover that stays open while the pointer
 is on the icon or the card, with a 150 ms close delay). It never shows the toast. The card says "<Agent> agent detected.
@@ -246,7 +259,10 @@ tabs and, because `suggestIntegration` checks the record before calling `warn`, 
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent:
 `{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false, "markerDismissed": false }`. It is read and written through
-`readIntegrationSuggestions` / `updateIntegrationSuggestions`, which serialise writes because the main window (the toast)
-and the Settings window (an install there) both write it. To see the toast or the dismissed icon again while testing, delete the agent's entry;
+`readIntegrationSuggestions` / `updateIntegrationSuggestions`. The main window (the toast, the tab marker) and the
+Settings window (an install there) both write it. `updateIntegrationSuggestions` reads, changes and writes in one step
+behind a promise queue, but the queue is a module variable and each webview has its own, so it orders the writes of one
+window and does not make two windows writing at the same moment safe; in practice that is a click in Settings
+overlapping a toast, and it can lose one of the two flags. To see the toast or the dismissed icon again while testing, delete the agent's entry;
 to see the second ask, set its `lastAskedAt` more than 15 days back. Manual test plan: block L in
 `docs/RESTORE_SESSION_TESTS.md`.
