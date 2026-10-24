@@ -110,6 +110,22 @@ Every PTY session receives a `KEX_TAB_ID` environment variable (a UUID matching 
 state). This is injected in `pty/shell_init.rs` → `apply_common` and is available to all processes running inside the
 terminal, including hook scripts.
 
+### Which events Kex registers
+
+`agent_enable_claude_hooks` does not write all 10 events into `~/.claude/settings.json`: it runs `claude --version`
+(2 s timeout, on the blocking pool, never on the UI thread) and registers only the events that version knows. Claude
+Code 1.0.23 to 2.1.100 discard the whole `settings.json` when `hooks` holds a key they do not recognise, and newer ones
+print an "Unknown hook event" warning on every start. The table lives in `agent/claude_version.rs` (`hook_events_for`,
+pure and tested at each boundary). First release per event: `Notification` 1.0.23, `Stop` 1.0.31, `SubagentStop` 1.0.41,
+`UserPromptSubmit` 1.0.53, `SessionStart` 1.0.62, `SessionEnd` 1.0.85, `SubagentStart` 2.0.43, `PermissionRequest`
+2.0.45, `StopFailure` 2.1.78, `MessageDisplay` 2.1.152 (this one from Claude's CHANGELOG, it is not in the fixture
+extracted from the npm releases). When the version cannot be read, only the six events present since 1.0.x are written.
+
+Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
+a downgrade removes Kex's hook from the events the older Claude does not know. Uninstalling removes Kex's hook from
+every known event whatever the installed version. `agent_claude_hooks_status` expects the events of the installed
+version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is unchanged: the script did not change.
+
 ### SessionStart hook
 
 Triggered by Claude Code at session start. The hook command:

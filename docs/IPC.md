@@ -168,9 +168,9 @@ State: `tab-history.json` in the app data dir, next to `agent-sessions.json`. On
 | `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the sidebar state persisted by `window_save_sidebar` so the two can change independently. |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
 | `get_build_info` | Return `{ hash, branch }`, both baked in at compile time by `build.rs` (`env!("KEX_GIT_HASH")` / `env!("KEX_GIT_BRANCH")`), each `"unknown"` if unavailable at build time (no `.git`, or a detached `HEAD` for `branch`). Shown in Settings > About; the branch is only displayed there in dev builds (`productName` "Kex Dev") |
-| `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
+| `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks). Async: runs `claude --version` (2 s timeout, on the blocking pool) and registers only the events that version knows (`claude_version.rs`); an unknown version gets the six events present since 1.0.x. Re-running it after a Claude Code update adds the new events |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
-| `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
+| `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed; async, expects the events of the installed Claude Code version (not always all 10) |
 | `agent_setup_opencode` | Atomically install the Kex session plugin into the OpenCode plugins dir (`~/.config/opencode/plugins/`, relocated by `OPENCODE_CONFIG_DIR`) (idempotent; no-op when the file already matches) |
 | `agent_opencode_plugin_status` | Query whether the OpenCode plugin is installed and current |
 | `agent_setup_omp` | Atomically install the Kex extension into `~/.omp/agent/extensions/kex-agent-status.ts` (idempotent; no-op when the file already matches, the same source is installed for Pi by `agent_setup_pi` with its own `agent` name) |
