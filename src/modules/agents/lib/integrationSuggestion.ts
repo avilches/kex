@@ -1,6 +1,6 @@
 import type { AgentId } from "./integrations";
 
-export const AGENT_IDS = ["claude", "opencode", "omp", "pi"] as const satisfies readonly AgentId[];
+export const AGENT_IDS = ["claude", "opencode", "omp", "pi", "codex"] as const satisfies readonly AgentId[];
 
 /** After the first suggestion goes unanswered, Kex asks once more when this much time has passed. */
 export const SUGGESTION_RETRY_MS = 15 * 24 * 60 * 60 * 1000;

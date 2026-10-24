@@ -1,0 +1,191 @@
+{
+  "hooks" : {
+    "Interrupt" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 3,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex attention; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex attention; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "PostToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex observe; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex observe; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "PreToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex observe; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex observe; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "SessionStart" : [
+      {
+        "hooks" : [
+          {
+            "additionalContextLimit" : 20000,
+            "command" : "\"${DOTFILES_DIR:-$HOME\/Hub\/dotfiles}\/home\/bin\/codex-context-hook\"",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex observe; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex observe; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "startup|resume|clear|compact"
+      }
+    ],
+    "Stop" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex stop; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex stop; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStart" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex observe; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex observe; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "SubagentStop" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex observe; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex observe; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "UserPromptSubmit" : [
+      {
+        "hooks" : [
+          {
+            "command" : ": orca-agent-hook-form=1; if [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -f \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${ORCA_AGENT_HOOK_ROOT-}\/agent-hooks\/codex-hook.sh\" || :; elif [ -z \"${ORCA_AGENT_HOOK_ROOT-}\" ] && [ -n \"${ORCA_PANE_KEY-}\" ] && [ -n \"${ORCA_AGENT_HOOK_PORT-}\" ] && [ -f \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" ]; then \/bin\/sh \"${HOME-}\/.orca\/agent-hooks\/codex-hook.sh\" || :; else { command -p cat 2>\/dev\/null || cat; } >\/dev\/null 2>&1 || :; fi",
+            "timeout" : 10,
+            "type" : "command"
+          }
+        ]
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "if [ -x \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient ]; then \/Applications\/Kaji.app\/Contents\/MacOS\/KajiHookClient codex-activity codex start; elif [ -n \"${KAJI_HOOK_CLIENT_PATH:-}\" ] && [ -x \"$KAJI_HOOK_CLIENT_PATH\" ]; then \"$KAJI_HOOK_CLIENT_PATH\" codex-activity codex start; fi # kaji-activity-hook",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ]
+      }
+    ]
+  }
+}

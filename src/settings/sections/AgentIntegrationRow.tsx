@@ -1,13 +1,34 @@
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { IS_WINDOWS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import type { AgentId } from "@/modules/agents/lib/integrations";
+import type { AgentId, IntegrationBlock } from "@/modules/agents/lib/integrations";
 import type { IntegrationState } from "@/modules/agents/lib/useIntegration";
 import { useEffect, useRef, useState } from "react";
 import { IntegrationDiffDialog } from "./IntegrationDiffDialog";
 
 const CHANGE_ANIMATION_MS = 700;
+
+// On Windows the backend reports Codex unavailable before looking for its folder (HOOKS_SUPPORTED).
+function blockLabel(block: IntegrationBlock): string {
+  if (block === "malformed") return "Cannot read config";
+  if (block === "uneditable") return "Cannot edit config";
+  return IS_WINDOWS ? "Not supported" : "Not found";
+}
+
+function blockText(block: IntegrationBlock, name: string, files: string[]): string {
+  if (block === "malformed") {
+    return `Kex cannot parse ${files.join(" or ")} and leaves them untouched. Fix it and check again.`;
+  }
+  if (block === "uneditable") {
+    const config = files.find((f) => f.endsWith("config.toml")) ?? "config.toml";
+    return `Kex cannot safely edit ${config}: it holds a trust entry for a Kex hook in a form Kex does not understand, so Kex left it untouched. Fix it and check again.`;
+  }
+  return IS_WINDOWS
+    ? `The ${name} integration is not supported on Windows yet.`
+    : `The ${name} folder does not exist yet. Install ${name} and run it once, then check again.`;
+}
 
 type Props = {
   agent: AgentId;
@@ -18,7 +39,7 @@ type Props = {
 };
 
 export function AgentIntegrationRow({ agent, name, files, state }: Props) {
-  const { ready, busy, failed, install, remove } = state;
+  const { ready, blocked, busy, failed, install, remove, refresh } = state;
   const [previewing, setPreviewing] = useState(false);
   const [justChanged, setJustChanged] = useState(false);
   const previous = useRef(ready);
@@ -47,7 +68,11 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
               <span
                 className={cn(
                   "relative flex items-center gap-1.5 text-[11px] font-normal transition-colors duration-300",
-                  installed ? "text-green-500" : "text-muted-foreground",
+                  installed
+                    ? "text-green-500"
+                    : blocked === "malformed" || blocked === "uneditable"
+                      ? "text-destructive"
+                      : "text-muted-foreground",
                 )}
               >
                 <span className="relative flex size-1.5">
@@ -56,7 +81,7 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
                   )}
                   <span className="relative size-1.5 rounded-full bg-current" />
                 </span>
-                {installed ? "Installed" : "Not installed"}
+                {installed ? "Installed" : blocked ? blockLabel(blocked) : "Not installed"}
               </span>
             )}
           </span>
@@ -65,38 +90,54 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
             <button
               type="button"
               className="ml-2 cursor-pointer font-sans text-primary hover:underline disabled:opacity-60"
-              disabled={ready === null}
+              disabled={ready === null || blocked !== null}
               onClick={() => setPreviewing(true)}
             >
               View changes
             </button>
           </span>
         </div>
-        <Button
-          key={String(installed)}
-          size="sm"
-          variant={installed ? "outline" : "default"}
-          className={cn(
-            "h-8 min-w-[92px] px-2.5 text-[11px] transition-colors active:scale-[0.96]",
-            installed &&
-              "text-muted-foreground hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive",
-            justChanged && "animate-in fade-in slide-in-from-bottom-1 duration-300",
-          )}
-          disabled={busy || ready === null}
-          onClick={act}
-        >
-          {busy ? (
-            <>
-              <Spinner size={12} />
-              {installed ? "Removing" : "Installing"}
-            </>
-          ) : installed ? (
-            "Uninstall"
-          ) : (
-            "Install"
-          )}
-        </Button>
+        {blocked ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 min-w-[92px] px-2.5 text-[11px] active:scale-[0.96]"
+            onClick={refresh}
+          >
+            Check again
+          </Button>
+        ) : (
+          <Button
+            key={String(installed)}
+            size="sm"
+            variant={installed ? "outline" : "default"}
+            className={cn(
+              "h-8 min-w-[92px] px-2.5 text-[11px] transition-colors active:scale-[0.96]",
+              installed &&
+                "text-muted-foreground hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive",
+              justChanged && "animate-in fade-in slide-in-from-bottom-1 duration-300",
+            )}
+            disabled={busy || ready === null}
+            onClick={act}
+          >
+            {busy ? (
+              <>
+                <Spinner size={12} />
+                {installed ? "Removing" : "Installing"}
+              </>
+            ) : installed ? (
+              "Uninstall"
+            ) : (
+              "Install"
+            )}
+          </Button>
+        )}
       </div>
+      {blocked && (
+        <p className="px-3 pb-2 text-[11px] text-muted-foreground">
+          {blockText(blocked, name, files)}
+        </p>
+      )}
       {failed && (
         <p className="px-3 pb-2 text-[11px] text-destructive">
           Could not change the {name} integration. Check the permissions of {files.join(", ")}.

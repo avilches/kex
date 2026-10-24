@@ -4,7 +4,12 @@ const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
 
 import type { IntegrationAgent } from "./integrations";
-import { installIntegration, removeIntegration, syncIntegrations } from "./integrationActions";
+import {
+  installIntegration,
+  integrationStatus,
+  removeIntegration,
+  syncIntegrations,
+} from "./integrationActions";
 
 // A store whose update applies the change to a list, like updateInstalledIntegrations does.
 function fakeStore(initial: IntegrationAgent[] = []) {
@@ -54,12 +59,58 @@ describe("installIntegration", () => {
   });
 });
 
+describe("installIntegration for Codex", () => {
+  it("runs the Codex setup and remembers codex", async () => {
+    const { state, update } = fakeStore(["omp"]);
+    await installIntegration("codex", update);
+    expect(invoke).toHaveBeenCalledWith("agent_setup_codex");
+    expect(state.list).toEqual(["omp", "codex"]);
+  });
+
+  it("does not remember codex when its config cannot be parsed", async () => {
+    invoke.mockImplementation(() => Promise.reject(new Error("leaving it alone")));
+    const { state, update } = fakeStore();
+    expect(await failureOf(() => installIntegration("codex", update))).toContain("leaving it alone");
+    expect(state.list).toEqual([]);
+  });
+});
+
+describe("integrationStatus", () => {
+  it("reads the boolean status of a file-based agent", async () => {
+    invoke.mockImplementation(() => Promise.resolve(true));
+    expect(await integrationStatus("pi")).toBe("installed");
+    expect(invoke).toHaveBeenCalledWith("agent_pi_extension_status");
+  });
+
+  it("reads the string status of Codex", async () => {
+    for (const [raw, status] of [
+      ["upToDate", "installed"],
+      ["notInstalled", "missing"],
+      ["outdated", "missing"],
+      ["malformed", "malformed"],
+      ["unsafeToEdit", "uneditable"],
+      ["unavailable", "unavailable"],
+    ] as const) {
+      invoke.mockImplementation(() => Promise.resolve(raw));
+      expect(await integrationStatus("codex")).toBe(status);
+    }
+    expect(invoke).toHaveBeenCalledWith("agent_codex_status");
+  });
+});
+
 describe("removeIntegration", () => {
   it("deletes the file and forgets only that agent", async () => {
     const { state, update } = fakeStore(["opencode", "omp"]);
     await removeIntegration("omp", update);
     expect(invoke).toHaveBeenCalledWith("agent_remove_integration", { agent: "omp" });
     expect(state.list).toEqual(["opencode"]);
+  });
+
+  it("removes Kex's Codex hooks and forgets codex", async () => {
+    const { state, update } = fakeStore(["pi", "codex"]);
+    await removeIntegration("codex", update);
+    expect(invoke).toHaveBeenCalledWith("agent_remove_integration", { agent: "codex" });
+    expect(state.list).toEqual(["pi"]);
   });
 
   it("keeps tracking the agent when the file could not be removed", async () => {
@@ -81,6 +132,14 @@ describe("syncIntegrations", () => {
     const { state, update } = fakeStore(["omp", "pi"]);
     await syncIntegrations(["omp", "pi"], update);
     expect(invoke).toHaveBeenCalledWith("agent_sync_integrations", { agents: ["omp", "pi"] });
+    expect(state.list).toEqual(["omp"]);
+  });
+
+  it("stops tracking codex when the sync reports it", async () => {
+    invoke.mockImplementation(() => Promise.resolve(["codex"]));
+    const { state, update } = fakeStore(["omp", "codex"]);
+    await syncIntegrations(["omp", "codex"], update);
+    expect(invoke).toHaveBeenCalledWith("agent_sync_integrations", { agents: ["omp", "codex"] });
     expect(state.list).toEqual(["omp"]);
   });
 

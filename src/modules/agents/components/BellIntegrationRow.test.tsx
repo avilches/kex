@@ -13,6 +13,7 @@ afterEach(cleanup);
 function state(over: Partial<IntegrationState> = {}): IntegrationState {
   return {
     ready: false,
+    blocked: null,
     busy: false,
     failed: false,
     install: vi.fn(() => Promise.resolve()),
@@ -51,5 +52,39 @@ describe("BellIntegrationRow", () => {
   it("explains a failed install", () => {
     render(<BellIntegrationRow agent="opencode" name="OpenCode" state={state({ failed: true })} />);
     expect(screen.getByText(/Could not write the OpenCode integration/)).toBeTruthy();
+  });
+
+  it("offers Codex like the other agents while its hooks are missing", () => {
+    const s = state();
+    render(<BellIntegrationRow agent="codex" name="Codex" state={s} />);
+    fireEvent.click(screen.getByText("Install Codex integration"));
+    expect(s.install).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a config Kex cannot parse and offers no install", () => {
+    render(
+      <BellIntegrationRow agent="codex" name="Codex" state={state({ blocked: "malformed" })} />,
+    );
+    expect(screen.getByText("Codex integration unavailable")).toBeTruthy();
+    expect(screen.getByText(/cannot parse its config/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByText(/Install Codex/)).toBeNull();
+  });
+
+  it("explains a config Kex cannot edit safely apart from one it cannot parse", () => {
+    render(
+      <BellIntegrationRow agent="codex" name="Codex" state={state({ blocked: "uneditable" })} />,
+    );
+    expect(screen.getByText("Codex integration unavailable")).toBeTruthy();
+    expect(screen.getByText(/cannot safely edit its config\.toml/)).toBeTruthy();
+    expect(screen.queryByText(/cannot parse/)).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("is hidden when the agent's folder does not exist", () => {
+    const { container } = render(
+      <BellIntegrationRow agent="codex" name="Codex" state={state({ blocked: "unavailable" })} />,
+    );
+    expect(container.firstChild).toBeNull();
   });
 });

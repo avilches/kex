@@ -159,10 +159,8 @@ fn known_agents(agent: &str) -> Vec<String> {
 /// Tokens keep their quotes, so a quoted value with spaces stays one value. Assignments and
 /// wrappers before the launcher (`FOO=1 claude`, `env X=1 claude-max`) are kept as written.
 fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
-    let (keep_flags, keep_with_value) = match Provider::of(agent) {
-        Some(provider) => (provider.keep_flags, provider.keep_with_value),
-        None => return None,
-    };
+    let provider = Provider::of(agent)?;
+    let (keep_flags, keep_with_value) = (provider.keep_flags, provider.keep_with_value);
 
     // A record written before the launch line was reduced to the agent segment can still
     // carry `cd dir && claude ...`; reducing it again here heals it on read.
@@ -188,15 +186,30 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
             i += 1;
             continue;
         }
+        let is_value = |t: &str| !t.starts_with('-') && launch_cmd::redirection_tokens(t).is_none();
+        if keep_with_value.contains(&flag) && provider.single_value_opts.contains(&flag) {
+            let (value, used) = if has_eq {
+                (Some(&token[flag.len() + 1..]), 1)
+            } else {
+                match tokens.get(i + 1) {
+                    Some(v) if is_value(v) => (Some(*v), 2),
+                    _ => (None, 1),
+                }
+            };
+            // Without a value the option would take the next word of the resume line
+            // (`resume`); a value the shell could expand may turn into another option.
+            if value.is_some_and(is_plain_shell_word) {
+                result.extend_from_slice(&tokens[i..i + used]);
+            }
+            i += used;
+            continue;
+        }
         if keep_with_value.contains(&flag) {
             result.push(token);
             i += 1;
             if !has_eq {
                 // Consume all immediately-following non-flag tokens as values.
-                while i < tokens.len()
-                    && !tokens[i].starts_with('-')
-                    && launch_cmd::redirection_tokens(tokens[i]).is_none()
-                {
+                while i < tokens.len() && is_value(tokens[i]) {
                     result.push(tokens[i]);
                     i += 1;
                 }
@@ -213,6 +226,25 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         }
     }
     Some(result.join(" "))
+}
+
+/// A word the shell passes through as one literal argument: plain characters, or the whole word
+/// in single quotes, or in double quotes with nothing that expands or escapes inside.
+fn is_plain_shell_word(word: &str) -> bool {
+    let quoted = |q: char| {
+        word.len() >= 2 && word.starts_with(q) && word.ends_with(q) && {
+            let inner = &word[1..word.len() - 1];
+            !inner.is_empty()
+                && !inner.contains(q)
+                && (q == '\'' || !inner.contains(['$', '`', '\\', '!']))
+        }
+    };
+    quoted('\'')
+        || quoted('"')
+        || (!word.is_empty()
+            && word
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "._:/@+=,%-".contains(c)))
 }
 
 /// Why `path` cannot be the working directory of a restored terminal, or `None` when it can.
@@ -298,9 +330,13 @@ fn build_plans_from(
                             MissingTranscriptPolicy::Ignore => {
                                 (record.cwd_launch.clone(), None, true, false)
                             }
-                            // ResumeAnyway only makes sense without a transcript source; with one,
-                            // the missing file leaves nothing to run and nothing to prune for.
-                            MissingTranscriptPolicy::ResumeAnyway => {
+                            MissingTranscriptPolicy::ResumeAnyway => (
+                                record.cwd_launch.clone(),
+                                Some(provider.resume_cmd(base.as_deref(), &record.session_id)),
+                                true,
+                                true,
+                            ),
+                            MissingTranscriptPolicy::KeepWithoutPlan => {
                                 (record.cwd_launch.clone(), None, true, false)
                             }
                         }
@@ -330,12 +366,12 @@ fn build_plans_from(
 
         // Pruned only now, after the directory check: a plan blocked by its directory keeps
         // the entry so "Try again" can still find the session once the directory is back.
-        // The policy decides: ResumeAnyway rows never prune (their record cannot be
-        // re-recorded by anything). No-op without a `store_path` (preview must not mutate).
+        // The policy decides: ResumeAnyway and KeepWithoutPlan rows never prune (their record
+        // cannot be re-recorded by anything). No-op without a `store_path` (preview must not mutate).
         if transcript_missing
             && !matches!(
                 provider.missing_transcript,
-                MissingTranscriptPolicy::ResumeAnyway
+                MissingTranscriptPolicy::ResumeAnyway | MissingTranscriptPolicy::KeepWithoutPlan
             )
         {
             if let Some(path) = store_path {
@@ -849,8 +885,151 @@ mod tests {
     }
 
     #[test]
+    fn codex_resume_keeps_profile_model_and_provider_options() {
+        let base = strip_for_resume_base(
+            "codex -p work --oss --local-provider ollama -m o3 'fix it'",
+            "codex",
+        );
+        assert_eq!(
+            base.as_deref(),
+            Some("codex -p work --oss --local-provider ollama -m o3")
+        );
+        let base = strip_for_resume_base("codex --profile work --model=o3 --search 'go'", "codex");
+        assert_eq!(base.as_deref(), Some("codex --profile work --model=o3"));
+    }
+
+    #[test]
+    fn codex_resume_never_regrants_sandbox_or_approval_bypasses() {
+        let mut lines = vec![
+            "codex --dangerously-bypass-approvals-and-sandbox -p work".to_string(),
+            "codex --yolo -p work".to_string(),
+            "codex -s danger-full-access -p work".to_string(),
+            "codex --sandbox danger-full-access -p work".to_string(),
+            "codex -a never -p work".to_string(),
+            "codex --ask-for-approval never -p work".to_string(),
+        ];
+        // A config override can set the sandbox or the approval policy as well as an option can.
+        for value in [
+            r#"sandbox_mode="danger-full-access""#,
+            "approval_policy=never",
+            "effort=high",
+        ] {
+            lines.push(format!("codex -c {value} -p work"));
+            lines.push(format!("codex -c={value} -p work"));
+            lines.push(format!("codex --config {value} -p work"));
+            lines.push(format!("codex --config={value} -p work"));
+        }
+        for line in &lines {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some("codex -p work"),
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
+    fn codex_resume_line_is_stable_under_a_second_strip() {
+        let base =
+            strip_for_resume_base("codex -p work -c a=b -m o3 --oss 'fix it'", "codex").unwrap();
+        let resume = Provider::of("codex")
+            .unwrap()
+            .resume_cmd(Some(&base), "id-1");
+        assert_eq!(resume, "codex -p work -m o3 --oss resume 'id-1'");
+        assert_eq!(strip_for_resume_base(&resume, "codex").unwrap(), base);
+    }
+
+    #[test]
+    fn a_codex_single_value_option_never_takes_a_flag_or_a_redirection_for_its_value() {
+        for (line, want) in [
+            ("codex -p work -m --yolo", "codex -p work"),
+            ("codex -m --oss -p work", "codex --oss -p work"),
+            ("codex -p work -m 2>/dev/null", "codex -p work"),
+            ("codex -p work -m > out.log", "codex -p work"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+        }
+    }
+
+    fn codex_base_is_stable(base: &str) {
+        let resume = Provider::of("codex")
+            .unwrap()
+            .resume_cmd(Some(base), "id-1");
+        assert_eq!(
+            strip_for_resume_base(&resume, "codex").as_deref(),
+            Some(base),
+            "{resume}"
+        );
+    }
+
+    #[test]
+    fn a_codex_value_option_left_without_a_value_is_dropped() {
+        for (line, want) in [
+            ("codex -p work -m --yolo", "codex -p work"),
+            ("codex -p work -m", "codex -p work"),
+            ("codex -m > out.log -p work", "codex -p work"),
+            ("codex -m 2>/dev/null -p work", "codex -p work"),
+            ("codex --model= -p work", "codex -p work"),
+            ("codex --profile --oss", "codex --oss"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+            codex_base_is_stable(want);
+        }
+    }
+
+    #[test]
+    fn a_codex_value_the_shell_would_expand_is_never_kept() {
+        for (line, want) in [
+            ("codex -m $(echo o3 --yolo) -p work", "codex -p work"),
+            ("codex -p `x` -m o3", "codex -m o3"),
+            ("codex -m $MODEL -p work", "codex -p work"),
+            ("codex --model=$MODEL -p work", "codex -p work"),
+            ("codex -m \"$MODEL\" -p work", "codex -p work"),
+            ("codex -m ${M:-o3} -p work", "codex -p work"),
+            ("codex -m o3\\ --yolo -p work", "codex -p work"),
+            ("codex -m o3* -p work", "codex -p work"),
+            ("codex -m ~/m -p work", "codex -p work"),
+            ("codex -m 'a'b -p work", "codex -p work"),
+            ("codex --local-provider $(x) --oss", "codex --oss"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+            codex_base_is_stable(want);
+        }
+    }
+
+    #[test]
+    fn a_plain_codex_value_is_kept() {
+        for line in [
+            "codex -m o3",
+            "codex -m gpt-5 -p work",
+            "codex --profile 'my profile'",
+            "codex --model=\"gpt-5\" --local-provider ollama",
+            "codex -m gpt-5.1-codex --profile team:a/b",
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(line),
+                "{line}"
+            );
+            codex_base_is_stable(line);
+        }
+    }
+
+    #[test]
     fn strip_keeps_another_known_agent_launcher_like_before() {
-        let base = strip_for_resume_base("codex resume --last", "claude");
+        let base = strip_for_resume_base("codex resume abc-123", "claude");
         assert_eq!(base.as_deref(), Some("codex"));
     }
 
@@ -920,6 +1099,49 @@ mod tests {
             "/tmp/p",
             false
         ));
+    }
+
+    #[test]
+    fn a_codex_session_start_records_the_full_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-codex-rec", "codex -p work".to_string());
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-codex-rec",
+            "codex",
+            "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e",
+            "",
+            "/tmp/p",
+            false
+        ));
+
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let rec = &store.tabs["tab-codex-rec"];
+        assert_eq!(rec.agent.as_deref(), Some("codex"));
+        assert_eq!(rec.session_id, "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e");
+        assert_eq!(rec.transcript_path, "");
+        assert_eq!(rec.cwd_launch, "/tmp/p");
+        assert_eq!(rec.launch_cmd.as_deref(), Some("codex -p work"));
+    }
+
+    #[test]
+    fn a_codex_exec_run_is_not_recorded() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        for (tab, line) in [
+            ("tab-codex-exec", "codex exec 'fix it'"),
+            ("tab-codex-e", "cd x && codex -c a=b e hi"),
+        ] {
+            stash_cmd(tab, line.to_string());
+            assert!(!record_session_at_path_with(
+                &path, tab, "codex", "s1", "", "/tmp/p", false
+            ));
+        }
+        assert!(!path.exists(), "a one-shot codex run writes nothing");
     }
 
     #[test]
@@ -2036,7 +2258,7 @@ mod tests {
     }
 
     #[test]
-    fn a_codex_record_always_resumes_last_and_survives_a_restore() {
+    fn a_codex_record_resumes_by_id_and_survives_a_restore() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
         std::fs::create_dir_all(&project).unwrap();
@@ -2049,16 +2271,108 @@ mod tests {
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
-        assert_eq!(plans[0].resume_cmd, "codex resume --last");
+        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
         assert!(plans[0].error_reason.is_empty());
 
         // Never pruned: the command re-appears every time the store is loaded.
         let second = load_restore_plan_from_path(&store_path);
-        assert_eq!(second[0].resume_cmd, "codex resume --last");
+        assert_eq!(second[0].resume_cmd, "codex resume 'abc-123'");
     }
 
     #[test]
-    fn a_codex_record_with_a_launch_cmd_resumes_last_on_the_stripped_base() {
+    fn a_codex_record_with_a_rollout_resumes_in_the_rollout_cwd() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("launch");
+        let stale = dir.path().join("stale");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&stale).unwrap();
+        let rollout = dir.path().join("rollout-2026-10-14T20-42-20-abc-123.jsonl");
+        std::fs::write(
+            &rollout,
+            format!(
+                "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"abc-123\",\"cwd\":\"{}\"}}}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(
+                Some("codex"),
+                &stale,
+                &rollout.display().to_string(),
+                Some("codex -m o3"),
+            ),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].resume_cmd, "codex -m o3 resume 'abc-123'");
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+        assert!(plans[0].worktree_cwd.is_none());
+    }
+
+    #[test]
+    fn a_codex_record_without_a_transcript_path_finds_its_rollout_in_the_injected_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("launch");
+        let stale = dir.path().join("stale");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&stale).unwrap();
+        let sessions = dir.path().join("sessions");
+        let day = sessions.join("2026/10/14");
+        std::fs::create_dir_all(&day).unwrap();
+        std::fs::write(
+            day.join("rollout-2026-10-14T20-42-20-abc-123.jsonl"),
+            format!(
+                "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"abc-123\",\"cwd\":\"{}\"}}}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("codex"), &stale, "", None));
+        write_store(&store_path, tabs);
+
+        let plans = crate::modules::agent::provider::with_codex_sessions_root(&sessions, || {
+            load_restore_plan_from_path(&store_path)
+        });
+
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
+    }
+
+    #[test]
+    fn a_codex_record_with_an_empty_transcript_path_and_no_rollout_still_resumes() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        let mut rec = record(Some("codex"), &project, "", None);
+        rec.session_id = "kex-test-no-rollout-7c4244dd".to_string();
+        tabs.insert("tab-1".to_string(), rec);
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(
+            plans[0].resume_cmd,
+            "codex resume 'kex-test-no-rollout-7c4244dd'"
+        );
+        assert_eq!(plans[0].cwd_launch, project.display().to_string());
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
+    }
+
+    #[test]
+    fn a_codex_record_with_a_launch_cmd_resumes_by_id_on_the_stripped_base() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
         std::fs::create_dir_all(&project).unwrap();
@@ -2076,7 +2390,7 @@ mod tests {
         write_store(&store_path, tabs);
 
         let plans = load_restore_plan_from_path(&store_path);
-        assert_eq!(plans[0].resume_cmd, "codex-max resume --last");
+        assert_eq!(plans[0].resume_cmd, "codex-max --model g5 resume 'abc-123'");
     }
 
     #[test]
@@ -2094,7 +2408,7 @@ mod tests {
         let plans = load_restore_plan_from_path(&store_path);
         assert!(plans[0].resume_cmd.is_empty());
         assert!(
-            plans[0].attempted_cmd.contains("resume --last"),
+            plans[0].attempted_cmd.contains("resume 'abc-123'"),
             "{}",
             plans[0].attempted_cmd
         );

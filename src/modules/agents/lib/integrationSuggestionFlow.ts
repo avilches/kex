@@ -1,10 +1,9 @@
 import { isAgentId, type SuggestionMap, shouldSuggest, withAsked, withInstalled } from "./integrationSuggestion";
-import type { AgentId } from "./integrations";
+import type { AgentId, IntegrationStatus } from "./integrations";
 
 export type SuggestDeps = {
   now: () => number;
-  /** Whether the integration is installed and current. */
-  status: (agent: AgentId) => Promise<boolean>;
+  status: (agent: AgentId) => Promise<IntegrationStatus>;
   read: () => Promise<SuggestionMap>;
   update: (change: (map: SuggestionMap) => SuggestionMap) => Promise<void>;
   show: (agent: AgentId) => void;
@@ -20,12 +19,15 @@ export function createIntegrationSuggester(deps: SuggestDeps) {
     if (!isAgentId(agent) || seen.has(agent)) return;
     seen.add(agent);
     try {
-      if (await deps.status(agent)) {
+      const status = await deps.status(agent);
+      if (status === "installed") {
         // Installed before this feature existed: it counts as installed once, so a later
         // uninstall does not bring the suggestion back.
         await deps.update((map) => withInstalled(map, agent));
         return;
       }
+      // Install would fail anyway; the ask is kept for a later run where it can work.
+      if (status !== "missing") return;
       const map = await deps.read();
       if (!shouldSuggest(map[agent], deps.now())) return;
       await deps.update((current) => withAsked(current, agent, deps.now()));

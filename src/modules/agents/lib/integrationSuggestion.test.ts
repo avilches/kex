@@ -57,9 +57,13 @@ describe("parseSuggestions", () => {
     expect(
       parseSuggestions({
         claude: { asks: 1, lastAskedAt: T0, installedOnce: false },
+        codex: { asks: 2, lastAskedAt: T0, installedOnce: false },
         gemini: { asks: 1, lastAskedAt: T0, installedOnce: true },
       }),
-    ).toEqual({ claude: { asks: 1, lastAskedAt: T0, installedOnce: false } });
+    ).toEqual({
+      claude: { asks: 1, lastAskedAt: T0, installedOnce: false },
+      codex: { asks: 2, lastAskedAt: T0, installedOnce: false },
+    });
   });
 
   it("repairs bad fields and rejects non-objects", () => {

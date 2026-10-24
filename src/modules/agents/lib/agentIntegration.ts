@@ -6,15 +6,19 @@ import {
 } from "@/modules/settings/store";
 import { installIntegration, integrationStatus, removeIntegration } from "./integrationActions";
 import { withInstalled } from "./integrationSuggestion";
-import { type AgentId, isIntegrationAgent } from "./integrations";
+import {
+  type AgentId,
+  fromInstalledFlag,
+  type IntegrationStatus,
+  isIntegrationAgent,
+} from "./integrations";
 
 // One entry point per action for every agent, so the Settings rows, the bell and the install
 // suggestion toast share the same write and the same bookkeeping.
 
-export function agentStatus(agent: AgentId): Promise<boolean> {
-  return isIntegrationAgent(agent)
-    ? integrationStatus(agent)
-    : invoke<boolean>("agent_claude_hooks_status");
+export async function agentStatus(agent: AgentId): Promise<IntegrationStatus> {
+  if (isIntegrationAgent(agent)) return integrationStatus(agent);
+  return fromInstalledFlag(await invoke<boolean>("agent_claude_hooks_status"));
 }
 
 export async function installAgent(agent: AgentId): Promise<void> {

@@ -102,13 +102,59 @@ impl Invocation {
             .join(" ")
     }
 
-    /// `-p` / `--print` among the agent's own options (not after `--`).
+    /// A one-shot run that is not a session to restore: `-p` / `--print` among the agent's
+    /// own options (not after `--`), or for codex the `exec` subcommand (alias `e`), where
+    /// `-p` is `--profile`.
     pub fn is_print_mode(&self) -> bool {
+        if self.agent == "codex" {
+            return matches!(codex_subcommand(&self.args), Some("exec" | "e"));
+        }
         self.args
             .iter()
             .take_while(|t| t.as_str() != "--")
             .any(|t| t == "-p" || t == "--print")
     }
+}
+
+/// Codex options that consume the next token, so a value is never read as the subcommand.
+pub const CODEX_VALUE_OPTS: &[&str] = &[
+    "-c",
+    "--config",
+    "-i",
+    "--image",
+    "-m",
+    "--model",
+    "-p",
+    "--profile",
+    "-s",
+    "--sandbox",
+    "-a",
+    "--ask-for-approval",
+    "-C",
+    "--cd",
+    "--add-dir",
+    "--enable",
+    "--disable",
+    "--local-provider",
+];
+
+fn codex_subcommand(args: &[String]) -> Option<&str> {
+    let mut i = 0;
+    while i < args.len() {
+        let tok = args[i].as_str();
+        if tok == "--" {
+            return None;
+        }
+        if !tok.starts_with('-') {
+            return Some(tok);
+        }
+        i += if CODEX_VALUE_OPTS.contains(&tok) {
+            2
+        } else {
+            1
+        };
+    }
+    None
 }
 
 /// The last segment of `line` whose command word is one of `agents`.
@@ -729,8 +775,8 @@ mod tests {
     #[test]
     fn the_last_agent_segment_wins() {
         assert_eq!(
-            cmd("claude --a && codex resume --last").as_deref(),
-            Some("codex resume --last")
+            cmd("claude --a && codex resume abc-123").as_deref(),
+            Some("codex resume abc-123")
         );
     }
 
@@ -803,5 +849,38 @@ mod tests {
         assert!(!is_print_mode("claude --model opus", &agents()));
         assert!(!is_print_mode("ls -p", &agents()));
         assert!(!is_print_mode("claude -- -p", &agents()));
+    }
+
+    #[test]
+    fn codex_exec_and_its_alias_are_print_mode() {
+        for line in [
+            "codex exec 'fix the build'",
+            "codex e hi",
+            "cd x && codex exec --json hi",
+            "codex -c model=o3 exec hi",
+            "codex --config model=o3 e hi",
+            "codex -m o3 -p work --full-auto exec hi",
+            "codex --model=o3 exec hi",
+            "codex-max exec hi",
+            "codex exec resume --last",
+        ] {
+            assert!(is_print_mode(line, &defaults()), "line: {line}");
+        }
+    }
+
+    #[test]
+    fn interactive_codex_lines_are_not_print_mode() {
+        for line in [
+            "codex",
+            "codex 'explain this repo'",
+            "codex resume 01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e",
+            "codex resume --last",
+            "codex -p work",
+            "codex --profile work 'hi'",
+            "codex -m exec",
+            "codex -- exec",
+        ] {
+            assert!(!is_print_mode(line, &defaults()), "line: {line}");
+        }
     }
 }

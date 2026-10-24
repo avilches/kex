@@ -1,14 +1,12 @@
 import { RoboticIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import claudeCodeUrl from "@/modules/agents/assets/claudecode-color.svg";
-import codexUrl from "@/modules/agents/assets/codex-color.svg";
 import geminiCliUrl from "@/modules/agents/assets/geminicli-color.svg";
 import ompUrl from "@/modules/agents/assets/omp-color.svg";
 
 function svgUrlFor(agent: string): string | null {
   const a = agent.toLowerCase();
   if (a.includes("claude")) return claudeCodeUrl;
-  if (a.includes("codex") || a.includes("gpt") || a.includes("openai")) return codexUrl;
   if (a.includes("gemini")) return geminiCliUrl;
   if (a === "omp") return ompUrl;
   return null;
@@ -65,6 +63,24 @@ function OpenCodeMark({ size, className }: { size: number; className?: string })
   );
 }
 
+function isCodex(agent: string): boolean {
+  return agent.includes("codex") || agent.includes("gpt") || agent.includes("openai");
+}
+
+// Kex's own mark for Codex, a terminal prompt in a frame, not the vendor's logo.
+function CodexMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <InlineMark size={size} className={className} label="codex" viewBox="0 0 24 24">
+      <path
+        fillRule="evenodd"
+        d="M5 1h14a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4V5a4 4 0 0 1 4-4Zm0 2.5A1.5 1.5 0 0 0 3.5 5v14A1.5 1.5 0 0 0 5 20.5h14a1.5 1.5 0 0 0 1.5-1.5V5A1.5 1.5 0 0 0 19 3.5H5Z"
+      />
+      <path d="M6.4 8.2 8.2 6.4 13.8 12l-5.6 5.6-1.8-1.8 3.8-3.8-3.8-3.8Z" />
+      <path d="M13 15.5h5V18h-5v-2.5Z" />
+    </InlineMark>
+  );
+}
+
 export function AgentIcon({
   agent,
   size = 15,
@@ -90,6 +106,7 @@ export function AgentIcon({
   const inline = agent.toLowerCase();
   if (inline === "pi") return <PiMark size={size} className={className} />;
   if (inline === "opencode") return <OpenCodeMark size={size} className={className} />;
+  if (isCodex(inline)) return <CodexMark size={size} className={className} />;
 
   const svgUrl = svgUrlFor(agent);
   if (svgUrl) {

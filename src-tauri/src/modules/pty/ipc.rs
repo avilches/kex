@@ -204,9 +204,27 @@ struct Payload {
     delta: Option<String>,
 }
 
+/// Codex documents PascalCase event names, which is unmeasured, so its snake_case spelling is
+/// read as the same event. Other agents' names are matched exactly.
+fn canonical_event(agent: Option<&str>, event: &str) -> String {
+    if agent != Some("codex") {
+        return event.to_string();
+    }
+    match event {
+        "session_start" => "SessionStart",
+        "user_prompt_submit" => "UserPromptSubmit",
+        "stop" => "Stop",
+        "permission_request" => "PermissionRequest",
+        "subagent_start" => "SubagentStart",
+        "subagent_stop" => "SubagentStop",
+        other => other,
+    }
+    .to_string()
+}
+
 fn parse_payload(json: &str) -> Option<Payload> {
     let v: serde_json::Value = serde_json::from_str(json).ok()?;
-    let event = v["hook_event_name"].as_str()?.to_string();
+    let event = canonical_event(v["agent"].as_str(), v["hook_event_name"].as_str()?);
     Some(Payload {
         event,
         session_id: v["session_id"].as_str().unwrap_or("").to_string(),
@@ -904,6 +922,69 @@ mod tests {
         }"#;
         let p = parse_payload(json).unwrap();
         assert_eq!(p.agent.as_deref(), Some("opencode"));
+    }
+
+    #[test]
+    fn parse_a_codex_session_start_with_a_null_transcript_path() {
+        let json = r#"{
+          "hook_event_name": "SessionStart",
+          "agent": "codex",
+          "session_id": "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e",
+          "transcript_path": null,
+          "cwd": "/home/user/proj",
+          "source": "startup",
+          "model": "gpt-5-codex",
+          "permission_mode": "default"
+        }"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "SessionStart");
+        assert_eq!(p.agent.as_deref(), Some("codex"));
+        assert_eq!(p.session_id, "01a13d02-8fbe-7d52-81ec-73ccfdbc1f1e");
+        assert_eq!(p.transcript_path, "");
+        assert_eq!(p.cwd, "/home/user/proj");
+        assert_eq!(p.source.as_deref(), Some("startup"));
+        assert!(reports_agent_cwd(&p.event, "startup", &p.cwd));
+    }
+
+    #[test]
+    fn codex_frames_other_than_session_start_become_codex_signals() {
+        for event in ["UserPromptSubmit", "Stop", "PermissionRequest"] {
+            let json = format!(
+                r#"{{"hook_event_name":"{event}","agent":"codex","session_id":"s","transcript_path":"/x/rollout-1-s.jsonl","cwd":"/p"}}"#
+            );
+            let p = parse_payload(&json).unwrap();
+            assert_eq!(p.transcript_path, "/x/rollout-1-s.jsonl");
+            let sig = agent_signal(3, &p.event, p.agent.as_deref());
+            assert_eq!(sig["agent"], "codex", "{event}");
+            assert_eq!(sig["kind"], event);
+        }
+    }
+
+    #[test]
+    fn codex_snake_case_events_are_read_as_their_canonical_names() {
+        for (snake, canonical) in [
+            ("session_start", "SessionStart"),
+            ("user_prompt_submit", "UserPromptSubmit"),
+            ("stop", "Stop"),
+            ("permission_request", "PermissionRequest"),
+            ("subagent_start", "SubagentStart"),
+            ("subagent_stop", "SubagentStop"),
+            ("Stop", "Stop"),
+        ] {
+            let json = format!(
+                r#"{{"hook_event_name":"{snake}","agent":"codex","session_id":"s","cwd":"/p"}}"#
+            );
+            assert_eq!(parse_payload(&json).unwrap().event, canonical, "{snake}");
+        }
+    }
+
+    #[test]
+    fn claude_and_opencode_event_names_are_never_rewritten() {
+        for agent in [None, Some("claude"), Some("opencode")] {
+            let tag = agent.map_or(String::new(), |a| format!(r#","agent":"{a}""#));
+            let json = format!(r#"{{"hook_event_name":"session_start","session_id":"s"{tag}}}"#);
+            assert_eq!(parse_payload(&json).unwrap().event, "session_start");
+        }
     }
 
     #[test]

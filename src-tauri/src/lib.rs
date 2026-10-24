@@ -982,6 +982,8 @@ pub fn run() {
             agent::agent_setup_pi,
             agent::agent_omp_extension_status,
             agent::agent_pi_extension_status,
+            agent::agent_setup_codex,
+            agent::agent_codex_status,
             agent::agent_integration_preview,
             agent::agent_detach_session,
             agent::agent_session_set_snapshot,

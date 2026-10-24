@@ -339,6 +339,8 @@ mod tests {
             "claude -p hello",
             "claude --print",
             "claude --model opus -p",
+            "codex exec hi",
+            "/usr/local/bin/codex e hi",
         ] {
             let mut d = AgentDetector::new();
             assert_eq!(
@@ -387,8 +389,8 @@ mod tests {
     fn arms_on_pathed_and_wrapped_command() {
         let mut d = AgentDetector::new();
         assert_eq!(
-            run(&mut d, &osc("133;C;/usr/local/bin/codex exec")),
-            vec![started_cmd("codex", "/usr/local/bin/codex exec")]
+            run(&mut d, &osc("133;C;/usr/local/bin/codex resume")),
+            vec![started_cmd("codex", "/usr/local/bin/codex resume")]
         );
         let mut d2 = AgentDetector::new();
         assert_eq!(

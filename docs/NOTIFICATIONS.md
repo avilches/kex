@@ -183,7 +183,7 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 ### Install suggestion
 
 Nothing in the app told a new user that the integrations exist, so when the `started` signal names an agent
-(`claude`, `opencode`, `omp` or `pi`) whose integration is not installed, `suggestIntegration`
+(`claude`, `opencode`, `omp`, `pi` or `codex`) whose integration is not installed, `suggestIntegration`
 (`IntegrationSuggestionToast.tsx`) shows a toast with Install and View changes (opens Settings > General); closing it
 is the "not now". The decision lives in pure functions (`lib/integrationSuggestion.ts`) and the flow in
 `lib/integrationSuggestionFlow.ts`, which looks at each agent once per app run:
@@ -193,6 +193,8 @@ is the "not now". The decision lives in pure functions (`lib/integrationSuggesti
 - Installed at any moment (the toast, Settings, the bell, or already installed when the agent is detected): never ask
   again, even if it is removed later. `installAgent` (`lib/agentIntegration.ts`) is the single install path and records
   it.
+- Install cannot run (Codex reports `malformed`, `unsafeToEdit` or `unavailable`): no toast and no ask counted; the next app run looks
+  again.
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce }`.
 

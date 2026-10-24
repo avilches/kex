@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createIntegrationSuggester, type SuggestDeps } from "./integrationSuggestionFlow";
 import { SUGGESTION_RETRY_MS, type SuggestionMap } from "./integrationSuggestion";
+import type { IntegrationStatus } from "./integrations";
 
 const T0 = 1_700_000_000_000;
 
-function setup(opts: { installed?: boolean; map?: SuggestionMap; now?: number } = {}) {
+function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: number } = {}) {
   const state = { map: opts.map ?? ({} as SuggestionMap), now: opts.now ?? T0 };
   const show = vi.fn();
   const deps: SuggestDeps = {
     now: () => state.now,
-    status: async () => opts.installed ?? false,
+    status: async () => opts.status ?? "missing",
     read: async () => state.map,
     update: async (change) => {
       state.map = change(state.map);
@@ -29,7 +30,7 @@ describe("integration suggester", () => {
 
   it("ignores agents that have no integration", async () => {
     const { suggest, show } = setup();
-    await suggest("codex");
+    await suggest("gemini");
     await suggest(null);
     expect(show).not.toHaveBeenCalled();
   });
@@ -42,10 +43,25 @@ describe("integration suggester", () => {
   });
 
   it("remembers an agent that is already installed and stays silent", async () => {
-    const { suggest, show, state } = setup({ installed: true });
+    const { suggest, show, state } = setup({ status: "installed" });
     await suggest("omp");
     expect(show).not.toHaveBeenCalled();
     expect(state.map.omp?.installedOnce).toBe(true);
+  });
+
+  it("suggests Codex like the other agents when its hooks are missing", async () => {
+    const { suggest, show } = setup();
+    await suggest("codex");
+    expect(show).toHaveBeenCalledWith("codex");
+  });
+
+  it("does not ask nor count an ask while Install could not work", async () => {
+    for (const status of ["malformed", "uneditable", "unavailable"] as const) {
+      const { suggest, show, state } = setup({ status });
+      await suggest("codex");
+      expect(show).not.toHaveBeenCalled();
+      expect(state.map).toEqual({});
+    }
   });
 
   it("does not ask again within 15 days of the first ask", async () => {
@@ -69,7 +85,7 @@ describe("integration suggester", () => {
     state.now = T0 + SUGGESTION_RETRY_MS * 5;
     const later = createIntegrationSuggester({
       now: () => state.now,
-      status: async () => false,
+      status: async () => "missing",
       read: async () => state.map,
       update: async (change) => {
         state.map = change(state.map);
@@ -93,7 +109,7 @@ describe("integration suggester", () => {
     const show = vi.fn();
     const suggest = createIntegrationSuggester({
       now: () => T0,
-      status: async () => false,
+      status: async () => "missing",
       read: async () => {
         throw new Error("store gone");
       },

@@ -6,6 +6,7 @@ describe("agentDisplayName", () => {
     expect(agentDisplayName("opencode")).toBe("OpenCode");
     expect(agentDisplayName("omp")).toBe("OMP");
     expect(agentDisplayName("pi")).toBe("Pi");
+    expect(agentDisplayName("codex")).toBe("Codex");
     expect(agentDisplayName("claude")).toBe("Claude");
   });
 });
@@ -29,8 +30,15 @@ describe("hasTranscriptActions", () => {
   });
 
   it("is on for the agents that report a session file", () => {
-    for (const agent of ["claude", "omp", "pi", "codex"]) {
+    for (const agent of ["claude", "omp", "pi"]) {
       expect(hasTranscriptActions({ agent })).toBe(true);
     }
+  });
+
+  it("is on for Codex only when its frame named a rollout", () => {
+    expect(hasTranscriptActions({ agent: "codex", meta: { transcriptPath: "/r.jsonl" } })).toBe(true);
+    expect(hasTranscriptActions({ agent: "codex", meta: { transcriptPath: "" } })).toBe(false);
+    expect(hasTranscriptActions({ agent: "codex", meta: {} })).toBe(false);
+    expect(hasTranscriptActions({ agent: "codex" })).toBe(false);
   });
 });

@@ -1,14 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AgentId, IntegrationAgent } from "./integrations";
-import { withIntegration } from "./integrations";
+import type { AgentId, CodexStatus, IntegrationAgent, IntegrationStatus } from "./integrations";
+import { fromCodexStatus, fromInstalledFlag, withIntegration } from "./integrations";
 
 const SETUP_COMMAND: Record<IntegrationAgent, string> = {
   opencode: "agent_setup_opencode",
   omp: "agent_setup_omp",
   pi: "agent_setup_pi",
+  codex: "agent_setup_codex",
 };
 
-const STATUS_COMMAND: Record<IntegrationAgent, string> = {
+// Codex answers with a string state of its own; the others with whether the file is current.
+const STATUS_COMMAND: Record<Exclude<IntegrationAgent, "codex">, string> = {
   opencode: "agent_opencode_plugin_status",
   omp: "agent_omp_extension_status",
   pi: "agent_pi_extension_status",
@@ -17,8 +19,9 @@ const STATUS_COMMAND: Record<IntegrationAgent, string> = {
 // Applies a change to the stored list of installed integrations.
 type Update = (change: (current: IntegrationAgent[]) => IntegrationAgent[]) => Promise<void>;
 
-export function integrationStatus(agent: IntegrationAgent): Promise<boolean> {
-  return invoke<boolean>(STATUS_COMMAND[agent]);
+export async function integrationStatus(agent: IntegrationAgent): Promise<IntegrationStatus> {
+  if (agent === "codex") return fromCodexStatus(await invoke<CodexStatus>("agent_codex_status"));
+  return fromInstalledFlag(await invoke<boolean>(STATUS_COMMAND[agent]));
 }
 
 // The flag is written only after the file is on disk, so a failed install never leaves the
@@ -46,8 +49,16 @@ export async function syncIntegrations(
   await update((current) => current.filter((a) => !foreign.includes(a)));
 }
 
-/** One file an install or an uninstall would change: `null` before means new, `null` after means deleted. */
-export type FilePreview = { path: string; before: string | null; after: string | null };
+/**
+ * One file an install or an uninstall would change: `null` before means new, `null` after means
+ * deleted. `note` explains a change the diff alone would not, such as a shared file being reformatted.
+ */
+export type FilePreview = {
+  path: string;
+  before: string | null;
+  after: string | null;
+  note?: string;
+};
 
 // Dry run: nothing is written.
 export function previewIntegration(agent: AgentId, install: boolean): Promise<FilePreview[]> {

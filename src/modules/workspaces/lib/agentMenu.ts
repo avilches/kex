@@ -4,7 +4,12 @@ import type { AgentSession } from "@/modules/agents/lib/types";
 // actions: "Transcript not created yet" would stay on screen forever.
 const AGENTS_WITHOUT_TRANSCRIPT = new Set(["opencode"]);
 
-const DISPLAY_NAMES: Record<string, string> = { opencode: "OpenCode", omp: "OMP", pi: "Pi" };
+const DISPLAY_NAMES: Record<string, string> = {
+  opencode: "OpenCode",
+  omp: "OMP",
+  pi: "Pi",
+  codex: "Codex",
+};
 
 export function agentDisplayName(agent: string): string {
   const key = agent.toLowerCase();
@@ -15,6 +20,10 @@ export function showsAgentMenu(session: Pick<AgentSession, "agent"> | undefined)
   return !!session;
 }
 
-export function hasTranscriptActions(session: Pick<AgentSession, "agent">): boolean {
-  return !AGENTS_WITHOUT_TRANSCRIPT.has(session.agent.toLowerCase());
+// Codex frames may carry an empty rollout path; without one there is nothing to reveal, ever.
+export function hasTranscriptActions(session: Pick<AgentSession, "agent" | "meta">): boolean {
+  const agent = session.agent.toLowerCase();
+  if (AGENTS_WITHOUT_TRANSCRIPT.has(agent)) return false;
+  if (agent === "codex") return !!session.meta?.transcriptPath;
+  return true;
 }
