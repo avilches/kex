@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Delete02Icon, PlayIcon, ArrowReloadHorizontalIcon } from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  ContextMenuCheckboxItem,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
+import { AgentIcon, StruckAgentIcon } from "@/modules/agents/lib/agentIcon";
+import { writeClipboardText } from "@/lib/clipboard";
 import { previewResumeCmd, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -131,6 +132,10 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
       />
     );
 
+  const shownCommand = agentSession
+    ? (previewPlan?.resumeCmd ?? "")
+    : (draft ?? effectiveRunOnStartCommand(tab, running));
+
   return (
     <ContextMenuSub
       onOpenChange={(next) => {
@@ -139,26 +144,40 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
       }}
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
-        <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
+        {agentSession ? (
+          enabled ? (
+            <AgentIcon agent={agentSession.agent} size={14} />
+          ) : (
+            <StruckAgentIcon
+              agent={agentSession.agent}
+              size={14}
+              title="Won't be restored on restart (Run on start is off)"
+            />
+          )
+        ) : enabled ? (
+          <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />
+        ) : (
+          <span className="size-[14px] shrink-0" />
+        )}
         Run on Start
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
         {sections.showEnabled && (
-          <ContextMenuCheckboxItem
-            checked={enabled}
-            onSelect={(e) => e.preventDefault()}
-            onCheckedChange={(next) =>
+          <ContextMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              const next = !enabled;
               onUpdateTab(tab.id, (p) => ({
                 ...p,
                 restoreOnRestart: next,
                 persistentCommand: next
                   ? commandOnEnable(tab, running, agentSession !== null)
                   : tab.persistentCommand,
-              }))
-            }
+              }));
+            }}
           >
-            Enabled
-          </ContextMenuCheckboxItem>
+            {enabled ? "Disable" : "Enable"}
+          </ContextMenuItem>
         )}
         {pending ? (
           <>
@@ -192,7 +211,15 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
             </ContextMenuItem>
           </>
         ) : (
-          <div className="p-1.5">{commandField}</div>
+          <>
+            <div className="p-1.5">{commandField}</div>
+            {shownCommand.trim() !== "" && (
+              <ContextMenuItem className="gap-2" onSelect={() => void writeClipboardText(shownCommand)}>
+                <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+                Copy command
+              </ContextMenuItem>
+            )}
+          </>
         )}
       </ContextMenuSubContent>
     </ContextMenuSub>

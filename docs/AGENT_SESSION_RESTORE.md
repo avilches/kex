@@ -689,7 +689,7 @@ finally runs the plan, on Retry restore success, and on Discard restore plan.
 The `Run on Start` submenu (`RunOnStartMenu`) reacts to it:
 
 - The submenu trigger turns red (`text-destructive`).
-- The `Enabled` checkbox is not rendered (`runOnStartSections`): it makes no sense while a plan waits.
+- The Enable / Disable button is not rendered (`runOnStartSections`): it makes no sense while a plan waits.
 - A "Restore pending" block (only its title is red) shows the reason and the command as it will be typed in the
   normal text colour, two selectable mono lines: `cd <dir>` and the command. It replaces the old red error text of
   the agent preview.
@@ -772,11 +772,11 @@ Session metadata that was previously accessible from the floating tab HoverCard 
 surfaced in the tab context menu (`TabAgentMenuItems`, rendered by `TabContextMenuItems`): Copy Tab ID for every tab, and
 for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
 with a `transcriptPath`). The two copy entries show the id they copy below their label. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
-`Run on Start` submenu with an `Enabled` checkbox and the command field inline (no third submenu). The path bar has no run-on-start icon; while
+`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger shows a check when it is on for a plain terminal, and the agent icon (struck through when it is off) for an agent. The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.
 
-- **Enabled** checkbox: toggles `restoreOnRestart` on the panel. For agent sessions it defaults to checked
+- **Enable / Disable** button: toggles `restoreOnRestart` on the panel. For agent sessions it defaults to on
   and enabling it captures the current running command as the `persistentCommand` if none is already set - this is only
   a fallback default now (see below), not what normally gets shown or run.
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
@@ -785,7 +785,7 @@ dot either, only the model name, because the tab icon already carries the workin
   restore plan - `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that - so it
   always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
   tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
-  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead (disabled while `Enabled` is off). Without a manual edit it follows the
+  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead (disabled while Run on Start is off). Without a manual edit it follows the
   command running in the terminal and writes it to `persistentCommand` while the menu is open; once the user types a
   value it is kept (`persistentCommandManual: true`), and clearing the field makes it follow the terminal again
   (`modules/terminal/lib/runOnStartCommand.ts`). This replaces the previous behaviour where the input always showed
