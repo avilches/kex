@@ -67,7 +67,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** Gives the focus back to the active tab when the palette is closed with Escape. */
   restoreFocus: () => void;
-  initialMode?: "commands" | "content";
+  initialMode?: "commands" | "content" | "history";
   commandItems: PaletteItem[];
   /** The active workspace while the palette is open (null otherwise): the Actions it lists are the Header's. */
   actionsWorkspace: Parameters<typeof useActionsBarModel>[0]["workspace"];
@@ -286,7 +286,7 @@ export function CommandPalette({
       setValue(lastContentValue);
       restored = true;
     } else {
-      setQuery(initialMode === "content" ? "#" : "");
+      setQuery(initialMode === "content" ? "#" : initialMode === "history" ? ">" : "");
       setPage("root");
     }
     contentRestoredRef.current = restored;

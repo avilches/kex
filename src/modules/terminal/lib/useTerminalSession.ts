@@ -129,6 +129,8 @@ type Session = {
   blockMode: BlockMode;
   blockListeners: Set<() => void>;
   blockDecorations: BlockDecorations | null;
+  // True once the shell emitted any OSC 133 marker, so prompt state is real.
+  integrationSeen: boolean;
   // Set by the block shell-input; called to pull focus back when the xterm
   // grid steals it at the prompt (e.g. on a click), so typing stays in the bar.
   inputFocus: (() => void) | null;
@@ -346,6 +348,15 @@ export function leafCwd(leafId: string): string | null {
 
 export function getLeafBlockMode(leafId: string): BlockMode {
   return sessions.get(leafId)?.blockMode ?? "prompt";
+}
+
+// Whether the leaf's shell is somewhere a command could be typed: the session is
+// alive, its shell has integration (so prompt state is real) and no full-screen
+// app owns the screen. Command state itself is tracked in the ephemeral store.
+export function leafPromptReady(leafId: string): boolean {
+  const s = sessions.get(leafId);
+  if (!s || s.shellExited || !s.integrationSeen) return false;
+  return !isLeafAltScreen(leafId);
 }
 
 export function subscribeLeafBlockMode(
@@ -720,6 +731,7 @@ function ensureSession(
     blockMode: "prompt",
     blockListeners: new Set(),
     blockDecorations: null,
+    integrationSeen: false,
     inputFocus: null,
     inputDraft: "",
     inputActive: false,
@@ -852,7 +864,10 @@ function bindLeafToSlot(leafId: string, s: Session): void {
       // 7 emitted by untrusted command output (remote SSH, `cat` of an
       // attacker file, etc.).
       const shellState = createShellIntegrationState();
-      const prompt = registerPromptTracker(term, shellState, (cmd, started) => s.callbacks.onRunningCommand?.(cmd, started));
+      const prompt = registerPromptTracker(term, shellState, (cmd, started) => {
+        s.integrationSeen = true;
+        s.callbacks.onRunningCommand?.(cmd, started);
+      });
       const cwd = registerCwdHandler(
         term,
         (next) => {

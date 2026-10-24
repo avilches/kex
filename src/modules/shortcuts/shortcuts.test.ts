@@ -354,6 +354,27 @@ describe("editor view shortcuts", () => {
   });
 });
 
+describe("commandPalette.history", () => {
+  it("is registered on bare Ctrl+R, in the Terminal group", () => {
+    const sc = SHORTCUTS.find((s) => s.id === "commandPalette.history");
+    expect(sc?.group).toBe("Terminal");
+    expect(sc?.defaultBindings).toEqual([{ ctrl: true, key: "r" }]);
+  });
+
+  it("the binding is plain Ctrl (never the platform Mod key)", () => {
+    const e = {
+      key: "r",
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      repeat: false,
+    } as unknown as KeyboardEvent;
+    expect(matchesShortcut(e, "commandPalette.history")).toBe(true);
+    expect(matchesShortcut({ ...e, ctrlKey: false, metaKey: true } as unknown as KeyboardEvent, "commandPalette.history")).toBe(false);
+  });
+});
+
 describe("workspace.hibernate", () => {
   it("is registered on Mod+Alt+Z and nothing else uses that chord", () => {
     const sc = SHORTCUTS.find((s) => s.id === "workspace.hibernate");

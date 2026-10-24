@@ -335,6 +335,7 @@ export function createCommandItems(
       group: "Search",
       keywords: ["history", "shell", "rerun", "previous commands"],
       icon: TerminalIcon,
+      shortcutId: "commandPalette.history",
       trailing: ">",
       run: noop,
     },

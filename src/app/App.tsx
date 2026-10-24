@@ -115,6 +115,7 @@ import {
   disposeSession,
   interruptAgentLeaf,
   leafHasForegroundProcess,
+  leafPromptReady,
   leaveLeafScratchpad,
   requestLeafFocus,
   toggleScratchpad,
@@ -238,7 +239,7 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -250,6 +251,7 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
+  getRunningCommand,
   getRunningCommandsSnapshot,
   getRunningScriptCommand,
   setScriptRunning,
@@ -1288,10 +1290,10 @@ export default function App() {
   const commandPaletteOpenRef = useRef(false);
   commandPaletteOpenRef.current = commandPaletteOpen;
   const [paletteInitialMode, setPaletteInitialMode] = useState<
-    "commands" | "content"
+    "commands" | "content" | "history"
   >("commands");
   const openCommandPalette = useCallback(
-    (mode: "commands" | "content" = "commands") => {
+    (mode: "commands" | "content" | "history" = "commands") => {
       setPaletteInitialMode(mode);
       setCommandPaletteOpen(true);
     },
@@ -2938,6 +2940,7 @@ export default function App() {
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
+      "commandPalette.history": () => openCommandPalette("history"),
       "palette.folderRoot": () => void runPaletteShortcut("folderRoot"),
       "palette.folderMain": () => void runPaletteShortcut("folderMain"),
       "palette.folderHome": () => void runPaletteShortcut("folderHome"),
@@ -3295,6 +3298,15 @@ export default function App() {
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
         return !(target as HTMLElement | null)?.closest?.(".xterm");
+      }
+      if (id === "commandPalette.history") {
+        // Live reads: a command starting or ending does not re-render the app.
+        if (!activeTabId || activeTab?.kind !== "terminal") return true;
+        return historyPaletteShortcutUnavailable({
+          activeTab,
+          promptReady: leafPromptReady(activeTabId),
+          runningCommand: getRunningCommand(activeTabId),
+        });
       }
       if (id === "file.rename") {
         if (sidebarRef.current?.isExplorerFocused()) return true;

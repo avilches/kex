@@ -38,3 +38,18 @@ export function paletteShortcutUnavailable(id: ShortcutId, c: ShortcutContext): 
   if (id === "workspace.run") return c.scriptCount === 0;
   return false;
 }
+
+export type HistoryPaletteSignals = {
+  activeTab: Tab | null;
+  /** The terminal leaf is alive, has shell integration and is not in alt-screen. */
+  promptReady: boolean;
+  /** Command the shell integration reports as running in that leaf, if any. */
+  runningCommand: string | null;
+};
+
+// Ctrl+R hands the shell's reverse search to the palette's > history mode. It may only claim
+// the key where a command could be typed into the terminal; otherwise the shell keeps it.
+export function historyPaletteShortcutUnavailable(s: HistoryPaletteSignals): boolean {
+  if (s.activeTab?.kind !== "terminal") return true;
+  return !s.promptReady || s.runningCommand !== null;
+}

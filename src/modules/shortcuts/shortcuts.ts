@@ -7,6 +7,7 @@ import { ENTER_KEY, IS_MAC, MOD_PROP } from "@/lib/platform";
 export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
+  | "commandPalette.history"
   | "palette.folderRoot"
   | "palette.folderMain"
   | "palette.folderHome"
@@ -193,6 +194,14 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Find in Files",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
+  },
+  {
+    id: "commandPalette.history",
+    label: "Search Command History",
+    group: "Terminal",
+    // Shell reverse-search (Ctrl+R) goes to the palette's > mode instead; it only
+    // fires while a terminal is focused and the shell can receive a command.
+    defaultBindings: [{ ctrl: true, key: "r" }],
   },
   {
     id: "settings.open",
