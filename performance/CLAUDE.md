@@ -47,8 +47,34 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   - `analyze`: reparto del hilo principal de uno o varios volcados, con la línea base al lado y un veredicto.
   - `profiler`: resumen de las líneas `[profiler]` (reparto de `rafShare`, fotogramas lentos, censo del DOM, peores
     ventanas y callbacks más caros).
+  - `jit`: las compilaciones del JIT más lentas, leídas del log unificado de macOS (`log show`). Solo hay datos si Kex
+    se arrancó con `scripts/run-performance.sh`.
+- **`scripts/run-performance.sh`**: abre `/Applications/Kex.app` con `__XPC_JSC_reportDFGCompileTimes=true` y
+  `__XPC_JSC_useOSLog=true`. Con eso el `WebContent` escribe en el log unificado una línea por función que compila el
+  JIT, con su nombre y su tiempo. Se niega a arrancar si Kex ya corre, porque el entorno solo vale al lanzar el proceso.
+  Va junto a `pnpm build:local --performance`; sin él los nombres salen mutilados.
 - **Documentación**: `docs/BUILD.md` ("Profiling a slow window"), `docs/ARCHITECTURE.md` (mapa de módulos) y
   `docs/FORK.md` ("Performance profiler").
+
+## Congelones por el compilador JIT: cómo investigarlos
+
+Cuando `analyze` da `stalled` (hilo principal esperando al JIT), el volcado nativo no nombra el código JavaScript que
+se compila. El procedimiento es:
+
+1. `pnpm build:local --performance` (instala en `/Applications`), cerrar Kex y abrirlo con
+   `bash scripts/run-performance.sh`.
+2. Trabajar con normalidad. El monitor externo (`watch`) sigue dejando sus volcados.
+3. Tras un congelón, `python3 performance/kexperf.py jit --hours 3`: ordena las funciones por tiempo total de
+   compilación y enseña el peor caso de cada una. Una función con decenas de segundos es la culpable.
+
+Medido con una app de prueba y el WebKit del sistema (2026-10-24):
+
+- Solo las variables con prefijo `__XPC_` llegan al `WebContent`; `JSC_*` a secas no, y su stderr no va a ningún sitio.
+  Por eso `useOSLog` es obligatorio.
+- `open -n --env` entrega esas variables al proceso.
+- **No medido**: que el `WebContent` de Kex las reciba (Tauri lanza la webview por otro camino que la app de prueba) ni
+  el coste del log en una sesión larga con 26 terminales. En la prueba mínima salieron 251 líneas en 5 minutos.
+- Quitar el log es volver a abrir Kex como siempre (`open -a Kex`).
 
 ## Cómo leer los resultados
 
