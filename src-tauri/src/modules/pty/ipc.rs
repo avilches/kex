@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 
-use super::hook_router::{frame_origin, is_safe_tab_id, route, Route, TabRegistry};
+use super::hook_router::{
+    frame_origin, is_safe_tab_id, late_frame_is_dropped, route, Route, TabRegistry,
+};
 use crate::modules::agent::{live_model, session_store};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
@@ -132,9 +134,10 @@ impl HookSink for AppSink {
     }
 }
 
-/// Routes every hook frame of the app to its tab. The registry lock is held across a spool
-/// write and across the drain that follows a registration, so a frame is either spooled
-/// before the drain reads the directory or routed live after it: none falls in between.
+/// Routes every hook frame of the app to its tab. The registry lock is held while a frame is
+/// routed and, when it must be, written to the spool, and across the drain that makes a PTY
+/// live, so a frame is either spooled before the drain reads the directory or routed live
+/// after it: none falls in between. Delivering a live frame happens after the lock is released.
 struct HookHub {
     sink: Box<dyn HookSink>,
     spool_base: Option<PathBuf>,
@@ -150,32 +153,57 @@ impl HookHub {
         }
     }
 
+    // A panic while handling one frame must not lock every terminal out of the registry.
+    fn tabs(&self) -> std::sync::MutexGuard<'_, TabRegistry> {
+        self.tabs.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     /// The whole contract a transport has with the hub: one line is one frame.
     fn handle_line(&self, line: &str) {
-        let tabs = self.tabs.lock().unwrap();
-        match route(&frame_origin(line), |t| tabs.current(t)) {
+        let route = {
+            let tabs = self.tabs();
+            let route = route(&frame_origin(line), |t| tabs.current(t));
+            if let Route::Spool { tab_id } = &route {
+                self.spool(line, tab_id);
+            }
+            route
+        };
+        match route {
             Route::Live { tab_id, pty_id } => self.dispatch(line, &tab_id, pty_id),
-            Route::Late { tab_id, pty_id } => self.replay(line, &tab_id, pty_id, "late"),
-            Route::Spool { tab_id } => self.spool(line, &tab_id),
+            Route::Late { tab_id, pty_id } => self.late(line, &tab_id, pty_id),
+            Route::Spool { .. } => {}
             Route::Reject(why) => {
                 log::debug!("[ipc] {why}: {}", truncate_for_log(line, MAX_LOG_FIELD_LEN))
             }
         }
     }
 
+    /// The tab's frames are spooled from now on until `activate`, so a PTY whose spawn fails
+    /// never consumes them.
     fn register(&self, tab_id: &str, pty_id: u32) {
-        let mut tabs = self.tabs.lock().unwrap();
-        tabs.register(tab_id, pty_id);
+        self.tabs().register(tab_id, pty_id);
+    }
+
+    /// Makes the PTY live and replays, in order, what the tab spooled while it had none.
+    fn activate(&self, tab_id: &str, pty_id: u32) {
+        let mut tabs = self.tabs();
+        if !tabs.activate(tab_id, pty_id) {
+            return;
+        }
         if let Some(base) = &self.spool_base {
             drain_spool(base, tab_id, |line| {
-                self.replay(line, tab_id, pty_id, "spooled")
+                if let Some(kind) = stale_spooled_event_kind(line) {
+                    log::debug!("[ipc] discarded spooled {kind} event tab={tab_id}");
+                    return;
+                }
+                self.dispatch(line, tab_id, pty_id);
             });
         }
-        log::debug!("[ipc] tab={tab_id} pty={pty_id} registered");
+        log::debug!("[ipc] tab={tab_id} pty={pty_id} live");
     }
 
     fn unregister(&self, tab_id: &str, pty_id: u32) {
-        self.tabs.lock().unwrap().unregister(tab_id, pty_id);
+        self.tabs().unregister(tab_id, pty_id);
     }
 
     fn dispatch(&self, line: &str, tab_id: &str, pty_id: u32) {
@@ -188,11 +216,11 @@ impl HookHub {
         );
     }
 
-    /// A frame that outlived the PTY that produced it: delivered to the tab's current PTY,
-    /// minus the "agent just ended" signals that would end the session running there now.
-    fn replay(&self, line: &str, tab_id: &str, pty_id: u32, why: &str) {
-        if let Some(kind) = stale_spooled_event_kind(line) {
-            log::debug!("[ipc] discarded {why} {kind} event tab={tab_id}");
+    /// A frame that outlived the PTY that produced it, delivered to the tab's current PTY.
+    fn late(&self, line: &str, tab_id: &str, pty_id: u32) {
+        let event = parse_payload(line).map(|p| p.event).unwrap_or_default();
+        if late_frame_is_dropped(&event) {
+            log::debug!("[ipc] discarded late {event} event tab={tab_id}");
             return;
         }
         self.dispatch(line, tab_id, pty_id);
@@ -220,6 +248,13 @@ pub struct TabLease {
     hub: &'static HookHub,
     tab_id: String,
     pty_id: u32,
+}
+
+impl TabLease {
+    /// Called once the PTY's child is running: from here the tab's frames go to this PTY.
+    pub fn activate(&self) {
+        self.hub.activate(&self.tab_id, self.pty_id);
+    }
 }
 
 impl Drop for TabLease {
@@ -285,7 +320,7 @@ fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool
         match stream {
             Ok(stream) => {
                 if let Some(line) = read_frame(stream, Instant::now() + FRAME_DEADLINE) {
-                    hub.handle_line(&line);
+                    handle_guarded(hub, &line);
                 }
             }
             Err(e) => {
@@ -295,6 +330,14 @@ fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool
         }
     }
     log::debug!("[ipc] thread exiting");
+}
+
+/// A panic loses this frame, not the listener every tab depends on.
+fn handle_guarded(hub: &HookHub, line: &str) {
+    let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hub.handle_line(line)));
+    if handled.is_err() {
+        log::error!("[ipc] panic while handling a hook frame, frame dropped");
+    }
 }
 
 /// One line, read before `deadline`. A frame that is not complete by then, or that outgrows
@@ -347,7 +390,7 @@ pub fn hook_socket(app: &AppHandle) -> PathBuf {
             sweep_orphaned_sockets(&dir);
             let path = socket_path_in(&dir);
             match HookServer::start(path.clone(), hub(app)) {
-                Ok(server) => *SERVER.lock().unwrap() = Some(server),
+                Ok(server) => *SERVER.lock().unwrap_or_else(|e| e.into_inner()) = Some(server),
                 Err(e) => log::warn!("[ipc] hook server on {path:?} failed: {e}"),
             }
             path
@@ -373,7 +416,7 @@ pub fn register_tab(app: &AppHandle, tab_id: &str, pty_id: u32) -> Option<TabLea
 
 /// Removes the socket file when the app exits; a crash leaves it for the next start's sweep.
 pub fn shutdown() {
-    drop(SERVER.lock().unwrap().take());
+    drop(SERVER.lock().unwrap_or_else(|e| e.into_inner()).take());
 }
 
 const MAX_SPOOL_FILES: usize = 200;
@@ -1140,8 +1183,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("kex-ipc-two.sock");
         let (hub, rec) = test_hub(None);
-        hub.register("tab-a", 1);
-        hub.register("tab-b", 2);
+        live(hub, "tab-a", 1);
+        live(hub, "tab-b", 2);
         let _server = HookServer::start(path.clone(), hub).unwrap();
 
         const PER_TAB: usize = 40;
@@ -1181,8 +1224,8 @@ mod tests {
     #[test]
     fn a_frame_cannot_reach_a_tab_through_another_tabs_pty() {
         let (hub, rec) = test_hub(None);
-        hub.register("tab-a", 1);
-        hub.register("tab-b", 2);
+        live(hub, "tab-a", 1);
+        live(hub, "tab-b", 2);
         hub.handle_line(&frame("Stop", "tab-b", 1, "s"));
         assert_eq!(rec.signals(), vec![(2.into(), "Stop".to_string())]);
     }
@@ -1191,7 +1234,7 @@ mod tests {
     fn frames_without_a_safe_tab_are_dropped() {
         let dir = tempfile::tempdir().unwrap();
         let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
-        hub.register("tab-a", 1);
+        live(hub, "tab-a", 1);
         hub.handle_line(r#"{"hook_event_name":"Stop","session_id":"s"}"#);
         hub.handle_line(r#"{"hook_event_name":"Stop","tab_id":"../x","pty_id":"1"}"#);
         hub.handle_line("not json");
@@ -1199,25 +1242,107 @@ mod tests {
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
     }
 
+    fn live(hub: &'static HookHub, tab: &str, pty: u32) {
+        hub.register(tab, pty);
+        hub.activate(tab, pty);
+    }
+
     #[test]
-    fn a_late_frame_of_a_restarted_pty_reaches_the_new_one_without_ending_it() {
+    fn a_late_frame_of_a_restarted_pty_reaches_the_new_one_without_rewriting_or_ending_it() {
         let (hub, rec) = test_hub(None);
         let old = TabLease {
             hub,
             tab_id: "tab-a".into(),
             pty_id: 1,
         };
-        hub.register("tab-a", 1);
-        hub.register("tab-a", 2);
+        live(hub, "tab-a", 1);
+        live(hub, "tab-a", 2);
         drop(old);
-        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
-        hub.handle_line(&frame("SessionEnd", "tab-a", 1, "s"));
+        for kind in [
+            "Stop",
+            "SessionEnd",
+            "StopFailure",
+            "SessionStart",
+            "UserPromptSubmit",
+            "Notification",
+        ] {
+            hub.handle_line(&frame(kind, "tab-a", 1, "dead"));
+        }
         hub.handle_line(&frame("UserPromptSubmit", "tab-a", 2, "s"));
         assert_eq!(
             rec.signals(),
             vec![
                 (2.into(), "Stop".to_string()),
+                (2.into(), "Notification".to_string()),
                 (2.into(), "UserPromptSubmit".to_string())
+            ]
+        );
+        assert!(
+            rec.meta_tabs().is_empty(),
+            "a late SessionStart records nothing"
+        );
+    }
+
+    struct PanickingSink;
+
+    impl HookSink for PanickingSink {
+        fn emit(&self, _: &str, _: serde_json::Value) {
+            panic!("sink failure");
+        }
+
+        fn live_model(&self, _: &str, _: &str) {}
+    }
+
+    #[test]
+    fn a_panic_while_handling_a_frame_spares_the_listener_and_the_registry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-panic.sock");
+        let hub: &'static HookHub =
+            Box::leak(Box::new(HookHub::new(Box::new(PanickingSink), None)));
+        live(hub, "tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        thread::sleep(Duration::from_millis(100));
+        assert!(!hub.tabs.is_poisoned());
+        live(hub, "tab-b", 2);
+        assert_eq!(hub.tabs().current("tab-b"), Some(2));
+        UnixStream::connect(&path).expect("the listener is still accepting");
+
+        hub.tabs.clear_poison();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = hub.tabs.lock().unwrap();
+            panic!("poison it");
+        }));
+        assert!(hub.tabs.is_poisoned());
+        live(hub, "tab-c", 3);
+        assert_eq!(hub.tabs().current("tab-c"), Some(3));
+    }
+
+    #[test]
+    fn a_pty_that_never_goes_live_leaves_the_spool_for_the_next_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        let failed = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 2,
+        };
+        hub.register("tab-a", 2);
+        hub.handle_line(&frame("Stop", "tab-a", 2, "s"));
+        drop(failed);
+        assert!(rec.events.lock().unwrap().is_empty());
+        assert_eq!(
+            std::fs::read_dir(dir.path().join("tab-a")).unwrap().count(),
+            2
+        );
+
+        live(hub, "tab-a", 3);
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (3.into(), "Notification".to_string()),
+                (3.into(), "Stop".to_string())
             ]
         );
     }
@@ -1233,7 +1358,7 @@ mod tests {
         let spooled = std::fs::read_dir(dir.path().join("tab-a")).unwrap().count();
         assert_eq!(spooled, 2, "SessionEnd is never spooled");
 
-        hub.register("tab-a", 7);
+        live(hub, "tab-a", 7);
         assert_eq!(
             rec.signals(),
             vec![
@@ -1269,7 +1394,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("kex-ipc-slow.sock");
         let (hub, rec) = test_hub(None);
-        hub.register("tab-a", 1);
+        live(hub, "tab-a", 1);
         let _server = HookServer::start(path.clone(), hub).unwrap();
         let _idle = UnixStream::connect(&path).unwrap();
         send(&path, &frame("Stop", "tab-a", 1, "s"));
@@ -1281,7 +1406,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("kex-ipc-drip.sock");
         let (hub, rec) = test_hub(None);
-        hub.register("tab-a", 1);
+        live(hub, "tab-a", 1);
         let _server = HookServer::start(path.clone(), hub).unwrap();
 
         let drip_path = path.clone();

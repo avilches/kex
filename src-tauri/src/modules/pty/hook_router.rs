@@ -12,29 +12,66 @@ pub fn is_safe_tab_id(tab_id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// The PTY each live tab runs on right now. A tab keeps its id across PTY restarts, so the
-/// entry is replaced, never duplicated.
+/// The PTY each tab runs on. A tab keeps its id across PTY restarts, so the entry is replaced,
+/// never duplicated. A PTY is registered before its child starts but only becomes the tab's
+/// live one once the spawn succeeded (`activate`): until then its tab's frames are spooled, so
+/// a spawn that fails never consumes them.
 #[derive(Default)]
 pub struct TabRegistry {
-    tabs: HashMap<String, u32>,
+    tabs: HashMap<String, Entry>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct Entry {
+    pty_id: u32,
+    live: bool,
 }
 
 impl TabRegistry {
     pub fn register(&mut self, tab_id: &str, pty_id: u32) {
-        self.tabs.insert(tab_id.to_string(), pty_id);
+        self.tabs.insert(
+            tab_id.to_string(),
+            Entry {
+                pty_id,
+                live: false,
+            },
+        );
+    }
+
+    /// True when `pty_id` is still the tab's PTY and is now live.
+    pub fn activate(&mut self, tab_id: &str, pty_id: u32) -> bool {
+        match self.tabs.get_mut(tab_id) {
+            Some(e) if e.pty_id == pty_id => {
+                e.live = true;
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Only the PTY that owns the entry may remove it: a restarted tab can register its new
     /// PTY before the old one is dropped.
     pub fn unregister(&mut self, tab_id: &str, pty_id: u32) {
-        if self.tabs.get(tab_id) == Some(&pty_id) {
+        if self.tabs.get(tab_id).is_some_and(|e| e.pty_id == pty_id) {
             self.tabs.remove(tab_id);
         }
     }
 
+    /// The tab's live PTY; a pending one does not count.
     pub fn current(&self, tab_id: &str) -> Option<u32> {
-        self.tabs.get(tab_id).copied()
+        self.tabs.get(tab_id).filter(|e| e.live).map(|e| e.pty_id)
     }
+}
+
+/// Events of an agent that are dropped when they arrive from a PTY the tab no longer runs on.
+/// `SessionStart` and `UserPromptSubmit` would rewrite the session record and status of the
+/// agent running there now (a `--resume` of the same session, for instance), and `SessionEnd`
+/// and `StopFailure` would end it.
+pub fn late_frame_is_dropped(event: &str) -> bool {
+    matches!(
+        event,
+        "SessionStart" | "UserPromptSubmit" | "SessionEnd" | "StopFailure"
+    )
 }
 
 /// The tab and PTY a frame says it comes from, as the sender's environment fixed them
@@ -75,14 +112,14 @@ pub enum Route {
         tab_id: String,
         pty_id: u32,
     },
-    /// Sent by a process of a PTY the tab no longer runs on: replayed on the current one with
-    /// the same rules as a spooled event, so a late `SessionEnd` cannot end the new session.
+    /// Sent by a process of a PTY the tab no longer runs on: delivered to the current one minus
+    /// the events of `late_frame_is_dropped`.
     Late {
         tab_id: String,
         pty_id: u32,
     },
-    /// No PTY of this instance runs the tab right now (closed, hibernated, restarting): kept on
-    /// disk until the tab registers again.
+    /// No live PTY of this instance runs the tab right now (closed, hibernated, restarting, or
+    /// its new PTY is still spawning): kept on disk until a PTY of the tab goes live.
     Spool {
         tab_id: String,
     },
@@ -231,6 +268,8 @@ mod tests {
         let mut reg = TabRegistry::default();
         reg.register("tab-a", 1);
         reg.register("tab-b", 2);
+        reg.activate("tab-a", 1);
+        reg.activate("tab-b", 2);
         assert_eq!(
             route(&origin(Some("tab-b"), Some(1)), |t| reg.current(t)),
             Route::Late {
@@ -245,9 +284,56 @@ mod tests {
         let mut reg = TabRegistry::default();
         reg.register("tab-a", 1);
         reg.register("tab-a", 2);
+        reg.activate("tab-a", 2);
         reg.unregister("tab-a", 1);
         assert_eq!(reg.current("tab-a"), Some(2));
         reg.unregister("tab-a", 2);
         assert_eq!(reg.current("tab-a"), None);
+    }
+
+    #[test]
+    fn a_registered_pty_is_not_live_until_activated() {
+        let mut reg = TabRegistry::default();
+        reg.register("tab-a", 1);
+        assert_eq!(reg.current("tab-a"), None);
+        assert!(
+            !reg.activate("tab-a", 9),
+            "another PTY cannot activate the entry"
+        );
+        assert!(reg.activate("tab-a", 1));
+        assert_eq!(reg.current("tab-a"), Some(1));
+    }
+
+    #[test]
+    fn a_restart_leaves_the_tab_pending_until_the_new_pty_is_live() {
+        let mut reg = TabRegistry::default();
+        reg.register("tab-a", 1);
+        reg.activate("tab-a", 1);
+        reg.register("tab-a", 2);
+        assert_eq!(reg.current("tab-a"), None);
+        assert!(!reg.activate("tab-a", 1));
+        assert!(reg.activate("tab-a", 2));
+        assert_eq!(reg.current("tab-a"), Some(2));
+    }
+
+    #[test]
+    fn late_frames_that_would_rewrite_or_end_the_new_session_are_dropped() {
+        for e in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "SessionEnd",
+            "StopFailure",
+        ] {
+            assert!(late_frame_is_dropped(e), "{e}");
+        }
+        for e in [
+            "Stop",
+            "Notification",
+            "PermissionRequest",
+            "SubagentStop",
+            "PostCompact",
+        ] {
+            assert!(!late_frame_is_dropped(e), "{e}");
+        }
     }
 }

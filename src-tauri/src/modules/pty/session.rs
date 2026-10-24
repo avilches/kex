@@ -154,7 +154,8 @@ pub fn spawn(
         shell,
     )?;
 
-    // Registered before the child starts, so its first hook frame already finds the tab.
+    // Claimed before the child starts, so its first hook frame is already kept for this tab;
+    // it only goes live (and drains the spool) once the spawn below has fully succeeded.
     #[cfg(unix)]
     let hook_lease = tab_id
         .as_deref()
@@ -187,6 +188,11 @@ pub fn spawn(
     };
 
     let exited = Arc::new(AtomicBool::new(false));
+
+    #[cfg(unix)]
+    if let Some(lease) = &hook_lease {
+        lease.activate();
+    }
 
     let session = Arc::new(Session {
         #[cfg(windows)]
