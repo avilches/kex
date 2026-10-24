@@ -1,6 +1,7 @@
 import { Settings01Icon, ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSyncExternalStore } from "react";
+import { cn } from "@/lib/utils";
 import { openTitleTemplatesSettings } from "@/modules/settings/openSettingsWindow";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
@@ -49,6 +50,8 @@ type Props = {
   // The rename shortcut, shown next to the toggle so the same key both opens
   // the field and expands the list. Absent where no shortcut drives the field.
   shortcutId?: ShortcutId;
+  // Extra classes for the variables list, to cap its height where the fields below must stay visible.
+  listClassName?: string;
 };
 
 // The rename field's variable help, replaced by an expandable list: every variable the
@@ -63,6 +66,7 @@ export function RenameTemplates({
   getInput,
   onInserted,
   shortcutId,
+  listClassName,
 }: Props) {
   const shortcut = useShortcutLabel(shortcutId ?? "tab.rename");
   return (
@@ -90,6 +94,7 @@ export function RenameTemplates({
           workspace={workspace}
           getInput={getInput}
           onInserted={onInserted}
+          className={listClassName}
         />
       )}
       {open && (
@@ -119,10 +124,11 @@ function VariablesList({
   workspace,
   getInput,
   onInserted,
-}: Omit<Props, "open" | "onToggle" | "shortcutId">) {
+  className,
+}: Omit<Props, "open" | "onToggle" | "shortcutId" | "listClassName"> & { className?: string }) {
   const values = useVariableValues(tab, workspace);
   return (
-    <div className="flex min-w-0 flex-col text-[11px] leading-snug">
+    <div className={cn("flex min-w-0 flex-col text-[11px] leading-snug", className)}>
       {titleVariablesFor(subject).map((variable) => (
         <VariableRow
           key={variable.name}

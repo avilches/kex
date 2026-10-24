@@ -58,7 +58,7 @@ export function WorkspaceSettingsDialog(props: Props) {
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent
         ref={setContentEl}
-        className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-xl"
+        className="max-h-[calc(100vh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto overflow-x-hidden sm:max-w-xl"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           props.onRestoreFocus();
@@ -152,7 +152,7 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   return (
-    <div className="flex min-h-[380px] flex-col gap-0 py-1">
+    <div className="flex min-h-[380px] min-w-0 flex-col gap-0 py-1">
         <div className="flex flex-col gap-5">
           {/* Name: full width */}
           <div className="flex flex-col gap-1.5">
@@ -182,6 +182,7 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
               open={templatesOpen}
               onToggle={() => setTemplatesOpen((o) => !o)}
               subject="workspace"
+              listClassName="max-h-44 overflow-y-auto"
               tab={focusedTab(ws.paneTree, ws.activePaneId)}
               workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
               getInput={() => nameInputRef.current}
