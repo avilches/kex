@@ -32,6 +32,7 @@ import {
   ComputerTerminal01Icon,
   GitBranchIcon,
   Home01Icon,
+  PinIcon,
   SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -378,22 +379,33 @@ function KeepHeadingsVisible({ listRef }: { listRef: RefObject<HTMLElement | nul
 function RowTail({ row }: { row: FolderRowMatched }) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const focused = useCommandState((state) => state.value) === row.key;
-  if (focused && row.repoHint) return <HintChip hint={row.repoHint} className="ml-auto" />;
-  if (!row.label) return null;
   const slotKey = row.slot ? getShortcutLabel(SLOT_SHORTCUT[row.slot], userShortcuts) : null;
+  const slotChip = slotKey ? (
+    <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
+      {slotKey}
+    </kbd>
+  ) : null;
+  // The worktrees hint takes the place of the label while the row has the focus, but a fixed row keeps its own key beside it.
+  if (focused && row.repoHint) {
+    return (
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        <HintChip hint={row.repoHint} />
+        {slotChip}
+      </span>
+    );
+  }
+  if (!row.label) return null;
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
       <span className="flex items-center gap-1">
-        {row.label === "Home" ? (
+        {row.slot === "home" ? (
           <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+        ) : row.slot === "root" ? (
+          <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
         ) : null}
         <HighlightText text={row.label} indices={row.labelIndices} />
       </span>
-      {slotKey ? (
-        <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
-          {slotKey}
-        </kbd>
-      ) : null}
+      {slotChip}
     </span>
   );
 }
@@ -452,9 +464,15 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
         <span className="shrink-0">New Tab in</span>
         <span className="min-w-0 truncate font-mono text-[10.5px]">{row.display}</span>
       </span>
+      {row.repoKey && row.repoHint ? (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}</kbd>
+          {worktreesLabel(row.repoHint)}
+        </span>
+      ) : null}
       {(["root", "main", "home"] as const).map((slot) => {
         const fixed = all.find((r) => r.slot === slot);
-        if (!fixed || fixed.key === row.key) return null;
+        if (!fixed) return null;
         return (
           <span key={slot} className="flex shrink-0 items-center gap-1.5">
             <kbd className={kbd}>{getShortcutLabel(SLOT_SHORTCUT[slot], userShortcuts)}</kbd>
@@ -462,12 +480,6 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
           </span>
         );
       })}
-      {row.repoKey && row.repoHint ? (
-        <span className="flex shrink-0 items-center gap-1.5">
-          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}</kbd>
-          {worktreesLabel(row.repoHint)}
-        </span>
-      ) : null}
       <span className="flex shrink-0 items-center gap-1.5">
         <kbd className={kbd}>Tab</kbd>
         Menu
