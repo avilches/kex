@@ -180,30 +180,35 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
-### Install suggestion
+### Install reminders
 
 Nothing in the app told a new user that the integrations exist, so when the `started` signal names an agent
-(`claude`, `opencode`, `omp`, `pi` or `codex`) whose integration is not installed, `suggestIntegration`
-(`IntegrationSuggestionToast.tsx`) shows a toast with Install and View changes (opens Settings > General); closing it
-is the "not now". The decision lives in pure functions (`lib/integrationSuggestion.ts`) and the flow in
-`lib/integrationSuggestionFlow.ts`, which looks at each agent once per app run:
+(`claude`, `opencode`, `omp`, `pi` or `codex`) whose integration is not installed, Kex reminds the user in two
+independent ways. The decision lives in pure functions (`lib/integrationSuggestion.ts`) and the flow in
+`lib/integrationSuggestionFlow.ts` (`suggestIntegration`), which checks the integration status on every `started`.
+Both reminders stop for good as soon as the integration is installed (the toast, Settings, the bell, or already
+installed when the agent is detected, even if it is removed later). `installAgent` (`lib/agentIntegration.ts`) is the
+single install path and records it.
+
+**Toast** (`IntegrationSuggestionToast.tsx`), with Install and View changes (opens Settings > General); closing it is the
+"not now". It is 480px wide (capped to the viewport) so the text fits, and carries a fixed id per agent. It is asked
+once per agent per app run:
 
 - First time: ask. The ask is counted when the toast shows, whatever the user does with it.
 - After an unanswered ask: ask once more after 15 days (`SUGGESTION_RETRY_MS`), then never again.
-- Installed at any moment (the toast, Settings, the bell, or already installed when the agent is detected): never ask
-  again, even if it is removed later. `installAgent` (`lib/agentIntegration.ts`) is the single install path and records
-  it.
-- Install cannot run (Codex reports `malformed`, `unsafeToEdit` or `unavailable`): no toast and no ask counted; the next app run looks
-  again.
 
-The toast is 480px wide (capped to the viewport) so the text fits. Independently of the ask policy, every tab where an
-agent starts without its integration gets an amber exclamation icon in the tab strip (`integrationWarningStore`, filled
-by the suggester's `warn` for each `started` signal and cleared when the session ends or the integration is installed);
-hovering it opens a small card (`IntegrationTabMarker.tsx`) saying "<Agent> agent detected. Open settings to install
-integration", with a cog button that opens Settings > General and a "Don't remind me again" link. The marker is
-independent of the toast and of the ask policy. The link stores `markerDismissed` for that agent in
-`integrationSuggestions`: the marker then never shows again for it, in any tab. The toast carries a fixed id per agent.
+**Tab marker** (`IntegrationTabMarker.tsx`), an amber exclamation icon in every tab where the agent runs without its
+integration. It does not depend on the ask policy: it shows on every start until the user dismisses it. State is in
+`integrationWarningStore` (tab id to agent), filled by the suggester's `warn` and cleared when the session ends or the
+integration is installed. Hovering the icon opens a small card (never the toast) saying "<Agent> agent detected. Open
+settings to install integration", with a cog button that opens Settings > General and a "Don't remind me again" link.
+The link stores `markerDismissed` for that agent: the icon then disappears from all its tabs and never comes back,
+while other agents keep theirs. The toast schedule is not affected.
 
-The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce, markerDismissed }`.
+In both cases, if Install cannot run (Codex reports `malformed`, `unsafeToEdit` or `unavailable`) nothing is shown and no
+ask is counted; the next app run looks again.
+
+The record is `integrationSuggestions` in `settings-general.json`, per agent:
+`{ asks, lastAskedAt, installedOnce, markerDismissed }`.
 
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).
