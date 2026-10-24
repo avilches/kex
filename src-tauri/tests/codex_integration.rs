@@ -349,6 +349,61 @@ fn a_user_disabled_kex_table_stays_disabled() {
     assert!(config.contains(&format!("[hooks.state.\"{stop}\"]\nenabled = false")));
 }
 
+fn stop_key(env: &Env) -> String {
+    let (_, entries) =
+        codex_hooks::install(&read(&env.paths.hooks), DEFAULT_SCRIPT_PATH, &source(env)).unwrap();
+    entries
+        .iter()
+        .find(|e| e.event.label() == "stop")
+        .unwrap()
+        .key()
+}
+
+#[test]
+fn a_user_disabled_kex_table_stays_disabled_when_another_tool_moves_the_handler() {
+    let env = codex_env();
+    codex_integration::setup(&env.paths).unwrap();
+    let old_key = stop_key(&env);
+    let header = format!("[hooks.state.\"{old_key}\"]\nenabled = true");
+    let config = read(&env.paths.config);
+    assert!(config.contains(&header));
+    std::fs::write(
+        &env.paths.config,
+        config.replace(
+            &header,
+            &format!("[hooks.state.\"{old_key}\"]\nenabled = false"),
+        ),
+    )
+    .unwrap();
+
+    // Another tool inserts its own group ahead of Kex's, so Kex's handler moves one group down.
+    let mut hooks = json(&read(&env.paths.hooks));
+    hooks["hooks"]["Stop"].as_array_mut().unwrap().insert(
+        0,
+        serde_json::json!({ "hooks": [{ "type": "command", "command": "other-tool" }] }),
+    );
+    std::fs::write(
+        &env.paths.hooks,
+        serde_json::to_string_pretty(&hooks).unwrap(),
+    )
+    .unwrap();
+    let new_key = stop_key(&env);
+    assert_ne!(new_key, old_key);
+
+    codex_integration::sync(&env.paths).unwrap();
+
+    let config = read(&env.paths.config);
+    assert!(
+        config.contains(&format!("[hooks.state.\"{new_key}\"]\nenabled = false")),
+        "{config}"
+    );
+    assert!(!config.contains(&format!("[hooks.state.\"{old_key}\"]")));
+
+    codex_integration::setup(&env.paths).unwrap();
+    let config = read(&env.paths.config);
+    assert!(config.contains(&format!("[hooks.state.\"{new_key}\"]\nenabled = false")));
+}
+
 #[test]
 fn malformed_hooks_json_is_left_intact() {
     let env = codex_env();

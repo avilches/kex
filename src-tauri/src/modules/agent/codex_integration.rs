@@ -158,8 +158,21 @@ fn plan_config(config: &str, plan: &HooksPlan, source: &str) -> Result<String, S
         .into_iter()
         .filter(|k| !current.contains(k))
         .collect();
+    // A handler another tool moved gets a table at its new key; the user's `enabled = false` on
+    // the old one goes with it.
+    let disabled_events: Vec<_> = stale
+        .iter()
+        .filter(|k| codex_trust::hook_trust_disabled(config, k))
+        .filter_map(|k| codex_trust::parse_trust_key(k).map(|(_, event, _, _)| event))
+        .collect();
+    let disabled: Vec<String> = plan
+        .entries
+        .iter()
+        .filter(|e| disabled_events.contains(&e.event))
+        .map(TrustEntry::key)
+        .collect();
     let cleaned = codex_trust::remove_hook_trust(config, &stale);
-    let after = codex_trust::upsert_hook_trust(&cleaned, &plan.entries);
+    let after = codex_trust::upsert_hook_trust_disabling(&cleaned, &plan.entries, &disabled);
     codex_trust::verify_hook_trust(&after, &plan.entries).map_err(left_alone)?;
     Ok(after)
 }

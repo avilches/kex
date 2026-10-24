@@ -65,7 +65,9 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
 - Only handlers carrying `# kex-session-hook` and only Kex's trust tables are touched. Kex's tables are the keys its
   handlers held before the edit plus any table on that `hooks.json` holding the exact hash of a Kex handler at its
   position (a leftover after positions moved); a stale one is removed on reinstall and all of them on uninstall.
-  A table the user set to `enabled = false` keeps it while its key stays the same.
+  A table the user set to `enabled = false` keeps it on a refresh, and when another tool moves Kex's handler to
+  another position the new table at the new key is written `enabled = false` too (the stale table of that event
+  carries it over before it is removed).
 - `hooks.json` is written only for a semantic change: when the parsed result equals the parsed file (key order
   ignored) the bytes are kept, so the startup sync never rewrites a file Kaji reformatted in its Swift style (sorted
   keys, `" : "`, `\/`) and the preview shows nothing. A real change re-serializes it (`serde_json` keeps key order, but

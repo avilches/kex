@@ -163,11 +163,31 @@ pub fn trusted_hash(entry: &TrustEntry) -> String {
 /// Writes or refreshes the trust table of every entry. A table that already holds the right
 /// hash is left untouched; a user's `enabled = false` survives a refresh.
 pub fn upsert_hook_trust(content: &str, entries: &[TrustEntry]) -> String {
+    upsert_hook_trust_disabling(content, entries, &[])
+}
+
+/// Same, but the tables of the `disabled` keys end up `enabled = false` whatever they held.
+pub fn upsert_hook_trust_disabling(
+    content: &str,
+    entries: &[TrustEntry],
+    disabled: &[String],
+) -> String {
+    let disabled: Vec<String> = disabled.iter().map(|k| lookup_key(k)).collect();
     let mut updated = content.to_string();
     for entry in entries {
-        updated = upsert_one(&updated, entry);
+        let off = disabled.contains(&lookup_key(&entry.key()));
+        updated = upsert_one(&updated, entry, off);
     }
     updated
+}
+
+/// Whether the user turned off the trust table of `key` (`enabled = false` in any of its tables).
+pub fn hook_trust_disabled(content: &str, key: &str) -> bool {
+    let wanted = lookup_key(key);
+    find_blocks(content)
+        .iter()
+        .filter(|b| lookup_key(&b.key) == wanted)
+        .any(|b| block_value(content, b, "enabled").as_deref() == Some("false"))
 }
 
 /// Deletes the trust tables of the given keys, plus the blank line that separated each one.
@@ -273,7 +293,7 @@ fn resolve_write_path(path: &Path) -> io::Result<PathBuf> {
     }
 }
 
-fn upsert_one(content: &str, entry: &TrustEntry) -> String {
+fn upsert_one(content: &str, entry: &TrustEntry, force_disabled: bool) -> String {
     let hash = trusted_hash(entry);
     let keys = write_variants(&entry.key());
     let wanted = lookup_key(&keys[0]);
@@ -288,7 +308,7 @@ fn upsert_one(content: &str, entry: &TrustEntry) -> String {
     };
 
     if blocks.is_empty() {
-        let text = render_blocks(&keys, &hash, true, eol);
+        let text = render_blocks(&keys, &hash, !force_disabled, eol);
         let separator = if content.is_empty() {
             String::new()
         } else if content.ends_with('\n') {
@@ -305,13 +325,14 @@ fn upsert_one(content: &str, entry: &TrustEntry) -> String {
             .as_deref()
             == Some(hash.as_str())
     }) && keys.iter().all(|k| blocks.iter().any(|b| &b.key == k));
-    if current {
+    let user_disabled = blocks
+        .iter()
+        .any(|b| block_value(content, b, "enabled").as_deref() == Some("false"));
+    if current && (user_disabled || !force_disabled) {
         return content.to_string();
     }
 
-    let enabled = !blocks
-        .iter()
-        .any(|b| block_value(content, b, "enabled").as_deref() == Some("false"));
+    let enabled = !user_disabled && !force_disabled;
     let text = render_blocks(&keys, &hash, enabled, eol);
     let mut updated = content.to_string();
     for (index, block) in blocks.iter().enumerate().rev() {
@@ -887,6 +908,24 @@ mod tests {
                 "[hooks.state.\"/h/hooks.json:stop:1:0\"]\nenabled = false\ntrusted_hash = \"{}\"\n\n# next\n[features]\nhooks = true\n",
                 trusted_hash(&e)
             )
+        );
+    }
+
+    #[test]
+    fn a_disabled_key_is_written_disabled_whether_new_or_current() {
+        let e = entry("/h/hooks.json", CodexHookEvent::Stop, 1);
+        let keys = [e.key()];
+        let fresh = upsert_hook_trust_disabling("", std::slice::from_ref(&e), &keys);
+        assert!(fresh.contains("enabled = false"));
+        assert!(hook_trust_disabled(&fresh, &e.key()));
+
+        let current = upsert_hook_trust("", std::slice::from_ref(&e));
+        assert!(!hook_trust_disabled(&current, &e.key()));
+        let out = upsert_hook_trust_disabling(&current, std::slice::from_ref(&e), &keys);
+        assert_eq!(out, fresh);
+        assert_eq!(
+            upsert_hook_trust_disabling(&out, std::slice::from_ref(&e), &keys),
+            out
         );
     }
 
