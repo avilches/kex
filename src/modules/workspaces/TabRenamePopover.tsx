@@ -95,8 +95,8 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
       {children}
       <PopoverContent
         ref={popoverRef}
-        side="bottom"
-        align="start"
+        side={origin === "sidebar" ? "right" : "bottom"}
+        align={origin === "sidebar" ? "center" : "start"}
         sideOffset={4}
         className={`flex flex-col gap-1 rounded-lg p-2 ${templatesOpen ? "w-[420px]" : "w-64"}`}
         onEscapeKeyDown={(e) => {
