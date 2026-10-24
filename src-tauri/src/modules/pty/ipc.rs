@@ -313,23 +313,37 @@ impl Drop for HookServer {
 }
 
 fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool>) {
+    let mut failures = 0u32;
     for stream in listener.incoming() {
         if shutdown.load(Ordering::SeqCst) {
             break;
         }
         match stream {
             Ok(stream) => {
+                failures = 0;
                 if let Some(line) = read_frame(stream, Instant::now() + FRAME_DEADLINE) {
                     handle_guarded(hub, &line);
                 }
             }
             Err(e) => {
-                log::debug!("[ipc] accept error (socket removed?): {e}");
-                break;
+                failures = failures.saturating_add(1);
+                let wait = accept_backoff(failures);
+                log::warn!("[ipc] accept failed ({e}), retrying in {wait:?}");
+                thread::sleep(wait);
             }
         }
     }
     log::debug!("[ipc] thread exiting");
+}
+
+const ACCEPT_BACKOFF_MAX: Duration = Duration::from_secs(1);
+
+/// The wait after the `failures`-th accept error in a row. Every one of them (EMFILE, ENFILE,
+/// ECONNABORTED) can clear on its own, and giving up would leave every tab without hooks for
+/// the rest of the session, so the loop only ever stops on shutdown.
+fn accept_backoff(failures: u32) -> Duration {
+    let ms = 10u64.saturating_mul(1u64 << failures.saturating_sub(1).min(16));
+    Duration::from_millis(ms).min(ACCEPT_BACKOFF_MAX)
 }
 
 /// A panic loses this frame, not the listener every tab depends on.
@@ -1435,6 +1449,20 @@ mod tests {
             .unwrap()
             .expect("the trickling client was never cut");
         assert!(cut < Duration::from_secs(3), "cut after {cut:?}");
+    }
+
+    #[test]
+    fn accept_errors_back_off_and_are_capped_instead_of_stopping_the_listener() {
+        assert_eq!(accept_backoff(1), Duration::from_millis(10));
+        assert_eq!(accept_backoff(2), Duration::from_millis(20));
+        assert_eq!(accept_backoff(5), Duration::from_millis(160));
+        assert_eq!(accept_backoff(8), ACCEPT_BACKOFF_MAX);
+        assert_eq!(accept_backoff(u32::MAX), ACCEPT_BACKOFF_MAX);
+        let mut prev = Duration::ZERO;
+        for n in 1..40 {
+            assert!(accept_backoff(n) >= prev);
+            prev = accept_backoff(n);
+        }
     }
 
     #[test]
