@@ -13,7 +13,11 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { CopyAbsolutePathItem, CopyRelativeTextItem } from "./copyPathItems";
+import {
+  CopyAbsolutePathItem,
+  CopyRelativePathItem,
+  CopyRelativeTextItem,
+} from "./copyPathItems";
 
 function open() {
   render(
@@ -22,6 +26,21 @@ function open() {
       <ContextMenuContent>
         <CopyRelativeTextItem text="src/a/b.ts" />
         <CopyAbsolutePathItem path="/ws/src/a/b.ts" />
+      </ContextMenuContent>
+    </ContextMenu>,
+  );
+  act(() => {
+    fireEvent.contextMenu(screen.getByText("target"));
+  });
+}
+
+function openAtWorkspaceRoot() {
+  render(
+    <ContextMenu>
+      <ContextMenuTrigger>target</ContextMenuTrigger>
+      <ContextMenuContent>
+        <CopyRelativeTextItem text="." />
+        <CopyRelativePathItem path="/ws" workspaceRoot="/ws" />
       </ContextMenuContent>
     </ContextMenu>,
   );
@@ -68,5 +87,11 @@ describe("copy path items", () => {
     open();
     fireEvent.click(screen.getByText("Copy Relative Path"));
     expect(copyToClipboard).toHaveBeenCalledWith("src/a/b.ts", "Copied relative path");
+  });
+
+  it("omits relative-path entries that would copy the workspace-root dot", () => {
+    openAtWorkspaceRoot();
+
+    expect(screen.queryByText("Copy Relative Path")).toBeNull();
   });
 });

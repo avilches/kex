@@ -27,6 +27,7 @@ export function CopyRelativePathItem({
   compact?: boolean;
 }) {
   const rel = relativeCopyFor(path, workspaceRoot);
+  if (rel.ok && rel.text === ".") return null;
   return (
     <ContextMenuItem
       className={compact ? COMPACT_ITEM : undefined}
@@ -46,6 +47,7 @@ export function CopyRelativePathItem({
 
 // For callers that already hold the relative path (wiki links, source control).
 export function CopyRelativeTextItem({ text }: { text: string }) {
+  if (text === ".") return null;
   return (
     <ContextMenuItem
       className={COMPACT_ITEM}
