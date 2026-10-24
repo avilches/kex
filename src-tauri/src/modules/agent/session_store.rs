@@ -189,19 +189,19 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         if keep_with_value.contains(&flag) {
             result.push(token);
             i += 1;
-            if !has_eq && provider.single_value_opts.contains(&flag) {
-                if let Some(value) = tokens.get(i) {
-                    result.push(value);
-                    i += 1;
-                }
-            } else if !has_eq {
-                // Consume all immediately-following non-flag tokens as values.
+            if !has_eq {
+                let single = provider.single_value_opts.contains(&flag);
+                // Consume the immediately-following non-flag tokens as values (one, for a
+                // single-value option).
                 while i < tokens.len()
                     && !tokens[i].starts_with('-')
                     && launch_cmd::redirection_tokens(tokens[i]).is_none()
                 {
                     result.push(tokens[i]);
                     i += 1;
+                    if single {
+                        break;
+                    }
                 }
             }
             continue;
@@ -908,6 +908,22 @@ mod tests {
             .resume_cmd(Some(&base), "id-1");
         assert_eq!(resume, "codex -p work -m o3 --oss resume 'id-1'");
         assert_eq!(strip_for_resume_base(&resume, "codex").unwrap(), base);
+    }
+
+    #[test]
+    fn a_codex_single_value_option_never_takes_a_flag_or_a_redirection_for_its_value() {
+        for (line, want) in [
+            ("codex -p work -m --yolo", "codex -p work -m"),
+            ("codex -m --oss -p work", "codex -m --oss -p work"),
+            ("codex -p work -m 2>/dev/null", "codex -p work -m"),
+            ("codex -p work -m > out.log", "codex -p work -m"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+        }
     }
 
     #[test]
