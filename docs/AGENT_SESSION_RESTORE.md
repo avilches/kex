@@ -329,6 +329,11 @@ the ones it reported are kept until their own `SubagentStop`, as for OMP. The ta
 Run on Start, and the transcript actions only when the frame named a rollout (`hasTranscriptActions`): with an empty
 path there is nothing to reveal, so it hides them, as for OpenCode, instead of "Transcript not created yet".
 
+The script now prints `{}` on stdout for Codex too (TASK-894). Not measured against a live Codex: the reasoning is that
+`{}` is valid JSON with no fields, which Codex's hook protocol treats as an empty result, and the same script output
+was verified to add no context and no warning on Claude Code 2.1.310. If a Codex build ever shows it as context,
+the fix is to skip the print when the first argument is `codex`.
+
 The provider row (`provider.rs`) reads Codex's own files and nothing else:
 
 - **Rollouts.** Codex writes one JSONL per session at

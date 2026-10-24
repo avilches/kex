@@ -143,7 +143,7 @@ below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
 through the PTY stream instead; once the socket migration (`2145a981`,
 `ed14289f`) left nothing emitting it, that parser was deleted from
 `agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
-channel. The current mechanism is marked `kex-session-v9` inside the hook
+channel. The current mechanism is marked `kex-session-v10` inside the hook
 script itself (`SESSION_HOOK_SCRIPT_VERSION` in `agent/mod.rs`).
 
 ### 2.1 OSC still in use

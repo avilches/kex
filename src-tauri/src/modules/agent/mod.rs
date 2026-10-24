@@ -843,12 +843,9 @@ mod tests {
             cmd.env_remove(k);
         }
         let mut child = cmd.spawn().unwrap();
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(STOP_FRAME.as_bytes())
-            .unwrap();
+        let mut stdin = child.stdin.take().unwrap();
+        let _ = stdin.write_all(STOP_FRAME.as_bytes());
+        drop(stdin);
         let out = child.wait_with_output().unwrap();
         String::from_utf8(out.stdout).unwrap()
     }
