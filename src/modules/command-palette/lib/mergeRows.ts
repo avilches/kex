@@ -1,3 +1,4 @@
+import { splitActionName } from "@/modules/actions/lib/actionName";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { PaletteItem } from "../types";
 import {
@@ -134,6 +135,26 @@ function commandHit(
   return top;
 }
 
+// An Action is found by the name it shows, by the value its template expands to or the folder a
+// script starts in (the line under the name), or by both read together ("pycharm hub").
+function actionPoints(item: BarItem, q: string): FieldScored | null {
+  const { main } = splitActionName(item.name);
+  const title = fuzzyHit(q, main);
+  if (title !== null)
+    return { points: title.points, highlight: asHighlight(title, "title") };
+  const subtitle = item.subtitle ?? "";
+  const detail = substringHit(q, subtitle);
+  if (detail !== null)
+    return {
+      points: SUBSTRING_BASE + detail.points,
+      highlight: asHighlight(detail, "detail"),
+    };
+  const expanded = subtitle ? fuzzyHit(q, `${main} ${subtitle}`) : null;
+  if (expanded !== null)
+    return { points: SUBSTRING_BASE - TIER_STEP + expanded.points };
+  return null;
+}
+
 // Every reopen counts, and counting outranks the tier of the field that matched: a folder the
 // user returns to twenty times should beat a live tab found by a scattered title match, which
 // is the whole point of keeping the history. It still sits below a precise live title hit
@@ -226,12 +247,12 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   });
   for (const item of userActions) {
-    const hit = fuzzyHit(q, item.name);
-    if (hit === null) continue;
+    const r = actionPoints(item, q);
+    if (r === null) continue;
     const key = actionRowKey(item.id);
     scored.push({
-      row: { kind: "action", key, item, highlight: asHighlight(hit, "title") },
-      points: hit.points + learnedBoost(learned, q, key),
+      row: { kind: "action", key, item, highlight: r.highlight },
+      points: r.points + learnedBoost(learned, q, key),
       recency: null,
     });
   }
