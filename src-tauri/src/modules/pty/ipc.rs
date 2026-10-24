@@ -196,6 +196,16 @@ impl HookHub {
                     log::debug!("[ipc] discarded spooled {kind} event tab={tab_id}");
                     return;
                 }
+                // Spooled while the PTY was pending, by a process of an earlier PTY of the tab:
+                // the same rules as a late frame, or the dead agent's SessionStart would
+                // overwrite the new session. Frames of the new child name this PTY and pass.
+                if frame_origin(line).pty_id != Some(pty_id) {
+                    let event = parse_payload(line).map(|p| p.event).unwrap_or_default();
+                    if late_frame_is_dropped(&event) {
+                        log::debug!("[ipc] discarded spooled late {event} event tab={tab_id}");
+                        return;
+                    }
+                }
                 self.dispatch(line, tab_id, pty_id);
             });
         }
@@ -1511,6 +1521,44 @@ mod tests {
                 (3.into(), "Notification".to_string()),
                 (3.into(), "Stop".to_string())
             ]
+        );
+    }
+
+    #[test]
+    fn frames_of_the_old_pty_spooled_while_the_new_one_is_pending_cannot_rewrite_its_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        let old = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 1,
+        };
+        live(hub, "tab-a", 1);
+        drop(old);
+        hub.register("tab-a", 2);
+        for kind in ["SessionStart", "UserPromptSubmit", "Notification"] {
+            hub.handle_line(&frame(kind, "tab-a", 1, "dead"));
+        }
+        hub.handle_line(&frame("SessionStart", "tab-a", 2, "new"));
+        assert!(
+            rec.events.lock().unwrap().is_empty(),
+            "pending: all spooled"
+        );
+
+        hub.activate("tab-a", 2);
+        assert_eq!(rec.signals(), vec![(2.into(), "Notification".to_string())]);
+        let metas: Vec<_> = rec
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(e, _)| e == AGENT_SESSION_META_EVENT)
+            .map(|(_, m)| m["sessionId"].as_str().unwrap_or("").to_string())
+            .collect();
+        assert_eq!(
+            metas,
+            vec!["new"],
+            "only the new child's SessionStart is recorded"
         );
     }
 
