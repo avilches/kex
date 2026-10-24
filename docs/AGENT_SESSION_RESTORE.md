@@ -790,7 +790,7 @@ while an agent's integration is missing (`agentMenuIntegration`, pure, in `works
 "Install <Agent> integration" (the same `installWithToast` path as the install toast) and Run on Start, and hides the session id, the model and the transcript
 entries, which can never be filled without it. With the status not yet known, or already installed, the block is the usual one and never offers Install; when Install
 cannot run (`malformed`, `uneditable`, `unavailable`) the dead entries are hidden and nothing is offered. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
-`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger keeps the play icon and ends with the state: a check when it is on for a plain terminal (nothing when off), and the agent icon (struck through when it is off) for an agent. The path bar has no run-on-start icon; while
+`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger keeps the play icon and ends with the state: a check when it is on and nothing when it is off, for terminals and agents alike. The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.
 

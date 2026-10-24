@@ -8,7 +8,6 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
-import { AgentIcon, StruckAgentIcon } from "@/modules/agents/lib/agentIcon";
 import { writeClipboardText } from "@/lib/clipboard";
 import { previewResumeCmd, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
@@ -146,19 +145,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
         <span className="min-w-0 flex-1">Run on Start</span>
-        {agentSession ? (
-          enabled ? (
-            <AgentIcon agent={agentSession.agent} size={14} />
-          ) : (
-            <StruckAgentIcon
-              agent={agentSession.agent}
-              size={14}
-              title="Won't be restored on restart (Run on start is off)"
-            />
-          )
-        ) : (
-          enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />
-        )}
+        {enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
         {sections.showEnabled && (
