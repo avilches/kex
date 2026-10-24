@@ -24,6 +24,7 @@ import {
   Delete02Icon,
   File01Icon,
   FileAddIcon,
+  FileEmptyIcon,
   FolderAddIcon,
   FolderOpenIcon,
   LinkSquare02Icon,
@@ -297,7 +298,7 @@ function EntryRowImpl(props: EntryRowProps) {
                 title="Open in a tab"
                 className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground"
               >
-                <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={2} />
+                <HugeiconsIcon icon={FileEmptyIcon} size={11} strokeWidth={2} />
               </span>
             )}
           </button>
