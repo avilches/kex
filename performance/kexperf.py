@@ -41,7 +41,9 @@ MAIN_THREAD_KEYS = {
     "dom_timers": "DOMTimer::fired",
     "ipc": "IPC::Connection::dispatchMessage",
     "gc": "Heap::collect",
+    "jit_wait": "JITWorklist::suspendAllThreads",
 }
+JIT_STALL_FROM = 20
 
 
 def run(cmd):
@@ -211,6 +213,9 @@ def main_thread_shares(path):
 
 
 def verdict(shares):
+    if shares["jit_wait"] >= JIT_STALL_FROM:
+        return (f"stalled: the main thread waited {shares['jit_wait']}% of the time for the JIT compiler "
+                "to pause (a garbage collection cannot start until it does), not a rendering cost")
     if shares["idle"] >= 50:
         return "healthy: the main thread is mostly asleep"
     if shares["idle"] >= 20:
@@ -227,7 +232,7 @@ def cmd_analyze(args):
         print(f"{'':<14}{'this':>7}{'healthy':>9}{'slow':>7}   (percent of the main thread, 2026-10-20 baselines)")
         for key in ("idle", "rendering", "layout", "style", "javascript"):
             print(f"{key:<14}{s[key]:>7}{BASELINE['healthy'][key]:>9}{BASELINE['slow'][key]:>7}")
-        for key in ("run_from_timers", "paint", "gpu_flush", "dom_timers", "ipc", "gc"):
+        for key in ("run_from_timers", "paint", "gpu_flush", "dom_timers", "ipc", "gc", "jit_wait"):
             print(f"{key:<14}{s[key]:>7}")
         print("verdict:", verdict(s))
 
