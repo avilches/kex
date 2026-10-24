@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, PlayIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ContextMenuItem,
@@ -144,6 +144,8 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
       }}
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
+        <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
+        <span className="min-w-0 flex-1">Run on Start</span>
         {agentSession ? (
           enabled ? (
             <AgentIcon agent={agentSession.agent} size={14} />
@@ -154,12 +156,9 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
               title="Won't be restored on restart (Run on start is off)"
             />
           )
-        ) : enabled ? (
-          <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />
         ) : (
-          <span className="size-[14px] shrink-0" />
+          enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />
         )}
-        Run on Start
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
         {sections.showEnabled && (
