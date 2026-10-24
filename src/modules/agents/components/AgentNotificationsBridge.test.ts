@@ -10,12 +10,14 @@ import { clearOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { useAgentStore } from "../store/agentStore";
 import { handleSessionMeta, handleSignal, type Ctx } from "./AgentNotificationsBridge";
 
+const UNKNOWN_PTY = vi.hoisted(() => 999);
+
 vi.mock("@/modules/workspaces", () => ({
   findTabPane: () => ({ tab: { kind: "terminal", cwd: "/p/proj", title: "" } }),
   focusedTabId: vi.fn(() => null),
 }));
 vi.mock("@/modules/terminal", () => ({
-  leafIdForPty: (id: number) => `tab-${id}`,
+  leafIdForPty: (id: number) => (id === UNKNOWN_PTY ? null : `tab-${id}`),
 }));
 vi.mock("@/modules/terminal/lib/oscTitleStore", () => ({
   getOscTitle: () => undefined,
@@ -62,6 +64,34 @@ function sig(kind: AgentSignal["kind"], extra: Partial<AgentSignal> = {}): Agent
 
 const session = () => useAgentStore.getState().sessions["tab-1"];
 const sub = (id: string) => ({ id, agentType: "Explore", description: "" });
+
+describe("handleSignal tab resolution", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+    vi.mocked(focusedTabId).mockReturnValue(null);
+  });
+
+  test("a hook signal whose PTY the frontend does not know yet reaches the tab it names", () => {
+    handleSignal(sig("UserPromptSubmit", { id: UNKNOWN_PTY, tabId: "tab-7" }), ctx());
+    expect(useAgentStore.getState().sessions["tab-7"]?.status).toBe("working");
+  });
+
+  test("the tab a hook signal names wins over the one its PTY id maps to", () => {
+    handleSignal(sig("UserPromptSubmit", { id: 1, tabId: "tab-7" }), ctx());
+    expect(useAgentStore.getState().sessions["tab-7"]?.status).toBe("working");
+    expect(useAgentStore.getState().sessions["tab-1"]).toBeUndefined();
+  });
+
+  test("a PTY reader signal without a tab still resolves by its PTY id", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    expect(session()?.status).toBe("working");
+  });
+
+  test("a signal with neither a tab nor a known PTY is dropped", () => {
+    handleSignal(sig("UserPromptSubmit", { id: UNKNOWN_PTY }), ctx());
+    expect(useAgentStore.getState().sessions).toEqual({});
+  });
+});
 
 describe("handleSignal PostCompact", () => {
   beforeEach(() => {

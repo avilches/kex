@@ -211,7 +211,7 @@ impl HookHub {
             line,
             tab_id,
             pty_id,
-            &mut |event, payload| self.sink.emit(event, payload),
+            &mut |event, payload| self.sink.emit(event, with_tab(event, payload, tab_id)),
             &mut |transcript| self.sink.live_model(tab_id, transcript),
         );
     }
@@ -240,6 +240,16 @@ impl HookHub {
             log::warn!("[ipc] failed to spool event for tab={tab_id}: {e}");
         }
     }
+}
+
+/// A hook signal names its tab: a frame replayed from the spool or arriving late is delivered
+/// while the frontend may not know the PTY id yet (`pty_open` has not returned, or a respawn
+/// cleared it), so it cannot be resolved by `id` alone.
+fn with_tab(event: &str, mut payload: serde_json::Value, tab_id: &str) -> serde_json::Value {
+    if event == AGENT_EVENT {
+        payload["tabId"] = tab_id.into();
+    }
+    payload
 }
 
 /// Unregisters the tab's PTY when the PTY session drops. A tab whose PTY restarts registers the
@@ -1168,6 +1178,16 @@ mod tests {
                 .collect()
         }
 
+        fn signal_tabs(&self) -> Vec<String> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_EVENT)
+                .map(|(_, sig)| sig["tabId"].as_str().unwrap_or("").to_string())
+                .collect()
+        }
+
         fn meta_tabs(&self) -> Vec<String> {
             self.events
                 .lock()
@@ -1357,6 +1377,24 @@ mod tests {
             rec.meta_tabs().is_empty(),
             "a late SessionStart records nothing"
         );
+    }
+
+    #[test]
+    fn every_hook_signal_names_its_tab_live_late_or_replayed() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        live(hub, "tab-a", 2);
+        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
+        hub.handle_line(&frame("PermissionRequest", "tab-a", 2, "s"));
+        assert_eq!(rec.signal_tabs(), vec!["tab-a"; 3]);
+        assert!(rec
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(e, _)| e == AGENT_SESSION_META_EVENT || e == AGENT_CWD_EVENT)
+            .all(|(_, p)| p["tabId"] == "tab-a"));
     }
 
     struct PanickingSink;

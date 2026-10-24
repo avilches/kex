@@ -30,6 +30,10 @@ export type BackgroundSubagent = {
 
 export type AgentSignal = {
   id: number;
+  // Set on hook signals, which can arrive while the frontend does not know the tab's PTY id
+  // yet (a spooled replay during pty_open, a late frame during a respawn). Absent on the PTY
+  // reader's own signals, whose PTY is always the tab's live one.
+  tabId?: string;
   kind: AgentSignalKind;
   agent: string | null;
   message?: string;

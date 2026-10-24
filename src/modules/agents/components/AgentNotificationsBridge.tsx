@@ -172,7 +172,7 @@ export function handleSessionMeta(p: AgentSessionMetaPayload, ctx: Ctx): void {
 }
 
 export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
-  const tabId = leafIdForPty(sig.id);
+  const tabId = sig.tabId ?? leafIdForPty(sig.id);
   if (tabId === null) return;
   const store = useAgentStore.getState();
   if (endsAgentSession(sig.kind)) {
