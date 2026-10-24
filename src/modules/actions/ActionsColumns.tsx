@@ -117,20 +117,24 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
   // An Action being moved between scopes by the modal is in neither list for a moment: the
   // modal keeps the last copy it saw until the new scope shows it.
   const moving = useRef<string | null>(null);
+  // Set with `moving` but kept until the modal closes: a list that lags behind can drop the
+  // Action again after it landed, and the modal must not go with it.
+  const moved = useRef<string | null>(null);
   const lastShown = useRef<Action | null>(null);
   const editedAction = (() => {
     if (!editing) return null;
     const saved = scopes[editing.scope].actions.find((a) => a.id === editing.id);
     if (saved) return saved;
     if (draft?.action.id === editing.id) return draft.action;
-    return moving.current === editing.id ? lastShown.current : null;
+    return moved.current === editing.id && !removing.current.has(editing.id) ? lastShown.current : null;
   })();
   if (editedAction) lastShown.current = editedAction;
   const editedSaved =
-    !!editing && (moving.current === editing.id || lists.global.some((a) => a.id === editing.id) || lists.workspace.some((a) => a.id === editing.id));
+    !!editing && (moved.current === editing.id || lists.global.some((a) => a.id === editing.id) || lists.workspace.some((a) => a.id === editing.id));
 
   const change = (scope: Scope, current: Action, next: Action) => {
     if (removing.current.has(current.id) || moving.current === current.id) return;
+    if (moved.current === current.id && !scopesRef.current[scope].actions.some((a) => a.id === current.id)) return;
     const owned = ownedAfterEdit(current, next, suggestions);
     const target = scopesRef.current[scope];
     if (target.actions.some((a) => a.id === current.id)) {
@@ -161,6 +165,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
     const { id, scope: from } = editing;
     if (lists[from].some((a) => a.id === id)) {
       moving.current = id;
+      moved.current = id;
       onMove(from, to, id);
     } else if (handedOver.current.has(id)) {
       return;
@@ -172,6 +177,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
 
   const closeEditor = () => {
     moving.current = null;
+    moved.current = null;
     setEditing(null);
     setDraft((d) => (d && !handedOver.current.has(d.action.id) ? null : d));
   };

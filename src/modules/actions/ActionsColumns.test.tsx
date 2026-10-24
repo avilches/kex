@@ -417,3 +417,70 @@ describe("ActionsColumns", () => {
     view.unmount();
   });
 });
+
+describe("ActionsColumns scope switch with lagging stores", () => {
+  function harness(initialGlobal: Action[], initialWorkspace: Action[]) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onMove = vi.fn();
+    const show = (g: Action[], w: Action[]) =>
+      act(() =>
+        root.render(
+          createElement(ActionsColumns, {
+            workspaceName: "Dashboard",
+            onMove,
+            suggestions: [],
+            global: scope(g),
+            workspace: scope(w),
+          }),
+        ),
+      );
+    show(initialGlobal, initialWorkspace);
+    return { container, show, onMove, unmount: () => act(() => root.unmount()) };
+  }
+  const radio = (v: string) => document.querySelector(`[aria-label='Where it is available'] [role='radio'][value='${v}']`);
+
+  it("keeps the modal open while the Action is in neither list, then lands in the new scope", () => {
+    const h = harness([saved], []);
+    click(pencil(h.container));
+    click(radio("workspace"));
+    h.show([], []);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.show([], [saved]);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.unmount();
+  });
+
+  it("keeps the modal open when the Action lands in the new scope before leaving the old one", () => {
+    const h = harness([saved], []);
+    click(pencil(h.container));
+    click(radio("workspace"));
+    h.show([saved], [saved]);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.show([], [saved]);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.unmount();
+  });
+
+  it("keeps the modal open when a stale list drops the Action after it landed in the new scope", () => {
+    const h = harness([saved], []);
+    click(pencil(h.container));
+    click(radio("workspace"));
+    h.show([], [saved]);
+    h.show([], []);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.show([], [saved]);
+    expect(commandField()?.value).toBe("pnpm dev");
+    h.unmount();
+  });
+
+  it("keeps the modal open when the move changes the Action id (merged twin)", () => {
+    const h = harness([savedApp], [{ ...savedApp, id: "ac-9" }]);
+    click(pencil(h.container));
+    click(radio("workspace"));
+    h.show([], [{ ...savedApp, id: "ac-9" }]);
+    expect(commandField()?.value).toBe("zed {filepath}");
+    h.unmount();
+  });
+});
