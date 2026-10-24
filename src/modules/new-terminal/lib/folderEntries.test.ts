@@ -84,7 +84,7 @@ describe("buildFolderGroups", () => {
       entry({ workspaceId: "ws-1", cwd: "/repo/src/a" }),
     ];
     const [group] = build({ home: "/Users/a", activeTabEntry: entries[1], entries });
-    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
+    expect(group.rows.map((r) => [r.labels[0] ?? null, r.path])).toEqual([
       ["Current tab", "/repo/src/b"],
       ["Workspace Root", "/repo"],
       ["Home", "/Users/a"],
@@ -93,7 +93,7 @@ describe("buildFolderGroups", () => {
       [null, "/Users/a/zeta"],
     ]);
     expect(group.rows.map((r) => r.pinned)).toEqual([false, true, true, false, false, false]);
-    expect(group.rows.map((r) => r.slot)).toEqual([null, "root", "home", null, null, null]);
+    expect(group.rows.map((r) => r.slots)).toEqual([[], ["root"], ["home"], [], [], []]);
   });
 
   it("carries the branch of every folder that has one", () => {
@@ -114,16 +114,15 @@ describe("buildFolderGroups", () => {
     ]);
   });
 
-  it("shows the root and home as fixed rows when the current tab, or another tab, is on the same folder", () => {
+  it("makes one row of the current tab and the root when they are the same folder, and home stays its own", () => {
     const entries = [
       entry({ workspaceId: "ws-1", cwd: "/repo" }),
       entry({ workspaceId: "ws-1", cwd: "/Users/a" }),
     ];
     const [group] = build({ home: "/Users/a", activeTabEntry: entries[0], entries });
-    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
-      ["Current tab", "/repo"],
-      ["Workspace Root", "/repo"],
-      ["Home", "/Users/a"],
+    expect(group.rows.map((r) => [r.labels, r.path])).toEqual([
+      [["Current tab", "Workspace Root"], "/repo"],
+      [["Home"], "/Users/a"],
     ]);
   });
 
@@ -138,7 +137,7 @@ describe("buildFolderGroups", () => {
     const groups = build({ workspaces: [active, other, empty, third], entries });
     expect(groups.map((g) => g.workspaceTitle)).toEqual(["Kex", "Dotfiles", "Third"]);
     expect(groups[1].active).toBe(false);
-    expect(groups[1].rows.map((r) => [r.label, r.path])).toEqual([
+    expect(groups[1].rows.map((r) => [r.labels[0] ?? null, r.path])).toEqual([
       ["Workspace Root", "/dotfiles"],
       [null, "/dotfiles/home"],
       [null, "/dotfiles/z"],
@@ -181,7 +180,7 @@ describe("buildFolderGroups", () => {
       entries: [entry({ workspaceId: "ws-4", cwd: "/sleep/sub", hibernated: true })],
     });
     expect(groups[1].hibernated).toBe(true);
-    expect(groups[1].rows.map((r) => [r.label, r.hibernated])).toEqual([
+    expect(groups[1].rows.map((r) => [r.labels[0] ?? null, r.hibernated])).toEqual([
       ["Workspace Root", true],
       [null, true],
     ]);
@@ -210,42 +209,43 @@ describe("fixed rows", () => {
       worktreesByRepo: listing(["/repo/.claude/worktrees/alpha"], list),
       ...over,
     })[0];
+  const shape = (group: { rows: { labels: string[]; slots: string[]; path: string }[] }) =>
+    group.rows.map((r) => [r.labels, r.slots, r.path]);
 
   it("puts the workspace root, the main checkout and home right after the current tab, in that order", () => {
     const group = inRepo({ workspaces: [ws({ id: "ws-1", title: "Kex", workspaceRoot: "/elsewhere" })] });
-    expect(group.rows.map((r) => [r.slot, r.label, r.path])).toEqual([
-      [null, "Current tab", "/repo/.claude/worktrees/alpha"],
-      ["root", "Workspace Root", "/elsewhere"],
-      ["main", "Main checkout", "/repo"],
-      ["home", "Home", "/Users/a"],
+    expect(shape(group)).toEqual([
+      [["Current tab"], [], "/repo/.claude/worktrees/alpha"],
+      [["Workspace Root"], ["root"], "/elsewhere"],
+      [["Main checkout"], ["main"], "/repo"],
+      [["Home"], ["home"], "/Users/a"],
     ]);
   });
 
-  it("shows the root and the main checkout both when they are the same folder", () => {
+  it("makes one row of a folder that is the root and the main checkout, with both labels and both keys", () => {
     const group = inRepo();
-    expect(group.rows.map((r) => [r.slot, r.path])).toEqual([
-      [null, "/repo/.claude/worktrees/alpha"],
-      ["root", "/repo"],
-      ["main", "/repo"],
-      ["home", "/Users/a"],
+    expect(shape(group)).toEqual([
+      [["Current tab"], [], "/repo/.claude/worktrees/alpha"],
+      [["Workspace Root", "Main checkout"], ["root", "main"], "/repo"],
+      [["Home"], ["home"], "/Users/a"],
     ]);
     expect(new Set(group.rows.map((r) => r.key)).size).toBe(group.rows.length);
   });
 
-  it("carries the branch of the main checkout", () => {
-    expect(inRepo().rows.find((r) => r.slot === "main")?.branch).toBe("main");
+  it("carries the branch of the main checkout, also when it is merged with the root", () => {
+    expect(inRepo().rows.find((r) => r.slots.includes("main"))?.branch).toBe("main");
   });
 
   it("leaves out a fixed row that does not exist, without moving the others", () => {
     const noRoot = inRepo({ workspaces: [bare] });
-    expect(noRoot.rows.map((r) => r.slot)).toEqual([null, "main", "home"]);
+    expect(noRoot.rows.map((r) => r.slots)).toEqual([[], ["main"], ["home"]]);
     const noHome = inRepo({ home: null });
-    expect(noHome.rows.map((r) => r.slot)).toEqual([null, "root", "main"]);
+    expect(noHome.rows.map((r) => r.slots)).toEqual([[], ["root", "main"]]);
     const noRepo = inRepo({ worktreesByRepo: new Map() });
-    expect(noRepo.rows.map((r) => r.slot)).toEqual([null, "root", "home"]);
+    expect(noRepo.rows.map((r) => r.slots)).toEqual([[], ["root"], ["home"]]);
   });
 
-  it("shows a fixed row even when the current tab is on the same folder", () => {
+  it("merges the fixed rows into the current tab when it is on the same folder, which stays first", () => {
     const atRoot = entry({ workspaceId: "ws-1", cwd: "/repo" });
     const group = inRepo({
       activeTabEntry: atRoot,
@@ -253,17 +253,25 @@ describe("fixed rows", () => {
       repoOf: repoOfMap({ "/repo": "/repo" }),
       worktreesByRepo: listing(["/repo"], list),
     });
-    expect(group.rows.map((r) => [r.slot, r.label, r.path])).toEqual([
-      [null, "Current tab", "/repo"],
-      ["root", "Workspace Root", "/repo"],
-      ["main", "Main checkout", "/repo"],
-      ["home", "Home", "/Users/a"],
+    expect(shape(group)).toEqual([
+      [["Current tab", "Workspace Root", "Main checkout"], ["root", "main"], "/repo"],
+      [["Home"], ["home"], "/Users/a"],
+    ]);
+    expect(group.rows[0].pinned).toBe(false);
+  });
+
+  it("merges home into the current tab when the tab is in the home folder", () => {
+    const atHome = entry({ workspaceId: "ws-1", cwd: "/Users/a" });
+    const group = inRepo({ activeTabEntry: atHome, entries: [atHome], worktreesByRepo: new Map() });
+    expect(shape(group)).toEqual([
+      [["Current tab", "Home"], ["home"], "/Users/a"],
+      [["Workspace Root"], ["root"], "/repo"],
     ]);
   });
 
   it("has no main checkout row without a current tab", () => {
     const group = inRepo({ activeTabEntry: null, entries: [] });
-    expect(group.rows.map((r) => r.slot)).toEqual(["root", "home"]);
+    expect(group.rows.map((r) => r.slots)).toEqual([["root"], ["home"]]);
   });
 
   it("lists a folder that a fixed row already shows only once among the rest", () => {
@@ -317,7 +325,7 @@ describe("repositories", () => {
         ...listing(["/aaa/zzz"], [main("/aaa/zzz")]),
       ]),
     });
-    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
+    expect(group.rows.map((r) => [r.labels[0] ?? null, r.path])).toEqual([
       ["Workspace Root", "/repo"],
       [null, "/aaa/zzz"],
       [null, "/repo/.claude/worktrees/x"],
@@ -338,7 +346,7 @@ describe("repositories", () => {
       entries,
       repoOf: repoOfMap({ "/repo/cur": "/repo", "/repo/a": "/repo", "/repo/b": "/repo" }),
     });
-    expect(group.rows.map((r) => [r.label, r.path])).toEqual([
+    expect(group.rows.map((r) => [r.labels[0] ?? null, r.path])).toEqual([
       ["Current tab", "/repo/cur"],
       ["Home", "/Users/a"],
       [null, "/repo/a"],
@@ -359,7 +367,7 @@ describe("repositories", () => {
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/cur" }),
       repoOf: () => "/repo",
     });
-    expect(group.rows[0]).toMatchObject({ label: "Current tab", cluster: 1, headed: true, repoName: "repo" });
+    expect(group.rows[0]).toMatchObject({ labels: ["Current tab"], cluster: 1, headed: true, repoName: "repo" });
   });
 
   it("leaves a folder alone in its repository without a heading, unless it is the current tab", () => {
@@ -479,7 +487,7 @@ describe("repositories", () => {
 
     it("adds the missing ones to its group, alphabetical, after the main checkout that is already fixed, without repeats", () => {
       const group = open(new Map([["/repo", "ws-1"]]));
-      expect(group.rows.map((r) => [r.label, r.path, r.branch])).toEqual([
+      expect(group.rows.map((r) => [r.labels[0] ?? null, r.path, r.branch])).toEqual([
         ["Current tab", "/repo/.claude/worktrees/alpha", null],
         ["Main checkout", "/repo", "main"],
         [null, "/repo/.claude/worktrees/beta", "b"],
@@ -658,8 +666,17 @@ describe("filterFolderGroups", () => {
 
     it("finds a row by its label", () => {
       const [g] = filterFolderGroups(shown, "root");
-      expect(g.rows.map((r) => r.label)).toEqual(["Workspace Root"]);
-      expect(g.rows[0].labelIndices).toEqual([10, 11, 12, 13]);
+      expect(g.rows.map((r) => r.labels)).toEqual([["Workspace Root"]]);
+      expect(g.rows[0].labelIndices).toEqual([[10, 11, 12, 13]]);
+    });
+
+    it("highlights each label of a row that is several things, in its own slot", () => {
+      const merged = {
+        ...shown[0].rows[0],
+        labels: ["Workspace Root", "Main checkout"] as ("Workspace Root" | "Main checkout")[],
+      };
+      const [g] = filterFolderGroups([{ ...shown[0], rows: [merged] }], "main");
+      expect(g.rows[0].labelIndices).toEqual([[], [0, 1, 2, 3]]);
     });
 
     it("keeps the whole group when the workspace title matches", () => {
@@ -749,7 +766,7 @@ describe("home collapsed to ~", () => {
 
   it("shows the home itself as ~", () => {
     const group = withCwd("/Users/a/", "/Users/a/x");
-    expect(group.rows.find((r) => r.label === "Home")?.display).toBe("~");
+    expect(group.rows.find((r) => r.labels.includes("Home"))?.display).toBe("~");
   });
 
   it("expresses the match indices against the displayed text", () => {

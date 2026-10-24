@@ -24,7 +24,8 @@ export type FolderRow = {
   // Where the search starts in the path: right after the home prefix, so the
   // home segment can never match a query (typing "ser" no longer hits "Users").
   matchOffset: number;
-  label: FolderRowLabel | null;
+  // Everything the folder is, in order: a folder can be the current tab, the workspace root and home at once.
+  labels: FolderRowLabel[];
   branch: string | null;
   // The main checkout of the repository the folder belongs to; the repository itself
   // until its worktree listing arrives; null outside a repository.
@@ -32,9 +33,10 @@ export type FolderRow = {
   // Name of that repository, shown on the small heading of a group of its folders.
   repoName: string | null;
   // A fixed row (workspace root, main checkout, home) right after the current tab, outside any repository group.
+  // The current tab never is one, even when it is also the workspace root: it stays first, under its repository.
   pinned: boolean;
-  // Which fixed shortcut picks it; null for every other row.
-  slot: FolderSlot | null;
+  // Which fixed shortcuts pick it; empty for every other row.
+  slots: FolderSlot[];
   // How many folders of its repository sit together in its workspace.
   cluster: number;
   // How many worktrees its repository has, main checkout included; 0 until the listing arrives.
@@ -67,7 +69,8 @@ export type FolderGroup = {
 export type FolderRowMatched = FolderRow & {
   indices?: number[];
   branchIndices?: number[];
-  labelIndices?: number[];
+  // Per label, in the order of `labels`.
+  labelIndices?: number[][];
   repoNameIndices?: number[];
 };
 
@@ -170,18 +173,17 @@ function rowOf(
   const display = displayOf(path, input.home);
   const repoKey = extras.repoKey ?? repoKeyOf(b, path);
   return {
-    // A fixed row may repeat a path that another row shows, so its slot is part of the key.
-    key: extras.slot ? `${workspaceId}:${path}#${extras.slot}` : `${workspaceId}:${path}`,
+    key: `${workspaceId}:${path}`,
     path,
     display,
     displayShift: path.length - display.length,
     matchOffset: matchOffsetOf(path, input.home),
-    label,
+    labels: label ? [label] : [],
     branch: "branch" in extras ? (extras.branch ?? null) : input.branchOf(path) || null,
     repoKey,
     repoName: repoNameOf(repoKey),
     pinned: extras.pinned ?? false,
-    slot: extras.slot ?? null,
+    slots: extras.slot ? [extras.slot] : [],
     cluster: 1,
     headed: false,
     worktreeCount: 0,
@@ -219,9 +221,9 @@ function inCluster(a: FolderRow, b: FolderRow): number {
   const rank = (r: FolderRow) =>
     r.nested
       ? 4
-      : r.label === "Current tab"
+      : r.labels.includes("Current tab")
         ? 0
-        : r.label === "Workspace Root"
+        : r.labels.includes("Workspace Root")
           ? 1
           : r.path === r.repoKey
             ? 2
@@ -340,28 +342,36 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     if (cwd) {
       pushUnique(b, currentRows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
     }
-    const slotRow = (
+    // A folder that is several of these at once is one row carrying all its labels and keys.
+    const addFixed = (
       path: string,
       label: FolderRowLabel,
       slot: FolderSlot,
       extras: Partial<RowExtras> = {},
-    ) => rowOf(b, path, activeWs.id, sleeping, label, { pinned: true, slot, ...extras });
+    ) => {
+      const same = [...currentRows, ...pinned].find((r) => r.path === path);
+      if (!same) {
+        pinned.push(rowOf(b, path, activeWs.id, sleeping, label, { pinned: true, slot, ...extras }));
+        return;
+      }
+      same.labels.push(label);
+      same.slots.push(slot);
+      if ("branch" in extras) same.branch = extras.branch ?? null;
+    };
     const rootPath = rootOf(activeWs);
-    if (rootPath) pinned.push(slotRow(rootPath, "Workspace Root", "root"));
+    if (rootPath) addFixed(rootPath, "Workspace Root", "root");
     const currentRepo = currentRows[0]?.repoKey;
     const mainCheckout = currentRepo
       ? b.worktreesOfKey.get(currentRepo)?.find((w) => w.isMain)
       : undefined;
     if (currentRepo && mainCheckout) {
-      pinned.push(
-        slotRow(mainCheckout.path, "Main checkout", "main", {
-          branch: mainCheckout.branch,
-          repoKey: currentRepo,
-        }),
-      );
+      addFixed(mainCheckout.path, "Main checkout", "main", {
+        branch: mainCheckout.branch,
+        repoKey: currentRepo,
+      });
     }
     const home = input.home?.replace(/[\\/]+$/, "");
-    if (home) pinned.push(slotRow(home, "Home", "home"));
+    if (home) addFixed(home, "Home", "home");
     for (const row of pinned) b.seen.add(row.path);
     raws.push({
       head: headOf(activeWs, true),
@@ -446,21 +456,21 @@ export function filterFolderGroups(
     for (const r of g.rows) {
       const path = foldText(r.path);
       const branch = foldText(r.branch ?? "");
-      const label = foldText(r.label ?? "");
+      const labels = r.labels.map((l) => foldText(l));
       const repoName = r.headed ? foldText(r.repoName ?? "") : "";
       let indices: number[] | undefined;
       let branchIndices: number[] | undefined;
-      let labelIndices: number[] | undefined;
+      let labelIndices: number[][] | undefined;
       let repoNameIndices: number[] | undefined;
       let rowTitleIndices: number[] | undefined;
       let ok = true;
       for (const token of tokens) {
         const inPath = path.indexOf(token, r.matchOffset);
         const inBranch = branch.indexOf(token);
-        const inLabel = label.indexOf(token);
+        const inLabel = labels.map((l) => l.indexOf(token));
         const inRepo = repoName.indexOf(token);
         const inTitle = title.indexOf(token);
-        if (inPath < 0 && inBranch < 0 && inLabel < 0 && inRepo < 0 && inTitle < 0) {
+        if (inPath < 0 && inBranch < 0 && inLabel.every((i) => i < 0) && inRepo < 0 && inTitle < 0) {
           ok = false;
           break;
         }
@@ -468,7 +478,11 @@ export function filterFolderGroups(
           indices = merge(indices, runOf(inPath, token.length).map((i) => i - r.displayShift));
         }
         if (inBranch >= 0) branchIndices = merge(branchIndices, runOf(inBranch, token.length));
-        if (inLabel >= 0) labelIndices = merge(labelIndices, runOf(inLabel, token.length));
+        inLabel.forEach((at, i) => {
+          if (at < 0) return;
+          labelIndices ??= labels.map(() => []);
+          labelIndices[i] = merge(labelIndices[i], runOf(at, token.length));
+        });
         if (inRepo >= 0) repoNameIndices = merge(repoNameIndices, runOf(inRepo, token.length));
         if (inTitle >= 0) rowTitleIndices = merge(rowTitleIndices, runOf(inTitle, token.length));
       }
@@ -479,7 +493,7 @@ export function filterFolderGroups(
         ...r,
         indices: sort(indices),
         branchIndices: sort(branchIndices),
-        labelIndices: sort(labelIndices),
+        labelIndices: labelIndices?.map((list) => list.sort((a, b) => a - b)),
         repoNameIndices: sort(repoNameIndices),
       });
     }

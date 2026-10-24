@@ -688,11 +688,13 @@ src/
                                      shortcut that always picks it (`palette.folderRoot` Cmd+1 the workspace root,
                                      `palette.folderMain` Cmd+2 the main checkout of the current tab's repository,
                                      `palette.folderHome` Cmd+3 home; reassignable in Settings > Shortcuts > Palette).
-                                     A fixed row that does not exist is left out and the others keep their key; one
-                                     that exists is always shown, even on the same folder as the current tab or as
-                                     another fixed row (root and main checkout, usually), so a working key never
-                                     points at a missing row. The key is drawn on the
-                                     row (beside the worktrees hint while the row has the focus, which no longer hides it; the workspace
+                                     A fixed row that does not exist is left out and the others keep their key.
+                                     A folder is one row however many things it is: a row carries `labels` and
+                                     `slots` (lists), so the current tab that sits in the workspace root, or a root
+                                     that is also the main checkout, is a single row with every label and, beside
+                                     each one that has a key, that key; both keys pick that row, and the current tab
+                                     stays first. The keys are drawn on the
+                                     row (beside the worktrees hint while the row has the focus, which no longer hides them; the workspace
                                      root wears the explorer's pin and home a house) and the footer always lists all
                                      the fixed rows that exist, after the worktrees key, so none of them moves as
                                      the focus does. The shortcuts are live only while
@@ -706,9 +708,9 @@ src/
                                      repository name and, right after it, how many worktrees it has, which never changes; a spinner takes its place while the listing loads), its
                                      main checkout first, then by path (the tab bar's
                                      terminal icon before every folder); repositories and
-                                     loose folders go alphabetically. Apart from the fixed rows, a path appears once
-                                     in the whole dialog, first occurrence keeps its label; the branch sits beside the folder, the right side
-                                     carries the label; home shows as `~`; headings use the resolved workspace title
+                                     loose folders go alphabetically. A path appears once
+                                     in the whole dialog; the branch sits beside the folder, the right side
+                                     carries the labels; home shows as `~`; headings use the resolved workspace title
                                      and `WorkspaceMark`. Worktrees are not listed by default: `useRepoWorktrees`
                                      asks the worktree listing of every repository on screen once per open. When a
                                      repository has worktrees not in the list, the row that has the focus shows
