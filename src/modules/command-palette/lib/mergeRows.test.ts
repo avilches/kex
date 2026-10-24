@@ -542,4 +542,32 @@ describe("mergeRows with Actions", () => {
     expect(keys(rows)).toEqual(["act:a"]);
     expect(rows[0]).toMatchObject({ highlight: { field: "title" } });
   });
+
+  const expanded = (id: string, name: string, subtitle: string) =>
+    ({ ...(item(id, name) as object), subtitle }) as never;
+
+  it("finds an app by the value its template expands to", () => {
+    const rows = mergeRows(
+      input({ term: "hub/proj", actions: [expanded("a", "PyCharm {workspace}", "/Users/me/Hub/Projects/x")] }),
+    );
+    expect(keys(rows)).toEqual(["act:a"]);
+    expect(rows[0]).toMatchObject({ highlight: { field: "detail" } });
+  });
+
+  it("finds a script by the folder shown under its name", () => {
+    const rows = mergeRows(input({ term: "home", actions: [expanded("s", "dev", "Home")] }));
+    expect(keys(rows)).toEqual(["act:s"]);
+  });
+
+  it("finds an Action by its name and its value read together", () => {
+    const rows = mergeRows(
+      input({ term: "pycharm kex", actions: [expanded("a", "PyCharm {workspace}", "/work/Kex")] }),
+    );
+    expect(keys(rows)).toEqual(["act:a"]);
+  });
+
+  it("does not match the raw template suffix of the name", () => {
+    const rows = mergeRows(input({ term: "workspace", actions: [expanded("a", "PyCharm {workspace}", "/work/x")] }));
+    expect(keys(rows)).toEqual([]);
+  });
 });
