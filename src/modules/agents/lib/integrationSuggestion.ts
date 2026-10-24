@@ -11,6 +11,8 @@ export type SuggestionRecord = {
   lastAskedAt: number | null;
   /** The integration was installed at some point, so it is never suggested again, even removed. */
   installedOnce: boolean;
+  /** The user chose "don't remind me again" on the tab marker, so it never shows for this agent. */
+  markerDismissed: boolean;
 };
 
 export type SuggestionMap = Partial<Record<AgentId, SuggestionRecord>>;
@@ -26,11 +28,12 @@ export function parseSuggestions(raw: unknown): SuggestionMap {
   for (const agent of AGENT_IDS) {
     const entry = (raw as Record<string, unknown>)[agent];
     if (typeof entry !== "object" || entry === null) continue;
-    const { asks, lastAskedAt, installedOnce } = entry as Record<string, unknown>;
+    const { asks, lastAskedAt, installedOnce, markerDismissed } = entry as Record<string, unknown>;
     out[agent] = {
       asks: typeof asks === "number" && Number.isInteger(asks) && asks > 0 ? asks : 0,
       lastAskedAt: typeof lastAskedAt === "number" && Number.isFinite(lastAskedAt) ? lastAskedAt : null,
       installedOnce: installedOnce === true,
+      markerDismissed: markerDismissed === true,
     };
   }
   return out;
@@ -47,7 +50,7 @@ export function shouldSuggest(record: SuggestionRecord | undefined, now: number)
   return false;
 }
 
-const EMPTY: SuggestionRecord = { asks: 0, lastAskedAt: null, installedOnce: false };
+const EMPTY: SuggestionRecord = { asks: 0, lastAskedAt: null, installedOnce: false, markerDismissed: false };
 
 export function withAsked(map: SuggestionMap, agent: AgentId, now: number): SuggestionMap {
   const current = map[agent] ?? EMPTY;
@@ -58,4 +61,10 @@ export function withInstalled(map: SuggestionMap, agent: AgentId): SuggestionMap
   const current = map[agent] ?? EMPTY;
   if (current.installedOnce) return map;
   return { ...map, [agent]: { ...current, installedOnce: true } };
+}
+
+export function withMarkerDismissed(map: SuggestionMap, agent: AgentId): SuggestionMap {
+  const current = map[agent] ?? EMPTY;
+  if (current.markerDismissed) return map;
+  return { ...map, [agent]: { ...current, markerDismissed: true } };
 }

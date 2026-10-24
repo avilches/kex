@@ -218,28 +218,35 @@ When it appears, per agent:
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
 (`lib/agentIntegration.ts`), the single install path, which records `installedOnce` only after the write succeeded.
 
-### 2. The tab warning (every tab, every time)
+### 2. The tab warning (every tab, until dismissed)
 
-Independent of the ask policy, each tab where an agent starts without its integration gets an amber exclamation icon in
+Independent of the ask policy and of the toast, each tab where an agent starts without its integration gets an amber exclamation icon in
 the tab strip, so a user who dismissed the toast still sees why that tab has no spinner. It is
 `integrationWarningStore` (`tabId -> agent`), filled by the suggester's `warn` on every `started` signal with status
 `missing`, and cleared when the session ends (`clearTab`) or the integration is installed (`clearAgent`, which removes it
-from every tab of that agent). Hovering the icon shows the toast again, with the same buttons. That toast has a fixed id
-per agent (`integration-<agent>`), so repeated hovers update it instead of stacking, and it never counts as an ask.
+from every tab of that agent).
+
+Hovering the icon opens a small card (`IntegrationTabMarker.tsx`, a controlled Popover that stays open while the pointer
+is on the icon or the card, with a 150 ms close delay). It never shows the toast. The card says "<Agent> agent detected.
+Open settings to install integration", with a cog button that opens Settings > General, and a "Don't remind me again"
+link below. The link records `markerDismissed` for that agent and calls `clearAgent`: the icon disappears from all its
+tabs and, because `suggestIntegration` checks the record before calling `warn`, never comes back. It is per agent
+(dismissing Claude keeps the Codex icon) and does not change the toast schedule.
 
 ### Where it lives
 
 | Piece | File |
 |---|---|
-| Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
+| Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `withMarkerDismissed`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
 | Flow: once per run, status check, `warn`, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
 | Toast, real dependencies, `suggestIntegration` | `modules/agents/components/IntegrationSuggestionToast.tsx` |
-| Tab warning state and icon | `modules/agents/store/integrationWarningStore.ts`, `modules/workspaces/PaneTabBar.tsx` |
+| Tab warning state | `modules/agents/store/integrationWarningStore.ts` |
+| Tab warning icon and card | `modules/agents/components/IntegrationTabMarker.tsx`, mounted from `modules/workspaces/PaneTabBar.tsx` |
 | Single install path, records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent:
-`{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false }`. It is read and written through
+`{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false, "markerDismissed": false }`. It is read and written through
 `readIntegrationSuggestions` / `updateIntegrationSuggestions`, which serialise writes because the main window (the toast)
-and the Settings window (an install there) both write it. To see the toast again while testing, delete the agent's entry;
+and the Settings window (an install there) both write it. To see the toast or the dismissed icon again while testing, delete the agent's entry;
 to see the second ask, set its `lastAskedAt` more than 15 days back. Manual test plan: block L in
 `docs/RESTORE_SESSION_TESTS.md`.

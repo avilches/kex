@@ -33,14 +33,14 @@ describe("installAgent", () => {
     await installAgent("claude");
     expect(invoke).toHaveBeenCalledWith("agent_enable_claude_hooks");
     expect(setAgentNotifications).toHaveBeenCalledWith(true);
-    expect(suggestions.claude).toMatchObject({ installedOnce: true });
+    expect(suggestions.claude).toMatchObject({ installedOnce: true, markerDismissed: false });
   });
 
   it("installs a file agent, tracks it and records the install", async () => {
     await installAgent("pi");
     expect(invoke).toHaveBeenCalledWith("agent_setup_pi");
     expect(installed).toEqual(["pi"]);
-    expect(suggestions.pi).toMatchObject({ installedOnce: true });
+    expect(suggestions.pi).toMatchObject({ installedOnce: true, markerDismissed: false });
   });
 
   it("records nothing when the install fails", async () => {
@@ -53,6 +53,6 @@ describe("installAgent", () => {
     await installAgent("omp");
     await removeAgent("omp");
     expect(installed).toEqual([]);
-    expect(suggestions.omp).toMatchObject({ installedOnce: true });
+    expect(suggestions.omp).toMatchObject({ installedOnce: true, markerDismissed: false });
   });
 });

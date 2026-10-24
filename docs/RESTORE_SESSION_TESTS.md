@@ -649,7 +649,7 @@ corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
 
 - [ ] Sin la integracion de Pi instalada y sin entrada `pi` en `integrationSuggestions`, abrir Kex y lanzar `pi` en un tab
 - [ ] Esperado: sale un toast "Pi is running without the Kex integration" con los botones Install y View changes, y el tab lleva un icono amarillo de exclamacion
-- [ ] `settings-general.json` ahora tiene `"pi": { "asks": 1, "lastAskedAt": <ahora>, "installedOnce": false }`
+- [ ] `settings-general.json` ahora tiene `"pi": { "asks": 1, "lastAskedAt": <ahora>, "installedOnce": false, "markerDismissed": false }`
 - [ ] Lanzar `pi` en un segundo tab: no sale otro toast, pero el segundo tab tambien lleva el icono
 
 ### L2 Botones del toast
@@ -660,15 +660,18 @@ corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
 
 ### L3 El icono del tab
 
-- [ ] Pasar el raton por el icono amarillo: vuelve a salir el toast. Repetir varias veces: no se apilan, siempre hay uno
-- [ ] Esa aparicion no cambia `asks` en `settings-general.json`
+- [ ] Pasar el raton por el icono amarillo: sale una tarjeta con "Pi agent detected. Open settings to install integration" y un engranaje. No sale ningun toast
+- [ ] La tarjeta sigue abierta al mover el raton del icono a ella, y se cierra al salir de ambos
+- [ ] El engranaje abre Settings > General
+- [ ] "Don't remind me again": el icono desaparece de todos los tabs de Pi, `markerDismissed` pasa a `true` y `asks` no cambia. Lanzar `pi` en un tab nuevo, tambien tras reabrir Kex: no hay icono
+- [ ] Con Pi descartado, lanzar otro agente sin integracion (OMP): su icono sigue saliendo
 - [ ] Salir de `pi` (Ctrl+D): el icono desaparece del tab
 
 ### L4 Segunda y ultima vez
 
 - [ ] Con la entrada `pi` en `asks: 1`, reabrir Kex y lanzar `pi`: no sale el toast, pero si el icono
 - [ ] Cerrar Kex, poner `lastAskedAt` 16 dias atras (`date -v-16d +%s000` da los milisegundos), abrir Kex y lanzar `pi`: sale el toast y `asks` pasa a 2
-- [ ] Repetir con `lastAskedAt` aun mas antiguo: no sale nunca mas el toast; el icono del tab sigue saliendo
+- [ ] Repetir con `lastAskedAt` aun mas antiguo: no sale nunca mas el toast; el icono del tab sigue saliendo (mientras no se haya descartado con "Don't remind me again")
 
 ### L5 Instalada una vez, no se vuelve a preguntar
 
