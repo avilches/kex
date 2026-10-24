@@ -152,11 +152,11 @@ impl SessionsSource {
             Self::PiSessions => {
                 find_in_agent_sessions(&pi_sessions_root(), session_id, transcript_path)
             }
-            Self::CodexSessions => {
-                let root =
-                    codex_sessions_root_from(std::env::var_os("CODEX_HOME"), dirs::home_dir())?;
-                find_in_codex_sessions(&root, session_id, transcript_path)
-            }
+            Self::CodexSessions => find_in_codex_sessions(
+                codex_sessions_root().as_deref(),
+                session_id,
+                transcript_path,
+            ),
         }
     }
 }
@@ -249,6 +249,32 @@ fn pi_sessions_root() -> PathBuf {
         .join("sessions")
 }
 
+#[cfg(not(test))]
+fn codex_sessions_root() -> Option<PathBuf> {
+    codex_sessions_root_from(std::env::var_os("CODEX_HOME"), dirs::home_dir())
+}
+
+// Tests never resolve the real CODEX_HOME or ~/.codex: the root is per test thread and unset
+// unless a test injects one with `with_codex_sessions_root`.
+#[cfg(test)]
+thread_local! {
+    static TEST_CODEX_ROOT: std::cell::RefCell<Option<PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn codex_sessions_root() -> Option<PathBuf> {
+    TEST_CODEX_ROOT.with(|r| r.borrow().clone())
+}
+
+#[cfg(test)]
+pub fn with_codex_sessions_root<T>(root: &Path, f: impl FnOnce() -> T) -> T {
+    let previous = TEST_CODEX_ROOT.with(|r| r.replace(Some(root.to_path_buf())));
+    let out = f();
+    TEST_CODEX_ROOT.with(|r| *r.borrow_mut() = previous);
+    out
+}
+
 fn codex_sessions_root_from(
     codex_home: Option<std::ffi::OsString>,
     home: Option<PathBuf>,
@@ -261,10 +287,15 @@ fn codex_sessions_root_from(
 /// The rollout of `session_id` under `<root>/YYYY/MM/DD/`. The depth is fixed and days are
 /// walked newest first, stopping at the first day that holds it, so a recent session costs
 /// a few directory reads even when the tree has thousands of rollouts.
-fn find_in_codex_sessions(root: &Path, session_id: &str, transcript_path: &str) -> Option<PathBuf> {
+fn find_in_codex_sessions(
+    root: Option<&Path>,
+    session_id: &str,
+    transcript_path: &str,
+) -> Option<PathBuf> {
     if !transcript_path.is_empty() && Path::new(transcript_path).is_file() {
         return Some(PathBuf::from(transcript_path));
     }
+    let root = root?;
     if session_id.is_empty() {
         return None;
     }
@@ -737,7 +768,7 @@ mod tests {
         );
 
         assert_eq!(
-            find_in_codex_sessions(root.path(), CODEX_ID, ""),
+            find_in_codex_sessions(Some(root.path()), CODEX_ID, ""),
             Some(want)
         );
     }
@@ -750,7 +781,8 @@ mod tests {
         std::fs::write(&recorded, "{}\n").unwrap();
         write_rollout(root.path(), "2026/10/14", "2026-10-14T20-42-20", CODEX_ID);
 
-        let found = find_in_codex_sessions(root.path(), CODEX_ID, &recorded.display().to_string());
+        let found =
+            find_in_codex_sessions(Some(root.path()), CODEX_ID, &recorded.display().to_string());
 
         assert_eq!(found, Some(recorded));
     }
@@ -781,14 +813,17 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(find_in_codex_sessions(root.path(), CODEX_ID, ""), None);
+        assert_eq!(
+            find_in_codex_sessions(Some(root.path()), CODEX_ID, ""),
+            None
+        );
     }
 
     #[test]
     fn a_codex_find_without_a_sessions_tree_finds_nothing() {
         let root = tempfile::tempdir().unwrap();
         assert_eq!(
-            find_in_codex_sessions(&root.path().join("missing"), CODEX_ID, ""),
+            find_in_codex_sessions(Some(&root.path().join("missing")), CODEX_ID, ""),
             None
         );
     }
@@ -813,6 +848,24 @@ mod tests {
 
         let root = codex_sessions_root_from(None, Some(home.path().to_path_buf()));
         assert_eq!(root, Some(home.path().join(".codex").join("sessions")));
+    }
+
+    #[test]
+    fn tests_never_resolve_a_real_codex_root() {
+        let root = tempfile::tempdir().unwrap();
+        assert_eq!(codex_sessions_root(), None);
+        let inside = with_codex_sessions_root(root.path(), codex_sessions_root);
+        assert_eq!(inside, Some(root.path().to_path_buf()));
+        assert_eq!(codex_sessions_root(), None);
+        assert_eq!(
+            Provider::of("codex")
+                .unwrap()
+                .sessions
+                .as_ref()
+                .unwrap()
+                .find(CODEX_ID, ""),
+            None
+        );
     }
 
     #[test]

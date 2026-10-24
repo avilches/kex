@@ -2216,6 +2216,37 @@ mod tests {
     }
 
     #[test]
+    fn a_codex_record_without_a_transcript_path_finds_its_rollout_in_the_injected_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("launch");
+        let stale = dir.path().join("stale");
+        std::fs::create_dir_all(&launch).unwrap();
+        std::fs::create_dir_all(&stale).unwrap();
+        let sessions = dir.path().join("sessions");
+        let day = sessions.join("2026/10/14");
+        std::fs::create_dir_all(&day).unwrap();
+        std::fs::write(
+            day.join("rollout-2026-10-14T20-42-20-abc-123.jsonl"),
+            format!(
+                "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"abc-123\",\"cwd\":\"{}\"}}}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), record(Some("codex"), &stale, "", None));
+        write_store(&store_path, tabs);
+
+        let plans = crate::modules::agent::provider::with_codex_sessions_root(&sessions, || {
+            load_restore_plan_from_path(&store_path)
+        });
+
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+        assert_eq!(plans[0].resume_cmd, "codex resume 'abc-123'");
+    }
+
+    #[test]
     fn a_codex_record_with_an_empty_transcript_path_and_no_rollout_still_resumes() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
