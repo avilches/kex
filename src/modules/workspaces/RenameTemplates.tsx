@@ -92,21 +92,23 @@ export function RenameTemplates({
           onInserted={onInserted}
         />
       )}
-      <button
-        type="button"
-        title="Edit the default titles in Settings"
-        aria-label="Edit the default titles in Settings"
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => {
-          e.stopPropagation();
-          void openTitleTemplatesSettings();
-        }}
-        className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-      >
-        <HugeiconsIcon icon={Settings01Icon} size={12} strokeWidth={2} />
-        Defaults
-      </button>
+      {open && (
+        <button
+          type="button"
+          title="Edit the default titles in Settings"
+          aria-label="Edit the default titles in Settings"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            void openTitleTemplatesSettings();
+          }}
+          className="flex h-6 w-full items-center gap-1.5 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Settings01Icon} size={12} strokeWidth={2} />
+          Defaults
+        </button>
+      )}
     </>
   );
 }
@@ -120,7 +122,7 @@ function VariablesList({
 }: Omit<Props, "open" | "onToggle" | "shortcutId">) {
   const values = useVariableValues(tab, workspace);
   return (
-    <div className="flex flex-col text-[11px] leading-snug">
+    <div className="flex min-w-0 flex-col text-[11px] leading-snug">
       {titleVariablesFor(subject).map((variable) => (
         <VariableRow
           key={variable.name}
@@ -196,7 +198,7 @@ function VariableRow({
         const { value: next } = insertTitleVariable(input, `{${variable.name}}`);
         onInserted?.(next);
       }}
-      className="flex items-center gap-2 border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
+      className="flex w-full min-w-0 items-center gap-2 border-b border-border/30 py-0.5 pr-1 text-left transition-colors last:border-b-0 hover:bg-muted/50"
     >
       <span className="shrink-0 font-mono text-foreground">{`{${variable.name}}`}</span>
       <span className="min-w-0 flex-1 truncate text-muted-foreground">{variable.description}</span>
