@@ -138,11 +138,11 @@ describe("AgentIntegrationRow", () => {
     expect(screen.getByText("Not installed")).toBeTruthy();
   });
 
-  it("View changes shows the dry run without writing and installs from the dialog", async () => {
+  it("Preview shows the dry run without writing and installs from the dialog", async () => {
     render(<Row />);
     await screen.findByText("Not installed");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "View changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Preview" }));
     });
     expect(await screen.findByText("+ export {}")).toBeTruthy();
     expect(invoke).toHaveBeenCalledWith("agent_integration_preview", {
@@ -186,7 +186,7 @@ describe("AgentIntegrationRow", () => {
     expect(screen.getByText(/cannot parse ~\/\.codex\/hooks\.json or ~\/\.codex\/config\.toml/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Uninstall" })).toBeNull();
-    expect((screen.getByRole("button", { name: "View changes" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Preview" }) as HTMLButtonElement).disabled).toBe(true);
 
     codexStatus = "upToDate";
     await act(async () => {
@@ -204,7 +204,7 @@ describe("AgentIntegrationRow", () => {
     expect(screen.queryByText(/cannot parse/)).toBeNull();
     expect(screen.queryByText("Cannot read config")).toBeNull();
     expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
-    expect((screen.getByRole("button", { name: "View changes" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Preview" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
   });
 
@@ -234,7 +234,7 @@ describe("AgentIntegrationRow", () => {
     render(<CodexRow />);
     await screen.findByText("Not installed");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "View changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Preview" }));
     });
     expect(
       await screen.findByText("hooks.json is rewritten with standard JSON formatting."),

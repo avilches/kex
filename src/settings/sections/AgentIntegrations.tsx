@@ -62,7 +62,7 @@ export function AgentIntegrations() {
         />
       </div>
       <p className="text-[10.5px] text-muted-foreground">
-        View changes shows what Install would write, or what Uninstall would remove. Nothing is
+        Preview shows what Install would write, or what Uninstall would remove. Nothing is
         touched until you press the button.
       </p>
     </div>
