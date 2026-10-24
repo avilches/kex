@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use kex_lib::modules::agent::codex_hooks::{self, DEFAULT_SCRIPT_PATH, SESSION_HOOK_MARKER};
 use kex_lib::modules::agent::codex_integration::{self, CodexPaths, CodexStatus};
@@ -512,8 +513,12 @@ fn an_unsupported_platform_reports_unavailable_and_writes_nothing() {
     assert!(!env.paths.script.exists());
 }
 
+// HOME and CODEX_HOME are process-wide: every test that reads or sets them holds this.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
 #[test]
 fn the_commands_support_hooks_exactly_on_unix() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     assert_eq!(codex_integration::HOOKS_SUPPORTED, cfg!(unix));
     assert_eq!(CodexPaths::from_env().unwrap().hooks_supported, cfg!(unix));
 }
@@ -604,10 +609,6 @@ fn codex_home_wins_over_home() {
 mod commands {
     use super::*;
     use kex_lib::modules::agent::{agent_codex_status, agent_setup_codex, agent_sync_integrations};
-    use std::sync::Mutex;
-
-    // The commands read HOME and CODEX_HOME, which are process-wide.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn the_commands_follow_home_and_codex_home() {
