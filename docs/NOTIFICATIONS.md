@@ -211,7 +211,7 @@ ni peticiones en background cuando no hay ningún agente corriendo.
 
 Hooks can be installed from the notification bell popover. `agent_enable_claude_hooks`:
 - Reads `~/.claude/settings.json` atomically
-- Injects hook entries for the events of `trigger-event.sh` that the installed Claude Code knows (up to 10: `SessionStart`,
+- Injects hook entries for the events of `trigger-event.sh` that the installed Claude Code knows (up to 11: `SessionStart`,
   `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
   `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
 - Is idempotent, safe to run on an already-configured installation

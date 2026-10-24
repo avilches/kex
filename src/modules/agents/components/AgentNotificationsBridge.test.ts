@@ -77,6 +77,12 @@ describe("handleSignal PostCompact", () => {
     expect(routeAgentNotification).not.toHaveBeenCalled();
   });
 
+  test("a compact whose trigger is empty behaves like a manual one", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "" }), ctx());
+    expect(session().status).toBe("idle");
+  });
+
   test("an automatic compact inside a turn keeps the tab working", () => {
     handleSignal(sig("UserPromptSubmit"), ctx());
     handleSignal(sig("PostCompact", { trigger: "auto" }), ctx());

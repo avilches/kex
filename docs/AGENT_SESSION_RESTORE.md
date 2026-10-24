@@ -124,7 +124,7 @@ extracted from the npm releases). When the version cannot be read, only the six 
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
 a downgrade removes Kex's hook from the events the older Claude does not know. Uninstalling removes Kex's hook from
 every known event whatever the installed version. `agent_claude_hooks_status` expects the events of the installed
-version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is unchanged: the script did not change.
+version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v11` since the script forwards `PostCompact`.
 
 ### SessionStart hook
 

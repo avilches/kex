@@ -175,7 +175,7 @@ merges hooks (preserving anything not owned by Kex) and writes atomically
 `~/.config/kex/hooks/trigger-event.sh`
 (`session_hook_script_path()`), content embedded via `include_str!`.
 
-Ten events, all of them real Claude Code hook events. They are written to
+Ten events at the time of the comparison (11 since TASK-895 added `PostCompact`), all of them real Claude Code hook events. They are written to
 `settings.json` unconditionally, without looking at which Claude Code version
 is installed (TASK-893 changes that, see section 5):
 

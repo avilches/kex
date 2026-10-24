@@ -486,6 +486,14 @@ fn post_compact_signal(id: u32, p: &Payload) -> serde_json::Value {
     sig
 }
 
+/// Events that reach the frontend as a signal with no side effect on the Rust side.
+fn passthrough_signal(p: &Payload, id: u32) -> Option<serde_json::Value> {
+    match p.event.as_str() {
+        "PostCompact" => Some(post_compact_signal(id, p)),
+        _ => None,
+    }
+}
+
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
         log::debug!(
@@ -636,11 +644,6 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             sig["agentDescription"] = p.agent_description.as_deref().unwrap_or("").into();
             let _ = app.emit(AGENT_EVENT, sig);
         }
-        "PostCompact" => {
-            let trigger = p.compact_trigger.as_deref().unwrap_or("");
-            log::debug!("[ipc] PostCompact tab={tab_id} trigger={trigger}");
-            let _ = app.emit(AGENT_EVENT, post_compact_signal(pty_id, &p));
-        }
         "MessageDisplay" => {
             if !p.is_final {
                 return;
@@ -655,9 +658,13 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             sig["message"] = delta.into();
             let _ = app.emit(AGENT_EVENT, sig);
         }
-        other => {
-            log::debug!("[ipc] unhandled event {other} from tab={tab_id}");
-        }
+        other => match passthrough_signal(&p, pty_id) {
+            Some(sig) => {
+                log::debug!("[ipc] {other} tab={tab_id}");
+                let _ = app.emit(AGENT_EVENT, sig);
+            }
+            None => log::debug!("[ipc] unhandled event {other} from tab={tab_id}"),
+        },
     }
 }
 
@@ -1108,6 +1115,16 @@ mod tests {
         assert_eq!(sig["id"], 3);
         assert_eq!(sig["agent"], "claude");
         assert_eq!(sig["trigger"], "manual");
+    }
+
+    #[test]
+    fn post_compact_is_dispatched_as_a_passthrough_signal() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","trigger":"auto"}"#;
+        let sig = passthrough_signal(&parse_payload(json).unwrap(), 5).expect("no signal");
+        assert_eq!(sig["kind"], "PostCompact");
+        assert_eq!(sig["trigger"], "auto");
+        let other = r#"{"hook_event_name":"PreToolUse","session_id":"s"}"#;
+        assert!(passthrough_signal(&parse_payload(other).unwrap(), 5).is_none());
     }
 
     #[test]
