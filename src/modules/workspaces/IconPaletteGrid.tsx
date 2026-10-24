@@ -10,6 +10,8 @@ import { INPUT_CLASS } from "@/settings/components/inputClass";
 type Props = {
   value: string | undefined;
   onSelect: (icon: string | null) => void;
+  // "inline" puts a compact search box as the first cell of a three-row grid; only for wide surfaces.
+  layout?: "menu" | "inline";
 };
 
 const SEARCH_LIMIT = 120;
@@ -46,27 +48,39 @@ function IconButton({
 
 // The icon picker shared by the workspace and tab context menus: the curated
 // palette by default, any Hugeicons icon through the search box.
-export function IconPaletteGrid({ value, onSelect }: Props) {
+export function IconPaletteGrid({ value, onSelect, layout = "menu" }: Props) {
+  const inline = layout === "inline";
   const [query, setQuery] = useState("");
   const { results, loading } = useIconSearch(query, SEARCH_LIMIT);
   const searching = query.trim().length > 0;
 
+  const searchBox = (
+    <input
+      type="text"
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      // Radix menus run typeahead and arrow navigation on keydown.
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") e.stopPropagation();
+      }}
+      placeholder="Search any icon..."
+      spellCheck={false}
+      autoComplete="off"
+      className={cn(INPUT_CLASS, inline ? "h-8 w-28 shrink-0 text-[12px]" : "h-7 w-full text-[12px]")}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-1.5">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        // Radix menus run typeahead and arrow navigation on keydown.
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") e.stopPropagation();
-        }}
-        placeholder="Search any icon..."
-        spellCheck={false}
-        autoComplete="off"
-        className={cn(INPUT_CLASS, "h-7 w-full text-[12px]")}
-      />
-      <div className="flex flex-wrap gap-0.5">
+      {!inline && searchBox}
+      <div
+        className={
+          inline
+            ? "flex max-h-[100px] flex-wrap content-start items-center gap-0.5 overflow-y-auto"
+            : "grid max-h-[202px] grid-cols-6 content-start justify-start gap-0.5 overflow-y-auto"
+        }
+      >
+        {inline && searchBox}
         <button
           type="button"
           title="No icon"

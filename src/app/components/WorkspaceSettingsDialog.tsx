@@ -98,6 +98,7 @@ function ColorPicker({
 }) {
   return (
     <ColorPaletteGrid
+      layout="row"
       value={wsColor}
       displayColor={displayColor}
       noneSelected={wsColor === null}
@@ -277,6 +278,7 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium">Icon</span>
             <IconPaletteGrid
+              layout="inline"
               value={ws.icon}
               onSelect={(icon) => props.onSetIcon(ws.id, icon)}
             />
