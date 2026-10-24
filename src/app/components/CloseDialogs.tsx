@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
@@ -74,7 +72,6 @@ function TerminalCloseHeader({ info }: { info: TabInfo | null }) {
     <>
       <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
         <AlertDialogTitle className="flex items-center gap-2">
-          <HugeiconsIcon icon={Alert02Icon} size={18} className="shrink-0 text-destructive" />
           Close terminal?
         </AlertDialogTitle>
         <div

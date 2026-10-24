@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
@@ -143,7 +143,6 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
       <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
         <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
           <AlertDialogTitle className="flex items-center gap-2">
-            {closing && <HugeiconsIcon icon={Alert02Icon} size={18} className="shrink-0 text-destructive" />}
             {closing ? "Close workspace?" : "Hibernate workspace?"}
           </AlertDialogTitle>
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
