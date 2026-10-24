@@ -932,7 +932,6 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[cfg(unix)]
     fn spool_script(home: &std::path::Path) -> std::path::PathBuf {
         let script = home.join("trigger-event.sh");
         std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
@@ -1032,6 +1031,58 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn trigger_script_spools_with_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let payload = r#"{"hook_event_name":"Notification","session_id":"s"}"#;
+        spawn_spooling_script(&script, dir.path(), payload)
+            .wait()
+            .unwrap();
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 1);
+        let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&files[0]), 0o600);
+        assert_eq!(mode(files[0].parent().unwrap()), 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_refuses_tab_ids_that_could_escape_the_spool() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        let victim = outside.join("victim.json");
+        std::fs::write(&victim, "keep").unwrap();
+        let abs = outside.to_string_lossy().to_string();
+        for tab in ["..", "../outside", abs.as_str(), "a/b", ".", ""] {
+            let mut child = Command::new("bash")
+                .arg(&script)
+                .env("HOME", dir.path())
+                .env("KEX_TERMINAL", "1")
+                .env("KEX_TAB_ID", tab)
+                .env("KEX_IPC", dir.path().join("missing.sock"))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap();
+            let _ = child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(br#"{"hook_event_name":"Notification","session_id":"s"}"#);
+            assert!(child.wait().unwrap().success());
+        }
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+        assert_eq!(std::fs::read_dir(&outside).unwrap().count(), 1);
+        assert!(!dir.path().join(".config/kex/spool").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn trigger_script_prunes_the_spool_by_count_and_by_age() {
         let dir = tempfile::tempdir().unwrap();
         let script = spool_script(dir.path());
@@ -1067,6 +1118,7 @@ mod tests {
         assert!(std::fs::read_to_string(newest).unwrap().contains("\"new\""));
     }
 
+    #[cfg(unix)]
     #[test]
     fn trigger_script_without_a_tab_id_sends_nothing() {
         assert!(run_trigger_script(Some("codex"), None).is_none());

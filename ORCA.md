@@ -143,7 +143,7 @@ below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
 through the PTY stream instead; once the socket migration (`2145a981`,
 `ed14289f`) left nothing emitting it, that parser was deleted from
 `agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
-channel. The current mechanism is marked `kex-session-v11` inside the hook
+channel. The current mechanism is marked `kex-session-v12` inside the hook
 script itself (`SESSION_HOOK_SCRIPT_VERSION` in `agent/mod.rs`).
 
 ### 2.1 OSC still in use
@@ -203,7 +203,7 @@ send_ipc() {
 If both `nc` and the `python3` fallback fail, the script appends the payload to
 `~/.config/kex/spool/<tab_id>/<timestamp>-<pid>-<random>.json`, one file per
 event, written under a dot name and renamed into place (nothing is ever
-rewritten; capped at 200 files and 7 days, oldest deleted first) and exits 0;
+rewritten; capped at 200 files and 7 days of file age, oldest deleted first; directory 0700, files 0600) and exits 0;
 the listener replays the files in name order and removes each one when it
 starts (`ipc.rs::drain_spool`, which skips stale `SessionEnd` and
 `StopFailure`). This is TASK-730 and TASK-896, done.

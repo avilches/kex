@@ -36,7 +36,7 @@ fi
 # Caps on a tab's spool directory, so a tab that never reopens in Kex (and so never drains
 # it) can't grow it without bound. Files older than the age cap are deleted too.
 MAX_SPOOL_FILES=200
-MAX_SPOOL_AGE_DAYS=7
+MAX_SPOOL_AGE_MINUTES=10080
 
 # Sortable, collision-free file name: microsecond timestamp (EPOCHREALTIME on bash 5, GNU date
 # %N, or whole seconds on macOS where bash is 3.2 and BSD date has no %N), then PID and RANDOM.
@@ -59,7 +59,7 @@ spool_name() {
 # Keeps the newest MAX_SPOOL_FILES events and drops what is too old. It only deletes.
 prune_spool() {
     local dir="$1" count excess f
-    find "$dir" -type f -mtime +"$MAX_SPOOL_AGE_DAYS" -exec rm -f {} + 2>/dev/null
+    find "$dir" -maxdepth 1 -type f -mmin +"$MAX_SPOOL_AGE_MINUTES" -exec rm -f {} + 2>/dev/null
     count="$(ls -1 "$dir" 2>/dev/null | wc -l | tr -d ' ')"
     if [ -n "$count" ] && [ "$count" -gt "$MAX_SPOOL_FILES" ]; then
         excess=$((count - MAX_SPOOL_FILES))
@@ -75,8 +75,15 @@ prune_spool() {
 # under a dot name and renamed, so the listener never reads a half-written one. The listener
 # removes the emptied directory after draining, which can land between our mkdir and mv; hence the retry.
 spool_event() {
+    # The tab id becomes a directory name; nid() ids are [A-Za-z0-9_-], anything else could
+    # point outside the spool.
+    case "$KEX_TAB_ID" in
+        ''|*[!A-Za-z0-9_-]*) return 0 ;;
+    esac
     local dir="$HOME/.config/kex/spool/$KEX_TAB_ID" name attempt
     name="$(spool_name)"
+    # Payloads carry prompts and paths: keep the directory 0700 and the files 0600.
+    umask 077
     for attempt in 1 2 3; do
         mkdir -p "$dir" 2>/dev/null || return 0
         if printf '%s\n' "$PAYLOAD" > "$dir/.$name.tmp" 2>/dev/null \

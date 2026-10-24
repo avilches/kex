@@ -262,9 +262,28 @@ fn spool_dir() -> Option<PathBuf> {
     Some(dirs::home_dir()?.join(".config").join("kex").join("spool"))
 }
 
+/// True for ids made of the `nid()` alphabet. The id names a directory under the spool, so
+/// anything else (empty, `..`, a separator, an absolute path) could reach outside it.
+fn is_safe_tab_id(tab_id: &str) -> bool {
+    (1..=64).contains(&tab_id.len())
+        && tab_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
 /// The directory holding one file per undelivered event of a tab.
-fn spool_dir_for_tab(base: &Path, tab_id: &str) -> PathBuf {
-    base.join(tab_id)
+fn spool_dir_for_tab(base: &Path, tab_id: &str) -> Option<PathBuf> {
+    is_safe_tab_id(tab_id).then(|| base.join(tab_id))
+}
+
+const ORPHAN_TMP_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+fn is_older_than(path: &Path, age: std::time::Duration) -> bool {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|e| e > age)
 }
 
 /// Replays any hook events spooled to disk by `trigger-event.sh` because a
@@ -278,15 +297,28 @@ fn spool_dir_for_tab(base: &Path, tab_id: &str) -> PathBuf {
 /// undelivered files for the next drain, which is also how a half-drained
 /// directory recovers. That trades a possible duplicate (a crash between
 /// `on_line` and the remove) for never dropping an event, like the rest of
-/// this module (at-least-once). Dot files are scripts' in-flight or
-/// crashed temporaries and are left to the script's age pruning.
+/// this module (at-least-once). Dot files are the script's in-flight
+/// temporaries: left alone unless they are over a day old, when the writer
+/// is certainly dead. A file that cannot be read as text is deleted, since
+/// it would otherwise stay forever.
 fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
-    let dir = spool_dir_for_tab(base, tab_id);
+    let Some(dir) = spool_dir_for_tab(base, tab_id) else {
+        log::warn!("[ipc] refusing to drain spool for unsafe tab id {tab_id:?}");
+        return;
+    };
     let mut files: Vec<PathBuf> = match std::fs::read_dir(&dir) {
         Ok(rd) => rd
             .filter_map(Result::ok)
-            .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
-            .map(|e| e.path())
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .filter_map(|e| {
+                if !e.file_name().to_string_lossy().starts_with('.') {
+                    return Some(e.path());
+                }
+                if is_older_than(&e.path(), ORPHAN_TMP_MAX_AGE) {
+                    let _ = std::fs::remove_file(e.path());
+                }
+                None
+            })
             .collect(),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -309,8 +341,7 @@ fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => {
-                log::warn!("[ipc] failed to read spooled event {path:?}: {e}");
-                continue;
+                log::warn!("[ipc] discarding unreadable spooled event {path:?}: {e}");
             }
         }
         if let Err(e) = std::fs::remove_file(path) {
@@ -1184,7 +1215,7 @@ mod tests {
     }
 
     fn spool_event_file(base: &Path, tab_id: &str, name: &str, body: &str) -> PathBuf {
-        let dir = spool_dir_for_tab(base, tab_id);
+        let dir = spool_dir_for_tab(base, tab_id).unwrap();
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join(name);
         std::fs::write(&path, body).unwrap();
@@ -1203,7 +1234,67 @@ mod tests {
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
         assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
-        assert!(!spool_dir_for_tab(dir.path(), tab_id).exists());
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
+    }
+
+    #[test]
+    fn is_safe_tab_id_accepts_only_the_nid_alphabet() {
+        assert!(is_safe_tab_id("tab-abc_123"));
+        assert!(is_safe_tab_id(&"a".repeat(64)));
+        for bad in [
+            "",
+            "..",
+            ".",
+            "a/b",
+            "../x",
+            "/etc",
+            "a b",
+            "a.b",
+            &"a".repeat(65),
+        ] {
+            assert!(!is_safe_tab_id(bad), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn drain_spool_never_touches_files_outside_the_spool_for_unsafe_tab_ids() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("spool");
+        std::fs::create_dir_all(&base).unwrap();
+        let victim = root.path().join("victim.json");
+        std::fs::write(&victim, "keep").unwrap();
+        let abs = root.path().to_string_lossy().to_string();
+        for tab in ["..", "../", abs.as_str(), "", "a/b"] {
+            let mut called = false;
+            drain_spool(&base, tab, |_| called = true);
+            assert!(!called, "{tab:?}");
+        }
+        assert!(victim.exists());
+    }
+
+    #[test]
+    fn drain_spool_deletes_unreadable_files_and_day_old_orphan_temporaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-junk";
+        let bad = spool_event_file(dir.path(), tab_id, "0001-a.json", "x");
+        std::fs::write(&bad, [0xff, 0xfe, 0xfd]).unwrap();
+        let old_tmp = spool_event_file(dir.path(), tab_id, ".0002-b.json.tmp", "half");
+        let two_days = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(&old_tmp)
+            .unwrap()
+            .set_modified(two_days)
+            .unwrap();
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "ok\n");
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+
+        assert_eq!(seen, vec!["ok"]);
+        assert!(!bad.exists());
+        assert!(!old_tmp.exists());
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
     }
 
     #[test]
@@ -1256,7 +1347,7 @@ mod tests {
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
         assert_eq!(seen, vec!["second", "third", "fourth"]);
-        assert!(!spool_dir_for_tab(dir.path(), tab_id).exists());
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
     }
 
     #[test]
