@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { pathBasename } from "@/lib/pathUtils";
+import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
@@ -41,6 +43,14 @@ import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { tabRowKey, workspaceRowKey } from "./lib/tabRank";
 import { type TerminalTarget, terminalTargetOf } from "./lib/terminalTarget";
 import { enterHintOf } from "./lib/enterHint";
+import { registerPaletteControl } from "./lib/paletteControl";
+import {
+  highlightedTabOf,
+  type RowMenuItemId,
+  tabEntryCopyPath,
+  tabMenuItems,
+} from "./lib/rowMenu";
+import { anchorOf, RowMenu, useRowMenu } from "./RowMenu";
 import { MergedList } from "./MergedList";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "./PaletteWidth";
 import { useRestoreFocusOnEscape } from "./useRestoreFocusOnEscape";
@@ -66,6 +76,8 @@ type Props = {
   onRunClosed: (entry: ClosedTabEntry) => void;
   onMoveActiveTabToWorkspace: (target: string | "new") => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
+  onOpenTerminalAt: (target: TerminalTarget) => void;
+  onCloseTab: (entry: TabEntry) => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -102,6 +114,8 @@ export function CommandPalette({
   onRunClosed,
   onMoveActiveTabToWorkspace,
   onTerminalTargetChange,
+  onOpenTerminalAt,
+  onCloseTab,
 }: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
@@ -163,6 +177,12 @@ export function CommandPalette({
     [open, inCommands, value, merged],
   );
   const footerEnterHint = inCommands ? enterHintOf(value, merged) : "Select";
+  const highlightedTab = useMemo(
+    () => (open && inCommands ? highlightedTabOf(value, merged) : null),
+    [open, inCommands, value, merged],
+  );
+  const rowMenu = useRowMenu();
+  const boxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     onTerminalTargetChange(terminalTarget);
     return () => onTerminalTargetChange(null);
@@ -350,6 +370,56 @@ export function CommandPalette({
     [insertCommand, runAfterClose],
   );
 
+  const { close: closeRowMenu, open: openRowMenu } = rowMenu;
+  const runTabAction = useCallback(
+    (id: RowMenuItemId, entry: TabEntry) => {
+      closeRowMenu();
+      if (id === "go") {
+        recordChoice(parsed.term, tabRowKey(entry.tabId));
+        runAfterClose(() => onSelectTab(entry));
+      } else if (id === "terminal") {
+        const target = terminalTargetOf(`tab:${entry.tabId}`, merged);
+        if (target) onOpenTerminalAt(target);
+      } else if (id === "copy") {
+        const path = tabEntryCopyPath(entry);
+        if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
+      } else if (id === "close") {
+        onCloseTab(entry);
+      }
+    },
+    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, onCloseTab],
+  );
+
+  const openTabMenu = useCallback(
+    (entry: TabEntry, row: Element | null | undefined) => {
+      const box = boxRef.current;
+      if (!box || !row) return;
+      openRowMenu(`tab:${entry.tabId}`, tabMenuItems(entry), anchorOf(box, row as HTMLElement));
+    },
+    [openRowMenu],
+  );
+
+  const latestShortcut = useRef({ highlightedTab, runTabAction });
+  latestShortcut.current = { highlightedTab, runTabAction };
+  // Cmd+W and Cmd+Shift+C act on the highlighted tab; Cmd+T keeps opening the terminal beside it.
+  useEffect(() => {
+    if (!open) return;
+    return registerPaletteControl((action) => {
+      if (action === "newTab") return false;
+      const { highlightedTab: entry, runTabAction: run } = latestShortcut.current;
+      if (entry) run(action === "closeTab" ? "close" : "copy", entry);
+      return true;
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) closeRowMenu();
+  }, [open, closeRowMenu]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: typing closes the menu
+  useEffect(() => {
+    closeRowMenu();
+  }, [query, closeRowMenu]);
+
   const commitTheme = useCallback(
     (id: string) => {
       setThemeId(id);
@@ -375,6 +445,21 @@ export function CommandPalette({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (rowMenu.menu) {
+        const entry = highlightedTabOf(rowMenu.menu.rowKey, merged);
+        if (rowMenu.handleKey(e, (item) => entry && runTabAction(item.id, entry))) return;
+      }
+      if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        if (inSubpage || !inCommands) return;
+        e.preventDefault();
+        if (highlightedTab) {
+          openTabMenu(
+            highlightedTab,
+            boxRef.current?.querySelector('[cmdk-item][aria-selected="true"]'),
+          );
+        }
+        return;
+      }
       if (!inSubpage) return;
       if (e.key === "Backspace" && query.length === 0) {
         e.preventDefault();
@@ -383,7 +468,19 @@ export function CommandPalette({
         else exitWorkspaces();
       }
     },
-    [inSubpage, inThemes, query, exitThemes, exitWorkspaces],
+    [
+      inSubpage,
+      inThemes,
+      inCommands,
+      query,
+      exitThemes,
+      exitWorkspaces,
+      rowMenu,
+      merged,
+      runTabAction,
+      highlightedTab,
+      openTabMenu,
+    ],
   );
 
   const placeholder = inThemes
@@ -424,6 +521,15 @@ export function CommandPalette({
           placeholder={placeholder}
           autoFocus
         />
+        <div
+          ref={boxRef}
+          className={cn("relative", rowMenu.menu && "min-h-[150px]")}
+          onPointerDownCapture={(e) => {
+            if (rowMenu.menu && !(e.target as HTMLElement).closest("[data-row-menu]")) {
+              closeRowMenu();
+            }
+          }}
+        >
         <ScrollArea
           ref={listRef}
           className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
@@ -551,6 +657,11 @@ export function CommandPalette({
                   onRunClosed={(entry) =>
                     runAfterClose(() => onRunClosed(entry))
                   }
+                  onContextMenuTab={(entry, e) => {
+                    e.preventDefault();
+                    setValue(`tab:${entry.tabId}`);
+                    openTabMenu(entry, e.currentTarget);
+                  }}
                 />
               )
             ) : parsed.mode === "content" ? (
@@ -642,6 +753,17 @@ export function CommandPalette({
             )}
           </CommandList>
         </ScrollArea>
+        {rowMenu.menu ? (
+          <RowMenu
+            menu={rowMenu.menu}
+            onRun={(id) => {
+              const entry = highlightedTabOf(rowMenu.menu?.rowKey ?? "", merged);
+              if (entry) runTabAction(id, entry);
+            }}
+            onActive={(active) => rowMenu.setActive(active)}
+          />
+        ) : null}
+        </div>
         <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
           <span className="flex shrink-0 items-center gap-1.5">
             <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
@@ -649,6 +771,14 @@ export function CommandPalette({
             </kbd>
             {footerEnterHint}
           </span>
+          {highlightedTab ? (
+            <span className="flex shrink-0 items-center gap-1.5">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+                Tab
+              </kbd>
+              Menu
+            </span>
+          ) : null}
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
               {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}

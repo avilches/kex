@@ -27,11 +27,13 @@ export function TabItem({
   highlight,
   term = "",
   onRun,
+  onContextMenu,
 }: {
   entry: TabEntry;
   highlight?: RowHighlight;
   term?: string;
   onRun: () => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   const lines = tabDetailLines(entry);
   const folded = foldText(term.trim());
@@ -44,6 +46,7 @@ export function TabItem({
     <CommandItem
       value={`tab:${entry.tabId}`}
       onSelect={onRun}
+      onContextMenu={onContextMenu}
       className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
     >
       <RowTag kind={tabTagKind(entry)} />

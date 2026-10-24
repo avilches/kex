@@ -267,6 +267,7 @@ import {
 import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
+import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
 import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
@@ -2918,6 +2919,7 @@ export default function App() {
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
       "tab.new": () => {
+        if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;
         if (target) void openTerminalAtPaletteTarget(target);
         else if (commandPaletteOpenRef.current) {
@@ -2958,7 +2960,10 @@ export default function App() {
       },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
-      "tab.close": handleCloseActiveTab,
+      "tab.close": () => {
+        if (runPaletteShortcut("closeTab")) return;
+        handleCloseActiveTab();
+      },
       "tab.reopenClosed": () => {
         if (activeWorkspace) reopenClosed();
       },
@@ -3155,6 +3160,7 @@ export default function App() {
           );
       },
       "path.copy": () => {
+        if (runPaletteShortcut("copyPath")) return;
         if (!activeTab) return;
         let value: string | undefined;
         let label: string;
@@ -3336,6 +3342,7 @@ export default function App() {
         void setEditorAutoSave(!usePreferencesStore.getState().editorAutoSave);
         break;
       case "close_tab":
+        if (runPaletteShortcut("closeTab")) break;
         handleCloseActiveTab();
         break;
       case "close_others":
@@ -3644,6 +3651,14 @@ export default function App() {
     },
     [wakeWorkspace, goToTab, focusTab],
   );
+  const onPaletteCloseTab = useCallback((entry: TabEntry) => {
+    if (entry.hibernated) return;
+    if (entry.tab.locked) {
+      flashLockIcon(entry.tabId);
+      return;
+    }
+    void closeTabsRef.current([entry.tabId]);
+  }, []);
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {
       void selectWorkspace(entry, { wake: wakeWorkspace, activate: setActiveWorkspaceId });
@@ -4147,6 +4162,8 @@ export default function App() {
             onRunClosed={onPaletteRunClosed}
             onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
+            onOpenTerminalAt={openTerminalAtPaletteTarget}
+            onCloseTab={onPaletteCloseTab}
           />
 
           <FolderPalette
