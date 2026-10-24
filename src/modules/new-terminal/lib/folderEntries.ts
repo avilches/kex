@@ -5,6 +5,9 @@ import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 
 export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" | "Home";
 
+/** The fixed rows right after the current tab; each has its own shortcut, always the same one. */
+export type FolderSlot = "root" | "main" | "home";
+
 /** One checkout of a repository, as the worktree listing reports it. */
 export type RepoWorktree = { path: string; branch: string | null; isMain: boolean };
 
@@ -28,8 +31,10 @@ export type FolderRow = {
   repoKey: string | null;
   // Name of that repository, shown on the small heading of a group of its folders.
   repoName: string | null;
-  // Home stays right after the current tab's repository, outside any repository group.
+  // A fixed row (workspace root, main checkout, home) right after the current tab, outside any repository group.
   pinned: boolean;
+  // Which fixed shortcut picks it; null for every other row.
+  slot: FolderSlot | null;
   // How many folders of its repository sit together in its workspace.
   cluster: number;
   // How many worktrees its repository has, main checkout included; 0 until the listing arrives.
@@ -145,7 +150,13 @@ function repoKeyOf(b: Builder, path: string): string | null {
   return b.keyOfRoot.get(root) ?? root;
 }
 
-type RowExtras = { branch: string | null; repoKey: string; pinned: boolean; nested: boolean };
+type RowExtras = {
+  branch: string | null;
+  repoKey: string;
+  pinned: boolean;
+  nested: boolean;
+  slot: FolderSlot;
+};
 
 function rowOf(
   b: Builder,
@@ -159,7 +170,8 @@ function rowOf(
   const display = displayOf(path, input.home);
   const repoKey = extras.repoKey ?? repoKeyOf(b, path);
   return {
-    key: `${workspaceId}:${path}`,
+    // A fixed row may repeat a path that another row shows, so its slot is part of the key.
+    key: extras.slot ? `${workspaceId}:${path}#${extras.slot}` : `${workspaceId}:${path}`,
     path,
     display,
     displayShift: path.length - display.length,
@@ -169,6 +181,7 @@ function rowOf(
     repoKey,
     repoName: repoNameOf(repoKey),
     pinned: extras.pinned ?? false,
+    slot: extras.slot ?? null,
     cluster: 1,
     headed: false,
     worktreeCount: 0,
@@ -200,7 +213,7 @@ type RawGroup = {
   loose: FolderRow[];
 };
 
-// Within a repository the current tab goes first, then the workspace root, then its main
+// Within a repository the current tab goes first, then the workspace root of another workspace, then its main
 // checkout, then the rest by path, and the worktrees added with the new-tab shortcut last.
 function inCluster(a: FolderRow, b: FolderRow): number {
   const rank = (r: FolderRow) =>
@@ -243,6 +256,7 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
   const mine = raw.current
     ? [raw.current, ...rest.filter((r) => currentKey && r.repoKey === currentKey)].sort(inCluster)
     : [];
+  const [first, ...mineRest] = mine;
   const others = clusterRows(
     currentKey ? rest.filter((r) => r.repoKey !== currentKey) : rest,
   );
@@ -270,15 +284,17 @@ function finalize(b: Builder, raw: RawGroup, addedHere: ReadonlySet<string>): Fo
     if (!row.repoKey) continue;
     row.repoHint = hintOf(row.repoKey);
   }
-  return { ...raw.head, rows: [...mine, ...raw.pinned, ...others] };
+  return { ...raw.head, rows: [...(first ? [first] : []), ...raw.pinned, ...mineRest, ...others] };
 }
 
 // One path appears once in the whole palette: the seen set is shared across
 // groups, so a folder shown in an earlier group never comes back in a later one,
 // and a workspace whose rows were all taken is skipped.
-// Order: the active workspace (the repository of the current tab with the current tab first, then
-// home, then the workspace root and its other folders), then every other workspace in position order. The folders of
-// one repository sit together under a small heading with its name, its main checkout first.
+// Order: the active workspace (the current tab, then the fixed rows: workspace root, main checkout of
+// the current tab's repository and home, each with its own shortcut and shown even when another row
+// repeats its path, then the other folders of the current tab's repository and the rest), then every other
+// workspace in position order. The folders of one repository sit together under a small heading with its
+// name, its main checkout first.
 // Worktrees are not listed until the new-tab shortcut asks for them on a row of their repository.
 export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const b = builderOf(input);
@@ -324,20 +340,34 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     if (cwd) {
       pushUnique(b, currentRows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
     }
-    const home = input.home?.replace(/[\\/]+$/, "");
-    if (home) {
-      pushUnique(b, pinned, rowOf(b, home, activeWs.id, sleeping, "Home", { pinned: true }));
-    }
+    const slotRow = (
+      path: string,
+      label: FolderRowLabel,
+      slot: FolderSlot,
+      extras: Partial<RowExtras> = {},
+    ) => rowOf(b, path, activeWs.id, sleeping, label, { pinned: true, slot, ...extras });
     const rootPath = rootOf(activeWs);
-    const rootRows: FolderRow[] = [];
-    if (rootPath) {
-      pushUnique(b, rootRows, rowOf(b, rootPath, activeWs.id, sleeping, "Workspace Root"));
+    if (rootPath && rootPath !== cwd) pinned.push(slotRow(rootPath, "Workspace Root", "root"));
+    const currentRepo = currentRows[0]?.repoKey;
+    const mainCheckout = currentRepo
+      ? b.worktreesOfKey.get(currentRepo)?.find((w) => w.isMain)
+      : undefined;
+    if (currentRepo && mainCheckout && mainCheckout.path !== cwd) {
+      pinned.push(
+        slotRow(mainCheckout.path, "Main checkout", "main", {
+          branch: mainCheckout.branch,
+          repoKey: currentRepo,
+        }),
+      );
     }
+    const home = input.home?.replace(/[\\/]+$/, "");
+    if (home && home !== cwd) pinned.push(slotRow(home, "Home", "home"));
+    for (const row of pinned) b.seen.add(row.path);
     raws.push({
       head: headOf(activeWs, true),
       current: currentRows[0] ?? null,
       pinned,
-      root: rootRows[0] ?? null,
+      root: null,
       loose: looseOf(activeWs),
     });
   }

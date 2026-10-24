@@ -17,6 +17,7 @@ const row = (over: Partial<FolderRow> = {}): FolderRow => ({
   repoKey: over.repoKey ?? null,
   repoName: over.repoName ?? null,
   pinned: over.pinned ?? false,
+  slot: over.slot ?? null,
   cluster: over.cluster ?? 1,
   headed: over.headed ?? (over.cluster ?? 1) >= 2,
   worktreeCount: over.worktreeCount ?? 0,
@@ -510,6 +511,88 @@ describe("FolderPalette", () => {
       });
       expect(onPick).toHaveBeenCalledTimes(1);
       expect(onPick.mock.calls[0][0]).toMatchObject({ path: "/repo" });
+    });
+  });
+
+  describe("fixed rows and their shortcuts", () => {
+    const fixed: FolderGroup[] = [
+      group({
+        workspaceId: "ws-1",
+        active: true,
+        rows: [
+          row({ path: "/repo/wt", label: "Current tab", key: "ws-1:/repo/wt" }),
+          row({ path: "/repo", label: "Workspace Root", slot: "root", pinned: true, key: "ws-1:/repo#root" }),
+          row({ path: "/repo", label: "Main checkout", slot: "main", pinned: true, key: "ws-1:/repo#main" }),
+          row({ path: "/Users/a", label: "Home", slot: "home", pinned: true, key: "ws-1:/Users/a#home" }),
+          row({ path: "/other", key: "ws-1:/other" }),
+        ],
+      }),
+    ];
+    const mountFixed = (rows: FolderGroup[], onPick = vi.fn()) =>
+      render(
+        createElement(FolderPalette, {
+          open: true,
+          onOpenChange: vi.fn(),
+          restoreFocus: vi.fn(),
+          groups: rows,
+          onPick,
+          onToggleWorktrees: vi.fn(),
+        }),
+      );
+
+    it.each([
+      ["folderRoot", "root"],
+      ["folderMain", "main"],
+      ["folderHome", "home"],
+    ] as const)("%s picks the %s row wherever the focus is", async (action, slot) => {
+      const onPick = vi.fn();
+      mountFixed(fixed, onPick);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+      });
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut(action);
+      });
+      expect(taken).toBe(true);
+      expect(onPick).toHaveBeenCalledTimes(1);
+      expect(onPick.mock.calls[0][0]).toMatchObject({ slot });
+    });
+
+    it("takes the key and does nothing when that fixed row does not exist", async () => {
+      const onPick = vi.fn();
+      mountFixed(
+        [group({ rows: [row({ path: "/a", label: "Current tab" }), row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h#home" })] })],
+        onPick,
+      );
+      await settle();
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut("folderMain");
+      });
+      expect(taken).toBe(true);
+      expect(onPick).not.toHaveBeenCalled();
+    });
+
+    it("draws the key of each fixed row on the row", async () => {
+      mountFixed(fixed);
+      await settle();
+      const keys = (label: string) =>
+        itemEls().find((el) => el.textContent?.includes(label))?.querySelector("kbd")?.textContent;
+      expect(keys("Workspace Root")).toMatch(/1$/);
+      expect(keys("Main checkout")).toMatch(/2$/);
+      expect(keys("Home")).toMatch(/3$/);
+      expect(keys("Current tab")).toBeUndefined();
+    });
+
+    it("lists the keys of the other fixed rows in the footer", async () => {
+      mountFixed(fixed);
+      await settle();
+      const footer = document.querySelector("[cmdk-root] > div:last-child")?.textContent ?? "";
+      expect(footer).toContain("Workspace Root");
+      expect(footer).toContain("Main checkout");
+      expect(footer).toContain("Home");
     });
   });
 

@@ -1283,6 +1283,8 @@ export default function App() {
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const folderPaletteOpenRef = useRef(false);
+  folderPaletteOpenRef.current = folderPaletteOpen;
   const commandPaletteOpenRef = useRef(false);
   commandPaletteOpenRef.current = commandPaletteOpen;
   const [paletteInitialMode, setPaletteInitialMode] = useState<
@@ -2927,6 +2929,9 @@ export default function App() {
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
+      "palette.folderRoot": () => void runPaletteShortcut("folderRoot"),
+      "palette.folderMain": () => void runPaletteShortcut("folderMain"),
+      "palette.folderHome": () => void runPaletteShortcut("folderHome"),
       "tab.new": () => {
         if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;
@@ -3267,6 +3272,7 @@ export default function App() {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
       if (shortcutUnavailable(id, shortcutContext)) return true;
+      if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
       if (
         id === "workspace.settings" &&
         !useWorkspaceSettingsStore.getState().open &&
