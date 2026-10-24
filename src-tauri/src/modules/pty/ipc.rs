@@ -153,7 +153,7 @@ impl HookHub {
         }
     }
 
-    // A panic while handling one frame must not lock every terminal out of the registry.
+    // Poison tolerance only matters in dev and test: release builds are panic = "abort".
     fn tabs(&self) -> std::sync::MutexGuard<'_, TabRegistry> {
         self.tabs.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -246,8 +246,9 @@ impl HookHub {
 /// while the frontend may not know the PTY id yet (`pty_open` has not returned, or a respawn
 /// cleared it), so it cannot be resolved by `id` alone.
 fn with_tab(event: &str, mut payload: serde_json::Value, tab_id: &str) -> serde_json::Value {
-    if event == AGENT_EVENT {
-        payload["tabId"] = tab_id.into();
+    // `payload["tabId"] = ..` panics on a non-object value; release builds abort on a panic.
+    if let (true, Some(obj)) = (event == AGENT_EVENT, payload.as_object_mut()) {
+        obj.insert("tabId".into(), tab_id.into());
     }
     payload
 }
@@ -275,8 +276,8 @@ impl Drop for TabLease {
 
 const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 // One thread serves every tab, so a connection gets this long in total, however it trickles
-// its bytes; the frames of the others wait in the socket backlog meanwhile, not lost. A local
-// hook writes its whole frame in well under a millisecond.
+// its bytes; the frames of the others wait in the socket backlog meanwhile, not lost. A frame
+// not complete by then is lost (logged). A local hook writes its frame in under a millisecond.
 const FRAME_DEADLINE: Duration = Duration::from_millis(500);
 
 /// The Unix transport: one socket and one accept thread for the life of the app. All it knows
@@ -356,7 +357,8 @@ fn accept_backoff(failures: u32) -> Duration {
     Duration::from_millis(ms).min(ACCEPT_BACKOFF_MAX)
 }
 
-/// A panic loses this frame, not the listener every tab depends on.
+/// Dev and test only (release is panic = "abort"): there the defence is a frame path with no
+/// unwrap, expect or unchecked indexing.
 fn handle_guarded(hub: &HookHub, line: &str) {
     let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hub.handle_line(line)));
     if handled.is_err() {
@@ -370,10 +372,13 @@ fn read_frame(mut stream: UnixStream, deadline: Instant) -> Option<String> {
     let mut buf = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
-        let left = deadline.checked_duration_since(Instant::now())?;
-        if left.is_zero() {
+        let left = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|d| !d.is_zero());
+        let Some(left) = left else {
+            log::warn!("[ipc] hook frame not complete within {FRAME_DEADLINE:?}, dropped");
             return None;
-        }
+        };
         // macOS answers EINVAL once the peer has closed, and then the read cannot block anyway.
         let _ = stream.set_read_timeout(Some(left));
         match stream.read(&mut chunk) {
@@ -389,6 +394,15 @@ fn read_frame(mut stream: UnixStream, deadline: Instant) -> Option<String> {
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                log::warn!("[ipc] hook frame not complete within {FRAME_DEADLINE:?}, dropped");
+                return None;
+            }
             Err(_) => return None,
         }
     }
@@ -1407,6 +1421,45 @@ mod tests {
         fn live_model(&self, _: &str, _: &str) {}
     }
 
+    #[test]
+    fn hostile_frames_never_panic_the_frame_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, _) = test_hub(Some(dir.path().to_path_buf()));
+        live(hub, "tab-a", 1);
+        let long = "€".repeat(10_000);
+        let frames = [
+            String::new(),
+            "null".into(),
+            "[]".into(),
+            "42".into(),
+            "\"str\"".into(),
+            r#"{"tab_id":"tab-a"}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":5}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":[1],"hook_event_name":"Stop","background_tasks":"x"}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"Stop","background_tasks":[1,null,{"type":"subagent","status":"running"}]}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"SubagentStart","agent_id":{}}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"SessionStart","session_id":7,"cwd":[]}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"Notification","notification_type":null}"#
+                .into(),
+            format!(
+                r#"{{"tab_id":"tab-a","pty_id":"1","hook_event_name":"UserPromptSubmit","prompt":"{long}"}}"#
+            ),
+            r#"{"tab_id":"tab-zz","pty_id":"1","hook_event_name":"Stop"}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"999999","hook_event_name":"SessionStart"}"#.into(),
+            "{\"tab_id\":\"tab-a\",\u{0}}".into(),
+        ];
+        for f in &frames {
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hub.handle_line(f)));
+            assert!(r.is_ok(), "panicked on {f:?}");
+        }
+        assert_eq!(with_tab(AGENT_EVENT, serde_json::json!(5), "t"), 5);
+    }
+
+    // Covers the dev and test builds only; release is panic = "abort" and relies on the frame
+    // path not panicking (see `hostile_frames_never_panic_the_frame_path`).
     #[test]
     fn a_panic_while_handling_a_frame_spares_the_listener_and_the_registry() {
         let dir = tempfile::tempdir().unwrap();
