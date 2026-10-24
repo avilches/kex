@@ -538,7 +538,7 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 ### K1 Instalar desde Settings y desde el campanazo
 
 - [ ] Con `~/.codex` existente (ejecutar `codex` una vez antes) y sin handlers de Kex: Settings > General > Agents > Codex muestra "Install" y los ficheros `~/.codex/hooks.json, ~/.codex/config.toml`; el campanazo ofrece "Install Codex integration"
-- [ ] "Preview" abre el diff con una pestana por fichero (`hooks.json`, `config.toml` y `trigger-event.sh` si no estaba instalado). Sobre el diff de `hooks.json` aparece la nota "Kex rewrites hooks.json as formatted JSON: ..."; la de `config.toml` no lleva nota
+- [ ] "Preview" abre el diff con una pestana por fichero (`hooks.json`, `config.toml` y `trigger-event.sh` si no estaba instalado). Ninguna pestana lleva nota; el diff de `hooks.json` solo muestra lineas anadidas (nunca cambios de indentacion o de espacios en lo que no es de Kex)
 - [ ] Instalar. Esperado en `hooks.json`: seis handlers (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`) cuyo comando es `[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" codex || true  # kex-session-hook`
 - [ ] Esperado en `config.toml`: seis tablas `[hooks.state."<ruta de hooks.json>:<evento>:<grupo>:<handler>"]` con `trusted_hash = "sha256:..."`
 - [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v9`
@@ -617,7 +617,7 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 ### K13 Convivencia con Orca y Kaji
 
 - [ ] Con los handlers de Orca y de Kaji ya en `hooks.json` y sus tablas `[hooks.state."..."]` en `config.toml`, guardar una copia de ambos ficheros y luego instalar Codex desde Kex
-- [ ] Esperado: cada handler ajeno sigue igual como JSON (comparar con `jq -S .` los que no llevan `# kex-session-hook`, antes y despues), en el mismo orden dentro de su evento, y `config.toml` solo gana las tablas de Kex (`diff` muestra lineas anadidas, ninguna cambiada ni borrada). `hooks.json` se reformatea (espacios y `\/`), que es lo que avisa la nota de "Preview"
+- [ ] Esperado: cada handler ajeno sigue igual como JSON (comparar con `jq -S .` los que no llevan `# kex-session-hook`, antes y despues), en el mismo orden dentro de su evento, y `config.toml` solo gana las tablas de Kex (`diff` muestra lineas anadidas, ninguna cambiada ni borrada). `hooks.json` conserva byte a byte lo ajeno (espacios, `\/`, indentacion)
 - [ ] Desinstalar desde Settings: `hooks.json` queda sin ningun handler con `# kex-session-hook`, las tablas de Kex desaparecen de `config.toml`, y los handlers y las tablas de Orca y Kaji siguen identicos
 - [ ] Si Orca o Kaji escriben el fichero mientras Kex instala, el plan se rehace (hasta tres intentos) sin perder lo suyo
 

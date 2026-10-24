@@ -2,10 +2,8 @@
 //!
 //! The file is shared with other tools, so a handler is Kex's only if its command carries
 //! `# kex-session-hook`; everything else is never modified. A file that already holds Kex's
-//! current handlers comes back byte for byte. Otherwise it is re-serialized (serde_json with
-//! `preserve_order`): key order is kept but whitespace and `\/` escapes are normalized, so
-//! other tools' handlers stay equal as JSON, not as bytes. That is enough because Codex
-//! trusts a handler by its parsed identity.
+//! current handlers comes back byte for byte. Otherwise only the changed values are patched in
+//! the text (`json_patch`), so whitespace, `\/` escapes and key order of everything else stay.
 
 use serde_json::{json, Map, Value};
 
@@ -60,10 +58,8 @@ fn parse(hooks_json: &str) -> Result<Value, String> {
     Ok(root)
 }
 
-fn render(root: &Value) -> String {
-    let mut out = serde_json::to_string_pretty(root).unwrap_or_default();
-    out.push('\n');
-    out
+fn render(original: &str, root: &Value) -> String {
+    super::json_patch::patch(original, root)
 }
 
 fn events_map(root: &mut Value) -> Result<&mut Map<String, Value>, String> {
@@ -113,7 +109,7 @@ pub fn install(
     let text = if root == original {
         hooks_json.to_string()
     } else {
-        render(&root)
+        render(hooks_json, &root)
     };
     Ok((text, entries))
 }
@@ -229,7 +225,7 @@ pub fn remove(hooks_json: &str) -> Result<String, String> {
         }
     }
     Ok(if changed {
-        render(&root)
+        render(hooks_json, &root)
     } else {
         hooks_json.to_string()
     })

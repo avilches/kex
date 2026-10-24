@@ -12,8 +12,6 @@ use super::codex_trust::{self, TrustEntry};
 use super::{changed, read_optional, FilePreview, SyncOutcome};
 use super::{SESSION_HOOK_SCRIPT, SESSION_HOOK_SCRIPT_VERSION};
 
-const REFORMAT_NOTE: &str = "Kex rewrites hooks.json as formatted JSON: indentation and escapes such as \\/ change, the handlers of other tools stay the same.";
-
 const WRITE_ATTEMPTS: usize = 3;
 
 /// The handler command is POSIX shell (`[ ]`, `$HOME`, `||`) and how Codex runs a hook on
@@ -391,14 +389,11 @@ pub fn preview(paths: &CodexPaths, install: bool) -> Result<Vec<FilePreview>, St
         config.as_deref(),
         after_text(config.as_deref(), config_after, install),
     );
-    let mut hooks_files = changed(
+    let hooks_files = changed(
         &paths.hooks,
         hooks.as_deref(),
         after_text(hooks.as_deref(), plan.text, install),
     );
-    for file in &mut hooks_files {
-        file.note = Some(REFORMAT_NOTE.to_string());
-    }
     files.splice(0..0, hooks_files);
     if install {
         let script = read_optional(&paths.script)?;
@@ -441,7 +436,7 @@ mod tests {
         assert!(!paths.script.exists());
         assert_eq!(files.len(), 3);
         assert!(files[0].path.ends_with("hooks.json"));
-        assert_eq!(files[0].note.as_deref(), Some(REFORMAT_NOTE));
+        assert_eq!(files[0].note, None);
         assert!(files[1].path.ends_with("config.toml"));
         assert_eq!(files[1].note, None);
         assert_eq!(files[2].after.as_deref(), Some(SESSION_HOOK_SCRIPT));
