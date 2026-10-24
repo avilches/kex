@@ -8,8 +8,6 @@ import { PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import type { GitStatusSnapshot } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { IntegrationTabMarker } from "@/modules/agents/components/IntegrationTabMarker";
-import { useIntegrationWarningStore } from "@/modules/agents/store/integrationWarningStore";
 import {
   buildGitStatusMap,
   type GitStatusCode,
@@ -235,9 +233,6 @@ function DraggableTab({
       <span className="inline-block size-[6px] rounded-full bg-amber-400" />
     ) : null;
 
-  const missingAgent = useIntegrationWarningStore((st) => st.byTab[tab.id]);
-  const integrationWarning = missingAgent ? <IntegrationTabMarker agent={missingAgent} /> : null;
-
   const tabDiv = (
     <div
       ref={setNodeRef}
@@ -362,7 +357,6 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
-      {integrationWarning}
       {isLocked && statusIndicator && (
         <span className="ml-0.5 flex shrink-0 items-center">
           {statusIndicator}

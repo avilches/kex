@@ -640,48 +640,39 @@ Necesitan un Codex con sesion iniciada y no se pudieron medir. Cada una puede ca
 
 ## Bloque L - Recordatorio de instalacion
 
-Prueba como Kex recuerda al usuario que instale la integracion de un agente. Diseno en `docs/NOTIFICATIONS.md`, seccion
-"Install reminder". El estado vive en `integrationSuggestions` dentro de `settings-general.json`; para repetir una prueba
-hay que cerrar Kex, borrar la entrada del agente y volver a abrirlo (la app mantiene el registro en memoria mientras
-corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
+Prueba como Kex recuerda al usuario que instale la integracion de un agente: un toast, sin ningun marcador en el tab.
+Diseno en `docs/NOTIFICATIONS.md`, seccion "Install reminder". El estado vive en `integrationSuggestions` dentro de
+`settings-general.json`; para repetir una prueba hay que cerrar Kex, borrar la entrada del agente y volver a abrirlo (la
+app mantiene el registro en memoria mientras corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
 
 ### L1 Primera vez
 
 - [ ] Sin la integracion de Pi instalada y sin entrada `pi` en `integrationSuggestions`, abrir Kex y lanzar `pi` en un tab
-- [ ] Esperado: sale un toast "Pi is running without the Kex integration" con los botones Install y View changes, y el tab lleva un icono amarillo de exclamacion
-- [ ] `settings-general.json` ahora tiene `"pi": { "asks": 1, "lastAskedAt": <ahora>, "installedOnce": false, "markerDismissed": false }`
-- [ ] Lanzar `pi` en un segundo tab: no sale otro toast, pero el segundo tab tambien lleva el icono
+- [ ] Esperado: sale un toast "Pi is running without the Kex integration" con un unico boton, Install, y la X de cerrar. El tab NO lleva ningun icono extra
+- [ ] `settings-general.json` ahora tiene `"pi": { "asks": 1, "lastAskedAt": <ahora>, "installedOnce": false }`
+- [ ] Lanzar `pi` en un segundo tab: no sale otro toast
 
-### L2 Botones del toast
+### L2 Install y cerrar
 
-- [ ] Install: se instala, sale "Pi integration installed", desaparece el icono amarillo de todos los tabs de Pi y `installedOnce` pasa a `true`
-- [ ] Instalar Pi desde Settings > General > Agents (o desde el campanazo) con el icono amarillo ya puesto en un tab: la fila pasa a "Installed" y `installedOnce` a `true`, pero el icono SE QUEDA en ese tab hasta que `pi` termina (solo el toast y "Don't remind me again" llaman a `clearAgent`). Un tab nuevo con `pi` ya no lleva icono. Si esto parece un fallo, es un fallo de comportamiento y no de documentacion: arreglarlo moviendo la limpieza a `installAgent`
-- [ ] View changes (con otra entrada nueva): abre Settings > General con la seccion Agents
+- [ ] Install: se instala, sale "Pi integration installed" y `installedOnce` pasa a `true`
 - [ ] Cerrar el toast con la X o dejar que pasen 20 s cuenta como "ahora no": la entrada sigue en `asks: 1`
+- [ ] Tras cerrarlo no queda nada en el tab que avise de que falta la integracion; se instala desde Settings > General > Agents o desde el campanazo
 
-### L3 El icono del tab
+### L3 Segunda y ultima vez
 
-- [ ] Pasar el raton por el icono amarillo: sale una tarjeta con "Pi agent detected. Open settings to install integration" y un engranaje. No sale ningun toast
-- [ ] La tarjeta sigue abierta al mover el raton del icono a ella, y se cierra al salir de ambos
-- [ ] El engranaje abre Settings > General
-- [ ] "Don't remind me again": el icono desaparece de todos los tabs de Pi, `markerDismissed` pasa a `true` y `asks` no cambia. Lanzar `pi` en un tab nuevo, tambien tras reabrir Kex: no hay icono
-- [ ] Con Pi descartado, lanzar otro agente sin integracion (OMP): su icono sigue saliendo
-- [ ] Salir de `pi` (Ctrl+D): el icono desaparece del tab
-
-### L4 Segunda y ultima vez
-
-- [ ] Con la entrada `pi` en `asks: 1`, reabrir Kex y lanzar `pi`: no sale el toast, pero si el icono
+- [ ] Con la entrada `pi` en `asks: 1`, reabrir Kex y lanzar `pi`: no sale el toast
 - [ ] Cerrar Kex, poner `lastAskedAt` 16 dias atras (`date -v-16d +%s000` da los milisegundos), abrir Kex y lanzar `pi`: sale el toast y `asks` pasa a 2
-- [ ] Repetir con `lastAskedAt` aun mas antiguo: no sale nunca mas el toast; el icono del tab sigue saliendo (mientras no se haya descartado con "Don't remind me again")
+- [ ] Repetir con `lastAskedAt` aun mas antiguo y `asks: 2`: no sale nunca mas
 
-### L5 Instalada una vez, no se vuelve a preguntar
+### L4 Instalada una vez, no se vuelve a preguntar
 
-- [ ] Instalar Pi desde Settings, desinstalarlo y borrar `asks`/`lastAskedAt` a mano dejando `installedOnce: true`: al lanzar `pi` no sale toast. El icono del tab si sale, porque el estado real es "no instalada"
+- [ ] Instalar Pi desde Settings, desinstalarlo y borrar `asks`/`lastAskedAt` a mano dejando `installedOnce: true`: al lanzar `pi` no sale el toast
 - [ ] Integracion ya instalada antes de esta funcion (sin entrada en `integrationSuggestions`): al lanzar el agente no sale nada y la entrada pasa a `installedOnce: true`
+- [ ] Una entrada antigua con `"markerDismissed": true`: se ignora, y tras la siguiente escritura de esa entrada el campo ya no esta
 
-### L6 Estados que bloquean
+### L5 Estados que bloquean
 
-- [ ] Con un `~/.codex/config.toml` que Kex no sabe leer, lanzar `codex`: no sale toast, ni icono, y `integrationSuggestions` no gana la entrada `codex`. Arreglar el fichero y repetir: sale el toast
+- [ ] Con un `~/.codex/config.toml` que Kex no sabe leer, lanzar `codex`: no sale el toast y `integrationSuggestions` no gana la entrada `codex`. Arreglar el fichero y repetir: sale el toast
 - [ ] Sin carpeta de Codex (`CODEX_HOME` apuntando a una ruta que no existe), lanzar `codex`: tampoco sale nada, porque el estado es `unavailable`
 - [ ] Con Claude Code: como `agentNotifications` esta activado por defecto, Kex instala los hooks solo al arrancar y el recordatorio no sale. Para verlo hay que desactivar el ajuste (o borrar a mano las entradas `kex-session-hook` de `~/.claude/settings.json` con el ajuste apagado), reabrir Kex y lanzar `claude`
 - [ ] `claude -p "hola"` (modo no interactivo) no dispara el recordatorio: el detector lo salta

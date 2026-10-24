@@ -35,7 +35,7 @@ same file under `~/.pi/agent/extensions/`. Without Kex's per-terminal env vars t
 lives in the bell popover (a row per agent, shown only while the integration is missing) and in Settings > General >
 Agents (`AgentIntegrations`: one row per agent, Claude Code included, with Install or Uninstall and a "View changes"
 link that opens the `agent_integration_preview` dry run as a diff, with one tab per file and the file's `note` above
-it). A user who never opens either is reminded by a toast and a tab icon when the agent starts without its integration
+it). A user who never opens either is reminded by a toast when the agent starts without its integration
 (`docs/NOTIFICATIONS.md`, "Install reminder"). `agent_*_status` tells whether the installed file is current. The frontend folds every status into one
 `IntegrationStatus` (`installed`, `missing`, `malformed`, `uneditable`, `unavailable`; `lib/integrations.ts`): the
 boolean of the file-based agents maps to the first two, and `agent_codex_status` maps `upToDate` to installed,

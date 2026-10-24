@@ -5,7 +5,6 @@ import {
   shouldSuggest,
   withAsked,
   withInstalled,
-  withMarkerDismissed,
 } from "./integrationSuggestion";
 
 const T0 = 1_700_000_000_000;
@@ -40,14 +39,7 @@ describe("shouldSuggest", () => {
 
   it("keeps the ask history when installing after a suggestion", () => {
     const map = withInstalled(withAsked({}, "opencode", T0), "opencode");
-    expect(map.opencode).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: true, markerDismissed: false });
-  });
-
-  it("dismisses the tab marker for one agent without touching the ask history", () => {
-    const map = withMarkerDismissed(withAsked({}, "pi", T0), "pi");
-    expect(map.pi).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: true });
-    expect(map.claude).toBeUndefined();
-    expect(withMarkerDismissed(map, "pi")).toBe(map);
+    expect(map.opencode).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: true });
   });
 
   it("treats each agent on its own", () => {
@@ -56,7 +48,7 @@ describe("shouldSuggest", () => {
   });
 
   it("stays silent for an asked-once record with no date", () => {
-    expect(shouldSuggest({ asks: 1, lastAskedAt: null, installedOnce: false, markerDismissed: false }, T0)).toBe(false);
+    expect(shouldSuggest({ asks: 1, lastAskedAt: null, installedOnce: false }, T0)).toBe(false);
   });
 });
 
@@ -64,19 +56,25 @@ describe("parseSuggestions", () => {
   it("keeps well-formed entries of known agents", () => {
     expect(
       parseSuggestions({
-        claude: { asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: false },
-        codex: { asks: 2, lastAskedAt: T0, installedOnce: false, markerDismissed: false },
-        gemini: { asks: 1, lastAskedAt: T0, installedOnce: true, markerDismissed: false },
+        claude: { asks: 1, lastAskedAt: T0, installedOnce: false },
+        codex: { asks: 2, lastAskedAt: T0, installedOnce: false },
+        gemini: { asks: 1, lastAskedAt: T0, installedOnce: true },
       }),
     ).toEqual({
-      claude: { asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: false },
-      codex: { asks: 2, lastAskedAt: T0, installedOnce: false, markerDismissed: false },
+      claude: { asks: 1, lastAskedAt: T0, installedOnce: false },
+      codex: { asks: 2, lastAskedAt: T0, installedOnce: false },
     });
+  });
+
+  it("drops a field this build no longer knows, such as the old marker flag", () => {
+    expect(
+      parseSuggestions({ pi: { asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: true } }),
+    ).toEqual({ pi: { asks: 1, lastAskedAt: T0, installedOnce: false } });
   });
 
   it("repairs bad fields and rejects non-objects", () => {
     expect(parseSuggestions({ pi: { asks: "x", lastAskedAt: "y", installedOnce: 1 } })).toEqual({
-      pi: { asks: 0, lastAskedAt: null, installedOnce: false, markerDismissed: false },
+      pi: { asks: 0, lastAskedAt: null, installedOnce: false },
     });
     expect(parseSuggestions(null)).toEqual({});
     expect(parseSuggestions([1])).toEqual({});

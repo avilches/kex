@@ -190,24 +190,26 @@ How Kex reminds the user to install an agent integration. Without it the spinner
 notification and the session restore do not work for that agent, and nothing else in the app says so: Settings > General
 > Agents and the bell only help a user who already went looking.
 
-There are two reminders, both driven by the `started` signal. That signal comes from channel 1, not from the hooks: it
+There is one reminder, a toast, driven by the `started` signal. That signal comes from channel 1, not from the hooks: it
 is emitted by `agent_detect.rs` when the `OSC 133;C` command line names one of `DEFAULT_AGENTS` (`claude`, `codex`,
 `opencode`, `omp`, `pi`), which is why it works before any integration exists and why it needs no hook to fire.
-`handleSignal` in `AgentNotificationsBridge.tsx` calls `suggestIntegration(agent, tabId)` and nothing else in the app does.
-A launcher script whose command line does not name one of those agents triggers neither reminder, and neither does a
-print-mode run (`claude -p`), which `agent_detect.rs` skips.
+`handleSignal` in `AgentNotificationsBridge.tsx` calls `suggestIntegration(agent)` and nothing else in the app does.
+A launcher script whose command line does not name one of those agents triggers nothing, and neither does a print-mode
+run (`claude -p`), which `agent_detect.rs` skips.
 
 Claude Code is the exception in practice. `agentNotifications` is on by default and `main.tsx` calls
 `agent_enable_claude_hooks` on every startup while it is on, so for Claude Code the reminder only appears for a user who
 turned that setting off, or whose `~/.claude/settings.json` could not be written. The other agents are never installed
 by Kex on its own, so they are where the reminder does its work.
 
-### 1. The toast (asked at most twice per agent)
+### The toast (asked at most twice per agent)
 
-A Sonner toast, "<Agent> is running without the Kex integration", with **Install** (runs `installAgent`, then a success or
-error toast) and **View changes** (opens Settings > General, where Agents has the dry-run diff). It has a close button and
-lasts 20 s; closing it, letting it expire or pressing View changes are all the same "not now". It is 480 px wide, capped to
-the viewport, because Sonner anchors it to the right edge and the text does not fit in the default width.
+A Sonner toast, "<Agent> is running without the Kex integration", with an **Install** button (runs `installAgent`, then a
+success or error toast). It has a close button and lasts 20 s; closing it or letting it expire is the "not now". There is
+no second button and no marker in the tab: once the toast is gone nothing in the tab strip says the integration is
+missing, and the user can still install from Settings > General > Agents or from the bell. The toast is 480 px wide,
+capped to the viewport, because Sonner anchors it to the right edge and the text does not fit in the default width. It
+carries a fixed id per agent (`integration-<agent>`).
 
 When it appears, per agent:
 
@@ -219,7 +221,7 @@ When it appears, per agent:
 | Asked twice | Never again |
 | Integration installed at any moment | Never again, even if it is removed later |
 | Integration already installed when the agent is detected | No, and it is recorded as installed, so removing it later does not bring the toast back |
-| Status is not `missing` (`malformed`, `uneditable`, `unavailable`: a Codex config Kex cannot parse or edit safely, or a Codex folder that does not exist yet) | No toast, no tab icon, and no ask is recorded: Install would fail, so the next app run looks again |
+| Status is not `missing` (`malformed`, `uneditable`, `unavailable`: a Codex config Kex cannot parse or edit safely, or a Codex folder that does not exist yet) | No, and no ask is recorded: Install would fail, so the next app run looks again |
 | Second tab starting the same agent in the same app run | No: each agent is looked at once per run |
 
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
@@ -228,41 +230,22 @@ to record it is only logged, since the install itself worked). The startup repai
 calls `agent_enable_claude_hooks` directly and records nothing; the next `started` signal then finds the status
 `installed` and records it.
 
-### 2. The tab warning (every tab, until dismissed)
-
-Independent of the ask policy and of the toast, each tab where an agent starts without its integration gets an amber exclamation icon in
-the tab strip, so a user who dismissed the toast still sees why that tab has no spinner. It is
-`integrationWarningStore` (`tabId -> agent`), filled by the suggester's `warn` on every `started` signal with status
-`missing` unless the agent's marker was dismissed, and cleared when the agent exits (`clearTab`, called for the `exited`
-signal in `handleSignal`), when the toast installs it (`clearAgent`, which removes it from every tab of that agent) or
-when the user dismisses it. Installing from Settings or the bell does not clear it: those paths do not call `clearAgent`,
-so a tab already marked keeps the icon until its agent exits. The next `started` signal sees `installed` and does not
-mark again.
-
-Hovering the icon opens a small card (`IntegrationTabMarker.tsx`, a controlled Popover that stays open while the pointer
-is on the icon or the card, with a 150 ms close delay). It never shows the toast. The card says "<Agent> agent detected.
-Open settings to install integration", with a cog button that opens Settings > General, and a "Don't remind me again"
-link below. The link records `markerDismissed` for that agent and calls `clearAgent`: the icon disappears from all its
-tabs and, because `suggestIntegration` checks the record before calling `warn`, never comes back. It is per agent
-(dismissing Claude keeps the Codex icon) and does not change the toast schedule.
-
 ### Where it lives
 
 | Piece | File |
 |---|---|
-| Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `withMarkerDismissed`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
-| Flow: once per run, status check, `warn`, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
+| Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
+| Flow: once per run, status check, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
 | Toast, real dependencies, `suggestIntegration` | `modules/agents/components/IntegrationSuggestionToast.tsx` |
-| Tab warning state | `modules/agents/store/integrationWarningStore.ts` |
-| Tab warning icon and card | `modules/agents/components/IntegrationTabMarker.tsx`, mounted from `modules/workspaces/PaneTabBar.tsx` |
 | Single install path, records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent:
-`{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false, "markerDismissed": false }`. It is read and written through
-`readIntegrationSuggestions` / `updateIntegrationSuggestions`. The main window (the toast, the tab marker) and the
-Settings window (an install there) both write it. `updateIntegrationSuggestions` reads, changes and writes in one step
-behind a promise queue, but the queue is a module variable and each webview has its own, so it orders the writes of one
-window and does not make two windows writing at the same moment safe; in practice that is a click in Settings
-overlapping a toast, and it can lose one of the two flags. To see the toast or the dismissed icon again while testing, delete the agent's entry;
-to see the second ask, set its `lastAskedAt` more than 15 days back. Manual test plan: block L in
+`{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false }`. It is read and written through
+`readIntegrationSuggestions` / `updateIntegrationSuggestions`. The main window (the toast) and the Settings window (an
+install there) both write it. `updateIntegrationSuggestions` reads, changes and writes in one step behind a promise
+queue, but the queue is a module variable and each webview has its own, so it orders the writes of one window and does
+not make two windows writing at the same moment safe; in practice that is a click in Settings overlapping a toast, and
+it can lose one of the two flags. An entry left over from the removed tab marker (`markerDismissed`) is ignored and
+dropped the next time the agent's entry is written. To see the toast again while testing, delete the agent's entry; to
+see the second ask, set its `lastAskedAt` more than 15 days back. Manual test plan: block L in
 `docs/RESTORE_SESSION_TESTS.md`.

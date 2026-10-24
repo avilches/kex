@@ -8,7 +8,6 @@ const T0 = 1_700_000_000_000;
 function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: number } = {}) {
   const state = { map: opts.map ?? ({} as SuggestionMap), now: opts.now ?? T0 };
   const show = vi.fn();
-  const warn = vi.fn();
   const deps: SuggestDeps = {
     now: () => state.now,
     status: async () => opts.status ?? "missing",
@@ -17,10 +16,8 @@ function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: nu
       state.map = change(state.map);
     },
     show,
-    warn,
   };
-  const raw = createIntegrationSuggester(deps);
-  return { state, show, warn, suggest: (agent: unknown, tabId = "tab-1") => raw(agent, tabId) };
+  return { state, show, suggest: createIntegrationSuggester(deps) };
 }
 
 describe("integration suggester", () => {
@@ -28,7 +25,7 @@ describe("integration suggester", () => {
     const { suggest, show, state } = setup();
     await suggest("claude");
     expect(show).toHaveBeenCalledWith("claude");
-    expect(state.map.claude).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: false });
+    expect(state.map.claude).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: false });
   });
 
   it("ignores agents that have no integration", async () => {
@@ -69,7 +66,7 @@ describe("integration suggester", () => {
 
   it("does not ask again within 15 days of the first ask", async () => {
     const { suggest, show } = setup({
-      map: { claude: { asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: false } },
+      map: { claude: { asks: 1, lastAskedAt: T0, installedOnce: false } },
       now: T0 + SUGGESTION_RETRY_MS - 1,
     });
     await suggest("claude");
@@ -78,7 +75,7 @@ describe("integration suggester", () => {
 
   it("asks a second and last time after 15 days", async () => {
     const { suggest, show, state } = setup({
-      map: { claude: { asks: 1, lastAskedAt: T0, installedOnce: false, markerDismissed: false } },
+      map: { claude: { asks: 1, lastAskedAt: T0, installedOnce: false } },
       now: T0 + SUGGESTION_RETRY_MS,
     });
     await suggest("claude");
@@ -94,15 +91,14 @@ describe("integration suggester", () => {
         state.map = change(state.map);
       },
       show,
-      warn: vi.fn(),
     });
-    await later("claude", "tab-1");
+    await later("claude");
     expect(show).toHaveBeenCalledTimes(1);
   });
 
   it("never asks about an integration that was installed once and removed", async () => {
     const { suggest, show } = setup({
-      map: { pi: { asks: 0, lastAskedAt: null, installedOnce: true, markerDismissed: false } },
+      map: { pi: { asks: 0, lastAskedAt: null, installedOnce: true } },
     });
     await suggest("pi");
     expect(show).not.toHaveBeenCalled();
@@ -119,44 +115,8 @@ describe("integration suggester", () => {
       },
       update: async () => {},
       show,
-      warn: vi.fn(),
     });
-    await expect(suggest("claude", "tab-1")).resolves.toBeUndefined();
+    await expect(suggest("claude")).resolves.toBeUndefined();
     expect(show).not.toHaveBeenCalled();
-  });
-
-  it("marks every tab that runs the agent without integration, but toasts once", async () => {
-    const { suggest, show, warn } = setup();
-    await suggest("claude", "tab-1");
-    await suggest("claude", "tab-2");
-    expect(warn).toHaveBeenCalledWith("tab-1", "claude");
-    expect(warn).toHaveBeenCalledWith("tab-2", "claude");
-    expect(show).toHaveBeenCalledTimes(1);
-  });
-
-  it("marks the tab even when the ask policy keeps the toast quiet", async () => {
-    const { suggest, show, warn } = setup({
-      map: { claude: { asks: 2, lastAskedAt: T0, installedOnce: false, markerDismissed: false } },
-    });
-    await suggest("claude");
-    expect(show).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith("tab-1", "claude");
-  });
-
-  it("does not mark a tab whose agent is installed or cannot be installed", async () => {
-    for (const status of ["installed", "malformed", "unavailable"] as const) {
-      const { suggest, warn } = setup({ status });
-      await suggest("claude");
-      expect(warn).not.toHaveBeenCalled();
-    }
-  });
-
-  it("never marks a tab for an agent whose marker was dismissed, and still toasts by policy", async () => {
-    const { suggest, show, warn } = setup({
-      map: { claude: { asks: 0, lastAskedAt: null, installedOnce: false, markerDismissed: true } },
-    });
-    await suggest("claude");
-    expect(warn).not.toHaveBeenCalled();
-    expect(show).toHaveBeenCalledTimes(1);
   });
 });
