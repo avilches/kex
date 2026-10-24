@@ -1,13 +1,13 @@
 #![cfg(unix)]
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 
@@ -228,10 +228,11 @@ impl Drop for TabLease {
     }
 }
 
-const MAX_FRAME_BYTES: u64 = 4 * 1024 * 1024;
-// One thread serves every tab, so a client that connects and never writes holds it at most
-// this long; the frames of the others wait in the socket backlog meanwhile, not lost.
-const READ_TIMEOUT: Duration = Duration::from_secs(2);
+const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
+// One thread serves every tab, so a connection gets this long in total, however it trickles
+// its bytes; the frames of the others wait in the socket backlog meanwhile, not lost. A local
+// hook writes its whole frame in well under a millisecond.
+const FRAME_DEADLINE: Duration = Duration::from_millis(500);
 
 /// The Unix transport: one socket and one accept thread for the life of the app. All it knows
 /// about a frame is that it is one line; the hub does the rest.
@@ -283,7 +284,7 @@ fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool
         }
         match stream {
             Ok(stream) => {
-                if let Some(line) = read_frame(stream) {
+                if let Some(line) = read_frame(stream, Instant::now() + FRAME_DEADLINE) {
                     hub.handle_line(&line);
                 }
             }
@@ -296,10 +297,35 @@ fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool
     log::debug!("[ipc] thread exiting");
 }
 
-fn read_frame(stream: UnixStream) -> Option<String> {
-    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
-    let mut line = String::new();
-    let _ = BufReader::new(stream.take(MAX_FRAME_BYTES)).read_line(&mut line);
+/// One line, read before `deadline`. A frame that is not complete by then, or that outgrows
+/// `MAX_FRAME_BYTES`, is dropped; one that ends at EOF without a newline is kept.
+fn read_frame(mut stream: UnixStream, deadline: Instant) -> Option<String> {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let left = deadline.checked_duration_since(Instant::now())?;
+        if left.is_zero() {
+            return None;
+        }
+        // macOS answers EINVAL once the peer has closed, and then the read cannot block anyway.
+        let _ = stream.set_read_timeout(Some(left));
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                if let Some(end) = chunk[..n].iter().position(|&b| b == b'\n') {
+                    buf.extend_from_slice(&chunk[..end]);
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+                if buf.len() > MAX_FRAME_BYTES {
+                    return None;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return None,
+        }
+    }
+    let line = String::from_utf8(buf).ok()?;
     let line = line.trim();
     (!line.is_empty()).then(|| line.to_string())
 }
@@ -1248,6 +1274,60 @@ mod tests {
         let _idle = UnixStream::connect(&path).unwrap();
         send(&path, &frame("Stop", "tab-a", 1, "s"));
         assert!(wait_until(|| rec.signals().len() == 1));
+    }
+
+    #[test]
+    fn a_client_that_trickles_bytes_is_cut_at_the_deadline_and_others_are_served() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-drip.sock");
+        let (hub, rec) = test_hub(None);
+        hub.register("tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+
+        let drip_path = path.clone();
+        let dripper = thread::spawn(move || {
+            let mut s = UnixStream::connect(&drip_path).unwrap();
+            let started = std::time::Instant::now();
+            while started.elapsed() < Duration::from_secs(10) {
+                if s.write_all(b"{").is_err() {
+                    return Some(started.elapsed());
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            None
+        });
+        thread::sleep(Duration::from_millis(100));
+        let sent_at = std::time::Instant::now();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        assert!(wait_until(|| rec.signals().len() == 1));
+        assert!(
+            sent_at.elapsed() < FRAME_DEADLINE * 3,
+            "the other client waited {:?}",
+            sent_at.elapsed()
+        );
+        let cut = dripper
+            .join()
+            .unwrap()
+            .expect("the trickling client was never cut");
+        assert!(cut < Duration::from_secs(3), "cut after {cut:?}");
+    }
+
+    #[test]
+    fn read_frame_keeps_a_frame_ended_by_eof_and_drops_an_oversized_one() {
+        let (mut a, b) = UnixStream::pair().unwrap();
+        a.write_all(b"{\"x\":1}").unwrap();
+        drop(a);
+        let deadline = Instant::now() + FRAME_DEADLINE;
+        assert_eq!(read_frame(b, deadline).as_deref(), Some("{\"x\":1}"));
+
+        let (a, b) = UnixStream::pair().unwrap();
+        let writer = thread::spawn(move || {
+            let mut a = a;
+            let big = vec![b'a'; MAX_FRAME_BYTES + 16 * 1024];
+            let _ = a.write_all(&big);
+        });
+        assert_eq!(read_frame(b, Instant::now() + Duration::from_secs(5)), None);
+        writer.join().unwrap();
     }
 
     #[test]
