@@ -144,7 +144,12 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
-        <span className="min-w-0 flex-1">Run on Start</span>
+        <span className="min-w-0 flex-1">
+          Run on Start
+          <span className="block max-w-[240px] whitespace-normal text-[10px] font-normal text-muted-foreground">
+            Command runs when the tab is restored after a restart or an undo close
+          </span>
+        </span>
         {enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
