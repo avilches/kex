@@ -655,6 +655,7 @@ corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
 ### L2 Botones del toast
 
 - [ ] Install: se instala, sale "Pi integration installed", desaparece el icono amarillo de todos los tabs de Pi y `installedOnce` pasa a `true`
+- [ ] Instalar Pi desde Settings > General > Agents (o desde el campanazo) con el icono amarillo ya puesto en un tab: la fila pasa a "Installed" y `installedOnce` a `true`, pero el icono SE QUEDA en ese tab hasta que `pi` termina (solo el toast y "Don't remind me again" llaman a `clearAgent`). Un tab nuevo con `pi` ya no lleva icono. Si esto parece un fallo, es un fallo de comportamiento y no de documentacion: arreglarlo moviendo la limpieza a `installAgent`
 - [ ] View changes (con otra entrada nueva): abre Settings > General con la seccion Agents
 - [ ] Cerrar el toast con la X o dejar que pasen 20 s cuenta como "ahora no": la entrada sigue en `asks: 1`
 
@@ -681,6 +682,9 @@ corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
 ### L6 Estados que bloquean
 
 - [ ] Con un `~/.codex/config.toml` que Kex no sabe leer, lanzar `codex`: no sale toast, ni icono, y `integrationSuggestions` no gana la entrada `codex`. Arreglar el fichero y repetir: sale el toast
+- [ ] Sin carpeta de Codex (`CODEX_HOME` apuntando a una ruta que no existe), lanzar `codex`: tampoco sale nada, porque el estado es `unavailable`
+- [ ] Con Claude Code: como `agentNotifications` esta activado por defecto, Kex instala los hooks solo al arrancar y el recordatorio no sale. Para verlo hay que desactivar el ajuste (o borrar a mano las entradas `kex-session-hook` de `~/.claude/settings.json` con el ajuste apagado), reabrir Kex y lanzar `claude`
+- [ ] `claude -p "hola"` (modo no interactivo) no dispara el recordatorio: el detector lo salta
 - [ ] Lanzar un agente sin integracion en Kex (por ejemplo `gemini`): no sale nada
 
 ---
