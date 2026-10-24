@@ -66,7 +66,7 @@ export function IconPaletteGrid({ value, onSelect, layout = "menu" }: Props) {
       placeholder="Search any icon..."
       spellCheck={false}
       autoComplete="off"
-      className={cn(INPUT_CLASS, inline ? "h-8 w-28 shrink-0 text-[12px]" : "h-7 w-full text-[12px]")}
+      className={cn(INPUT_CLASS, inline ? "col-span-3 h-8 w-full text-[12px]" : "h-7 w-full text-[12px]")}
     />
   );
 
@@ -74,11 +74,10 @@ export function IconPaletteGrid({ value, onSelect, layout = "menu" }: Props) {
     <div className="flex flex-col gap-1.5">
       {!inline && searchBox}
       <div
-        className={
-          inline
-            ? "flex max-h-[100px] flex-wrap content-start items-center gap-0.5 overflow-y-auto"
-            : "grid max-h-[202px] grid-cols-6 content-start justify-start gap-0.5 overflow-y-auto"
-        }
+        className={cn(
+          "grid grid-cols-[repeat(auto-fill,2rem)] content-start gap-0.5 overflow-y-auto",
+          inline ? "max-h-[100px]" : "max-h-[202px]",
+        )}
       >
         {inline && searchBox}
         <button

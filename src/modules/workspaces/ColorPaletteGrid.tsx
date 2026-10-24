@@ -46,15 +46,25 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect, 
   const customHex =
     value != null && !(COLOR_SWATCHES as readonly string[]).includes(value) ? value : "";
 
+  const swatchSize = layout === "row" ? "aspect-square w-full" : "size-5";
+
   return (
     <div className="flex flex-col gap-2">
-      <div className={layout === "row" ? "flex gap-1" : "grid grid-cols-7 gap-1"}>
+      <div
+        className={cn("grid gap-1", layout === "grid" && "grid-cols-7")}
+        style={
+          layout === "row"
+            ? { gridTemplateColumns: `repeat(${COLOR_SWATCHES.length + 1}, minmax(0, 1fr))` }
+            : undefined
+        }
+      >
         <button
           type="button"
           title="No color"
           onClick={() => onSelect(null)}
           className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
+            swatchSize,
+            "flex items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
             noneSelected
               ? "border-foreground"
               : "border-transparent hover:border-muted-foreground/50",
@@ -69,7 +79,8 @@ export function ColorPaletteGrid({ value, displayColor, noneSelected, onSelect, 
             title={hex}
             onClick={() => onSelect(hex)}
             className={cn(
-              "size-5 shrink-0 rounded-full border-2 transition-opacity",
+              swatchSize,
+              "rounded-full border-2 transition-opacity",
               value === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
             )}
             style={{ backgroundColor: hex }}
