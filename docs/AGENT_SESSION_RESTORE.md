@@ -296,10 +296,14 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
 - **Rollouts.** Codex writes one JSONL per session at
   `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/rollout-<local timestamp>-<uuid>.jsonl`; the uuid is the session id.
   `SessionsSource::CodexSessions` tries the recorded `transcript_path` first (only when its file name is
-  `rollout-*.jsonl`; any other name falls back to the id lookup), then walks the three date levels newest
-  first and returns the `rollout-*-<id>.jsonl` of the first day that holds one. The depth is fixed, so a recent session
-  costs a handful of directory reads even when the tree holds thousands of rollouts; anything else in the tree (files
-  that do not start with `rollout-`, other extensions, directories) is ignored. `CODEX_HOME` is resolved like the
+  `rollout-*.jsonl`; any other name falls back to the id lookup), then looks the id up in the date folders. Codex's
+  ids are UUIDv7, whose first 48 bits are the creation time in Unix milliseconds, and the folder is the local date the
+  session started, so for such an id only the three folders from the day before to the day after its UTC date are
+  read (any time zone falls in that window) and a rollout anywhere else is not found. An id that does not parse as a
+  UUIDv7 walks the three date levels newest first and returns the `rollout-*-<id>.jsonl` of the first day that holds
+  one. Either way the depth is fixed, so the lookup costs a handful of directory reads even when the tree holds
+  thousands of rollouts; anything else in the tree (files that do not start with `rollout-`, other extensions,
+  directories) is ignored. `CODEX_HOME` is resolved like the
   hooks folder (canonicalized when set). Kex reads it from its own environment, so a `CODEX_HOME` exported only in the
   shell is not seen by a Kex started from the Dock; the recorded `transcript_path` covers that case when Codex sends it.
 - **Launch cwd.** Line 1 of a rollout is `{"type":"session_meta","payload":{"id":...,"cwd":...}}`;
@@ -468,7 +472,8 @@ For each session in the store:
    OMP's and Pi's sources (`OmpSessions`, `PiSessions`) keep the never-populated `transcript_path` shortcut for symmetry
    and scan `~/.omp/agent/sessions/**/<timestamp>_<sessionId>.jsonl` (Pi: `~/.pi/agent/sessions/**/...`), keeping the
    lexicographically latest file (names carry a timestamp). Codex's (`CodexSessions`) checks the recorded
-   `transcript_path`, then walks `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` newest first for
+   `transcript_path`, then looks in `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` (the days around a UUIDv7 id's
+   date, or every day newest first) for
    `rollout-*-<sessionId>.jsonl` (see "Codex hooks").
 3. **Transcript found - resume.** The launch cwd is read back with the row's cwd-read strategy (claude: if a
    `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its

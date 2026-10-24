@@ -284,9 +284,9 @@ fn codex_sessions_root_from(
         .map(|dir| dir.join("sessions"))
 }
 
-/// The rollout of `session_id` under `<root>/YYYY/MM/DD/`. The depth is fixed and days are
-/// walked newest first, stopping at the first day that holds it, so a recent session costs
-/// a few directory reads even when the tree has thousands of rollouts.
+/// The rollout of `session_id` under `<root>/YYYY/MM/DD/`. A UUIDv7 id names its day, so only
+/// the three folders around it are read; any other id walks the days newest first, stopping
+/// at the first one that holds it.
 fn find_in_codex_sessions(
     root: Option<&Path>,
     session_id: &str,
@@ -301,28 +301,82 @@ fn find_in_codex_sessions(
         return None;
     }
     let suffix = format!("-{session_id}.jsonl");
-    for year in subdirs_newest_first(root) {
-        for month in subdirs_newest_first(&year) {
-            for day in subdirs_newest_first(&month) {
-                let Ok(files) = std::fs::read_dir(&day) else {
-                    continue;
-                };
-                let found = files
-                    .flatten()
-                    .filter(|f| f.file_type().map(|t| t.is_file()).unwrap_or(false))
-                    .filter_map(|f| {
-                        let name = f.file_name().into_string().ok()?;
-                        (name.starts_with("rollout-") && name.ends_with(&suffix))
-                            .then(|| (name, f.path()))
-                    })
-                    .max_by(|a, b| a.0.cmp(&b.0));
-                if let Some((_, path)) = found {
-                    return Some(path);
-                }
-            }
-        }
+    match codex_day_dirs(root, session_id) {
+        Some(days) => days.iter().find_map(|d| rollout_in_day(d, &suffix)),
+        None => all_codex_day_dirs(root).find_map(|d| rollout_in_day(&d, &suffix)),
     }
-    None
+}
+
+const MS_PER_DAY: i64 = 86_400_000;
+
+/// Days since the Unix epoch (UTC) of the timestamp a UUIDv7 carries in its first 48 bits.
+fn uuid_v7_unix_day(id: &str) -> Option<i64> {
+    let b = id.as_bytes();
+    let dash = |i: usize| [8, 13, 18, 23].contains(&i);
+    let shaped = b.len() == 36
+        && b.iter().enumerate().all(|(i, c)| {
+            if dash(i) {
+                *c == b'-'
+            } else {
+                c.is_ascii_hexdigit()
+            }
+        });
+    if !shaped || b[14] != b'7' {
+        return None;
+    }
+    let ms = i64::from_str_radix(&format!("{}{}", &id[..8], &id[9..13]), 16).ok()?;
+    Some(ms.div_euclid(MS_PER_DAY))
+}
+
+/// `(year, month, day)` of a day count since 1970-01-01 (Howard Hinnant's civil_from_days).
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let month = (if mp < 10 { mp + 3 } else { mp - 9 }) as u32;
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+// The date folders are the local date the session started, which is within a day of the
+// UTC date in the id; no other folder can hold it.
+fn codex_day_dirs(root: &Path, session_id: &str) -> Option<Vec<PathBuf>> {
+    let day = uuid_v7_unix_day(session_id)?;
+    Some(
+        [day + 1, day, day - 1]
+            .into_iter()
+            .map(|n| {
+                let (y, m, d) = civil_from_days(n);
+                root.join(format!("{y:04}"))
+                    .join(format!("{m:02}"))
+                    .join(format!("{d:02}"))
+            })
+            .collect(),
+    )
+}
+
+fn all_codex_day_dirs(root: &Path) -> impl Iterator<Item = PathBuf> {
+    subdirs_newest_first(root)
+        .into_iter()
+        .flat_map(|year| subdirs_newest_first(&year))
+        .flat_map(|month| subdirs_newest_first(&month))
+}
+
+fn rollout_in_day(day: &Path, suffix: &str) -> Option<PathBuf> {
+    std::fs::read_dir(day)
+        .ok()?
+        .flatten()
+        .filter(|f| f.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .filter_map(|f| {
+            let name = f.file_name().into_string().ok()?;
+            (name.starts_with("rollout-") && name.ends_with(suffix)).then(|| (name, f.path()))
+        })
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, path)| path)
 }
 
 // The recorded path comes from a hook frame; only a file that looks like a rollout is read.
@@ -765,6 +819,9 @@ mod tests {
         file
     }
 
+    // Version 4, so its id carries no timestamp and the lookup walks every day.
+    const V4_ID: &str = "4f1c2a00-8fbe-4d52-81ec-73ccfdbc1f1e";
+
     #[test]
     fn a_codex_record_finds_its_rollout_by_id_across_date_dirs() {
         let root = tempfile::tempdir().unwrap();
@@ -772,20 +829,59 @@ mod tests {
             root.path(),
             "2026/10/20",
             "2026-10-20T09-00-00",
-            "01a13d02-0000-7000-8000-000000000000",
+            "4f1c2a00-0000-4000-8000-000000000000",
         );
-        let want = write_rollout(root.path(), "2026/09/14", "2026-09-14T20-42-20", CODEX_ID);
+        let want = write_rollout(root.path(), "2024/09/14", "2024-09-14T20-42-20", V4_ID);
         write_rollout(
             root.path(),
-            "2025/12/31",
-            "2025-12-31T23-59-59",
-            "01a13d02-1111-7000-8000-000000000000",
+            "2023/12/31",
+            "2023-12-31T23-59-59",
+            "4f1c2a00-1111-4000-8000-000000000000",
         );
 
         assert_eq!(
-            find_in_codex_sessions(Some(root.path()), CODEX_ID, ""),
+            find_in_codex_sessions(Some(root.path()), V4_ID, ""),
             Some(want)
         );
+    }
+
+    #[test]
+    fn a_uuid_v7_id_names_the_utc_day_it_was_created() {
+        // 0x01a13d028fbe ms is 2026-10-15T00:42:20.478Z.
+        let day = uuid_v7_unix_day(CODEX_ID).unwrap();
+        assert_eq!(civil_from_days(day), (2026, 10, 15));
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        assert_eq!(civil_from_days(19_782), (2024, 2, 29));
+        for id in [
+            V4_ID,
+            "abc-123",
+            "",
+            "01a13d02-8fbe-7d52-81ec",
+            "01a13d0z-8fbe-7d52-81ec-73ccfdbc1f1e",
+        ] {
+            assert_eq!(uuid_v7_unix_day(id), None, "{id}");
+        }
+    }
+
+    #[test]
+    fn a_uuid_v7_rollout_is_looked_up_only_within_a_day_of_its_timestamp() {
+        for (day, found) in [
+            ("2026/10/14", true),
+            ("2026/10/15", true),
+            ("2026/10/16", true),
+            ("2026/10/13", false),
+            ("2026/10/17", false),
+            ("2026/09/14", false),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let stamp = format!("{}T12-00-00", day.replace('/', "-"));
+            let file = write_rollout(root.path(), day, &stamp, CODEX_ID);
+            assert_eq!(
+                find_in_codex_sessions(Some(root.path()), CODEX_ID, ""),
+                found.then_some(file),
+                "{day}"
+            );
+        }
     }
 
     #[test]

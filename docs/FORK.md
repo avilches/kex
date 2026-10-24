@@ -220,9 +220,10 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   the monochrome mark of pi.dev drawn as an inline SVG (an `<img>` would not inherit `currentColor`), Pi ends a turn on `agent_settled` only, and Settings > General plus the bell popover gain a Pi row.
 
 - **Codex session restore from its rollouts** (not present upstream): the codex provider row gains
-  `SessionsSource::CodexSessions` (the recorded `transcript_path`, else a newest-first walk of
-  `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` for `rollout-*-<id>.jsonl`) and reads the launch cwd from the
-  `session_meta` entry on line 1; a session without a rollout still resumes (`ResumeAnyway`) and is never pruned.
+  `SessionsSource::CodexSessions` (the recorded `transcript_path` when it names a `rollout-*.jsonl`, else
+  `<CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/` for `rollout-*-<id>.jsonl`, only the days around the date a UUIDv7
+  id carries or a newest-first walk for any other id) and reads the launch cwd from the `session_meta` entry on line 1
+  (read up to 1 MiB); a session without a rollout still resumes (`ResumeAnyway`) and is never pruned.
   `codex exec` and its alias `codex e` are filtered like `claude -p`, and `codex -p` (`--profile`) is no longer taken
   for print mode. OMP and Pi move to the new `KeepWithoutPlan` policy, which is what `ResumeAnyway` used to mean for a
   provider with a sessions source; their behavior does not change.
