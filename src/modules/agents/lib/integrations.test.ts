@@ -75,11 +75,13 @@ describe("integration status", () => {
     expect(fromCodexStatus("notInstalled")).toBe("missing");
     expect(fromCodexStatus("outdated")).toBe("missing");
     expect(fromCodexStatus("malformed")).toBe("malformed");
+    expect(fromCodexStatus("unsafeToEdit")).toBe("uneditable");
     expect(fromCodexStatus("unavailable")).toBe("unavailable");
   });
 
-  it("blocks Install only for a config it cannot parse or a missing folder", () => {
+  it("blocks Install only for a config it cannot parse or edit safely, or a missing folder", () => {
     expect(blockOf("malformed")).toBe("malformed");
+    expect(blockOf("uneditable")).toBe("uneditable");
     expect(blockOf("unavailable")).toBe("unavailable");
     expect(blockOf("installed")).toBeNull();
     expect(blockOf("missing")).toBeNull();

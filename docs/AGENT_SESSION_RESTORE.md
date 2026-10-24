@@ -36,12 +36,13 @@ lives in the bell popover (a row per agent, shown only while the integration is 
 Agents (`AgentIntegrations`: one row per agent, Claude Code included, with Install or Uninstall and a "View changes"
 link that opens the `agent_integration_preview` dry run as a diff, with one tab per file and the file's `note` above
 it). `agent_*_status` tells whether the installed file is current. The frontend folds every status into one
-`IntegrationStatus` (`installed`, `missing`, `malformed`, `unavailable`; `lib/integrations.ts`): the boolean of the
-file-based agents maps to the first two, and `agent_codex_status` maps `upToDate` to installed and `notInstalled` and
-`outdated` to missing, so Install refreshes an outdated Codex install like a stale OMP file. `malformed` and
-`unavailable` block Install: the Settings row says "Cannot read config" or "Not found" ("Not supported" on Windows),
-explains it and offers only "Check again" (no Install, Uninstall or View changes); the bell shows a malformed Codex as
-a row without a button and hides an unavailable one.
+`IntegrationStatus` (`installed`, `missing`, `malformed`, `uneditable`, `unavailable`; `lib/integrations.ts`): the
+boolean of the file-based agents maps to the first two, and `agent_codex_status` maps `upToDate` to installed,
+`notInstalled` and `outdated` to missing (so Install refreshes an outdated Codex install like a stale OMP file) and
+`unsafeToEdit` to `uneditable`. `malformed`, `uneditable` and `unavailable` block Install: the Settings row says
+"Cannot read config", "Cannot edit config" or "Not found" ("Not supported" on Windows), explains it and offers only
+"Check again" (no Install, Uninstall or View changes); the bell shows a malformed or uneditable Codex as a row without
+a button, each with its own sentence, and hides an unavailable one.
 
 Kex remembers what the user installed. `installedIntegrations` (in `settings-general.json`, the list of `opencode`,
 `omp`, `pi` and `codex`) is written only after the file is on disk, and removed when the user presses Uninstall. On every startup
@@ -77,8 +78,11 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   "leaving it alone". The edited `config.toml` is checked the same way before anything is written: it must parse as
   TOML and every Kex table must read back with its hash, so a trust table in a form the textual editor does not see
   (an inline table under `[hooks.state]`, a quoted `["hooks".state."..."]` header) is never duplicated into a file
-  Codex would refuse; neither file is written and the integration counts as malformed. In those cases
-  `agent_codex_status` reports `malformed` and Settings blocks Install. The startup sync only skips `codex` (with a
+  Codex would refuse; neither file is written. That case is not a parse error, so it has its own outcome: the error
+  says Kex cannot safely edit `config.toml` because it holds a trust entry for a Kex handler in a form Kex does not
+  understand, `agent_codex_status` reports `unsafeToEdit` and Settings says "Cannot edit config" instead of "Cannot read
+  config". For a file that does not parse `agent_codex_status` reports `malformed`. Either way Settings blocks Install.
+  The startup sync only skips `codex` (with a
   warning in the log) and keeps it in `installedIntegrations`, because a file that does not parse may be another tool
   halfway through a write, and dropping it would stop refreshing an install that is still there. A `hooks.json`
   without Kex handlers is different: it drops `codex` from the list, as a file that lost its marker does for the

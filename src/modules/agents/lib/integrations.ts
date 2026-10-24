@@ -13,17 +13,24 @@ export const AGENT_LABELS: Record<AgentId, string> = {
 };
 
 /**
- * What a status check found. `malformed` and `unavailable` block Install: the agent's config
- * cannot be parsed (Kex leaves it untouched), or the agent's folder does not exist yet.
+ * What a status check found. `malformed`, `uneditable` and `unavailable` block Install: the
+ * agent's config cannot be parsed, or parses but cannot be edited safely (Kex leaves it untouched
+ * either way), or the agent's folder does not exist yet.
  */
-export type IntegrationStatus = "installed" | "missing" | "malformed" | "unavailable";
-export type IntegrationBlock = Extract<IntegrationStatus, "malformed" | "unavailable">;
+export type IntegrationStatus = "installed" | "missing" | "malformed" | "uneditable" | "unavailable";
+export type IntegrationBlock = Exclude<IntegrationStatus, "installed" | "missing">;
 
 /** What `agent_codex_status` returns. */
-export type CodexStatus = "unavailable" | "notInstalled" | "upToDate" | "outdated" | "malformed";
+export type CodexStatus =
+  | "unavailable"
+  | "notInstalled"
+  | "upToDate"
+  | "outdated"
+  | "malformed"
+  | "unsafeToEdit";
 
 export function blockOf(status: IntegrationStatus | null): IntegrationBlock | null {
-  return status === "malformed" || status === "unavailable" ? status : null;
+  return status === "malformed" || status === "uneditable" || status === "unavailable" ? status : null;
 }
 
 export function fromInstalledFlag(installed: boolean): IntegrationStatus {
@@ -37,6 +44,8 @@ export function fromCodexStatus(status: CodexStatus): IntegrationStatus {
       return "installed";
     case "malformed":
       return "malformed";
+    case "unsafeToEdit":
+      return "uneditable";
     case "unavailable":
       return "unavailable";
     default:

@@ -548,7 +548,8 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 
 - [ ] Malformed: con `CODEX_HOME` apuntando a una copia, romper la sintaxis de `hooks.json` a mano (quitar una llave). La fila de Settings dice "Cannot read config", explica que Kex no puede leerlo y lo deja intacto, y solo ofrece "Check again" (sin Install, Uninstall ni View changes). El campanazo muestra una fila "Codex integration unavailable" sin boton
 - [ ] Arreglar el fichero y pulsar "Check again": la fila vuelve a su estado normal sin reiniciar. Repetir rompiendo `config.toml`
-- [ ] Con un `hooks.json` roto, reiniciar Kex con Codex marcado como instalado: el fichero no se reescribe y Codex deja de figurar como instalado (se pierde de `installedIntegrations` en `settings-general.json`)
+- [ ] Con un `hooks.json` roto, reiniciar Kex con Codex marcado como instalado: el fichero no se reescribe y Codex sigue en `installedIntegrations` de `settings-general.json` (el log dice que se salta); al arreglarlo, el siguiente arranque lo refresca
+- [ ] Cannot edit config: con Kex instalado, convertir a mano una tabla de Kex de `config.toml` en tabla en linea bajo `[hooks.state]` (`"<clave>" = { enabled = true, trusted_hash = "..." }`). El fichero sigue siendo TOML valido. La fila de Settings dice "Cannot edit config" (no "Cannot read config"), explica que Kex no puede editar `config.toml` con seguridad y lo deja intacto, y solo ofrece "Check again". El campanazo dice que Kex no puede editar su `config.toml`
 - [ ] Unavailable: con `CODEX_HOME` apuntando a una carpeta que no existe (o sin `~/.codex`), la fila dice "Not found" y solo ofrece "Check again"; el campanazo no muestra Codex. Kex no crea la carpeta
 - [ ] Outdated: cambiar a mano el comando de un handler de Kex en `hooks.json`. La fila vuelve a ofrecer Install, que lo repara (y el siguiente arranque de Kex tambien lo repara solo, porque Codex sigue en `installedIntegrations`)
 

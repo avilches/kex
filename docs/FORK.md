@@ -236,7 +236,8 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is re-serialized only for a
   semantic change (the diff dialog carries a note saying so), the edited `config.toml` must parse and read back before
   anything is written, and a file that cannot be parsed is never written: Settings > General > Agents shows
-  "Cannot read config" or "Not found" with only "Check again", and the bell shows a row without button or hides it.
+  "Cannot read config", "Cannot edit config" (a `config.toml` that parses but holds a Kex trust entry in a form Kex
+  does not edit) or "Not found" with only "Check again", and the bell shows a row without button or hides it.
   The integration is reported unavailable on Windows until its POSIX hook command is measured there. Resume keeps
   `-p`/`--profile`, `-m`/`--model`, `--local-provider` and `--oss`, never the sandbox or approval options nor
   `-c`/`--config`, which can set either. `trigger-event.sh` is `kex-session-v8` and takes the agent name as its first argument. The Codex icon is an original

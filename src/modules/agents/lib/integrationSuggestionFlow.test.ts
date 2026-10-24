@@ -56,7 +56,7 @@ describe("integration suggester", () => {
   });
 
   it("does not ask nor count an ask while Install could not work", async () => {
-    for (const status of ["malformed", "unavailable"] as const) {
+    for (const status of ["malformed", "uneditable", "unavailable"] as const) {
       const { suggest, show, state } = setup({ status });
       await suggest("codex");
       expect(show).not.toHaveBeenCalled();

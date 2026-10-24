@@ -285,7 +285,8 @@ export function NotificationBell({ onActivate }: Props) {
 }
 
 // Offered only while the integration is missing: once installed, Settings owns reinstall and remove.
-// An agent whose folder does not exist is not offered; a config Kex cannot parse is explained instead.
+// An agent whose folder does not exist is not offered; a config Kex cannot parse or edit safely is
+// explained instead.
 export function BellIntegrationRow({
   agent,
   name,
@@ -296,7 +297,7 @@ export function BellIntegrationRow({
   state: IntegrationState;
 }) {
   if (state.ready || state.blocked === "unavailable") return null;
-  if (state.blocked === "malformed") {
+  if (state.blocked === "malformed" || state.blocked === "uneditable") {
     return (
       <div className="border-t border-border/60 p-1">
         <div className="flex w-full items-center gap-2 px-2 py-1.5 text-[12px] text-muted-foreground">
@@ -304,7 +305,9 @@ export function BellIntegrationRow({
           <span className="text-left">
             <span className="block font-medium">{name} integration unavailable</span>
             <span className="block text-[11px] text-destructive">
-              Kex cannot parse its config and leaves it untouched.
+              {state.blocked === "malformed"
+                ? "Kex cannot parse its config and leaves it untouched."
+                : "Kex cannot safely edit its config.toml and leaves it untouched."}
             </span>
           </span>
         </div>

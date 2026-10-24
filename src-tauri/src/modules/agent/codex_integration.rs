@@ -84,6 +84,9 @@ pub enum CodexStatus {
     Outdated,
     /// `hooks.json` or `config.toml` cannot be parsed, so Kex will not touch them.
     Malformed,
+    /// `config.toml` parses, but the planned edit would not read back (a Kex trust table in a
+    /// form the textual editor does not see), so Kex will not touch it.
+    UnsafeToEdit,
 }
 
 fn missing_dir(paths: &CodexPaths) -> String {
@@ -97,11 +100,32 @@ fn left_alone(error: String) -> String {
     format!("{error}; leaving it alone")
 }
 
-fn check_config(config: &str) -> Result<(), String> {
+/// Why an edit is refused: a file that does not parse, or a `config.toml` that parses but that
+/// Kex cannot edit safely. Both leave the files alone; the UI tells them apart.
+enum Refusal {
+    Malformed(String),
+    UnsafeToEdit(String),
+}
+
+impl From<Refusal> for String {
+    fn from(refusal: Refusal) -> Self {
+        match refusal {
+            Refusal::Malformed(m) | Refusal::UnsafeToEdit(m) => m,
+        }
+    }
+}
+
+fn check_config(config: &str) -> Result<(), Refusal> {
     config
         .parse::<toml::Table>()
         .map(|_| ())
-        .map_err(|e| left_alone(format!("config.toml is not valid TOML: {e}")))
+        .map_err(|e| Refusal::Malformed(left_alone(format!("config.toml is not valid TOML: {e}"))))
+}
+
+fn unsafe_to_edit(error: String) -> Refusal {
+    Refusal::UnsafeToEdit(left_alone(format!(
+        "Kex cannot safely edit config.toml: it holds a trust entry for a Kex handler in a form Kex does not understand ({error})"
+    )))
 }
 
 struct HooksPlan {
@@ -151,7 +175,7 @@ fn kex_table_keys(config: &str, previous: &[String], source: &str) -> Vec<String
     keys
 }
 
-fn plan_config(config: &str, plan: &HooksPlan, source: &str) -> Result<String, String> {
+fn plan_config(config: &str, plan: &HooksPlan, source: &str) -> Result<String, Refusal> {
     check_config(config)?;
     let current: Vec<String> = plan.entries.iter().map(TrustEntry::key).collect();
     let stale: Vec<String> = kex_table_keys(config, &plan.previous_keys, source)
@@ -173,13 +197,13 @@ fn plan_config(config: &str, plan: &HooksPlan, source: &str) -> Result<String, S
         .collect();
     let cleaned = codex_trust::remove_hook_trust(config, &stale);
     let after = codex_trust::upsert_hook_trust_disabling(&cleaned, &plan.entries, &disabled);
-    codex_trust::verify_hook_trust(&after, &plan.entries).map_err(left_alone)?;
+    codex_trust::verify_hook_trust(&after, &plan.entries).map_err(unsafe_to_edit)?;
     Ok(after)
 }
 
 // The whole install planned against the current text: an error means Kex leaves both alone.
-fn plan_install(hooks: &str, config: &str, source: &str) -> Result<(), String> {
-    let plan = plan_hooks(hooks, source, true)?;
+fn plan_install(hooks: &str, config: &str, source: &str) -> Result<(), Refusal> {
+    let plan = plan_hooks(hooks, source, true).map_err(Refusal::Malformed)?;
     plan_config(config, &plan, source).map(|_| ())
 }
 
@@ -288,8 +312,10 @@ pub fn sync(paths: &CodexPaths) -> Result<SyncOutcome, String> {
         HooksStatus::UpToDate | HooksStatus::Outdated => {}
     }
     let config = read_optional(&paths.config)?;
-    if plan_install(&hooks, config.as_deref().unwrap_or(""), &paths.source()).is_err() {
-        return Ok(SyncOutcome::Malformed);
+    match plan_install(&hooks, config.as_deref().unwrap_or(""), &paths.source()) {
+        Err(Refusal::Malformed(_)) => return Ok(SyncOutcome::Malformed),
+        Err(Refusal::UnsafeToEdit(_)) => return Ok(SyncOutcome::UnsafeToEdit),
+        Ok(()) => {}
     }
     super::install_session_hook_script(&paths.script)?;
     apply(paths, true, false)?;
@@ -314,8 +340,10 @@ pub fn status(paths: &CodexPaths) -> CodexStatus {
 }
 
 fn status_of(hooks: &str, config: &str, script: Option<&str>, source: &str) -> CodexStatus {
-    if plan_install(hooks, config, source).is_err() {
-        return CodexStatus::Malformed;
+    match plan_install(hooks, config, source) {
+        Err(Refusal::Malformed(_)) => return CodexStatus::Malformed,
+        Err(Refusal::UnsafeToEdit(_)) => return CodexStatus::UnsafeToEdit,
+        Ok(()) => {}
     }
     match codex_hooks::status(hooks, DEFAULT_SCRIPT_PATH) {
         HooksStatus::Malformed => CodexStatus::Malformed,

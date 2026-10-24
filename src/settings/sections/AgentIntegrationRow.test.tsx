@@ -196,6 +196,18 @@ describe("AgentIntegrationRow", () => {
     expect(screen.getByRole("button", { name: "Uninstall" })).toBeTruthy();
   });
 
+  it("explains a config.toml it cannot edit safely without saying it cannot parse it", async () => {
+    codexStatus = "unsafeToEdit";
+    render(<CodexRow />);
+    expect(await screen.findByText("Cannot edit config")).toBeTruthy();
+    expect(screen.getByText(/cannot safely edit ~\/\.codex\/config\.toml/)).toBeTruthy();
+    expect(screen.queryByText(/cannot parse/)).toBeNull();
+    expect(screen.queryByText("Cannot read config")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+    expect((screen.getByRole("button", { name: "View changes" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
+  });
+
   it("says Codex is missing when its folder does not exist", async () => {
     codexStatus = "unavailable";
     render(<CodexRow />);

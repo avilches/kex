@@ -418,6 +418,8 @@ pub enum SyncOutcome {
     Foreign,
     /// A shared file Kex cannot parse: left untouched and skipped, but still tracked.
     Malformed,
+    /// A shared file that parses but that Kex cannot edit safely: left untouched, still tracked.
+    UnsafeToEdit,
     /// The integration does not run on this platform: skipped, still tracked.
     Unsupported,
 }
@@ -468,6 +470,11 @@ pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
             // here would stop refreshing an install that is still there once it settles.
             Ok(SyncOutcome::Malformed) => {
                 log::warn!("[agent] sync {agent}: a config file does not parse, skipped");
+            }
+            Ok(SyncOutcome::UnsafeToEdit) => {
+                log::warn!(
+                    "[agent] sync {agent}: a config file holds Kex's trust in a form Kex cannot edit safely, skipped"
+                );
             }
             Ok(SyncOutcome::Foreign) => dropped.push(agent),
             Err(e) => log::warn!("[agent] sync {agent} failed: {e}"),

@@ -472,16 +472,19 @@ fn a_trust_table_kex_cannot_see_is_never_duplicated() {
         std::fs::write(&env.paths.config, &config).unwrap();
         std::fs::write(&env.paths.hooks, &hooks).unwrap();
 
+        // The file parses, so this is not reported as one Kex cannot read.
         let err = codex_integration::setup(&env.paths).unwrap_err();
-        assert!(err.contains("leaving it alone"), "{err}");
-        assert!(codex_integration::preview(&env.paths, true).is_err());
+        assert!(err.contains("cannot safely edit config.toml"), "{err}");
+        assert!(!err.contains("not valid TOML"), "{err}");
+        let err = codex_integration::preview(&env.paths, true).unwrap_err();
+        assert!(err.contains("cannot safely edit config.toml"), "{err}");
         assert_eq!(
             codex_integration::sync(&env.paths).unwrap(),
-            SyncOutcome::Malformed
+            SyncOutcome::UnsafeToEdit
         );
         assert_eq!(
             codex_integration::status(&env.paths),
-            CodexStatus::Malformed
+            CodexStatus::UnsafeToEdit
         );
         assert_eq!(read(&env.paths.config), config);
         assert_eq!(read(&env.paths.hooks), hooks);

@@ -88,6 +88,7 @@ describe("integrationStatus", () => {
       ["notInstalled", "missing"],
       ["outdated", "missing"],
       ["malformed", "malformed"],
+      ["unsafeToEdit", "uneditable"],
       ["unavailable", "unavailable"],
     ] as const) {
       invoke.mockImplementation(() => Promise.resolve(raw));

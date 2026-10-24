@@ -13,12 +13,17 @@ const CHANGE_ANIMATION_MS = 700;
 // On Windows the backend reports Codex unavailable before looking for its folder (HOOKS_SUPPORTED).
 function blockLabel(block: IntegrationBlock): string {
   if (block === "malformed") return "Cannot read config";
+  if (block === "uneditable") return "Cannot edit config";
   return IS_WINDOWS ? "Not supported" : "Not found";
 }
 
 function blockText(block: IntegrationBlock, name: string, files: string[]): string {
   if (block === "malformed") {
     return `Kex cannot parse ${files.join(" or ")} and leaves them untouched. Fix it and check again.`;
+  }
+  if (block === "uneditable") {
+    const config = files.find((f) => f.endsWith("config.toml")) ?? "config.toml";
+    return `Kex cannot safely edit ${config}: it holds a trust entry for a Kex hook in a form Kex does not understand, so Kex left it untouched. Fix it and check again.`;
   }
   return IS_WINDOWS
     ? `The ${name} integration is not supported on Windows yet.`
@@ -65,7 +70,7 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
                   "relative flex items-center gap-1.5 text-[11px] font-normal transition-colors duration-300",
                   installed
                     ? "text-green-500"
-                    : blocked === "malformed"
+                    : blocked === "malformed" || blocked === "uneditable"
                       ? "text-destructive"
                       : "text-muted-foreground",
                 )}

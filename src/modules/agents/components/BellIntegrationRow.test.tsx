@@ -71,6 +71,16 @@ describe("BellIntegrationRow", () => {
     expect(screen.queryByText(/Install Codex/)).toBeNull();
   });
 
+  it("explains a config Kex cannot edit safely apart from one it cannot parse", () => {
+    render(
+      <BellIntegrationRow agent="codex" name="Codex" state={state({ blocked: "uneditable" })} />,
+    );
+    expect(screen.getByText("Codex integration unavailable")).toBeTruthy();
+    expect(screen.getByText(/cannot safely edit its config\.toml/)).toBeTruthy();
+    expect(screen.queryByText(/cannot parse/)).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
   it("is hidden when the agent's folder does not exist", () => {
     const { container } = render(
       <BellIntegrationRow agent="codex" name="Codex" state={state({ blocked: "unavailable" })} />,

@@ -193,7 +193,7 @@ is the "not now". The decision lives in pure functions (`lib/integrationSuggesti
 - Installed at any moment (the toast, Settings, the bell, or already installed when the agent is detected): never ask
   again, even if it is removed later. `installAgent` (`lib/agentIntegration.ts`) is the single install path and records
   it.
-- Install cannot run (Codex reports `malformed` or `unavailable`): no toast and no ask counted; the next app run looks
+- Install cannot run (Codex reports `malformed`, `unsafeToEdit` or `unavailable`): no toast and no ask counted; the next app run looks
   again.
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce }`.
