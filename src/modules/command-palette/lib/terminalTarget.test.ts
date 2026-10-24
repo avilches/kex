@@ -17,6 +17,15 @@ const closed = (kind: "terminal" | "file", path: string): MergedRow => ({
 });
 
 describe("terminalTargetOf", () => {
+  it("has no folder for the rows that are not a tab or a closed entry", () => {
+    const others = [
+      { kind: "command", key: "cmd:x" },
+      { kind: "action", key: "act:x" },
+      { kind: "workspace", key: "ws:x" },
+    ] as MergedRow[];
+    for (const row of others) expect(terminalTargetOf(row.key, others)).toBeNull();
+  });
+
   const rows = [
     tab("a", "/work/a"),
     tab("b", ""),

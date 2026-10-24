@@ -527,3 +527,19 @@ describe("mergeRows highlight", () => {
     expect(rows.every((r) => !r.highlight)).toBe(true);
   });
 });
+
+describe("mergeRows with Actions", () => {
+  const item = (id: string, name: string) =>
+    ({ id, name, global: false, state: "idle", stoppable: false, disabledReason: null, action: { id } }) as never;
+
+  it("lists the Actions after the recents and before the commands when the term is empty", () => {
+    const rows = mergeRows(input({ commands: [cmd("c", "C")], actions: [item("a", "Dev")], tabs: [tab("t")] }));
+    expect(keys(rows)).toEqual(["tab:t", "act:a", "cmd:c"]);
+  });
+
+  it("finds an Action by its name", () => {
+    const rows = mergeRows(input({ term: "dev", commands: [cmd("c", "Zzz")], actions: [item("a", "Dev server")] }));
+    expect(keys(rows)).toEqual(["act:a"]);
+    expect(rows[0]).toMatchObject({ highlight: { field: "title" } });
+  });
+});

@@ -4,7 +4,9 @@ import {
   type KeyBinding,
   type ShortcutId,
 } from "@/modules/shortcuts";
+import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import { ActionItem } from "./ActionItem";
+import { ActionRowItem } from "./ActionRowItem";
 import { ClosedItem } from "./ClosedItem";
 import { COMMAND_GROUPS } from "./commands";
 import type { ClosedTabEntry } from "./lib/closedEntries";
@@ -23,6 +25,8 @@ type Props = {
   onRunTab: (entry: TabEntry) => void;
   onRunWorkspace: (entry: WorkspaceEntry) => void;
   onRunClosed: (entry: ClosedTabEntry) => void;
+  onRunAction: (item: BarItem) => void;
+  onContextMenuAction?: (item: BarItem, e: React.MouseEvent<HTMLElement>) => void;
   onContextMenuTab?: (entry: TabEntry, e: React.MouseEvent<HTMLElement>) => void;
   onContextMenuClosed?: (entry: ClosedTabEntry, e: React.MouseEvent<HTMLElement>) => void;
 };
@@ -35,6 +39,18 @@ function shortcutLabel(
 }
 
 function Row({ row, p }: { row: MergedRow; p: Props }) {
+  if (row.kind === "action") {
+    return (
+      <ActionRowItem
+        item={row.item}
+        highlight={row.highlight}
+        onRun={() => p.onRunAction(row.item)}
+        onContextMenu={
+          p.onContextMenuAction ? (e) => p.onContextMenuAction?.(row.item, e) : undefined
+        }
+      />
+    );
+  }
   if (row.kind === "tab") {
     return (
       <TabItem
@@ -93,6 +109,11 @@ export function MergedList(p: Props) {
   }
   const tabs = p.rows.filter((r) => r.kind === "tab");
   const closed = p.rows.filter((r) => r.kind === "closed");
+  const userActions = p.rows.filter(
+    (r): r is Extract<MergedRow, { kind: "action" }> => r.kind === "action",
+  );
+  const workspaceActions = userActions.filter((r) => !r.item.global);
+  const globalActions = userActions.filter((r) => r.item.global);
   const actions = p.rows.filter(
     (r): r is Extract<MergedRow, { kind: "command" }> => r.kind === "command",
   );
@@ -108,6 +129,20 @@ export function MergedList(p: Props) {
       {closed.length > 0 ? (
         <CommandGroup heading="Recently closed">
           {closed.map((row) => (
+            <Row key={row.key} row={row} p={p} />
+          ))}
+        </CommandGroup>
+      ) : null}
+      {workspaceActions.length > 0 ? (
+        <CommandGroup heading="Workspace actions">
+          {workspaceActions.map((row) => (
+            <Row key={row.key} row={row} p={p} />
+          ))}
+        </CommandGroup>
+      ) : null}
+      {globalActions.length > 0 ? (
+        <CommandGroup heading="Global actions">
+          {globalActions.map((row) => (
             <Row key={row.key} row={row} p={p} />
           ))}
         </CommandGroup>

@@ -1,11 +1,21 @@
 import { pathBasename } from "@/lib/pathUtils";
+import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import type { TabEntry } from "./tabEntries";
 
-export type RowMenuItemId = "go" | "terminal" | "copy" | "close" | "pick" | "worktrees";
+export type RowMenuItemId =
+  | "go"
+  | "terminal"
+  | "copy"
+  | "close"
+  | "pick"
+  | "worktrees"
+  | "run"
+  | "stop"
+  | "edit";
 
 export type RowMenuItem = {
   id: RowMenuItemId;
@@ -23,6 +33,21 @@ export function highlightedTabOf(value: string, rows: readonly MergedRow[]): Tab
     if (row.kind === "tab" && value === `tab:${row.entry.tabId}`) return row.entry;
   }
   return null;
+}
+
+export function highlightedActionOf(value: string, rows: readonly MergedRow[]): BarItem | null {
+  for (const row of rows) {
+    if (row.kind === "action" && value === row.key) return row.item;
+  }
+  return null;
+}
+
+export function actionMenuItems(item: BarItem): RowMenuItem[] {
+  const label = item.state !== "idle" ? "Show script" : item.action.runInTerminal ? "Run" : "Open";
+  const items: RowMenuItem[] = [{ id: "run", label, enter: true }];
+  if (item.stoppable) items.push({ id: "stop", label: "Stop" });
+  items.push({ id: "edit", label: "Edit" });
+  return items;
 }
 
 export function highlightedClosedOf(

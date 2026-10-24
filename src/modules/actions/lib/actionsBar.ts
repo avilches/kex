@@ -478,3 +478,12 @@ export function menuEntries(item: BarItem): MenuEntry[] {
   const main: MenuEntry = { kind: "main", enabled: waiting || item.state === "running" || item.disabledReason === null };
   return [main];
 }
+
+// What the command palette lists: the Actions the Header offers here, runnable ones only. A
+// blocked Action is left out instead of muted, and a script already running stays so it can
+// be shown or stopped.
+export function paletteActions(model: Pick<BarModel, "buttons" | "menu">): BarItem[] {
+  return [...model.buttons, ...model.menu.workspace, ...model.menu.global].filter(
+    (i) => i.disabledReason === null || i.stoppable,
+  );
+}

@@ -9,6 +9,9 @@ import {
   ComputerTerminal01Icon,
   CopySlashIcon,
   GitBranchIcon,
+  PencilEdit02Icon,
+  PlayIcon,
+  StopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -28,6 +31,9 @@ const ICONS = {
   copy: CopySlashIcon,
   close: Cancel01Icon,
   worktrees: GitBranchIcon,
+  run: PlayIcon,
+  stop: StopIcon,
+  edit: PencilEdit02Icon,
 } as const;
 
 export type RowMenuState = {

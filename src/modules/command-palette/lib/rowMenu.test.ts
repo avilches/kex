@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import {
+  actionMenuItems,
   closedMenuItems,
   folderMenuItems,
   highlightedClosedOf,
@@ -131,5 +132,25 @@ describe("placeMenuLeft", () => {
   it("never goes past the left edge", () => {
     expect(placeMenuLeft(-5, 500, 200)).toBe(0);
     expect(placeMenuLeft(10, 100, 200)).toBe(0);
+  });
+});
+
+describe("actionMenuItems", () => {
+  const base = { state: "idle", stoppable: false, action: { runInTerminal: true } };
+
+  it("offers Run with Enter, then Edit", () => {
+    const items = actionMenuItems(base as never);
+    expect(items.map((i) => i.id)).toEqual(["run", "edit"]);
+    expect(items[0]).toMatchObject({ label: "Run", enter: true });
+  });
+
+  it("says Open for an app", () => {
+    expect(actionMenuItems({ ...base, action: { runInTerminal: false } } as never)[0].label).toBe("Open");
+  });
+
+  it("adds Stop and turns Run into Show script while the script runs", () => {
+    const items = actionMenuItems({ ...base, state: "running", stoppable: true } as never);
+    expect(items.map((i) => i.id)).toEqual(["run", "stop", "edit"]);
+    expect(items[0].label).toBe("Show script");
   });
 });
