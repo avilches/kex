@@ -702,8 +702,10 @@ src/
                                      the focus does. The shortcuts are live only while
                                      the folder palette is open (`shortcutsDisabled`), so Cmd+1..9 still jump to a
                                      workspace everywhere else, and reach the palette through `lib/paletteControl.ts`.
-                                     Below them come the rest of the current tab's repository (its heading, so the
-                                     worktrees Tab adds appear right under it) and the other folders; then one
+                                     Below them come the rest of the current tab's repository, with its heading drawn once,
+                                     right above its first folder (the current tab and the fixed rows have none, and
+                                     the current tab only carries it when its repository has nothing else to show),
+                                     so the worktrees Tab adds appear right under it, and the other folders; then one
                                      group per other workspace in position order (root, then folders, hibernated
                                      included). The folders of one repository (several of a workspace) sit together
                                      under a small heading aligned with the workspace heading (a git icon, the
