@@ -162,16 +162,17 @@ export function CommandPalette({
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
   const learned = useMemo(() => (open ? learnedSnapshot() : {}), [open]);
 
-  const inCommands = !inThemes && parsed.mode === "commands";
+  const actionsOnly = parsed.mode === "actions";
+  const inCommands = !inThemes && (parsed.mode === "commands" || actionsOnly);
   const merged = useMemo(
     () =>
       inCommands
         ? mergeRows({
-            commands: commandItems,
+            commands: actionsOnly ? [] : commandItems,
             actions: actionItems,
-            tabs: tabEntries,
-            workspaces: workspaceEntries,
-            closed: closedEntries,
+            tabs: actionsOnly ? [] : tabEntries,
+            workspaces: actionsOnly ? [] : workspaceEntries,
+            closed: actionsOnly ? [] : closedEntries,
             term: parsed.term,
             activeTabId,
             learned,
@@ -180,6 +181,7 @@ export function CommandPalette({
         : [],
     [
       inCommands,
+      actionsOnly,
       commandItems,
       actionItems,
       tabEntries,
@@ -610,7 +612,9 @@ export function CommandPalette({
         ? "Find text in files..."
         : parsed.mode === "history"
           ? "Search command history..."
-          : "Type a command, tab or workspace, > for history, # to find in files";
+          : actionsOnly
+            ? "Search actions..."
+            : "Type a command, tab or workspace, > history, # files, / actions";
 
   return (
     <CommandDialog
@@ -753,9 +757,9 @@ export function CommandPalette({
                   <StatusItem label="No other workspaces" />
                 ) : null}
               </CommandGroup>
-            ) : parsed.mode === "commands" ? (
+            ) : parsed.mode === "commands" || actionsOnly ? (
               merged.length === 0 ? (
-                <EmptyHint />
+                <EmptyHint actionsOnly={actionsOnly} />
               ) : (
                 <MergedList
                   rows={merged}
@@ -996,11 +1000,15 @@ function StatusItem({
   );
 }
 
-function EmptyHint() {
+function EmptyHint({ actionsOnly }: { actionsOnly: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
       <HugeiconsIcon icon={CommandIcon} size={18} strokeWidth={1.5} />
-      <span>No commands found. Type ? to see search modes.</span>
+      <span>
+        {actionsOnly
+          ? "No actions found."
+          : "No commands found. Type ? to see search modes."}
+      </span>
     </div>
   );
 }
