@@ -7,6 +7,7 @@ const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?:
   name: id,
   binary,
   argsBeforePath,
+  kind: "editor",
   enabled,
 });
 

@@ -6,6 +6,7 @@ export interface DetectedEditor {
   binary: string;
   /** Args inserted between binary and the target path at launch time. */
   argsBeforePath: string[];
+  kind: "editor" | "agent";
   /** false means user-disabled. Absent or true means enabled. */
   enabled?: boolean;
 }

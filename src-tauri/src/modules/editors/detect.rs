@@ -3,6 +3,13 @@ use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DetectedKind {
+    Editor,
+    Agent,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DetectedEditor {
@@ -12,10 +19,13 @@ pub struct DetectedEditor {
     pub binary: String,
     /// Args inserted between `binary` and the target path at launch time.
     pub args_before_path: Vec<String>,
+    pub kind: DetectedKind,
 }
 
 pub fn detect_all() -> Vec<DetectedEditor> {
-    CATALOG.iter().filter_map(detect_entry).collect()
+    let mut all: Vec<DetectedEditor> = CATALOG.iter().filter_map(detect_entry).collect();
+    all.extend(crate::modules::editors::agents::detect_agents());
+    all
 }
 
 fn detect_entry(entry: &EditorEntry) -> Option<DetectedEditor> {
@@ -127,6 +137,7 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
         name: entry.name.to_string(),
         binary,
         args_before_path: args,
+        kind: DetectedKind::Editor,
     })
 }
 
@@ -234,6 +245,7 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        kind: DetectedKind::Editor,
     })
 }
 
@@ -277,6 +289,7 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        kind: DetectedKind::Editor,
     })
 }
 
@@ -341,6 +354,7 @@ fn detect_via_which(entry: &EditorEntry) -> Option<DetectedEditor> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        kind: DetectedKind::Editor,
     })
 }
 

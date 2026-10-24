@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { native } from "@/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setDetectedEditors } from "@/modules/settings/store";
@@ -21,6 +21,26 @@ function getScanningSnapshot(): boolean {
   return scanning;
 }
 
+export function splitDetected(list: DetectedEditor[]) {
+  return {
+    detectedEditors: list.filter((e) => e.kind === "editor"),
+    detectedAgents: list.filter((e) => e.kind === "agent"),
+  };
+}
+
+export function mergeEnabled(
+  result: DetectedEditor[],
+  existing: DetectedEditor[],
+): DetectedEditor[] {
+  const enabledById = new Map(
+    existing.map((e) => [`${e.kind}:${e.id}`, e.enabled]),
+  );
+  return result.map((e) => {
+    const saved = enabledById.get(`${e.kind}:${e.id}`);
+    return saved !== undefined ? { ...e, enabled: saved } : e;
+  });
+}
+
 /** Run a full editor scan and persist results, preserving user-set enabled flags. */
 export async function runEditorScan(): Promise<void> {
   if (scanning) return;
@@ -29,12 +49,7 @@ export async function runEditorScan(): Promise<void> {
   try {
     const result = await native.editorScan();
     const existing: DetectedEditor[] = usePreferencesStore.getState().detectedEditors;
-    const enabledById = new Map(existing.map((e) => [e.id, e.enabled]));
-    const merged = result.map((e) => {
-      const saved = enabledById.get(e.id);
-      return saved !== undefined ? { ...e, enabled: saved } : e;
-    });
-    await setDetectedEditors(merged);
+    await setDetectedEditors(mergeEnabled(result, existing));
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {
@@ -44,10 +59,14 @@ export async function runEditorScan(): Promise<void> {
 }
 
 export function useExternalEditors() {
-  const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
+  const detected = usePreferencesStore((s) => s.detectedEditors);
+  const { detectedEditors, detectedAgents } = useMemo(
+    () => splitDetected(detected),
+    [detected],
+  );
   const isScanning = useSyncExternalStore(subscribeScan, getScanningSnapshot);
   const scan = useCallback(() => {
     void runEditorScan();
   }, []);
-  return { detectedEditors, isScanning, scan };
+  return { detectedEditors, detectedAgents, isScanning, scan };
 }
