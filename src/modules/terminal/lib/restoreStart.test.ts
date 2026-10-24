@@ -192,14 +192,14 @@ describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
 });
 
 describe("restoreCommandLine", () => {
-  it("cds with && on Unix and keeps a leading space", () => {
-    expect(restoreCommandLine("/work", "claude -r", false)).toBe(" cd /work && claude -r\r");
+  it("cds with && on Unix without a leading space", () => {
+    expect(restoreCommandLine("/work", "claude -r", false)).toBe("cd /work && claude -r\r");
   });
   it("quotes a directory with spaces", () => {
-    expect(restoreCommandLine("/my work", "x", false)).toBe(" cd '/my work' && x\r");
+    expect(restoreCommandLine("/my work", "x", false)).toBe("cd '/my work' && x\r");
   });
   it("joins with a semicolon on Windows", () => {
-    expect(restoreCommandLine("C:/w", "claude", true)).toBe(" cd C:/w; claude\r");
+    expect(restoreCommandLine("C:/w", "claude", true)).toBe("cd C:/w; claude\r");
   });
 });
 
@@ -213,7 +213,7 @@ describe("pendingAfterPlan", () => {
   });
   it("runs the resume command in its directory", () => {
     const o = pendingAfterPlan(plan({ resumeCmd: "claude -r", cwdLaunch: "/d" }), false);
-    expect(o).toEqual({ kind: "run", line: " cd /d && claude -r\r" });
+    expect(o).toEqual({ kind: "run", line: "cd /d && claude -r\r" });
   });
 });
 
@@ -223,6 +223,6 @@ describe("pendingAfterDirCheck", () => {
     expect(pendingAfterDirCheck(b, "gone", false)).toEqual({ kind: "blocked", block: { ...b, reason: "gone" } });
   });
   it("runs the saved command when the directory is fine", () => {
-    expect(pendingAfterDirCheck(b, null, false)).toEqual({ kind: "run", line: " cd /d && npm start\r" });
+    expect(pendingAfterDirCheck(b, null, false)).toEqual({ kind: "run", line: "cd /d && npm start\r" });
   });
 });

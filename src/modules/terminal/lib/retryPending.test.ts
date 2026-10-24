@@ -54,7 +54,7 @@ describe("retryPendingFlow", () => {
     expect(t.pending()).toBeNull();
     expect(t.calls.clearPlaceholder).toHaveBeenCalled();
     expect(t.calls.adopt).toHaveBeenCalledWith(p);
-    expect(t.calls.write).toHaveBeenCalledWith(" cd /work && claude --resume 'a'\r");
+    expect(t.calls.write).toHaveBeenCalledWith("cd /work && claude --resume 'a'\r");
   });
 
   it("agent plan error: stays pending with the new reason, marks the tab, writes nothing", async () => {
@@ -79,7 +79,7 @@ describe("retryPendingFlow", () => {
     const t = mk(cmdBlock);
     await retryPendingFlow(t.d);
     expect(t.pending()).toBeNull();
-    expect(t.calls.write).toHaveBeenCalledWith(" cd /proj && npm run dev\r");
+    expect(t.calls.write).toHaveBeenCalledWith("cd /proj && npm run dev\r");
     expect(t.calls.stillBlocked).not.toHaveBeenCalled();
     expect(t.calls.adopt).not.toHaveBeenCalled();
     expect(t.calls.markBlocked).not.toHaveBeenCalled();
