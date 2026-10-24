@@ -186,22 +186,32 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
             i += 1;
             continue;
         }
+        let is_value = |t: &str| !t.starts_with('-') && launch_cmd::redirection_tokens(t).is_none();
+        if keep_with_value.contains(&flag) && provider.single_value_opts.contains(&flag) {
+            let (value, used) = if has_eq {
+                (Some(&token[flag.len() + 1..]), 1)
+            } else {
+                match tokens.get(i + 1) {
+                    Some(v) if is_value(v) => (Some(*v), 2),
+                    _ => (None, 1),
+                }
+            };
+            // Without a value the option would take the next word of the resume line
+            // (`resume`); a value the shell could expand may turn into another option.
+            if value.is_some_and(is_plain_shell_word) {
+                result.extend_from_slice(&tokens[i..i + used]);
+            }
+            i += used;
+            continue;
+        }
         if keep_with_value.contains(&flag) {
             result.push(token);
             i += 1;
             if !has_eq {
-                let single = provider.single_value_opts.contains(&flag);
-                // Consume the immediately-following non-flag tokens as values (one, for a
-                // single-value option).
-                while i < tokens.len()
-                    && !tokens[i].starts_with('-')
-                    && launch_cmd::redirection_tokens(tokens[i]).is_none()
-                {
+                // Consume all immediately-following non-flag tokens as values.
+                while i < tokens.len() && is_value(tokens[i]) {
                     result.push(tokens[i]);
                     i += 1;
-                    if single {
-                        break;
-                    }
                 }
             }
             continue;
@@ -216,6 +226,25 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         }
     }
     Some(result.join(" "))
+}
+
+/// A word the shell passes through as one literal argument: plain characters, or the whole word
+/// in single quotes, or in double quotes with nothing that expands or escapes inside.
+fn is_plain_shell_word(word: &str) -> bool {
+    let quoted = |q: char| {
+        word.len() >= 2 && word.starts_with(q) && word.ends_with(q) && {
+            let inner = &word[1..word.len() - 1];
+            !inner.is_empty()
+                && !inner.contains(q)
+                && (q == '\'' || !inner.contains(['$', '`', '\\', '!']))
+        }
+    };
+    quoted('\'')
+        || quoted('"')
+        || (!word.is_empty()
+            && word
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "._:/@+=,%-".contains(c)))
 }
 
 /// Why `path` cannot be the working directory of a restored terminal, or `None` when it can.
@@ -913,16 +942,88 @@ mod tests {
     #[test]
     fn a_codex_single_value_option_never_takes_a_flag_or_a_redirection_for_its_value() {
         for (line, want) in [
-            ("codex -p work -m --yolo", "codex -p work -m"),
-            ("codex -m --oss -p work", "codex -m --oss -p work"),
-            ("codex -p work -m 2>/dev/null", "codex -p work -m"),
-            ("codex -p work -m > out.log", "codex -p work -m"),
+            ("codex -p work -m --yolo", "codex -p work"),
+            ("codex -m --oss -p work", "codex --oss -p work"),
+            ("codex -p work -m 2>/dev/null", "codex -p work"),
+            ("codex -p work -m > out.log", "codex -p work"),
         ] {
             assert_eq!(
                 strip_for_resume_base(line, "codex").as_deref(),
                 Some(want),
                 "{line}"
             );
+        }
+    }
+
+    fn codex_base_is_stable(base: &str) {
+        let resume = Provider::of("codex")
+            .unwrap()
+            .resume_cmd(Some(base), "id-1");
+        assert_eq!(
+            strip_for_resume_base(&resume, "codex").as_deref(),
+            Some(base),
+            "{resume}"
+        );
+    }
+
+    #[test]
+    fn a_codex_value_option_left_without_a_value_is_dropped() {
+        for (line, want) in [
+            ("codex -p work -m --yolo", "codex -p work"),
+            ("codex -p work -m", "codex -p work"),
+            ("codex -m > out.log -p work", "codex -p work"),
+            ("codex -m 2>/dev/null -p work", "codex -p work"),
+            ("codex --model= -p work", "codex -p work"),
+            ("codex --profile --oss", "codex --oss"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+            codex_base_is_stable(want);
+        }
+    }
+
+    #[test]
+    fn a_codex_value_the_shell_would_expand_is_never_kept() {
+        for (line, want) in [
+            ("codex -m $(echo o3 --yolo) -p work", "codex -p work"),
+            ("codex -p `x` -m o3", "codex -m o3"),
+            ("codex -m $MODEL -p work", "codex -p work"),
+            ("codex --model=$MODEL -p work", "codex -p work"),
+            ("codex -m \"$MODEL\" -p work", "codex -p work"),
+            ("codex -m ${M:-o3} -p work", "codex -p work"),
+            ("codex -m o3\\ --yolo -p work", "codex -p work"),
+            ("codex -m o3* -p work", "codex -p work"),
+            ("codex -m ~/m -p work", "codex -p work"),
+            ("codex -m 'a'b -p work", "codex -p work"),
+            ("codex --local-provider $(x) --oss", "codex --oss"),
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(want),
+                "{line}"
+            );
+            codex_base_is_stable(want);
+        }
+    }
+
+    #[test]
+    fn a_plain_codex_value_is_kept() {
+        for line in [
+            "codex -m o3",
+            "codex -m gpt-5 -p work",
+            "codex --profile 'my profile'",
+            "codex --model=\"gpt-5\" --local-provider ollama",
+            "codex -m gpt-5.1-codex --profile team:a/b",
+        ] {
+            assert_eq!(
+                strip_for_resume_base(line, "codex").as_deref(),
+                Some(line),
+                "{line}"
+            );
+            codex_base_is_stable(line);
         }
     }
 

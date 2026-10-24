@@ -241,7 +241,8 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   without button or hides it.
   The integration is reported unavailable on Windows until its POSIX hook command is measured there. Resume keeps
   `-p`/`--profile`, `-m`/`--model`, `--local-provider` and `--oss`, never the sandbox or approval options nor
-  `-c`/`--config`, which can set either. `trigger-event.sh` is `kex-session-v9`, takes the agent name as its first argument and, for `codex` only, reads a
+  `-c`/`--config`, which can set either; a kept option needs a value that is a plain shell word (no `$`, backtick,
+  backslash or other expansion), or it is dropped. `trigger-event.sh` is `kex-session-v9`, takes the agent name as its first argument and, for `codex` only, reads a
   snake_case event name as its PascalCase form (as `pty/ipc.rs` does), because Codex's casing is unmeasured. The Codex icon is an original
   inline monochrome mark, and the tab menu hides the transcript actions when the frame named no rollout. The
   `MissingTranscriptPolicy::KeepWithoutPlan` value came with it (see the rollouts entry). Nothing was run against a

@@ -327,10 +327,16 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
 - **Resume.** `codex resume '<id>'` on top of the stripped launch line. The codex row keeps `-p`/`--profile`,
   `-m`/`--model`, `--local-provider` and `--oss`, so `codex -p work -m o3` resumes as
   `codex -p work -m o3 resume '<id>'` (Codex 0.163 parses those options before the subcommand; that it applies them to
-  the resumed session is read from its CLI, not measured live). Each of those value options takes at most one token
-  (`single_value_opts`, the same `CODEX_VALUE_OPTS` list the `exec` detection uses), and never one that starts with
-  `-` or is a redirection, so a prompt, a following flag or the `resume <id>` of an already resumed line is never taken
-  for a value and a second strip gives the same base. The sandbox and
+  the resumed session is read from its CLI, not measured live). Each of those value options takes exactly one token
+  (`single_value_opts`, the same `CODEX_VALUE_OPTS` list the `exec` detection uses), never one that starts with `-` or
+  is a redirection, so a prompt, a following flag or the `resume <id>` of an already resumed line is never taken for a
+  value and a second strip gives the same base. An option left without a value (last token, `--model=`, or followed by
+  a flag or a redirection) is dropped, because kept bare it would take `resume` as its value. The value must also be a
+  plain shell word: only letters, digits and `._:/@+=,%-`, or the whole word in single quotes, or in double quotes
+  with no `$`, backtick, backslash or `!` inside. Anything else (`$(...)`, `` `...` ``, `$VAR`, `${...}`, `\`, globs,
+  `~`, mixed quoting) is dropped with its option, since the shell running the resume line could expand it into
+  another option such as `--yolo`. So `codex -m o3`, `-m gpt-5`, `-p work` and `--profile 'my profile'` are kept and
+  `codex -m $(echo o3 --yolo)` resumes as plain `codex resume '<id>'`. The sandbox and
   approval options (`-s`/`--sandbox`, `-a`/`--ask-for-approval`, `--yolo`,
   `--dangerously-bypass-approvals-and-sandbox`) are dropped on purpose: a restore must not silently re-grant them. So
   is `-c`/`--config` in every spelling (`-c v`, `-c=v`, `--config v`, `--config=v`), because an override such as
@@ -561,9 +567,9 @@ to be replayed on resume. Any flag not in either list is dropped along with any 
 tokens.
 
 Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A positional prompt that follows a whitelisted value flag is still read as one more value of that flag, except for
-the options a row lists in `single_value_opts` (Codex), which take at most one token. A value is never a token that
-starts with `-` or a redirection, so `codex -m --yolo` keeps `-m` alone and still drops `--yolo`. A stored command that
-was cut is refused (see above).
+the options a row lists in `single_value_opts` (Codex), which take exactly one plain shell word and are dropped
+without one. A value is never a token that starts with `-` or a redirection, so `codex -m --yolo` drops both `-m` and
+`--yolo`. A stored command that was cut is refused (see above).
 
 ### Print-mode filtering
 
