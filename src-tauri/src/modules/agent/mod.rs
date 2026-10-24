@@ -756,10 +756,12 @@ mod tests {
     #[cfg(unix)]
     const STOP_FRAME: &str = r#"{"hook_event_name":"Stop","session_id":"s1"}"#;
 
+    #[cfg(unix)]
     fn run_trigger_script(arg: Option<&str>, tab_id: Option<&str>) -> Option<String> {
         run_trigger_script_with(arg, tab_id, STOP_FRAME)
     }
 
+    #[cfg(unix)]
     fn run_trigger_script_with(
         arg: Option<&str>,
         tab_id: Option<&str>,
