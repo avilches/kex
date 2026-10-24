@@ -31,7 +31,6 @@ function mount(visibleTabIds: string, tabs: Tab[] = baseTabs) {
     paneTabCount: () => 1,
     onClose: () => {},
     onCloseOtherTabs: () => {},
-    onCloseAllTabs: () => {},
     onRenameTab: () => {},
     onUpdateTab,
     onSaveTab: () => {},

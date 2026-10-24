@@ -13,7 +13,7 @@ import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
-import { bulkClosableIds, otherBulkClosableIds } from "./lib/tabClose";
+import { otherBulkClosableIds } from "./lib/tabClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { noteSurfaceKind } from "@/modules/theme/noteSurface";
@@ -272,9 +272,6 @@ export const PaneView = memo(function PaneView({
   const handleCloseOtherTabs = useCallback((tabId: string) => {
     onCloseManyTabs(workspaceId, otherBulkClosableIds(pane.tabs, tabId));
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
-  const handleCloseAllTabs = useCallback(() => {
-    onCloseManyTabs(workspaceId, bulkClosableIds(pane.tabs));
-  }, [pane.tabs, onCloseManyTabs, workspaceId]);
   const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
   const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
@@ -343,7 +340,6 @@ export const PaneView = memo(function PaneView({
           onClose={handleClose}
           onNewTerminal={handleNewTerminal}
           onCloseOtherTabs={handleCloseOtherTabs}
-          onCloseAllTabs={handleCloseAllTabs}
           onSplitTerminalRight={handleSplitTerminalRight}
           onSplitTerminalDown={handleSplitTerminalDown}
           onNewBrowser={handleNewBrowser}

@@ -41,7 +41,6 @@ function setup(initial: Tab) {
         onClose={noop}
         onNewTerminal={noop}
         onCloseOtherTabs={noop}
-        onCloseAllTabs={noop}
         onSplitTerminalRight={noop}
         onSplitTerminalDown={noop}
         onNewBrowser={noop}

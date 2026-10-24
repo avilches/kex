@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   CancelCircleIcon,
-  CancelSquareIcon,
   CrosshairIcon,
   Image01Icon,
   PaintBoardIcon,
@@ -51,7 +50,6 @@ type Props = {
   onActivate: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseAllTabs: (tabId: string) => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
 };
@@ -72,7 +70,6 @@ export function TabContextMenuItems({
   onActivate,
   onClose,
   onCloseOtherTabs,
-  onCloseAllTabs,
   onRenameTab,
   onUpdateTab,
 }: Props) {
@@ -252,7 +249,10 @@ export function TabContextMenuItems({
       </TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       <ContextMenuItem
-        onSelect={() =>
+        // preventDefault keeps the menu open: the point of Lock/Unlock from the
+        // menu is toggling in place, so the item flips to Unlock Tab and stays.
+        onSelect={(e) => {
+          e.preventDefault();
           onUpdateTab?.(tab.id, (p) => {
             const newLocked = !isLocked;
             return {
@@ -262,8 +262,8 @@ export function TabContextMenuItems({
                 ? { preview: false }
                 : {}),
             };
-          })
-        }
+          });
+        }}
       >
         <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
         {isLocked ? "Unlock Tab" : "Lock Tab"}
@@ -277,10 +277,6 @@ export function TabContextMenuItems({
       <ContextMenuItem disabled={paneTabCount <= 1} onSelect={() => onCloseOtherTabs(tab.id)}>
         <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
         Close Other Tabs
-      </ContextMenuItem>
-      <ContextMenuItem disabled={isLocked} onSelect={() => onCloseAllTabs(tab.id)}>
-        <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
-        Close All Tabs
       </ContextMenuItem>
     </>
   );

@@ -2754,6 +2754,15 @@ export default function App() {
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 
+  // "Close All Tabs" in the workspace menu: every unlocked tab of every pane,
+  // not just the focused one. Locked tabs are protected like in the pane action.
+  const closeAllTabsInWorkspace = useCallback((workspaceId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (!ws || ws.hibernated) return;
+    const ids = allPanes(ws.paneTree).flatMap((pane) => bulkClosableIds(pane.tabs));
+    if (ids.length) void closeTabsRef.current(ids);
+  }, []);
+
   const tabCallbacksRef = useRef(tabCallbacks);
   tabCallbacksRef.current = tabCallbacks;
   const saveTabRef = useRef(saveTabReportingErrors);
@@ -3949,6 +3958,7 @@ export default function App() {
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
+              onCloseAllTabs={(wsId) => void closeAllTabsInWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
               onHibernate={(id) => void hibernateFlow.requestHibernate(id)}
               onWake={(id) => void wakeWorkspace(id)}

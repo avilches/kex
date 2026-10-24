@@ -164,7 +164,6 @@ function DetailTabMenu({
       onActivate={onActivate}
       onClose={actions.onClose}
       onCloseOtherTabs={actions.onCloseOtherTabs}
-      onCloseAllTabs={actions.onCloseAllTabs}
       onRenameTab={actions.onRenameTab}
       onUpdateTab={actions.onUpdateTab}
     />
