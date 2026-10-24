@@ -8,6 +8,9 @@ import { PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import type { GitStatusSnapshot } from "@/lib/native";
 import { cn } from "@/lib/utils";
+import { showIntegrationSuggestion } from "@/modules/agents/components/IntegrationSuggestionToast";
+import { AGENT_LABELS } from "@/modules/agents/lib/integrations";
+import { useIntegrationWarningStore } from "@/modules/agents/store/integrationWarningStore";
 import {
   buildGitStatusMap,
   type GitStatusCode,
@@ -19,6 +22,7 @@ import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
+  AlertCircleIcon,
   CrosshairIcon,
   LockKeyIcon,
   StickyNote03Icon,
@@ -233,6 +237,17 @@ function DraggableTab({
       <span className="inline-block size-[6px] rounded-full bg-amber-400" />
     ) : null;
 
+  const missingAgent = useIntegrationWarningStore((st) => st.byTab[tab.id]);
+  const integrationWarning = missingAgent ? (
+    <span
+      className="ml-0.5 flex shrink-0 items-center text-amber-400"
+      aria-label={`${AGENT_LABELS[missingAgent]} runs without the Kex integration`}
+      onPointerEnter={() => showIntegrationSuggestion(missingAgent)}
+    >
+      <HugeiconsIcon icon={AlertCircleIcon} size={13} strokeWidth={2} />
+    </span>
+  ) : null;
+
   const tabDiv = (
     <div
       ref={setNodeRef}
@@ -357,6 +372,7 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
+      {integrationWarning}
       {isLocked && statusIndicator && (
         <span className="ml-0.5 flex shrink-0 items-center">
           {statusIndicator}

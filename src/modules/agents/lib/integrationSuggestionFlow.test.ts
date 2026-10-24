@@ -8,6 +8,7 @@ const T0 = 1_700_000_000_000;
 function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: number } = {}) {
   const state = { map: opts.map ?? ({} as SuggestionMap), now: opts.now ?? T0 };
   const show = vi.fn();
+  const warn = vi.fn();
   const deps: SuggestDeps = {
     now: () => state.now,
     status: async () => opts.status ?? "missing",
@@ -16,8 +17,10 @@ function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: nu
       state.map = change(state.map);
     },
     show,
+    warn,
   };
-  return { state, show, suggest: createIntegrationSuggester(deps) };
+  const raw = createIntegrationSuggester(deps);
+  return { state, show, warn, suggest: (agent: unknown, tabId = "tab-1") => raw(agent, tabId) };
 }
 
 describe("integration suggester", () => {
@@ -91,8 +94,9 @@ describe("integration suggester", () => {
         state.map = change(state.map);
       },
       show,
+      warn: vi.fn(),
     });
-    await later("claude");
+    await later("claude", "tab-1");
     expect(show).toHaveBeenCalledTimes(1);
   });
 
@@ -115,8 +119,35 @@ describe("integration suggester", () => {
       },
       update: async () => {},
       show,
+      warn: vi.fn(),
     });
-    await expect(suggest("claude")).resolves.toBeUndefined();
+    await expect(suggest("claude", "tab-1")).resolves.toBeUndefined();
     expect(show).not.toHaveBeenCalled();
+  });
+
+  it("marks every tab that runs the agent without integration, but toasts once", async () => {
+    const { suggest, show, warn } = setup();
+    await suggest("claude", "tab-1");
+    await suggest("claude", "tab-2");
+    expect(warn).toHaveBeenCalledWith("tab-1", "claude");
+    expect(warn).toHaveBeenCalledWith("tab-2", "claude");
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the tab even when the ask policy keeps the toast quiet", async () => {
+    const { suggest, show, warn } = setup({
+      map: { claude: { asks: 2, lastAskedAt: T0, installedOnce: false } },
+    });
+    await suggest("claude");
+    expect(show).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith("tab-1", "claude");
+  });
+
+  it("does not mark a tab whose agent is installed or cannot be installed", async () => {
+    for (const status of ["installed", "malformed", "unavailable"] as const) {
+      const { suggest, warn } = setup({ status });
+      await suggest("claude");
+      expect(warn).not.toHaveBeenCalled();
+    }
   });
 });
