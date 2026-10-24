@@ -21,6 +21,20 @@ Call graph:
 """
 
 
+JIT_STALL_SAMPLE = """Analysis of sampling com.apple.WebKit.WebContent (pid 1) every 1 millisecond
+Physical footprint:         500M
+
+Call graph:
+    1000 Thread_1   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 1000 start  (in dyld) + 1  [0x1]
+    +   1000 JSC::Heap::collect(JSC::Synchronousness, JSC::GCRequest)  (in JavaScriptCore) + 108  [0x2]
+    +     1000 JSC::JITWorklist::suspendAllThreads()  (in JavaScriptCore) + 336  [0x3]
+    +       1000 __psynch_cvwait  (in libsystem_kernel.dylib) + 8  [0x4]
+    1000 Thread_2: JIT Worklist Helper Thread
+    + 1000 JSC::DFG::performIntegerRangeOptimization(JSC::DFG::Graph&)  (in JavaScriptCore) + 748  [0x5]
+"""
+
+
 def shares(**overrides):
     base = {k: 0.0 for k in kexperf.MAIN_THREAD_KEYS}
     base.update(overrides)
@@ -50,6 +64,25 @@ class MainThreadShares(unittest.TestCase):
                 kexperf.main_thread_shares(f.name)
         finally:
             os.unlink(f.name)
+
+
+class JitStall(unittest.TestCase):
+    def test_a_main_thread_waiting_for_the_jit_is_measured(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write(JIT_STALL_SAMPLE)
+        try:
+            result = kexperf.main_thread_shares(f.name)
+        finally:
+            os.unlink(f.name)
+        self.assertEqual(result["shares"]["jit_wait"], 100.0)
+
+    def test_the_jit_wait_beats_the_garbage_collection_it_hides_behind(self):
+        text = kexperf.verdict(shares(idle=0, gc=100, jit_wait=100))
+        self.assertTrue(text.startswith("stalled"))
+        self.assertIn("JIT", text)
+
+    def test_a_short_jit_wait_does_not_change_the_verdict(self):
+        self.assertTrue(kexperf.verdict(shares(idle=62, jit_wait=2)).startswith("healthy"))
 
 
 class Verdict(unittest.TestCase):

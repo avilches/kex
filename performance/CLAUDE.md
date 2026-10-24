@@ -69,6 +69,10 @@ los seis frames que lo registraron), `calls`, `ms`, `avg` y `max`. Entre episodi
 - `WebCore::timerFired` (en `analyze`, `run_from_timers`) engloba todo lo que se ejecuta desde un temporizador, el
   renderizado incluido. No lo sumes a los demás.
 - El JavaScript sale sin nombres en el volcado. Para saber qué código es, está el profiler.
+- `jit_wait` (`JITWorklist::suspendAllThreads`) es el hilo principal parado esperando a que el compilador JIT de
+  JavaScriptCore se pause. Una recolección de basura no puede empezar hasta entonces, así que sale también como `gc`
+  al 100 %: no es coste de renderizado ni de recolección, y `analyze` da el veredicto `stalled` cuando pasa del 20 %.
+  El volcado nombra la fase del JIT atascada en el hilo `JIT Worklist Helper Thread`.
 
 **Línea base del hilo principal** (porcentaje de las muestras, 2026-10-20 y 21):
 
@@ -98,7 +102,18 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
 - El presupuesto `backgroundMemoryBudgetMb` en 256 permite unas 35 terminales aparcadas, así que con 26 ninguna se
   libera. `WEBGL_MAX_CONTEXTS` es 7 y a los 30 s de ocultar una terminal se le suelta el WebGL.
 
+- 2026-10-24 16:23: volcado automático de un congelón con el hilo principal bloqueado todo el volcado (4727 muestras)
+  esperando al JIT. El hilo `JIT Worklist Helper Thread` pasó el 100 % compilando con `IntegerRangeOptimizationPhase`
+  de DFG (`mergeTo`, `mergeConstantsImpl`). El profiler de la misma franja registró un hueco de hasta 50,9 s entre
+  fotogramas. JavaScriptCore no tiene una opción para apagar esa fase: solo `useFTLJIT`, `useDFGJIT` y
+  `useConcurrentJIT`, y no se probó que lleguen por `JSC_*` a la webview de Tauri.
+- El monitor externo corre como LaunchAgent `com.avilches.kexperf-watch` (`~/Library/Logs/kexperf-watch.log`), sin
+  versionar: 3,4 s de CPU en 47 min y 17 MB de RSS.
+
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
+
+0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
+   Prueba: un release de usar y tirar con `build.minify: false` y volcados del siguiente congelón.
 
 1. **El spinner `braille`** (el usuario lo tiene): un único `setInterval` de 80 ms re-renderiza todos los spinners y
    cambia un carácter en cada uno, lo que fuerza estilos y layout en las filas `flex` de la barra de workspaces y de las
