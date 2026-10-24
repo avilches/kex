@@ -4,9 +4,10 @@ Research notes from 2026-09-11, comparing how Kex detects a running Claude Code
 session, notifies the user, and restores that session after an app restart,
 against how Orca implements the same three features. Written so an agent can
 pick this up later without redoing the investigation. The matching backlog
-milestone is "Orca notification" (`backlog milestone list`), tasks TASK-729
-through TASK-735 (`backlog task 729` .. `backlog task 735`, or filter by
-milestone in `backlog board`).
+milestone is "Orca notification" (`backlog milestone list`, id `m-8`); the
+task map is in section 3. Updated 2026-10-24: the first pass (TASK-729 to
+TASK-735) is mostly done, section 2.6 and 3 now say what is still open, and
+section 5 holds measurements taken on that date.
 
 Orca repo referenced throughout: `~/Work/Proy/Repos/orca` (Electron app,
 TypeScript main and renderer processes, pnpm monorepo). All Orca paths below
@@ -142,8 +143,8 @@ below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
 through the PTY stream instead; once the socket migration (`2145a981`,
 `ed14289f`) left nothing emitting it, that parser was deleted from
 `agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
-channel. The current mechanism is marked `kex-session-v5` inside the hook
-script itself.
+channel. The current mechanism is marked `kex-session-v9` inside the hook
+script itself (`SESSION_HOOK_SCRIPT_VERSION` in `agent/mod.rs`).
 
 ### 2.1 OSC still in use
 
@@ -165,7 +166,7 @@ All OSC parsing happens in `AgentDetector::process`
 (`src-tauri/src/modules/pty/agent_detect.rs`), a byte-level state machine fed
 from the PTY reader thread (`src-tauri/src/modules/pty/session.rs`).
 
-### 2.2 Hooks (the v5 mechanism, what's actually live)
+### 2.2 Hooks (the Unix socket mechanism, what's actually live)
 
 Installed into `~/.claude/settings.json` by
 `src-tauri/src/modules/agent/mod.rs::agent_enable_claude_hooks()`, which
@@ -174,13 +175,15 @@ merges hooks (preserving anything not owned by Kex) and writes atomically
 `~/.config/kex/hooks/trigger-event.sh`
 (`session_hook_script_path()`), content embedded via `include_str!`.
 
-Eight events, all official documented Claude Code hook events (a more
-conservative choice than Orca's, which registers several undocumented ones):
+Ten events, all of them real Claude Code hook events. They are written to
+`settings.json` unconditionally, without looking at which Claude Code version
+is installed (TASK-893 changes that, see section 5):
 
 ```rust
-const SESSION_HOOK_EVENTS: [&str; 8] = [
+const SESSION_HOOK_EVENTS: [&str; 10] = [
     "SessionStart", "UserPromptSubmit", "Notification",
     "Stop", "StopFailure", "SessionEnd", "PermissionRequest", "MessageDisplay",
+    "SubagentStart", "SubagentStop",
 ];
 ```
 
@@ -197,8 +200,12 @@ send_ipc() {
 }
 ```
 
-If both `nc` and the `python3` fallback fail, the script exits 0 anyway
-(`|| true`) and the event is gone. No retry, no spool (TASK-730).
+If both `nc` and the `python3` fallback fail, the script appends the payload to
+`~/.config/kex/spool/<tab_id>.jsonl` (capped at 200 lines, oldest dropped
+first) and exits 0; the listener replays that file when it starts
+(`ipc.rs::drain_spool`, which skips stale `SessionEnd` and `StopFailure`).
+This is TASK-730, done. TASK-896 proposes replacing the bash rotation with one
+file per event.
 
 The listener (`ipc.rs::run_listener`, `#![cfg(unix)]`, so **this whole path
 is absent on native Windows**, see TASK-731) reads one line per connection
@@ -235,12 +242,11 @@ Injected on the frontend side in
 leading space before the command (so shells with `histignorespace` don't log
 it to history).
 
-**Failure mode with no safety net (TASK-735):** if `agent-sessions.json`
-fails to parse, `load_restore_plan()` logs a warning and returns an empty
-list. Every open session's restore state is gone in one shot, with nothing
-to fall back to. The store is already written atomically (temp + rename);
-keeping one `.bak` of the previous version before overwriting is a small
-change that avoids total loss from a single corrupted write.
+**Corruption safety net (TASK-735, done):** every write of `agent-sessions.json`
+first copies the previous content to `agent-sessions.json.bak`
+(`session_store.rs`), and `load_restore_plan()` falls back to that copy when
+the main file fails to parse, instead of returning an empty list. A corrupt
+main file never overwrites a good `.bak`.
 
 ### 2.4 Foreground/liveness detection
 
@@ -266,37 +272,60 @@ Clicking a native notification needs to know which tab to focus; that's
 `agent_queue_nav` (`src-tauri/src/modules/agent/pending_nav.rs`), a
 `Mutex<Option<PendingNav>>` with a 5 second TTL, consumed once.
 
-### 2.6 What's missing, compared to Orca (fallbacks)
+### 2.6 What is still missing, compared to Orca
 
-Confirmed absent, not just "not found in this pass":
+Checked again on 2026-10-24. Closed since the first pass: the offline spool
+and startup race (TASK-730), the backup of `agent-sessions.json` (TASK-735),
+socket permissions (TASK-732: `kex-ipc-<uid>` directory mode 0700, socket mode
+0600, see section 5) and the unbounded `/tmp` debug logs (TASK-734: the logging
+was removed). Still open:
 
-- No retry queue or offline spool when the IPC send fails (TASK-730).
-- No defense against the startup race (hook fires before the socket listener
-  is up) beyond the same missing spool (TASK-730).
-- No cross-platform transport: the Unix-socket + bash-script combination
-  simply doesn't run on native Windows (TASK-731).
-- No explicit socket permission hardening or per-connection auth, unlike
-  Orca's per-session HTTP token (TASK-732).
-- No rotation/size cap on the `/tmp/kex-hook-*.log` / `/tmp/kex-tab-*.log`
-  debug files, unlike Orca's 5 MB / 7 day spool rotation (TASK-734).
-- No backup of the previous `agent-sessions.json` before an overwrite
-  (TASK-735).
+- No cross-platform transport: the Unix-socket + bash-script combination does
+  not run on native Windows (TASK-731, depends on TASK-736).
+- One socket and one listener thread per PTY, no per-connection auth: a
+  process of the same user can send forged events (TASK-736).
+- Hook events are written to `settings.json` without checking the installed
+  Claude Code version (TASK-893).
+- The hook script prints nothing to stdout, Orca prints `{}` first (TASK-894).
+- Orca forwards more events than Kex (`PostCompact`, `PreToolUse`,
+  `PostToolUse`, `PostToolUseFailure`, `TeammateIdle`); whether Kex should is
+  TASK-895.
+- No `statusLine` integration for usage limits (TASK-738).
+- No viewer for a session that has no live terminal (TASK-737).
 
-The one thing Kex already does that's arguably more conservative than Orca:
-it only relies on real, documented Claude Code hook events, never on
-speculative/undocumented ones.
+Kex registers only events that exist in Claude Code. Orca also registers
+events that older Claude builds do not know; it protects itself by checking the
+installed version first, which Kex does not do yet.
 
 ## 3. Findings to backlog task map
 
-| # | Finding | Task |
-|---|---|---|
-| 1 | Docs describe v4 OSC-777, code is v5 Unix socket | TASK-729 |
-| 2 | No retry/spool on failed IPC send (also covers the startup race) | TASK-730 |
-| 3 | No session restore path on native Windows (Unix-only transport) | TASK-731 |
-| 4 | Socket permissions / auth not hardened | TASK-732 |
-| 5 | Legacy OSC 777 parser: deleted once nothing emitted it | TASK-733 |
-| 6 | Unbounded debug logs in /tmp | TASK-734 |
-| 7 | Corrupt `agent-sessions.json` loses all restore state silently | TASK-735 (high priority, data loss) |
+Milestone `m-8` ("Orca notification"). Each task states its own context, so an
+agent can start from "do TASK-N" without reading the rest of this file.
+
+Done:
+
+| Finding | Task |
+|---|---|
+| Docs described the old OSC 777 design, code uses a Unix socket | TASK-729 |
+| No retry or spool when the socket send fails (also the startup race) | TASK-730 |
+| Legacy OSC 777 parser removed | TASK-733 |
+| Corrupt `agent-sessions.json` lost all restore state | TASK-735 |
+| Socket permissions (already fixed in code, closed 2026-10-24) | TASK-732 |
+| Unbounded `/tmp` debug logs (already fixed in code, closed 2026-10-24) | TASK-734 |
+
+Open, by suggested order:
+
+| Task | What | Priority | Depends on |
+|---|---|---|---|
+| TASK-893 | Register only the hook events the installed Claude Code version knows | High | none |
+| TASK-894 | `trigger-event.sh` prints `{}` to stdout first | Low | none |
+| TASK-895 | Decide whether to forward more events (measure cost first) | Low | TASK-893 |
+| TASK-896 | Spool as one file per event, no bash rotation | Low | TASK-730 (done) |
+| TASK-736 | One hook server for the whole app instead of one socket per tab | Medium | none |
+| TASK-731 | Agents on native Windows | Low | TASK-736 |
+| TASK-738 | `statusLine` for usage limits (user already has their own) | Low | TASK-736 |
+| TASK-737 | Last assistant message on dormant sessions | Medium | none |
+| TASK-856 | OpenCode, OMP and Pi rows on Windows (milestone `m-10`) | Low | related to TASK-731, no formal link |
 
 ## 4. Suggested reading order for whoever picks this up
 
@@ -315,3 +344,52 @@ Orca side, for comparison while implementing any of the above:
 3. `src/shared/agent-session-resume.ts` (session id capture, resume argv)
 4. `src/renderer/src/store/slices/agent-status.ts` (persisted sleeping-session record)
 5. `src/main/native-chat/session-file-resolver.ts` + `claude-transcript-branch-proof.ts` (JSONL reading, only if Kex ever wants a no-PTY transcript viewer)
+
+## 5. Measurements taken on 2026-10-24
+
+Things that were checked by running them, so nobody has to repeat it. Claude
+Code used was 2.1.310 (`claude --version`).
+
+- **Unknown hook event in `settings.json`.** On 2.1.310 an invented event name
+  does not break anything: Claude prints "These settings entries were skipped;
+  the rest of each file is in effect ... Unknown hook event" at startup and the
+  other hooks still run. Orca's fixture
+  (`src/main/claude/__fixtures__/claude-hook-event-enums.json`, read from each
+  release's `cli.js`) says that on 1.0.23 to 2.1.100 an unknown key makes
+  Claude discard the whole user `settings.json`. Behaviour between 2.1.110 and
+  2.1.310 is not measured, and newer npm releases no longer ship `cli.js`, so
+  the extraction cannot be repeated. See TASK-893.
+- **First Claude Code version that knows each event** (from that fixture):
+  Notification 1.0.23, Stop 1.0.31, SubagentStop 1.0.41, UserPromptSubmit
+  1.0.53, SessionStart 1.0.62, SessionEnd 1.0.85, SubagentStart 2.0.43,
+  PermissionRequest 2.0.45, StopFailure 2.1.78, PostCompact 2.1.76,
+  PostToolUseFailure 2.0.56, TeammateIdle 2.1.33, PreToolUse and PostToolUse
+  1.0.23. `MessageDisplay` is not in the fixture (it ends at 2.1.110); Claude
+  Code's CHANGELOG adds it in 2.1.152, and 2.1.310 accepts it and sends the
+  fields `turn_id`, `message_id`, `index`, `final`, `delta`.
+- **Hook script cost.** One run of `trigger-event.sh` takes about 108 ms when
+  the socket send fails (20 runs in 2.15 s, spool path included). The success
+  path was not measured; TASK-895 asks for it. `PostToolUse` is ignored by the
+  script today and exits 0 without writing anything.
+- **Socket hardening is already in place.** `ipc.rs::runtime_dir` uses
+  `XDG_RUNTIME_DIR` or a `kex-ipc-<uid>` directory created with mode 0700 and
+  refuses one owned by someone else (commit `490f1fc7`); `spawn_listener`
+  forces the socket file to 0600. A process of the same user can still connect.
+- **`statusLine` is single-slot and this machine already uses it.**
+  `~/.claude/settings.json` has
+  `"statusLine": {"type": "command", "command": "$HOME/.claude/hooks/run-hud.sh"}`.
+  Orca leaves a user-owned `statusLine` alone, so copying it as is would do
+  nothing here. Claude does not run the `statusLine` command in `-p` mode, so
+  the stdin it receives was not captured; do it in an interactive session
+  first (TASK-738).
+- **`Stop` already carries the assistant's last message.**
+  `ipc.rs` reads `last_assistant_message` into `last_message` and sends it to
+  the frontend as `message`; it is just not stored in `SessionRecord` (TASK-737).
+- **Kex terminals do not outlive the app.** Kex opens PTYs in-process with
+  `portable-pty` (`pty/session.rs`), there is no daemon, and
+  `docs/WORKSPACES.md` says the agent and its resume command die with the PTY;
+  a session comes back with `claude --resume` in a new PTY, which gets a fresh
+  `KEX_IPC`. Inferred from those, not from reading the app-exit code. That is why Orca's endpoint file (`ORCA_AGENT_HOOK_ENDPOINT`,
+  needed because its terminals outlive the app) buys little for Kex; the
+  reasons for TASK-736 are one listener instead of N, tab identity in the
+  payload, a token, and a shared base for Windows and `statusLine`.
