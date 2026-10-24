@@ -31,7 +31,7 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&terminal=auto|<theme id>&editor=auto|<editor theme id>`.
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app|dialogs&terminal=auto|<theme id>&editor=auto|<editor theme id>`.
   `terminal` mirrors the "Terminal theme" preference: the terminal panes use that theme's palette
   while the rest of the page keeps `theme`. `editor` mirrors the "Editor theme" preference the same way
   (`auto` is the app theme's own pairing, an id sets the editor background and text color like Settings does).
@@ -39,6 +39,11 @@ token. It is dev only and not part of `pnpm build`.
 - The theme selector is a row of one button per theme, each with a dot of the theme's `primary`.
   `ArrowLeft` / `ArrowRight` cycle themes and `ArrowUp` / `ArrowDown` switch dark / light, so a theme can be
   stepped through without opening anything. The two git color schemes (vs code / jetbrains) stay as buttons.
+- A third view, `dialogs`, stacks every confirmation dialog (close terminal with a short and a long
+  name, close workspace, hibernate, close file, delete entry, discard changes, reset shortcuts, delete
+  action, duplication in progress) at one width (`max-w-lg`), each with title, name line, description,
+  body, checkbox, footer buttons and notice, over the dimmed overlay. They copy `AlertDialogContent`
+  and the real dialogs, so a change to one of those is reflected in `dialogsView` too.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
   two approximations of the real window: the WorkspaceBar (group header, workspace chips, one expanded

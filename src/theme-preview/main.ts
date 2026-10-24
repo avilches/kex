@@ -39,15 +39,18 @@ import {
   ArrowRight01Icon,
   ChevronRightIcon,
   CommandLineIcon,
+  ComputerTerminal01Icon,
   CrosshairIcon,
   FolderTreeIcon,
   GitBranchIcon,
   Moon02Icon,
   PinIcon,
+  PlayIcon,
   Refresh01Icon,
   RemoveSquareIcon,
   Search01Icon,
   SleepingIcon,
+  Tick02Icon,
   SquareArrowDown02Icon,
   SquareArrowDown03Icon,
   SquareArrowUp02Icon,
@@ -55,6 +58,7 @@ import {
   UnfoldMoreIcon,
   ViewIcon,
 } from "@hugeicons/core-free-icons";
+import { buttonVariants } from "@/components/ui/button";
 import { toHex, tokenValue } from "./color";
 import { fileIcon, folderIcon, icon } from "./icons";
 import markdownDemo from "./live-preview-demo.md?raw";
@@ -81,9 +85,9 @@ const state = {
   scheme: (params.get("scheme") === "jetbrains"
     ? "jetbrains"
     : "vscode") as Scheme,
-  view: (["app", "swatches"].includes(params.get("view") ?? "")
+  view: (["app", "swatches", "dialogs"].includes(params.get("view") ?? "")
     ? params.get("view")
-    : "swatches") as "app" | "swatches",
+    : "swatches") as "app" | "swatches" | "dialogs",
   terminal: params.get("terminal") ?? TERMINAL_THEME_AUTO,
   editor: params.get("editor") ?? "auto",
   custom: null as Theme | null,
@@ -1198,6 +1202,332 @@ function hibernatedOverlay(): HTMLElement {
 }
 
 // ---------------------------------------------------------------------------
+// Dialogs: copies of AlertDialogContent and of the real close/confirm dialogs,
+// all at one width so their headers, bodies and footers can be compared.
+
+type ButtonVariant = "default" | "outline" | "destructive";
+
+function dialogButton(
+  label: string,
+  variant: ButtonVariant = "outline",
+  small = false,
+): HTMLElement {
+  return h(
+    "span",
+    { class: buttonVariants({ variant, size: small ? "sm" : "default" }) },
+    label,
+  );
+}
+
+function dialogCheckbox(label: string, checked = false): HTMLElement {
+  const box = h(
+    "span",
+    {
+      class: `flex size-4 shrink-0 items-center justify-center rounded-[5px] border ${
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-transparent bg-input/90"
+      }`,
+    },
+    ...(checked ? [icon(Tick02Icon, 14, 2)] : []),
+  );
+  return h(
+    "label",
+    { class: "flex items-center gap-2 text-[13px] text-muted-foreground" },
+    box,
+    label,
+  );
+}
+
+function dialogName(
+  mark: Node,
+  name: string,
+  color?: string,
+  trailing?: string,
+): HTMLElement {
+  return h(
+    "div",
+    {
+      class: "flex min-w-0 items-center gap-2 text-sm font-medium",
+      ...(color ? { style: `color:${color}` } : {}),
+    },
+    h("span", { class: "flex shrink-0 items-center" }, mark),
+    h("span", { class: "min-w-0 truncate", title: name }, name),
+    ...(trailing
+      ? [
+          h(
+            "span",
+            {
+              class:
+                "max-w-[40%] shrink-0 truncate text-[12px] font-normal text-muted-foreground",
+            },
+            trailing,
+          ),
+        ]
+      : []),
+  );
+}
+
+function dialogSection(title: string, ...rows: Node[]): HTMLElement {
+  return h(
+    "section",
+    { class: "flex flex-col gap-1" },
+    h("h3", { class: "text-[12px] font-medium" }, title),
+    ...rows,
+  );
+}
+
+function dialogRow(
+  mark: Node,
+  label: string,
+  command: string,
+  action?: HTMLElement,
+): HTMLElement {
+  return h(
+    "div",
+    {
+      class:
+        "grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)_auto] items-center gap-x-3",
+    },
+    h(
+      "span",
+      { class: "flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground" },
+      h("span", { class: "flex shrink-0 items-center" }, mark),
+      h("span", { class: "truncate" }, label),
+    ),
+    h(
+      "span",
+      { class: "min-w-0 truncate font-mono text-[12px] text-muted-foreground" },
+      command,
+    ),
+    action ?? h("span"),
+  );
+}
+
+function dialogDocRow(name: string, failure?: string): HTMLElement {
+  return h(
+    "div",
+    { class: "flex flex-col gap-1" },
+    h(
+      "div",
+      { class: "flex items-center justify-between gap-2" },
+      h("span", { class: "truncate text-[12px] text-muted-foreground" }, name),
+      dialogButton("Save", "outline", true),
+    ),
+    ...(failure
+      ? [h("p", { class: "text-[12px] text-destructive" }, `Could not save: ${failure}`)]
+      : []),
+  );
+}
+
+function dialogFrame(opts: {
+  id: string;
+  title: string;
+  name?: HTMLElement;
+  description?: string;
+  body?: Node[];
+  footer: HTMLElement[];
+  notice?: string;
+}): HTMLElement {
+  return h(
+    "div",
+    { class: "flex flex-col gap-1", "data-surface": `dialog-${opts.id}` },
+    h("div", { class: "text-[11px] text-muted-foreground" }, opts.id),
+    h(
+      "div",
+      { class: "rounded-md bg-black/30 p-6" },
+      h(
+        "div",
+        {
+          class:
+            "mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)] gap-6 rounded-4xl bg-popover p-6 text-popover-foreground shadow-xl ring-1 ring-foreground/5 dark:ring-foreground/10",
+        },
+        h(
+          "div",
+          { class: "grid grid-cols-[minmax(0,1fr)] gap-1.5" },
+          h("h2", { class: "font-heading text-lg font-medium" }, opts.title),
+          ...(opts.name ? [opts.name] : []),
+          ...(opts.description
+            ? [
+                h(
+                  "p",
+                  { class: "text-sm text-balance text-muted-foreground" },
+                  opts.description,
+                ),
+              ]
+            : []),
+        ),
+        ...(opts.body ?? []),
+        h("div", { class: "flex justify-end gap-2" }, ...opts.footer),
+        ...(opts.notice
+          ? [h("p", { class: "text-[12px] text-muted-foreground" }, opts.notice)]
+          : []),
+      ),
+    ),
+  );
+}
+
+function dialogsView(): HTMLElement {
+  const term = (size = 16) => icon(ComputerTerminal01Icon, size, 2);
+  const tinted = (color: string, node: Node) =>
+    h("span", { class: "contents", style: `color:${color}` }, node);
+  const dot = (color: string) =>
+    h("span", {
+      class: "shrink-0 rounded-full",
+      style: `width:12px;height:12px;background:${color}`,
+    });
+  const busy = () => h("span", { class: "font-mono text-[11px]" }, "⠋");
+  const longName =
+    "pnpm tauri dev --config src-tauri/tauri.dev.conf.json --features diagnostics-profiler";
+
+  return h(
+    "div",
+    { class: "grid grid-cols-1 gap-6 xl:grid-cols-2" },
+    dialogFrame({
+      id: "close-terminal",
+      title: "Close terminal?",
+      name: dialogName(tinted("#e5a50a", term()), "claude: refactor close dialogs", "#e5a50a"),
+      description: "The running process will be killed",
+      body: [
+        h(
+          "p",
+          { class: "break-all font-mono text-[12px] text-muted-foreground" },
+          "claude --resume 7f3a9c",
+        ),
+        dialogCheckbox("Don't ask me again"),
+      ],
+      footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
+      notice: "Run on start enabled: you can undo close this tab",
+    }),
+    dialogFrame({
+      id: "close-terminal (long name)",
+      title: "Close terminal?",
+      name: dialogName(tinted("#3b82f6", term()), longName, "#3b82f6"),
+      description: "The running process will be killed",
+      body: [dialogCheckbox("Don't ask me again", true)],
+      footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
+    }),
+    dialogFrame({
+      id: "close-workspace",
+      title: "Close workspace?",
+      name: dialogName(dot("#22c55e"), "Kex", undefined, "In progress"),
+      body: [
+        dialogSection(
+          "Agents that will be killed",
+          dialogRow(term(12), "claude", "claude --resume 7f3a9c", busy()),
+          dialogRow(term(12), "codex", "codex", busy()),
+        ),
+        dialogSection(
+          "Running scripts that will be stopped",
+          dialogRow(icon(PlayIcon, 12, 2), "dev", "pnpm tauri dev"),
+        ),
+        dialogSection(
+          "Unsaved documents that will be discarded",
+          dialogDocRow("CloseDialogs.tsx", "permission denied"),
+        ),
+        dialogSection(
+          "Running processes that will be killed",
+          dialogRow(term(12), "logs", "tail -f ~/.cache/kex/kex.log"),
+        ),
+        h(
+          "p",
+          { class: "text-[12px] text-muted-foreground" },
+          "2 actions will be deleted.",
+        ),
+      ],
+      footer: [dialogButton("Cancel"), dialogButton("Close workspace", "default")],
+    }),
+    dialogFrame({
+      id: "hibernate-workspace",
+      title: "Hibernate workspace?",
+      name: dialogName(dot("#a855f7"), "Notes and drafts"),
+      body: [
+        dialogSection(
+          "Waiting for these agents to finish",
+          dialogRow(term(12), "claude", "claude", busy()),
+        ),
+        h(
+          "p",
+          { class: "text-[12px] text-muted-foreground" },
+          "The workspace will hibernate as soon as they are done.",
+        ),
+        dialogSection(
+          "Commands that will not come back",
+          dialogRow(term(12), "server", "pnpm dev", dialogButton("Run on start", "outline", true)),
+        ),
+        dialogSection("Unsaved documents", dialogDocRow("notes.md")),
+      ],
+      footer: [dialogButton("Close"), dialogButton("Hibernate now", "default")],
+    }),
+    dialogFrame({
+      id: "close-file",
+      title: "Close file?",
+      name: dialogName(fileIcon("CloseDialogs.tsx"), "CloseDialogs.tsx"),
+      description: "You are about to close a file with unsaved changes",
+      body: [
+        h(
+          "p",
+          { class: "break-all text-[12px] text-muted-foreground" },
+          "Path: /Users/me/Projects/Kex/src/app/components/CloseDialogs.tsx",
+        ),
+      ],
+      footer: [
+        dialogButton("Cancel"),
+        dialogButton("Don't save"),
+        dialogButton("Save", "default"),
+      ],
+    }),
+    dialogFrame({
+      id: "delete-entry",
+      title: "Delete file?",
+      name: dialogName(fileIcon("App.tsx"), "App.tsx"),
+      description:
+        "Move it to the system trash, or delete it permanently. Permanent deletion cannot be undone.",
+      footer: [
+        dialogButton("Cancel"),
+        dialogButton("Delete", "destructive"),
+        dialogButton("Move to trash", "default"),
+      ],
+    }),
+    dialogFrame({
+      id: "discard-changes",
+      title: "Discard changes?",
+      name: dialogName(fileIcon("SourceControlPanel.tsx"), "SourceControlPanel.tsx"),
+      description: "Your edits to this file will be lost. This can't be undone.",
+      footer: [dialogButton("Cancel"), dialogButton("Discard", "destructive")],
+    }),
+    dialogFrame({
+      id: "reset-shortcuts",
+      title: "Reset all shortcuts?",
+      description:
+        "This will revert all your custom keyboard shortcuts to their factory defaults. This action cannot be undone.",
+      footer: [dialogButton("Cancel"), dialogButton("Reset All", "destructive")],
+    }),
+    dialogFrame({
+      id: "delete-action",
+      title: "Delete action?",
+      name: dialogName(icon(PlayIcon, 16, 2), "Run dev server"),
+      description: "The Action is removed and cannot come back.",
+      footer: [dialogButton("Cancel"), dialogButton("Delete", "destructive")],
+    }),
+    dialogFrame({
+      id: "duplication-in-progress",
+      title: "Duplication in progress",
+      name: dialogName(folderIcon("backup", false), "kex-backup-2026-10-24"),
+      description: "The app will close automatically when the copy finishes.",
+      body: [
+        h(
+          "div",
+          { class: "h-2 w-full overflow-hidden rounded-full bg-muted" },
+          h("div", { class: "h-full rounded-full bg-primary", style: "width:62%" }),
+        ),
+      ],
+      footer: [dialogButton("Keep app open")],
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Theme bar, controls, tuner
 
 function allThemes(): Theme[] {
@@ -1348,6 +1678,9 @@ function controls(): HTMLElement {
         set({ view: "swatches" }),
       ),
       btn("app view", state.view === "app", () => set({ view: "app" })),
+      btn("dialogs view", state.view === "dialogs", () =>
+        set({ view: "dialogs" }),
+      ),
     ),
     area,
     load,
@@ -1926,7 +2259,9 @@ function render(): void {
       tunerPanel(),
       ...(state.view === "app"
         ? [section("App (approximation of the real layout)", appView())]
-        : [section("Buttons and badges", buttons)]),
+        : state.view === "dialogs"
+          ? [section("Dialogs (all at the same width)", dialogsView())]
+          : [section("Buttons and badges", buttons)]),
       section("Tokens (declared value read back as hex)", tokenGrid),
     ),
   );
