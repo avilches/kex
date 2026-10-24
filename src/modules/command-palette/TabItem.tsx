@@ -6,7 +6,7 @@ import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlightText } from "./HighlightText";
-import { foldText, substringIndices } from "./lib/fuzzy";
+import { foldText, highlightIndices, substringIndices } from "./lib/fuzzy";
 import type { RowHighlight } from "./lib/mergeRows";
 import { tabDetailLines } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
@@ -39,9 +39,10 @@ export function TabItem({
   const folded = foldText(term.trim());
   const note = entry.note?.replace(/\s+/g, " ").trim();
   const titleIndices =
-    highlight?.field === "title" ? highlight.indices : undefined;
-  const wsIndices =
-    highlight?.field === "workspace" ? highlight.indices : undefined;
+    highlight?.field === "title"
+      ? highlight.indices
+      : highlightIndices(folded, entry.title);
+  const wsIndices = highlightIndices(folded, entry.workspaceTitle);
   return (
     <CommandItem
       value={`tab:${entry.tabId}`}

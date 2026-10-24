@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fuzzyBest,
+  highlightIndices,
   fuzzyBestLower,
   foldText,
   substringIndices,
@@ -202,5 +203,21 @@ describe("accent folding", () => {
   it("finds a folded substring for highlighting", () => {
     expect(substringIndices("nand", "Ñandú")).toEqual([0, 1, 2, 3]);
     expect(substringIndices("zz", "Ñandú")).toEqual([]);
+  });
+});
+
+describe("highlightIndices", () => {
+  it("lights the letters of a field whatever ranked the row", () => {
+    expect(highlightIndices("api", "my-api")).toEqual([3, 4, 5]);
+  });
+
+  it("is empty for an empty query, an empty field or a miss", () => {
+    expect(highlightIndices("", "my-api")).toEqual([]);
+    expect(highlightIndices("api", "")).toEqual([]);
+    expect(highlightIndices("zzz", "my-api")).toEqual([]);
+  });
+
+  it("ignores a scattered match that the quality gate rejects", () => {
+    expect(highlightIndices("ser", "sidebar.showexplorer")).toEqual([]);
   });
 });

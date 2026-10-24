@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { ClosedTabEntry } from "./closedEntries";
+import type { MergedRow } from "./mergeRows";
 import {
+  closedMenuItems,
   folderMenuItems,
+  highlightedClosedOf,
+  placeMenuLeft,
   placeMenuTop,
   stepEnabled,
   tabMenuItems,
@@ -88,5 +93,43 @@ describe("placeMenuTop", () => {
   });
   it("pins to the bottom edge when it fits in neither", () => {
     expect(placeMenuTop({ rowTop: 20, rowBottom: 50 }, 150, 120)).toBe(30);
+  });
+});
+
+const closed = (path: string): ClosedTabEntry => ({ key: `closed:terminal:${path}`, path }) as ClosedTabEntry;
+
+describe("closedMenuItems", () => {
+  it("offers reopen with Enter and copy path", () => {
+    const items = closedMenuItems(closed("/repo"));
+    expect(items.map((i) => i.id)).toEqual(["go", "copy"]);
+    expect(items[0]).toMatchObject({ label: "Reopen Closed Tab", enter: true });
+    expect(items[1].disabled).toBe(false);
+  });
+});
+
+describe("highlightedClosedOf", () => {
+  const rows = [{ kind: "closed", key: "k", entry: closed("/repo") }] as MergedRow[];
+
+  it("finds the closed entry by its row key", () => {
+    expect(highlightedClosedOf("closed:terminal:/repo", rows)?.path).toBe("/repo");
+  });
+
+  it("ignores other keys and live tabs", () => {
+    expect(highlightedClosedOf("tab:tab-1", rows)).toBeNull();
+  });
+});
+
+describe("placeMenuLeft", () => {
+  it("hangs the menu from the pointer", () => {
+    expect(placeMenuLeft(100, 500, 200)).toBe(100);
+  });
+
+  it("keeps the menu inside the box on the right edge", () => {
+    expect(placeMenuLeft(450, 500, 200)).toBe(300);
+  });
+
+  it("never goes past the left edge", () => {
+    expect(placeMenuLeft(-5, 500, 200)).toBe(0);
+    expect(placeMenuLeft(10, 100, 200)).toBe(0);
   });
 });

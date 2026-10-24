@@ -14,6 +14,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   type MenuAnchor,
+  placeMenuLeft,
   placeMenuTop,
   type RowMenuItem,
   type RowMenuItemId,
@@ -36,11 +37,26 @@ export type RowMenuState = {
   anchor: MenuAnchor;
 };
 
+// A right click or a click inside the menu would move the focus off the palette input, so the
+// default of the mouse down is cancelled and the user keeps typing.
+export function keepInputFocus(e: React.MouseEvent): void {
+  if (e.button === 2 || (e.target as HTMLElement).closest("[data-row-menu]")) e.preventDefault();
+}
+
 // The box the menu is placed in (its `relative` wrapper) and the row it hangs from.
-export function anchorOf(box: HTMLElement, row: HTMLElement): MenuAnchor {
+export function anchorOf(
+  box: HTMLElement,
+  row: HTMLElement,
+  pointer?: { clientX: number; clientY: number },
+): MenuAnchor {
   const b = box.getBoundingClientRect();
   const r = row.getBoundingClientRect();
-  return { rowTop: r.top - b.top, rowBottom: r.bottom - b.top };
+  const anchor: MenuAnchor = { rowTop: r.top - b.top, rowBottom: r.bottom - b.top };
+  if (pointer) {
+    const y = pointer.clientY - b.top;
+    return { rowTop: y, rowBottom: y, pointer: { x: pointer.clientX - b.left, y } };
+  }
+  return anchor;
 }
 
 // The menu of the highlighted row, opened with Tab or the right button. The palette input keeps
@@ -118,6 +134,7 @@ export function RowMenu({
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const ref = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState<number | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: placed once per open, items do not change its size
   useLayoutEffect(() => {
@@ -125,6 +142,11 @@ export function RowMenu({
     const box = el?.offsetParent as HTMLElement | null;
     if (!el || !box) return;
     setTop(placeMenuTop(menu.anchor, box.clientHeight, el.offsetHeight));
+    setLeft(
+      menu.anchor.pointer
+        ? placeMenuLeft(menu.anchor.pointer.x, box.clientWidth, el.offsetWidth)
+        : null,
+    );
   }, [menu.rowKey, menu.anchor]);
 
   return (
@@ -132,8 +154,15 @@ export function RowMenu({
       ref={ref}
       role="menu"
       data-row-menu=""
-      style={{ top: top ?? 0, visibility: top === null ? "hidden" : "visible" }}
-      className="absolute right-3 z-10 min-w-56 max-w-[calc(100%-24px)] rounded-menu bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
+      style={{
+        top: top ?? 0,
+        ...(left !== null ? { left } : {}),
+        visibility: top === null ? "hidden" : "visible",
+      }}
+      className={cn(
+        "absolute z-10 min-w-56 max-w-[calc(100%-24px)] rounded-menu bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
+        !menu.anchor.pointer && "right-3",
+      )}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {menu.items.map((item, i) => {
@@ -154,7 +183,7 @@ export function RowMenu({
             )}
           >
             <HugeiconsIcon
-              icon={item.id === "go" && item.label.startsWith("Restore") ? ArrowReloadHorizontalIcon : ICONS[item.id]}
+              icon={item.id === "go" && (item.label.startsWith("Restore") || item.label.startsWith("Reopen")) ? ArrowReloadHorizontalIcon : ICONS[item.id]}
               size={14}
               strokeWidth={2}
               className="shrink-0"

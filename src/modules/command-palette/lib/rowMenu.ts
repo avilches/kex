@@ -1,6 +1,7 @@
 import { pathBasename } from "@/lib/pathUtils";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
+import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import type { TabEntry } from "./tabEntries";
 
@@ -22,6 +23,28 @@ export function highlightedTabOf(value: string, rows: readonly MergedRow[]): Tab
     if (row.kind === "tab" && value === `tab:${row.entry.tabId}`) return row.entry;
   }
   return null;
+}
+
+export function highlightedClosedOf(
+  value: string,
+  rows: readonly MergedRow[],
+): ClosedTabEntry | null {
+  for (const row of rows) {
+    if (row.kind === "closed" && value === row.entry.key) return row.entry;
+  }
+  return null;
+}
+
+export function closedMenuItems(entry: ClosedTabEntry): RowMenuItem[] {
+  return [
+    { id: "go", label: "Reopen Closed Tab", enter: true },
+    {
+      id: "copy",
+      label: "Copy Absolute Path",
+      shortcutId: "path.copy",
+      disabled: !entry.path,
+    },
+  ];
 }
 
 export function tabEntryCopyPath(entry: TabEntry): string | null {
@@ -93,7 +116,17 @@ export function stepEnabled(
   return -1;
 }
 
-export type MenuAnchor = { rowTop: number; rowBottom: number };
+export type MenuAnchor = {
+  rowTop: number;
+  rowBottom: number;
+  // Set when the menu was opened with the mouse: it hangs from the pointer, not from the row.
+  pointer?: { x: number; y: number };
+};
+
+// Left edge for a menu opened at the pointer, kept inside the box.
+export function placeMenuLeft(pointerX: number, boxWidth: number, menuWidth: number): number {
+  return Math.max(0, Math.min(pointerX, boxWidth - menuWidth));
+}
 
 // Below the row when the menu fits, above it otherwise, and pinned to the bottom edge when it
 // fits in neither, so it never leaves the palette.

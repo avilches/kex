@@ -24,6 +24,7 @@ type Props = {
   onRunWorkspace: (entry: WorkspaceEntry) => void;
   onRunClosed: (entry: ClosedTabEntry) => void;
   onContextMenuTab?: (entry: TabEntry, e: React.MouseEvent<HTMLElement>) => void;
+  onContextMenuClosed?: (entry: ClosedTabEntry, e: React.MouseEvent<HTMLElement>) => void;
 };
 
 function shortcutLabel(
@@ -60,8 +61,11 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
     return (
       <ClosedItem
         entry={row.entry}
-        highlight={row.highlight}
+        term={p.term}
         onRun={() => p.onRunClosed(row.entry)}
+        onContextMenu={
+          p.onContextMenuClosed ? (e) => p.onContextMenuClosed?.(row.entry, e) : undefined
+        }
       />
     );
   }

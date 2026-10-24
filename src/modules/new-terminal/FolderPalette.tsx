@@ -16,7 +16,12 @@ import {
   folderMenuItems,
   worktreesLabel,
 } from "@/modules/command-palette/lib/rowMenu";
-import { anchorOf, RowMenu, useRowMenu } from "@/modules/command-palette/RowMenu";
+import {
+  anchorOf,
+  keepInputFocus,
+  RowMenu,
+  useRowMenu,
+} from "@/modules/command-palette/RowMenu";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
@@ -121,7 +126,11 @@ export function FolderPalette({
     [onOpenChange],
   );
 
-  const openMenuOn = (row: FolderRow | undefined, el: HTMLElement | null) => {
+  const openMenuOn = (
+    row: FolderRow | undefined,
+    el: HTMLElement | null,
+    pointer?: { clientX: number; clientY: number },
+  ) => {
     const box = boxRef.current;
     if (!row || !box || !el) return;
     openRowMenu(
@@ -130,7 +139,7 @@ export function FolderPalette({
         path: row.path,
         worktrees: row.repoKey && row.repoHint ? row.repoHint : null,
       }),
-      anchorOf(box, el),
+      anchorOf(box, el, pointer),
     );
   };
 
@@ -200,6 +209,7 @@ export function FolderPalette({
         <div
           ref={boxRef}
           className={cn("relative", rowMenu.menu && "min-h-[150px]")}
+          onMouseDown={keepInputFocus}
           onPointerDownCapture={(e) => {
             if (rowMenu.menu && !(e.target as HTMLElement).closest("[data-row-menu]")) {
               closeRowMenu();
@@ -208,7 +218,7 @@ export function FolderPalette({
         >
         <ScrollArea
           ref={listRef}
-          className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
+          className="[&_[data-slot=scroll-area-viewport]]:max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
         >
           <CommandList className="max-h-none overflow-visible pr-3">
             {empty ? (
@@ -238,7 +248,7 @@ export function FolderPalette({
                         onSelect={() => onPick(row)}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          openMenuOn(row, e.currentTarget);
+                          openMenuOn(row, e.currentTarget, e);
                         }}
                         className={cn("text-[12.5px]", row.nested ? "pl-12" : "pl-7")}
                       >

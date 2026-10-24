@@ -2914,6 +2914,10 @@ export default function App() {
     },
     [wakeWorkspace, setActiveWorkspaceId, openTab, activateTab],
   );
+  const dismissPalettes = useCallback(() => {
+    setCommandPaletteOpen(false);
+    setFolderPaletteOpen(false);
+  }, []);
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -3041,6 +3045,7 @@ export default function App() {
         if (handle) void handle.save();
       },
       "tab.next": () => {
+        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length < 2) return;
@@ -3049,6 +3054,7 @@ export default function App() {
         onActivateTabStable(activeWorkspace.id, next.id);
       },
       "tab.prev": () => {
+        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length < 2) return;
@@ -3057,6 +3063,7 @@ export default function App() {
         onActivateTabStable(activeWorkspace.id, prev.id);
       },
       "tab.selectByIndex": (e) => {
+        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length === 0) return;
@@ -3081,7 +3088,10 @@ export default function App() {
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("workspace"),
       "explorer.toggleHidden": handleToggleShowHidden,
-      "explorer.search": handleExplorerSearch,
+      "explorer.search": () => {
+        dismissPalettes();
+        handleExplorerSearch();
+      },
       "terminal.clear": () => {
         clearFocusedTerminal();
       },
@@ -3090,13 +3100,23 @@ export default function App() {
           toggleScratchpad(activeTabId);
         }
       },
-      "search.focus": () => searchInlineRef.current?.focus(),
+      "search.focus": () => {
+        dismissPalettes();
+        searchInlineRef.current?.focus();
+      },
       "settings.open": () => void openSettingsWindow(),
       "notifications.toggle": () => useBellStore.getState().toggle(),
       "window.new": () => void native.openMainWindow(),
-      "nav.prev": () => cycleLinear(-1),
-      "nav.next": () => cycleLinear(1),
+      "nav.prev": () => {
+        dismissPalettes();
+        cycleLinear(-1);
+      },
+      "nav.next": () => {
+        dismissPalettes();
+        cycleLinear(1);
+      },
       "workspace.selectByIndex": (e) => {
+        dismissPalettes();
         const idx = parseInt(e.key, 10) - 1;
         const visible = visibleWorkspaceOrder(
           workspaces,
@@ -3194,6 +3214,7 @@ export default function App() {
       groups,
       collapsedGroups,
       openCommandPalette,
+      dismissPalettes,
       cycleLinear,
       onActivateTabStable,
       handleCloseActiveTab,
@@ -3657,7 +3678,7 @@ export default function App() {
       flashLockIcon(entry.tabId);
       return;
     }
-    void closeTabsRef.current([entry.tabId]);
+    return closeTabsRef.current([entry.tabId]);
   }, []);
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {

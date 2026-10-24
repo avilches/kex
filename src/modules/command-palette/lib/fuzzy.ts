@@ -37,6 +37,13 @@ export function substringIndices(foldedQuery: string, text: string): number[] {
   return i < 0 ? [] : Array.from({ length: foldedQuery.length }, (_, k) => i + k);
 }
 
+// The letters a field lights up for a folded query, independent of which field ranked the row.
+export function highlightIndices(foldedQuery: string, text: string): number[] {
+  if (!foldedQuery || !text) return [];
+  const m = fuzzyMatchLower(foldedQuery, text);
+  return m && passesQuality(foldedQuery.length, m.score) ? m.indices : [];
+}
+
 export type FuzzyMatch = { score: number; indices: number[] };
 
 // With lowerInputs the strings arrive pre-lowercased, so the second toLowerCase is

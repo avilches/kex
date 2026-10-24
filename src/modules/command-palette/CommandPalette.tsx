@@ -45,12 +45,14 @@ import { type TerminalTarget, terminalTargetOf } from "./lib/terminalTarget";
 import { enterHintOf } from "./lib/enterHint";
 import { registerPaletteControl } from "./lib/paletteControl";
 import {
+  closedMenuItems,
+  highlightedClosedOf,
   highlightedTabOf,
   type RowMenuItemId,
   tabEntryCopyPath,
   tabMenuItems,
 } from "./lib/rowMenu";
-import { anchorOf, RowMenu, useRowMenu } from "./RowMenu";
+import { anchorOf, keepInputFocus, RowMenu, useRowMenu } from "./RowMenu";
 import { MergedList } from "./MergedList";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "./PaletteWidth";
 import { useRestoreFocusOnEscape } from "./useRestoreFocusOnEscape";
@@ -77,7 +79,7 @@ type Props = {
   onMoveActiveTabToWorkspace: (target: string | "new") => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
-  onCloseTab: (entry: TabEntry) => void;
+  onCloseTab: (entry: TabEntry) => void | Promise<unknown>;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -177,6 +179,10 @@ export function CommandPalette({
     [open, inCommands, value, merged],
   );
   const footerEnterHint = inCommands ? enterHintOf(value, merged) : "Select";
+  const highlightedClosed = useMemo(
+    () => (open && inCommands ? highlightedClosedOf(value, merged) : null),
+    [open, inCommands, value, merged],
+  );
   const highlightedTab = useMemo(
     () => (open && inCommands ? highlightedTabOf(value, merged) : null),
     [open, inCommands, value, merged],
@@ -371,6 +377,16 @@ export function CommandPalette({
   );
 
   const { close: closeRowMenu, open: openRowMenu } = rowMenu;
+  // The close-confirmation dialog returns the focus to the page when it unmounts, after the close
+  // promise has settled, so the palette claims it again once that has happened.
+  const refocusInput = useCallback(() => {
+    for (const delay of [0, 250]) {
+      window.setTimeout(() => {
+        const input = paletteInputElement();
+        if (input && document.activeElement !== input) input.focus();
+      }, delay);
+    }
+  }, []);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
       closeRowMenu();
@@ -384,17 +400,55 @@ export function CommandPalette({
         const path = tabEntryCopyPath(entry);
         if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
       } else if (id === "close") {
-        onCloseTab(entry);
+        void Promise.resolve(onCloseTab(entry)).then(refocusInput);
       }
     },
     [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, onCloseTab],
   );
 
-  const openTabMenu = useCallback(
-    (entry: TabEntry, row: Element | null | undefined) => {
+  const runClosedAction = useCallback(
+    (id: RowMenuItemId, entry: ClosedTabEntry) => {
+      closeRowMenu();
+      if (id === "go") {
+        runAfterClose(() => onRunClosed(entry));
+      } else if (id === "copy" && entry.path) {
+        const path = entry.path;
+        runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
+      }
+    },
+    [closeRowMenu, runAfterClose, onRunClosed],
+  );
+
+  const openClosedMenu = useCallback(
+    (
+      entry: ClosedTabEntry,
+      row: Element | null | undefined,
+      pointer?: { clientX: number; clientY: number },
+    ) => {
       const box = boxRef.current;
       if (!box || !row) return;
-      openRowMenu(`tab:${entry.tabId}`, tabMenuItems(entry), anchorOf(box, row as HTMLElement));
+      openRowMenu(
+        entry.key,
+        closedMenuItems(entry),
+        anchorOf(box, row as HTMLElement, pointer),
+      );
+    },
+    [openRowMenu],
+  );
+
+  const openTabMenu = useCallback(
+    (
+      entry: TabEntry,
+      row: Element | null | undefined,
+      pointer?: { clientX: number; clientY: number },
+    ) => {
+      const box = boxRef.current;
+      if (!box || !row) return;
+      openRowMenu(
+        `tab:${entry.tabId}`,
+        tabMenuItems(entry),
+        anchorOf(box, row as HTMLElement, pointer),
+      );
     },
     [openRowMenu],
   );
@@ -446,18 +500,21 @@ export function CommandPalette({
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (rowMenu.menu) {
-        const entry = highlightedTabOf(rowMenu.menu.rowKey, merged);
-        if (rowMenu.handleKey(e, (item) => entry && runTabAction(item.id, entry))) return;
+        const key = rowMenu.menu.rowKey;
+        const entry = highlightedTabOf(key, merged);
+        const closed = highlightedClosedOf(key, merged);
+        const run = (item: { id: RowMenuItemId }) => {
+          if (entry) runTabAction(item.id, entry);
+          else if (closed) runClosedAction(item.id, closed);
+        };
+        if (rowMenu.handleKey(e, run)) return;
       }
       if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
         if (inSubpage || !inCommands) return;
         e.preventDefault();
-        if (highlightedTab) {
-          openTabMenu(
-            highlightedTab,
-            boxRef.current?.querySelector('[cmdk-item][aria-selected="true"]'),
-          );
-        }
+        const row = boxRef.current?.querySelector('[cmdk-item][aria-selected="true"]');
+        if (highlightedTab) openTabMenu(highlightedTab, row);
+        else if (highlightedClosed) openClosedMenu(highlightedClosed, row);
         return;
       }
       if (!inSubpage) return;
@@ -478,8 +535,11 @@ export function CommandPalette({
       rowMenu,
       merged,
       runTabAction,
+      runClosedAction,
       highlightedTab,
+      highlightedClosed,
       openTabMenu,
+      openClosedMenu,
     ],
   );
 
@@ -524,6 +584,7 @@ export function CommandPalette({
         <div
           ref={boxRef}
           className={cn("relative", rowMenu.menu && "min-h-[150px]")}
+          onMouseDown={keepInputFocus}
           onPointerDownCapture={(e) => {
             if (rowMenu.menu && !(e.target as HTMLElement).closest("[data-row-menu]")) {
               closeRowMenu();
@@ -532,7 +593,7 @@ export function CommandPalette({
         >
         <ScrollArea
           ref={listRef}
-          className="max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
+          className="[&_[data-slot=scroll-area-viewport]]:max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
         >
           <CommandList className="max-h-none overflow-visible pr-3">
             {inThemes ? (
@@ -657,10 +718,15 @@ export function CommandPalette({
                   onRunClosed={(entry) =>
                     runAfterClose(() => onRunClosed(entry))
                   }
+                  onContextMenuClosed={(entry, e) => {
+                    e.preventDefault();
+                    setValue(entry.key);
+                    openClosedMenu(entry, e.currentTarget, e);
+                  }}
                   onContextMenuTab={(entry, e) => {
                     e.preventDefault();
                     setValue(`tab:${entry.tabId}`);
-                    openTabMenu(entry, e.currentTarget);
+                    openTabMenu(entry, e.currentTarget, e);
                   }}
                 />
               )
@@ -757,8 +823,11 @@ export function CommandPalette({
           <RowMenu
             menu={rowMenu.menu}
             onRun={(id) => {
-              const entry = highlightedTabOf(rowMenu.menu?.rowKey ?? "", merged);
+              const key = rowMenu.menu?.rowKey ?? "";
+              const entry = highlightedTabOf(key, merged);
+              const closed = highlightedClosedOf(key, merged);
               if (entry) runTabAction(id, entry);
+              else if (closed) runClosedAction(id, closed);
             }}
             onActive={(active) => rowMenu.setActive(active)}
           />
@@ -771,14 +840,6 @@ export function CommandPalette({
             </kbd>
             {footerEnterHint}
           </span>
-          {highlightedTab ? (
-            <span className="flex shrink-0 items-center gap-1.5">
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
-                Tab
-              </kbd>
-              Menu
-            </span>
-          ) : null}
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
               {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
@@ -792,6 +853,14 @@ export function CommandPalette({
               </span>
             ) : null}
           </span>
+          {highlightedTab || highlightedClosed ? (
+            <span className="flex shrink-0 items-center gap-1.5">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+                Tab
+              </kbd>
+              Menu
+            </span>
+          ) : null}
         </div>
       </Command>
     </CommandDialog>

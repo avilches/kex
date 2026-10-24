@@ -1,38 +1,34 @@
 import { CommandItem } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import {
-  File01Icon,
-  Folder01Icon,
-  SleepingIcon,
-} from "@hugeicons/core-free-icons";
+import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlightText } from "./HighlightText";
 import type { ClosedTabEntry } from "./lib/closedEntries";
-import type { RowHighlight } from "./lib/mergeRows";
+import { foldText, highlightIndices, substringIndices } from "./lib/fuzzy";
 import { RowTag } from "./RowTag";
 
 export function ClosedItem({
   entry,
-  highlight,
+  term = "",
   onRun,
+  onContextMenu,
 }: {
   entry: ClosedTabEntry;
-  highlight?: RowHighlight;
+  term?: string;
   onRun: () => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   const folder = entry.kind === "terminal";
-  const titleIndices =
-    highlight?.field === "title" ? highlight.indices : undefined;
-  const detailIndices =
-    highlight?.field === "detail" ? highlight.indices : undefined;
-  const wsIndices =
-    highlight?.field === "workspace" ? highlight.indices : undefined;
+  const folded = foldText(term.trim());
+  const titleIndices = highlightIndices(folded, entry.title);
+  const detailIndices = substringIndices(folded, entry.detail);
+  const wsIndices = highlightIndices(folded, entry.workspaceTitle);
   return (
     <CommandItem
       value={entry.key}
       onSelect={onRun}
-      className={cn("text-[12.5px]", entry.hibernated && "opacity-60")}
+      onContextMenu={onContextMenu}
+      className="text-[12.5px] opacity-60"
     >
       <RowTag kind={folder ? "Terminal" : "File"} closed />
       <span className="shrink-0 text-muted-foreground">
@@ -50,20 +46,6 @@ export function ClosedItem({
           <HighlightText text={entry.detail} indices={detailIndices} />
         </span>
       </span>
-      {entry.hibernated ? (
-        <span
-          role="img"
-          aria-label="Workspace is hibernated"
-          className="shrink-0"
-        >
-          <HugeiconsIcon
-            icon={SleepingIcon}
-            size={12}
-            strokeWidth={1.75}
-            className="text-muted-foreground"
-          />
-        </span>
-      ) : null}
       {entry.workspaceTitle ? (
         <span className="ml-auto flex max-w-56 shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
           <WorkspaceMark
