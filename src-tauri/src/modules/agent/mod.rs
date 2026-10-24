@@ -1,6 +1,7 @@
 pub mod codex_hooks;
 pub mod codex_integration;
 pub mod codex_trust;
+pub mod json_patch;
 pub mod launch_cmd;
 pub mod live_model;
 pub mod os_notify;
@@ -263,8 +264,8 @@ fn plan_settings(
     if next == existing {
         return Ok(None);
     }
-    // Keep the user's own indent so the diff only shows the hooks.
-    serialize_pretty(&next, detect_json_indent(existing_str)).map(Some)
+    // Patched by text so the diff only shows the hooks.
+    Ok(Some(json_patch::patch(existing_str, &next)))
 }
 
 #[tauri::command]
@@ -721,34 +722,6 @@ pub fn agent_claude_hooks_status() -> bool {
         .contains(SESSION_HOOK_SCRIPT_VERSION)
 }
 
-fn detect_json_indent(s: &str) -> usize {
-    for line in s.lines().skip(1) {
-        let trimmed = line.trim_start_matches(' ');
-        let spaces = line.len() - trimmed.len();
-        if spaces > 0 {
-            return spaces;
-        }
-    }
-    2
-}
-
-fn serialize_pretty(value: &Value, indent: usize) -> Result<String, String> {
-    let raw = serde_json::to_string_pretty(value).map_err(|e| format!("serialize: {e}"))?;
-    if indent == 2 {
-        return Ok(raw);
-    }
-    let pad = " ".repeat(indent);
-    let out = raw
-        .lines()
-        .map(|line| {
-            let depth = (line.len() - line.trim_start_matches(' ').len()) / 2;
-            format!("{}{}", pad.repeat(depth), line.trim_start())
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    Ok(out)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -873,6 +846,21 @@ mod tests {
         let arr = out["hooks"]["UserPromptSubmit"].as_array().unwrap();
         assert!(arr.len() >= 2);
         assert_eq!(arr[0]["hooks"][0]["command"].as_str().unwrap(), "echo hi");
+    }
+
+    #[test]
+    fn installing_into_a_foreign_style_settings_file_only_adds_lines() {
+        let path = std::path::Path::new("/x/settings.json");
+        let src = "{\n\t\"model\" : \"a\\/b\",\n\t\"permissions\":{\"allow\":[ \"x\" ]}\n}\n";
+        let out = plan_settings(src, path, true).unwrap().unwrap();
+        let kept: Vec<&str> = src
+            .lines()
+            .filter(|l| l.contains("model") || l.contains("permissions"))
+            .collect();
+        assert!(kept.iter().all(|l| out.contains(l)));
+        assert!(out.contains("\"SessionStart\"") || out.contains("\"Stop\""));
+        let removed = plan_settings(&out, path, false).unwrap().unwrap();
+        assert!(removed.contains("\"permissions\":{\"allow\":[ \"x\" ]}"));
     }
 
     #[test]

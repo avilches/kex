@@ -75,9 +75,10 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   carries it over before it is removed).
 - `hooks.json` is written only for a semantic change: when the parsed result equals the parsed file (key order
   ignored) the bytes are kept, so the startup sync never rewrites a file Kaji reformatted in its Swift style (sorted
-  keys, `" : "`, `\/`) and the preview shows nothing. A real change re-serializes it (`serde_json` keeps key order, but
-  whitespace and `\/` escapes are normalized), so other tools' handlers stay equal as JSON, not as bytes; the "View
-  changes" preview says so in its `note`. `config.toml` is edited textually and keeps every other byte.
+  keys, `" : "`, `\/`) and the preview shows nothing. A real change is patched in the text (`agent/json_patch.rs`):
+  only the values that changed are rewritten and new entries copy the indent of their neighbours, so the diff shows
+  just the lines added or removed. `config.toml` is edited textually and keeps every other byte. Claude Code's
+  `settings.json` goes through the same patcher.
 - A `hooks.json` or `config.toml` that cannot be parsed is never written: setup, uninstall and the preview fail with
   "leaving it alone". The edited `config.toml` is checked the same way before anything is written: it must parse as
   TOML and every Kex table must read back with its hash, so a trust table in a form the textual editor does not see

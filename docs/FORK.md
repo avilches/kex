@@ -233,8 +233,8 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   each with a `[hooks.state."<key>"]` table in `config.toml`, because Codex does not run an untrusted handler. The
   commands are `agent_setup_codex`, `agent_codex_status` and the `codex` cases of `agent_sync_integrations`,
   `agent_remove_integration` and `agent_integration_preview`. Both files are shared with Orca and Kaji, so only
-  `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is re-serialized only for a
-  semantic change (the diff dialog carries a note saying so), the edited `config.toml` must parse and read back before
+  `# kex-session-hook` handlers and Kex's own trust tables are touched, `hooks.json` is patched in the text only for a
+  semantic change (`json_patch.rs`, so the diff shows just the added or removed lines), the edited `config.toml` must parse and read back before
   anything is written, and a file that cannot be parsed is never written: Settings > General > Agents shows
   "Cannot read config", "Cannot edit config" (a `config.toml` that parses but holds a Kex trust entry in a form Kex
   does not edit), "Not found" or, on Windows, "Not supported" with only "Check again", and the bell shows a row
