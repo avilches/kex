@@ -25,7 +25,6 @@ import {
   setEditorViewForExt,
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
 import type { Tab } from "./lib/types";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
@@ -213,7 +212,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       ext,
       value: resolveEditorView(path, editorViewByExt),
       onChange: (next: EditorViewSettings) => void setEditorViewForExt(ext, next),
-      onViewInSettings: () => void openFileTypesSettings(ext || undefined),
       disabled: effectivePreviewMode === "overlay",
     };
   };

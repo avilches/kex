@@ -17,7 +17,6 @@ import { useEffect } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { AgentIntegrations } from "./AgentIntegrations";
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
@@ -118,8 +117,6 @@ export function GeneralSection() {
           />
         </SettingRow>
       </div>
-
-      <AgentIntegrations />
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Startup</FieldLabel>

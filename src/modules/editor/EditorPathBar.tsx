@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -90,7 +89,6 @@ type Props = {
     ext: string;
     value: EditorViewSettings;
     onChange: (next: EditorViewSettings) => void;
-    onViewInSettings?: () => void;
     disabled?: boolean;
   };
   globalToggles?: {
@@ -364,19 +362,6 @@ export function EditorPathBar({
                   />
                 </div>
               </div>
-              {viewToggles.onViewInSettings && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-[12px] text-muted-foreground"
-                    onSelect={() => viewToggles.onViewInSettings?.()}
-                  >
-                    {viewToggles.ext
-                      ? `View ${viewToggles.ext} Settings`
-                      : "View file type Settings"}
-                  </DropdownMenuItem>
-                </>
-              )}
               {globalToggles && (
                 <>
                   <DropdownMenuSeparator />

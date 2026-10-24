@@ -160,7 +160,7 @@ State: `tab-history.json` in the app data dir, next to `agent-sessions.json`. On
 
 | Command | Description |
 |---|---|
-| `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a section (`section?: string`, e.g. `filetypes:ts`, or `appearance:titles` to scroll to the default title templates; an already open window only focuses and scrolls) |
+| `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a section (`section?: string`, e.g. `agents`, or `appearance:titles` to scroll to the default title templates; an already open window only focuses and scrolls) |
 | `open_main_window` | Open a new main window with a fresh `w-<hex>` label |
 | `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry + optional `sidebar` chrome) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
 | `window_save_workspace_state` | Persist workspace list and active index for a window label; writes the lean `workspaces.json` index plus one `workspaces/<id>.json` per changed workspace |

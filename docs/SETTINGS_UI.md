@@ -33,11 +33,11 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
 ## Patrones que se repiten
 
 - **Tarjetas plegables**: las filas de configuracion que abren un formulario van plegadas a
-  una linea (resumen) y se despliegan una a la vez con click, como archivos de extension en
-  `FileTypesSection`. Las Actions ya no se despliegan: cada una es una fila fija y su edicion
+  una linea (resumen) y se despliegan una a la vez con click, como las Actions de la columna de Settings en
+  `ActionsSection`. Las Actions ya no se despliegan: cada una es una fila fija y su edicion
   vive en un modal (`ActionEditDialog`), abierto con el lapiz de la fila.
 - **Borrado con confirmacion**: cualquier removida de una fila guardada (fila de Action en
-  `ActionRow`, entrada de extension en `FileTypesSection`) abre `AlertDialog` y solo llega al
+  `ActionRow`) abre `AlertDialog` y solo llega al
   store con el boton destructivo confirmado. Excepcion: una Action inmutable de app (`appId`
   presente) se borra sin pedir nada, porque vuelve una sola eleccion en el combo.
 - **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el

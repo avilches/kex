@@ -8,15 +8,15 @@ import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, createElement, useEffect, useRef, useState } from "react";
+import { type JSX, createElement, useEffect, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
 import { parseActionsTarget } from "@/modules/actions/lib/actionsTarget";
 import { ActionsSection, type ActionsRequest } from "./sections/ActionsSection";
+import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
-import { FileTypesSection } from "./sections/FileTypesSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
@@ -27,9 +27,9 @@ const COMPONENTS: Record<SettingsSection, (props: never) => JSX.Element> = {
   general: GeneralSection,
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
+  agents: AgentsSection,
   actions: ActionsSection,
   editor: EditorSection,
-  filetypes: FileTypesSection,
   appearance: AppearanceSection,
   themes: ThemesSection,
   shortcuts: ShortcutsSection,
@@ -62,13 +62,6 @@ function readInitialSection(): SettingsSection {
   return parseSectionParam(url.searchParams.get("section")).section;
 }
 
-function readInitialFileTypesExt(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  const url = new URL(window.location.href);
-  const { section, ext } = parseSectionParam(url.searchParams.get("section"));
-  return section === "filetypes" ? ext : undefined;
-}
-
 function readInitialActionsTarget(): ActionsRequest | null {
   if (typeof window === "undefined") return null;
   const { section, ext } = parseSectionParam(new URL(window.location.href).searchParams.get("section"));
@@ -78,11 +71,8 @@ function readInitialActionsTarget(): ActionsRequest | null {
 
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsSection>(readInitialSection);
-  const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
-  // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
-  const fileTypesExtConsumed = useRef(false);
   const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
   const [actionsTarget, setActionsTarget] = useState<ActionsRequest | null>(readInitialActionsTarget);
 
@@ -133,10 +123,6 @@ export function SettingsApp() {
       setAnchor(section === "appearance" ? ext : undefined);
       const target = section === "actions" ? parseActionsTarget(ext) : null;
       if (target) setActionsTarget((prev) => ({ ...target, nonce: (prev?.nonce ?? 0) + 1 }));
-      if (ext && section === "filetypes") {
-        fileTypesExtConsumed.current = false;
-        setFileTypesExt(ext);
-      }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
       "kex:settings-section",
@@ -205,15 +191,7 @@ export function SettingsApp() {
         <ScrollArea type="auto" className="min-h-0 flex-1">
           <div className="px-8 pt-2 pb-7">
             <div className="mx-auto w-full max-w-160">
-              {active === "filetypes" ? (
-                <FileTypesSection
-                  focusExt={fileTypesExtConsumed.current ? undefined : fileTypesExt}
-                  onFocusConsumed={() => {
-                    fileTypesExtConsumed.current = true;
-                    setFileTypesExt(undefined);
-                  }}
-                />
-              ) : active === "actions" ? (
+              {active === "actions" ? (
                 <ActionsSection target={actionsTarget} />
               ) : (
                 ActiveSection && createElement(ActiveSection)
