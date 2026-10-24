@@ -1231,3 +1231,36 @@ Con dnd-kit activo no existen eventos de salida de ventana; se detecta por coord
 `pointermove`. Y para depurar el webview de un drag no basta la consola: la tecnica del `fetch` a
 un receptor local (memoria `reference_webview_debug_via_fetch`) dio el diagnostico en una sola
 prueba, y habria evitado la primera ronda a ciegas.
+
+## Bug 25: el modal de una Action se cerraba solo al cambiar su ambito en Settings (RESUELTO)
+
+### Sintoma
+
+En Settings > Actions, al cambiar el radio Global / This workspace del modal de una Action, el modal
+a veces se cerraba solo. No pasaba siempre.
+
+### Pistas falsas descartadas
+
+1. **Hueco entre listas** (la Action fuera de las dos a la vez): `moving` ya lo cubria, y tres tests
+   que simulan ese hueco, y que la Action aterriza antes de salir de la vieja, pasaban sin cambios.
+2. **Remonte de la seccion o del dialogo** (`key`, `nonce` de `SettingsApp`, `onOpenChange` de Radix):
+   nada de eso cambia al mover una Action.
+
+### Causa raiz
+
+`ActionsColumns` solo recordaba que la Action se estaba moviendo hasta que aparecia en el ambito
+nuevo (`moving` se pone a null entonces). El movimiento cruza dos almacenes con eco asincrono (la
+lista global por preferencias en disco, la del workspace por un evento de la ventana principal), asi
+que puede llegar despues una lista desfasada sin la Action. `editedAction` pasaba a null y el modal
+se desmontaba.
+
+### Fix
+
+`moved` guarda el id de la Action movida hasta que se cierra el modal, y mientras tanto `editedAction`
+cae a la ultima copia vista si una lista desfasada la quita. `change` no escribe en un ambito donde la
+Action no esta. Test: `ActionsColumns.test.tsx`, "a stale list drops the Action".
+
+### Leccion
+
+Un estado "en transito" que se limpia al primer eco no cubre ecos desordenados: mantenerlo hasta que
+termine la sesion que lo necesita (aqui, la vida del modal).
