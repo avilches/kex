@@ -1,3 +1,4 @@
+import { resolveScriptCwd, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
 import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
@@ -74,6 +75,8 @@ export type BarContext = {
   hibernated?: boolean;
   /** The vars are words for what a variable stands for, not values (Settings has no tab). */
   labels?: boolean;
+  /** The folders the runner picks a start folder from, so the bar names the same one. */
+  folders?: Omit<ScriptCwdInput, "mode" | "fixedFolder">;
 };
 
 const NEEDS: Record<string, string> = {
@@ -199,11 +202,14 @@ function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext 
   const real = ctx && !ctx.labels ? ctx : null;
   if (mode === "home") return { text: "Home", startTrim: false };
   if (mode === "fixed") return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
-  if (mode === "context") {
-    return real?.vars.cwd ? { text: real.vars.cwd, startTrim: true } : { text: "Current directory", startTrim: false };
-  }
-  if (ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
-  return real ? { text: real.vars.workspace, startTrim: true } : { text: "Workspace", startTrim: false };
+  if (mode === "workspace" && ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
+  if (!real) return { text: mode === "context" ? "Current directory" : "Workspace", startTrim: false };
+  const start = real.folders
+    ? resolveScriptCwd({ mode, ...real.folders })
+    : mode === "context"
+      ? real.vars.cwd
+      : real.vars.workspace;
+  return start ? { text: start, startTrim: true } : { text: null, startTrim: false };
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.

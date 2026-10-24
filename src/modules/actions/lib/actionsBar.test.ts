@@ -685,6 +685,17 @@ describe("agents", () => {
     expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS).text).toBe("Workspace");
   });
 
+  it("names the folder the runner falls back to when the focused tab has none", () => {
+    const sub = (o: Partial<Action>, folders: NonNullable<Parameters<typeof scriptSubtitle>[1]>["folders"]) =>
+      scriptSubtitle(agent(o), { ...ctx, folders });
+    const noFocus = { focusFolder: null, workspaceRoot: "/root", workspaceCwd: "/cwd" };
+    expect(sub({ cwdMode: "context" }, noFocus)).toEqual({ text: "/root", startTrim: true });
+    expect(sub({ cwdMode: "context" }, { ...noFocus, workspaceRoot: null })).toEqual({ text: "/cwd", startTrim: true });
+    expect(sub({ cwdMode: "context" }, { ...noFocus, focusFolder: "/root/src" })).toEqual({ text: "/root/src", startTrim: true });
+    expect(sub({ cwdMode: "context" }, { focusFolder: null, workspaceRoot: null, workspaceCwd: null }).text).toBeNull();
+    expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current directory");
+  });
+
   it("is grey with the root message when it starts in a rootless workspace", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
     const m = buildActionsBarModel({ local: [agent({ cwdMode: "workspace" })], context: rootless, states: new Map(), activeId: undefined });

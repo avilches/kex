@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { pathDirname } from "@/lib/pathUtils";
 import { IS_WINDOWS } from "@/lib/platform";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
@@ -9,11 +10,25 @@ import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { buildCommandVars, inWorktree } from "./commandVars";
-import type { Workspace } from "@/modules/workspaces/lib/types";
+import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import type { CommandShell } from "./commandTemplate";
-import type { FocusPlace } from "./actionsBar";
+import type { BarContext, FocusPlace } from "./actionsBar";
 
-export type ActionContext = { vars: Record<string, string>; shell: CommandShell; hibernated: boolean; place: FocusPlace };
+export type ActionContext = {
+  vars: Record<string, string>;
+  shell: CommandShell;
+  hibernated: boolean;
+  place: FocusPlace;
+  folders: NonNullable<BarContext["folders"]>;
+};
+
+// The folder the runner treats as the focused one: a terminal's, or the one holding a file tab's file.
+function focusFolderOf(tab: Tab | null): string | null {
+  if (!tab) return null;
+  if (tab.kind === "terminal") return tab.cwd || null;
+  const file = tabFilePath(tab);
+  return file ? pathDirname(file) : null;
+}
 
 // The values an Action would see if it ran right now from this workspace, the same ones the
 // runner builds. Settings has no workspace, so its editor passes none and gets no values.
@@ -30,7 +45,14 @@ export function useActionContext(
   const info = useDirGit(dir, focused?.id);
   const vars = ws ? buildCommandVars(focused, ws, info, sys.host) : null;
   const hibernated = !!ws?.hibernated;
-  const key = vars ? JSON.stringify([vars, envKind, hibernated, focused?.kind, focused && tabFilePath(focused)]) : null;
+  const folders = {
+    focusFolder: focusFolderOf(focused),
+    workspaceRoot: ws?.workspaceRoot ?? null,
+    workspaceCwd: ws?.cwd ?? null,
+  };
+  const key = vars
+    ? JSON.stringify([vars, envKind, hibernated, focused?.kind, focused && tabFilePath(focused), folders])
+    : null;
   return useMemo(
     () =>
       vars
@@ -39,6 +61,7 @@ export function useActionContext(
             shell: scriptShellFor(IS_WINDOWS, envKind),
             hibernated,
             place: { folder: focused?.kind === "terminal", file: !!(focused && tabFilePath(focused)) },
+            folders,
           }
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps

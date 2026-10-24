@@ -349,4 +349,10 @@ describe("planActionRun, agents", () => {
     expect(planActionRun(agent({ command: "  " }), ctx()).kind).toBe("blocked");
     expect(planActionRun(agent({ command: "claude\nrm -rf /" }), ctx()).kind).toBe("blocked");
   });
+
+  it("refuses a tab and an escape in the command", () => {
+    for (const command of ["claude\t--x", "claude \u001b[31m"]) {
+      expect(planActionRun(agent({ command }), ctx())).toMatchObject({ kind: "blocked", reason: expect.stringMatching(/control character/) });
+    }
+  });
 });

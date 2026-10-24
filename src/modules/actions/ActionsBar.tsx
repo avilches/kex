@@ -65,7 +65,6 @@ import {
   type BarItem,
 } from "./lib/actionsBar";
 import { isScript, usesTerminal, type Action, type ActionKind } from "./lib/types";
-
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
