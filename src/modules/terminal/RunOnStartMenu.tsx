@@ -144,12 +144,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
-        <span className="min-w-0 flex-1">
-          Run on Start
-          <span className="block max-w-[240px] whitespace-normal text-[10px] font-normal text-muted-foreground">
-            Command runs when the tab is restored after a restart or an undo close
-          </span>
-        </span>
+        <span className="min-w-0 flex-1">Run on Start</span>
         {enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
@@ -203,7 +198,12 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
           </>
         ) : (
           <>
-            <div className="p-1.5">{commandField}</div>
+            <div className="p-1.5">
+              {commandField}
+              <p className="mt-1.5 px-0.5 text-[10px] font-normal leading-snug text-muted-foreground">
+                Command runs when the tab is restored after a restart or an undo close
+              </p>
+            </div>
             {shownCommand.trim() !== "" && (
               <ContextMenuItem className="gap-2" onSelect={() => void writeClipboardText(shownCommand)}>
                 <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
