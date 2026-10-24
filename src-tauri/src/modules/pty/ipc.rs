@@ -403,6 +403,9 @@ pub fn hook_socket(app: &AppHandle) -> PathBuf {
         .get_or_init(|| {
             let dir = runtime_dir();
             sweep_orphaned_sockets(&dir);
+            if let Some(base) = spool_dir() {
+                sweep_spool(&base);
+            }
             socket_path_in(&dir)
         })
         .clone();
@@ -484,21 +487,61 @@ fn spool_event(base: &Path, tab_id: &str, line: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+// The same 7 days the script prunes with (`MAX_SPOOL_AGE_MINUTES`).
+const MAX_SPOOL_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// Keeps a tab's newest `MAX_SPOOL_FILES` events and deletes those older than `MAX_SPOOL_AGE`.
 fn prune_spool(dir: &Path) {
     let Ok(rd) = std::fs::read_dir(dir) else {
         return;
     };
-    let mut names: Vec<String> = rd
-        .filter_map(Result::ok)
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| !n.starts_with('.'))
-        .collect();
+    let mut names: Vec<String> = Vec::new();
+    for e in rd.filter_map(Result::ok) {
+        let Ok(name) = e.file_name().into_string() else {
+            continue;
+        };
+        if name.starts_with('.') {
+            continue;
+        }
+        if is_older_than(&e.path(), MAX_SPOOL_AGE) {
+            let _ = std::fs::remove_file(e.path());
+        } else {
+            names.push(name);
+        }
+    }
     if names.len() <= MAX_SPOOL_FILES {
         return;
     }
     names.sort();
     for name in &names[..names.len() - MAX_SPOOL_FILES] {
         let _ = std::fs::remove_file(dir.join(name));
+    }
+}
+
+/// A tab that never reopens never drains its directory: once per app start, prune every tab's
+/// directory by age and remove the ones left empty. Directories whose name is not a tab id are
+/// not Kex's and are left alone.
+fn sweep_spool(base: &Path) {
+    let Ok(rd) = std::fs::read_dir(base) else {
+        return;
+    };
+    for e in rd.filter_map(Result::ok) {
+        let is_tab = e.file_name().to_str().is_some_and(is_safe_tab_id);
+        if !is_tab || !e.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        let dir = e.path();
+        prune_spool(&dir);
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for tmp in rd.filter_map(Result::ok) {
+                let dot = tmp.file_name().to_string_lossy().starts_with('.');
+                if dot && is_older_than(&tmp.path(), ORPHAN_TMP_MAX_AGE) {
+                    let _ = std::fs::remove_file(tmp.path());
+                }
+            }
+        }
+        // Fails while the directory still holds events, which is the point.
+        let _ = std::fs::remove_dir(&dir);
     }
 }
 
@@ -1400,6 +1443,60 @@ mod tests {
             ]
         );
         assert!(!dir.path().join("tab-a").exists());
+    }
+
+    fn age(path: &Path, days: u64) {
+        let then = std::time::SystemTime::now() - Duration::from_secs(days * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(then)
+            .unwrap();
+    }
+
+    #[test]
+    fn the_hub_spool_drops_events_older_than_a_week() {
+        let dir = tempfile::tempdir().unwrap();
+        spool_event(dir.path(), "tab-age", "{\"n\":0}").unwrap();
+        let tab = dir.path().join("tab-age");
+        let old = std::fs::read_dir(&tab)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        age(&old, 8);
+        spool_event(dir.path(), "tab-age", "{\"n\":1}").unwrap();
+        let left: Vec<_> = std::fs::read_dir(&tab).unwrap().collect();
+        assert_eq!(left.len(), 1);
+        assert!(!old.exists());
+    }
+
+    #[test]
+    fn the_spool_sweep_removes_stale_and_empty_tab_directories_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        std::fs::create_dir(base.join("tab-empty")).unwrap();
+        std::fs::create_dir(base.join("tab-old")).unwrap();
+        let old = base.join("tab-old").join("0001-a.json");
+        std::fs::write(&old, "{}\n").unwrap();
+        age(&old, 8);
+        let tmp = base.join("tab-old").join(".0002-b.json.tmp");
+        std::fs::write(&tmp, "half").unwrap();
+        age(&tmp, 2);
+        std::fs::create_dir(base.join("tab-fresh")).unwrap();
+        std::fs::write(base.join("tab-fresh").join("0001-a.json"), "{}\n").unwrap();
+        std::fs::create_dir(base.join("not.a.tab")).unwrap();
+        std::fs::write(base.join("not.a.tab").join("x"), "keep").unwrap();
+        age(&base.join("not.a.tab").join("x"), 30);
+
+        sweep_spool(base);
+
+        assert!(!base.join("tab-empty").exists());
+        assert!(!base.join("tab-old").exists());
+        assert!(base.join("tab-fresh").join("0001-a.json").exists());
+        assert!(base.join("not.a.tab").join("x").exists());
     }
 
     #[test]
