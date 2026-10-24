@@ -196,6 +196,14 @@ fn write(path: &std::path::Path, text: &str) -> Result<(), String> {
     codex_trust::write_atomically(path, text).map_err(|e| format!("write {}: {e}", path.display()))
 }
 
+// Puts a file back as it was read: the same bytes, or no file when there was none.
+fn restore(path: &std::path::Path, before: Option<&str>) -> Result<(), String> {
+    match before {
+        Some(text) => write(path, text),
+        None => std::fs::remove_file(path).map_err(|e| format!("remove {}: {e}", path.display())),
+    }
+}
+
 /// Brings both files to their installed or removed state. Nothing is written unless both parse.
 /// With `create` false a missing file stays missing.
 fn apply(paths: &CodexPaths, install: bool, create: bool) -> Result<(), String> {
@@ -221,7 +229,14 @@ fn apply(paths: &CodexPaths, install: bool, create: bool) -> Result<(), String> 
                 write(&paths.config, t)?;
             }
             if let Some(t) = &hooks_write {
-                write(&paths.hooks, t)?;
+                if let Err(e) = write(&paths.hooks, t) {
+                    // Trust for handlers that are not there would leave a moved one untrusted.
+                    if config_write.is_some() {
+                        restore(&paths.config, config.as_deref())
+                            .map_err(|r| format!("{e}; restoring config.toml: {r}"))?;
+                    }
+                    return Err(e);
+                }
             }
         } else {
             if let Some(t) = &hooks_write {

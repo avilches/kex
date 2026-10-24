@@ -519,6 +519,44 @@ fn the_commands_support_hooks_exactly_on_unix() {
     assert_eq!(CodexPaths::from_env().unwrap().hooks_supported, cfg!(unix));
 }
 
+// hooks.json links into a read-only folder, so its write fails after config.toml's succeeded.
+#[cfg(unix)]
+fn with_unwritable_hooks(env: &Env, check: impl FnOnce()) {
+    use std::os::unix::fs::PermissionsExt;
+    let locked = env.paths.dir.parent().unwrap().join("locked");
+    std::fs::create_dir_all(&locked).unwrap();
+    let target = locked.join("hooks.json");
+    std::fs::rename(&env.paths.hooks, &target).unwrap();
+    std::os::unix::fs::symlink(&target, &env.paths.hooks).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(check));
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_failed_hooks_json_write_rolls_config_toml_back() {
+    let env = codex_env();
+    let hooks = read(&env.paths.hooks);
+    let config = read(&env.paths.config);
+    with_unwritable_hooks(&env, || {
+        let err = codex_integration::setup(&env.paths).unwrap_err();
+        assert!(err.contains("hooks.json"), "{err}");
+        assert_eq!(read(&env.paths.hooks), hooks);
+        assert_eq!(read(&env.paths.config), config);
+    });
+
+    let env = codex_env();
+    std::fs::remove_file(&env.paths.config).unwrap();
+    with_unwritable_hooks(&env, || {
+        assert!(codex_integration::setup(&env.paths).is_err());
+        assert!(!env.paths.config.exists());
+    });
+}
+
 #[test]
 fn a_missing_codex_dir_is_never_created() {
     let tmp = TempDir::new().unwrap();

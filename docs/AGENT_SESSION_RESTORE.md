@@ -91,7 +91,9 @@ Kex never creates it, so `agent_setup_codex` fails with a clear error until Code
   the install preview fail, the startup sync skips `codex` and keeps it tracked, and nothing is written.
 - Both files are read, planned and re-read just before writing; if another tool wrote in between the plan starts over
   (three attempts). On install the trust tables go in before the handlers, on uninstall they come out after them, so
-  Codex never sees a Kex handler without its trust.
+  Codex never sees a Kex handler without its trust. If the `hooks.json` write of an install fails after `config.toml`
+  was written, `config.toml` is put back as it was read (atomically, or removed if it did not exist), so a handler
+  another tool moved is not left with its new trust while it is still at the old position.
 
 ### KEX_TAB_ID
 
