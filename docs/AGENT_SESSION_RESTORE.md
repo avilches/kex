@@ -775,7 +775,7 @@ Session metadata that was previously accessible from the floating tab HoverCard 
 surfaced in the tab context menu (`TabAgentMenuItems`, rendered by `TabContextMenuItems`): Copy Tab ID for every tab, and
 for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
 with a `transcriptPath`). The two copy entries show the id they copy below their label. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
-`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger shows a check when it is on for a plain terminal, and the agent icon (struck through when it is off) for an agent. The path bar has no run-on-start icon; while
+`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger keeps the play icon and ends with the state: a check when it is on for a plain terminal (nothing when off), and the agent icon (struck through when it is off) for an agent. The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.
 
