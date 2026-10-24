@@ -688,10 +688,10 @@ src/
                                      shortcut that always picks it (`palette.folderRoot` Cmd+1 the workspace root,
                                      `palette.folderMain` Cmd+2 the main checkout of the current tab's repository,
                                      `palette.folderHome` Cmd+3 home; reassignable in Settings > Shortcuts > Palette).
-                                     A fixed row that does not exist is left out and the others keep their key; one that
-                                     sits on the same folder as the current tab is left out too, but a fixed row on
-                                     the same folder as another fixed row (root and main checkout, usually) is shown
-                                     twice, so a working key never points at a missing row. The key is drawn on the
+                                     A fixed row that does not exist is left out and the others keep their key; one
+                                     that exists is always shown, even on the same folder as the current tab or as
+                                     another fixed row (root and main checkout, usually), so a working key never
+                                     points at a missing row. The key is drawn on the
                                      row and the footer lists the other fixed rows. The shortcuts are live only while
                                      the folder palette is open (`shortcutsDisabled`), so Cmd+1..9 still jump to a
                                      workspace everywhere else, and reach the palette through `lib/paletteControl.ts`.
