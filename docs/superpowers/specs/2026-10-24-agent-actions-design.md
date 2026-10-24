@@ -17,40 +17,41 @@ Coding agents (`claude`, `codex`, `opencode`, `omp`, `pi`) should be launchable 
 - No running state, no stop button, no red zone, no `actionStateStore` entry for agents. A second click must never focus or reuse the first tab.
 - No backward compatibility, migration or fallback for the old `runInTerminal` boolean (project rule: users start from defaults, stored Actions in the old shape are dropped by normalization).
 - No second hardcoded list of agent names on the frontend: Rust `DEFAULT_AGENTS` (`src-tauri/src/modules/agent/launch_cmd.rs`) is the single source.
+- No templates, variables or value rules for agents.
 - Not a success if clicking an agent twice ends in one tab, if removing the seeded agents brings them back on the next launch, or if app and script behaviour regresses.
 
 ## Model
 
 Replace `Action.runInTerminal: boolean` (`src/modules/actions/lib/types.ts`) with `kind: "app" | "script" | "agent"`, everywhere (about 60 non-test uses in `src`, plus tests, docs and the glossary row in `CLAUDE.md`). Every place that branched on the boolean decides explicitly what an agent does; none may silently treat `agent` as `app`.
 
-Agent reuses: `command`, `appId`/`iconId`, `cwdMode`/`cwd` (same "Run in folder" choices as scripts: Home, Workspace root, Current tab folder, Absolute path), `ownButton`. Target comes from the command variables as for any Action (`actionTarget`).
+Agent reuses: `command`, `appId`/`iconId`, `cwdMode`/`cwd` (same "Run in folder" choices as scripts: Home, Workspace root, Current tab folder, Absolute path), `ownButton`.
+
+**An agent has no template.** Agents do not edit files or open directories, so there are no command variables: `command` is literal text (the binary plus any flags the user writes, such as `claude --model opus`), typed as is, and braces mean nothing. The only context an agent takes is its start folder. Consequences: no `{var}` handling, no variable chips or "Current Directory" labels in the modal, no expansion step, no value rejection (there are no values), and `actionTarget` is always "workspace", so an agent is shown in the Header always and never in the explorer, path bar or tab context menus.
 
 ## Execution
 
-Reuse the script path that opens a terminal tab in a resolved folder and writes the command (`useActionRunner`, `actionRun.ts`), minus everything stateful: no link to a previous tab (`linkFor`/`getActionTab`/`linkActionTab`), no `setScriptRunning`/`setScriptCommand`, no `scriptPaneId` reuse that implies a single tab. Each click calls the open-tab path again. Where the new tab goes (focused pane vs script pane) is left to the builder, with the constraint that it respects `workspacePaneLimit` the same way scripts do, and that a hibernated workspace behaves as for scripts. The same value rules as scripts apply (a script rejects `$`, quotes, backtick and backslash in variable values because they go to a shell; an agent command also goes to a shell, so the same rejection applies).
+Reuse the script path that resolves the start folder (`resolveScriptCwd`, `scriptCwdProblem`) and opens a terminal tab (`useActionRunner`, `actionRun.ts`), minus the template expansion and everything stateful: no link to a previous tab (`linkFor`/`getActionTab`/`linkActionTab`), no `setScriptRunning`/`setScriptCommand`, no `scriptPaneId` reuse that implies a single tab. Each click calls the open-tab path again. Where the new tab goes (focused pane vs script pane) is left to the builder, with the constraint that it respects `workspacePaneLimit` the same way scripts do, and that a hibernated workspace behaves as for scripts. The typed input is `command` verbatim plus `\r`. The command is refused when it is empty or holds control characters (newline included, so one click types exactly one line).
 
 ## Detection and presets
 
 - Rust: extend `editor_scan` (`src-tauri/src/modules/editors/`) so it also returns the agents found on PATH (`which`, same helper as editors), built from `DEFAULT_AGENTS`. The returned entry carries `binary` and a marker that it is an agent. Update `docs/IPC.md`.
-- Frontend: `suggestionsFromDetected` (`actions/lib/appSuggestions.ts`) yields for each enabled detected agent two presets, `{workspace}` and `{cwd}` (no `{filepath}`), with the agent kind, the icon from `modules/agents/lib/agentIcon.tsx` (fall back to the generic one for agents without a logo), and the same "installed presets stay out of the combo" rule (`hasCommandOf`, `presetOf`, `ownedAfterEdit` must understand the agent kind).
+- Frontend: for each enabled detected agent, two presets that differ only in the start folder, "Workspace" (`cwdMode: "workspace"`) and "Current directory" (`cwdMode: "context"`), with the agent kind, the icon from `modules/agents/lib/agentIcon.tsx` (fall back to the generic one for agents without a logo), and the same "installed presets stay out of the combo" rule (`hasCommandOf`, `presetOf`, `ownedAfterEdit` must understand the agent kind).
 - Detected agents are not editors: they must not appear in editor-only lists (Open in, external editors settings).
 
 ## First-time seeding
 
-After the first successful scan, for each detected agent, add the `{cwd}` variant globally (`globalActions.add`) with `ownButton: true` and `kind: "agent"`. A persisted preference flag (name left to the builder, in `settings/store.ts` with its default) is set after seeding so it happens once per machine, even if the user later deletes the Actions and restarts. If the scan finds no agents the flag is NOT set (so a later install can still seed once). Agents installed later only appear in the combo. Seeding must be idempotent under two windows scanning at once (the global actions queue already serializes writes) and must skip an agent whose command already exists.
+After the first successful scan, for each detected agent, add the "Current directory" variant (`cwdMode: "context"`) globally (`globalActions.add`) with `ownButton: true` and `kind: "agent"`. A persisted preference flag (name left to the builder, in `settings/store.ts` with its default) is set after seeding so it happens once per machine, even if the user later deletes the Actions and restarts. If the scan finds no agents the flag is NOT set (so a later install can still seed once). Agents installed later only appear in the combo. Seeding must be idempotent under two windows scanning at once (the global actions queue already serializes writes) and must skip an agent that already has an Action with the same (command, cwdMode).
 
 ## UI
 
 - Header (`ActionsBar`): agents go with the apps, before scripts. A single own button of a detected agent is drawn icon-only like apps. Never shows a running or stop state.
 - Settings > Actions: each column gets three lists (scripts, apps, agents) that do not mix when reordering; the Add combo creates the kind from the chosen preset; the kind cannot change afterwards (delete and recreate), as today. The modal shows "Run in folder" for agents as for scripts.
 - Drag and drop (`actionDrop.ts`, `barOps.ts`): agents are their own type; the bar has a zone per type and scope as already done for apps and scripts, and a zone only admits its own type.
-- Context menus (`RowActionsMenu`, `contextActionEntries.ts`): agents follow their target (folder agents in folder menus).
+- Context menus (`RowActionsMenu`, `contextActionEntries.ts`): agents never appear (their target is workspace).
 
-## Variants of a preset (decided after the builder check)
+## Variants of a preset (decided after the builder check and a correction from the user)
 
-The command of an agent is the bare binary (`claude`), never with a path argument. The two variants differ only in the start folder: `{workspace}` is `cwdMode: "workspace"` (Workspace root) and `{cwd}` is `cwdMode: "context"` (Current tab folder, the same mode scripts already have). So the identity of an installed agent preset is the pair (command, cwdMode), not the command alone: `hasCommandOf`, `presetOf`, `uninstalledSuggestions` and `ownedAfterEdit` compare both for agents, and installing one variant leaves the other in the combo. Seeding compares the same pair.
-
-Visibility in the Header follows the start folder, as for scripts: a `workspace` agent is always shown (grey with "Set a root to this workspace" when there is no root), a `context` agent needs a terminal tab focused to know its folder, exactly like a script with Run in Current tab folder; the builder reuses the script rule and must check what `actionTarget` and the Header filter do for a script with that mode, and keep agents consistent with it. Preset names show the variant the way app presets do (`Claude Code {cwd}`).
+The command of a preset is the bare binary (`claude`). The two variants differ only in the start folder: "Workspace" is `cwdMode: "workspace"` and "Current directory" is `cwdMode: "context"` (the folder of the focused tab, falling back to the workspace folder when there is none, as scripts already do). The identity of an installed agent preset is the pair (command, cwdMode), so installing one variant leaves the other in the combo: `hasCommandOf`, `presetOf`, `uninstalledSuggestions` and `ownedAfterEdit` compare both for agents. Seeding compares the same pair. Preset names carry no `{var}`; the variant shows in the second line of the name (the folder it starts in), the way Actions already show a subtitle.
 
 ## Constraints
 
