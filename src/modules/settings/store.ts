@@ -216,6 +216,7 @@ export type Preferences = {
   detectedEditors: DetectedEditor[];
   // Global Actions, available in every workspace. Each workspace has its own on top.
   actions: Action[];
+  agentActionsSeeded: boolean;
   randomWorkspaceColor: boolean;
   workspaceDetailTerminalsEnabled: boolean;
   workspaceDetailTerminals: TerminalDetail;
@@ -326,6 +327,7 @@ const KEY_SHORTCUTS = "shortcuts";
 // Tools store keys
 const KEY_DETECTED_EDITORS = "tools";
 const KEY_ACTIONS = "actions";
+const KEY_AGENT_ACTIONS_SEEDED = "agentActionsSeeded";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -486,6 +488,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scratchpadEnterSends: true,
   detectedEditors: [],
   actions: [],
+  agentActionsSeeded: false,
   randomWorkspaceColor: true,
   workspaceDetailTerminalsEnabled: true,
   workspaceDetailTerminals: "all",
@@ -787,6 +790,8 @@ export async function loadPreferences(): Promise<Preferences> {
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
     })(),
     actions: normalizeActions(getTools<unknown>(KEY_ACTIONS)),
+    agentActionsSeeded:
+      getTools<boolean>(KEY_AGENT_ACTIONS_SEEDED) ?? DEFAULT_PREFERENCES.agentActionsSeeded,
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
@@ -1137,6 +1142,10 @@ export async function setGlobalActions(value: Action[]): Promise<void> {
   await writeToolsPref(KEY_ACTIONS, normalizeActions(value));
 }
 
+export async function setAgentActionsSeeded(value: boolean): Promise<void> {
+  await writeToolsPref(KEY_AGENT_ACTIONS_SEEDED, value);
+}
+
 export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
@@ -1428,6 +1437,7 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_ACTIONS]: "actions",
+  [KEY_AGENT_ACTIONS_SEEDED]: "agentActionsSeeded",
 };
 
 const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {

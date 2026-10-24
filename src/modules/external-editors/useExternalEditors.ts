@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { native } from "@/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setDetectedEditors } from "@/modules/settings/store";
+import { planAgentSeed } from "@/modules/actions/lib/agentSeed";
+import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
+import { setAgentActionsSeeded, setDetectedEditors } from "@/modules/settings/store";
 import type { DetectedEditor } from "./types";
 
 // Module-level scanning state - not persisted; each webview tracks its own spinner.
@@ -41,6 +43,18 @@ export function mergeEnabled(
   });
 }
 
+// The plan is computed from the live flag and the live Actions right before the writes, which go
+// through the serialized queue. A partial failure leaves the flag false and the next scan only
+// adds what is still missing. Two windows scanning inside the same store echo delay can still
+// both seed: the preferences store has no cross-window compare-and-set to close that.
+async function seedAgentActions(agents: DetectedEditor[]): Promise<void> {
+  const seeded = usePreferencesStore.getState().agentActionsSeeded;
+  if (seeded || !agents.some((a) => a.enabled !== false)) return;
+  const plan = planAgentSeed({ seeded, agents, existing: globalActions.get() });
+  await Promise.all(plan.map((a) => globalActions.add(a)));
+  await setAgentActionsSeeded(true);
+}
+
 /** Run a full editor scan and persist results, preserving user-set enabled flags. */
 export async function runEditorScan(): Promise<void> {
   if (scanning) return;
@@ -49,7 +63,9 @@ export async function runEditorScan(): Promise<void> {
   try {
     const result = await native.editorScan();
     const existing: DetectedEditor[] = usePreferencesStore.getState().detectedEditors;
-    await setDetectedEditors(mergeEnabled(result, existing));
+    const merged = mergeEnabled(result, existing);
+    await setDetectedEditors(merged);
+    await seedAgentActions(merged.filter((e) => e.kind === "agent"));
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {
