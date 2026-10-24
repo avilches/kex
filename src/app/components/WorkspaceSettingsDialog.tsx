@@ -182,7 +182,6 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
               open={templatesOpen}
               onToggle={() => setTemplatesOpen((o) => !o)}
               subject="workspace"
-              listClassName="max-h-44 overflow-y-auto"
               tab={focusedTab(ws.paneTree, ws.activePaneId)}
               workspace={{ id: ws.id, cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }}
               getInput={() => nameInputRef.current}
@@ -193,97 +192,101 @@ function WorkspaceSettingsForm({ ws, initialFocus, onRequestClose, ...props }: F
             />
           </div>
 
-          {/* Working Directory */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="workspace-root" className="text-xs font-medium">Workspace Root</label>
-            <div className="flex items-center gap-1">
-              <input
-                id="workspace-root"
-                ref={cwdInputRef}
-                className={cn(
-                  INPUT_CLASS,
-                  "flex-1",
-                  cwdValid === false && "border-destructive",
+          {!templatesOpen && (
+<>
+            {/* Working Directory */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="workspace-root" className="text-xs font-medium">Workspace Root</label>
+              <div className="flex items-center gap-1">
+                <input
+                  id="workspace-root"
+                  ref={cwdInputRef}
+                  className={cn(
+                    INPUT_CLASS,
+                    "flex-1",
+                    cwdValid === false && "border-destructive",
+                  )}
+                  spellCheck={false}
+                  value={cwdValue}
+                  onChange={(e) => setCwdValue(e.target.value)}
+                  onBlur={() => {
+                    const normalized = normalizeRootPath(cwdValue);
+                    if (normalized !== cwdValue) setCwdValue(normalized);
+                    if (!normalized) {
+                      props.onSetWorkspaceRoot(ws.id, undefined);
+                    } else if (cwdValid !== false) {
+                      props.onSetWorkspaceRoot(ws.id, normalized);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); onRequestClose(); }
+                  }}
+                  placeholder="Not set"
+                />
+                {cwdValue && (
+                  <button
+                    type="button"
+                    title="Clear"
+                    onClick={() => {
+                      setCwdValue("");
+                      setCwdValid(null);
+                      props.onSetWorkspaceRoot(ws.id, undefined);
+                    }}
+                    className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                  </button>
                 )}
-                spellCheck={false}
-                value={cwdValue}
-                onChange={(e) => setCwdValue(e.target.value)}
-                onBlur={() => {
-                  const normalized = normalizeRootPath(cwdValue);
-                  if (normalized !== cwdValue) setCwdValue(normalized);
-                  if (!normalized) {
-                    props.onSetWorkspaceRoot(ws.id, undefined);
-                  } else if (cwdValid !== false) {
-                    props.onSetWorkspaceRoot(ws.id, normalized);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); onRequestClose(); }
-                }}
-                placeholder="Not set"
-              />
-              {cwdValue && (
                 <button
                   type="button"
-                  title="Clear"
-                  onClick={() => {
-                    setCwdValue("");
-                    setCwdValid(null);
-                    props.onSetWorkspaceRoot(ws.id, undefined);
+                  title="Browse"
+                  onClick={async () => {
+                    const selected = await openFolderDialog({
+                      directory: true,
+                      defaultPath: cwdValue || undefined,
+                    });
+                    if (typeof selected === "string") {
+                      const normalized = toForwardSlashes(selected);
+                      setCwdValue(normalized);
+                      setCwdValid(null);
+                      props.onSetWorkspaceRoot(ws.id, normalized);
+                    }
                   }}
                   className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                  <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
                 </button>
+              </div>
+              {cwdValid === false && (
+                <p className="text-[11px] text-destructive">Folder does not exist</p>
               )}
-              <button
-                type="button"
-                title="Browse"
-                onClick={async () => {
-                  const selected = await openFolderDialog({
-                    directory: true,
-                    defaultPath: cwdValue || undefined,
-                  });
-                  if (typeof selected === "string") {
-                    const normalized = toForwardSlashes(selected);
-                    setCwdValue(normalized);
-                    setCwdValid(null);
-                    props.onSetWorkspaceRoot(ws.id, normalized);
-                  }
-                }}
-                className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
-              </button>
+              <p className="text-[11px] text-muted-foreground/60">
+                Tip: right-click any folder in the explorer and choose &quot;Set as Workspace Root&quot;
+              </p>
             </div>
-            {cwdValid === false && (
-              <p className="text-[11px] text-destructive">Folder does not exist</p>
-            )}
-            <p className="text-[11px] text-muted-foreground/60">
-              Tip: right-click any folder in the explorer and choose &quot;Set as Workspace Root&quot;
-            </p>
-          </div>
 
-          {/* Color */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">Color</span>
-            <ColorPicker
-              wsId={ws.id}
-              wsColor={ws.color}
-              displayColor={displayColor}
-              onSetColor={props.onSetColor}
-            />
-          </div>
+            {/* Color */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium">Color</span>
+              <ColorPicker
+                wsId={ws.id}
+                wsColor={ws.color}
+                displayColor={displayColor}
+                onSetColor={props.onSetColor}
+              />
+            </div>
 
-          {/* Icon */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">Icon</span>
-            <IconPaletteGrid
-              layout="inline"
-              value={ws.icon}
-              onSelect={(icon) => props.onSetIcon(ws.id, icon)}
-            />
-          </div>
+            {/* Icon */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium">Icon</span>
+              <IconPaletteGrid
+                layout="inline"
+                value={ws.icon}
+                onSelect={(icon) => props.onSetIcon(ws.id, icon)}
+              />
+            </div>
+            </>
+          )}
         </div>
     </div>
   );
