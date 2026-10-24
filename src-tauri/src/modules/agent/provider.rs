@@ -425,17 +425,24 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     None
 }
 
+// Codex's session_meta embeds the instructions and can be tens of KB; the cap bounds what a
+// corrupt rollout with no newline could make Kex read.
+const HEADER_LINE_CAP: usize = 1024 * 1024;
+
 fn scan_header_line(jsonl: &Path, line_no: usize) -> Option<String> {
     let file = std::fs::File::open(jsonl).ok()?;
     let mut reader = std::io::BufReader::new(file);
-    let mut line = String::new();
+    let mut line = Vec::new();
     for _ in 0..line_no {
         line.clear();
-        if reader.read_line(&mut line).ok()? == 0 {
+        let read = std::io::Read::take(&mut reader, HEADER_LINE_CAP as u64 + 1)
+            .read_until(b'\n', &mut line)
+            .ok()?;
+        if read == 0 || line.len() > HEADER_LINE_CAP {
             return None;
         }
     }
-    let obj = serde_json::from_str::<serde_json::Value>(&line).ok()?;
+    let obj = serde_json::from_slice::<serde_json::Value>(&line).ok()?;
     let header = match obj.get("type").and_then(|t| t.as_str()) {
         Some("session") => &obj,
         Some("session_meta") => obj.get("payload")?,
@@ -885,6 +892,39 @@ mod tests {
             provider.cwd_read.read_launch_cwd(&jsonl),
             Some("/tmp/proj".to_string())
         );
+    }
+
+    fn session_meta_line(padding: usize) -> String {
+        format!(
+            "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"{CODEX_ID}\",\"cwd\":\"/tmp/proj\",\"instructions\":\"{}\"}}}}\n",
+            "x".repeat(padding)
+        )
+    }
+
+    #[test]
+    fn a_long_session_meta_line_is_read_up_to_the_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        let line = session_meta_line(64 * 1024);
+        std::fs::write(&jsonl, format!("{line}{{\"type\":\"response_item\"}}\n")).unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), Some("/tmp/proj".to_string()));
+
+        let at_cap = session_meta_line(0);
+        let at_cap = session_meta_line(HEADER_LINE_CAP - at_cap.len());
+        assert_eq!(at_cap.len(), HEADER_LINE_CAP);
+        std::fs::write(&jsonl, &at_cap).unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), Some("/tmp/proj".to_string()));
+    }
+
+    #[test]
+    fn a_header_line_longer_than_the_cap_is_unreadable() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        let line = session_meta_line(HEADER_LINE_CAP);
+        std::fs::write(&jsonl, format!("{line}{{\"type\":\"response_item\"}}\n")).unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), None);
+        std::fs::write(&jsonl, line.trim_end()).unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), None);
     }
 
     #[test]

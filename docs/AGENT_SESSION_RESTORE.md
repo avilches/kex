@@ -303,6 +303,8 @@ The provider row (`provider.rs`) reads Codex's own files and nothing else:
   shell is not seen by a Kex started from the Dock; the recorded `transcript_path` covers that case when Codex sends it.
 - **Launch cwd.** Line 1 of a rollout is `{"type":"session_meta","payload":{"id":...,"cwd":...}}`;
   `CwdRead::HeaderLine(1)` reads `payload.cwd` from it (the same reader takes OMP's and Pi's `{type:"session", cwd}`).
+  `session_meta` carries the instructions and can be tens of KB, so each header line is read up to 1 MiB and a longer
+  one counts as unreadable (the recorded launch directory is used instead).
 - **Resume.** `codex resume '<id>'` on top of the stripped launch line. The codex row keeps `-p`/`--profile`,
   `-m`/`--model`, `--local-provider` and `--oss`, so `codex -p work -m o3` resumes as
   `codex -p work -m o3 resume '<id>'` (Codex 0.163 parses those options before the subcommand; that it applies them to
