@@ -19,7 +19,8 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
-import { buildCommandVars } from "./commandVars";
+import { buildCommandVars, inWorktree } from "./commandVars";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
   pickRunnableAction,
@@ -90,7 +91,8 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
 }
 
 function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
-  const focused = focusedTab(ws.paneTree, ws.activePaneId);
+  const tab = focusedTab(ws.paneTree, ws.activePaneId);
+  const focused = inWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null);
   const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {

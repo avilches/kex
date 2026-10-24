@@ -7,7 +7,8 @@ import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
-import { buildCommandVars } from "./commandVars";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { buildCommandVars, inWorktree } from "./commandVars";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { CommandShell } from "./commandTemplate";
 import type { FocusPlace } from "./actionsBar";
@@ -21,7 +22,9 @@ export function useActionContext(
 ): ActionContext | null {
   const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
-  const focused = ws ? focusedTab(ws.paneTree, ws.activePaneId) : null;
+  const tab = ws ? focusedTab(ws.paneTree, ws.activePaneId) : null;
+  const worktree = useAgentStore((s) => (tab ? (s.sessions[tab.id]?.meta?.worktreeCwd ?? null) : null));
+  const focused = useMemo(() => inWorktree(tab, worktree), [tab, worktree]);
   const dir = ws ? workspaceDir(ws, focused) : undefined;
   // The focused tab owns the folder: a command that ends in it can have changed the branch.
   const info = useDirGit(dir, focused?.id);
