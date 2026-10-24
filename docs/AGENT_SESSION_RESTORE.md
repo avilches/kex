@@ -22,10 +22,13 @@ The feature has three cooperating parts:
 
 ### Prerequisites
 
-Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifications` preference in Settings
-(General > Coding agent notifications) is the master control: enabling it calls `agent_enable_claude_hooks`; disabling
-it calls `agent_disable_claude_hooks`. Both commands are idempotent. On every startup, if `agentNotifications` is
-true, `agent_enable_claude_hooks` is called silently to repair any missing or outdated hooks.
+Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifications` preference is the master
+switch, but it has no control of its own in Settings: it is set to `true` by installing the Claude Code integration
+(Settings > General > Agents, the bell, or the install toast) and to `false` by uninstalling it, and the install and
+uninstall commands (`agent_enable_claude_hooks`, `agent_disable_claude_hooks`) are idempotent. On every startup,
+`main.tsx` calls `agent_enable_claude_hooks` when the preference is `true` and `agent_disable_claude_hooks` when it is
+`false`, so any missing or outdated hooks are repaired silently. With it `false` no toast, operating system
+notification or bell row is produced either (`route.ts`).
 
 OpenCode, OMP and Pi are wired by file instead of by a settings merge. Kex writes one script into the agent's own
 config folder, and the agent's process loads it: `agent_setup_opencode` writes
