@@ -166,11 +166,14 @@ export function TabAgentMenuItems({
       {process}
       {children}
       {integration.mode === "install" && (
-        <ContextMenuItem onSelect={() => void installWithToast(integration.agent)}>
+        <ContextMenuItem
+          className="text-primary focus:text-primary"
+          onSelect={() => void installWithToast(integration.agent)}
+        >
           <HugeiconsIcon icon={PlugSocketIcon} size={14} strokeWidth={2} />
           <span className="min-w-0">
             Install {AGENT_LABELS[integration.agent]} integration
-            <ValueHint value="Session, model and transcript need it" />
+            <ValueHint value="Restore session, transcript and notifications" />
           </span>
         </ContextMenuItem>
       )}
