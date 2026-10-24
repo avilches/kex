@@ -201,7 +201,7 @@ entera. Cuando el usuario envía el siguiente prompt, `trigger-event.sh` reenví
 
 ## Zero cost when idle
 
-El detector del canal 1 corre enteramente en el filtro de bytes del PTY. El listener del canal 2 (un hilo por PTY,
+El detector del canal 1 corre enteramente en el filtro de bytes del PTY. El listener del canal 2 (un unico hilo para toda la app,
 bloqueado en `accept()`) tampoco hace trabajo mientras no llega ningún hook. En ninguno de los dos casos hay timers
 ni peticiones en background cuando no hay ningún agente corriendo.
 
