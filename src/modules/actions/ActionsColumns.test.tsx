@@ -226,6 +226,22 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
+  it("Enter in the name field saves what is typed and closes the modal", () => {
+    const { container, g, unmount } = mount([saved]);
+    click(pencil(container));
+    act(() => nameField()!.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(nameField()!, "Server");
+      nameField()!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(g.onUpdate).not.toHaveBeenCalled();
+    act(() => nameField()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(nameField()).toBeNull();
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ name: "Server" }));
+    unmount();
+  });
+
   it("flags an empty command and saves nothing for it", () => {
     const { container, g, unmount } = mount([saved]);
     click(pencil(container));
