@@ -21,6 +21,8 @@ type Props = {
   children: ReactNode;
 };
 
+const OPEN_GRACE_MS = 300;
+
 // The rename field of a tab, shared by the pane tab and the sidebar row. Both
 // mount one; only the one whose origin matches the store opens.
 export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRenameTab, children }: Props) {
@@ -31,9 +33,12 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const handledRef = useRef(false);
+  const openedAtRef = useRef(0);
 
   useEffect(() => {
-    if (isRenaming) handledRef.current = false;
+    if (!isRenaming) return;
+    handledRef.current = false;
+    openedAtRef.current = performance.now();
   }, [isRenaming]);
 
   function handleSave() {
@@ -52,6 +57,14 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
 
   function handleBlur(e: React.FocusEvent) {
     if (popoverRef.current?.contains(e.relatedTarget as Node | null)) return;
+    // Right after opening, the context menu closing hands focus back to the terminal
+    // of the pane (a deferred requestLeafFocus). That is not the user leaving the
+    // field, so take the focus back instead of saving and closing.
+    if (performance.now() - openedAtRef.current < OPEN_GRACE_MS) {
+      const input = e.currentTarget as HTMLInputElement;
+      requestAnimationFrame(() => input.focus());
+      return;
+    }
     handleSave();
   }
 
@@ -82,8 +95,8 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
       {children}
       <PopoverContent
         ref={popoverRef}
-        side="bottom"
-        align="start"
+        side={origin === "sidebar" ? "right" : "bottom"}
+        align={origin === "sidebar" ? "center" : "start"}
         sideOffset={4}
         className={`flex flex-col gap-1 rounded-lg p-2 ${templatesOpen ? "w-[420px]" : "w-64"}`}
         onEscapeKeyDown={(e) => {

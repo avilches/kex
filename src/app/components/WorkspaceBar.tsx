@@ -658,6 +658,7 @@ function SortableWorkspaceItem({
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
       >
+        <span className="px-0.5 text-[12px] text-muted-foreground">Rename workspace</span>
         <input
           ref={inputRef}
           type="text"
