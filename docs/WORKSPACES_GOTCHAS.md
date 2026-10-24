@@ -890,6 +890,8 @@ El socket de hooks se llamaba `kex-ipc-<pty_id>.sock` y vive en un directorio po
 
 El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, de forma que dos instancias vivas nunca comparten ruta. La primera vez que se construye una ruta se borran los `kex-ipc-<pid>-*.sock` cuyo pid ya no existe (`kill(pid, 0)` con ESRCH); los de pids vivos y los ficheros que no encajan en el patron no se tocan (`orphaned_sockets`, funcion pura con tests). Los sockets del formato antiguo `kex-ipc-<n>.sock` que ya hubiera en disco no se barren (no hay migracion); se borran a mano con `rm $TMPDIR/kex-ipc-$(id -u)/kex-ipc-[0-9]*.sock`.
 
+Desde TASK-736 hay un solo socket por proceso, `kex-ipc-<pid>.sock`, y no uno por PTY; el pid en el nombre sigue siendo lo que separa las instancias, y el barrido de pids muertos es el mismo. Los `kex-ipc-<pid>-<pty_id>.sock` que deje una version anterior no encajan en el patron nuevo y no se barren.
+
 ### Leccion
 
 Un recurso con nombre derivado de un contador por proceso no es unico en una ruta compartida entre procesos. Si varias instancias de la app pueden convivir (instalada y dev), el nombre debe incluir algo propio del proceso, y borrar por ruta solo es seguro si esa ruta no la puede usar nadie mas.

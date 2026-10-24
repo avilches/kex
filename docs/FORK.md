@@ -207,7 +207,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
   `session` header on JSONL line 2; `--resume <id>`; `KeepWithoutPlan`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
-  (`agent_setup_omp`, marker `kex-agent-status-v4`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
+  (`agent_setup_omp`, marker `kex-agent-status-v6`, shared with Pi), which translates `session_start`/`session_switch` (the session is reported before any prompt), `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
   assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
   inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the
@@ -242,7 +242,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   The integration is reported unavailable on Windows until its POSIX hook command is measured there. Resume keeps
   `-p`/`--profile`, `-m`/`--model`, `--local-provider` and `--oss`, never the sandbox or approval options nor
   `-c`/`--config`, which can set either; a kept option needs a value that is a plain shell word (no `$`, backtick,
-  backslash or other expansion), or it is dropped. `trigger-event.sh` is `kex-session-v12`, takes the agent name as its first argument and, for `codex` only, reads a
+  backslash or other expansion), or it is dropped. `trigger-event.sh` is `kex-session-v13`, takes the agent name as its first argument and, for `codex` only, reads a
   snake_case event name as its PascalCase form (as `pty/ipc.rs` does), because Codex's casing is unmeasured. The Codex icon is an original
   inline monochrome mark, and the tab menu hides the transcript actions when the frame named no rollout. The
   `MissingTranscriptPolicy::KeepWithoutPlan` value came with it (see the rollouts entry). Nothing was run against a
@@ -255,7 +255,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `~/.config/opencode/plugins/opencode-session.js` (`agent_setup_opencode`, bell popover button): it turns the session lifecycle
   (`session.created`, `session.status`, `session.idle`, `permission.asked`, `question.asked`, `session.error`) into the
   same IPC frames Claude's hooks send, with `agent: opencode`, gated on Kex's env vars and inert outside them. The socket payload gained an optional `agent` field (frames without it are still `claude`), and
-  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude` (it is `kex-session-v12` now: the tag is the script's first argument, `claude` when absent, which is how Codex's handlers tag theirs). A TUI restored with
+  `trigger-event.sh` was bumped to `kex-session-v7` to tag its own frames with `agent: claude` (it is `kex-session-v13` now: the tag is the script's first argument, `claude` when absent, which is how Codex's handlers tag theirs). A TUI restored with
   `--session` fires no `session.created` (anomalyco/opencode#39711), so the plugin registers the session on the first
   event that names it; opencode records are never pruned.
 - **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
@@ -278,6 +278,10 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   the Workspace/Panel model each panel gets and keeps its own slot; eviction no longer applies.
 - **`TERMINAL_ID` env var** - injected into the shell environment at PTY spawn (both Unix and Windows). Available to
   shell scripts and tools running inside the terminal.
+- **`KEX_PTY_ID` env var** - the same PTY id under the `KEX_` prefix, injected next to `TERMINAL_ID`. The hook script
+  and the OpenCode, OMP and Pi integrations put it in every frame as `pty_id`, next to `tab_id` from `KEX_TAB_ID`,
+  because the app has a single hook socket for every tab (TASK-736) and must tell a frame of the tab's current PTY
+  from a late one of the PTY it ran on before a restart.
 - **`KEX_PANEL_ID` env var** (formerly `TERAX_PANEL_ID`) - UUID injected into each PTY shell at spawn. Used by session
   persistence hooks to associate an agent session with a specific terminal panel across restarts.
 - **App env var prefix renamed to `KEX_`** - all shell integration env vars (`TERAX_TERMINAL`, `TERAX_BLOCKS`,

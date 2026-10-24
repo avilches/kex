@@ -1007,6 +1007,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                pty::shutdown_hook_server();
+                return;
+            }
             // Dock icon click with no open windows: open a new window.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {

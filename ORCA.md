@@ -143,7 +143,7 @@ below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
 through the PTY stream instead; once the socket migration (`2145a981`,
 `ed14289f`) left nothing emitting it, that parser was deleted from
 `agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
-channel. The current mechanism is marked `kex-session-v12` inside the hook
+channel. The current mechanism is marked `kex-session-v13` inside the hook
 script itself (`SESSION_HOOK_SCRIPT_VERSION` in `agent/mod.rs`).
 
 ### 2.1 OSC still in use
@@ -187,10 +187,13 @@ const SESSION_HOOK_EVENTS: [&str; 10] = [
 ];
 ```
 
-`trigger-event.sh` reads the hook's JSON from stdin and forwards it, byte for
-byte, over a **Unix domain socket, one per PTY**
-(`src-tauri/src/modules/pty/ipc.rs::socket_path_for_pty_id`, path
-`kex-ipc-<pid>-<pty_id>.sock` in the per-user `kex-ipc-<uid>` directory, passed to the child as `KEX_IPC`):
+`trigger-event.sh` reads the hook's JSON from stdin, tags it with `agent`,
+`tab_id` and `pty_id` (the last two from `KEX_TAB_ID` and `KEX_PTY_ID`, set
+last so the payload cannot choose them) and forwards it over **one Unix domain
+socket for the whole app** (TASK-736: `src-tauri/src/modules/pty/ipc.rs::hook_socket`,
+path `kex-ipc-<pid>.sock` in the per-user `kex-ipc-<uid>` directory, passed to
+every terminal as `KEX_IPC`), much like Orca's single server with
+`ORCA_PANE_KEY` in the body:
 
 ```bash
 send_ipc() {
@@ -204,13 +207,15 @@ If both `nc` and the `python3` fallback fail, the script appends the payload to
 `~/.config/kex/spool/<tab_id>/<timestamp>-<pid>-<random>.json`, one file per
 event, written under a dot name and renamed into place (nothing is ever
 rewritten; capped at 200 files and 7 days of file age, oldest deleted first; directory 0700, files 0600) and exits 0;
-the listener replays the files in name order and removes each one when it
-starts (`ipc.rs::drain_spool`, which skips stale `SessionEnd` and
-`StopFailure`). This is TASK-730 and TASK-896, done.
+the hub replays the files in name order and removes each one when the tab
+registers its PTY (`ipc.rs::drain_spool`, which skips stale `SessionEnd` and
+`StopFailure`). The hub writes to the same spool itself when a frame names a
+tab that has no PTY right now. This is TASK-730, TASK-896 and TASK-736, done.
 
-The listener (`ipc.rs::run_listener`, `#![cfg(unix)]`, so **this whole path
-is absent on native Windows**, see TASK-731) reads one line per connection
-and dispatches: `SessionStart` calls `session_store::record_session(...)`,
+The listener (`ipc.rs::HookServer`, one thread, `#![cfg(unix)]`, so **this
+whole path is absent on native Windows**, see TASK-731) reads one line per
+connection and hands it to `HookHub::handle_line`, which routes it by
+`tab_id`/`pty_id` (`pty/hook_router.rs`) and dispatches: `SessionStart` calls `session_store::record_session(...)`,
 everything else re-emits as a generic `kex:agent-signal` Tauri event consumed
 by React.
 
@@ -283,8 +288,9 @@ was removed). Still open:
 
 - No cross-platform transport: the Unix-socket + bash-script combination does
   not run on native Windows (TASK-731, depends on TASK-736).
-- One socket and one listener thread per PTY, no per-connection auth: a
-  process of the same user can send forged events (TASK-736).
+- No per-connection auth: a process of the same user can still send forged
+  events for any tab. TASK-736 replaced the socket per PTY with one listener
+  for the app but kept the Unix socket, with no token (see its notes).
 - Hook events are written to `settings.json` without checking the installed
   Claude Code version (TASK-893).
 - The hook script prints nothing to stdout, Orca prints `{}` first (TASK-894).
@@ -321,7 +327,7 @@ Open, by suggested order:
 | TASK-893 | Register only the hook events the installed Claude Code version knows | High | none |
 | TASK-894 | `trigger-event.sh` prints `{}` to stdout first | Low | none |
 | TASK-895 | Decide whether to forward more events (measure cost first) | Low | TASK-893 |
-| TASK-736 | One hook server for the whole app instead of one socket per tab | Medium | none |
+| TASK-736 | One hook server for the whole app instead of one socket per tab (done: one Unix listener, no token) | Medium | none |
 | TASK-731 | Agents on native Windows | Low | TASK-736 |
 | TASK-738 | `statusLine` for usage limits (user already has their own) | Low | TASK-736 |
 | TASK-737 | Last assistant message on dormant sessions | Medium | none |
@@ -373,7 +379,7 @@ Code used was 2.1.310 (`claude --version`).
   script today and exits 0 without writing anything.
 - **Socket hardening is already in place.** `ipc.rs::runtime_dir` uses
   `XDG_RUNTIME_DIR` or a `kex-ipc-<uid>` directory created with mode 0700 and
-  refuses one owned by someone else (commit `490f1fc7`); `spawn_listener`
+  refuses one owned by someone else (commit `490f1fc7`); `HookServer::start`
   forces the socket file to 0600. A process of the same user can still connect.
 - **`statusLine` is single-slot and this machine already uses it.**
   `~/.claude/settings.json` has
@@ -388,8 +394,9 @@ Code used was 2.1.310 (`claude --version`).
 - **Kex terminals do not outlive the app.** Kex opens PTYs in-process with
   `portable-pty` (`pty/session.rs`), there is no daemon, and
   `docs/WORKSPACES.md` says the agent and its resume command die with the PTY;
-  a session comes back with `claude --resume` in a new PTY, which gets a fresh
-  `KEX_IPC`. Inferred from those, not from reading the app-exit code. That is why Orca's endpoint file (`ORCA_AGENT_HOOK_ENDPOINT`,
+  a session comes back with `claude --resume` in a new PTY, which gets
+  `KEX_IPC` again. Inferred from those, not from reading the app-exit code. That is why Orca's endpoint file (`ORCA_AGENT_HOOK_ENDPOINT`,
   needed because its terminals outlive the app) buys little for Kex; the
-  reasons for TASK-736 are one listener instead of N, tab identity in the
-  payload, a token, and a shared base for Windows and `statusLine`.
+  reasons for TASK-736 were one listener instead of N, tab identity in the
+  payload, a token, and a shared base for Windows and `statusLine`; it shipped
+  the first two and a transport-free router, not the token.

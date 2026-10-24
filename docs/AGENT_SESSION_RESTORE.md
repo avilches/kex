@@ -124,7 +124,7 @@ extracted from the npm releases). When the version cannot be read, only the six 
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
 a downgrade removes Kex's hook from the events the older Claude does not know. Uninstalling removes Kex's hook from
 every known event whatever the installed version. `agent_claude_hooks_status` expects the events of the installed
-version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v12` since the script spools undelivered events as one file per event.
+version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v13` since every frame names its tab and PTY (`tab_id`, `pty_id`) for the app's single socket.
 
 ### SessionStart hook
 
@@ -134,7 +134,7 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v12`) handles all 11 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v13`) handles all 11 registered Claude Code
 hook events the same way:
 
 0. Prints `{}` and a newline on stdout before anything else, early exits and a failed socket send included: some
@@ -143,7 +143,8 @@ hook events the same way:
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits (tab is not managed by
    Kex), still after printing `{}`.
 2. Uses `jq` to re-serialize the payload tagged with `"agent"` set to the script's first argument, `claude` when
-   there is none (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
+   there is none, and with `tab_id` and `pty_id` set from `KEX_TAB_ID` and `KEX_PTY_ID` (added last, so a field of the
+   same name in the agent's payload is overwritten, never trusted) (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
    pass `codex`; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract
    `hook_event_name`, only to pick the handler. For `codex` only, a snake_case name (`session_start`,
    `user_prompt_submit`, `stop`, `permission_request`, `subagent_start`, `subagent_stop`) is turned into its PascalCase
@@ -154,11 +155,12 @@ hook events the same way:
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
    without rotation (TASK-557); removed with no replacement since nothing depended on it.
-3. Forwards the JSON payload, re-serialized by the `agent` tag, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+3. Forwards the JSON payload, re-serialized with those tags, to the app's single socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
    falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, the
    event is spooled (below); if `KEX_IPC` is unset it is silently dropped.
-4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
-   directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
+4. `pty/ipc.rs`, one listener thread for the whole app on `kex-ipc-<pid>.sock`, reads the line and routes it by
+   its `tab_id`/`pty_id` (`pty/hook_router.rs`, see `docs/IPC.md` for the `Live`/`Late`/`Spool` routes), then reads the
+   JSON directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
    `SessionEnd`, `PermissionRequest`, `MessageDisplay`, `SubagentStart`, `SubagentStop`) it emits `kex:agent-signal` directly with a `kind` matching
    the event name. None of this goes through `agent_detect.rs` or its OSC byte-level state machine.
@@ -200,15 +202,15 @@ resume and `/clear`, so a record dropped while the process is still running woul
 tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
 destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
-**Offline spool.** When neither `nc` nor `python3` can reach the socket (listener not accepting yet, crashed, gone), `trigger-event.sh` writes the payload as its own file in `~/.config/kex/spool/<tab_id>/`, named `<microseconds>-<pid>-<random>.json` so names sort in arrival order (`EPOCHREALTIME` on bash 5, GNU `date +%s%N`, whole seconds on macOS bash 3.2, whose same-second ties order by PID). The file is written under a dot name and renamed into place, so a visible file is always complete, and no existing file is ever rewritten, so concurrent hooks cannot lose each other's events. After each write the script prunes the directory to the newest 200 files and deletes files whose mtime is more than 7 days old (`find -mmin +10080`, portable to BSD and GNU), so a tab that never reopens cannot grow it without bound. When a listener starts, `ipc.rs::drain_spool` hands the files to `dispatch` in name order, removing each one only after it is handed off (a crash mid-drain leaves exactly the undelivered files for the next start, at-least-once) and then the empty directory; dot files are in-flight temporaries and are skipped unless over a day old, and unreadable files are deleted. The script refuses a `KEX_TAB_ID` outside `[A-Za-z0-9_-]` and the listener a `tab_id` outside `^[A-Za-z0-9_-]{1,64}$`, so the id cannot point outside the spool; directory and files are created 0700/0600. Stale `SessionEnd` and `StopFailure` are discarded (`stale_spooled_event_kind`). Old `<tab_id>.jsonl` spool files from script v11 and earlier are no longer read (TASK-730, TASK-896).
+**Offline spool.** When neither `nc` nor `python3` can reach the socket (listener not started yet, failed to bind, gone), `trigger-event.sh` writes the payload as its own file in `~/.config/kex/spool/<tab_id>/`, named `<microseconds>-<pid>-<random>.json` so names sort in arrival order (`EPOCHREALTIME` on bash 5, GNU `date +%s%N`, whole seconds on macOS bash 3.2, whose same-second ties order by PID). The file is written under a dot name and renamed into place, so a visible file is always complete, and no existing file is ever rewritten, so concurrent hooks cannot lose each other's events. After each write the script prunes the directory to the newest 200 files and deletes files whose mtime is more than 7 days old (`find -mmin +10080`, portable to BSD and GNU), so a tab that never reopens cannot grow it without bound. The hub writes there too, in the same format (`ipc.rs::spool_event`, same caps by count), when a frame reaches the socket for a tab that has no PTY in this Kex right now (closed, hibernated, between two PTYs of a restart). When a tab registers its PTY, `ipc.rs::drain_spool` hands the files to the dispatcher in name order, under the registry lock so a frame arriving meanwhile cannot overtake them, removing each one only after it is handed off (a crash mid-drain leaves exactly the undelivered files for the next start, at-least-once) and then the empty directory; dot files are in-flight temporaries and are skipped unless over a day old, and unreadable files are deleted. The script refuses a `KEX_TAB_ID` outside `[A-Za-z0-9_-]` and the hub a `tab_id` outside `^[A-Za-z0-9_-]{1,64}$`, for a frame, a spool write or a registration (`hook_router::is_safe_tab_id`), so the id cannot point outside the spool; directory and files are created 0700/0600. Stale `SessionEnd` and `StopFailure` are discarded (`stale_spooled_event_kind`) on a drain, on a late frame of a PTY the tab no longer runs on, and before the hub spools anything. Old `<tab_id>.jsonl` spool files from script v11 and earlier are no longer read (TASK-730, TASK-896).
 
 ### OpenCode plugin
 
 OpenCode has no hook commands; its extension surface is plugins (JS modules its own process loads from
 `~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, marker
-`kex-opencode-v3`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
+`kex-opencode-v4`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
 `KEX_TAB_ID` are present in the plugin host's environment it translates the session lifecycle into the frames Claude
-Code's hooks emit, sent directly on the socket:
+Code's hooks emit, sent directly on the socket, each tagged with `tab_id` and `pty_id` from the environment:
 
 - `SessionStart` once per session id, with `agent: "opencode"`, an empty `transcript_path` and a `cwd` (the session
   directory from `session.created`, `process.cwd()` otherwise). It is sent on `session.created` and, for a TUI resumed
@@ -245,7 +247,7 @@ The OSC/`AgentDetector` layer still detects plain `opencode` invocations like an
 
 OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
 `~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships one
-source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v4`, embedded with
+source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v6`, embedded with
 `include_str!`). `agent_setup_omp` and `agent_setup_pi` stamp the runtime name into the template's `agent` constant and
 write the result atomically into the matching folder, so one file reports `agent: omp` and the other `agent: pi`. Their
 status commands compare the whole installed file with the script stamped for that runtime, so an outdated copy, or one
@@ -278,7 +280,7 @@ Claude Code's hooks emit.
   `willContinue`; Pi ignores `agent_end` because it keeps working afterwards (retries, compaction, queued work) and
   only `agent_settled` is final.
 
-Frames go on the `KEX_IPC` socket (1 s send cap, silent failure), session ids come from
+Frames go on the `KEX_IPC` socket tagged with `tab_id` and `pty_id` (1 s send cap, silent failure), session ids come from
 `ctx.sessionManager.getSessionId()` and every send is gated on `KEX_IPC` + `KEX_TAB_ID`, so a bare `omp` or `pi` run is
 untouched. Child processes inheriting a parent's environment may load the extension again; the first loader asserts
 itself with `KEX_AGENT_STATUS_OWNED` (pid).
@@ -402,7 +404,7 @@ for one without (codex, opencode); with codex gaining a source the two had to be
 ### Launch command capture
 
 The original CLI invocation is captured from `OSC 133;C;<cmd>` (the shell integration "command started" signal).
-Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives on its own Unix socket thread,
+Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives on the app's hook listener thread,
 the command is bridged through a thread-safe stash:
 
 1. **PTY reader thread** (`session.rs`): `Transition::Started { cmd_string }` is emitted (from `agent_detect.rs`,

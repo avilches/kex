@@ -6,8 +6,8 @@ end up emitting `kex:agent-signal` to the frontend, but never touch each other:
 1. **OSC bytes in the PTY stream.** `agent_detect.rs` in the Rust PTY reader watches for `OSC 133` (shell
    integration) and `OSC 9` (Claude Code's built-in fallback notification). xterm.js in the frontend sees the same
    bytes in parallel via the Tauri channel. Neither consumer removes bytes from the stream.
-2. **Claude Code hook JSON over a Unix socket, one per PTY.** `trigger-event.sh` forwards the hook's payload
-   unmodified to `pty/ipc.rs::run_listener`, which parses it directly and emits `kex:agent-signal` (or, for
+2. **Claude Code hook JSON over one Unix socket for the whole app.** `trigger-event.sh` forwards the hook's payload,
+   tagged with its `tab_id` and `pty_id`, to the single listener in `pty/ipc.rs`, which routes it to the tab and parses it directly and emits `kex:agent-signal` (or, for
    `SessionStart`, records the session first). This path is entirely out of band from the PTY byte stream: it never
    passes through `agent_detect.rs`, and it does not touch the OSC-driven `armed` state kept there. See
    `docs/AGENT_SESSION_RESTORE.md` for the hook script and socket details.
@@ -69,7 +69,7 @@ Reglas que atraviesan todas las filas:
 
 ## Unix socket hook events (channel 2)
 
-`trigger-event.sh` reenvía el JSON del hook tal cual a `$KEX_IPC`. `pty/ipc.rs::dispatch` lo parsea y actúa
+`trigger-event.sh` reenvía el JSON del hook a `$KEX_IPC`, el socket único de la app, con `tab_id` y `pty_id` sacados de su entorno. `pty/ipc.rs::dispatch` lo parsea y actúa
 directamente, sin pasar por `agent_detect.rs`:
 
 | `hook_event_name` | Cuando | `ipc.rs::dispatch` (Rust) | `AgentNotificationsBridge` (TS) |

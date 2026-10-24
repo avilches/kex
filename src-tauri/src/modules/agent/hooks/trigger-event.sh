@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kex-session-v12
+# kex-session-v13
 # Some Claude Code versions treat an empty hook stdout as a failure, so `{}` goes out first,
 # before any early exit or socket work; Claude reads it as "no output" (no context, no warning).
 printf '{}\n'
@@ -11,8 +11,11 @@ PAYLOAD="$(cat)"
 # The hook command passes the agent as the first argument (Codex's handlers pass "codex");
 # Claude Code's command has none, so it defaults to "claude". OpenCode's plugin writes
 # the socket itself with "agent":"opencode".
+# Kex has one socket for every tab, so the frame names its tab and PTY. Both come from the
+# environment Kex gave the terminal and are set last, so the agent's payload cannot pick them.
 AGENT="${1:-claude}"
-PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" '. + {"agent": $agent}')"
+PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" --arg tab "$KEX_TAB_ID" --arg pty "${KEX_PTY_ID:-}" \
+    '. + {"agent": $agent, "tab_id": $tab, "pty_id": $pty}')"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Codex documents PascalCase event names, which is unmeasured, so its snake_case spelling
@@ -95,7 +98,7 @@ spool_event() {
     return 0
 }
 
-# Send raw payload to KEX_IPC Unix socket.
+# Send the payload to the KEX_IPC Unix socket, shared by every tab of this Kex.
 # Uses nc -U (BSD/OpenBSD netcat on macOS + most Linux), falls back to python3.
 # Spools the event to disk if KEX_IPC is set but neither delivery path works.
 send_ipc() {

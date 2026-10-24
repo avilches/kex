@@ -1,8 +1,9 @@
-// kex-agent-status-v5
+// kex-agent-status-v6
 // Kex terminal integration. Loaded by OpenCode's plugin system or by OMP/Pi extension
 // discovery, it translates the runtime's lifecycle events into the same JSON frames the
-// Claude Code hooks emit on Kex's Unix socket (KEX_IPC). Without the per-terminal KEX_IPC
-// and KEX_TAB_ID variables the extension does nothing, so a bare `omp` or `pi` run is untouched.
+// Claude Code hooks emit on Kex's Unix socket (KEX_IPC), shared by every tab, so each frame
+// names its tab (KEX_TAB_ID) and PTY (KEX_PTY_ID). Without KEX_IPC and KEX_TAB_ID the
+// extension does nothing, so a bare `omp` or `pi` run is untouched.
 // The installer stamps the runtime name (omp or pi) into the agent constant below.
 
 // @ts-expect-error - the OMP/Pi extension host resolves node builtins.
@@ -30,6 +31,7 @@ interface KexFrame {
 
 const socketPath = String(process.env.KEX_IPC || "");
 const tabId = String(process.env.KEX_TAB_ID || "");
+const ptyId = String(process.env.KEX_PTY_ID || "");
 
 // A one-shot run (-p / --print) is not a session worth restoring or showing in the tab.
 const printMode = (() => {
@@ -52,7 +54,7 @@ function send(frame: KexFrame): void {
       client = net.connect(socketPath);
       client.on("error", () => finish());
       client.on("connect", () => {
-        client.end(JSON.stringify({ ...frame, tab_id: tabId }) + "\n", () => finish());
+        client.end(JSON.stringify({ ...frame, tab_id: tabId, pty_id: ptyId }) + "\n", () => finish());
       });
     } catch {
       clearTimeout(timer);

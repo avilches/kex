@@ -29,7 +29,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // v10: the script prints `{}` on stdout before anything else.
 // v11: the script forwards PostCompact.
 // v12: undelivered events are spooled as one file per event instead of a rotated .jsonl.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v12";
+// v13: every frame carries `tab_id` and `pty_id`, since one socket serves every tab.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v13";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -52,7 +53,7 @@ const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 // integrations ship as static scripts instead of merged settings. The OpenCode status greps
 // the installed file for a version marker; the OMP and Pi statuses compare the whole file with
 // the script stamped for that runtime, so an outdated or wrongly stamped copy counts as not installed.
-const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v3";
+const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v4";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
 const AGENT_EXTENSION_TEMPLATE: &str = include_str!("plugins/kex-agent-status.ts");
 
@@ -785,6 +786,16 @@ mod tests {
         tab_id: Option<&str>,
         payload: &str,
     ) -> Option<String> {
+        run_trigger_script_env(arg, tab_id, payload, &[])
+    }
+
+    #[cfg(unix)]
+    fn run_trigger_script_env(
+        arg: Option<&str>,
+        tab_id: Option<&str>,
+        payload: &str,
+        env: &[(&str, &str)],
+    ) -> Option<String> {
         use std::io::{BufRead, BufReader, Write};
         use std::os::unix::net::UnixListener;
         use std::process::{Command, Stdio};
@@ -803,10 +814,12 @@ mod tests {
             .env("KEX_TERMINAL", "1")
             .env("KEX_IPC", &sock)
             .env_remove("KEX_TAB_ID")
+            .env_remove("KEX_PTY_ID")
             .stdin(Stdio::piped());
         if let Some(t) = tab_id {
             cmd.env("KEX_TAB_ID", t);
         }
+        cmd.envs(env.iter().copied());
         let mut child = cmd.spawn().unwrap();
         child
             .stdin
@@ -921,6 +934,24 @@ mod tests {
         let frame = run_trigger_script(None, Some("tab-1")).unwrap();
         let v: Value = serde_json::from_str(&frame).unwrap();
         assert_eq!(v["hook_event_name"], "Stop");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_names_the_tab_and_pty_from_the_environment_only() {
+        let payload =
+            r#"{"hook_event_name":"Stop","session_id":"s1","tab_id":"tab-other","pty_id":"99"}"#;
+        let frame = run_trigger_script_with(None, Some("tab-1"), payload).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["tab_id"], "tab-1");
+        assert_eq!(v["pty_id"], "", "KEX_PTY_ID is unset in this run");
+        let frame =
+            run_trigger_script_env(None, Some("tab-1"), payload, &[("KEX_PTY_ID", "7")]).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(
+            (v["tab_id"].as_str(), v["pty_id"].as_str()),
+            (Some("tab-1"), Some("7"))
+        );
     }
 
     #[cfg(unix)]

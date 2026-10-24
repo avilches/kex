@@ -1,15 +1,17 @@
 #![cfg(unix)]
 
-use std::io::{BufRead, BufReader};
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
+use std::time::Duration;
 
 use tauri::{AppHandle, Emitter};
 
+use super::hook_router::{frame_origin, is_safe_tab_id, route, Route, TabRegistry};
 use crate::modules::agent::{live_model, session_store};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
@@ -63,15 +65,16 @@ fn owned_runtime_subdir(base: &std::path::Path, uid: u32) -> PathBuf {
     }
 }
 
-fn socket_file_name(pid: u32, pty_id: u32) -> String {
-    format!("kex-ipc-{pid}-{pty_id}.sock")
+fn socket_file_name(pid: u32) -> String {
+    format!("kex-ipc-{pid}.sock")
 }
 
 fn socket_owner_pid(file_name: &str) -> Option<u32> {
-    let rest = file_name.strip_prefix("kex-ipc-")?.strip_suffix(".sock")?;
-    let (pid, pty_id) = rest.split_once('-')?;
-    pty_id.parse::<u32>().ok()?;
-    pid.parse().ok()
+    file_name
+        .strip_prefix("kex-ipc-")?
+        .strip_suffix(".sock")?
+        .parse()
+        .ok()
 }
 
 /// Names in `names` that are sockets of a Kex process that no longer exists.
@@ -104,40 +107,296 @@ fn sweep_orphaned_sockets(dir: &Path) {
     }
 }
 
-/// The path embeds this process's pid because several Kex instances (installed
-/// and dev) share `runtime_dir()` and each numbers its PTYs from 1.
-pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
-    static SWEEP: std::sync::Once = std::sync::Once::new();
-    let dir = runtime_dir();
-    SWEEP.call_once(|| sweep_orphaned_sockets(&dir));
-    socket_path_in(&dir, id)
+/// The path embeds this process's pid because several Kex instances (installed and dev) share
+/// `runtime_dir()`.
+fn socket_path_in(dir: &Path) -> PathBuf {
+    dir.join(socket_file_name(std::process::id()))
 }
 
-fn socket_path_in(dir: &Path, id: u32) -> PathBuf {
-    dir.join(socket_file_name(std::process::id(), id))
+/// Where hook frames end up once the transport has read them. Split from the transport so a
+/// test, or another platform's transport, drives the same routing without Tauri.
+trait HookSink: Send + Sync {
+    fn emit(&self, event: &str, payload: serde_json::Value);
+    fn live_model(&self, tab_id: &str, transcript_path: &str);
 }
 
-/// Stops the listener thread and removes the socket file when dropped.
-///
-/// `unlink`ing a Unix socket does NOT unblock a thread parked in
-/// `UnixListener::incoming()` (accept() keeps waiting on the now-unnamed
-/// socket). Without a wakeup, that thread (plus its AppHandle clone) would
-/// leak for the remaining lifetime of the process every time a tab closes.
-/// Fix: connect to our own socket first, which the listener's accept()
-/// receives as a real connection; the listener checks `shutdown` right after
-/// waking up and exits instead of processing it as a payload.
-pub struct IpcGuard {
+struct AppSink(AppHandle);
+
+impl HookSink for AppSink {
+    fn emit(&self, event: &str, payload: serde_json::Value) {
+        let _ = self.0.emit(event, payload);
+    }
+
+    fn live_model(&self, tab_id: &str, transcript_path: &str) {
+        live_model::emit_live_model(&self.0, tab_id, transcript_path);
+    }
+}
+
+/// Routes every hook frame of the app to its tab. The registry lock is held across a spool
+/// write and across the drain that follows a registration, so a frame is either spooled
+/// before the drain reads the directory or routed live after it: none falls in between.
+struct HookHub {
+    sink: Box<dyn HookSink>,
+    spool_base: Option<PathBuf>,
+    tabs: Mutex<TabRegistry>,
+}
+
+impl HookHub {
+    fn new(sink: Box<dyn HookSink>, spool_base: Option<PathBuf>) -> Self {
+        Self {
+            sink,
+            spool_base,
+            tabs: Mutex::new(TabRegistry::default()),
+        }
+    }
+
+    /// The whole contract a transport has with the hub: one line is one frame.
+    fn handle_line(&self, line: &str) {
+        let tabs = self.tabs.lock().unwrap();
+        match route(&frame_origin(line), |t| tabs.current(t)) {
+            Route::Live { tab_id, pty_id } => self.dispatch(line, &tab_id, pty_id),
+            Route::Late { tab_id, pty_id } => self.replay(line, &tab_id, pty_id, "late"),
+            Route::Spool { tab_id } => self.spool(line, &tab_id),
+            Route::Reject(why) => {
+                log::debug!("[ipc] {why}: {}", truncate_for_log(line, MAX_LOG_FIELD_LEN))
+            }
+        }
+    }
+
+    fn register(&self, tab_id: &str, pty_id: u32) {
+        let mut tabs = self.tabs.lock().unwrap();
+        tabs.register(tab_id, pty_id);
+        if let Some(base) = &self.spool_base {
+            drain_spool(base, tab_id, |line| {
+                self.replay(line, tab_id, pty_id, "spooled")
+            });
+        }
+        log::debug!("[ipc] tab={tab_id} pty={pty_id} registered");
+    }
+
+    fn unregister(&self, tab_id: &str, pty_id: u32) {
+        self.tabs.lock().unwrap().unregister(tab_id, pty_id);
+    }
+
+    fn dispatch(&self, line: &str, tab_id: &str, pty_id: u32) {
+        dispatch_with(
+            line,
+            tab_id,
+            pty_id,
+            &mut |event, payload| self.sink.emit(event, payload),
+            &mut |transcript| self.sink.live_model(tab_id, transcript),
+        );
+    }
+
+    /// A frame that outlived the PTY that produced it: delivered to the tab's current PTY,
+    /// minus the "agent just ended" signals that would end the session running there now.
+    fn replay(&self, line: &str, tab_id: &str, pty_id: u32, why: &str) {
+        if let Some(kind) = stale_spooled_event_kind(line) {
+            log::debug!("[ipc] discarded {why} {kind} event tab={tab_id}");
+            return;
+        }
+        self.dispatch(line, tab_id, pty_id);
+    }
+
+    /// The end-of-session signals are dropped here rather than on the drain: the drain would
+    /// discard them anyway, and a closed tab would keep a spool directory just for them.
+    fn spool(&self, line: &str, tab_id: &str) {
+        if let Some(kind) = stale_spooled_event_kind(line) {
+            log::debug!("[ipc] {kind} for tab={tab_id} with no PTY dropped");
+            return;
+        }
+        let Some(base) = &self.spool_base else {
+            return;
+        };
+        if let Err(e) = spool_event(base, tab_id, line) {
+            log::warn!("[ipc] failed to spool event for tab={tab_id}: {e}");
+        }
+    }
+}
+
+/// Unregisters the tab's PTY when the PTY session drops. A tab whose PTY restarts registers the
+/// new one first, and `TabRegistry::unregister` ignores the stale PTY.
+pub struct TabLease {
+    hub: &'static HookHub,
+    tab_id: String,
+    pty_id: u32,
+}
+
+impl Drop for TabLease {
+    fn drop(&mut self) {
+        self.hub.unregister(&self.tab_id, self.pty_id);
+    }
+}
+
+const MAX_FRAME_BYTES: u64 = 4 * 1024 * 1024;
+// One thread serves every tab, so a client that connects and never writes holds it at most
+// this long; the frames of the others wait in the socket backlog meanwhile, not lost.
+const READ_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// The Unix transport: one socket and one accept thread for the life of the app. All it knows
+/// about a frame is that it is one line; the hub does the rest.
+struct HookServer {
     path: PathBuf,
     shutdown: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
 }
 
-impl Drop for IpcGuard {
+impl HookServer {
+    fn start(path: PathBuf, hub: &'static HookHub) -> std::io::Result<Self> {
+        // The pid in the name makes this path ours alone, so only a leftover of ours can be here.
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path)?;
+        // bind() honors the umask, which on a shared machine could leave the socket group or
+        // world accessible; force owner-only so another local user cannot send forged events.
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let stop = shutdown.clone();
+        let thread = thread::Builder::new()
+            .name("kex-ipc".into())
+            .spawn(move || serve(listener, hub, stop))?;
+        log::debug!("[ipc] listening path={path:?}");
+        Ok(Self {
+            path,
+            shutdown,
+            thread: Some(thread),
+        })
+    }
+}
+
+impl Drop for HookServer {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::SeqCst);
-        // Wake up the thread blocked in accept(); the connection itself
-        // carries no payload, the listener only uses it as a signal.
+        // Unlinking does not wake a thread parked in accept(), connecting does, and the loop
+        // checks the flag before reading.
         let _ = UnixStream::connect(&self.path);
         let _ = std::fs::remove_file(&self.path);
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+    }
+}
+
+fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool>) {
+    for stream in listener.incoming() {
+        if shutdown.load(Ordering::SeqCst) {
+            break;
+        }
+        match stream {
+            Ok(stream) => {
+                if let Some(line) = read_frame(stream) {
+                    hub.handle_line(&line);
+                }
+            }
+            Err(e) => {
+                log::debug!("[ipc] accept error (socket removed?): {e}");
+                break;
+            }
+        }
+    }
+    log::debug!("[ipc] thread exiting");
+}
+
+fn read_frame(stream: UnixStream) -> Option<String> {
+    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
+    let mut line = String::new();
+    let _ = BufReader::new(stream.take(MAX_FRAME_BYTES)).read_line(&mut line);
+    let line = line.trim();
+    (!line.is_empty()).then(|| line.to_string())
+}
+
+static HUB: OnceLock<HookHub> = OnceLock::new();
+static SERVER: Mutex<Option<HookServer>> = Mutex::new(None);
+static SOCKET: OnceLock<PathBuf> = OnceLock::new();
+
+fn hub(app: &AppHandle) -> &'static HookHub {
+    HUB.get_or_init(|| HookHub::new(Box::new(AppSink(app.clone())), spool_dir()))
+}
+
+/// The app's hook socket, started by the first PTY. A failed bind still returns the path, so
+/// the hook script spools what it cannot deliver instead of dropping it.
+pub fn hook_socket(app: &AppHandle) -> PathBuf {
+    SOCKET
+        .get_or_init(|| {
+            let dir = runtime_dir();
+            sweep_orphaned_sockets(&dir);
+            let path = socket_path_in(&dir);
+            match HookServer::start(path.clone(), hub(app)) {
+                Ok(server) => *SERVER.lock().unwrap() = Some(server),
+                Err(e) => log::warn!("[ipc] hook server on {path:?} failed: {e}"),
+            }
+            path
+        })
+        .clone()
+}
+
+/// Makes `pty_id` the PTY that frames of `tab_id` are delivered to, replaying what the tab
+/// spooled while it had none. `None` for a tab id that could not name a spool directory.
+pub fn register_tab(app: &AppHandle, tab_id: &str, pty_id: u32) -> Option<TabLease> {
+    if !is_safe_tab_id(tab_id) {
+        log::warn!("[ipc] not registering unsafe tab id {tab_id:?}");
+        return None;
+    }
+    let hub = hub(app);
+    hub.register(tab_id, pty_id);
+    Some(TabLease {
+        hub,
+        tab_id: tab_id.to_string(),
+        pty_id,
+    })
+}
+
+/// Removes the socket file when the app exits; a crash leaves it for the next start's sweep.
+pub fn shutdown() {
+    drop(SERVER.lock().unwrap().take());
+}
+
+const MAX_SPOOL_FILES: usize = 200;
+
+/// Same layout and guarantees as the script's `spool_event`: written under a dot name and
+/// renamed, owner-only, never rewriting a file, capped at the newest `MAX_SPOOL_FILES`.
+fn spool_event(base: &Path, tab_id: &str, line: &str) -> std::io::Result<()> {
+    static SEQ: AtomicU32 = AtomicU32::new(0);
+    let Some(dir) = spool_dir_for_tab(base, tab_id) else {
+        return Ok(());
+    };
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&dir)?;
+    let micros = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_micros());
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed) % 100_000;
+    let name = format!("{micros:016}-{:07}-{seq:05}.json", std::process::id());
+    let tmp = dir.join(format!(".{name}.tmp"));
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&tmp)?;
+    f.write_all(line.as_bytes())?;
+    f.write_all(b"\n")?;
+    drop(f);
+    std::fs::rename(&tmp, dir.join(name))?;
+    prune_spool(&dir);
+    Ok(())
+}
+
+fn prune_spool(dir: &Path) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut names: Vec<String> = rd
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| !n.starts_with('.'))
+        .collect();
+    if names.len() <= MAX_SPOOL_FILES {
+        return;
+    }
+    names.sort();
+    for name in &names[..names.len() - MAX_SPOOL_FILES] {
+        let _ = std::fs::remove_file(dir.join(name));
     }
 }
 
@@ -255,20 +514,11 @@ fn parse_payload(json: &str) -> Option<Payload> {
     })
 }
 
-/// Directory `trigger-event.sh` spools undelivered hook events to when
-/// `send_ipc` cannot reach the socket (listener not accepting yet, crashed,
-/// or gone). Mirrors `session_hook_script_path` in `agent/mod.rs`.
+/// Directory undelivered hook events wait in: `trigger-event.sh` writes there when it cannot
+/// reach the socket, and the hub when a frame names a tab that has no PTY right now. Mirrors
+/// `session_hook_script_path` in `agent/mod.rs`.
 fn spool_dir() -> Option<PathBuf> {
     Some(dirs::home_dir()?.join(".config").join("kex").join("spool"))
-}
-
-/// True for ids made of the `nid()` alphabet. The id names a directory under the spool, so
-/// anything else (empty, `..`, a separator, an absolute path) could reach outside it.
-fn is_safe_tab_id(tab_id: &str) -> bool {
-    (1..=64).contains(&tab_id.len())
-        && tab_id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 /// The directory holding one file per undelivered event of a tab.
@@ -357,48 +607,6 @@ fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
     let _ = std::fs::remove_dir(&dir);
 }
 
-/// Creates the socket, then spawns the listener thread. Returns an IpcGuard
-/// that stops the thread and removes the socket file when dropped.
-pub fn spawn_listener(
-    socket_path: PathBuf,
-    tab_id: String,
-    pty_id: u32,
-    app: AppHandle,
-) -> IpcGuard {
-    // The pid in the name makes this path ours alone, so only a leftover of ours can be here.
-    let _ = std::fs::remove_file(&socket_path);
-    let shutdown = Arc::new(AtomicBool::new(false));
-
-    let listener = match UnixListener::bind(&socket_path) {
-        Ok(l) => l,
-        Err(e) => {
-            log::warn!("[ipc] bind {:?} failed: {e}", socket_path);
-            return IpcGuard {
-                path: socket_path,
-                shutdown,
-            };
-        }
-    };
-    // bind() creates the socket file honoring the process umask, which on a
-    // shared machine could leave it group/world accessible; force it to
-    // owner-only regardless, so another local user cannot connect and send
-    // forged agent-hook events.
-    let _ = std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600));
-    log::debug!("[ipc] listening tab={tab_id} path={:?}", socket_path);
-
-    let thread_shutdown = shutdown.clone();
-    if let Err(e) = thread::Builder::new()
-        .name(format!("kex-ipc-{tab_id}"))
-        .spawn(move || run_listener(listener, tab_id, pty_id, app, thread_shutdown))
-    {
-        log::warn!("[ipc] failed to spawn listener thread: {e}");
-    }
-    IpcGuard {
-        path: socket_path,
-        shutdown,
-    }
-}
-
 /// True when a spooled line is a `SessionEnd`/`StopFailure` notification: a
 /// live-only "the agent just finished/crashed" signal that made sense at the
 /// moment `trigger-event.sh` couldn't reach the socket, but is actively wrong
@@ -412,45 +620,7 @@ fn stale_spooled_event_kind(json: &str) -> Option<String> {
         .filter(|e| e == "SessionEnd" || e == "StopFailure")
 }
 
-fn run_listener(
-    listener: UnixListener,
-    tab_id: String,
-    pty_id: u32,
-    app: AppHandle,
-    shutdown: Arc<AtomicBool>,
-) {
-    if let Some(base) = spool_dir() {
-        drain_spool(&base, &tab_id, |line| {
-            if let Some(kind) = stale_spooled_event_kind(line) {
-                log::debug!("[ipc] discarded stale spooled {kind} event tab={tab_id}");
-                return;
-            }
-            dispatch(line, &tab_id, pty_id, &app);
-        });
-    }
-
-    for stream in listener.incoming() {
-        if shutdown.load(Ordering::SeqCst) {
-            break;
-        }
-        match stream {
-            Ok(stream) => {
-                let mut line = String::new();
-                let _ = BufReader::new(stream).read_line(&mut line);
-                if !line.trim().is_empty() {
-                    dispatch(line.trim(), &tab_id, pty_id, &app);
-                }
-            }
-            Err(e) => {
-                log::debug!("[ipc] accept error (socket removed?): {e}");
-                break;
-            }
-        }
-    }
-    log::debug!("[ipc] thread exiting tab={tab_id}");
-}
-
-/// Debug logging in `dispatch` below echoes free-text agent payload fields
+/// Debug logging in `dispatch_with` below echoes free-text agent payload fields
 /// (prompt, message, diff deltas). A single "final" MessageDisplay for a
 /// long code review has been observed to carry 7000+ characters; left
 /// unbounded, a handful of such lines are enough to blow through the log
@@ -510,20 +680,7 @@ fn passthrough_signal(p: &Payload, id: u32) -> Option<serde_json::Value> {
     }
 }
 
-fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
-    dispatch_with(
-        json,
-        tab_id,
-        pty_id,
-        &mut |event, payload| {
-            let _ = app.emit(event, payload);
-        },
-        &mut |transcript_path| live_model::emit_live_model(app, tab_id, transcript_path),
-    );
-}
-
-/// `dispatch` without a Tauri handle: every event goes through `emit`, so a test can see what
-/// a hook payload sends to the frontend.
+/// Every event goes through `emit`, so a test can see what a hook payload sends to the frontend.
 fn dispatch_with(
     json: &str,
     tab_id: &str,
@@ -726,38 +883,37 @@ mod tests {
     }
 
     #[test]
-    fn socket_path_for_id_is_short_enough() {
-        let p = socket_path_in(&runtime_dir(), u32::MAX);
+    fn socket_path_is_short_enough() {
+        let p = socket_path_in(&runtime_dir());
         assert!(p.to_str().unwrap().len() < 104);
     }
 
     #[test]
-    fn same_pty_id_in_two_processes_gets_different_socket_names() {
-        assert_ne!(socket_file_name(100, 38), socket_file_name(200, 38));
+    fn two_processes_get_different_socket_names() {
+        assert_ne!(socket_file_name(100), socket_file_name(200));
     }
 
     #[test]
     fn socket_path_embeds_the_current_pid() {
-        let p = socket_path_in(Path::new("/x"), 7);
-        let expected = socket_file_name(std::process::id(), 7);
+        let p = socket_path_in(Path::new("/x"));
+        let expected = socket_file_name(std::process::id());
         assert_eq!(p.file_name().unwrap().to_str().unwrap(), expected);
     }
 
     #[test]
     fn orphan_cleanup_only_selects_dead_pids_and_matching_names() {
         let names: Vec<String> = [
-            "kex-ipc-100-1.sock",
-            "kex-ipc-200-1.sock",
-            "kex-ipc-300-2.sock",
-            "kex-ipc-5.sock",
-            "kex-ipc-abc-1.sock",
-            "kex-ipc-100-1.txt",
-            "other-100-1.sock",
+            "kex-ipc-100.sock",
+            "kex-ipc-200.sock",
+            "kex-ipc-300.sock",
+            "kex-ipc-abc.sock",
+            "kex-ipc-100.txt",
+            "other-100.sock",
         ]
         .map(String::from)
         .to_vec();
         let found = orphaned_sockets(&names, |pid| pid == 200);
-        assert_eq!(found, vec!["kex-ipc-100-1.sock", "kex-ipc-300-2.sock"]);
+        assert_eq!(found, vec!["kex-ipc-100.sock", "kex-ipc-300.sock"]);
     }
 
     #[test]
@@ -766,19 +922,19 @@ mod tests {
         let mut child = std::process::Command::new("true").spawn().unwrap();
         let dead = child.id();
         child.wait().unwrap();
-        let orphan = socket_file_name(dead, 1);
-        let live = socket_file_name(std::process::id(), 1);
+        let orphan = socket_file_name(dead);
+        let live = socket_file_name(std::process::id());
         for name in [
             orphan.as_str(),
             live.as_str(),
-            "kex-ipc-5.sock",
+            "kex-ipc-x.sock",
             "notes.txt",
         ] {
             std::fs::write(dir.path().join(name), b"").unwrap();
         }
         sweep_orphaned_sockets(dir.path());
         assert!(!dir.path().join(&orphan).exists());
-        for name in [live.as_str(), "kex-ipc-5.sock", "notes.txt"] {
+        for name in [live.as_str(), "kex-ipc-x.sock", "notes.txt"] {
             assert!(dir.path().join(name).exists(), "{name} must survive");
         }
     }
@@ -851,85 +1007,247 @@ mod tests {
         assert_eq!(mode, 0o700);
     }
 
-    #[test]
-    fn spawn_listener_leaves_the_socket_file_owner_only() {
-        let base = tempfile::tempdir().unwrap();
-        let socket_path = base
-            .path()
-            .join(format!("kex-test-perms-{}.sock", std::process::id()));
-
-        // Use a Tauri-less path: bind directly the way spawn_listener does,
-        // without going through the full AppHandle machinery this test has
-        // no access to.
-        let listener = UnixListener::bind(&socket_path).unwrap();
-        std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        drop(listener);
-
-        let mode = std::fs::metadata(&socket_path)
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777;
-        assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
+    #[derive(Default)]
+    struct Recorder {
+        events: Mutex<Vec<(String, serde_json::Value)>>,
     }
 
-    #[test]
-    fn ipc_guard_removes_file_on_drop() {
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("kex-test-guard-{}.sock", std::process::id()));
-        std::fs::write(&path, b"").unwrap();
-        assert!(path.exists());
-        let guard = IpcGuard {
-            path: path.clone(),
-            shutdown: Arc::new(AtomicBool::new(false)),
-        };
-        drop(guard);
-        assert!(!path.exists());
+    impl Recorder {
+        fn signals(&self) -> Vec<(serde_json::Value, String)> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_EVENT)
+                .map(|(_, sig)| (sig["id"].clone(), sig["kind"].as_str().unwrap().to_string()))
+                .collect()
+        }
+
+        fn meta_tabs(&self) -> Vec<String> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_SESSION_META_EVENT)
+                .map(|(_, m)| m["tabId"].as_str().unwrap().to_string())
+                .collect()
+        }
     }
 
-    #[test]
-    fn dropping_guard_unblocks_the_listener_thread() {
-        // Regression test for the leaked-thread bug: unlinking the socket file
-        // alone never wakes a thread parked in accept(), so this must join
-        // quickly rather than hang until the test harness kills it.
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("kex-test-wakeup-{}.sock", std::process::id()));
-        let _ = std::fs::remove_file(&path);
+    struct RecordingSink(Arc<Recorder>);
 
-        let listener = UnixListener::bind(&path).unwrap();
-        let shutdown = Arc::new(AtomicBool::new(false));
-        let thread_shutdown = shutdown.clone();
-        let handle = thread::spawn(move || {
-            for stream in listener.incoming() {
-                if thread_shutdown.load(Ordering::SeqCst) {
-                    break;
-                }
-                drop(stream);
+    impl HookSink for RecordingSink {
+        fn emit(&self, event: &str, payload: serde_json::Value) {
+            self.0
+                .events
+                .lock()
+                .unwrap()
+                .push((event.to_string(), payload));
+        }
+
+        fn live_model(&self, _: &str, _: &str) {}
+    }
+
+    fn test_hub(spool: Option<PathBuf>) -> (&'static HookHub, Arc<Recorder>) {
+        let rec = Arc::new(Recorder::default());
+        let hub = Box::leak(Box::new(HookHub::new(
+            Box::new(RecordingSink(rec.clone())),
+            spool,
+        )));
+        (hub, rec)
+    }
+
+    fn frame(event: &str, tab: &str, pty: u32, session: &str) -> String {
+        format!(
+            r#"{{"hook_event_name":"{event}","session_id":"{session}","tab_id":"{tab}","pty_id":"{pty}","cwd":""}}"#
+        )
+    }
+
+    fn send(path: &Path, line: &str) {
+        let mut s = UnixStream::connect(path).unwrap();
+        s.write_all(line.as_bytes()).unwrap();
+        s.write_all(b"\n").unwrap();
+    }
+
+    fn wait_until(mut done: impl FnMut() -> bool) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            if done() {
+                return true;
             }
-        });
+            thread::sleep(Duration::from_millis(10));
+        }
+        done()
+    }
 
-        // Give the thread a moment to reach accept() before we try to wake it.
-        thread::sleep(std::time::Duration::from_millis(50));
-
-        let guard = IpcGuard {
-            path: path.clone(),
-            shutdown,
-        };
-        drop(guard);
-
-        let joined = {
-            let (tx, rx) = std::sync::mpsc::channel();
-            thread::spawn(move || {
-                handle.join().ok();
-                let _ = tx.send(());
-            });
-            rx.recv_timeout(std::time::Duration::from_secs(2)).is_ok()
-        };
-        assert!(
-            joined,
-            "listener thread did not exit after guard was dropped"
-        );
+    #[test]
+    fn the_hook_server_socket_is_owner_only_and_removed_on_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-perm.sock");
+        let (hub, _) = test_hub(None);
+        let server = HookServer::start(path.clone(), hub).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
+        drop(server);
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn dropping_the_hook_server_joins_its_thread() {
+        // Unlinking alone never wakes a thread parked in accept(); Drop joins it, so a missing
+        // wakeup would hang here instead of passing.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-join.sock");
+        let (hub, _) = test_hub(None);
+        let server = HookServer::start(path, hub).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let (tx, rx) = std::sync::mpsc::channel();
+        thread::spawn(move || {
+            drop(server);
+            let _ = tx.send(());
+        });
+        assert!(rx.recv_timeout(Duration::from_secs(2)).is_ok());
+    }
+
+    #[test]
+    fn one_listener_keeps_two_concurrent_tabs_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-two.sock");
+        let (hub, rec) = test_hub(None);
+        hub.register("tab-a", 1);
+        hub.register("tab-b", 2);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+
+        const PER_TAB: usize = 40;
+        let clients: Vec<_> = [("tab-a", 1u32), ("tab-b", 2u32)]
+            .into_iter()
+            .map(|(tab, pty)| {
+                let path = path.clone();
+                thread::spawn(move || {
+                    for i in 0..PER_TAB {
+                        let kind = if i == 0 { "SessionStart" } else { "Stop" };
+                        send(&path, &frame(kind, tab, pty, &format!("{tab}-s")));
+                    }
+                })
+            })
+            .collect();
+        for c in clients {
+            c.join().unwrap();
+        }
+
+        assert!(wait_until(
+            || rec.events.lock().unwrap().len() == 2 * PER_TAB
+        ));
+        let signals = rec.signals();
+        let of = |id: u32| signals.iter().filter(|(i, _)| *i == id).count();
+        assert_eq!(of(1), PER_TAB - 1);
+        assert_eq!(of(2), PER_TAB - 1);
+        let mut metas = rec.meta_tabs();
+        metas.sort();
+        assert_eq!(metas, vec!["tab-a", "tab-b"]);
+        for (_, payload) in rec.events.lock().unwrap().iter() {
+            if let Some(sid) = payload["sessionId"].as_str() {
+                assert!(sid.starts_with(payload["tabId"].as_str().unwrap()));
+            }
+        }
+    }
+
+    #[test]
+    fn a_frame_cannot_reach_a_tab_through_another_tabs_pty() {
+        let (hub, rec) = test_hub(None);
+        hub.register("tab-a", 1);
+        hub.register("tab-b", 2);
+        hub.handle_line(&frame("Stop", "tab-b", 1, "s"));
+        assert_eq!(rec.signals(), vec![(2.into(), "Stop".to_string())]);
+    }
+
+    #[test]
+    fn frames_without_a_safe_tab_are_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.register("tab-a", 1);
+        hub.handle_line(r#"{"hook_event_name":"Stop","session_id":"s"}"#);
+        hub.handle_line(r#"{"hook_event_name":"Stop","tab_id":"../x","pty_id":"1"}"#);
+        hub.handle_line("not json");
+        assert!(rec.events.lock().unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn a_late_frame_of_a_restarted_pty_reaches_the_new_one_without_ending_it() {
+        let (hub, rec) = test_hub(None);
+        let old = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 1,
+        };
+        hub.register("tab-a", 1);
+        hub.register("tab-a", 2);
+        drop(old);
+        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
+        hub.handle_line(&frame("SessionEnd", "tab-a", 1, "s"));
+        hub.handle_line(&frame("UserPromptSubmit", "tab-a", 2, "s"));
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (2.into(), "Stop".to_string()),
+                (2.into(), "UserPromptSubmit".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn frames_for_a_tab_between_ptys_are_spooled_and_replayed_on_its_next_pty() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        hub.handle_line(&frame("SessionEnd", "tab-a", 1, "s"));
+        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
+        assert!(rec.events.lock().unwrap().is_empty());
+        let spooled = std::fs::read_dir(dir.path().join("tab-a")).unwrap().count();
+        assert_eq!(spooled, 2, "SessionEnd is never spooled");
+
+        hub.register("tab-a", 7);
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (7.into(), "Notification".to_string()),
+                (7.into(), "Stop".to_string())
+            ]
+        );
+        assert!(!dir.path().join("tab-a").exists());
+    }
+
+    #[test]
+    fn the_hub_spool_is_owner_only_and_capped() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..(MAX_SPOOL_FILES + 5) {
+            spool_event(dir.path(), "tab-cap", &format!("{{\"n\":{i}}}")).unwrap();
+        }
+        let tab = dir.path().join("tab-cap");
+        let mut names: Vec<_> = std::fs::read_dir(&tab)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        names.sort();
+        assert_eq!(names.len(), MAX_SPOOL_FILES);
+        let first = std::fs::read_to_string(&names[0]).unwrap();
+        assert_eq!(first.trim(), "{\"n\":5}", "the oldest are pruned");
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&tab), 0o700);
+        assert_eq!(mode(&names[0]), 0o600);
+    }
+
+    #[test]
+    fn a_client_that_never_writes_does_not_block_the_others_for_good() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-slow.sock");
+        let (hub, rec) = test_hub(None);
+        hub.register("tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+        let _idle = UnixStream::connect(&path).unwrap();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        assert!(wait_until(|| rec.signals().len() == 1));
     }
 
     #[test]
@@ -1235,25 +1553,6 @@ mod tests {
 
         assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
         assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
-    }
-
-    #[test]
-    fn is_safe_tab_id_accepts_only_the_nid_alphabet() {
-        assert!(is_safe_tab_id("tab-abc_123"));
-        assert!(is_safe_tab_id(&"a".repeat(64)));
-        for bad in [
-            "",
-            "..",
-            ".",
-            "a/b",
-            "../x",
-            "/etc",
-            "a b",
-            "a.b",
-            &"a".repeat(65),
-        ] {
-            assert!(!is_safe_tab_id(bad), "{bad:?}");
-        }
     }
 
     #[test]
