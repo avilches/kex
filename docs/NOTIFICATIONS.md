@@ -180,28 +180,66 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
-### Install suggestion
-
-Nothing in the app told a new user that the integrations exist, so when the `started` signal names an agent
-(`claude`, `opencode`, `omp`, `pi` or `codex`) whose integration is not installed, `suggestIntegration`
-(`IntegrationSuggestionToast.tsx`) shows a toast with Install and View changes (opens Settings > General); closing it
-is the "not now". The decision lives in pure functions (`lib/integrationSuggestion.ts`) and the flow in
-`lib/integrationSuggestionFlow.ts`, which looks at each agent once per app run:
-
-- First time: ask. The ask is counted when the toast shows, whatever the user does with it.
-- After an unanswered ask: ask once more after 15 days (`SUGGESTION_RETRY_MS`), then never again.
-- Installed at any moment (the toast, Settings, the bell, or already installed when the agent is detected): never ask
-  again, even if it is removed later. `installAgent` (`lib/agentIntegration.ts`) is the single install path and records
-  it.
-- Install cannot run (Codex reports `malformed`, `unsafeToEdit` or `unavailable`): no toast and no ask counted; the next app run looks
-  again.
-
-The toast is 480px wide (capped to the viewport) so the text fits. Independently of the ask policy, every tab where an
-agent starts without its integration gets an amber exclamation icon in the tab strip (`integrationWarningStore`, filled
-by the suggester's `warn` for each `started` signal and cleared when the session ends or the integration is installed);
-hovering it shows the toast again, with the same Install and View changes buttons. The re-shown toast carries a fixed id
-per agent, so repeated hovers update it instead of stacking, and it does not count as an ask.
-
-The record is `integrationSuggestions` in `settings-general.json`, per agent: `{ asks, lastAskedAt, installedOnce }`.
-
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).
+
+---
+
+## Install reminder
+
+How Kex reminds the user to install an agent integration. Without it the spinner, the attention dot, the finish
+notification and the session restore do not work for that agent, and nothing else in the app says so: Settings > General
+> Agents and the bell only help a user who already went looking.
+
+There are two reminders, both driven by the `started` signal (channel 2 above) that names an agent with an integration
+(`claude`, `opencode`, `omp`, `pi` or `codex`). `handleSignal` in `AgentNotificationsBridge.tsx` calls
+`suggestIntegration(agent, tabId)` and nothing else in the app does. An agent Kex does not detect as started (a launcher
+script it cannot recognise) triggers neither.
+
+### 1. The toast (asked at most twice per agent)
+
+A Sonner toast, "<Agent> is running without the Kex integration", with **Install** (runs `installAgent`, then a success or
+error toast) and **View changes** (opens Settings > General, where Agents has the dry-run diff). It has a close button and
+lasts 20 s; closing it, letting it expire or pressing View changes are all the same "not now". It is 480 px wide, capped to
+the viewport, because Sonner anchors it to the right edge and the text does not fit in the default width.
+
+When it appears, per agent:
+
+| Situation | Toast |
+|---|---|
+| Never asked before | Yes. The ask is recorded when the toast shows, whatever the user does with it |
+| Asked once, less than 15 days ago (`SUGGESTION_RETRY_MS`) | No |
+| Asked once, 15 days or more ago | Yes, the second and last time |
+| Asked twice | Never again |
+| Integration installed at any moment | Never again, even if it is removed later |
+| Integration already installed when the agent is detected | No, and it is recorded as installed, so removing it later does not bring the toast back |
+| Status is not `missing` (`malformed`, `uneditable`, `unavailable`: Codex config Kex cannot parse or edit safely) | No, and no ask is recorded: Install would fail, so the next app run looks again |
+| Second tab starting the same agent in the same app run | No: each agent is looked at once per run |
+
+"Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
+(`lib/agentIntegration.ts`), the single install path, which records `installedOnce` only after the write succeeded.
+
+### 2. The tab warning (every tab, every time)
+
+Independent of the ask policy, each tab where an agent starts without its integration gets an amber exclamation icon in
+the tab strip, so a user who dismissed the toast still sees why that tab has no spinner. It is
+`integrationWarningStore` (`tabId -> agent`), filled by the suggester's `warn` on every `started` signal with status
+`missing`, and cleared when the session ends (`clearTab`) or the integration is installed (`clearAgent`, which removes it
+from every tab of that agent). Hovering the icon shows the toast again, with the same buttons. That toast has a fixed id
+per agent (`integration-<agent>`), so repeated hovers update it instead of stacking, and it never counts as an ask.
+
+### Where it lives
+
+| Piece | File |
+|---|---|
+| Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
+| Flow: once per run, status check, `warn`, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
+| Toast, real dependencies, `suggestIntegration` | `modules/agents/components/IntegrationSuggestionToast.tsx` |
+| Tab warning state and icon | `modules/agents/store/integrationWarningStore.ts`, `modules/workspaces/PaneTabBar.tsx` |
+| Single install path, records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
+
+The record is `integrationSuggestions` in `settings-general.json`, per agent:
+`{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false }`. It is read and written through
+`readIntegrationSuggestions` / `updateIntegrationSuggestions`, which serialise writes because the main window (the toast)
+and the Settings window (an install there) both write it. To see the toast again while testing, delete the agent's entry;
+to see the second ask, set its `lastAskedAt` more than 15 days back. Manual test plan: block L in
+`docs/RESTORE_SESSION_TESTS.md`.

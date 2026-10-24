@@ -638,6 +638,48 @@ Necesitan un Codex con sesion iniciada y no se pudieron medir. Cada una puede ca
 - [ ] **Codex no pide confiar en los hooks al arrancar (K3).** Con la integracion instalada, abrir `codex` por primera vez: no debe preguntar si confia en los hooks de Kex. Si lo pregunta, la tabla `[hooks.state]` que escribe Kex no le basta y hay que revisar el punto siguiente
 - [ ] **El hash de confianza con un Codex actual.** Confirmar que tras instalar, Codex ejecuta los seis handlers sin pedir confianza. Si no, el algoritmo de `codex_trust.rs` se ha desviado del de Codex y el unico sintoma es que no llegan eventos
 
+## Bloque L - Recordatorio de instalacion
+
+Prueba como Kex recuerda al usuario que instale la integracion de un agente. Diseno en `docs/NOTIFICATIONS.md`, seccion
+"Install reminder". El estado vive en `integrationSuggestions` dentro de `settings-general.json`; para repetir una prueba
+hay que cerrar Kex, borrar la entrada del agente y volver a abrirlo (la app mantiene el registro en memoria mientras
+corre). Usar OMP o Pi para probar sin tocar la config de Claude Code.
+
+### L1 Primera vez
+
+- [ ] Sin la integracion de Pi instalada y sin entrada `pi` en `integrationSuggestions`, abrir Kex y lanzar `pi` en un tab
+- [ ] Esperado: sale un toast "Pi is running without the Kex integration" con los botones Install y View changes, y el tab lleva un icono amarillo de exclamacion
+- [ ] `settings-general.json` ahora tiene `"pi": { "asks": 1, "lastAskedAt": <ahora>, "installedOnce": false }`
+- [ ] Lanzar `pi` en un segundo tab: no sale otro toast, pero el segundo tab tambien lleva el icono
+
+### L2 Botones del toast
+
+- [ ] Install: se instala, sale "Pi integration installed", desaparece el icono amarillo de todos los tabs de Pi y `installedOnce` pasa a `true`
+- [ ] View changes (con otra entrada nueva): abre Settings > General con la seccion Agents
+- [ ] Cerrar el toast con la X o dejar que pasen 20 s cuenta como "ahora no": la entrada sigue en `asks: 1`
+
+### L3 El icono del tab
+
+- [ ] Pasar el raton por el icono amarillo: vuelve a salir el toast. Repetir varias veces: no se apilan, siempre hay uno
+- [ ] Esa aparicion no cambia `asks` en `settings-general.json`
+- [ ] Salir de `pi` (Ctrl+D): el icono desaparece del tab
+
+### L4 Segunda y ultima vez
+
+- [ ] Con la entrada `pi` en `asks: 1`, reabrir Kex y lanzar `pi`: no sale el toast, pero si el icono
+- [ ] Cerrar Kex, poner `lastAskedAt` 16 dias atras (`date -v-16d +%s000` da los milisegundos), abrir Kex y lanzar `pi`: sale el toast y `asks` pasa a 2
+- [ ] Repetir con `lastAskedAt` aun mas antiguo: no sale nunca mas el toast; el icono del tab sigue saliendo
+
+### L5 Instalada una vez, no se vuelve a preguntar
+
+- [ ] Instalar Pi desde Settings, desinstalarlo y borrar `asks`/`lastAskedAt` a mano dejando `installedOnce: true`: al lanzar `pi` no sale toast. El icono del tab si sale, porque el estado real es "no instalada"
+- [ ] Integracion ya instalada antes de esta funcion (sin entrada en `integrationSuggestions`): al lanzar el agente no sale nada y la entrada pasa a `installedOnce: true`
+
+### L6 Estados que bloquean
+
+- [ ] Con un `~/.codex/config.toml` que Kex no sabe leer, lanzar `codex`: no sale toast, ni icono, y `integrationSuggestions` no gana la entrada `codex`. Arreglar el fichero y repetir: sale el toast
+- [ ] Lanzar un agente sin integracion en Kex (por ejemplo `gemini`): no sale nada
+
 ---
 
 ## Checklist de diagnostico rapido (en caso de que no restaure)
