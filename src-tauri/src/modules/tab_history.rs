@@ -181,10 +181,22 @@ fn list_at(path: &Path) -> Vec<TabHistoryRecord> {
     entries
 }
 
+// A closed tab can only be reopened while its folder or file is still there.
+fn still_exists(record: &TabHistoryRecord) -> bool {
+    let p = Path::new(&record.path);
+    if record.kind == "terminal" {
+        p.is_dir()
+    } else {
+        p.is_file()
+    }
+}
+
 #[tauri::command]
 pub fn tab_history_list() -> Result<Vec<TabHistoryRecord>, String> {
     let path = store_path().ok_or_else(|| "tab-history store not initialized".to_string())?;
-    Ok(list_at(&path))
+    let mut entries = list_at(&path);
+    entries.retain(still_exists);
+    Ok(entries)
 }
 
 #[tauri::command]
@@ -210,6 +222,25 @@ mod tests {
             workspace_id: workspace.to_string(),
             count,
         }
+    }
+
+    #[test]
+    fn still_exists_checks_the_kind_of_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.txt");
+        std::fs::write(&file, "x").unwrap();
+        let record = |kind: &str, p: &Path| TabHistoryRecord {
+            kind: kind.to_string(),
+            path: p.to_string_lossy().into_owned(),
+            workspace_id: "ws".to_string(),
+            uses: 1,
+            last_used_at: 1,
+        };
+        assert!(still_exists(&record("terminal", dir.path())));
+        assert!(still_exists(&record("file", &file)));
+        assert!(!still_exists(&record("terminal", &file)));
+        assert!(!still_exists(&record("file", &dir.path().join("gone.txt"))));
+        assert!(!still_exists(&record("terminal", &dir.path().join("gone"))));
     }
 
     #[test]

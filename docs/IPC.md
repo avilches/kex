@@ -150,7 +150,7 @@ State: `tab-history.json` in the app data dir, next to `agent-sessions.json`. On
 
 | Command | Description |
 |---|---|
-| `tab_history_list` | Return every stored record, most used first, then most recently used. Corrupt or missing files read as an empty list |
+| `tab_history_list` | Return the stored records whose folder (terminal) or file still exists on disk, most used first, then most recently used. Records whose path is gone stay in the store until the cap drops them. Corrupt or missing files read as an empty list |
 | `tab_history_record(kind, path, workspaceId)` | Insert or update the location without changing `uses`, and refresh its workspace. Used when a tab closes. Paths are normalized to forward slashes without a trailing one. Rejects unknown kinds and empty paths |
 | `tab_history_touch(entries)` | Batch of `{ kind, path, workspaceId, count }`. Insert or update each location, add `count` to `uses`, set `lastUsedAt`, and refresh its workspace. One lock, read and write for the whole batch |
 
