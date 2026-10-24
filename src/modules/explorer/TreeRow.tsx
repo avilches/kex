@@ -87,6 +87,7 @@ export type EntryRowProps = {
   gitStatusCode?: GitStatusCode | null;
   gitColorScheme?: GitColorScheme;
   gitignored?: boolean;
+  isOpenInTab?: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -117,6 +118,7 @@ function EntryRowImpl(props: EntryRowProps) {
     gitStatusCode,
     gitColorScheme = "vscode",
     gitignored = false,
+    isOpenInTab = false,
     onOpenFile,
     onSelectPath,
     onRevealInTerminal,
@@ -290,6 +292,14 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
+            {isOpenInTab && (
+              <span
+                title="Open in a tab"
+                className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground"
+              >
+                <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={2} />
+              </span>
+            )}
           </button>
         )}
       </ContextMenuTrigger>

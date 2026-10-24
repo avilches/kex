@@ -21,14 +21,24 @@ export function buildCatalog(mod: Record<string, unknown>): CatalogEntry[] {
   return out;
 }
 
-// Every query word must appear in the icon name; exact label first, then
-// prefix matches, then the rest alphabetically.
+// Every query word must appear in the icon label, or the whole query (spaces
+// ignored) must appear in the identifier ("penciledit01icon"); exact match
+// first, then prefix matches, then the rest alphabetically.
 export function searchCatalog(catalog: CatalogEntry[], query: string, limit: number): CatalogEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const tokens = q.split(/\s+/);
-  const hits = catalog.filter((e) => tokens.every((t) => e.words.includes(t)));
-  const rank = (e: CatalogEntry) => (e.words === q ? 0 : e.words.startsWith(q) ? 1 : 2);
+  const compact = tokens.join("");
+  const idOf = (e: CatalogEntry) => e.name.toLowerCase();
+  const hits = catalog.filter(
+    (e) => tokens.every((t) => e.words.includes(t)) || idOf(e).includes(compact),
+  );
+  const rank = (e: CatalogEntry) =>
+    e.words === q || idOf(e) === compact
+      ? 0
+      : e.words.startsWith(q) || idOf(e).startsWith(compact)
+        ? 1
+        : 2;
   hits.sort((a, b) => rank(a) - rank(b) || a.words.localeCompare(b.words));
   return hits.slice(0, limit);
 }
