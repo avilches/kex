@@ -495,6 +495,26 @@ fn passthrough_signal(p: &Payload, id: u32) -> Option<serde_json::Value> {
 }
 
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
+    dispatch_with(
+        json,
+        tab_id,
+        pty_id,
+        &mut |event, payload| {
+            let _ = app.emit(event, payload);
+        },
+        &mut |transcript_path| live_model::emit_live_model(app, tab_id, transcript_path),
+    );
+}
+
+/// `dispatch` without a Tauri handle: every event goes through `emit`, so a test can see what
+/// a hook payload sends to the frontend.
+fn dispatch_with(
+    json: &str,
+    tab_id: &str,
+    pty_id: u32,
+    emit: &mut dyn FnMut(&str, serde_json::Value),
+    emit_live_model: &mut dyn FnMut(&str),
+) {
     let Some(p) = parse_payload(json) else {
         log::debug!(
             "[ipc] invalid JSON: {}",
@@ -511,7 +531,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     }
     if reports_agent_cwd(&p.event, p.source.as_deref().unwrap_or(""), &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
-        let _ = app.emit(
+        emit(
             AGENT_CWD_EVENT,
             serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }),
         );
@@ -536,7 +556,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 &p.cwd,
                 same_process,
             );
-            let _ = app.emit(
+            emit(
                 AGENT_SESSION_META_EVENT,
                 serde_json::json!({
                     "tabId":          tab_id,
@@ -553,7 +573,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         "SessionEnd" => {
             let reason = p.reason.as_deref().unwrap_or("");
             log::debug!("[ipc] SessionEnd tab={tab_id} reason={reason}");
-            let _ = app.emit(
+            emit(
                 AGENT_EVENT,
                 agent_signal(pty_id, "SessionEnd", p.agent.as_deref()),
             );
@@ -567,7 +587,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "UserPromptSubmit", p.agent.as_deref());
             sig["prompt"] = prompt.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "Notification" => {
             let notif_type = p.notif_type.as_deref().unwrap_or("");
@@ -586,7 +606,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "Notification", p.agent.as_deref());
             sig["message"] = msg.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
@@ -609,8 +629,8 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             let mut sig = agent_signal(pty_id, "Stop", p.agent.as_deref());
             sig["message"] = last.into();
             sig["backgroundSubagents"] = subagents.into();
-            let _ = app.emit(AGENT_EVENT, sig);
-            live_model::emit_live_model(app, tab_id, &p.transcript_path);
+            emit(AGENT_EVENT, sig);
+            emit_live_model(&p.transcript_path);
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
@@ -620,14 +640,14 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "StopFailure", p.agent.as_deref());
             sig["message"] = err.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "PermissionRequest" => {
             let tool = p.tool_name.as_deref().unwrap_or("");
             log::debug!("[ipc] PermissionRequest tab={tab_id} tool={tool}");
             let mut sig = agent_signal(pty_id, "PermissionRequest", p.agent.as_deref());
             sig["toolName"] = tool.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "SubagentStart" | "SubagentStop" => {
             let Some(agent_id) = p.agent_id.as_deref() else {
@@ -642,7 +662,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             sig["agentId"] = agent_id.into();
             sig["agentType"] = agent_type.into();
             sig["agentDescription"] = p.agent_description.as_deref().unwrap_or("").into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "MessageDisplay" => {
             if !p.is_final {
@@ -656,12 +676,12 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "MessageDisplay", p.agent.as_deref());
             sig["message"] = delta.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         other => match passthrough_signal(&p, pty_id) {
             Some(sig) => {
                 log::debug!("[ipc] {other} tab={tab_id}");
-                let _ = app.emit(AGENT_EVENT, sig);
+                emit(AGENT_EVENT, sig);
             }
             None => log::debug!("[ipc] unhandled event {other} from tab={tab_id}"),
         },
@@ -1115,6 +1135,34 @@ mod tests {
         assert_eq!(sig["id"], 3);
         assert_eq!(sig["agent"], "claude");
         assert_eq!(sig["trigger"], "manual");
+    }
+
+    #[test]
+    fn dispatching_a_post_compact_payload_emits_its_signal() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","trigger":"manual"}"#;
+        let mut emitted = Vec::new();
+        dispatch_with(
+            json,
+            "tab-post-compact",
+            9,
+            &mut |event, payload| emitted.push((event.to_string(), payload)),
+            &mut |_| {},
+        );
+        let kinds: Vec<_> = emitted
+            .iter()
+            .filter(|(event, _)| event == AGENT_EVENT)
+            .map(|(_, sig)| {
+                (
+                    sig["kind"].clone(),
+                    sig["id"].clone(),
+                    sig["trigger"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![("PostCompact".into(), 9.into(), "manual".into())]
+        );
     }
 
     #[test]
