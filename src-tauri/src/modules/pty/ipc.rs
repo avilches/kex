@@ -396,24 +396,43 @@ fn hub(app: &AppHandle) -> &'static HookHub {
 }
 
 /// The app's hook socket, started by the first PTY. A failed bind still returns the path, so
-/// the hook script spools what it cannot deliver instead of dropping it.
+/// the hook script spools what it cannot deliver instead of dropping it, and the next PTY
+/// tries the bind again.
 pub fn hook_socket(app: &AppHandle) -> PathBuf {
-    SOCKET
+    let path = SOCKET
         .get_or_init(|| {
             let dir = runtime_dir();
             sweep_orphaned_sockets(&dir);
-            let path = socket_path_in(&dir);
-            match HookServer::start(path.clone(), hub(app)) {
-                Ok(server) => *SERVER.lock().unwrap_or_else(|e| e.into_inner()) = Some(server),
-                Err(e) => log::warn!("[ipc] hook server on {path:?} failed: {e}"),
-            }
-            path
+            socket_path_in(&dir)
         })
-        .clone()
+        .clone();
+    let mut server = SERVER.lock().unwrap_or_else(|e| e.into_inner());
+    ensure_server(&mut server, &path, |p| {
+        HookServer::start(p.to_path_buf(), hub(app))
+    });
+    path
 }
 
-/// Makes `pty_id` the PTY that frames of `tab_id` are delivered to, replaying what the tab
-/// spooled while it had none. `None` for a tab id that could not name a spool directory.
+/// Starts the server when none is running. The error is logged as a warning on every failed
+/// attempt, so a channel that stays down is visible in the log, not only on the first try.
+fn ensure_server<S>(
+    slot: &mut Option<S>,
+    path: &Path,
+    start: impl FnOnce(&Path) -> std::io::Result<S>,
+) {
+    if slot.is_some() {
+        return;
+    }
+    match start(path) {
+        Ok(server) => *slot = Some(server),
+        Err(e) => log::warn!(
+            "[ipc] hook server on {path:?} failed: {e}; agent hooks are spooled until a later terminal binds it"
+        ),
+    }
+}
+
+/// Claims `tab_id` for `pty_id`, pending until `TabLease::activate`. `None` for a tab id that
+/// could not name a spool directory.
 pub fn register_tab(app: &AppHandle, tab_id: &str, pty_id: u32) -> Option<TabLease> {
     if !is_safe_tab_id(tab_id) {
         log::warn!("[ipc] not registering unsafe tab id {tab_id:?}");
@@ -1449,6 +1468,46 @@ mod tests {
             .unwrap()
             .expect("the trickling client was never cut");
         assert!(cut < Duration::from_secs(3), "cut after {cut:?}");
+    }
+
+    #[test]
+    fn a_failed_bind_is_retried_until_one_succeeds_and_then_never_again() {
+        let mut slot: Option<u32> = None;
+        let mut calls = 0;
+        let path = Path::new("/x/kex-ipc-1.sock");
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Err(std::io::Error::other("busy"))
+        });
+        assert_eq!(slot, None);
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Ok(7)
+        });
+        assert_eq!(slot, Some(7));
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Ok(8)
+        });
+        assert_eq!((slot, calls), (Some(7), 2));
+    }
+
+    #[test]
+    fn a_retried_bind_takes_over_a_path_that_was_unusable_before() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocked = dir.path().join("missing-dir").join("kex-ipc-r.sock");
+        let (hub, _) = test_hub(None);
+        let mut slot = None;
+        ensure_server(&mut slot, &blocked, |p| {
+            HookServer::start(p.to_path_buf(), hub)
+        });
+        assert!(slot.is_none());
+        std::fs::create_dir(blocked.parent().unwrap()).unwrap();
+        ensure_server(&mut slot, &blocked, |p| {
+            HookServer::start(p.to_path_buf(), hub)
+        });
+        assert!(slot.is_some());
+        assert!(UnixStream::connect(&blocked).is_ok());
     }
 
     #[test]
