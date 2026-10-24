@@ -112,13 +112,13 @@ terminal, including hook scripts.
 
 ### Which events Kex registers
 
-`agent_enable_claude_hooks` does not write all 10 events into `~/.claude/settings.json`: it runs `claude --version`
+`agent_enable_claude_hooks` does not write all 11 events into `~/.claude/settings.json`: it runs `claude --version`
 (2 s timeout, on the blocking pool, never on the UI thread) and registers only the events that version knows. Claude
 Code 1.0.23 to 2.1.100 discard the whole `settings.json` when `hooks` holds a key they do not recognise, and newer ones
 print an "Unknown hook event" warning on every start. The table lives in `agent/claude_version.rs` (`hook_events_for`,
 pure and tested at each boundary). First release per event: `Notification` 1.0.23, `Stop` 1.0.31, `SubagentStop` 1.0.41,
 `UserPromptSubmit` 1.0.53, `SessionStart` 1.0.62, `SessionEnd` 1.0.85, `SubagentStart` 2.0.43, `PermissionRequest`
-2.0.45, `StopFailure` 2.1.78, `MessageDisplay` 2.1.152 (this one from Claude's CHANGELOG, it is not in the fixture
+2.0.45, `StopFailure` 2.1.78, `PostCompact` 2.1.76, `MessageDisplay` 2.1.152 (this one from Claude's CHANGELOG, it is not in the fixture
 extracted from the npm releases). When the version cannot be read, only the six events present since 1.0.x are written.
 
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
@@ -134,7 +134,7 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v10`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v11`) handles all 11 registered Claude Code
 hook events the same way:
 
 0. Prints `{}` and a newline on stdout before anything else, early exits and a failed socket send included: some

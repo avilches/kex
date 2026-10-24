@@ -258,6 +258,15 @@ export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       // its background subagents are assumed gone with it.
       store.forgetSubagents(tabId);
       return;
+    case "PostCompact": {
+      // A manual /compact ends without a Stop, so this is what leaves the tab idle. An
+      // automatic one happens inside a running turn, whose own Stop is still to come.
+      if (sig.trigger === "auto") return;
+      const session = store.sessions[tabId];
+      if (!session) return;
+      store.setStatus(tabId, stopOutcome(Object.keys(session.subagents).length, true));
+      return;
+    }
     case "MessageDisplay":
       // Fields TBD after log inspection - for now just ensure session exists.
       ensureSession(tabId, ctx, sig.agent ?? "claude");

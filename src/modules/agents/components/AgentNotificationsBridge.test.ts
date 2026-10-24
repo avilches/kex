@@ -63,6 +63,39 @@ function sig(kind: AgentSignal["kind"], extra: Partial<AgentSignal> = {}): Agent
 const session = () => useAgentStore.getState().sessions["tab-1"];
 const sub = (id: string) => ({ id, agentType: "Explore", description: "" });
 
+describe("handleSignal PostCompact", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+    vi.mocked(routeAgentNotification).mockClear();
+    vi.mocked(focusedTabId).mockReturnValue(null);
+  });
+
+  test("a manual compact leaves a working tab idle without notifying", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session().status).toBe("idle");
+    expect(routeAgentNotification).not.toHaveBeenCalled();
+  });
+
+  test("an automatic compact inside a turn keeps the tab working", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "auto" }), ctx());
+    expect(session().status).toBe("working");
+  });
+
+  test("a compact with a live subagent stays working", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("SubagentStart", { agentId: "a1", agentType: "Explore" }), ctx());
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session().status).toBe("working");
+  });
+
+  test("a compact with no session on the tab does nothing", () => {
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session()).toBeUndefined();
+  });
+});
+
 describe("handleSignal with background subagents", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {}, notifications: [] });

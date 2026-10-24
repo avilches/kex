@@ -13,6 +13,7 @@ type AgentSignalKind =
   | "MessageDisplay"
   | "SubagentStart"
   | "SubagentStop"
+  | "PostCompact"
   | "exited";
 
 export type SubagentRecord = {
@@ -34,6 +35,7 @@ export type AgentSignal = {
   message?: string;
   toolName?: string;
   prompt?: string;
+  trigger?: string;
   agentId?: string;
   agentType?: string;
   agentDescription?: string;

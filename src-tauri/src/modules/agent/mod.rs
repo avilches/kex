@@ -27,7 +27,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // users with an older script see the "Set up Claude Code" button again.
 // v8: the script tags its frames with its first argument, defaulting to "claude" (see trigger-event.sh).
 // v10: the script prints `{}` on stdout before anything else.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v10";
+// v11: the script forwards PostCompact.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v11";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -42,6 +43,7 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v10";
 //   MessageDisplay:     TBD
 //   SubagentStart:      agent_id, agent_type
 //   SubagentStop:       agent_id, agent_type
+//   PostCompact:        trigger (manual|auto)
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
 // OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, and OMP/Pi
@@ -878,6 +880,16 @@ mod tests {
         let v: Value = serde_json::from_str(&frame).unwrap();
         assert_eq!(v["agent"], "codex");
         assert_eq!(v["session_id"], "s1");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_forwards_post_compact() {
+        let payload = r#"{"hook_event_name":"PostCompact","session_id":"s1","trigger":"manual"}"#;
+        let frame = run_trigger_script_with(None, Some("tab-1"), payload).expect("not sent");
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["hook_event_name"], "PostCompact");
+        assert_eq!(v["trigger"], "manual");
     }
 
     #[cfg(unix)]

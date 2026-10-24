@@ -9,7 +9,7 @@ type Version = (u32, u32, u32);
 // ones print a warning on every start, so an event is only written for a release that has it.
 // MessageDisplay is not in Orca's extracted fixture; its release comes from Claude's CHANGELOG.
 // The order is the order the events are written in.
-const EVENT_SINCE: [(&str, Version); 10] = [
+const EVENT_SINCE: [(&str, Version); 11] = [
     ("SessionStart", (1, 0, 62)),
     ("UserPromptSubmit", (1, 0, 53)),
     ("Notification", (1, 0, 23)),
@@ -20,6 +20,7 @@ const EVENT_SINCE: [(&str, Version); 10] = [
     ("MessageDisplay", (2, 1, 152)),
     ("SubagentStart", (2, 0, 43)),
     ("SubagentStop", (1, 0, 41)),
+    ("PostCompact", (2, 1, 76)),
 ];
 
 // What an unknown version gets: the events that exist since 1.0.x.
@@ -205,6 +206,11 @@ mod tests {
     #[test]
     fn subagent_stop_edge() {
         edge("SubagentStop", "1.0.40", "1.0.41");
+    }
+
+    #[test]
+    fn post_compact_edge() {
+        edge("PostCompact", "2.1.75", "2.1.76");
     }
 
     #[test]

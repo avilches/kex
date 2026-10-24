@@ -82,6 +82,7 @@ directamente, sin pasar por `agent_detect.rs`:
 | `StopFailure` | Claude Code falló con error | emit `kex:agent-signal` `kind: "StopFailure"` | route error + `store.finish()` + detach |
 | `SessionEnd` | Sesión terminó limpiamente | emit `kex:agent-signal` `kind: "SessionEnd"` | `store.finish()` + detach |
 | `PermissionRequest` | Claude Code pide permiso para usar una herramienta | emit `kex:agent-signal` `kind: "PermissionRequest"` | `setStatus("attention")` + route |
+| `PostCompact` | Termina un `/compact` (Claude Code 2.1.76 o posterior; payload `trigger` manual o auto) | emit `kex:agent-signal` `kind: "PostCompact"` con `trigger` | Un compact manual no emite `Stop`, así que deja la pestaña en `idle` (o `working` si quedan subagentes vivos), sin notificar. Uno `auto` ocurre dentro de un turno cuyo `Stop` aún llega: se ignora |
 | `MessageDisplay` | Mensaje final de un turno (campos por confirmar) | Si `final` es falso, ignorado; si es verdad, emit `kex:agent-signal` `kind: "MessageDisplay"` | `ensureSession` (sin efecto adicional hoy) |
 
 Ningún evento de este canal arma ni desarma `agent_detect.rs`: `armed` ahí solo reacciona a `OSC 133`/`OSC 9`
@@ -212,7 +213,7 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 - Reads `~/.claude/settings.json` atomically
 - Injects hook entries for the events of `trigger-event.sh` that the installed Claude Code knows (up to 10: `SessionStart`,
   `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
-  `SubagentStart`, `SubagentStop`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
+  `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 

@@ -198,6 +198,8 @@ struct Payload {
     error_message: Option<String>,
     // PermissionRequest
     tool_name: Option<String>,
+    // PostCompact
+    compact_trigger: Option<String>,
     // MessageDisplay
     is_final: bool,
     turn_id: Option<String>,
@@ -246,6 +248,7 @@ fn parse_payload(json: &str) -> Option<Payload> {
         agent_description: v["description"].as_str().map(str::to_string),
         error_message: v["error_message"].as_str().map(str::to_string),
         tool_name: v["tool_name"].as_str().map(str::to_string),
+        compact_trigger: v["trigger"].as_str().map(str::to_string),
         is_final: v["final"].as_bool().unwrap_or(false),
         turn_id: v["turn_id"].as_str().map(str::to_string),
         delta: v["delta"].as_str().map(str::to_string),
@@ -477,6 +480,12 @@ fn agent_signal(id: u32, kind: &str, agent: Option<&str>) -> serde_json::Value {
     })
 }
 
+fn post_compact_signal(id: u32, p: &Payload) -> serde_json::Value {
+    let mut sig = agent_signal(id, "PostCompact", p.agent.as_deref());
+    sig["trigger"] = p.compact_trigger.as_deref().unwrap_or("").into();
+    sig
+}
+
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
         log::debug!(
@@ -626,6 +635,11 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             sig["agentType"] = agent_type.into();
             sig["agentDescription"] = p.agent_description.as_deref().unwrap_or("").into();
             let _ = app.emit(AGENT_EVENT, sig);
+        }
+        "PostCompact" => {
+            let trigger = p.compact_trigger.as_deref().unwrap_or("");
+            log::debug!("[ipc] PostCompact tab={tab_id} trigger={trigger}");
+            let _ = app.emit(AGENT_EVENT, post_compact_signal(pty_id, &p));
         }
         "MessageDisplay" => {
             if !p.is_final {
@@ -1081,6 +1095,26 @@ mod tests {
         let json = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
         let p = parse_payload(json).unwrap();
         assert_eq!(p.error_message.as_deref(), Some("oops"));
+    }
+
+    #[test]
+    fn post_compact_reaches_the_frontend_as_a_signal_with_its_trigger() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","transcript_path":"","cwd":"/p","trigger":"manual"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "PostCompact");
+        assert!(reports_agent_cwd(&p.event, "", &p.cwd));
+        let sig = post_compact_signal(3, &p);
+        assert_eq!(sig["kind"], "PostCompact");
+        assert_eq!(sig["id"], 3);
+        assert_eq!(sig["agent"], "claude");
+        assert_eq!(sig["trigger"], "manual");
+    }
+
+    #[test]
+    fn post_compact_without_a_trigger_sends_an_empty_one() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s"}"#;
+        let sig = post_compact_signal(1, &parse_payload(json).unwrap());
+        assert_eq!(sig["trigger"], "");
     }
 
     #[test]

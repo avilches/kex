@@ -143,7 +143,7 @@ below). An older ("v4") design had the hook emit an `OSC 777;kex;...` marker
 through the PTY stream instead; once the socket migration (`2145a981`,
 `ed14289f`) left nothing emitting it, that parser was deleted from
 `agent_detect.rs` (TASK-733), so the Rust detector now only handles the OSC
-channel. The current mechanism is marked `kex-session-v10` inside the hook
+channel. The current mechanism is marked `kex-session-v11` inside the hook
 script itself (`SESSION_HOOK_SCRIPT_VERSION` in `agent/mod.rs`).
 
 ### 2.1 OSC still in use
@@ -287,9 +287,9 @@ was removed). Still open:
 - Hook events are written to `settings.json` without checking the installed
   Claude Code version (TASK-893).
 - The hook script prints nothing to stdout, Orca prints `{}` first (TASK-894).
-- Orca forwards more events than Kex (`PostCompact`, `PreToolUse`,
-  `PostToolUse`, `PostToolUseFailure`, `TeammateIdle`); whether Kex should is
-  TASK-895.
+- Orca forwards more events than Kex. TASK-895 added `PostCompact` and left
+  out `PreToolUse`, `PostToolUse`, `PostToolUseFailure` and `TeammateIdle`
+  (a bash, jq and nc launch per tool call for an uncertain benefit).
 - No `statusLine` integration for usage limits (TASK-738).
 - No viewer for a session that has no live terminal (TASK-737).
 

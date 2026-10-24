@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kex-session-v10
+# kex-session-v11
 # Some Claude Code versions treat an empty hook stdout as a failure, so `{}` goes out first,
 # before any early exit or socket work; Claude reads it as "no output" (no context, no warning).
 printf '{}\n'
@@ -123,8 +123,12 @@ handle_SubagentStop() {
     send_ipc
 }
 
+handle_PostCompact() {
+    send_ipc
+}
+
 case "$EVENT" in
-    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay|SubagentStart|SubagentStop)
+    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay|SubagentStart|SubagentStop|PostCompact)
         "handle_${EVENT}" ;;
     *) exit 0 ;;
 esac
