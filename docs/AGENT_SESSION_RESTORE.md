@@ -124,7 +124,7 @@ extracted from the npm releases). When the version cannot be read, only the six 
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
 a downgrade removes Kex's hook from the events the older Claude does not know. Uninstalling removes Kex's hook from
 every known event whatever the installed version. `agent_claude_hooks_status` expects the events of the installed
-version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v11` since the script forwards `PostCompact`.
+version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v12` since the script forwards `PostCompact`.
 
 ### SessionStart hook
 
@@ -134,7 +134,7 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v11`) handles all 11 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v12`) handles all 11 registered Claude Code
 hook events the same way:
 
 0. Prints `{}` and a newline on stdout before anything else, early exits and a failed socket send included: some
@@ -155,8 +155,8 @@ hook events the same way:
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
    without rotation (TASK-557); removed with no replacement since nothing depended on it.
 3. Forwards the JSON payload, re-serialized by the `agent` tag, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
-   falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
-   `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
+   falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, the
+   event is spooled (below); if `KEX_IPC` is unset it is silently dropped.
 4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
    directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
@@ -199,6 +199,8 @@ emitted by `/clear` and `/resume`, which keep the process alive. Claude Code onl
 resume and `/clear`, so a record dropped while the process is still running would never be written again and the
 tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
 destroyed before the PTYs finish shutting down, so a single store file is sufficient.
+
+**Offline spool.** When neither `nc` nor `python3` can reach the socket (listener not accepting yet, crashed, gone), `trigger-event.sh` writes the payload as its own file in `~/.config/kex/spool/<tab_id>/`, named `<microseconds>-<pid>-<random>.json` so names sort in arrival order (`EPOCHREALTIME` on bash 5, GNU `date +%s%N`, whole seconds on macOS bash 3.2, whose same-second ties order by PID). The file is written under a dot name and renamed into place, so a visible file is always complete, and no existing file is ever rewritten, so concurrent hooks cannot lose each other's events. After each write the script prunes the directory to the newest 200 files and deletes files older than 7 days, so a tab that never reopens cannot grow it without bound. When a listener starts, `ipc.rs::drain_spool` hands the files to `dispatch` in name order, removing each one only after it is handed off (a crash mid-drain leaves exactly the undelivered files for the next start, at-least-once) and then the empty directory; dot files are in-flight temporaries and are skipped. Stale `SessionEnd` and `StopFailure` are discarded (`stale_spooled_event_kind`). Old `<tab_id>.jsonl` spool files from script v11 and earlier are no longer read (TASK-730, TASK-896).
 
 ### OpenCode plugin
 

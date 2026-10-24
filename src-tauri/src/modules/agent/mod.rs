@@ -28,7 +28,8 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // v8: the script tags its frames with its first argument, defaulting to "claude" (see trigger-event.sh).
 // v10: the script prints `{}` on stdout before anything else.
 // v11: the script forwards PostCompact.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v11";
+// v12: undelivered events are spooled as one file per event instead of a rotated .jsonl.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v12";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -931,6 +932,141 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[cfg(unix)]
+    fn spool_script(home: &std::path::Path) -> std::path::PathBuf {
+        let script = home.join("trigger-event.sh");
+        std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
+        script
+    }
+
+    #[cfg(unix)]
+    fn spawn_spooling_script(
+        script: &std::path::Path,
+        home: &std::path::Path,
+        payload: &str,
+    ) -> std::process::Child {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let mut child = Command::new("bash")
+            .arg(script)
+            .env("HOME", home)
+            .env("KEX_TERMINAL", "1")
+            .env("KEX_TAB_ID", "tab-spool")
+            .env("KEX_IPC", home.join("missing.sock"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        // The script may exit before reading when nothing needs the payload.
+        let _ = child.stdin.take().unwrap().write_all(payload.as_bytes());
+        child
+    }
+
+    #[cfg(unix)]
+    fn spooled_files(home: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let dir = home.join(".config/kex/spool/tab-spool");
+        let mut files: Vec<_> = std::fs::read_dir(dir)
+            .map(|rd| rd.filter_map(Result::ok).map(|e| e.path()).collect())
+            .unwrap_or_default();
+        files.sort();
+        files
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_spools_30_concurrent_events_without_losing_any() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let children: Vec<_> = (0..30)
+            .map(|i| {
+                let payload =
+                    format!(r#"{{"hook_event_name":"Notification","session_id":"s{i}"}}"#);
+                spawn_spooling_script(&script, dir.path(), &payload)
+            })
+            .collect();
+        for mut c in children {
+            assert!(c.wait().unwrap().success());
+        }
+
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 30);
+        assert!(files
+            .iter()
+            .all(|f| !f.file_name().unwrap().to_string_lossy().starts_with('.')));
+        let mut sessions: Vec<_> = files
+            .iter()
+            .map(|f| {
+                let v: serde_json::Value =
+                    serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap();
+                v["session_id"].as_str().unwrap().to_string()
+            })
+            .collect();
+        sessions.sort();
+        let mut expected: Vec<_> = (0..30).map(|i| format!("s{i}")).collect();
+        expected.sort();
+        assert_eq!(sessions, expected);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_spool_names_sort_in_arrival_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        for i in 0..3 {
+            let payload = format!(r#"{{"hook_event_name":"Notification","session_id":"s{i}"}}"#);
+            spawn_spooling_script(&script, dir.path(), &payload)
+                .wait()
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(1100));
+        }
+        let order: Vec<_> = spooled_files(dir.path())
+            .iter()
+            .map(|f| std::fs::read_to_string(f).unwrap())
+            .collect();
+        for (i, body) in order.iter().enumerate() {
+            assert!(body.contains(&format!("\"s{i}\"")), "{order:?}");
+        }
+        assert_eq!(order.len(), 3);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prunes_the_spool_by_count_and_by_age() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let spool = dir.path().join(".config/kex/spool/tab-spool");
+        std::fs::create_dir_all(&spool).unwrap();
+        for i in 0..205 {
+            std::fs::write(spool.join(format!("{i:016}-0000001-00000.json")), "{}\n").unwrap();
+        }
+        let old = spool.join("0000000000000000-old.json");
+        std::fs::write(&old, "{}\n").unwrap();
+        let week_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(9 * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_modified(week_ago)
+            .unwrap();
+
+        let payload = r#"{"hook_event_name":"Notification","session_id":"new"}"#;
+        assert!(spawn_spooling_script(&script, dir.path(), payload)
+            .wait()
+            .unwrap()
+            .success());
+
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 200);
+        assert!(!old.exists());
+        assert!(
+            !spool.join(format!("{:016}-0000001-00000.json", 0)).exists(),
+            "the oldest by name goes first"
+        );
+        let newest = files.last().unwrap();
+        assert!(std::fs::read_to_string(newest).unwrap().contains("\"new\""));
+    }
+
     #[test]
     fn trigger_script_without_a_tab_id_sends_nothing() {
         assert!(run_trigger_script(Some("codex"), None).is_none());

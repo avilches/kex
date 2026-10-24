@@ -201,11 +201,12 @@ send_ipc() {
 ```
 
 If both `nc` and the `python3` fallback fail, the script appends the payload to
-`~/.config/kex/spool/<tab_id>.jsonl` (capped at 200 lines, oldest dropped
-first) and exits 0; the listener replays that file when it starts
-(`ipc.rs::drain_spool`, which skips stale `SessionEnd` and `StopFailure`).
-This is TASK-730, done. TASK-896 proposes replacing the bash rotation with one
-file per event.
+`~/.config/kex/spool/<tab_id>/<timestamp>-<pid>-<random>.json`, one file per
+event, written under a dot name and renamed into place (nothing is ever
+rewritten; capped at 200 files and 7 days, oldest deleted first) and exits 0;
+the listener replays the files in name order and removes each one when it
+starts (`ipc.rs::drain_spool`, which skips stale `SessionEnd` and
+`StopFailure`). This is TASK-730 and TASK-896, done.
 
 The listener (`ipc.rs::run_listener`, `#![cfg(unix)]`, so **this whole path
 is absent on native Windows**, see TASK-731) reads one line per connection
@@ -320,7 +321,6 @@ Open, by suggested order:
 | TASK-893 | Register only the hook events the installed Claude Code version knows | High | none |
 | TASK-894 | `trigger-event.sh` prints `{}` to stdout first | Low | none |
 | TASK-895 | Decide whether to forward more events (measure cost first) | Low | TASK-893 |
-| TASK-896 | Spool as one file per event, no bash rotation | Low | TASK-730 (done) |
 | TASK-736 | One hook server for the whole app instead of one socket per tab | Medium | none |
 | TASK-731 | Agents on native Windows | Low | TASK-736 |
 | TASK-738 | `statusLine` for usage limits (user already has their own) | Low | TASK-736 |

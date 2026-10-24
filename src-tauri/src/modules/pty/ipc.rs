@@ -262,83 +262,68 @@ fn spool_dir() -> Option<PathBuf> {
     Some(dirs::home_dir()?.join(".config").join("kex").join("spool"))
 }
 
-fn spool_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
-    base.join(format!("{tab_id}.jsonl"))
-}
-
-/// The path a spool file is renamed to while being drained. See `drain_spool`
-/// for why the rename happens before reading.
-fn spool_draining_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
-    base.join(format!("{tab_id}.jsonl.draining"))
+/// The directory holding one file per undelivered event of a tab.
+fn spool_dir_for_tab(base: &Path, tab_id: &str) -> PathBuf {
+    base.join(tab_id)
 }
 
 /// Replays any hook events spooled to disk by `trigger-event.sh` because a
-/// live `send_ipc` delivery failed, handing each line to `on_line` (in
-/// production, `dispatch`) in the order they were appended.
+/// live `send_ipc` delivery failed, handing each payload to `on_line` (in
+/// production, `dispatch`) in file-name order, which is arrival order.
 ///
-/// Claims the spool file with a rename before reading it, rather than
-/// read-then-delete in place: a rename on the same filesystem is atomic, so
-/// any line `trigger-event.sh` appends after this point lands in a spool
-/// file created fresh by its next write, never in the file we just renamed
-/// away. Reading straight from the live path and deleting it afterwards
-/// would leave a window where a line appended between the read and the
-/// delete is silently dropped, exactly the bug this spool exists to
-/// prevent.
-///
-/// If a `.draining` file is already there, it is a leftover from a previous
-/// drain that crashed between the rename and the final `remove_file`; it is
-/// replayed first so those lines aren't lost, before claiming the live
-/// spool (if any) the same way.
+/// The script writes each event under a dot name and renames it into place,
+/// so a visible file is always complete, and it never rewrites an existing
+/// file, so there is nothing to claim or lock here. Each file is removed
+/// right after it is handed off: a crash mid-drain leaves exactly the
+/// undelivered files for the next drain, which is also how a half-drained
+/// directory recovers. That trades a possible duplicate (a crash between
+/// `on_line` and the remove) for never dropping an event, like the rest of
+/// this module (at-least-once). Dot files are scripts' in-flight or
+/// crashed temporaries and are left to the script's age pruning.
 fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
-    let draining_path = spool_draining_path_for_tab(base, tab_id);
-    drain_file(&draining_path, tab_id, &mut on_line);
-
-    let path = spool_path_for_tab(base, tab_id);
-    if let Err(e) = std::fs::rename(&path, &draining_path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            log::warn!("[ipc] failed to claim spool {path:?} for draining: {e}");
-        }
-        return;
-    }
-    drain_file(&draining_path, tab_id, &mut on_line);
-}
-
-/// Reads `path` line by line, hands each non-blank line to `on_line`, then
-/// removes it. The file is removed only after every line has been handed
-/// off, so a crash mid-drain leaves it in place for the next attempt to
-/// replay. That trades a possible duplicate delivery for never silently
-/// dropping an event, which matches how the rest of this module treats
-/// agent signals (at-least-once, not exactly-once).
-fn drain_file(path: &Path, tab_id: &str, on_line: &mut impl FnMut(&str)) {
-    let contents = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+    let dir = spool_dir_for_tab(base, tab_id);
+    let mut files: Vec<PathBuf> = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+            .map(|e| e.path())
+            .collect(),
         Err(e) => {
-            log::warn!("[ipc] failed to read spool {path:?}: {e}");
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("[ipc] failed to read spool dir {dir:?}: {e}");
+            }
             return;
         }
     };
+    files.sort();
 
-    let lines: Vec<&str> = contents
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect();
-    if !lines.is_empty() {
-        for line in &lines {
-            on_line(line);
+    let mut drained = 0usize;
+    for path in &files {
+        match std::fs::read_to_string(path) {
+            Ok(contents) => {
+                let payload = contents.trim();
+                if !payload.is_empty() {
+                    on_line(payload);
+                    drained += 1;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                log::warn!("[ipc] failed to read spooled event {path:?}: {e}");
+                continue;
+            }
         }
-        log::debug!(
-            "[ipc] drained {} spooled event(s) for tab={tab_id}",
-            lines.len()
-        );
-    }
-
-    if let Err(e) = std::fs::remove_file(path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            log::warn!("[ipc] failed to remove drained spool {path:?}: {e}");
+        if let Err(e) = std::fs::remove_file(path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("[ipc] failed to remove drained event {path:?}: {e}");
+            }
         }
     }
+    if drained > 0 {
+        log::debug!("[ipc] drained {drained} spooled event(s) for tab={tab_id}");
+    }
+    // Fails while a script still has a file in flight, which is fine.
+    let _ = std::fs::remove_dir(&dir);
 }
 
 /// Creates the socket, then spawns the listener thread. Returns an IpcGuard
@@ -1198,25 +1183,31 @@ mod tests {
         assert_eq!(p.delta.as_deref(), Some("hello"));
     }
 
+    fn spool_event_file(base: &Path, tab_id: &str, name: &str, body: &str) -> PathBuf {
+        let dir = spool_dir_for_tab(base, tab_id);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, body).unwrap();
+        path
+    }
+
     #[test]
-    fn drain_spool_replays_lines_in_order_then_removes_the_file() {
+    fn drain_spool_replays_events_in_file_name_order_then_removes_them_and_the_directory() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-1";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "line-one\nline-two\nline-three\n").unwrap();
+        spool_event_file(dir.path(), tab_id, "0002-b.json", "line-two\n");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "line-three\n");
+        spool_event_file(dir.path(), tab_id, "0001-a.json", "line-one\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
         assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
-        assert!(
-            !path.exists(),
-            "spool file should be removed after a full drain"
-        );
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).exists());
     }
 
     #[test]
-    fn drain_spool_is_a_noop_when_no_spool_file_exists() {
+    fn drain_spool_is_a_noop_when_no_spool_directory_exists() {
         let dir = tempfile::tempdir().unwrap();
         let mut called = false;
         drain_spool(dir.path(), "tab-missing", |_| called = true);
@@ -1224,82 +1215,72 @@ mod tests {
     }
 
     #[test]
-    fn drain_spool_skips_blank_lines() {
+    fn drain_spool_skips_blank_files_and_in_flight_dot_files() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-2";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "\n  \nreal-line\n\n").unwrap();
+        spool_event_file(dir.path(), tab_id, "0001-a.json", "\n  \n");
+        let in_flight = spool_event_file(dir.path(), tab_id, ".0002-b.json.tmp", "half");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "real\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
-        assert_eq!(seen, vec!["real-line"]);
+
+        assert_eq!(seen, vec!["real"]);
+        assert!(
+            in_flight.exists(),
+            "a temporary being written is not ours to touch"
+        );
     }
 
     #[test]
-    fn drain_spool_leaves_other_tabs_spool_files_untouched() {
+    fn drain_spool_leaves_other_tabs_spool_directories_untouched() {
         let dir = tempfile::tempdir().unwrap();
-        let other_path = spool_path_for_tab(dir.path(), "tab-other");
-        std::fs::write(&other_path, "untouched\n").unwrap();
-
+        let other = spool_event_file(dir.path(), "tab-other", "0001-a.json", "other\n");
         let mut called = false;
         drain_spool(dir.path(), "tab-drain-3", |_| called = true);
-
         assert!(!called);
-        assert!(other_path.exists());
+        assert!(other.exists());
     }
 
     #[test]
-    fn drain_spool_claims_the_file_by_rename_before_reading_it() {
-        // A drain that read-then-deleted the live path in place would have a
-        // window where a line appended between the read and the delete is
-        // lost. Renaming first means the live path is gone (and free for a
-        // fresh append) the instant the rename succeeds, before any line has
-        // even been read.
+    fn drain_spool_resumes_a_directory_left_half_drained_by_a_crash() {
+        // A crash after the first event was handed off and removed leaves only
+        // the rest; a new file arriving meanwhile sorts after them.
         let dir = tempfile::tempdir().unwrap();
-        let tab_id = "tab-drain-rename";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "line-one\n").unwrap();
+        let tab_id = "tab-drain-crash";
+        spool_event_file(dir.path(), tab_id, "0002-b.json", "second\n");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "third\n");
+        spool_event_file(dir.path(), tab_id, "0004-d.json", "fourth\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
-        assert_eq!(seen, vec!["line-one"]);
-        assert!(!path.exists());
-        assert!(!draining_path.exists());
+        assert_eq!(seen, vec!["second", "third", "fourth"]);
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).exists());
     }
 
     #[test]
-    fn drain_spool_replays_a_leftover_draining_file_from_a_crashed_drain() {
-        // Simulates a process that renamed the live spool to `.draining` on a
-        // previous run but crashed before finishing (or before removing the
-        // file), then wrote a new live spool file afterwards. Both must be
-        // replayed, oldest first, and neither should clobber the other.
+    fn drain_spool_keeps_a_file_whose_handoff_did_not_finish() {
+        // The file is removed only after on_line returns, so a panic inside it
+        // (standing in for a crash) leaves the event for the next drain.
         let dir = tempfile::tempdir().unwrap();
-        let tab_id = "tab-drain-leftover";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&draining_path, "leftover-line\n").unwrap();
-        std::fs::write(&path, "fresh-line\n").unwrap();
+        let tab_id = "tab-drain-panic";
+        let kept = spool_event_file(dir.path(), tab_id, "0001-a.json", "boom\n");
 
-        let mut seen = Vec::new();
-        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            drain_spool(dir.path(), tab_id, |_| panic!("crash"));
+        }));
 
-        assert_eq!(seen, vec!["leftover-line", "fresh-line"]);
-        assert!(!path.exists());
-        assert!(!draining_path.exists());
+        assert!(result.is_err());
+        assert!(kept.exists());
     }
 
     #[test]
-    fn drain_spool_lines_parse_the_same_way_a_live_payload_does() {
-        // Proves a spooled line reaches dispatch's parsing exactly like a
-        // payload that arrived over the live socket: same parse_payload call,
-        // same JSON shape, same extracted event kind.
+    fn drain_spool_payloads_parse_the_same_way_a_live_payload_does() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-4";
-        let path = spool_path_for_tab(dir.path(), tab_id);
         let payload = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":"","stop_reason":"end_turn","last_assistant_message":"done"}"#;
-        std::fs::write(&path, format!("{payload}\n")).unwrap();
+        spool_event_file(dir.path(), tab_id, "0001-a.json", &format!("{payload}\n"));
 
         let mut events = Vec::new();
         drain_spool(dir.path(), tab_id, |line| {
@@ -1339,17 +1320,17 @@ mod tests {
         // still replay normally.
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-stale";
-        let path = spool_path_for_tab(dir.path(), tab_id);
         let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
         let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
         let session_start =
             r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
         let notification = r#"{"hook_event_name":"Notification","session_id":"s","transcript_path":"","cwd":"","message":"hi","notification_type":"other"}"#;
-        std::fs::write(
-            &path,
-            format!("{session_end}\n{session_start}\n{stop_failure}\n{notification}\n"),
-        )
-        .unwrap();
+        for (i, body) in [session_end, session_start, stop_failure, notification]
+            .iter()
+            .enumerate()
+        {
+            spool_event_file(dir.path(), tab_id, &format!("000{i}-x.json"), body);
+        }
 
         let mut replayed = Vec::new();
         drain_spool(dir.path(), tab_id, |line| {

@@ -247,6 +247,8 @@ Independent of agents, the PTY reader emits `kex:shell-ready` (`{ id }`, the PTY
 
 The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed). The first time a socket path is built, `kex-ipc-<pid>-*.sock` files whose pid no longer exists (`kill(pid, 0)` returns ESRCH) are deleted; sockets of live pids are never touched.
 
+Events the script cannot deliver are spooled as one file per event under `~/.config/kex/spool/<tab_id>/` and replayed in order by `drain_spool` when the tab's listener starts (see `docs/AGENT_SESSION_RESTORE.md`, "Offline spool").
+
 Hooks must be installed via "Set up Claude Code" (notification bell popover). See `docs/NOTIFICATIONS.md` for the detector state machine and `docs/AGENT_SESSION_RESTORE.md` for session persistence.
 
 ### OS notification deep-link
