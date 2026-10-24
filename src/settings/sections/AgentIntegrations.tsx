@@ -2,7 +2,6 @@ import { INTEGRATION_MIN_BUSY_MS } from "@/modules/agents/lib/integrations";
 import { useIntegration } from "@/modules/agents/lib/useIntegration";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Notification03Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
-import { FieldLabel } from "../components/FieldLabel";
 import { AgentIntegrationRow } from "./AgentIntegrationRow";
 
 const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS };
@@ -16,8 +15,7 @@ export function AgentIntegrations() {
 
   return (
     <div className="flex flex-col gap-2">
-      <FieldLabel>Agents</FieldLabel>
-      <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+      <div className="flex flex-col gap-2.5">
         <Benefit
           icon={Notification03Icon}
           title="Spinner and attention dot"
@@ -30,6 +28,12 @@ export function AgentIntegrations() {
         />
       </div>
       <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border/60 bg-card/60">
+        <AgentIntegrationRow
+          agent="codex"
+          name="Codex"
+          files={["~/.codex/hooks.json", "~/.codex/config.toml"]}
+          state={codex}
+        />
         <AgentIntegrationRow
           agent="claude"
           name="Claude Code"
@@ -53,12 +57,6 @@ export function AgentIntegrations() {
           name="Pi"
           files={["~/.pi/agent/extensions/kex-agent-status.ts"]}
           state={pi}
-        />
-        <AgentIntegrationRow
-          agent="codex"
-          name="Codex"
-          files={["~/.codex/hooks.json", "~/.codex/config.toml"]}
-          state={codex}
         />
       </div>
       <p className="text-[10.5px] text-muted-foreground">
