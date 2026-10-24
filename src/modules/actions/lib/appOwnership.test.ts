@@ -13,8 +13,8 @@ const preset: Action = {
   ownButton: false,
 };
 
-const sublime: AppSuggestion = { key: "sublime:ws", appId: "sublime", name: "Sublime Text {workspace}", iconId: "sublime", defaultCommand: "subl {workspace}" };
-const zed: AppSuggestion = { key: "zed:ws", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
+const sublime: AppSuggestion = { key: "sublime:ws", appId: "sublime", name: "Sublime Text {workspace}", iconId: "sublime", defaultCommand: "subl {workspace}", kind: "app" };
+const zed: AppSuggestion = { key: "zed:ws", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
 const presets = [sublime, zed];
 
 // What the store keeps after an edit, the way Settings applies it.
@@ -77,5 +77,34 @@ describe("presetOf", () => {
     expect(presetOf({ kind: "app", command: " subl {workspace} " }, presets)).toBe(sublime);
     expect(presetOf({ kind: "app", command: "subl" }, presets)).toBeUndefined();
     expect(presetOf({ kind: "script", command: "subl {workspace}" }, presets)).toBeUndefined();
+  });
+});
+
+describe("agent presets", () => {
+  const agentWs: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
+  const agentCtx: AppSuggestion = { ...agentWs, key: "claude:context", cwdMode: "context" };
+  const agents = [agentWs, agentCtx];
+  const installed: Action = { id: "g", name: "Claude Code", command: "claude", kind: "agent", appId: "claude", cwdMode: "context", ownButton: false };
+
+  it("offers the other variant while one is installed", () => {
+    expect(uninstalledSuggestions(agents, [installed])).toEqual([agentWs]);
+  });
+
+  it("never matches across kinds", () => {
+    const app: Action = { ...installed, kind: "app", cwdMode: undefined };
+    expect(uninstalledSuggestions(agents, [app])).toEqual(agents);
+    expect(uninstalledSuggestions([sublime], [{ ...preset, kind: "agent" }])).toEqual([sublime]);
+    expect(presetOf(installed, agents)).toBe(agentCtx);
+    expect(presetOf({ kind: "app", command: "claude" }, agents)).toBeUndefined();
+  });
+
+  it("owns an edited command or start folder, and gives the link back on restore", () => {
+    const edited = ownedAfterEdit(installed, { ...installed, command: "claude --model opus" }, agents);
+    expect(edited).toMatchObject({ appId: "", iconId: "claude" });
+    const own = apply([installed], edited)[0]!;
+    expect(uninstalledSuggestions(agents, [own])).toEqual(agents);
+    const back = ownedAfterEdit(own, { ...own, command: "claude" }, agents);
+    expect(back).toMatchObject({ appId: "claude", iconId: "" });
+    expect(ownedAfterEdit(installed, { ...installed, cwdMode: "workspace" }, agents)).toMatchObject({ appId: "claude" });
   });
 });

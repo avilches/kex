@@ -12,8 +12,8 @@ const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm 
 const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {filepath}", ownButton: false };
 const preset: Action = { id: "ac-3", name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
 
-const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" };
-const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}" };
+const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
+const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" };
 
 type Handlers = { onAdd: ReturnType<typeof vi.fn>; onUpdate: ReturnType<typeof vi.fn>; onRemove: ReturnType<typeof vi.fn>; onReorder: ReturnType<typeof vi.fn> };
 

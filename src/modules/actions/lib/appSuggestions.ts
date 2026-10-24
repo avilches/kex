@@ -1,7 +1,8 @@
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
-import { isApp, type Action } from "./types";
+import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
+import type { Action, ActionKind } from "./types";
 
 export type AppSuggestion = {
   /** Unique within a list: the app id, plus the variable the preset points at. */
@@ -13,6 +14,9 @@ export type AppSuggestion = {
   iconId: string | null;
   /** Editable template that goes through the argv expander. */
   defaultCommand: string;
+  kind: ActionKind;
+  /** Agents only: where the preset starts the agent. */
+  cwdMode?: ScriptCwdMode;
 };
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
@@ -20,31 +24,55 @@ export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   name: "Custom app",
   iconId: null,
   defaultCommand: "",
+  kind: "app",
 };
 
 const KNOWN = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 
 const sameCommand = (a: string, b: string): boolean => a.trim() === b.trim();
 
-/** An app is defined by its command alone: the name, the icon and the appId do not matter. */
-export function hasCommandOf(actions: readonly Action[], command: string): boolean {
-  return !!command.trim() && actions.some((a) => isApp(a) && sameCommand(a.command, command));
+type Identity = { kind: ActionKind; command: string; cwdMode?: ScriptCwdMode };
+
+/** An app is defined by its command alone: the name, the icon and the appId do not matter. An
+ * agent is defined by its command and where it starts, so one binary backs two presets. */
+export function sameIdentity(a: Identity, b: Identity): boolean {
+  if (a.kind !== b.kind || !sameCommand(a.command, b.command)) return false;
+  return a.kind !== "agent" || a.cwdMode === b.cwdMode;
 }
 
-/** The presets still to install, one per app and starting point: a preset whose command some
- * app already has is installed, and installed presets stay out of the combo, because the good
- * next step is Edit on that app, not a second copy. */
+export function hasCommandOf(
+  actions: readonly Action[],
+  command: string,
+  kind: ActionKind = "app",
+  cwdMode?: ScriptCwdMode,
+): boolean {
+  return !!command.trim() && actions.some((a) => sameIdentity(a, { kind, command, cwdMode }));
+}
+
+/** The presets still to install: a preset whose identity some Action already has is installed,
+ * and installed presets stay out of the combo, because the good next step is Edit on that
+ * Action, not a second copy. */
 export function uninstalledSuggestions(
   suggestions: readonly AppSuggestion[],
   actions: readonly Action[],
 ): AppSuggestion[] {
-  return suggestions.filter((s) => !(s.appId && hasCommandOf(actions, s.defaultCommand)));
+  return suggestions.filter((s) => !(s.appId && hasCommandOf(actions, s.defaultCommand, s.kind, s.cwdMode)));
 }
 
-/** The detected preset an app is, by its command, or undefined when it is the user's own. */
-export function presetOf(action: Pick<Action, "kind" | "command">, suggestions: readonly AppSuggestion[]): AppSuggestion | undefined {
-  if (!isApp(action)) return undefined;
-  return suggestions.find((s) => s.appId && sameCommand(s.defaultCommand, action.command));
+/** The detected preset an Action is, by its identity, or undefined when it is the user's own. */
+export function presetOf(
+  action: Pick<Action, "kind" | "command" | "cwdMode">,
+  suggestions: readonly AppSuggestion[],
+): AppSuggestion | undefined {
+  if (action.kind === "script") return undefined;
+  return suggestions.find(
+    (s) =>
+      s.appId &&
+      sameIdentity(
+        { kind: s.kind, command: s.defaultCommand, cwdMode: s.cwdMode },
+        { kind: action.kind, command: action.command, cwdMode: action.cwdMode },
+      ),
+  );
 }
 
 // Text goes through the template parser, where a brace is a variable; doubling keeps it literal.
@@ -68,8 +96,10 @@ const VARIANTS = ["filepath", "workspace", "cwd"] as const;
 
 // Alphabetical by app, and within one app the three presets in their variant order, so
 // the combo reads like a list of names and the variants of one app stay together.
+const RANKS: readonly string[] = [...VARIANTS, "context"];
+
 export function compareByName(a: AppSuggestion, b: AppSuggestion): number {
-  const rank = (s: AppSuggestion) => VARIANTS.indexOf(s.key.slice(s.key.lastIndexOf(":") + 1) as (typeof VARIANTS)[number]);
+  const rank = (s: AppSuggestion) => RANKS.indexOf(s.key.slice(s.key.lastIndexOf(":") + 1));
   const main = (s: AppSuggestion) => splitActionName(s.name).main;
   return main(a).localeCompare(main(b)) || rank(a) - rank(b);
 }
@@ -94,7 +124,29 @@ export function suggestionsFromDetected(detected: readonly DetectedEditor[]): Ap
         name: `${name} {${target}}`,
         iconId: editor.id,
         defaultCommand: commandFor(editor, `{${target}}`),
+        kind: "app" as const,
       }));
     })
+    .sort(compareByName);
+}
+
+const AGENT_VARIANTS = ["workspace", "context"] as const satisfies readonly ScriptCwdMode[];
+
+/** Two presets per enabled agent, starting in the workspace root or in the current directory.
+ * The command is the bare binary name, so the Action stays portable across machines. */
+export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]): AppSuggestion[] {
+  return agents
+    .filter((a) => a.enabled !== false)
+    .flatMap((agent) =>
+      AGENT_VARIANTS.map((cwdMode) => ({
+        key: `${agent.id}:${cwdMode}`,
+        appId: agent.id,
+        name: agent.name,
+        iconId: agent.id,
+        defaultCommand: agent.binary.split(/[\\/]/).pop() || agent.binary,
+        kind: "agent" as const,
+        cwdMode,
+      })),
+    )
     .sort(compareByName);
 }

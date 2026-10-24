@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import { CUSTOM_APP_SUGGESTION, suggestionsFromDetected } from "./appSuggestions";
+import { CUSTOM_APP_SUGGESTION, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
 
 const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?: boolean): DetectedEditor => ({
   id,
@@ -67,5 +67,30 @@ describe("custom app", () => {
   it("has an empty command, no app id and the generic icon", () => {
     expect(CUSTOM_APP_SUGGESTION).toMatchObject({ name: "Custom app", defaultCommand: "", iconId: null });
     expect(CUSTOM_APP_SUGGESTION.appId).toBeUndefined();
+  });
+});
+
+describe("agentSuggestionsFromDetected", () => {
+  const ag = (id: string, binary: string, enabled?: boolean): DetectedEditor => ({
+    id,
+    name: "Claude Code",
+    binary,
+    argsBeforePath: [],
+    kind: "agent",
+    enabled,
+  });
+
+  it("offers workspace then context per enabled agent, with the bare binary as command", () => {
+    const list = agentSuggestionsFromDetected([ag("claude", "/usr/local/bin/claude")]);
+    expect(list.map((s) => [s.key, s.cwdMode])).toEqual([
+      ["claude:workspace", "workspace"],
+      ["claude:context", "context"],
+    ]);
+    expect(list[0]).toMatchObject({ kind: "agent", appId: "claude", iconId: "claude", name: "Claude Code", defaultCommand: "claude" });
+    expect(list.every((s) => !/[{}]/.test(s.defaultCommand + s.name))).toBe(true);
+  });
+
+  it("skips disabled agents", () => {
+    expect(agentSuggestionsFromDetected([ag("claude", "claude", false)])).toEqual([]);
   });
 });

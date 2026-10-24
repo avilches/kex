@@ -8,9 +8,9 @@ import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const suggestions: AppSuggestion[] = [
-  { key: "zed:path", appId: "zed", name: "Zed {filepath}", iconId: "zed", defaultCommand: "zed {filepath}" },
-  { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}" },
-  { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}" },
+  { key: "zed:path", appId: "zed", name: "Zed {filepath}", iconId: "zed", defaultCommand: "zed {filepath}", kind: "app" },
+  { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" },
+  { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" },
 ];
 
 function mount(actions: readonly AppSuggestion[] = suggestions) {

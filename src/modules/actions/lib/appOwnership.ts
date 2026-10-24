@@ -1,4 +1,4 @@
-import { presetOf, type AppSuggestion } from "./appSuggestions";
+import { presetOf, sameIdentity, type AppSuggestion } from "./appSuggestions";
 import type { Action } from "./types";
 
 // What an edit does to the preset link of an app, which depends on its command alone. A
@@ -13,6 +13,6 @@ export function ownedAfterEdit(current: Action, next: Action, presets: readonly 
   const preset = presetOf(next, presets);
   if (preset?.appId === app) return next.appId === app && !next.iconId ? next : { ...next, appId: app, iconId: "" };
   if (current.appId === undefined) return next;
-  if (next.command.trim() === current.command.trim()) return next;
+  if (sameIdentity(next, current)) return next;
   return { ...next, appId: "", iconId: current.appId };
 }
