@@ -90,6 +90,10 @@ pub struct SessionRecord {
     /// "interrupted" when the agent was working when Kex closed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notification: Option<String>,
+    /// Preview of what the assistant said when its last turn ended, clipped to
+    /// `MAX_LAST_MESSAGE_CHARS`. Absent for agents whose Stop does not carry the text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_message: Option<String>,
     pub updated_at: u64,
 }
 
@@ -498,10 +502,7 @@ fn record_session_at_path_with(
         "[agent-session] record tab={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
          launch_cmd={launch_cmd:?}"
     );
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = now_secs();
     let mut record = SessionRecord {
         agent: Some(agent.to_string()),
         session_id: session_id.to_string(),
@@ -510,6 +511,7 @@ fn record_session_at_path_with(
         launch_cmd,
         title: None,
         notification: None,
+        last_message: None,
         updated_at: now,
     };
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
@@ -547,6 +549,7 @@ fn record_session_at_path_with(
     {
         record.title = previous.title.clone();
         record.notification = previous.notification.clone();
+        record.last_message = previous.last_message.clone();
     }
     // The same session id is the same process: a duplicate SessionStart (two plugin instances,
     // a re-registered session) brings no launch line and must not erase the known one.
@@ -620,6 +623,82 @@ fn set_snapshot_at_path(
     }
     record.title = next_title;
     record.notification = next_notification;
+    let Ok(out) = serde_json::to_string_pretty(&store) else {
+        return false;
+    };
+    let tmp = path.with_extension("json.kex-tmp");
+    if std::fs::write(&tmp, out).is_err() {
+        return false;
+    }
+    write_backup(path, &content);
+    if std::fs::rename(&tmp, path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return false;
+    }
+    true
+}
+
+// A preview to recognise the conversation by, not a transcript: agent-sessions.json is not
+// encrypted, so the less of what the assistant said lands there the better. 280 characters
+// fill the two clamped lines of the hibernated overlay with room to spare.
+pub const MAX_LAST_MESSAGE_CHARS: usize = 280;
+
+/// The stored form of a Stop's `last_assistant_message`: whitespace runs (newlines, code
+/// indentation) collapsed to one space, clipped by characters with a trailing ellipsis. `None`
+/// when nothing visible is left, a turn that ended on a tool call says nothing.
+pub fn clip_last_message(message: &str) -> Option<String> {
+    let flat = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.is_empty() {
+        return None;
+    }
+    if flat.chars().count() <= MAX_LAST_MESSAGE_CHARS {
+        return Some(flat);
+    }
+    let mut clipped: String = flat.chars().take(MAX_LAST_MESSAGE_CHARS - 1).collect();
+    clipped.truncate(clipped.trim_end().len());
+    clipped.push('\u{2026}');
+    Some(clipped)
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Stores the assistant's last message of a Stop and stamps `updated_at` with the end of the
+/// turn. Only for a recorded tab of the same session id, like `set_snapshot`. A Stop without
+/// the field (agents whose hook never sends it) must not call this: the record keeps no message.
+pub fn set_last_message(tab_id: &str, session_id: &str, message: &str) -> bool {
+    match store_path() {
+        Some(path) => set_last_message_at_path(&path, tab_id, session_id, message, now_secs()),
+        None => false,
+    }
+}
+
+fn set_last_message_at_path(
+    path: &Path,
+    tab_id: &str,
+    session_id: &str,
+    message: &str,
+    now: u64,
+) -> bool {
+    let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else {
+        return false;
+    };
+    let Some(record) = store.tabs.get_mut(tab_id) else {
+        return false;
+    };
+    if record.session_id != session_id {
+        return false;
+    }
+    record.last_message = clip_last_message(message);
+    record.updated_at = now;
     let Ok(out) = serde_json::to_string_pretty(&store) else {
         return false;
     };
@@ -826,6 +905,7 @@ mod tests {
                 launch_cmd: Some("claude --model opus --safe-mode".to_string()),
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1312,6 +1392,7 @@ mod tests {
                 launch_cmd: Some(" cd '/somewhere' && claude-max --resume 'abc-123'".to_string()),
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1351,6 +1432,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1405,6 +1487,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1435,6 +1518,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1476,6 +1560,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1506,6 +1591,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1652,6 +1738,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -1729,6 +1816,7 @@ mod tests {
                 launch_cmd: None,
                 title: None,
                 notification: None,
+                last_message: None,
                 updated_at: 0,
             },
         );
@@ -2141,6 +2229,114 @@ mod tests {
     }
 
     #[test]
+    fn clip_last_message_flattens_whitespace_and_keeps_short_text() {
+        assert_eq!(
+            clip_last_message("  Done.\n\n  Tests   pass\t").as_deref(),
+            Some("Done. Tests pass")
+        );
+        assert_eq!(clip_last_message(" \n\t "), None);
+        assert_eq!(clip_last_message(""), None);
+    }
+
+    #[test]
+    fn clip_last_message_caps_by_characters_without_splitting_one() {
+        let exact: String = "\u{00e9}".repeat(MAX_LAST_MESSAGE_CHARS);
+        assert_eq!(clip_last_message(&exact).as_deref(), Some(exact.as_str()));
+
+        let long: String = "\u{00e9}\u{1F600}x".repeat(300);
+        let clipped = clip_last_message(&long).unwrap();
+        assert_eq!(clipped.chars().count(), MAX_LAST_MESSAGE_CHARS);
+        assert!(clipped.ends_with('\u{2026}'));
+        assert!(long.starts_with(clipped.trim_end_matches('\u{2026}')));
+    }
+
+    #[test]
+    fn clip_last_message_drops_the_space_before_the_ellipsis() {
+        let long = format!("{} tail", "a".repeat(MAX_LAST_MESSAGE_CHARS - 2));
+        let clipped = clip_last_message(&long).unwrap();
+        assert!(clipped.ends_with("a\u{2026}"), "{clipped}");
+    }
+
+    #[test]
+    fn each_stop_replaces_the_last_message_and_stamps_the_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+
+        assert!(set_last_message_at_path(
+            &path,
+            "tab-1",
+            "abc",
+            "first answer",
+            100
+        ));
+        assert!(set_last_message_at_path(
+            &path,
+            "tab-1",
+            "abc",
+            "second\nanswer",
+            200
+        ));
+
+        let rec = &read_store(&path).tabs["tab-1"];
+        assert_eq!(rec.last_message.as_deref(), Some("second answer"));
+        assert_eq!(rec.updated_at, 200);
+    }
+
+    #[test]
+    fn an_empty_stop_message_clears_the_previous_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        set_last_message_at_path(&path, "tab-1", "abc", "old answer", 100);
+
+        set_last_message_at_path(&path, "tab-1", "abc", "  ", 200);
+
+        assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
+    }
+
+    #[test]
+    fn set_last_message_ignores_another_session_and_unrecorded_tabs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "new", "/tmp/s.jsonl", "/tmp/p");
+
+        assert!(!set_last_message_at_path(&path, "tab-1", "old", "stale", 1));
+        assert!(!set_last_message_at_path(&path, "tab-2", "new", "x", 1));
+
+        let store = read_store(&path);
+        assert_eq!(store.tabs["tab-1"].last_message, None);
+        assert!(!store.tabs.contains_key("tab-2"));
+    }
+
+    #[test]
+    fn a_record_without_a_message_omits_the_field_on_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "opencode", "ses_1", "", "/tmp/p");
+
+        let raw = std::fs::read_to_string(&path).unwrap();
+        assert!(!raw.contains("last_message"), "{raw}");
+    }
+
+    #[test]
+    fn a_resume_keeps_the_last_message_and_a_new_session_drops_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        set_last_message_at_path(&path, "tab-1", "abc", "answer", 100);
+
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        assert_eq!(
+            read_store(&path).tabs["tab-1"].last_message.as_deref(),
+            Some("answer")
+        );
+
+        record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s.jsonl", "/tmp/p");
+        assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
+    }
+
+    #[test]
     fn set_snapshot_does_not_rewrite_the_file_when_nothing_changed() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
@@ -2253,6 +2449,7 @@ mod tests {
             launch_cmd: launch_cmd.map(str::to_string),
             title: None,
             notification: None,
+            last_message: None,
             updated_at: 0,
         }
     }

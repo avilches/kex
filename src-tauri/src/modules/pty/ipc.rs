@@ -978,6 +978,9 @@ fn dispatch_with(
                     })
                 })
                 .collect();
+            if let Some(message) = p.last_message.as_deref() {
+                session_store::set_last_message(tab_id, &p.session_id, message);
+            }
             let mut sig = agent_signal(pty_id, "Stop", p.agent.as_deref());
             sig["message"] = last.into();
             sig["backgroundSubagents"] = subagents.into();

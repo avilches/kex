@@ -237,7 +237,7 @@ The frame is never attributed to the PTY that the payload's `pty_id` names unles
 | `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
 | `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
 | `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |
-| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message`, and `backgroundSubagents` (`{ id, agentType, description }[]`): the `background_tasks` entries with `type == "subagent"` and `status == "running"` |
+| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message` (and, when the field is present, stores it clipped in the tab's `SessionRecord` through `session_store::set_last_message`), and `backgroundSubagents` (`{ id, agentType, description }[]`): the `background_tasks` entries with `type == "subagent"` and `status == "running"` |
 | `SubagentStart` | `kex:agent-signal` kind=`SubagentStart` | Includes `agent_id` as `agentId` and `agent_type` as `agentType`; dropped without an `agent_id` |
 | `SubagentStop` | `kex:agent-signal` kind=`SubagentStop` | Same fields as `SubagentStart` |
 | `StopFailure` | `kex:agent-signal` kind=`StopFailure` | Includes `error_message` as `message` |

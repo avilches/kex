@@ -481,6 +481,7 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
       "launch_cmd": "claude --safe-mode --add-dir /extra",
       "title": "fixing the build",
       "notification": "attention",
+      "last_message": "The build is green again: the missing import is back and all tests pass.",
       "updated_at": 1718000000
     }
   }
@@ -496,6 +497,19 @@ else the session title); `notification` is the kind (`attention`, `finished` or 
 still had unread. Neither comes from the hooks: the frontend reports them through `agent_session_set_snapshot`
 (see *Name and notification* below). A later `SessionStart` rewrites the record but keeps both when the session id is the same (a resume keeps it; `/clear` or an agent launched by hand brings a new one and starts clean). An empty title
 never overwrites the stored one, because titles go empty while the app closes.
+
+`last_message` is optional as well: what the assistant said when its last turn ended, taken from the Stop hook's
+`last_assistant_message` (`ipc.rs` calls `session_store::set_last_message` on every Stop that carries the field, for the
+record of the same session id only). It is stored flattened (whitespace runs collapsed to one space) and clipped to
+`MAX_LAST_MESSAGE_CHARS` (280) characters, never bytes, with a trailing ellipsis (`clip_last_message`). The cap is there
+because `agent-sessions.json` is not encrypted and the text may hold anything the assistant printed: it is a preview to
+recognise the conversation by, not a copy of it. A Stop whose message is empty (a turn that ended on a tool call) clears
+it; a Stop without the field (OpenCode's plugin today) leaves the record without one, and the UI shows only the folder
+and the time. The same write stamps `updated_at` with the end of the turn, so it reads as "when the session last
+answered". A resume of the same session keeps it; a new session id starts without it, like `title`. Kex does not read
+the `.jsonl` transcript to fill it or to show more than this one message: the hook already carries the text, and a
+transcript reader would have to follow the `uuid`/`parentUuid` chain to skip branches abandoned by `/rewind`, as Orca
+does, which is not worth it for a single line.
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
