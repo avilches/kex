@@ -47,34 +47,26 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   - `analyze`: reparto del hilo principal de uno o varios volcados, con la línea base al lado y un veredicto.
   - `profiler`: resumen de las líneas `[profiler]` (reparto de `rafShare`, fotogramas lentos, censo del DOM, peores
     ventanas y callbacks más caros).
-  - `jit`: las compilaciones del JIT más lentas, leídas del log unificado de macOS (`log show`). Solo hay datos si Kex
-    se arrancó con `scripts/run-performance.sh`.
-- **`scripts/run-performance.sh`**: abre `/Applications/Kex.app` con `__XPC_JSC_reportDFGCompileTimes=true` y
-  `__XPC_JSC_useOSLog=true`. Con eso el `WebContent` escribe en el log unificado una línea por función que compila el
-  JIT, con su nombre y su tiempo. Se niega a arrancar si Kex ya corre, porque el entorno solo vale al lanzar el proceso.
-  Va junto a `pnpm build:local --performance`; sin él los nombres salen mutilados.
+- **`scripts/run-performance.sh`**: abre `/Applications/Kex.app` con opciones de JavaScriptCore (`__XPC_JSC_<opcion>`)
+  que limitan el tamaño de función que el JIT intenta optimizar. Sin argumentos aplica los topes por defecto del script;
+  acepta `NOMBRE=VALOR` para probar otros y `--verify` para registrar las opciones recibidas. Se niega a arrancar si
+  Kex ya corre, porque el entorno solo vale al lanzar el proceso.
 - **Documentación**: `docs/BUILD.md` ("Profiling a slow window"), `docs/ARCHITECTURE.md` (mapa de módulos) y
   `docs/FORK.md` ("Performance profiler").
 
-## Congelones por el compilador JIT: cómo investigarlos
+## Congelones por el compilador JIT: qué se probó
 
-Cuando `analyze` da `stalled` (hilo principal esperando al JIT), el volcado nativo no nombra el código JavaScript que
-se compila. El procedimiento es:
+El 2026-10-24 el `WebContent` quedó bloqueado con el hilo principal esperando al JIT (`analyze` da `stalled`). El volcado
+nativo no nombra el JavaScript implicado. Lo que se sabe:
 
-1. `pnpm build:local --performance` (instala en `/Applications`), cerrar Kex y abrirlo con
-   `bash scripts/run-performance.sh`.
-2. Trabajar con normalidad. El monitor externo (`watch`) sigue dejando sus volcados.
-3. Tras un congelón, `python3 performance/kexperf.py jit --hours 3`: ordena las funciones por tiempo total de
-   compilación y enseña el peor caso de cada una. Una función con decenas de segundos es la culpable.
-
-Medido con una app de prueba y el WebKit del sistema (2026-10-24):
-
-- Solo las variables con prefijo `__XPC_` llegan al `WebContent`; `JSC_*` a secas no, y su stderr no va a ningún sitio.
-  Por eso `useOSLog` es obligatorio.
-- `open -n --env` entrega esas variables al proceso.
-- **No medido**: que el `WebContent` de Kex las reciba (Tauri lanza la webview por otro camino que la app de prueba) ni
-  el coste del log en una sesión larga con 26 terminales. En la prueba mínima salieron 251 líneas en 5 minutos.
-- Quitar el log es volver a abrir Kex como siempre (`open -a Kex`).
+- Solo las variables con prefijo `__XPC_` llegan al `WebContent`; `JSC_*` a secas no. `open -n --env` las entrega.
+- **No uses `reportDFGCompileTimes`**: el hilo del JIT pide el código fuente de un script cacheado de
+  `tauri://localhost` al formatear el nombre, solo es posible en el hilo principal, y WebKit mata el `WebContent`
+  (`EXC_BREAKPOINT`) en bucle: la vista se reinicia cada 5-10 s. Medido el 2026-10-25 con 7 crash reports.
+- `bash scripts/run-performance.sh` arranca Kex con topes de coste de bytecode para DFG y FTL. Es una prueba de si el
+  congelón desaparece: hipótesis, no medido. Si no cambia nada, probar `useFTLJIT=false`, y como último recurso
+  `useDFGJIT=false` (más lento en todo el JavaScript).
+- Comparar con `watch` (volcados automáticos) y con `profiler --hours` durante unos días.
 
 ## Cómo leer los resultados
 
@@ -139,7 +131,7 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
 
 0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
-   Prueba: `pnpm build:local --performance` y volcados del siguiente congelón.
+   Prueba: ningún método nombra la función (el registro del JIT mata la webview). Se prueba por efecto con `scripts/run-performance.sh`.
 
 1. **El spinner `braille`** (el usuario lo tiene): un único `setInterval` de 80 ms re-renderiza todos los spinners y
    cambia un carácter en cada uno, lo que fuerza estilos y layout en las filas `flex` de la barra de workspaces y de las

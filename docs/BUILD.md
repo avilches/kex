@@ -146,7 +146,7 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 `pnpm build:local --performance` does the same build without minifying the JavaScript (`KEX_BUILD_PERFORMANCE=1`, read by `vite.config.ts`), so the in-app profiler and native samples show readable function names. The frontend bundle grows from about 11.7 MB to 16 MB; use it only to investigate performance (`performance/CLAUDE.md`), and go back to a plain `pnpm build:local` afterwards.
 
-To then log which JavaScript functions the JIT compiles (and how long each takes), quit Kex and start it with `bash scripts/run-performance.sh`, then read the result with `python3 performance/kexperf.py jit`. Details and the procedure are in `performance/CLAUDE.md`.
+To try JavaScriptCore options that tame JIT freezes, quit Kex and start it with `bash scripts/run-performance.sh`; see `performance/CLAUDE.md`.
 
 ### Version mismatch gotcha
 
