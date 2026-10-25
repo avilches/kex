@@ -32,7 +32,7 @@ fn detect_entry(entry: &EditorEntry) -> Option<DetectedEditor> {
     detect_entry_platform(entry)
 }
 
-// ---- helpers (used on all platforms) ----------------------------------------
+// ---- helpers ----------------------------------------
 
 pub(crate) fn extract_first_app_path(output: &str) -> Option<String> {
     output
@@ -42,6 +42,7 @@ pub(crate) fn extract_first_app_path(output: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) fn which_binary(name: &str) -> Option<String> {
     if name.is_empty() {
         return None;
@@ -389,6 +390,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[test]
     fn which_binary_returns_none_for_nonexistent() {
         assert_eq!(which_binary("__kex_nonexistent_binary_xyz__"), None);
