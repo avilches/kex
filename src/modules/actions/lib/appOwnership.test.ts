@@ -107,4 +107,19 @@ describe("agent presets", () => {
     expect(back).toMatchObject({ appId: "claude", iconId: "" });
     expect(ownedAfterEdit(installed, { ...installed, cwdMode: "workspace" }, agents)).toMatchObject({ appId: "claude" });
   });
+
+  it("relinks by start folder and keeps the user's name and own-button choice", () => {
+    const mine: Action = { ...installed, name: "My Claude", ownButton: true, appId: "", iconId: "claude", cwdMode: "fixed", cwd: "/x" };
+    const relinked = ownedAfterEdit(mine, { ...mine, cwdMode: "workspace", cwd: undefined }, agents);
+    expect(relinked).toMatchObject({ appId: "claude", iconId: "", name: "My Claude", ownButton: true, cwdMode: "workspace" });
+    expect(presetOf(relinked, agents)).toBe(agentWs);
+    const moved = ownedAfterEdit(installed, { ...installed, name: "Mine", ownButton: true, cwdMode: "workspace" }, agents);
+    expect(moved).toMatchObject({ appId: "claude", name: "Mine", ownButton: true, cwdMode: "workspace" });
+  });
+
+  it("an agent preset cannot be built without its start folder", () => {
+    // @ts-expect-error an agent suggestion must carry cwdMode
+    const missing: AppSuggestion = { key: "k", appId: "claude", name: "C", iconId: "claude", defaultCommand: "claude", kind: "agent" };
+    expect(missing.kind).toBe("agent");
+  });
 });
