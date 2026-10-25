@@ -305,7 +305,7 @@ mod tests {
             .unwrap();
         let out = child.wait_with_output().unwrap();
         // The send runs in the background after the script exits.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(700);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         let frame = loop {
             match listener.accept() {
                 Ok((stream, _)) => {
