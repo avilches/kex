@@ -66,12 +66,11 @@ impl TabRegistry {
 /// Events of an agent that are dropped when they arrive from a PTY the tab no longer runs on.
 /// `SessionStart` and `UserPromptSubmit` would rewrite the session record and status of the
 /// agent running there now (a `--resume` of the same session, for instance), and `SessionEnd`
-/// and `StopFailure` would end it. A `StatusLine` reading of the old agent would misreport the
-/// new one.
+/// and `StopFailure` would end it.
 pub fn late_frame_is_dropped(event: &str) -> bool {
     matches!(
         event,
-        "SessionStart" | "UserPromptSubmit" | "SessionEnd" | "StopFailure" | "StatusLine"
+        "SessionStart" | "UserPromptSubmit" | "SessionEnd" | "StopFailure"
     )
 }
 
@@ -324,7 +323,6 @@ mod tests {
             "UserPromptSubmit",
             "SessionEnd",
             "StopFailure",
-            "StatusLine",
         ] {
             assert!(late_frame_is_dropped(e), "{e}");
         }

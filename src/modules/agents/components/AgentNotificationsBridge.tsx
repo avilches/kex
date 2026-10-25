@@ -15,7 +15,6 @@ import { isHibernating } from "../lib/hibernatingTabs";
 import { detachesRecord, endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
 import { stopOutcome } from "../lib/subagentGate";
 import type { AgentSession, AgentSignal } from "../lib/types";
-import type { AgentUsage } from "../lib/usage";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
 import { suggestIntegration } from "./IntegrationSuggestionToast";
@@ -172,16 +171,6 @@ export function handleSessionMeta(p: AgentSessionMetaPayload, ctx: Ctx): void {
   });
 }
 
-// The usage event reaches every window; one for a tab another window owns would sit in this
-// window's store forever, since nothing here ever ends that tab's session.
-export function handleUsage(
-  p: { tabId: string; usage: AgentUsage },
-  ctx: Ctx,
-): void {
-  if (!ctx.workspaces.some((ws) => findTabPane(ws.paneTree, p.tabId))) return;
-  useAgentStore.getState().setUsage(p.tabId, p.usage);
-}
-
 export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = sig.tabId ?? leafIdForPty(sig.id);
   if (tabId === null) return;
@@ -330,10 +319,6 @@ export function AgentNotificationsBridge({
 
   useTauriListen<{ tabId: string; cwd: string }>("kex:agent-cwd", (e) =>
     handleAgentCwd(e.payload.tabId, e.payload.cwd),
-  );
-
-  useTauriListen<{ tabId: string; usage: AgentUsage }>("kex:agent-usage", (e) =>
-    handleUsage(e.payload, ctxRef.current),
   );
 
   return null;

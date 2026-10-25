@@ -341,32 +341,3 @@ describe("agentStore subagents", () => {
     expect(stopOutcome(count(), false)).toBe("attention");
   });
 });
-
-describe("agentStore.setUsage", () => {
-  beforeEach(() => {
-    useAgentStore.setState({ sessions: {}, usage: {} });
-  });
-
-  test("keeps the same state for an unchanged reading", () => {
-    const s = useAgentStore.getState();
-    s.setUsage("tab-1", { contextUsedPct: 2 });
-    const before = useAgentStore.getState().usage;
-    s.setUsage("tab-1", { contextUsedPct: 2 });
-    expect(useAgentStore.getState().usage).toBe(before);
-  });
-
-  test("an empty reading removes the tab's entry", () => {
-    const s = useAgentStore.getState();
-    s.setUsage("tab-1", { contextUsedPct: 2 });
-    s.setUsage("tab-1", {});
-    expect(useAgentStore.getState().usage).toEqual({});
-  });
-
-  test("the agent exiting drops its reading", () => {
-    const s = useAgentStore.getState();
-    s.start("tab-1", "ws-1", "claude");
-    s.setUsage("tab-1", { contextUsedPct: 2 });
-    s.finish("tab-1");
-    expect(useAgentStore.getState().usage).toEqual({});
-  });
-});

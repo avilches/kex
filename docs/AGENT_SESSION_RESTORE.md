@@ -142,66 +142,6 @@ removes Kex's hook from every known event whatever the installed version. `agent
 events of the installed version (the six baseline ones when it is unknown, which is all the install guarantees then),
 so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v13` since every frame names its tab and PTY (`tab_id`, `pty_id`) for the app's single socket.
 
-### Status line (context and rate limits)
-
-Claude Code's `statusLine` is not a hook: it is one command that Claude runs on every status line tick (several a
-second while streaming) with the session's state on stdin, and shows its stdout under the prompt. The slot holds a
-single command, so `agent/statusline.rs` decides who owns it:
-
-- Empty slot (the `statusLine` key missing or `null`, nothing else): `agent_enable_claude_hooks` writes
-  `{"type":"command","command":"\"$HOME/.config/kex/hooks/statusline.sh\"  # kex-statusline"}`.
-- Kex's (a string `command` that ends, after trailing spaces, in the comment `# kex-statusline`): rewritten to the
-  current command, and removed on uninstall. A command that only contains the word (`~/bin/my-kex-statusline-hud.sh`)
-  is not Kex's.
-- The user's (anything else, a malformed slot included: a string or an array instead of an object, a typo such as
-  `cmd`, a `command` that is empty, blank or not a string): never replaced, never wrapped, never removed, byte for
-  byte (Orca's `applyManagedStatusLine` policy). Kex cannot tell a half-written entry of the user's from a stale one,
-  so it leaves it. Kex then shows no reading. This is the case on the development machine, whose
-  `settings.json` has its own HUD (`$HOME/.claude/hooks/run-hud.sh`). Wrapping was rejected: the user's command would
-  run under Kex's script, and a fault in it would break their status line.
-
-The startup reinstall runs the same install, so a user who empties the slot on purpose finds it taken by Kex again on
-the next start unless they turn the Claude Code integration off; putting any command of their own there keeps it. The
-same goes for deleting Kex's `statusLine` entry by hand: while the integration is on, the next reinstall (any Kex start)
-sees an empty slot and writes it back.
-Kex's entry is rewritten whole, so fields the user added to it (`padding`, for instance) are lost on the next install.
-
-`statusline.sh` (marker `kex-statusline-v1`) is written next to `trigger-event.sh` on every install, even when the slot
-is the user's, since it is inert until `settings.json` names it. It prints nothing (Claude would show it), reads stdin
-with the shell's own `read`, and exits without sending outside a Kex tab, for a tab or PTY id outside `[A-Za-z0-9_-]`
-and digits (both are pasted into the frame unescaped), and under `CLAUDE_JOB_DIR` (Claude daemon workers inherit a
-stale tab environment). The reading it cares about (`remaining_percentage` and the `rate_limits` object) is cut out of
-the payload with parameter expansion; an unchanged reading is sent again only after
-`KEX_STATUSLINE_MIN_POST_INTERVAL_SECONDS` (15 by default, Orca's value), a changed one at once. The clock is bash 5's
-`EPOCHSECONDS` or, on macOS where `/bin/sh` is bash 3.2, the payload's `cost.total_duration_ms`, so a skipped tick
-spawns no process at all. The last send is kept in `~/.config/kex/statusline/<tab_id>` (0600). The frame is the
-payload with `hook_event_name: "StatusLine"`, `agent`, `tab_id` and `pty_id` appended last (a repeated key keeps its
-last value, so the payload cannot pick the tab), sent to `$KEX_IPC` by `nc -U` (or `python3`) in the background, so the
-status line never waits on the socket. It is never spooled: an old reading is worthless.
-
-Measured on macOS with the real 1.3 KB tick (200 runs each, `/bin/sh` = bash 3.2): `sh -c 'cat >/dev/null'` 38 ms,
-the script on a throttled tick 30 ms, on a tick that sends 32 ms. The script costs no more than an empty shell, and the
-send does not block it. With a real interactive Claude Code 2.1.310 (`CLAUDE_CONFIG_DIR` in a temporary folder, the
-script as its `statusLine` and a test socket), one short prompt produced two frames for the tab (the first tick with
-`used_percentage: null`, then 2%), and the status line showed nothing.
-
-What a tick carries (2.1.310, API billing, captured from an interactive session; Claude does not run the status line
-in `-p` mode): `session_id`, `transcript_path`, `cwd`, `prompt_id`, `session_name`, `effort.level`, `model.id`,
-`model.display_name`, `workspace.{current_dir,project_dir,added_dirs}`, `version`, `output_style.name`,
-`cost.{total_cost_usd,total_duration_ms,total_api_duration_ms,total_lines_added,total_lines_removed}`,
-`context_window.{total_input_tokens,total_output_tokens,context_window_size,current_usage,used_percentage,remaining_percentage}`
-(`current_usage` and both percentages are `null` until the first API answer), `exceeds_200k_tokens`, `prompt_cache`
-(after the first answer), `fast_mode` and `thinking.enabled`. `rate_limits` is absent with API billing; with a Claude
-subscription it is documented (and assumed by Orca) as `rate_limits.five_hour` and `rate_limits.seven_day`, each
-`{ used_percentage, resets_at }` in Unix seconds. That shape is not measured here: no subscription account was at hand.
-`agent::statusline::usage` also accepts `utilization` for the percentage, as Orca does.
-
-The tab shows the reading as a small number next to its title (`AgentUsageBadge`, `agents/lib/usage.ts`): the context
-used, or the rate limit window (`5h`, `7d`) once it reaches 80% and is above the context, since that is what would
-stop the agent first. Amber from 80%, the destructive color from 95%. The native tooltip lists every value and the
-reset times. The readings live in `useAgentStore().usage`, apart from the sessions, so a tick re-renders only that tab,
-and are dropped when the agent exits.
-
 ### SessionStart hook
 
 Triggered by Claude Code at session start. The hook command:

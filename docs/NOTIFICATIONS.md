@@ -214,8 +214,6 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
 - Injects hook entries for the events of `trigger-event.sh` that the installed Claude Code knows (up to 11: `SessionStart`,
   `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
   `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
-- Points an empty `statusLine` at `statusline.sh`, which feeds the context and rate limit reading shown on the tab; a
-  status line of the user's is left as it is (`docs/AGENT_SESSION_RESTORE.md`, "Status line")
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
