@@ -1,7 +1,7 @@
-import { resolveScriptCwd, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
+import { folderKey, resolveScriptCwd, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
-import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
+import { commandProblem, commandVariablesUsed, expandCommandArgv, expandCommandShell, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import { isAgent, isApp, isScript, usesTerminal, type Action, type ActionKind } from "./types";
 
 export const COMPACT_WIDTH = 720;
@@ -55,12 +55,13 @@ export function ownButtonsThatFit(
   room: number,
   place?: FocusPlace,
   states?: ReadonlyMap<string, ScriptState>,
+  hidden?: ReadonlySet<string>,
 ): number {
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   const sole = soleIconButtons(actions);
   for (const action of actions) {
-    if (!shownAtPlace(action, stateOf(action, states), place)) continue;
+    if (hidden?.has(action.id) || !shownAtPlace(action, stateOf(action, states), place)) continue;
     left -= ownButtonWidth(action, sole.has(action.id)) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
@@ -278,6 +279,70 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
   return null;
 }
 
+const DYNAMIC_VARS = ["cwd", "dir", "branch", "repo"];
+
+// What running the Action here would do: its kind, the command it ends up with and the
+// folder it starts in. Null when that cannot be told (a variable with no value, a command
+// that does not expand), so such an Action is never compared.
+function effectKey(action: Action, ctx: BarContext): string | null {
+  const folders = ctx.folders ?? {};
+  try {
+    if (isApp(action)) {
+      if (missingVariables(action.command, ctx.vars).length > 0) return null;
+      const spawn = folders.workspaceRoot?.trim() || folders.workspaceCwd;
+      return JSON.stringify([action.kind, expandCommandArgv(action.command, ctx.vars), folderKey(spawn)]);
+    }
+    const start = folderKey(resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders }));
+    if (isAgent(action)) return JSON.stringify([action.kind, action.command, start]);
+    if (missingVariables(action.command, ctx.vars).length > 0) return null;
+    return JSON.stringify([action.kind, expandCommandShell(action.command, ctx.vars, ctx.shell), start]);
+  } catch {
+    return null;
+  }
+}
+
+// Twins: Actions that depend on the focused tab and would do exactly what another one does
+// right now (an agent in the workspace folder and the same agent in the current folder, with
+// the focus at the root). The bar hides them so the same effect is not offered twice. With
+// the same effect, a button beats a menu entry; with the same placement, a static Action
+// beats a dynamic one, and two of the same sort are the user's own doing, so both stay. A
+// script that is not idle is never hidden, and a blocked Action neither hides nor survives.
+// Nothing is hidden without a real context, or while the workspace sleeps.
+export function twinIds(
+  actions: readonly Action[],
+  ctx: BarContext | null,
+  states: ReadonlyMap<string, ScriptState>,
+  place?: FocusPlace,
+): Set<string> {
+  const hidden = new Set<string>();
+  if (!ctx || ctx.labels || ctx.hibernated) return hidden;
+  const groups = new Map<string, { action: Action; dynamic: boolean; idle: boolean }[]>();
+  for (const action of actions) {
+    const state = stateOf(action, states);
+    if (state === "idle" && actionAvailability(action, ctx) !== null) continue;
+    if (!shownAtPlace(action, state, place)) continue;
+    const key = effectKey(action, ctx);
+    if (!key) continue;
+    const used = commandVariablesUsed(action.command);
+    const dynamic = (!isAgent(action) && DYNAMIC_VARS.some((v) => used.has(v))) || action.cwdMode === "context";
+    const group = groups.get(key) ?? [];
+    group.push({ action, dynamic, idle: state === "idle" });
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    let kept = group;
+    if (new Set(group.map((c) => !!c.action.ownButton)).size > 1) {
+      for (const c of group) if (!c.action.ownButton && c.idle) hidden.add(c.action.id);
+      kept = group.filter((c) => !hidden.has(c.action.id));
+    }
+    if (kept.some((c) => !c.dynamic)) {
+      for (const c of kept) if (c.dynamic && c.idle) hidden.add(c.action.id);
+    }
+  }
+  return hidden;
+}
+
 export type BarItem = {
   id: string;
   /** The Action belongs to the global scope rather than the workspace. */
@@ -315,10 +380,12 @@ export function ownButtonCandidates(
   global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
   place: FocusPlace | undefined,
+  hidden?: ReadonlySet<string>,
 ): Action[] {
   return [...local, ...global].filter(
     (action) =>
       action.ownButton &&
+      !hidden?.has(action.id) &&
       shownAtPlace(action, stateOf(action, states), place),
   );
 }
@@ -467,6 +534,8 @@ type BuildInput = {
   /** What the focused tab is: file Actions show on a file, folder Actions on a terminal,
    * workspace Actions always. Absent: every Action shows (nothing depends on a place). */
   place?: FocusPlace;
+  /** Twin Actions to leave out (`twinIds`); absent: worked out from the other inputs. */
+  hidden?: ReadonlySet<string>;
 };
 
 // Own buttons first (workspace Actions, then global, each by kind in the user's order),
@@ -474,7 +543,7 @@ type BuildInput = {
 // user's order. A running script is never disabled whatever its variables are now: it has
 // to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
 // place to live.
-export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place }: BuildInput): BarModel {
+export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, hidden }: BuildInput): BarModel {
   const toItem = (action: Action, isGlobal: boolean): BarItem => {
     const state = stateOf(action, states);
     const running = state === "running";
@@ -496,6 +565,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       iconOnly: false,
     };
   };
+  const twins = hidden ?? twinIds([...local, ...global], context, states, place);
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const ordered = [...byKind(local).map((a) => [a, false] as const), ...byKind(global).map((a) => [a, true] as const)];
   const model: BarModel = {
@@ -504,11 +574,12 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     empty: local.length + global.length === 0,
   };
   const buttonIds = new Set(
-    ownButtonCandidates(byKind(local), byKind(global), states, place)
+    ownButtonCandidates(byKind(local), byKind(global), states, place, twins)
       .slice(0, limit)
       .map((a) => a.id),
   );
   for (const [action, isGlobal] of ordered) {
+    if (twins.has(action.id)) continue;
     const item = toItem(action, isGlobal);
     if (!shownAtPlace(action, item.state, place)) continue;
     if (buttonIds.has(action.id)) model.buttons.push(item);

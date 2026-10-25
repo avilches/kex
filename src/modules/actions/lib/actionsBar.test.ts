@@ -19,6 +19,7 @@ import {
   isCompactBar,
   menuEntries,
   MENUS_RESERVE,
+  ownButtonCandidates,
   ownButtonsThatFit,
   ownButtonWidth,
   paletteActions,
@@ -26,10 +27,11 @@ import {
   resolveDrop,
   SETTINGS_LABELS,
   scriptSubtitle,
+  twinIds,
   soleIconButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
-import type { BarItem } from "./actionsBar";
+import type { BarContext, BarItem, FocusPlace } from "./actionsBar";
 import type { Action } from "./types";
 
 const script = (o: Partial<Action> = {}): Action => ({
@@ -235,9 +237,9 @@ describe("buildActionsBarModel", () => {
   const actions = [
     script({ id: "s1", name: "dev", ownButton: true }),
     app({ id: "a1", name: "PyCharm", ownButton: true }),
-    script({ id: "s2", name: "test" }),
-    app({ id: "a2", name: "Zed" }),
-    script({ id: "s3", name: "build", ownButton: true }),
+    script({ id: "s2", name: "test", command: "pnpm test" }),
+    app({ id: "a2", name: "Zed", command: "zed {workspace}" }),
+    script({ id: "s3", name: "build", command: "pnpm build", ownButton: true }),
   ];
 
 
@@ -299,7 +301,7 @@ describe("buildActionsBarModel", () => {
   it("pools non-own Actions into one menu, workspace scope first and then global", () => {
     const m = buildActionsBarModel({
       local: [script({ id: "s1", name: "dev" }), app({ id: "a0", name: "Zed", ownButton: true })],
-      global: [script({ id: "s2", name: "top" }), app({ id: "a1", name: "Code" })],
+      global: [script({ id: "s2", name: "top", command: "pnpm top" }), app({ id: "a1", name: "Code", command: "code {workspace}" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
@@ -808,5 +810,147 @@ describe("paletteActions", () => {
       activeId: undefined,
     });
     expect(paletteActions(model).map((i) => i.id)).toEqual(["s1"]);
+  });
+});
+
+describe("twinIds", () => {
+  const agent = (o: Partial<Action> = {}): Action => ({
+    id: "g1",
+    name: "Claude Code",
+    kind: "agent",
+    command: "claude",
+    appId: "claude",
+    cwdMode: "workspace",
+    ownButton: true,
+    ...o,
+  });
+  const at = (focus: string | null, root: string | null = "/p"): BarContext => ({
+    vars: { ...vars, workspace: root ?? "", cwd: focus ?? "" },
+    shell: "posix",
+    folders: { focusFolder: focus, workspaceRoot: root, workspaceCwd: root },
+  });
+  const none = new Map<string, "running" | "waiting">();
+  const ids = (actions: Action[], c: BarContext | null, states = none, place?: FocusPlace) => [...twinIds(actions, c, states, place)].sort();
+  const workspaceAgent = agent({ id: "w" });
+  const contextAgent = agent({ id: "c", cwdMode: "context" });
+
+  it("hides the agent in the current folder when it is the workspace one", () => {
+    expect(ids([workspaceAgent, contextAgent], at("/p"))).toEqual(["c"]);
+    expect(ids([contextAgent, workspaceAgent], at("/p"))).toEqual(["c"]);
+  });
+
+  it("shows both once the focus leaves the root", () => {
+    expect(ids([workspaceAgent, contextAgent], at("/p/sub"))).toEqual([]);
+  });
+
+  it("hides the context agent with a browser focused, which has no folder", () => {
+    expect(ids([workspaceAgent, contextAgent], at(null))).toEqual(["c"]);
+  });
+
+  it("compares folders the way the runner does, trailing slash included", () => {
+    expect(ids([workspaceAgent, contextAgent], at("/p/"))).toEqual(["c"]);
+    expect(ids([workspaceAgent, contextAgent], at("/p", "/p/"))).toEqual(["c"]);
+  });
+
+  it("hides an app opened on the current folder when the workspace one opens the same", () => {
+    const byWorkspace = app({ id: "w", command: "code {workspace}" });
+    const byCwd = app({ id: "c", command: "code {cwd}" });
+    expect(ids([byWorkspace, byCwd], at("/p"))).toEqual(["c"]);
+    expect(ids([byWorkspace, byCwd], at("/p/sub"))).toEqual([]);
+  });
+
+  it("hides a script run in the current folder when the workspace one runs in the same", () => {
+    const inWorkspace = script({ id: "w", cwdMode: "workspace" });
+    const inContext = script({ id: "c", cwdMode: "context" });
+    expect(ids([inWorkspace, inContext], at("/p"))).toEqual(["c"]);
+    expect(ids([inWorkspace, inContext], at("/p/sub"))).toEqual([]);
+  });
+
+  it("hides a dynamic script whose variable expands to the static command", () => {
+    const fixed = script({ id: "w", command: "ls {workspace}", cwdMode: "workspace" });
+    const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "workspace" });
+    expect(ids([fixed, dynamic], at("/p"))).toEqual(["c"]);
+  });
+
+  it("keeps the context Action while the workspace one is blocked for lack of a root", () => {
+    expect(ids([workspaceAgent, contextAgent], at("/p/sub", null))).toEqual([]);
+    expect(ids([script({ id: "w" }), script({ id: "c", cwdMode: "context" })], at("/p/sub", null))).toEqual([]);
+  });
+
+  it("never hides or keeps a blocked Action", () => {
+    const blocked = app({ id: "b", command: "code {workspace}" });
+    const dynamic = app({ id: "c", command: "code {cwd}" });
+    expect(ids([blocked, dynamic], { ...at("/p"), vars: { ...vars, workspace: "", cwd: "/p" } })).toEqual([]);
+  });
+
+  it("keeps two static Actions or two dynamic ones, made on purpose", () => {
+    expect(ids([agent({ id: "a" }), agent({ id: "b" })], at("/p"))).toEqual([]);
+    expect(ids([agent({ id: "a", cwdMode: "context" }), agent({ id: "b", cwdMode: "context" })], at("/p"))).toEqual([]);
+  });
+
+  it("hides the one in the menu, whichever is dynamic, when only one has a button", () => {
+    const menu = agent({ id: "m", ownButton: false });
+    expect(ids([menu, agent({ id: "b", cwdMode: "context" })], at("/p"))).toEqual(["m"]);
+    expect(ids([contextAgent, agent({ id: "m", ownButton: false })], at("/p"))).toEqual(["m"]);
+    expect(ids([agent({ id: "m", cwdMode: "context", ownButton: false }), workspaceAgent], at("/p"))).toEqual(["m"]);
+  });
+
+  it("hides the dynamic one only when a static one survives, after the menu pass", () => {
+    const staticMenu = agent({ id: "sm", ownButton: false });
+    const dynamicButton = agent({ id: "db", cwdMode: "context" });
+    expect(ids([staticMenu, dynamicButton], at("/p"))).toEqual(["sm"]);
+  });
+
+  it("never hides a script that is not idle, and it keeps the others hidden", () => {
+    const inWorkspace = script({ id: "w", cwdMode: "workspace", ownButton: true });
+    const inContext = script({ id: "c", cwdMode: "context", ownButton: true });
+    expect(ids([inWorkspace, inContext], at("/p"), new Map([["c", "running"]]))).toEqual([]);
+    expect(ids([inWorkspace, inContext], at("/p"), new Map([["w", "running"]]))).toEqual(["c"]);
+    expect(ids([inWorkspace, inContext], at("/p"), new Map([["c", "waiting"]]))).toEqual([]);
+    const menu = script({ id: "m", cwdMode: "workspace", ownButton: false });
+    expect(ids([menu, inWorkspace], at("/p"), new Map([["m", "running"]]))).toEqual([]);
+  });
+
+  it("does nothing without a context, in Settings or while hibernated", () => {
+    expect(ids([workspaceAgent, contextAgent], null)).toEqual([]);
+    expect(ids([workspaceAgent, contextAgent], { ...at("/p"), labels: true })).toEqual([]);
+    expect(ids([workspaceAgent, contextAgent], { ...at("/p"), hibernated: true })).toEqual([]);
+  });
+
+  it("leaves alone an Action it cannot compare", () => {
+    const broken = script({ id: "x", command: 'echo "{cwd}"', cwdMode: "context" });
+    const other = script({ id: "y", command: 'echo "{cwd}"', cwdMode: "workspace" });
+    expect(ids([broken, other], at("/p"))).toEqual([]);
+    expect(ids([app({ id: "n", command: "code {filepath}" }), app({ id: "m", command: "code {filepath}" })], at("/p"))).toEqual([]);
+  });
+
+  it("does not let an Action the place hides hide another one", () => {
+    const file = { file: true, folder: false };
+    const byWorkspace = app({ id: "w", command: "code /p" });
+    const byCwd = script({ id: "c", command: "code {cwd}", ownButton: true });
+    expect(ids([byWorkspace, byCwd], at("/p"), none, file)).toEqual([]);
+  });
+
+  it("takes the hidden twin out of the bar, the menu and the fit count", () => {
+    const context = at("/p");
+    const model = buildActionsBarModel({ local: [workspaceAgent, contextAgent], context, states: none, activeId: undefined });
+    expect(model.buttons.map((b) => b.id)).toEqual(["w"]);
+    const asMenu = buildActionsBarModel({
+      local: [{ ...workspaceAgent, ownButton: false }, { ...contextAgent, ownButton: false }],
+      context,
+      states: none,
+      activeId: undefined,
+    });
+    expect(asMenu.menu.workspace.map((i) => i.id)).toEqual(["w"]);
+    expect(paletteActions(model).map((i) => i.id)).toEqual(["w"]);
+    const hidden = twinIds([workspaceAgent, contextAgent], context, none);
+    const candidates = ownButtonCandidates([workspaceAgent, contextAgent], [], none, undefined, hidden);
+    expect(candidates.map((a) => a.id)).toEqual(["w"]);
+    const later = agent({ id: "later", command: "other" });
+    const trio = [contextAgent, workspaceAgent, later];
+    const room = trio.reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
+    expect(ownButtonsThatFit(trio, room)).toBe(3);
+    expect(ownButtonsThatFit(trio, room, undefined, none, hidden)).toBe(2);
+    expect(ownButtonsThatFit(trio, ownButtonWidth(later) * 2 + BAR_GAP * 2 + MENUS_RESERVE, undefined, none, hidden)).toBe(2);
   });
 });

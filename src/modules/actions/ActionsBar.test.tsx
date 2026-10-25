@@ -121,7 +121,7 @@ describe("OwnButton", () => {
     const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
     const focus = vi.fn(() => true);
     const context: BarContext = { vars: { workspace: "/p", cwd: "/p" }, shell: "posix", folders: { focusFolder: "/p", workspaceRoot: "/p" } };
-    const twin: Action = { ...agent, id: "g2", cwdMode: "workspace" };
+    const twin: Action = { ...agent, id: "g2", cwdMode: "fixed", cwd: "/elsewhere" };
     const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map(), activeId: undefined }).buttons[0]!;
     expect(built).toMatchObject({ id: "g1", iconOnly: false });
     expect(built.subtitle).toBe("/p");
