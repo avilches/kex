@@ -1,5 +1,4 @@
-import { IS_WINDOWS } from "@/lib/platform";
-import { resolveScriptCwd, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
+import { equalFolder, resolveScriptCwd, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
 import { planScriptStop } from "@/modules/workspaces/lib/scriptRunState";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
@@ -60,20 +59,6 @@ export type RunPlan =
     };
 
 const label = (action: Action) => action.name.trim() || "Action";
-
-// Two folders are the tab's one when the canonical strings match: separators folded to
-// forward slashes, no trailing separator, and (Windows folders being case-insensitive on
-// disk) case only folded there. A symlinked folder that the shell cwd resolves elsewhere
-// reads as a different folder and just opens a new tab, which is the safe side.
-const equalFolder = (a: string | undefined, b: string | undefined): boolean => {
-  if (!a || !b) return a === b;
-  const norm = (p: string) => {
-    let q = p.replace(/\\/g, "/").replace(/\/+$/, "");
-    if (IS_WINDOWS || /^\\\\/.test(p)) q = q.toLowerCase();
-    return q;
-  };
-  return norm(a) === norm(b);
-};
 
 const blocked = (action: Action, why: string): RunPlan => ({
   kind: "blocked",

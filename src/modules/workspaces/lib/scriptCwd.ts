@@ -1,5 +1,5 @@
+import { IS_WINDOWS } from "@/lib/platform";
 import type { ScriptCwdMode } from "./types";
-
 
 export type ScriptShell = "posix" | "powershell";
 
@@ -31,6 +31,21 @@ export function resolveScriptCwd(input: ScriptCwdInput): string | undefined {
     default:
       return present(input.home);
   }
+}
+
+// Two folders are the same when the canonical strings match: separators folded to forward
+// slashes, no trailing separator, and (Windows folders being case-insensitive on disk) case
+// only folded there. A symlinked folder that resolves elsewhere reads as a different folder,
+// which is the safe side.
+export function folderKey(p: string | null | undefined): string {
+  if (!p) return "";
+  const q = p.replace(/\\/g, "/").replace(/\/+$/, "");
+  return IS_WINDOWS || /^\\\\/.test(p) ? q.toLowerCase() : q;
+}
+
+export function equalFolder(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return a === b;
+  return folderKey(a) === folderKey(b);
 }
 
 export function isSafeScriptCwd(cwd: string): boolean {
