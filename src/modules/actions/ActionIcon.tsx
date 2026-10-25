@@ -1,6 +1,7 @@
 import { AppWindowIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { EditorIcon } from "@/modules/external-editors/EditorIcon";
 import type { Action } from "./lib/types";
 
@@ -8,8 +9,8 @@ type Props = {
   action: Pick<Action, "appId" | "kind"> & { iconId?: string };
   size?: number;
   /**
-   * The one size of an Action icon wherever an Action is listed: 24px, centered on the two
-   * lines of its name (`ActionNameLines`).
+   * The one size of an Action icon wherever an Action is listed, the `actionIconSize`
+   * preference (Settings > Appearance), centered on the two lines of its name.
    */
   fill?: boolean;
 };
@@ -17,6 +18,7 @@ type Props = {
 // An app shows the icon of the detected app it came from; an agent its logo (the generic robot
 // without one); a script the terminal glyph; a user app the window glyph.
 export function ActionIcon({ action, size = 14, fill }: Props) {
+  const boxSize = usePreferencesStore((s) => s.actionIconSize);
   const id = action.appId || action.iconId;
   const agent = action.kind === "agent";
   const icon = action.kind === "script" ? ComputerTerminal01Icon : AppWindowIcon;
@@ -28,7 +30,8 @@ export function ActionIcon({ action, size = 14, fill }: Props) {
   return (
     <span
       data-action-icon-fill
-      className="relative size-6 shrink-0 text-muted-foreground"
+      style={{ width: boxSize, height: boxSize }}
+      className="relative shrink-0 text-muted-foreground"
     >
       {agent ? (
         <AgentIcon agent={id ?? ""} size={size} className="absolute inset-0 size-full!" />

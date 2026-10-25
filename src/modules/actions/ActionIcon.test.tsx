@@ -49,7 +49,7 @@ describe("ActionIcon", () => {
   it("fill sizes the icon to the two lines next to it, to one constant size", () => {
     const app = render({ action: { appId: "zed", kind: "app" }, fill: true });
     const box = app.container.querySelector("[data-action-icon-fill]")!;
-    expect(box.className).toContain("size-6");
+    expect((box as HTMLElement).style.width).toBe("20px");
     expect(box.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
     app.unmount();
     const glyph = render({ action: { kind: "script" }, fill: true });

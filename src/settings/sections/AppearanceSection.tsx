@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { ACTION_ICON_SIZES } from "@/lib/actionIconSizes";
 import { ZOOM_LEVELS } from "@/lib/zoomLevels";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -16,6 +17,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   SPINNER_STYLES,
   type SpinnerStyle,
+  setActionIconSize,
   setExplorerGitColorScheme,
   setSpinnerStyle,
   setUiFont,
@@ -64,6 +66,7 @@ export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const spinnerStyle = usePreferencesStore((s) => s.spinnerStyle);
+  const actionIconSize = usePreferencesStore((s) => s.actionIconSize);
   const uiFont = usePreferencesStore((s) => s.uiFont);
   const hydrated = usePreferencesStore((s) => s.hydrated);
 
@@ -171,6 +174,26 @@ export function AppearanceSection() {
               className={INPUT_CLASS}
             />
           )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2">
+          <span className="text-[12.5px] font-medium">Action icon size</span>
+          <RadioGroup
+            value={String(actionIconSize)}
+            onValueChange={(v) => void setActionIconSize(Number(v))}
+            className="flex items-center gap-2"
+          >
+            {ACTION_ICON_SIZES.map((s) => (
+              <div key={s} className="flex items-center gap-1.5">
+                <RadioGroupItem value={String(s)} id={`action-icon-${s}`} />
+                <label htmlFor={`action-icon-${s}`} className="cursor-pointer text-[12px] tabular-nums">
+                  {s}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
         </div>
       </div>
 
