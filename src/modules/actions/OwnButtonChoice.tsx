@@ -7,7 +7,6 @@ import { ActionNameLines } from "./ActionNameLines";
 import type { Scope } from "./lib/actionDrop";
 import { scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
 import { BOXED_RADIO } from "./lib/boxedRadio";
-import { splitActionName } from "./lib/actionName";
 import type { Action } from "./lib/types";
 
 type Props = {
@@ -28,7 +27,6 @@ const OPTIONS = [
 export function OwnButtonChoice({ action, scope, onChange }: Props) {
   const value = action.ownButton ? "button" : "combo";
   const display = action.name.trim() || "Action";
-  const name = splitActionName(display).main;
   const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
   return (
     <div className="flex flex-col gap-1.5">
@@ -54,9 +52,11 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
         >
           <div className="flex items-center justify-end gap-1.5">
             {value === "button" && (
-              <span className="flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-[11px]">
+              <span className="flex h-9 min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2">
                 <ActionIcon action={action} size={13} fill />
-                <span className="max-w-[90px] truncate">{name}</span>
+                <span className="max-w-[110px] min-w-0">
+                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
+                </span>
               </span>
             )}
             <span

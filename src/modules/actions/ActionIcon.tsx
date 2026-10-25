@@ -7,9 +7,8 @@ type Props = {
   action: Pick<Action, "appId" | "runInTerminal"> & { iconId?: string };
   size?: number;
   /**
-   * The one size of an Action icon wherever an Action is listed: a square as tall as its two
-   * lines (`ActionNameLines`: 12px and 9.5px, both `leading-tight`, 26.875px), so the top edge
-   * meets the top of the name and the bottom edge the bottom of the line under it.
+   * The one size of an Action icon wherever an Action is listed: 24px, centered on the two
+   * lines of its name (`ActionNameLines`).
    */
   fill?: boolean;
 };
@@ -25,7 +24,7 @@ export function ActionIcon({ action, size = 14, fill }: Props) {
   return (
     <span
       data-action-icon-fill
-      className="relative size-[26.875px] shrink-0 text-muted-foreground"
+      className="relative size-6 shrink-0 text-muted-foreground"
     >
       {app ? (
         <EditorIcon id={app} size={size} className="absolute inset-0 size-full" />
