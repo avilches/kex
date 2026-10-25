@@ -716,12 +716,12 @@ describe("agents", () => {
     expect(actionAvailability(agent({ command: "claude\nrm" }), ctx)).toMatch(/control character/);
   });
 
-  it("refuses bidi overrides and isolates, and nothing just outside those ranges", () => {
-    for (const cp of [0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069]) {
+  it("refuses bidi marks, overrides and isolates, and nothing just outside those ranges", () => {
+    for (const cp of [0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069]) {
       const command = `claude ${String.fromCodePoint(cp)}x`;
       expect(agentCommandProblem(command), cp.toString(16)).toMatch(/text direction/);
     }
-    for (const cp of [0x2030, 0x202f, 0x2065, 0x206a]) {
+    for (const cp of [0x200d, 0x2030, 0x202f, 0x2065, 0x206a]) {
       expect(agentCommandProblem(`claude ${String.fromCodePoint(cp)}`), cp.toString(16)).toBeNull();
     }
   });
