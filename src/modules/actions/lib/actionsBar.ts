@@ -220,7 +220,7 @@ function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext 
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.
-function agentTitle(label: string, disabledReason: string | null): string {
+export function agentTitle(label: string, disabledReason: string | null): string {
   return disabledReason ? `${label}: ${disabledReason}` : `Run ${label}`;
 }
 

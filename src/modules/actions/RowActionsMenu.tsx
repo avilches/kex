@@ -77,11 +77,15 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
   return { groups, overlay };
 }
 
-type ActionMenuApi = {
+export type ActionMenuApi = {
   run: (action: Action, overlay?: RunOverlay) => void;
   /** The workspace the menu is in: the row finds its own values from it. */
   ws: MenuWorkspace;
 };
+
+export function useActionMenuApi(): ActionMenuApi | null {
+  return useContext(ApiCtx);
+}
 
 const ApiCtx = createContext<ActionMenuApi | null>(null);
 

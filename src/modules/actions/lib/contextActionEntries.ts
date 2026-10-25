@@ -1,5 +1,7 @@
-import { actionAvailability, actionRowTitle, byKind, scriptSubtitle, type BarContext } from "./actionsBar";
-import { isAgent, isScript, type Action } from "./types";
+import { folderKey } from "@/modules/workspaces/lib/scriptCwd";
+import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { actionAvailability, actionTarget, agentTitle, actionRowTitle, byKind, scriptSubtitle, twinIds, type BarContext } from "./actionsBar";
+import { isAgent, isApp, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -18,10 +20,10 @@ export type ContextActionEntry = {
 
 export type ContextActionGroups = { workspace: ContextActionEntry[]; global: ContextActionEntry[] };
 
-function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEntry[] {
+function entriesOf(actions: readonly Action[], ctx: BarContext, withAgents = false): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
   for (const action of byKind(actions)) {
-    if (action.command.trim() === "" || isAgent(action)) continue;
+    if (action.command.trim() === "" || (isAgent(action) && !withAgents)) continue;
     const name = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name }, ctx);
     const reason = actionAvailability(action, ctx);
@@ -31,7 +33,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEn
       reason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      title: actionRowTitle(name, isScript(action), null, ctx),
+      title: isAgent(action) ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }
   return rows;
@@ -47,4 +49,34 @@ export function contextActionEntries(
   ctx: BarContext,
 ): ContextActionGroups {
   return { workspace: entriesOf(local, ctx), global: entriesOf(global, ctx) };
+}
+
+function runsInFolder(action: Action, atWorkspace: boolean): boolean {
+  const target = actionTarget(action.command);
+  if (target === "file") return false;
+  if (target === "folder") return true;
+  if (!isApp(action) && action.cwdMode === "context") return true;
+  return atWorkspace;
+}
+
+/** What the new-tab menu of a pane offers: the Actions that run in the pane's folder (a folder
+ * command, or a script or agent starting in the current directory), and the workspace ones
+ * only while that folder is the workspace's. Only the runnable ones, with the twins the Header
+ * hides left out (a `{cwd}` app and a `{workspace}` app are one entry at the workspace root). */
+export function newTabActionEntries(
+  local: readonly Action[],
+  global: readonly Action[],
+  ctx: BarContext,
+  states: ReadonlyMap<string, ScriptState>,
+): ContextActionGroups {
+  const folders = ctx.folders ?? {};
+  const workspaceFolder = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
+  const atWorkspace = workspaceFolder !== "" && folderKey(folders.focusFolder) === workspaceFolder;
+  const pick = (actions: readonly Action[]) =>
+    actions.filter((a) => a.command.trim() !== "" && runsInFolder(a, atWorkspace) && actionAvailability(a, ctx) === null);
+  const l = pick(local);
+  const g = pick(global);
+  const hidden = twinIds([...l, ...g], ctx, states, { file: false, folder: true });
+  const keep = (actions: Action[]) => entriesOf(actions.filter((a) => !hidden.has(a.id)), ctx, true);
+  return { workspace: keep(l), global: keep(g) };
 }

@@ -34,6 +34,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
+import { tabFolder } from "./lib/tabPath";
 import { TabBarIcon } from "./lib/tabBarIcon";
 import { tabTopLineColor } from "./lib/tabColor";
 import { tabGitColor } from "./lib/tabGitColor";
@@ -698,6 +699,7 @@ export function PaneTabBar({
         )}
       >
         <NewTabMenuButton
+          folder={tabFolder(tabs.find((t) => t.id === activeTabId) ?? null)}
           onNewTerminal={onNewTerminal}
           onSplitTerminalRight={onSplitTerminalRight}
           onSplitTerminalDown={onSplitTerminalDown}

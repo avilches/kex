@@ -14,12 +14,15 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { NewTabActionItems } from "@/modules/actions/NewTabActionItems";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { createHoverSwitch } from "./lib/hoverSwitch";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 
 type Props = {
+  /** The folder the pane works in; its Actions run there. */
+  folder?: string | null;
   onNewTerminal: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
@@ -41,6 +44,7 @@ function Shortcut({ id }: { id: ShortcutId }) {
 // controlled: its trigger is an inert anchor, so Radix never toggles it from
 // the button's own pointer or keyboard events.
 export function NewTabMenuButton({
+  folder = null,
   onNewTerminal,
   onSplitTerminalRight,
   onSplitTerminalDown,
@@ -126,6 +130,7 @@ export function NewTabMenuButton({
           <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
           New Browser Split Down
         </DropdownMenuItem>
+        <NewTabActionItems folder={folder} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
