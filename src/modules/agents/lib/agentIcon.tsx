@@ -4,13 +4,8 @@ import claudeCodeUrl from "@/modules/agents/assets/claudecode-color.svg";
 import geminiCliUrl from "@/modules/agents/assets/geminicli-color.svg";
 import ompUrl from "@/modules/agents/assets/omp-color.svg";
 
-function svgUrlFor(agent: string): string | null {
-  const a = agent.toLowerCase();
-  if (a.includes("claude")) return claudeCodeUrl;
-  if (a.includes("gemini")) return geminiCliUrl;
-  if (a === "omp") return ompUrl;
-  return null;
-}
+// By exact id, so an unknown agent whose name contains a known one gets the generic icon.
+const SVG_URLS = new Map([["claude", claudeCodeUrl], ["gemini", geminiCliUrl], ["omp", ompUrl]]);
 
 // Marks drawn inline follow the text color, which an <img> cannot: a monochrome logo loaded
 // through <img> renders black and disappears on dark themes.
@@ -63,10 +58,6 @@ function OpenCodeMark({ size, className }: { size: number; className?: string })
   );
 }
 
-function isCodex(agent: string): boolean {
-  return agent.includes("codex") || agent.includes("gpt") || agent.includes("openai");
-}
-
 // The OpenAI mark, drawn inline so it follows the text color.
 function CodexMark({ size, className }: { size: number; className?: string }) {
   return (
@@ -85,7 +76,8 @@ export function AgentIcon({
   size?: number;
   className?: string;
 }) {
-  if (agent.toLowerCase().includes("kex")) {
+  const id = agent.toLowerCase();
+  if (id === "kex") {
     return (
       <img
         src="/logo.png"
@@ -98,12 +90,11 @@ export function AgentIcon({
     );
   }
 
-  const inline = agent.toLowerCase();
-  if (inline === "pi") return <PiMark size={size} className={className} />;
-  if (inline === "opencode") return <OpenCodeMark size={size} className={className} />;
-  if (isCodex(inline)) return <CodexMark size={size} className={className} />;
+  if (id === "pi") return <PiMark size={size} className={className} />;
+  if (id === "opencode") return <OpenCodeMark size={size} className={className} />;
+  if (id === "codex") return <CodexMark size={size} className={className} />;
 
-  const svgUrl = svgUrlFor(agent);
+  const svgUrl = SVG_URLS.get(id);
   if (svgUrl) {
     return (
       <img

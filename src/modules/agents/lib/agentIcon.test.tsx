@@ -78,4 +78,22 @@ describe("AgentIcon", () => {
     const root = render(<AgentIcon agent="omp" size={14} />);
     expect(root.querySelector("img")).not.toBeNull();
   });
+
+  it("matches the exact id, so a name that only contains a known one gets the generic icon", () => {
+    for (const agent of ["gpt-x", "openai", "codex-cli", "claude2", "my-gemini", "kexy", "toString"]) {
+      const root = render(<AgentIcon agent={agent} size={14} />);
+      expect(root.querySelector("img"), agent).toBeNull();
+      expect(root.querySelector("[aria-label]"), agent).toBeNull();
+      expect(root.querySelector("svg"), agent).not.toBeNull();
+      host?.remove();
+    }
+  });
+
+  it("draws the image marks for their exact ids, in any case", () => {
+    for (const agent of ["claude", "Claude", "gemini", "omp"]) {
+      const root = render(<AgentIcon agent={agent} size={14} />);
+      expect(root.querySelector("img"), agent).not.toBeNull();
+      host?.remove();
+    }
+  });
 });
