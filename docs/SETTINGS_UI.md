@@ -83,7 +83,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   El combo Add pone Add script arriba y Custom como primera app y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.
   Donde un nombre lleva dos lineas (fila de Settings, boton del Header, menu, combo Add) el icono de app mide lo que las dos lineas
-  (`ActionIcon fill`: `1.25em + 11.875px`, la altura de `leading-tight` mas la linea de 9.5px) y el play/stop de un script ocupa
+  (`ActionIcon fill`: 26.875px en todos los sitios, la altura de la linea de 12px de `ActionNameLines` mas la de 9.5px, ambas `leading-tight`) y el play/stop de un script ocupa
   toda la altura de su fila, igual que el hover del nombre. El selector de ambito del modal son dos botones pequenos arriba a la
   derecha (This workspace, Global), sin radio.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono

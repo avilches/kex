@@ -1,4 +1,4 @@
-import { Add01Icon, ChevronDownIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, ChevronDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -55,9 +55,7 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 }}
                 className="text-[12px]"
               >
-                <span className="flex size-5 shrink-0 items-center justify-center">
-                  <HugeiconsIcon icon={ComputerTerminal01Icon} size={13} strokeWidth={1.75} />
-                </span>
+                <ActionIcon action={{ runInTerminal: true }} size={13} fill />
                 <span className="min-w-0 flex-1 truncate">Add script</span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">runs in a terminal</span>
               </CommandItem>
@@ -72,9 +70,7 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 }}
                 className="text-[12px]"
               >
-                <span className="flex size-5 shrink-0 items-center justify-center">
-                  <ActionIcon action={{ runInTerminal: false }} size={13} />
-                </span>
+                <ActionIcon action={{ runInTerminal: false }} size={13} fill />
                 <span className="min-w-0 flex-1 truncate">{CUSTOM_APP_SUGGESTION.name}</span>
               </CommandItem>
               {[...suggestions].sort(compareByName).map((s) => {

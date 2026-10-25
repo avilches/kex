@@ -141,7 +141,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
         )}
       >
         {iconOnly ? (
-          <ActionIcon action={item.action} size={14} />
+          <ActionIcon action={item.action} size={14} fill />
         ) : (
           <span className="flex min-w-0 items-center gap-1.5">
             {!script && <ActionIcon action={item.action} size={14} fill />}
@@ -823,7 +823,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
         <DragOverlay dropAnimation={null} modifiers={[followPointer]}>
           {dragged && (
             <div className="flex h-8 items-center gap-1.5 rounded-md bg-popover px-2 text-[11px] shadow-lg ring-1 ring-foreground/10">
-              <ActionIcon action={dragged.action} size={14} />
+              <ActionIcon action={dragged.action} size={14} fill />
               <span className="max-w-[120px] truncate">{splitActionName(dragged.name).main}</span>
             </div>
           )}

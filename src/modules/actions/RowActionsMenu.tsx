@@ -105,7 +105,7 @@ function EntryItem({ entry, overlay, run }: { entry: ContextActionEntry; overlay
       className={COMPACT_ITEM}
       onSelect={() => run(entry.action, overlay)}
     >
-      <ActionIcon action={entry.action} size={14} />
+      <ActionIcon action={entry.action} size={14} fill />
       <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
         <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
       </span>
