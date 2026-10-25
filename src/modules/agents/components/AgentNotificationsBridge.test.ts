@@ -11,7 +11,6 @@ import { useAgentStore } from "../store/agentStore";
 import {
   handleSessionMeta,
   handleSignal,
-  handleUsage,
   type Ctx,
 } from "./AgentNotificationsBridge";
 
@@ -362,19 +361,5 @@ describe("handleSignal: the tab title when the agent ends", () => {
     expect(session()).toBeUndefined();
     expect(clearOscTitle).not.toHaveBeenCalled();
     expect(invoke).not.toHaveBeenCalledWith("agent_detach_session", { tabId: "tab-1" });
-  });
-});
-
-describe("handleUsage", () => {
-  beforeEach(() => useAgentStore.setState({ usage: {} }));
-
-  test("stores the reading of a tab that lives in this window", () => {
-    handleUsage({ tabId: "tab-1", usage: { contextUsedPct: 12 } }, ctx());
-    expect(useAgentStore.getState().usage["tab-1"]).toEqual({ contextUsedPct: 12 });
-  });
-
-  test("ignores the reading of a tab that no workspace of this window holds", () => {
-    handleUsage({ tabId: "tab-elsewhere", usage: { contextUsedPct: 12 } }, ctx());
-    expect(useAgentStore.getState().usage).toEqual({});
   });
 });

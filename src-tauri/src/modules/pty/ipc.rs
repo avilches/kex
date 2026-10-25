@@ -14,14 +14,11 @@ use tauri::{AppHandle, Emitter};
 use super::hook_router::{
     frame_origin, is_safe_tab_id, late_frame_is_dropped, route, Route, TabRegistry,
 };
-use crate::modules::agent::{live_model, session_store, statusline};
+use crate::modules::agent::{live_model, session_store};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
 const AGENT_CWD_EVENT: &str = "kex:agent-cwd";
-const AGENT_USAGE_EVENT: &str = "kex:agent-usage";
-/// The frame `statusline.sh` sends for a Claude Code status line tick. Not a hook event.
-const STATUS_LINE_FRAME: &str = "StatusLine";
 
 /// Directory that holds this user's IPC sockets.
 ///
@@ -796,11 +793,10 @@ fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
 /// same tab and recorded a fresh session for it. Unparseable JSON is not
 /// stale (it isn't recognized as anything): let it reach `dispatch`, which
 /// has its own handling for that case.
-/// A status line reading is live-only too: an old one would misreport the session.
 fn stale_spooled_event_kind(json: &str) -> Option<String> {
     parse_payload(json)
         .map(|p| p.event)
-        .filter(|e| e == "SessionEnd" || e == "StopFailure" || e == STATUS_LINE_FRAME)
+        .filter(|e| e == "SessionEnd" || e == "StopFailure")
 }
 
 /// Debug logging in `dispatch_with` below echoes free-text agent payload fields
@@ -829,7 +825,7 @@ fn reports_agent_cwd(event: &str, source: &str, cwd: &str) -> bool {
         return false;
     }
     match event {
-        "SessionEnd" | "SubagentStart" | "SubagentStop" | STATUS_LINE_FRAME => false,
+        "SessionEnd" | "SubagentStart" | "SubagentStop" => false,
         "SessionStart" => source != "resume",
         _ => true,
     }
@@ -853,16 +849,6 @@ fn post_compact_signal(id: u32, p: &Payload) -> serde_json::Value {
     let mut sig = agent_signal(id, "PostCompact", p.agent.as_deref());
     sig["trigger"] = p.compact_trigger.as_deref().unwrap_or("").into();
     sig
-}
-
-/// A tick with nothing to show still goes out, empty, so a reading the session no longer has
-/// (after `/clear`) disappears from the tab.
-fn usage_signal(json: &str, tab_id: &str) -> serde_json::Value {
-    let usage = serde_json::from_str::<serde_json::Value>(json)
-        .ok()
-        .and_then(|v| statusline::usage(&v))
-        .unwrap_or_default();
-    serde_json::json!({ "tabId": tab_id, "usage": usage })
 }
 
 /// Events that reach the frontend as a signal with no side effect on the Rust side.
@@ -903,9 +889,6 @@ fn dispatch_with(
         );
     }
     match p.event.as_str() {
-        STATUS_LINE_FRAME => {
-            emit(AGENT_USAGE_EVENT, usage_signal(json, tab_id));
-        }
         "SessionStart" => {
             let source = p.source.as_deref().unwrap_or("");
             let session_title = p.session_title.as_deref().unwrap_or("");
@@ -2095,46 +2078,6 @@ mod tests {
             );
             assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
         });
-    }
-
-    #[test]
-    fn a_status_line_frame_emits_only_the_tab_usage() {
-        let json = r#"{"hook_event_name":"StatusLine","agent":"claude","tab_id":"tab-sl","pty_id":"3","cwd":"/w","session_id":"s","context_window":{"used_percentage":12},"rate_limits":{"five_hour":{"used_percentage":40,"resets_at":1792900000}}}"#;
-        let emitted = dispatch_events(json, "tab-sl");
-        assert_eq!(emitted.len(), 1, "no cwd, no agent signal: {emitted:?}");
-        let (event, payload) = &emitted[0];
-        assert_eq!(event, AGENT_USAGE_EVENT);
-        assert_eq!(payload["tabId"], "tab-sl");
-        assert_eq!(payload["usage"]["contextUsedPct"], 12.0);
-        assert_eq!(payload["usage"]["fiveHour"]["usedPct"], 40.0);
-        assert!(payload["usage"].get("sevenDay").is_none());
-    }
-
-    #[test]
-    fn a_status_line_frame_with_nothing_to_show_clears_the_reading() {
-        let json = r#"{"hook_event_name":"StatusLine","tab_id":"tab-sl","context_window":{"used_percentage":null}}"#;
-        let emitted = dispatch_events(json, "tab-sl");
-        assert_eq!(emitted[0].1["usage"], serde_json::json!({}));
-    }
-
-    #[test]
-    fn a_status_line_frame_is_never_spooled() {
-        let base = tempfile::tempdir().unwrap();
-        let (hub, rec) = test_hub(Some(base.path().to_path_buf()));
-        hub.handle_line(&frame("StatusLine", "tab-off", 1, "s"));
-        assert!(!base.path().join("tab-off").exists());
-        assert!(rec.events.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn a_late_status_line_frame_is_dropped() {
-        let (hub, rec) = test_hub(None);
-        hub.register("tab-late", 2);
-        hub.activate("tab-late", 2);
-        hub.handle_line(&frame("StatusLine", "tab-late", 1, "s"));
-        assert!(rec.events.lock().unwrap().is_empty());
-        hub.handle_line(&frame("StatusLine", "tab-late", 2, "s"));
-        assert_eq!(rec.events.lock().unwrap()[0].0, AGENT_USAGE_EVENT);
     }
 
     #[test]

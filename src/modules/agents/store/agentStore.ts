@@ -9,7 +9,6 @@ import type {
   BackgroundSubagent,
   LocalAgentState,
 } from "../lib/types";
-import { type AgentUsage, sameUsage } from "../lib/usage";
 
 const MAX_NOTIFICATIONS = 50;
 const MAX_CLOSED = 20;
@@ -18,9 +17,6 @@ let notifSeq = 0;
 
 type AgentStoreState = {
   sessions: Record<string, AgentSession>;
-  /** Apart from `sessions` so a status line tick re-renders only the tab that shows it. */
-  usage: Record<string, AgentUsage>;
-  setUsage: (tabId: string, usage: AgentUsage) => void;
   localAgent: LocalAgentState;
   notifications: AgentNotification[];
   /** tabId -> workspaceId of every live tab; null until the app reports it. */
@@ -73,23 +69,11 @@ type AgentStoreState = {
 
 export const useAgentStore = create<AgentStoreState>((set) => ({
   sessions: {},
-  usage: {},
   localAgent: null,
   notifications: [],
   tabLocations: null,
   userTabTitles: {},
   closedSessions: {},
-
-  setUsage: (tabId, usage) =>
-    set((s) => {
-      const empty = Object.keys(usage).length === 0;
-      if (empty ? !(tabId in s.usage) : sameUsage(s.usage[tabId], usage))
-        return s;
-      const next = { ...s.usage };
-      if (empty) delete next[tabId];
-      else next[tabId] = usage;
-      return { usage: next };
-    }),
 
   start: (tabId, workspaceId, agent) =>
     set((s) => {
@@ -225,14 +209,10 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
 
   finish: (tabId) =>
     set((s) => {
-      const hasUsage = tabId in s.usage;
-      if (!s.sessions[tabId] && !hasUsage) return s;
+      if (!s.sessions[tabId]) return s;
       const next = { ...s.sessions };
       delete next[tabId];
-      if (!hasUsage) return { sessions: next };
-      const usage = { ...s.usage };
-      delete usage[tabId];
-      return { sessions: next, usage };
+      return { sessions: next };
     }),
 
   startRestored: (tabId, workspaceId, agent) =>
