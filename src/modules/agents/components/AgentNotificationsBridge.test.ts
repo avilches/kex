@@ -8,12 +8,21 @@ import type { AgentSession } from "../lib/types";
 import { isHibernating } from "../lib/hibernatingTabs";
 import { clearOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { useAgentStore } from "../store/agentStore";
-import { handleSessionMeta, handleSignal, type Ctx } from "./AgentNotificationsBridge";
+import {
+  handleSessionMeta,
+  handleSignal,
+  handleUsage,
+  type Ctx,
+} from "./AgentNotificationsBridge";
 
 const UNKNOWN_PTY = vi.hoisted(() => 999);
 
 vi.mock("@/modules/workspaces", () => ({
-  findTabPane: () => ({ tab: { kind: "terminal", cwd: "/p/proj", title: "" } }),
+  findTabPane: vi.fn((_tree: unknown, tabId: string) =>
+    tabId === "tab-elsewhere"
+      ? null
+      : { tab: { kind: "terminal", cwd: "/p/proj", title: "" } },
+  ),
   focusedTabId: vi.fn(() => null),
 }));
 vi.mock("@/modules/terminal", () => ({
@@ -353,5 +362,19 @@ describe("handleSignal: the tab title when the agent ends", () => {
     expect(session()).toBeUndefined();
     expect(clearOscTitle).not.toHaveBeenCalled();
     expect(invoke).not.toHaveBeenCalledWith("agent_detach_session", { tabId: "tab-1" });
+  });
+});
+
+describe("handleUsage", () => {
+  beforeEach(() => useAgentStore.setState({ usage: {} }));
+
+  test("stores the reading of a tab that lives in this window", () => {
+    handleUsage({ tabId: "tab-1", usage: { contextUsedPct: 12 } }, ctx());
+    expect(useAgentStore.getState().usage["tab-1"]).toEqual({ contextUsedPct: 12 });
+  });
+
+  test("ignores the reading of a tab that no workspace of this window holds", () => {
+    handleUsage({ tabId: "tab-elsewhere", usage: { contextUsedPct: 12 } }, ctx());
+    expect(useAgentStore.getState().usage).toEqual({});
   });
 });
