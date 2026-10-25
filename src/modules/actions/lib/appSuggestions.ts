@@ -1,3 +1,4 @@
+import { newActionId } from "@/lib/ids";
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
@@ -151,4 +152,16 @@ export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]):
       })),
     )
     .sort(compareByName);
+}
+
+export function actionFromSuggestion(s: AppSuggestion, ownButton = false): Action {
+  return {
+    id: newActionId(),
+    name: s.name,
+    kind: s.kind,
+    command: s.defaultCommand,
+    ...(s.appId ? { appId: s.appId } : {}),
+    ...(s.kind === "agent" ? { cwdMode: s.cwdMode } : {}),
+    ownButton,
+  };
 }

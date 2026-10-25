@@ -28,7 +28,7 @@ import {
 } from "./lib/actionDrop";
 import { KIND_ORDER } from "./lib/actionsBar";
 import { ownedAfterEdit } from "./lib/appOwnership";
-import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
+import { actionFromSuggestion, presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action, ActionKind } from "./lib/types";
 
@@ -70,18 +70,6 @@ function blankApp(): Action {
 
 // A preset carries its own kind: an app preset is an app, an agent preset an agent that starts
 // where the preset says.
-function actionFromSuggestion(s: AppSuggestion): Action {
-  return {
-    id: newActionId(),
-    name: s.name,
-    kind: s.kind,
-    command: s.defaultCommand,
-    ...(s.appId ? { appId: s.appId } : {}),
-    ...(s.kind === "agent" ? { cwdMode: s.cwdMode } : {}),
-    ownButton: false,
-  };
-}
-
 const GROUP_LABELS: Record<ActionKind, string> = { script: "Scripts", app: "Applications", agent: "Agents" };
 
 const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "This workspace" };

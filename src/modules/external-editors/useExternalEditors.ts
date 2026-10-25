@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
-import { planAgentSeed } from "@/modules/actions/lib/agentSeed";
+import { planAgentSeed, planAppSeed } from "@/modules/actions/lib/agentSeed";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
-import { setAgentActionsSeeded, setDetectedEditors } from "@/modules/settings/store";
+import { setAgentActionsSeeded, setAppActionsSeeded, setDetectedEditors } from "@/modules/settings/store";
 import type { DetectedEditor } from "./types";
 
 // Module-level scanning state - not persisted; each webview tracks its own spinner.
@@ -47,12 +47,22 @@ export function mergeEnabled(
 // through the serialized queue. A partial failure leaves the flag false and the next scan only
 // adds what is still missing. Only one window scans at startup (`runStartupEditorScan`), so the
 // others never seed in parallel; they get the Actions and the flag through the preferences echo.
-async function seedAgentActions(agents: DetectedEditor[]): Promise<void> {
-  const seeded = usePreferencesStore.getState().agentActionsSeeded;
-  const plan = planAgentSeed({ seeded, agents, existing: globalActions.get() });
-  if (!plan) return;
-  await Promise.all(plan.map((a) => globalActions.add(a)));
-  await setAgentActionsSeeded(true);
+// Agents first, then apps, each with its own flag set only after its own writes. If the agents
+// write throws, the apps are not attempted and no flag moves; the next scan retries both.
+async function seedActions(merged: DetectedEditor[]): Promise<void> {
+  const agents = merged.filter((e) => e.kind === "agent");
+  const editors = merged.filter((e) => e.kind === "editor");
+  const prefs = () => usePreferencesStore.getState();
+  const agentPlan = planAgentSeed({ seeded: prefs().agentActionsSeeded, agents, existing: globalActions.get() });
+  if (agentPlan) {
+    await Promise.all(agentPlan.map((a) => globalActions.add(a)));
+    await setAgentActionsSeeded(true);
+  }
+  const appPlan = planAppSeed({ seeded: prefs().appActionsSeeded, editors, existing: globalActions.get() });
+  if (appPlan) {
+    await Promise.all(appPlan.map((a) => globalActions.add(a)));
+    await setAppActionsSeeded(true);
+  }
 }
 
 /** Run a full editor scan and persist results, preserving user-set enabled flags. */
@@ -66,7 +76,7 @@ export async function runEditorScan(): Promise<void> {
     const existing: DetectedEditor[] = usePreferencesStore.getState().detectedEditors;
     const merged = mergeEnabled(result, existing);
     await setDetectedEditors(merged);
-    await seedAgentActions(merged.filter((e) => e.kind === "agent"));
+    await seedActions(merged);
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {
