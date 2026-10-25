@@ -8,7 +8,11 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { ACTION_ICON_SIZES } from "@/lib/actionIconSizes";
+import {
+  ACTION_ICON_SIZE_MAX,
+  ACTION_ICON_SIZE_MIN,
+  DEFAULT_ACTION_ICON_SIZE,
+} from "@/lib/actionIconSizes";
 import { ZOOM_LEVELS } from "@/lib/zoomLevels";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -28,6 +32,7 @@ import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { INPUT_CLASS } from "../components/inputClass";
 import { SectionHeader } from "../components/SectionHeader";
+import { SliderRow } from "../components/SliderRow";
 import { TitleTemplatesBlock } from "../components/TitleTemplatesBlock";
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
@@ -177,25 +182,17 @@ export function AppearanceSection() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2">
-          <span className="text-[12.5px] font-medium">Action icon size</span>
-          <RadioGroup
-            value={String(actionIconSize)}
-            onValueChange={(v) => void setActionIconSize(Number(v))}
-            className="flex items-center gap-2"
-          >
-            {ACTION_ICON_SIZES.map((s) => (
-              <div key={s} className="flex items-center gap-1.5">
-                <RadioGroupItem value={String(s)} id={`action-icon-${s}`} />
-                <label htmlFor={`action-icon-${s}`} className="cursor-pointer text-[12px] tabular-nums">
-                  {s}
-                </label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
-      </div>
+      <SliderRow
+        title="Action icon size"
+        description="Icons of the Actions in the header, its menu and Settings."
+        value={actionIconSize}
+        min={ACTION_ICON_SIZE_MIN}
+        max={ACTION_ICON_SIZE_MAX}
+        step={1}
+        defaultValue={DEFAULT_ACTION_ICON_SIZE}
+        format={(v) => `${v}px`}
+        onChange={(v) => void setActionIconSize(v)}
+      />
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2">
