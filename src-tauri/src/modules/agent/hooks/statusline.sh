@@ -59,7 +59,7 @@ if [ "$reading" = "$last_reading" ] && [ -n "$last_at" ] && [ "${#last_at}" -le 
 fi
 umask 077
 [ -d "$stamp_dir" ] || mkdir -p "$stamp_dir" 2>/dev/null
-printf '%s\n%s\n' "$now" "$reading" > "$stamp" 2>/dev/null
+printf '%s\n%s\n' "$now" "$reading" 2>/dev/null > "$stamp"
 
 # Same frame shape as trigger-event.sh, with the ids set last so the payload cannot pick them
 # (a repeated key keeps its last value). Nothing is spooled: an old reading is worthless.
@@ -71,16 +71,17 @@ case "$payload" in
 esac
 frame="${payload%\}},\"hook_event_name\":\"StatusLine\",\"agent\":\"claude\",\"tab_id\":\"$KEX_TAB_ID\",\"pty_id\":\"${KEX_PTY_ID:-}\"}"
 # In the background with its output redirected, so Claude's status line never waits on the
-# socket and the pipe it reads closes as soon as this script exits.
-if command -v nc >/dev/null 2>&1; then
-    printf '%s\n' "$frame" | nc -w 1 -U "$KEX_IPC" >/dev/null 2>&1 &
-else
-    printf '%s\n' "$frame" | python3 -c "
+# socket and the pipe it reads closes as soon as this script exits. GNU and busybox nc have no
+# -U and fail at once, which is what hands the frame to python3, as in trigger-event.sh; both
+# give up within a second, so nothing outlives the send.
+{
+    printf '%s\n' "$frame" | nc -w 1 -U "$KEX_IPC" \
+        || printf '%s\n' "$frame" | python3 -c "
 import socket, sys
 s = socket.socket(socket.AF_UNIX)
 s.settimeout(1)
 s.connect(sys.argv[1])
 s.sendall(sys.stdin.buffer.read())
-" "$KEX_IPC" >/dev/null 2>&1 &
-fi
+" "$KEX_IPC"
+} >/dev/null 2>&1 </dev/null &
 exit 0
