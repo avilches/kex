@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { byKind, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
+import { byKind, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, twinIds, type BarModel } from "./actionsBar";
 import type { Action } from "./types";
 import { useActionContext } from "./useActionContext";
 import { useActionStates } from "./useActionStates";
@@ -39,12 +39,19 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
   const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
+  const hidden = useMemo(() => twinIds([...local, ...global], context, states, context?.place), [local, global, context, states]);
   const ownButtonsShown = useMemo(
     () =>
       room === undefined
         ? undefined
-        : ownButtonsThatFit(ownButtonCandidates(byKind(local), byKind(global), states, context?.place), room, context?.place, states),
-    [local, global, room, context, states],
+        : ownButtonsThatFit(
+            ownButtonCandidates(byKind(local), byKind(global), states, context?.place, hidden),
+            room,
+            context?.place,
+            states,
+            hidden,
+          ),
+    [local, global, room, context, states, hidden],
   );
   return useMemo(
     () =>
@@ -56,7 +63,8 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
         activeId: workspace?.activeAction,
         ownButtonsShown,
         place: context?.place,
+        hidden,
       }),
-    [local, global, context, states, workspace?.activeAction, ownButtonsShown],
+    [local, global, context, states, workspace?.activeAction, ownButtonsShown, hidden],
   );
 }
