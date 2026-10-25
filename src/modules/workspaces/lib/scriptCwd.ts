@@ -33,14 +33,16 @@ export function resolveScriptCwd(input: ScriptCwdInput): string | undefined {
   }
 }
 
-// Two folders are the same when the canonical strings match: separators folded to forward
-// slashes, no trailing separator, and (Windows folders being case-insensitive on disk) case
-// only folded there. A symlinked folder that resolves elsewhere reads as a different folder,
-// which is the safe side.
+// Two folders are the same when the canonical strings match: no trailing separator and, for
+// Windows paths (any path on Windows, or one that looks like a drive or UNC path), separators
+// folded to forward slashes and case folded, since those folders are case-insensitive on
+// disk. On POSIX a backslash is an ordinary name character. A symlinked folder that resolves
+// elsewhere reads as a different folder, which is the safe side.
 export function folderKey(p: string | null | undefined): string {
   if (!p) return "";
+  if (!(IS_WINDOWS || /^([A-Za-z]:[\\/]|\\\\)/.test(p))) return p.replace(/\/+$/, "");
   const q = p.replace(/\\/g, "/").replace(/\/+$/, "");
-  return IS_WINDOWS || /^\\\\/.test(p) ? q.toLowerCase() : q;
+  return q.toLowerCase();
 }
 
 export function equalFolder(a: string | undefined, b: string | undefined): boolean {

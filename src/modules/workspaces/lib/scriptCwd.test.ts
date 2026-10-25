@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  equalFolder,
+  folderKey,
   resolveScriptCwd,
   scriptCwdProblem,
   scriptFolderMissingMessage,
@@ -129,5 +131,18 @@ describe("scriptFolderMissingMessage", () => {
   it("explains a missing folder and a file", () => {
     expect(scriptFolderMissingMessage("/a", null)).toContain("does not exist");
     expect(scriptFolderMissingMessage("/a", { kind: "file" })).toContain("not a folder");
+  });
+});
+
+describe("folderKey and equalFolder", () => {
+  it("keeps a backslash on a POSIX path as part of a name", () => {
+    expect(equalFolder("/x/a\\b", "/x/a/b")).toBe(false);
+    expect(folderKey("/x/a\\b")).toBe("/x/a\\b");
+  });
+
+  it("folds separators and case on a drive or UNC path, and the trailing separator everywhere", () => {
+    expect(equalFolder("C:\\Work\\App", "c:/work/app/")).toBe(true);
+    expect(equalFolder("\\\\Host\\Share\\A", "\\\\host/share/a")).toBe(true);
+    expect(equalFolder("/x/a/", "/x/a")).toBe(true);
   });
 });
