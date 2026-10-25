@@ -86,28 +86,6 @@ export function ThemesSection() {
     <div className="flex flex-col gap-6">
       <SectionHeader title="Themes" />
 
-      <div className="flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-        <span className="text-[12.5px] font-medium">Mode</span>
-        <div className="flex items-center gap-1">
-          {APPEARANCE_MODES.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setMode(o.id)}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-all",
-                mode === o.id
-                  ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
-                  : "border-border/60 bg-transparent hover:border-border",
-              )}
-            >
-              <HugeiconsIcon icon={o.icon} size={12} strokeWidth={1.75} />
-              <span>{o.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div
         role="presentation"
         className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 p-3"
@@ -122,6 +100,24 @@ export function ThemesSection() {
       >
         <div className="flex items-center justify-between">
           <span className="text-[12.5px] font-medium">Theme</span>
+          <div className="flex items-center gap-1">
+            {APPEARANCE_MODES.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setMode(o.id)}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] transition-all",
+                  mode === o.id
+                    ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
+                    : "border-border/60 bg-transparent hover:border-border",
+                )}
+              >
+                <HugeiconsIcon icon={o.icon} size={12} strokeWidth={1.75} />
+                <span>{o.label}</span>
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"

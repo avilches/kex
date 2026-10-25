@@ -906,14 +906,14 @@ export function CommandPalette({
         </div>
         <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
           <span className="flex shrink-0 items-center gap-1.5">
-            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+            <kbd className="rounded bg-foreground/15 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground">
               {"\u21b5"}
             </kbd>
             {footerEnterHint}
           </span>
           {terminalTarget ? (
             <span className="flex min-w-0 flex-1 items-center gap-1.5">
-              <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+              <kbd className="shrink-0 rounded bg-foreground/15 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground">
                 {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
               </kbd>
               <span className="shrink-0">Open terminal</span>
@@ -926,7 +926,7 @@ export function CommandPalette({
           )}
           {highlightedTab || highlightedClosed || highlightedAction ? (
             <span className="flex shrink-0 items-center gap-1.5">
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+              <kbd className="rounded bg-foreground/15 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground">
                 Tab
               </kbd>
               Menu

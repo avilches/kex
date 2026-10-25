@@ -23,7 +23,7 @@ export function ActionNameLines({
   const subtitle = value === undefined ? variable : value;
   return (
     <span className={cn("flex min-w-0 flex-1 flex-col leading-tight", className)}>
-      <span className="truncate">{main}</span>
+      <span className="truncate text-[12px]">{main}</span>
       {subtitle && (
         startTrim ? (
           <StartTrimmed text={subtitle} className="flex font-mono text-[9.5px] text-muted-foreground" />

@@ -8,9 +8,8 @@ type Props = {
   action: Pick<Action, "appId" | "kind"> & { iconId?: string };
   size?: number;
   /**
-   * Next to a two-line name: a square as tall as the lines, so its top and bottom edges meet
-   * the top of the name and the bottom of the line under it. The name is `leading-tight` at the
-   * font size the icon inherits plus a 9.5px line, hence the em in the size.
+   * The one size of an Action icon wherever an Action is listed: 24px, centered on the two
+   * lines of its name (`ActionNameLines`).
    */
   fill?: boolean;
 };
@@ -29,7 +28,7 @@ export function ActionIcon({ action, size = 14, fill }: Props) {
   return (
     <span
       data-action-icon-fill
-      className="relative size-[calc(1.25em+11.875px)] shrink-0 text-muted-foreground"
+      className="relative size-6 shrink-0 text-muted-foreground"
     >
       {agent ? (
         <AgentIcon agent={id ?? ""} size={size} className="absolute inset-0 size-full!" />
