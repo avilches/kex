@@ -404,7 +404,30 @@ fn build_plans_from(
 // Preserves the version of agent-sessions.json about to be overwritten, so
 // load_restore_plan can recover from it if the new write is corrupted or truncated.
 fn write_backup(path: &Path, previous_content: &str) {
-    let _ = std::fs::write(path.with_extension("json.bak"), previous_content);
+    let _ = write_private(&path.with_extension("json.bak"), previous_content);
+}
+
+// The store holds what the assistant said last, so it and its .bak are the owner's only. The
+// mode is set again after writing because `mode` only applies when the file is created, and an
+// older Kex left them with the default umask.
+fn write_private(path: &Path, content: &str) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        file.write_all(content.as_bytes())
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, content)
+    }
 }
 
 fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
@@ -420,7 +443,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
         return;
     };
     let tmp = path.with_extension("json.kex-tmp");
-    if std::fs::write(&tmp, out).is_ok() {
+    if write_private(&tmp, &out).is_ok() {
         write_backup(path, &content);
         let _ = std::fs::rename(&tmp, path);
     }
@@ -564,7 +587,7 @@ fn record_session_at_path_with(
     store.tabs.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
-        if std::fs::write(&tmp, out).is_ok() {
+        if write_private(&tmp, &out).is_ok() {
             if let Some(prev) = valid_existing {
                 write_backup(path, prev);
             }
@@ -627,7 +650,7 @@ fn set_snapshot_at_path(
         return false;
     };
     let tmp = path.with_extension("json.kex-tmp");
-    if std::fs::write(&tmp, out).is_err() {
+    if write_private(&tmp, &out).is_err() {
         return false;
     }
     write_backup(path, &content);
@@ -703,7 +726,7 @@ fn set_last_message_at_path(
         return false;
     };
     let tmp = path.with_extension("json.kex-tmp");
-    if std::fs::write(&tmp, out).is_err() {
+    if write_private(&tmp, &out).is_err() {
         return false;
     }
     write_backup(path, &content);
@@ -776,7 +799,7 @@ fn detach_session_at_path(path: &Path, tab_id: &str) {
             store.tabs.remove(tab_id);
             if let Ok(out) = serde_json::to_string_pretty(&store) {
                 let tmp = path.with_extension("json.kex-tmp");
-                if std::fs::write(&tmp, out).is_ok() {
+                if write_private(&tmp, &out).is_ok() {
                     write_backup(path, &content);
                     let _ = std::fs::rename(&tmp, path);
                 }
@@ -2338,6 +2361,23 @@ mod tests {
         set_last_message_at_path(&path, "tab-1", "abc", "  ", 200);
 
         assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_store_and_its_backup_are_readable_by_the_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        let bak = path.with_extension("json.bak");
+        std::fs::write(&bak, "{}").unwrap();
+        std::fs::set_permissions(&bak, std::fs::Permissions::from_mode(0o644)).unwrap();
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        set_last_message_at_path(&path, "tab-1", "abc", "secret answer", 100);
+
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&path), 0o600);
+        assert_eq!(mode(&bak), 0o600);
     }
 
     #[test]

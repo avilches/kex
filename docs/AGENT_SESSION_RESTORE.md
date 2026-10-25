@@ -577,7 +577,9 @@ never overwrites the stored one, because titles go empty while the app closes.
 record of the same session id only). It is stored flattened (whitespace runs collapsed to one space) and clipped to
 `MAX_LAST_MESSAGE_CHARS` (280) characters, never bytes, with a trailing ellipsis (`clip_last_message`). The cap is there
 because `agent-sessions.json` is not encrypted and the text may hold anything the assistant printed: it is a preview to
-recognise the conversation by, not a copy of it. A Stop whose message is empty (a turn that ended on a tool call) clears
+recognise the conversation by, not a copy of it. For the same reason, on unix `agent-sessions.json`, its temporary file
+and its `.bak` are written with mode 0600 (`write_private`, which also tightens a file an older Kex left with the default
+umask). A Stop whose message is empty (a turn that ended on a tool call) clears
 it; a Stop without the field (OpenCode's plugin today) leaves the record without one, and the UI shows only the folder
 and the time. The same write stamps `updated_at` with the end of the turn, so it reads as "when the session last
 answered". A resume of the same session keeps it; a new session id starts without it, like `title`. Kex does not read
