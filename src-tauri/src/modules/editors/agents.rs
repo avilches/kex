@@ -1,15 +1,15 @@
 use crate::modules::agent::launch_cmd::DEFAULT_AGENTS;
 use crate::modules::editors::detect::{DetectedEditor, DetectedKind};
 
-fn display_name(agent: &str) -> &str {
-    match agent {
+fn display_name(agent: &str) -> Option<&'static str> {
+    Some(match agent {
         "claude" => "Claude Code",
         "codex" => "Codex",
         "opencode" => "OpenCode",
         "omp" => "OMP",
         "pi" => "Pi",
-        other => other,
-    }
+        _ => return None,
+    })
 }
 
 fn is_plain_name(name: &str) -> bool {
@@ -43,7 +43,7 @@ fn detect_agents_with(lookup: impl Fn(&str) -> Option<String>) -> Vec<DetectedEd
             let binary = lookup(name)?;
             Some(DetectedEditor {
                 id: name.to_string(),
-                name: display_name(name).to_string(),
+                name: display_name(name).unwrap_or(name).to_string(),
                 binary,
                 args_before_path: Vec::new(),
                 kind: DetectedKind::Agent,
@@ -212,6 +212,17 @@ mod tests {
         let found = detect_agents_with(|n| Some(n.to_string()));
         let names: Vec<_> = found.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ["Claude Code", "Codex", "OpenCode", "OMP", "Pi"]);
+    }
+
+    #[test]
+    fn every_default_agent_has_a_display_name() {
+        for agent in DEFAULT_AGENTS {
+            assert!(
+                display_name(agent).is_some(),
+                "{agent} has no display name: add it to display_name"
+            );
+        }
+        assert_eq!(display_name("unknown"), None);
     }
 
     #[test]
