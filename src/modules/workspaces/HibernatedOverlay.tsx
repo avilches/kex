@@ -18,7 +18,10 @@ import {
   shouldPlayHibernateFx,
 } from "./lib/hibernateFx";
 import { allPanes, focusedTab } from "./lib/splitNode";
-import { describeSessionPreview, previewRequestKey } from "./lib/sessionPreview";
+import {
+  describeSessionPreview,
+  previewRequestKey,
+} from "./lib/sessionPreview";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
 import { tabIcon } from "./lib/tabTitle";
 import type { Tab, TabHibernation, Workspace } from "./lib/types";
@@ -76,12 +79,20 @@ function useSleepingSnapshot(tab: Tab): TabHibernation | undefined {
 
 // One read of agent-sessions.json for every terminal tab of the workspace, redone each time
 // the overlay is shown so a message stored by the last Stop before hibernating is there.
-function useSessionPreviews(tabs: Tab[], active: boolean): Map<string, SessionPreview> {
-  const ids = useMemo(() => tabs.filter((t) => t.kind === "terminal").map((t) => t.id), [tabs]);
+function useSessionPreviews(
+  tabs: Tab[],
+  active: boolean,
+): Map<string, SessionPreview> {
+  const ids = useMemo(
+    () => tabs.filter((t) => t.kind === "terminal").map((t) => t.id),
+    [tabs],
+  );
   const key = previewRequestKey(ids);
   const idsRef = useRef(ids);
   idsRef.current = ids;
-  const [previews, setPreviews] = useState<Map<string, SessionPreview>>(() => new Map());
+  const [previews, setPreviews] = useState<Map<string, SessionPreview>>(
+    () => new Map(),
+  );
   useEffect(() => {
     if (!active || key === "") return;
     let cancelled = false;
@@ -95,17 +106,29 @@ function useSessionPreviews(tabs: Tab[], active: boolean): Map<string, SessionPr
   return previews;
 }
 
-function SessionPreviewLine({ preview, now }: { preview: SessionPreview; now: number }) {
+function SessionPreviewLine({
+  preview,
+  now,
+}: {
+  preview: SessionPreview;
+  now: number;
+}) {
   const line = describeSessionPreview(preview, now, cachedHomeDir());
   return (
     <span className="col-span-2 flex flex-col gap-0.5 pb-1.5 pl-7 pr-2 [contain:inline-size]">
       {line.message && (
-        <span title={line.message} className="line-clamp-2 text-[11.5px] leading-snug text-foreground/80">
+        <span
+          title={line.message}
+          className="line-clamp-2 text-[11.5px] leading-snug text-foreground/80"
+        >
           {line.message}
         </span>
       )}
       {line.meta && (
-        <span title={line.metaTitle} className="truncate text-[11px] opacity-60">
+        <span
+          title={line.metaTitle}
+          className="truncate text-[11px] opacity-60"
+        >
           {line.meta}
         </span>
       )}
@@ -113,7 +136,15 @@ function SessionPreviewLine({ preview, now }: { preview: SessionPreview; now: nu
   );
 }
 
-function SleepingTabRow({ tab, preview, now }: { tab: Tab; preview?: SessionPreview; now: number }) {
+function SleepingTabRow({
+  tab,
+  preview,
+  now,
+}: {
+  tab: Tab;
+  preview?: SessionPreview;
+  now: number;
+}) {
   const info = useAgentTabTitle(tab);
   const snapshot = useSleepingSnapshot(tab);
   const title =
@@ -223,7 +254,12 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
           )}
         >
           {tabs.map((tab) => (
-            <SleepingTabRow key={tab.id} tab={tab} preview={previews.get(tab.id)} now={now} />
+            <SleepingTabRow
+              key={tab.id}
+              tab={tab}
+              preview={previews.get(tab.id)}
+              now={now}
+            />
           ))}
         </ul>
       )}

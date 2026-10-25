@@ -23,8 +23,12 @@ export function describeSessionPreview(
   const parts: string[] = [];
   if (preview.cwd) parts.push(tildePath(preview.cwd, home));
   const at = preview.updatedAt * 1000;
-  if (preview.updatedAt > 0) parts.push(`${formatHibernatedFor(nowMs - at)} ago`);
-  const titleParts = [preview.cwd, preview.updatedAt > 0 ? new Date(at).toLocaleString() : ""];
+  if (preview.updatedAt > 0)
+    parts.push(`${formatHibernatedFor(nowMs - at)} ago`);
+  const titleParts = [
+    preview.cwd,
+    preview.updatedAt > 0 ? new Date(at).toLocaleString() : "",
+  ];
   return {
     message: preview.lastMessage?.trim() || null,
     meta: parts.join(" · "),
