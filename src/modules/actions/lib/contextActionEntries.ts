@@ -1,4 +1,4 @@
-import { actionAvailability, actionRowTitle, appsFirst, scriptSubtitle, type BarContext } from "./actionsBar";
+import { actionAvailability, actionRowTitle, byKind, scriptSubtitle, type BarContext } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -20,7 +20,7 @@ export type ContextActionGroups = { workspace: ContextActionEntry[]; global: Con
 
 function entriesOf(actions: readonly Action[], ctx: BarContext): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
-  for (const action of appsFirst(actions)) {
+  for (const action of byKind(actions)) {
     if (action.command.trim() === "" || isAgent(action)) continue;
     const name = action.name.trim() || "Action";
     const subtitle = scriptSubtitle({ ...action, name }, ctx);

@@ -34,16 +34,16 @@ describe("contextActionEntries", () => {
       ctx(),
     );
     expect(groups.workspace.map((e) => e.action.command)).toEqual(["pycharm {workspace}", "agent {cwd}"]);
-    expect(groups.global.map((e) => e.action.command)).toEqual(["code {filepath}", "pnpm dev"]);
+    expect(groups.global.map((e) => e.action.command)).toEqual(["pnpm dev", "code {filepath}"]);
   });
 
-  it("puts apps before scripts inside a scope, each keeping its order", () => {
+  it("puts scripts before apps inside a scope, each keeping its order", () => {
     const groups = contextActionEntries(
       [action("make", true), action("code {cwd}"), action("pnpm test", true), action("zed {cwd}")],
       [],
       ctx(),
     );
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["code {cwd}", "zed {cwd}", "make", "pnpm test"]);
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make", "pnpm test", "code {cwd}", "zed {cwd}"]);
   });
 
   it("an Action that needs a file the row lacks is muted with why, not hidden", () => {

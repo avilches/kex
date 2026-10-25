@@ -196,14 +196,15 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("lists scripts, apps and agents in three groups of each column", () => {
+  it("lists agents, scripts and apps in three groups of each column", () => {
     const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
     const { container, unmount } = mount([agent, savedApp, saved]);
     const text = column(container, "global").textContent ?? "";
+    expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Scripts"));
     expect(text.indexOf("Scripts")).toBeLessThan(text.indexOf("Applications"));
-    expect(text.indexOf("Applications")).toBeLessThan(text.indexOf("Agents"));
-    expect(text.indexOf("Zed")).toBeLessThan(text.indexOf("Agents"));
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Claude Code"));
+    expect(text.indexOf("Claude Code")).toBeLessThan(text.indexOf("Scripts"));
+    expect(text.indexOf("Applications")).toBeLessThan(text.indexOf("Zed"));
     expect(text).toContain("Current directory");
     unmount();
   });

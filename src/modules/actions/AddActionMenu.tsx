@@ -47,6 +47,12 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
           <CommandInput placeholder="Search..." />
           <CommandList className="max-h-[min(34rem,calc(var(--radix-popover-content-available-height,34rem)-3.5rem))]">
             <CommandEmpty>Nothing found.</CommandEmpty>
+            {suggestions.some((s) => s.kind === "agent") && (
+              <>
+                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
+                <CommandSeparator />
+              </>
+            )}
             <CommandGroup>
               <CommandItem
                 value="add-script"
@@ -77,12 +83,6 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
               </CommandItem>
               {presetItems(suggestions, "app", onPickApp)}
             </CommandGroup>
-            {suggestions.some((s) => s.kind === "agent") && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
-              </>
-            )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -299,17 +299,13 @@ export type BarItem = {
   iconOnly: boolean;
 };
 
-export const HEADER_KINDS: readonly ActionKind[] = ["app", "agent", "script"];
-export const SETTINGS_KINDS: readonly ActionKind[] = ["script", "app", "agent"];
+// Agents, then scripts, then apps, everywhere an Action list is shown: the Header, its menu, the
+// Add combo and Settings. In a narrow bar the last kind is the first to fold into the menu.
+export const KIND_ORDER: readonly ActionKind[] = ["agent", "script", "app"];
 
-function byKinds<T extends Pick<Action, "kind">>(actions: readonly T[], kinds: readonly ActionKind[]): T[] {
-  return kinds.flatMap((kind) => actions.filter((a) => a.kind === kind));
-}
-
-// The Header shows apps, then agents, then scripts, each keeping the user's order, so it never
-// interleaves the kinds.
-export function appsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
-  return byKinds(actions, HEADER_KINDS);
+// Each kind keeps the user's order inside it, so the kinds never interleave.
+export function byKind<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
+  return KIND_ORDER.flatMap((kind) => actions.filter((a) => a.kind === kind));
 }
 
 // The own buttons the bar may draw, in order: those the place shows. Each list comes already
@@ -501,14 +497,14 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     };
   };
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
-  const ordered = [...appsFirst(local).map((a) => [a, false] as const), ...appsFirst(global).map((a) => [a, true] as const)];
+  const ordered = [...byKind(local).map((a) => [a, false] as const), ...byKind(global).map((a) => [a, true] as const)];
   const model: BarModel = {
     buttons: [],
     menu: { workspace: [], global: [] },
     empty: local.length + global.length === 0,
   };
   const buttonIds = new Set(
-    ownButtonCandidates(appsFirst(local), appsFirst(global), states, place)
+    ownButtonCandidates(byKind(local), byKind(global), states, place)
       .slice(0, limit)
       .map((a) => a.id),
   );

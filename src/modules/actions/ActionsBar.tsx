@@ -55,7 +55,7 @@ import {
   DROP_MENU_GLOBAL,
   DROP_MENU_WORKSPACE,
   barZoneId,
-  HEADER_KINDS,
+  KIND_ORDER,
   MENU_DRAG_PREFIX,
   menuEntries,
   parseBarZone,
@@ -792,7 +792,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
               {i === 1 && !dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
                 <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
               )}
-              {HEADER_KINDS.map((kind) => {
+              {KIND_ORDER.map((kind) => {
                 const list = scoped.filter((b) => b.action.kind === kind);
                 return (
                   <BarZone

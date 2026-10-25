@@ -6,7 +6,7 @@ import {
   actionSubtitle,
   actionTarget,
   agentCommandProblem,
-  appsFirst,
+  byKind,
   barZoneId,
   buildActionsBarModel,
   BAR_GAP,
@@ -241,23 +241,23 @@ describe("buildActionsBarModel", () => {
   ];
 
 
-  it("puts apps before scripts, each kind in user order", () => {
+  it("puts scripts before apps, each kind in user order", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
-    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1", "s3"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a2", "s2"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3", "a1"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2"]);
     expect(m.empty).toBe(false);
   });
 
   it("moves every own button into its menu when none fits", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a1", "a2", "s1", "s2", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "s2", "s3", "a1", "a2"]);
   });
 
   it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
-    expect(m.buttons.map((b) => b.id)).toEqual(["a1", "s1"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["a2", "s2", "s3"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a1", "a2"]);
   });
 
   it("carries the run state, the active mark and the disabled reason", () => {
@@ -267,7 +267,7 @@ describe("buildActionsBarModel", () => {
       states: new Map([["s1", "running"]]),
       activeId: "s1",
     });
-    const [a, s] = m.buttons;
+    const [s, a] = m.buttons;
     expect(s).toMatchObject({ state: "running", active: true, disabledReason: null, stoppable: true });
     expect(a).toMatchObject({ state: "idle", active: false, disabledReason: "needs an open file", stoppable: false });
   });
@@ -289,7 +289,7 @@ describe("buildActionsBarModel", () => {
       states: new Map([["s1", "running"]]),
       activeId: undefined,
     });
-    expect(m.buttons.map((b) => b.disabledReason)).toEqual(["workspace is hibernated", null, "workspace is hibernated"]);
+    expect(m.buttons.map((b) => b.disabledReason)).toEqual([null, "workspace is hibernated", "workspace is hibernated"]);
   });
 
   it("reports empty only when there are no Actions at all", () => {
@@ -305,7 +305,7 @@ describe("buildActionsBarModel", () => {
       activeId: undefined,
     });
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1"]);
-    expect(m.menu.global.map((b) => b.id)).toEqual(["a1", "s2"]);
+    expect(m.menu.global.map((b) => b.id)).toEqual(["s2", "a1"]);
     expect(m.empty).toBe(false);
   });
 
@@ -320,8 +320,8 @@ describe("buildActionsBarModel", () => {
       ["z1", false],
       ["z2", false],
       ["c1", true],
-      ["u1", false],
       ["s1", false],
+      ["u1", false],
     ]);
     expect(soleIconButtons([zedWs, zedFile, code])).toEqual(new Set(["c1"]));
   });
@@ -470,7 +470,7 @@ describe("buildActionsBarModel place", () => {
       activeId: undefined,
       place: { file: false, folder: true },
     });
-    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["w1", "d1"]);
+    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["d1", "w1"]);
   });
 
   it("keeps a running script visible whatever the focused tab is", () => {
@@ -498,11 +498,11 @@ describe("buildActionsBarModel place", () => {
   });
 });
 
-describe("appsFirst", () => {
+describe("byKind", () => {
   const mixed = [script({ id: "s1" }), app({ id: "a1" }), script({ id: "s2" }), app({ id: "a2" })];
 
   it("partition by kind and keep the order inside each kind", () => {
-    expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "a2", "s1", "s2"]);
+    expect(byKind(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "a2"]);
   });
 });
 
@@ -652,9 +652,23 @@ describe("agents", () => {
     ...o,
   });
 
-  it("orders the Header apps, agents, scripts", () => {
+  it("orders the Header agents, scripts, apps", () => {
     const mixed = [agent({ id: "g1" }), script({ id: "s1" }), app({ id: "a1" }), agent({ id: "g2" }), script({ id: "s2" })];
-    expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "g1", "g2", "s1", "s2"]);
+    expect(byKind(mixed).map((a) => a.id)).toEqual(["g1", "g2", "s1", "s2", "a1"]);
+  });
+
+  it("folds apps first, then scripts, then agents when the bar narrows", () => {
+    const mixed = [
+      app({ id: "a1", ownButton: true }),
+      script({ id: "s1", ownButton: true }),
+      agent({ id: "g1" }),
+      app({ id: "a2", ownButton: true }),
+    ];
+    const at = (n: number) => buildActionsBarModel({ local: mixed, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: n });
+    expect(at(2).buttons.map((b) => b.id)).toEqual(["g1", "s1"]);
+    expect(at(2).menu.workspace.map((b) => b.id)).toEqual(["a1", "a2"]);
+    expect(at(1).buttons.map((b) => b.id)).toEqual(["g1"]);
+    expect(at(1).menu.workspace.map((b) => b.id)).toEqual(["s1", "a1", "a2"]);
   });
 
   it("never reports a state other than idle, even with a mark under its id", () => {

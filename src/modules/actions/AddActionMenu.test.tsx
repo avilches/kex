@@ -113,6 +113,21 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
+  it("orders the combo as the Agents group, then Add script, then the Applications", () => {
+    const claude: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
+    const view = mount([...suggestions, claude]);
+    click(view.trigger);
+    expect(view.options().map((o) => o.textContent)).toEqual([
+      "Claude CodeWorkspace",
+      "Add scriptruns in a terminal",
+      "Custom",
+      "BBEditCurrent File",
+      "ZedCurrent File",
+      "ZedWorkspace",
+    ]);
+    view.unmount();
+  });
+
   it("shows an empty state when nothing matches", () => {
     const view = mount();
     click(view.trigger);

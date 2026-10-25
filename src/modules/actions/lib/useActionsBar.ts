@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { appsFirst, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
+import { byKind, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
 import type { Action } from "./types";
 import { useActionContext } from "./useActionContext";
 import { useActionStates } from "./useActionStates";
@@ -43,7 +43,7 @@ export function useActionsBarModel({ workspace, room }: Input): BarModel {
     () =>
       room === undefined
         ? undefined
-        : ownButtonsThatFit(ownButtonCandidates(appsFirst(local), appsFirst(global), states, context?.place), room, context?.place, states),
+        : ownButtonsThatFit(ownButtonCandidates(byKind(local), byKind(global), states, context?.place), room, context?.place, states),
     [local, global, room, context, states],
   );
   return useMemo(

@@ -26,7 +26,7 @@ import {
   resolveDrop,
   type Scope,
 } from "./lib/actionDrop";
-import { SETTINGS_KINDS } from "./lib/actionsBar";
+import { KIND_ORDER } from "./lib/actionsBar";
 import { ownedAfterEdit } from "./lib/appOwnership";
 import { presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
@@ -316,7 +316,7 @@ function Column({
 }: ColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnDropId(scope), disabled: !editor.available });
   const available = useMemo(() => uninstalledSuggestions(suggestions, editor.actions), [suggestions, editor.actions]);
-  const groups = SETTINGS_KINDS.map((kind) => ({ label: GROUP_LABELS[kind], items: editor.actions.filter((a) => a.kind === kind) }));
+  const groups = KIND_ORDER.map((kind) => ({ label: GROUP_LABELS[kind], items: editor.actions.filter((a) => a.kind === kind) }));
   return (
     <div
       ref={setNodeRef}
