@@ -932,6 +932,12 @@ describe("twinIds", () => {
     expect(ids([control, working], at("/p"))).toEqual([]);
   });
 
+  it("never compares anything that starts at the root folder, script or app", () => {
+    const rootCtx = at("/", "/");
+    expect(ids([script({ id: "a", ownButton: true }), script({ id: "b", cwdMode: "context" })], rootCtx)).toEqual([]);
+    expect(ids([app({ id: "c", command: "code /x" }), app({ id: "d", command: "code /x" })], rootCtx)).toEqual([]);
+  });
+
   it("never compares Actions whose start folder is unknown", () => {
     const noFolders: BarContext = { vars: { ...vars, workspace: "", cwd: "/x" }, shell: "posix", folders: { focusFolder: null, workspaceRoot: null, workspaceCwd: null } };
     const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "context" });

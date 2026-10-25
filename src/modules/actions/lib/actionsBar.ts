@@ -295,6 +295,7 @@ function effectKey(action: Action, ctx: BarContext): string | null {
     const raw = resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders });
     if (!raw || scriptCwdProblem(raw)) return null;
     const start = folderKey(raw);
+    if (!start) return null;
     if (isAgent(action)) return JSON.stringify([action.kind, action.command, start]);
     if (missingVariables(action.command, ctx.vars).length > 0) return null;
     return JSON.stringify([action.kind, expandCommandShell(action.command, ctx.vars, ctx.shell), start]);
