@@ -71,23 +71,18 @@ describe("closeIdsForTab", () => {
     },
   ];
 
-  test("others closes the rest of the pane that holds the tab, skipping locked ones", () => {
-    expect(closeIdsForTab(workspaces, "a", "others")).toEqual(["c"]);
-  });
-
-  test("all closes every unlocked tab of that pane only", () => {
-    expect(closeIdsForTab(workspaces, "a", "all")).toEqual(["a", "c"]);
-    expect(closeIdsForTab(workspaces, "d", "all")).toEqual(["d", "e"]);
+  test("closes the rest of the pane that holds the tab, skipping locked ones", () => {
+    expect(closeIdsForTab(workspaces, "a")).toEqual(["c"]);
   });
 
   test("finds the pane in a workspace other than the first and inside a split", () => {
-    expect(closeIdsForTab(workspaces, "e", "others")).toEqual(["d"]);
-    expect(closeIdsForTab(workspaces, "f", "others")).toEqual([]);
+    expect(closeIdsForTab(workspaces, "e")).toEqual(["d"]);
+    expect(closeIdsForTab(workspaces, "f")).toEqual([]);
   });
 
   test("a missing tab closes nothing", () => {
-    expect(closeIdsForTab(workspaces, "nope", "all")).toEqual([]);
-    expect(closeIdsForTab([], "a", "others")).toEqual([]);
+    expect(closeIdsForTab(workspaces, "nope")).toEqual([]);
+    expect(closeIdsForTab([], "a")).toEqual([]);
   });
 
   test("paneTabCountForTab counts the tabs of the holding pane, 0 when missing", () => {

@@ -41,7 +41,6 @@ function setup(initial: Tab) {
         onClose={noop}
         onNewTerminal={noop}
         onCloseOtherTabs={noop}
-        onCloseAllTabs={noop}
         onSplitTerminalRight={noop}
         onSplitTerminalDown={noop}
         onNewBrowser={noop}
@@ -68,15 +67,24 @@ describe("PaneTabBar rename and note", () => {
   });
 
   it("the rename popover has no note field and saves its title on blur", () => {
-    const { onRenameTab, getTab } = setup({ id: "tab-1", kind: "terminal", note: "keep me" });
-    act(() => useTabRenameStore.getState().startRename("tab-1"));
-    expect(document.querySelector("textarea")).toBeNull();
-    const title = screen.getByPlaceholderText(/./) as HTMLInputElement;
-    title.value = "  build ";
-    fireEvent.blur(title);
-    expect(onRenameTab).toHaveBeenCalledWith("tab-1", "build");
-    expect(getTab()).toMatchObject({ title: "build", note: "keep me" });
-    expect(useTabRenameStore.getState().renamingTabId).toBeNull();
+    // The blur save is ignored within the open grace (the context menu closing
+    // hands focus back to the terminal); jump past it so this is a real blur.
+    let now = 1000;
+    const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => now);
+    try {
+      const { onRenameTab, getTab } = setup({ id: "tab-1", kind: "terminal", note: "keep me" });
+      act(() => useTabRenameStore.getState().startRename("tab-1"));
+      expect(document.querySelector("textarea")).toBeNull();
+      const title = screen.getByPlaceholderText(/./) as HTMLInputElement;
+      title.value = "  build ";
+      now += 301;
+      fireEvent.blur(title);
+      expect(onRenameTab).toHaveBeenCalledWith("tab-1", "build");
+      expect(getTab()).toMatchObject({ title: "build", note: "keep me" });
+      expect(useTabRenameStore.getState().renamingTabId).toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it("Enter saves the title", () => {

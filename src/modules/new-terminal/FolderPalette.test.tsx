@@ -7,16 +7,20 @@ import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl
 import { FolderPalette } from "./FolderPalette";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 
-const row = (over: Partial<FolderRow> = {}): FolderRow => ({
+// `label` and `slot` are shorthands for a row that is only one thing; `labels` and `slots` say several.
+type RowOver = Partial<FolderRow> & { label?: FolderRow["labels"][number]; slot?: FolderRow["slots"][number] };
+
+const row = (over: RowOver = {}): FolderRow => ({
   key: over.key ?? `${over.workspaceId ?? "ws-1"}:${over.path ?? "/repo"}`,
   path: over.path ?? "/repo",
   display: over.display ?? over.path ?? "/repo",
   displayShift: over.displayShift ?? 0,
-  label: over.label ?? null,
+  labels: over.labels ?? (over.label ? [over.label] : []),
   branch: over.branch ?? null,
   repoKey: over.repoKey ?? null,
   repoName: over.repoName ?? null,
   pinned: over.pinned ?? false,
+  slots: over.slots ?? (over.slot ? [over.slot] : []),
   cluster: over.cluster ?? 1,
   headed: over.headed ?? (over.cluster ?? 1) >= 2,
   worktreeCount: over.worktreeCount ?? 0,
@@ -190,7 +194,7 @@ describe("FolderPalette", () => {
 
   describe("worktrees on Tab", () => {
     const show = { kind: "show", count: 2 } as const;
-    const base = (over: Partial<FolderRow>) =>
+    const base = (over: RowOver) =>
       row({ repoKey: "/repo", repoName: "repo", repoHint: show, ...over });
     // Two folders of one repository: the heading carries the hint, the rows keep their labels.
     const clustered = [
@@ -336,6 +340,30 @@ describe("FolderPalette", () => {
       expect(itemEls()[0].textContent).not.toContain("worktrees");
       await arrowDown();
       await waitFor(() => expect(itemEls()[1].textContent).toContain("hide worktrees"));
+    });
+
+    it("draws the repository heading once, above the folders that follow the fixed rows", async () => {
+      const inRepo = { repoKey: "/repo", repoName: "repo", repoHint: show, cluster: 3 } as const;
+      mountGroups(
+        [
+          group({
+            active: true,
+            rows: [
+              row({ path: "/repo", label: "Current tab", headed: false, key: "ws-1:/repo", ...inRepo }),
+              row({ path: "/docs", label: "Workspace Root", slot: "root", pinned: true, key: "ws-1:/docs" }),
+              row({ path: "/Users/a", label: "Home", slot: "home", pinned: true, key: "ws-1:/Users/a" }),
+              row({ path: "/repo/wt", headed: true, key: "ws-1:/repo/wt", ...inRepo }),
+              row({ path: "/repo/scripts", headed: true, key: "ws-1:/repo/scripts", ...inRepo }),
+            ],
+          }),
+        ],
+        vi.fn(),
+      );
+      await settle();
+      const headings = repoHeadings();
+      expect(headings).toHaveLength(1);
+      expect(headings[0].nextElementSibling?.textContent).toContain("/repo/wt");
+      expect(itemEls()[0].previousElementSibling).not.toBe(headings[0]);
     });
 
     it("opens a heading above the current tab when its repository has no other folder", async () => {
@@ -510,6 +538,174 @@ describe("FolderPalette", () => {
       });
       expect(onPick).toHaveBeenCalledTimes(1);
       expect(onPick.mock.calls[0][0]).toMatchObject({ path: "/repo" });
+    });
+  });
+
+  describe("fixed rows and their shortcuts", () => {
+    const fixed: FolderGroup[] = [
+      group({
+        workspaceId: "ws-1",
+        active: true,
+        rows: [
+          row({ path: "/repo/wt", label: "Current tab", key: "ws-1:/repo/wt" }),
+          row({
+            path: "/repo",
+            labels: ["Workspace Root", "Main checkout"],
+            slots: ["root", "main"],
+            pinned: true,
+            key: "ws-1:/repo",
+          }),
+          row({ path: "/Users/a", label: "Home", slot: "home", pinned: true, key: "ws-1:/Users/a" }),
+          row({ path: "/other", key: "ws-1:/other" }),
+        ],
+      }),
+    ];
+    const mountFixed = (rows: FolderGroup[], onPick = vi.fn()) =>
+      render(
+        createElement(FolderPalette, {
+          open: true,
+          onOpenChange: vi.fn(),
+          restoreFocus: vi.fn(),
+          groups: rows,
+          onPick,
+          onToggleWorktrees: vi.fn(),
+        }),
+      );
+
+    it.each([
+      ["folderRoot", "root"],
+      ["folderMain", "main"],
+      ["folderHome", "home"],
+    ] as const)("%s picks the %s row wherever the focus is", async (action, slot) => {
+      const onPick = vi.fn();
+      mountFixed(fixed, onPick);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+      });
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut(action);
+      });
+      expect(taken).toBe(true);
+      expect(onPick).toHaveBeenCalledTimes(1);
+      expect(onPick.mock.calls[0][0].slots).toContain(slot);
+    });
+
+    it("takes the key and does nothing when that fixed row does not exist", async () => {
+      const onPick = vi.fn();
+      mountFixed(
+        [group({ rows: [row({ path: "/a", label: "Current tab" }), row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h" })] })],
+        onPick,
+      );
+      await settle();
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut("folderMain");
+      });
+      expect(taken).toBe(true);
+      expect(onPick).not.toHaveBeenCalled();
+    });
+
+    it("draws the key of each fixed row on the row", async () => {
+      mountFixed(fixed);
+      await settle();
+      const keys = (label: string) =>
+        itemEls().find((el) => el.textContent?.includes(label))?.querySelector("kbd")?.textContent;
+      expect(keys("Workspace Root")).toMatch(/1$/);
+      expect(keys("Home")).toMatch(/3$/);
+      expect(keys("Current tab")).toBeUndefined();
+    });
+
+    it("lists the keys of the three fixed rows in the footer, whichever row has the focus", async () => {
+      mountFixed(fixed);
+      await settle();
+      const footerKeys = () =>
+        [...(document.querySelector("[cmdk-root] > div:last-child")?.querySelectorAll("kbd") ?? [])].map(
+          (el) => el.textContent,
+        );
+      const before = footerKeys();
+      expect(before.some((k) => k?.endsWith("1"))).toBe(true);
+      expect(before.some((k) => k?.endsWith("2"))).toBe(true);
+      expect(before.some((k) => k?.endsWith("3"))).toBe(true);
+      for (let i = 0; i < 2; i++) {
+        await act(async () => {
+          fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+        });
+        await settle();
+        expect(footerKeys().filter((k) => /[123]$/.test(k ?? ""))).toHaveLength(3);
+      }
+    });
+
+    it("puts the worktrees key before the fixed keys in the footer, so they never shift", async () => {
+      mountFixed([
+        group({
+          active: true,
+          rows: [
+            row({ path: "/repo", label: "Current tab", key: "ws-1:/repo", repoKey: "/repo", repoHint: { kind: "show", count: 1 } }),
+            row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h" }),
+          ],
+        }),
+      ]);
+      await settle();
+      const keys = [...(document.querySelector("[cmdk-root] > div:last-child")?.querySelectorAll("kbd") ?? [])].map(
+        (el) => el.textContent ?? "",
+      );
+      const worktrees = keys.findIndex((k) => /T$/i.test(k));
+      const home = keys.findIndex((k) => k.endsWith("3"));
+      expect(worktrees).toBeGreaterThan(-1);
+      expect(worktrees).toBeLessThan(home);
+    });
+
+    it("keeps the fixed key beside the worktrees hint on the focused fixed row", async () => {
+      mountFixed([
+        group({
+          active: true,
+          rows: [
+            row({ path: "/h", label: "Home", slot: "home", pinned: true, key: "ws-1:/h", repoKey: "/r", repoHint: { kind: "show", count: 1 } }),
+          ],
+        }),
+      ]);
+      await settle();
+      const kbds = [...(itemEls()[0]?.querySelectorAll("kbd") ?? [])].map((el) => el.textContent ?? "");
+      expect(kbds).toHaveLength(2);
+      expect(kbds.some((k) => k.endsWith("3"))).toBe(true);
+    });
+
+    it("draws a pin before the workspace root and a house before home", async () => {
+      mountFixed(fixed);
+      await settle();
+      const labelIcons = (key: string) =>
+        document.querySelector(`[data-folder-row="${key}"]`)?.querySelectorAll("span.ml-auto svg").length;
+      expect(labelIcons("ws-1:/repo")).toBe(1);
+      expect(labelIcons("ws-1:/Users/a")).toBe(1);
+      expect(labelIcons("ws-1:/other")).toBe(0);
+    });
+
+    it("gives a folder that is several things one row with every label and its own key beside each", async () => {
+      mountFixed(fixed);
+      await settle();
+      const merged = document.querySelector('[data-folder-row="ws-1:/repo"]');
+      expect(merged?.textContent).toContain("Workspace Root");
+      expect(merged?.textContent).toContain("Main checkout");
+      const keys = [...(merged?.querySelectorAll("kbd") ?? [])].map((el) => el.textContent ?? "");
+      expect(keys).toHaveLength(2);
+      expect(keys[0]).toMatch(/1$/);
+      expect(keys[1]).toMatch(/2$/);
+      expect(document.querySelectorAll('[data-folder-row="ws-1:/repo"]')).toHaveLength(1);
+    });
+
+    it("both keys of a merged row pick that one row", async () => {
+      const onPick = vi.fn();
+      mountFixed(fixed, onPick);
+      await settle();
+      for (const action of ["folderRoot", "folderMain"] as const) {
+        await act(async () => {
+          runPaletteShortcut(action);
+        });
+      }
+      expect(onPick).toHaveBeenCalledTimes(2);
+      expect(onPick.mock.calls.map((c) => c[0].path)).toEqual(["/repo", "/repo"]);
     });
   });
 

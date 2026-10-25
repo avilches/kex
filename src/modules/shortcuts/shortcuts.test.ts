@@ -257,12 +257,24 @@ describe("index shortcut digit families", () => {
   // exception, excluded below.
   const KNOWN_DIGIT_OVERLAP = new Set<ShortcutId>(["view.zoomReset"]);
 
+  test("the palette shortcuts are matched before the index jumps they share keys with", () => {
+    const at = (id: ShortcutId) => SHORTCUTS.findIndex((s) => s.id === id);
+    for (const s of SHORTCUTS.filter((c) => c.group === "Palette")) {
+      expect(at(s.id)).toBeLessThan(at("workspace.selectByIndex"));
+      expect(at(s.id)).toBeLessThan(at("tab.selectByIndex"));
+    }
+    expect(matchesShortcut(digitEvent("1", { [MOD_PROP]: true }), "palette.folderRoot")).toBe(true);
+    expect(matchesShortcut(digitEvent("2", { [MOD_PROP]: true }), "palette.folderMain")).toBe(true);
+    expect(matchesShortcut(digitEvent("3", { [MOD_PROP]: true }), "palette.folderHome")).toBe(true);
+  });
+
   test("no unexpected shortcut collides with the index digit families", () => {
     const digit = /^[0-9]$/;
     for (const s of SHORTCUTS) {
       if (
         s.id === "workspace.selectByIndex" ||
         s.id === "tab.selectByIndex" ||
+        s.group === "Palette" ||
         KNOWN_DIGIT_OVERLAP.has(s.id)
       )
         continue;
@@ -339,6 +351,27 @@ describe("editor view shortcuts", () => {
 
   it("keeps the split preview available with no default binding", () => {
     expect(SHORTCUTS.find((x) => x.id === "editor.preview.toggleSplit")?.defaultBindings).toEqual([]);
+  });
+});
+
+describe("commandPalette.history", () => {
+  it("is registered on bare Ctrl+R, in the Terminal group", () => {
+    const sc = SHORTCUTS.find((s) => s.id === "commandPalette.history");
+    expect(sc?.group).toBe("Terminal");
+    expect(sc?.defaultBindings).toEqual([{ ctrl: true, key: "r" }]);
+  });
+
+  it("the binding is plain Ctrl (never the platform Mod key)", () => {
+    const e = {
+      key: "r",
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      repeat: false,
+    } as unknown as KeyboardEvent;
+    expect(matchesShortcut(e, "commandPalette.history")).toBe(true);
+    expect(matchesShortcut({ ...e, ctrlKey: false, metaKey: true } as unknown as KeyboardEvent, "commandPalette.history")).toBe(false);
   });
 });
 

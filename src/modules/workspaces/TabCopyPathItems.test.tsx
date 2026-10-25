@@ -23,7 +23,6 @@ function open(tab: Tab, root: string | null = "/repo") {
     paneTabCount: () => 1,
     onClose: noop,
     onCloseOtherTabs: noop,
-    onCloseAllTabs: noop,
     onRenameTab: noop,
     onUpdateTab: noop,
     onSaveTab: noop,

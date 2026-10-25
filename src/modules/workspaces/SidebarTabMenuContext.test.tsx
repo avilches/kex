@@ -66,8 +66,6 @@ describe("useSidebarTabMenuActions", () => {
     ];
     actions.onCloseOtherTabs("a");
     expect(closeTabs).toHaveBeenLastCalledWith(["c"]);
-    actions.onCloseAllTabs("a");
-    expect(closeTabs).toHaveBeenLastCalledWith(["a", "c"]);
 
     const rename = vi.fn();
     tabCallbacksRef.current = { onRenameTab: rename };
@@ -77,7 +75,6 @@ describe("useSidebarTabMenuActions", () => {
 
   it("closes nothing when the tab is gone", () => {
     const { hook, closeTabs } = setup();
-    hook.result.current.onCloseAllTabs("nope");
     hook.result.current.onCloseOtherTabs("nope");
     expect(closeTabs).not.toHaveBeenCalled();
   });

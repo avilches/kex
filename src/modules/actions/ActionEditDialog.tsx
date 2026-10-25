@@ -213,6 +213,12 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
               setNameFocused(false);
               saveName(e.target.value);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                onClose();
+              }
+            }}
           />
         </label>
 

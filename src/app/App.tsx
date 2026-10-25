@@ -115,6 +115,7 @@ import {
   disposeSession,
   interruptAgentLeaf,
   leafHasForegroundProcess,
+  leafPromptReady,
   leaveLeafScratchpad,
   requestLeafFocus,
   toggleScratchpad,
@@ -238,7 +239,7 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -250,6 +251,7 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
+  getRunningCommand,
   getRunningCommandsSnapshot,
   getRunningScriptCommand,
   setScriptRunning,
@@ -1283,13 +1285,15 @@ export default function App() {
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const folderPaletteOpenRef = useRef(false);
+  folderPaletteOpenRef.current = folderPaletteOpen;
   const commandPaletteOpenRef = useRef(false);
   commandPaletteOpenRef.current = commandPaletteOpen;
   const [paletteInitialMode, setPaletteInitialMode] = useState<
-    "commands" | "content"
+    "commands" | "content" | "history"
   >("commands");
   const openCommandPalette = useCallback(
-    (mode: "commands" | "content" = "commands") => {
+    (mode: "commands" | "content" | "history" = "commands") => {
       setPaletteInitialMode(mode);
       setCommandPaletteOpen(true);
     },
@@ -2752,6 +2756,15 @@ export default function App() {
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 
+  // "Close All Tabs" in the workspace menu: every unlocked tab of every pane,
+  // not just the focused one. Locked tabs are protected like in the pane action.
+  const closeAllTabsInWorkspace = useCallback((workspaceId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (!ws || ws.hibernated) return;
+    const ids = allPanes(ws.paneTree).flatMap((pane) => bulkClosableIds(pane.tabs));
+    if (ids.length) void closeTabsRef.current(ids);
+  }, []);
+
   const tabCallbacksRef = useRef(tabCallbacks);
   tabCallbacksRef.current = tabCallbacks;
   const saveTabRef = useRef(saveTabReportingErrors);
@@ -2927,6 +2940,10 @@ export default function App() {
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
+      "commandPalette.history": () => openCommandPalette("history"),
+      "palette.folderRoot": () => void runPaletteShortcut("folderRoot"),
+      "palette.folderMain": () => void runPaletteShortcut("folderMain"),
+      "palette.folderHome": () => void runPaletteShortcut("folderHome"),
       "tab.new": () => {
         if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;
@@ -3267,6 +3284,7 @@ export default function App() {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
       if (shortcutUnavailable(id, shortcutContext)) return true;
+      if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
       if (
         id === "workspace.settings" &&
         !useWorkspaceSettingsStore.getState().open &&
@@ -3280,6 +3298,15 @@ export default function App() {
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
         return !(target as HTMLElement | null)?.closest?.(".xterm");
+      }
+      if (id === "commandPalette.history") {
+        // Live reads: a command starting or ending does not re-render the app.
+        if (!activeTabId || activeTab?.kind !== "terminal") return true;
+        return historyPaletteShortcutUnavailable({
+          activeTab,
+          promptReady: leafPromptReady(activeTabId),
+          runningCommand: getRunningCommand(activeTabId),
+        });
       }
       if (id === "file.rename") {
         if (sidebarRef.current?.isExplorerFocused()) return true;
@@ -3943,6 +3970,7 @@ export default function App() {
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
+              onCloseAllTabs={(wsId) => void closeAllTabsInWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
               onHibernate={(id) => void hibernateFlow.requestHibernate(id)}
               onWake={(id) => void wakeWorkspace(id)}

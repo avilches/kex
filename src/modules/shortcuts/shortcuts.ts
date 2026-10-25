@@ -7,6 +7,10 @@ import { ENTER_KEY, IS_MAC, MOD_PROP } from "@/lib/platform";
 export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
+  | "commandPalette.history"
+  | "palette.folderRoot"
+  | "palette.folderMain"
+  | "palette.folderHome"
   | "tab.new"
   | "tab.newBrowser"
   | "tab.newEditor"
@@ -76,7 +80,8 @@ export type ShortcutGroup =
   | "Panes"
   | "Terminal"
   | "View"
-  | "Editor";
+  | "Editor"
+  | "Palette";
 
 export type KeyBinding = {
   key: string;
@@ -149,6 +154,26 @@ export const SHORTCUTS: Shortcut[] = [
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
+  // Only live while the new-terminal palette is open (shortcutsDisabled), so Cmd+1..9 keep
+  // jumping to a workspace everywhere else; they sit before workspace.selectByIndex to win there.
+  {
+    id: "palette.folderRoot",
+    label: "New Terminal: Workspace Root",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
+  },
+  {
+    id: "palette.folderMain",
+    label: "New Terminal: Main Checkout",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "2" }],
+  },
+  {
+    id: "palette.folderHome",
+    label: "New Terminal: Home",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "3" }],
+  },
   {
     id: "workspace.selectByIndex",
     label: "Jump to Workspace 1–9",
@@ -169,6 +194,14 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Find in Files",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
+  },
+  {
+    id: "commandPalette.history",
+    label: "Search Command History",
+    group: "Terminal",
+    // Shell reverse-search (Ctrl+R) goes to the palette's > mode instead; it only
+    // fires while a terminal is focused and the shell can receive a command.
+    defaultBindings: [{ ctrl: true, key: "r" }],
   },
   {
     id: "settings.open",
@@ -505,6 +538,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Terminal",
   "View",
   "Editor",
+  "Palette",
 ];
 
 export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {

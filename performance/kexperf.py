@@ -6,6 +6,7 @@
   kexperf.py watch [--above 60]          sample automatically when a webview stays hot
   kexperf.py analyze FILE [FILE...]      where the main thread of a sample spends its time
   kexperf.py profiler [--hours N]        summary of the [profiler] lines in Kex.log
+  kexperf.py jit [--hours N]             slowest JIT compilations, from a Kex started with scripts/run-performance.sh
 """
 import argparse
 import ctypes
@@ -23,6 +24,8 @@ LOG_LINE = re.compile(r"^\[(\d{4}-\d{2}-\d{2})\]\[(\d{2}:\d{2}:\d{2})\]\[[^\]]*\
 PROFILER_PREFIX = "[profiler] "
 TREE_LINE = re.compile(r"^([ +!:|]*?)(\d+) (.+)$")
 THREAD_LINE = re.compile(r"^    \d+ Thread_")
+JIT_LINE = re.compile(r"Optimized (\S*?)#\w+:\[.*?\] using (\w+) with \w+ into (\d+) bytes in ([\d.]+) ms")
+JIT_PREDICATE = 'eventMessage CONTAINS "Optimized" AND eventMessage CONTAINS "WebContent"'
 
 # Main-thread share measured on 2026-10-20 with the same keys, for comparison.
 BASELINE = {
@@ -41,7 +44,9 @@ MAIN_THREAD_KEYS = {
     "dom_timers": "DOMTimer::fired",
     "ipc": "IPC::Connection::dispatchMessage",
     "gc": "Heap::collect",
+    "jit_wait": "JITWorklist::suspendAllThreads",
 }
+JIT_STALL_FROM = 20
 
 
 def run(cmd):
@@ -211,6 +216,9 @@ def main_thread_shares(path):
 
 
 def verdict(shares):
+    if shares["jit_wait"] >= JIT_STALL_FROM:
+        return (f"stalled: the main thread waited {shares['jit_wait']}% of the time for the JIT compiler "
+                "to pause (a garbage collection cannot start until it does), not a rendering cost")
     if shares["idle"] >= 50:
         return "healthy: the main thread is mostly asleep"
     if shares["idle"] >= 20:
@@ -227,7 +235,7 @@ def cmd_analyze(args):
         print(f"{'':<14}{'this':>7}{'healthy':>9}{'slow':>7}   (percent of the main thread, 2026-10-20 baselines)")
         for key in ("idle", "rendering", "layout", "style", "javascript"):
             print(f"{key:<14}{s[key]:>7}{BASELINE['healthy'][key]:>9}{BASELINE['slow'][key]:>7}")
-        for key in ("run_from_timers", "paint", "gpu_flush", "dom_timers", "ipc", "gc"):
+        for key in ("run_from_timers", "paint", "gpu_flush", "dom_timers", "ipc", "gc", "jit_wait"):
             print(f"{key:<14}{s[key]:>7}")
         print("verdict:", verdict(s))
 
@@ -280,6 +288,39 @@ def cmd_profiler(args):
         print(f"  {ms:>8} ms  {calls:>7} calls  avg {ms / calls:5.1f}  {origin[:170]}")
 
 
+def parse_jit_compiles(lines):
+    """One dict per JavaScriptCore compile line; every other line is ignored."""
+    compiles = []
+    for line in lines:
+        m = JIT_LINE.search(line)
+        if m:
+            compiles.append({"name": m.group(1) or "<anonymous>", "tier": m.group(2), "bytes": int(m.group(3)), "ms": float(m.group(4))})
+    return compiles
+
+
+def summarize_jit(compiles):
+    """Per function: compiles, total and worst time, slowest first."""
+    per_name = {}
+    for c in compiles:
+        row = per_name.setdefault(c["name"], {"name": c["name"], "compiles": 0, "total_ms": 0.0, "max_ms": 0.0, "tiers": set()})
+        row["compiles"] += 1
+        row["total_ms"] += c["ms"]
+        row["max_ms"] = max(row["max_ms"], c["ms"])
+        row["tiers"].add(c["tier"])
+    return sorted(per_name.values(), key=lambda r: -r["total_ms"])
+
+
+def cmd_jit(args):
+    text = run(["/usr/bin/log", "show", "--last", f"{int(args.hours * 60)}m", "--info", "--debug", "--predicate", JIT_PREDICATE])
+    compiles = parse_jit_compiles(text.splitlines())
+    if not compiles:
+        sys.exit("no JIT compile lines in the system log. Start Kex with scripts/run-performance.sh first (performance/CLAUDE.md)")
+    print(f"{len(compiles)} compiles in the last {args.hours:g} h")
+    print(f"{'total ms':>10} {'worst ms':>10} {'compiles':>9}  function (tiers)")
+    for row in summarize_jit(compiles)[: args.top]:
+        print(f"{row['total_ms']:>10.1f} {row['max_ms']:>10.1f} {row['compiles']:>9}  {row['name']} ({'/'.join(sorted(row['tiers']))})")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -311,6 +352,11 @@ def build_parser():
     p.add_argument("--out", help="logs folder, overrides --dev")
     p.add_argument("--top", type=int, default=8)
     p.set_defaults(run=cmd_profiler)
+
+    p = sub.add_parser("jit")
+    p.add_argument("--hours", type=float, default=3.0)
+    p.add_argument("--top", type=int, default=15)
+    p.set_defaults(run=cmd_jit)
     return parser
 
 

@@ -62,6 +62,8 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
     target:
       process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome120" : "es2022",
     chunkSizeWarningLimit: 1500,
+    // `pnpm build:local --performance`: keep function names so the profiler can name its callbacks.
+    ...(process.env.KEX_BUILD_PERFORMANCE === "1" && { minify: false }),
     rolldownOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),

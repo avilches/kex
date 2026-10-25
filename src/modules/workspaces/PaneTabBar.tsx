@@ -62,7 +62,6 @@ type Props = {
   onClose: (tabId: string) => void;
   onNewTerminal: () => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseAllTabs: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
   onNewBrowser: () => void;
@@ -119,7 +118,6 @@ function DraggableTab({
   onActivate,
   onClose,
   onCloseOtherTabs,
-  onCloseAllTabs,
   onRenameTab,
   onUpdateTab,
   onNoteHover,
@@ -138,7 +136,6 @@ function DraggableTab({
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseAllTabs: () => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
@@ -436,7 +433,6 @@ function DraggableTab({
             onActivate={onActivate}
             onClose={onClose}
             onCloseOtherTabs={onCloseOtherTabs}
-            onCloseAllTabs={onCloseAllTabs}
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
           />
@@ -456,7 +452,6 @@ export function PaneTabBar({
   onClose,
   onNewTerminal,
   onCloseOtherTabs,
-  onCloseAllTabs,
   onSplitTerminalRight,
   onSplitTerminalDown,
   onNewBrowser,
@@ -681,7 +676,6 @@ export function PaneTabBar({
             onActivate={onActivate}
             onClose={onClose}
             onCloseOtherTabs={onCloseOtherTabs}
-            onCloseAllTabs={onCloseAllTabs}
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
             onNoteHover={onNoteHover}

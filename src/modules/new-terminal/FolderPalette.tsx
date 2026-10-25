@@ -24,7 +24,7 @@ import {
 } from "@/modules/command-palette/RowMenu";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getShortcutLabel } from "@/modules/shortcuts";
+import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -32,6 +32,7 @@ import {
   ComputerTerminal01Icon,
   GitBranchIcon,
   Home01Icon,
+  PinIcon,
   SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -48,9 +49,29 @@ import {
   filterFolderGroups,
   type FolderGroup,
   type FolderRow,
+  type FolderRowLabel,
   type FolderRowMatched,
+  type FolderSlot,
   type RepoHint,
 } from "./lib/folderEntries";
+
+const SLOT_SHORTCUT = {
+  root: "palette.folderRoot",
+  main: "palette.folderMain",
+  home: "palette.folderHome",
+} as const satisfies Record<FolderSlot, ShortcutId>;
+
+const SLOT_LABEL: Record<FolderSlot, FolderRowLabel> = {
+  root: "Workspace Root",
+  main: "Main checkout",
+  home: "Home",
+};
+
+const SLOT_ACTION = {
+  folderRoot: "root",
+  folderMain: "main",
+  folderHome: "home",
+} as const satisfies Record<string, FolderSlot>;
 
 type Props = {
   open: boolean;
@@ -151,14 +172,20 @@ export function FolderPalette({
     else if (id === "copy") copyPath(row);
   };
 
-  const latest = useRef({ toggleWorktrees, copyPath, rowOf });
-  latest.current = { toggleWorktrees, copyPath, rowOf };
+  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick });
+  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick };
   // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action) => {
       if (action === "closeTab") return false;
       const { toggleWorktrees: toggle, copyPath: copy, rowOf: find } = latest.current;
+      if (action in SLOT_ACTION) {
+        const slot = SLOT_ACTION[action as keyof typeof SLOT_ACTION];
+        const fixed = latest.current.groups.flatMap((g) => g.rows).find((r) => r.slots.includes(slot));
+        if (fixed) latest.current.onPick(fixed);
+        return true;
+      }
       const row = find(selectedRowEl()?.dataset.folderRow);
       if (action === "newTab") toggle(row);
       else copy(row);
@@ -357,14 +384,63 @@ function KeepHeadingsVisible({ listRef }: { listRef: RefObject<HTMLElement | nul
 
 // The right end of a row: the Tab hint while the row has the focus, otherwise its label.
 function RowTail({ row }: { row: FolderRowMatched }) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const focused = useCommandState((state) => state.value) === row.key;
-  if (focused && row.repoHint) return <HintChip hint={row.repoHint} className="ml-auto" />;
-  if (!row.label) return null;
+  // The worktrees hint takes the place of the labels while the row has the focus, but a fixed row keeps its keys beside it.
+  if (focused && row.repoHint) {
+    return (
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        <HintChip hint={row.repoHint} />
+        {row.slots.map((slot) => (
+          <SlotKey key={slot} slot={slot} userShortcuts={userShortcuts} />
+        ))}
+      </span>
+    );
+  }
+  if (row.labels.length === 0) return null;
   return (
-    <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground">
-      {row.label === "Home" ? <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} /> : null}
-      <HighlightText text={row.label} indices={row.labelIndices} />
+    <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] font-normal text-muted-foreground">
+      {row.labels.map((label, i) => {
+        const slot = SLOT_OF_LABEL[label];
+        return (
+          <span key={label} className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1">
+              {slot === "home" ? (
+                <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+              ) : slot === "root" ? (
+                <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
+              ) : null}
+              <HighlightText text={label} indices={row.labelIndices?.[i]} />
+            </span>
+            {slot && row.slots.includes(slot) ? (
+              <SlotKey slot={slot} userShortcuts={userShortcuts} />
+            ) : null}
+          </span>
+        );
+      })}
     </span>
+  );
+}
+
+const SLOT_OF_LABEL: Partial<Record<FolderRowLabel, FolderSlot>> = {
+  "Workspace Root": "root",
+  "Main checkout": "main",
+  Home: "home",
+};
+
+function SlotKey({
+  slot,
+  userShortcuts,
+}: {
+  slot: FolderSlot;
+  userShortcuts: Parameters<typeof getShortcutLabel>[1];
+}) {
+  const label = getShortcutLabel(SLOT_SHORTCUT[slot], userShortcuts);
+  if (!label) return null;
+  return (
+    <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
+      {label}
+    </kbd>
   );
 }
 
@@ -411,7 +487,8 @@ function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
 function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const value = useCommandState((state) => state.value);
-  const row = value ? groups.flatMap((g) => g.rows).find((r) => r.key === value) : undefined;
+  const all = groups.flatMap((g) => g.rows);
+  const row = value ? all.find((r) => r.key === value) : undefined;
   if (!row) return null;
   const kbd = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]";
   return (
@@ -427,6 +504,16 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
           {worktreesLabel(row.repoHint)}
         </span>
       ) : null}
+      {(["root", "main", "home"] as const).map((slot) => {
+        const fixed = all.find((r) => r.slots.includes(slot));
+        if (!fixed) return null;
+        return (
+          <span key={slot} className="flex shrink-0 items-center gap-1.5">
+            <kbd className={kbd}>{getShortcutLabel(SLOT_SHORTCUT[slot], userShortcuts)}</kbd>
+            {SLOT_LABEL[slot]}
+          </span>
+        );
+      })}
       <span className="flex shrink-0 items-center gap-1.5">
         <kbd className={kbd}>Tab</kbd>
         Menu
