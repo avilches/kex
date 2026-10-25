@@ -236,9 +236,12 @@ async fn detect_version(refresh: bool) -> Option<String> {
     .flatten()
 }
 
+/// `refresh` is for the user's own install: it runs `claude --version` again. The startup sync of
+/// every window passes false and reuses the answer of the last minute; a new Kex process starts
+/// with no answer, so a Claude update is still seen on the next start.
 #[tauri::command]
-pub async fn agent_enable_claude_hooks() -> Result<(), String> {
-    let version = detect_version(true).await;
+pub async fn agent_enable_claude_hooks(refresh: bool) -> Result<(), String> {
+    let version = detect_version(refresh).await;
     install_session_hook_script(&session_hook_script_path()?)?;
     // Written even while the user's own status line keeps the slot: the file is inert until
     // settings.json names it.

@@ -130,6 +130,12 @@ fails once cannot strip `PermissionRequest`, `StopFailure` and the rest from a w
 version does not know happens only when the version is known and older (`merge_hooks` with `prune`, set by
 `claude_version::is_known`).
 
+The startup reinstall of each window calls `agent_enable_claude_hooks` with `refresh: false`, which reuses the version
+read in the last 60 s (`detect_claude_version_cached`), so opening several windows spawns `claude --version` once; the
+user's own install (Settings, the bell, the install toast) passes `refresh: true`. The cache lives in the Kex process, so
+a fresh Kex start always runs `claude --version` again; the only case it misses is a Claude update less than a minute
+before opening a new window of an already running Kex, which the next start or a manual Reinstall picks up.
+
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
 a downgrade to a version Kex can read removes Kex's hook from the events the older Claude does not know. Uninstalling
 removes Kex's hook from every known event whatever the installed version. `agent_claude_hooks_status` expects the
