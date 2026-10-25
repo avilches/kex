@@ -30,7 +30,7 @@ export function buildCommandVars(
     dir: raw.dir,
     filename: raw.file,
     filepath: raw.path,
-    workspace: raw.workspace,
+    workspace: raw.workspace.trim(),
     branch: git.branch,
     repo: git.repoRoot.split(/[\\/]/).filter(Boolean).pop() ?? "",
     host,
