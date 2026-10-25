@@ -19,6 +19,7 @@ export function AgentUsageBadge({ tabId }: { tabId: string }) {
         "shrink-0 text-[10px] tabular-nums leading-none",
         LEVEL_CLASS[badge.level],
       )}
+      role="img"
       title={badge.title}
       aria-label={badge.title}
     >
