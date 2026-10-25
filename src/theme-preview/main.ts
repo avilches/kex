@@ -807,14 +807,26 @@ function header(): HTMLElement {
 }
 
 function tabBar(): HTMLElement {
-  const tab = (label: string, cls: string, dot = "", usage = "", usageCls = "") =>
+  const tab = (
+    label: string,
+    cls: string,
+    dot = "",
+    usage = "",
+    usageCls = "",
+  ) =>
     h(
       "div",
       {
         class: `flex items-center gap-1.5 rounded px-2 py-1 text-[12px] ${cls}`,
       },
       h("span", {}, label),
-      usage ? h("span", { class: `text-[10px] tabular-nums leading-none ${usageCls}` }, usage) : "",
+      usage
+        ? h(
+            "span",
+            { class: `text-[10px] tabular-nums leading-none ${usageCls}` },
+            usage,
+          )
+        : "",
       dot ? h("span", { class: dot }) : "",
     );
   const active = tab(
@@ -843,7 +855,13 @@ function tabBar(): HTMLElement {
       "ml-0.5 inline-block size-[6px] rounded-full bg-amber-400",
     ),
     tab("context", "bg-muted/40", "", "42%", "text-muted-foreground"),
-    tab("limit high", "bg-muted/40", "", "5h 86%", "text-amber-500 dark:text-amber-400"),
+    tab(
+      "limit high",
+      "bg-muted/40",
+      "",
+      "5h 86%",
+      "text-amber-500 dark:text-amber-400",
+    ),
     tab("limit critical", "bg-muted/40", "", "7d 97%", "text-destructive"),
     tab(
       "restore error",

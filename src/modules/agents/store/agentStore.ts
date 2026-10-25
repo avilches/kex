@@ -83,7 +83,8 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   setUsage: (tabId, usage) =>
     set((s) => {
       const empty = Object.keys(usage).length === 0;
-      if (empty ? !(tabId in s.usage) : sameUsage(s.usage[tabId], usage)) return s;
+      if (empty ? !(tabId in s.usage) : sameUsage(s.usage[tabId], usage))
+        return s;
       const next = { ...s.usage };
       if (empty) delete next[tabId];
       else next[tabId] = usage;
