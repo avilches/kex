@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import {
   clampPaletteWidth,
   DEFAULT_PALETTE_WIDTH,
-  paletteWidthCss,
+  paletteBox,
   widthAfterDrag,
 } from "@/lib/paletteWidth";
 import { setPaletteWidth } from "@/modules/settings/store";
@@ -10,6 +10,38 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 
 // Classes the palette dialogs pass so the inline width is not capped by the primitive's max-width.
 export const PALETTE_WIDTH_CLASS = "sm:max-w-[calc(100vw-32px)]";
+
+type Screen = { width: number; height: number; ratio: number };
+
+let screen: Screen | null = null;
+const listeners = new Set<() => void>();
+
+function readScreen(): Screen {
+  return { width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio };
+}
+
+function refreshScreen() {
+  const next = readScreen();
+  if (screen && next.width === screen.width && next.height === screen.height && next.ratio === screen.ratio) return;
+  screen = next;
+  for (const listener of listeners) listener();
+}
+
+// The window size and the pixel ratio, which changes when the window moves to another monitor or the
+// page is zoomed. The snapshot keeps its identity until one of them changes.
+function subscribeScreen(listener: () => void): () => void {
+  if (listeners.size === 0) {
+    refreshScreen();
+    window.addEventListener("resize", refreshScreen);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) window.removeEventListener("resize", refreshScreen);
+  };
+}
+
+const getScreen = (): Screen => (screen ??= readScreen());
 
 type Drag = { edge: "left" | "right"; startX: number; startWidth: number };
 
@@ -20,6 +52,7 @@ export function usePaletteWidth() {
   const [live, setLive] = useState<number | null>(null);
   const drag = useRef<Drag | null>(null);
   const width = live ?? saved;
+  const view = useSyncExternalStore(subscribeScreen, getScreen);
 
   const commit = useCallback((next: number) => {
     const clamped = clampPaletteWidth(next);
@@ -72,5 +105,9 @@ export function usePaletteWidth() {
     </>
   );
 
-  return { contentStyle: { width: paletteWidthCss(width) }, handles };
+  const box = paletteBox(width, view.width, view.height, view.ratio);
+  return {
+    contentStyle: { width: box.width, left: box.left, top: box.top },
+    handles,
+  };
 }

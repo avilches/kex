@@ -68,7 +68,7 @@ function CommandDialog({
         onCloseAutoFocus={onCloseAutoFocus}
         style={contentStyle}
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-4xl! p-0",
+          "translate-x-0 translate-y-0 overflow-hidden rounded-4xl! p-0 data-open:zoom-in-100 data-closed:zoom-out-100",
           className
         )}
         showCloseButton={showCloseButton}

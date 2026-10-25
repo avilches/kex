@@ -740,7 +740,11 @@ src/
                                      because a repository heading sits before the first row of its group, cmdk's rule
                                      that reveals the group heading never fires, so `KeepHeadingsVisible` does it. The
                                      dialog width is shared with the command palette (`paletteWidth` preference,
-                                     dragged from either side edge by `usePaletteWidth`, double-click resets).
+                                     dragged from either side edge by `usePaletteWidth`, double-click resets). Both palettes place
+                                     their dialog from `paletteBox` (`lib/paletteWidth.ts`): width, left and top are
+                                     computed in JS on whole device pixels (the width an even count of them), because
+                                     centering with CSS lands on half a pixel in a window of odd size and the text
+                                     is painted blurred; the dialog also skips the zoom animation for the same reason.
                                      Closing either palette with Escape gives the focus back to the active tab
                                      (editor, terminal, browser: `focusActiveTab`) through
                                      `useRestoreFocusOnEscape`; picking a row or clicking elsewhere keeps deciding its own focus.
