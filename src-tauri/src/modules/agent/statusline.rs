@@ -22,19 +22,26 @@ pub enum Slot {
     Foreign,
 }
 
-/// A slot whose command is not a string (or is blank) counts as empty, the same rule Orca
-/// applies, since Claude Code runs nothing from it.
+/// Only a missing or `null` slot is empty. Anything else the user wrote, even a malformed one
+/// (a typo in `command`, a blank or non-string command), is theirs and is left alone. Kex's
+/// own is recognised by the command ending in its marker comment, which every Kex release
+/// writes, so a user command that merely contains the word is not taken for Kex's.
 pub fn slot(root: &Value) -> Slot {
-    match root
-        .get("statusLine")
-        .and_then(|s| s.get("command"))
-        .and_then(Value::as_str)
-        .filter(|c| !c.trim().is_empty())
-    {
-        None => Slot::Empty,
-        Some(c) if c.contains(MARKER) => Slot::Kex,
-        Some(_) => Slot::Foreign,
+    match root.get("statusLine") {
+        None | Some(Value::Null) => Slot::Empty,
+        Some(s) => match s.get("command").and_then(Value::as_str) {
+            Some(c) if is_kex_command(c) => Slot::Kex,
+            _ => Slot::Foreign,
+        },
     }
+}
+
+fn is_kex_command(command: &str) -> bool {
+    command
+        .trim_end()
+        .strip_suffix(MARKER)
+        .and_then(|rest| rest.trim_end().strip_suffix('#'))
+        .is_some()
 }
 
 pub fn install(mut root: Value) -> Value {
@@ -136,14 +143,41 @@ mod tests {
     }
 
     #[test]
-    fn a_blank_or_non_string_command_counts_as_empty() {
-        for root in [
-            json!({ "statusLine": { "type": "command", "command": "  " } }),
-            json!({ "statusLine": { "type": "command", "command": 5 } }),
-            json!({ "statusLine": null }),
-        ] {
+    fn only_a_missing_or_null_slot_is_empty() {
+        for root in [json!({}), json!({ "statusLine": null })] {
             assert_eq!(slot(&root), Slot::Empty, "{root}");
             assert_eq!(slot(&install(root)), Slot::Kex);
+        }
+    }
+
+    #[test]
+    fn a_malformed_slot_is_the_users_and_is_left_alone() {
+        for root in [
+            json!({ "statusLine": { "type": "command", "command": "" } }),
+            json!({ "statusLine": { "type": "command", "command": "  " } }),
+            json!({ "statusLine": { "type": "command", "command": 5 } }),
+            json!({ "statusLine": { "type": "command", "cmd": "~/hud.sh" } }),
+            json!({ "statusLine": "~/hud.sh" }),
+            json!({ "statusLine": ["~/hud.sh"] }),
+        ] {
+            assert_eq!(slot(&root), Slot::Foreign, "{root}");
+            assert_eq!(install(root.clone()), root);
+            assert_eq!(remove(root.clone()), root);
+        }
+    }
+
+    #[test]
+    fn a_user_command_that_only_contains_the_marker_word_is_not_kex() {
+        for command in [
+            "~/bin/my-kex-statusline-hud.sh",
+            "kex-statusline",
+            "~/hud.sh # kex-statusline --verbose",
+            "~/hud.sh #kex-statusline-v2",
+        ] {
+            let root = json!({ "statusLine": { "type": "command", "command": command } });
+            assert_eq!(slot(&root), Slot::Foreign, "{command}");
+            assert_eq!(install(root.clone()), root);
+            assert_eq!(remove(root.clone()), root);
         }
     }
 
@@ -306,6 +340,27 @@ mod tests {
             (Some("tab-1"), Some("7"))
         );
         assert_eq!(frame["context_window"]["used_percentage"], 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_nc_without_unix_sockets_falls_back_to_python() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = tempfile::tempdir().unwrap();
+        let bin = home.path().join("bin");
+        std::fs::create_dir(&bin).unwrap();
+        // GNU netcat rejects -U with a usage error on stderr.
+        let nc = bin.join("nc");
+        std::fs::write(
+            &nc,
+            "#!/bin/sh\necho 'nc: invalid option -- U' >&2\nexit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&nc, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+        let run = run_script(home.path(), API_TICK, &[("PATH", &path)]);
+        assert_eq!(run.stdout, "");
+        assert_eq!(run.frame.expect("python3 did not send")["tab_id"], "tab-1");
     }
 
     #[cfg(unix)]

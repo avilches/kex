@@ -132,13 +132,21 @@ Claude Code's `statusLine` is not a hook: it is one command that Claude runs on 
 second while streaming) with the session's state on stdin, and shows its stdout under the prompt. The slot holds a
 single command, so `agent/statusline.rs` decides who owns it:
 
-- Empty slot (missing, `null`, or a blank or non-string `command`): `agent_enable_claude_hooks` writes
+- Empty slot (the `statusLine` key missing or `null`, nothing else): `agent_enable_claude_hooks` writes
   `{"type":"command","command":"\"$HOME/.config/kex/hooks/statusline.sh\"  # kex-statusline"}`.
-- Kex's (the command carries `# kex-statusline`): rewritten to the current command, and removed on uninstall.
-- The user's (anything else): never replaced, never wrapped, never removed, byte for byte (Orca's
-  `applyManagedStatusLine` policy). Kex then shows no reading. This is the case on the development machine, whose
+- Kex's (a string `command` that ends, after trailing spaces, in the comment `# kex-statusline`): rewritten to the
+  current command, and removed on uninstall. A command that only contains the word (`~/bin/my-kex-statusline-hud.sh`)
+  is not Kex's.
+- The user's (anything else, a malformed slot included: a string or an array instead of an object, a typo such as
+  `cmd`, a `command` that is empty, blank or not a string): never replaced, never wrapped, never removed, byte for
+  byte (Orca's `applyManagedStatusLine` policy). Kex cannot tell a half-written entry of the user's from a stale one,
+  so it leaves it. Kex then shows no reading. This is the case on the development machine, whose
   `settings.json` has its own HUD (`$HOME/.claude/hooks/run-hud.sh`). Wrapping was rejected: the user's command would
   run under Kex's script, and a fault in it would break their status line.
+
+The startup reinstall runs the same install, so a user who empties the slot on purpose finds it taken by Kex again on
+the next start unless they turn the Claude Code integration off; putting any command of their own there keeps it.
+Kex's entry is rewritten whole, so fields the user added to it (`padding`, for instance) are lost on the next install.
 
 `statusline.sh` (marker `kex-statusline-v1`) is written next to `trigger-event.sh` on every install, even when the slot
 is the user's, since it is inert until `settings.json` names it. It prints nothing (Claude would show it), reads stdin
