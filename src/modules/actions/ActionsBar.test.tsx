@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { ActionsMenu, OwnButton } from "./ActionsBar";
-import type { BarItem } from "./lib/actionsBar";
+import { buildActionsBarModel, type BarContext, type BarItem } from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -120,7 +120,12 @@ describe("OwnButton", () => {
   it("gives an agent no run or stop zone and never a Show title: each click runs it again", () => {
     const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
     const focus = vi.fn(() => true);
-    const { container, handlers, unmount } = mount(item(agent, { title: "Run Claude Code", subtitle: "/p" }), focus);
+    const context: BarContext = { vars: { workspace: "/p", cwd: "/p" }, shell: "posix", folders: { focusFolder: "/p", workspaceRoot: "/p" } };
+    const twin: Action = { ...agent, id: "g2", cwdMode: "workspace" };
+    const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map(), activeId: undefined }).buttons[0]!;
+    expect(built).toMatchObject({ id: "g1", iconOnly: false });
+    expect(built.subtitle).toBe("/p");
+    const { container, handlers, unmount } = mount(built, focus);
     expect(container.querySelectorAll("button")).toHaveLength(1);
     expect(byLabel(container, "Stop Claude Code")).toBeNull();
     expect(container.querySelector(".text-destructive")).toBeNull();
