@@ -20,6 +20,17 @@ vi.mock("@/lib/native", () => ({
   native: { actionSpawn: spawn, fsStat, ptyStop },
 }));
 vi.mock("sonner", () => ({ toast: { error: toastError } }));
+const scriptCommand = vi.hoisted(() => vi.fn());
+vi.mock("@/modules/workspaces/lib/terminalEphemeralStore", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/modules/workspaces/lib/terminalEphemeralStore")>();
+  return {
+    ...real,
+    setScriptCommand: (tabId: string, command: string) => {
+      scriptCommand(tabId, command);
+      real.setScriptCommand(tabId, command);
+    },
+  };
+});
 vi.mock("@/modules/terminal/lib/useTerminalSession", () => ({ requestLeafFocus: vi.fn() }));
 vi.mock("@/modules/workspace", () => ({
   useWorkspaceEnvStore: { getState: () => ({ env: { kind: "local" } }) },
@@ -68,6 +79,7 @@ beforeEach(() => {
   spawn.mockClear();
   ptyStop.mockClear();
   toastError.mockClear();
+  scriptCommand.mockClear();
 });
 
 afterEach(() => {
@@ -194,6 +206,46 @@ describe("useActionRunner", () => {
     deps.terminalHandles.current.set(tabs[0].id, { write });
     act(() => void vi.advanceTimersByTime(500));
     expect(write).toHaveBeenCalledWith("claude\r");
+  });
+
+  it("types an agent's line when its terminal handle only appears on a later retry", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const { deps, result, write } = setup(ws());
+    act(() => result.current.runAction(agent));
+    const tab = (deps.openTab.mock.calls[0] as unknown[])[2] as Tab;
+    act(() => void vi.advanceTimersByTime(650));
+    expect(write).not.toHaveBeenCalled();
+    deps.terminalHandles.current.set(tab.id, { write });
+    act(() => void vi.advanceTimersByTime(100));
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith("claude\r");
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives up on an agent's line in silence when its terminal never shows up", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const { deps, result, write } = setup(ws());
+    act(() => result.current.runAction(agent));
+    const tab = (deps.openTab.mock.calls[0] as unknown[])[2] as Tab;
+    act(() => void vi.advanceTimersByTime(10_000));
+    expect(vi.getTimerCount()).toBe(0);
+    deps.terminalHandles.current.set(tab.id, { write });
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(write).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(getScriptRunningSnapshot().has(tab.id)).toBe(false);
+  });
+
+  it("never records a script command for an agent's tab, while a script's tab gets one", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const { deps, result } = setup(ws());
+    act(() => result.current.runAction(agent));
+    expect(scriptCommand).not.toHaveBeenCalled();
+    act(() => result.current.runAction(script));
+    const tab = (deps.splitPaneAndOpenTab.mock.calls[0] as unknown[])[3] as Tab;
+    expect(scriptCommand).toHaveBeenCalledWith(tab.id, script.command);
+    clearScriptRunningEntry(tab.id);
   });
 
   it("tells the user when the folder an agent starts in is gone", async () => {
