@@ -19,7 +19,9 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
-import { buildCommandVars, inWorktree } from "./commandVars";
+import { buildCommandVars, focusPlace, inWorktree } from "./commandVars";
+import { twinIds } from "./actionsBar";
+import { getActionStatesSnapshot } from "./useActionStates";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
@@ -101,9 +103,26 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   };
 }
 
-function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
+function focusedOf(ws: Workspace): Tab | null {
   const tab = focusedTab(ws.paneTree, ws.activePaneId);
-  const focused = inWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null);
+  return inWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null);
+}
+
+// The twins the bar hides right now, worked out from the same values the bar reads.
+function hiddenTwins(ws: Workspace, deps: ActionRunnerDeps): ReadonlySet<string> {
+  const focused = focusedOf(ws);
+  const ctx = contextFor(null, ws, deps);
+  const { home: _home, ...folders } = ctx.folders;
+  return twinIds(
+    [...(ws.actions ?? []), ...(usePreferencesStore.getState().actions ?? [])],
+    { vars: ctx.vars, shell: ctx.shell, hibernated: ctx.hibernated, folders },
+    getActionStatesSnapshot(),
+    focusPlace(focused),
+  );
+}
+
+function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
+  const focused = focusedOf(ws);
   const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
@@ -116,7 +135,7 @@ function contextFor(action: Action, ws: Workspace, deps: ActionRunnerDeps, overl
       workspaceCwd: ws.cwd,
       home: cachedHomeDir(),
     },
-    link: isScript(action) ? linkFor(action.id, deps) : null,
+    link: action && isScript(action) ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
     atPaneLimit: allPanes(ws.paneTree).length >= workspacePaneLimit,
   };
@@ -327,7 +346,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   const toggleActiveAction = useCallback(() => {
     const ws = activeWorkspace;
     if (!ws) return;
-    const action = pickRunnableAction(ws.actions ?? [], ws.activeAction);
+    const action = pickRunnableAction(ws.actions ?? [], ws.activeAction, hiddenTwins(ws, deps));
     if (!action) return;
     const tabId = isScript(action) ? getActionTab(action.id) : undefined;
     if (tabId && getScriptRunningSnapshot().get(tabId)) stopAction(action);

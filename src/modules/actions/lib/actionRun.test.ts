@@ -312,6 +312,13 @@ describe("pickRunnableAction", () => {
     expect(pickRunnableAction([a, b], "gone")).toBe(a);
   });
 
+  it("skips hidden twins, the active one included", () => {
+    expect(pickRunnableAction([a, b], "a", new Set(["a"]))).toBe(b);
+    expect(pickRunnableAction([a, b], "b", new Set(["a"]))).toBe(b);
+    expect(pickRunnableAction([a, b], undefined, new Set(["a"]))).toBe(b);
+    expect(pickRunnableAction([a], "a", new Set(["a"]))).toBeUndefined();
+  });
+
   it("returns nothing when no Action has a command", () => {
     expect(pickRunnableAction([empty], "e")).toBeUndefined();
     expect(pickRunnableAction([], undefined)).toBeUndefined();

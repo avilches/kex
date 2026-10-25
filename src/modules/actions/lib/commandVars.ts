@@ -1,6 +1,8 @@
+import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { tabRawValues } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import type { COMMAND_VARIABLES } from "./actionForm";
+import type { FocusPlace } from "./actionsBar";
 
 export type GitInfo = { branch: string; repoRoot: string };
 
@@ -35,4 +37,9 @@ export function buildCommandVars(
     repo: git.repoRoot.split(/[\\/]/).filter(Boolean).pop() ?? "",
     host,
   };
+}
+
+// What the focused tab offers Actions: a folder only on a terminal, a file when it has a path.
+export function focusPlace(focused: Tab | null): FocusPlace {
+  return { folder: focused?.kind === "terminal", file: !!(focused && tabFilePath(focused)) };
 }

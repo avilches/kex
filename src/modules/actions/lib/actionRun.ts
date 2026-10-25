@@ -208,11 +208,12 @@ export function planTabReveal(at: {
   return { switchWorkspace: false, mode: at.tabPaneId === at.userPaneId ? "activate" : "reveal" };
 }
 
-/** The Action F12 acts on: the active one, or the first with a command when it has none. */
+/** The Action F12 acts on: the active one, or the first with a command when it has none. Hidden twins are never picked. */
 export function pickRunnableAction(
   actions: readonly Action[],
   activeId: string | undefined,
+  hidden?: ReadonlySet<string>,
 ): Action | undefined {
-  const runnable = actions.filter((a) => a.command.trim() !== "");
+  const runnable = actions.filter((a) => a.command.trim() !== "" && !hidden?.has(a.id));
   return runnable.find((a) => a.id === activeId) ?? runnable[0];
 }

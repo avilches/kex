@@ -8,7 +8,7 @@ import { tabFilePath, tabFolder } from "@/modules/workspaces/lib/tabPath";
 import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { buildCommandVars, inWorktree } from "./commandVars";
+import { buildCommandVars, focusPlace, inWorktree } from "./commandVars";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { CommandShell } from "./commandTemplate";
 import type { BarContext, FocusPlace } from "./actionsBar";
@@ -51,7 +51,7 @@ export function useActionContext(
             vars,
             shell: scriptShellFor(IS_WINDOWS, envKind),
             hibernated,
-            place: { folder: focused?.kind === "terminal", file: !!(focused && tabFilePath(focused)) },
+            place: focusPlace(focused),
             folders,
           }
         : null,
