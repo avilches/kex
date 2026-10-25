@@ -1,3 +1,4 @@
+import { pathDirname } from "@/lib/pathUtils";
 import type { Tab } from "./types";
 
 const ABSOLUTE = /^([A-Za-z]:|\/|\\)/;
@@ -30,4 +31,13 @@ export function tabFilePath(tab: Tab): string | null {
 export function tabCopyPath(tab: Tab, agentWorktree: string | null): string | null {
   if (tab.kind === "terminal") return agentWorktree ?? tab.cwd ?? null;
   return tabFilePath(tab);
+}
+
+// The folder a tab works in: a terminal's cwd, or the folder holding a file tab's file ("/" for a
+// file directly in the root).
+export function tabFolder(tab: Tab | null): string | null {
+  if (!tab) return null;
+  if (tab.kind === "terminal") return tab.cwd || null;
+  const file = tabFilePath(tab);
+  return file ? pathDirname(file) : null;
 }

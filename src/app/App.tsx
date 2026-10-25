@@ -266,7 +266,7 @@ import {
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
-import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
+import { tabFilePath, tabFolder } from "@/modules/workspaces/lib/tabPath";
 import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
 import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
@@ -437,14 +437,7 @@ export default function App() {
     : null;
   activeCwdRef.current = activeCwd;
 
-  const contextCwdFilePath = activeTab ? tabFilePath(activeTab) : null;
-  const contextCwd =
-    activeTab?.kind === "terminal"
-      ? (activeTab.cwd ?? null)
-      : contextCwdFilePath
-        ? contextCwdFilePath.split(/[\\/]/).slice(0, -1).join("/") || null
-        : null;
-  contextCwdRef.current = contextCwd;
+  contextCwdRef.current = tabFolder(activeTab ?? null);
 
   // ── Handle maps ───────────────────────────────────────────────────────────
 

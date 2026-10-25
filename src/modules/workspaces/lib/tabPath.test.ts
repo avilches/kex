@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tabCopyPath, tabFilePath } from "./tabPath";
+import { tabCopyPath, tabFilePath, tabFolder } from "./tabPath";
 import type { Tab } from "./types";
 
 describe("tabFilePath", () => {
@@ -102,5 +102,30 @@ describe("tabCopyPath", () => {
 
   it("has nothing to copy for a browser tab", () => {
     expect(tabCopyPath({ id: "1", kind: "browser", url: "https://a.b" } as Tab, null)).toBeNull();
+  });
+});
+
+describe("tabFolder", () => {
+  const term = (cwd?: string) => ({ id: "t", kind: "terminal", cwd }) as Tab;
+  const md = (path: string): Tab => ({ id: "m", kind: "markdown", path });
+
+  it("is a terminal's cwd, or null without one", () => {
+    expect(tabFolder(term("/w/src"))).toBe("/w/src");
+    expect(tabFolder(term(""))).toBeNull();
+    expect(tabFolder(term())).toBeNull();
+    expect(tabFolder(null)).toBeNull();
+  });
+
+  it("is the folder holding a file tab's file, with forward slashes", () => {
+    expect(tabFolder(md("/w/docs/a.md"))).toBe("/w/docs");
+    expect(tabFolder(md("C:\\w\\a.md"))).toBe("C:/w");
+  });
+
+  it("is the root for a file directly in the root", () => {
+    expect(tabFolder(md("/a.md"))).toBe("/");
+  });
+
+  it("is null for a tab without a file", () => {
+    expect(tabFolder({ id: "b", kind: "browser", url: "about:blank" } as Tab)).toBeNull();
   });
 });
