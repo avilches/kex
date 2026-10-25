@@ -128,6 +128,32 @@ describe("FolderPalette", () => {
     );
   });
 
+  it("keeps a highlighted label in one piece next to its icon", async () => {
+    render(
+      createElement(FolderPalette, {
+        open: true,
+        onOpenChange: vi.fn(),
+        restoreFocus: vi.fn(),
+        groups: [
+          group({
+            rows: [row({ path: "/repo", label: "Workspace Root", slot: "root", pinned: true })],
+          }),
+        ],
+        onPick: vi.fn(),
+        onToggleWorktrees: vi.fn(),
+      }),
+    );
+    await settle();
+    await act(async () => {
+      fireEvent.change(inputEl(), { target: { value: "work" } });
+    });
+    await settle();
+    const bold = itemEls()[0].querySelector("b");
+    expect(bold).not.toBeNull();
+    expect(bold?.parentElement?.querySelector("svg")).toBeNull();
+    expect(bold?.parentElement?.textContent).toBe("Workspace Root");
+  });
+
   it("drops groups with no matching rows", async () => {
     const onPick = vi.fn();
     mount(onPick);

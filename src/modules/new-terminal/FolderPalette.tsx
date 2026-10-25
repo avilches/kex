@@ -410,7 +410,9 @@ function RowTail({ row }: { row: FolderRowMatched }) {
               ) : slot === "root" ? (
                 <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
               ) : null}
-              <HighlightText text={label} indices={row.labelIndices?.[i]} />
+              <span>
+                <HighlightText text={label} indices={row.labelIndices?.[i]} />
+              </span>
             </span>
             {slot && row.slots.includes(slot) ? (
               <SlotKey slot={slot} userShortcuts={userShortcuts} />
