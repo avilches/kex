@@ -490,7 +490,7 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
   const all = groups.flatMap((g) => g.rows);
   const row = value ? all.find((r) => r.key === value) : undefined;
   if (!row) return null;
-  const kbd = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]";
+  const kbd = "shrink-0 rounded bg-foreground/15 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground";
   return (
     <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
