@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import { CUSTOM_APP_SUGGESTION, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
+import { CUSTOM_APP_SUGGESTION, agentCommand, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
 
 const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?: boolean): DetectedEditor => ({
   id,
@@ -80,22 +80,43 @@ describe("agentSuggestionsFromDetected", () => {
     enabled,
   });
 
-  it("offers workspace then context per enabled agent, with the bare binary as command", () => {
+  it("offers workspace then context per enabled agent, with the binary and its bypass switch as command", () => {
     const list = agentSuggestionsFromDetected([ag("claude", "/usr/local/bin/claude")]);
     expect(list.map((s) => [s.key, s.cwdMode])).toEqual([
       ["claude:workspace", "workspace"],
       ["claude:context", "context"],
     ]);
-    expect(list[0]).toMatchObject({ kind: "agent", appId: "claude", iconId: "claude", name: "Claude Code", defaultCommand: "claude" });
+    expect(list[0]).toMatchObject({ kind: "agent", appId: "claude", iconId: "claude", name: "Claude Code", defaultCommand: "claude --dangerously-skip-permissions" });
     expect(list.every((s) => !/[{}]/.test(s.defaultCommand + s.name))).toBe(true);
   });
 
   it("uses the agent id as the command, so a Windows binary gives no .exe", () => {
     const list = agentSuggestionsFromDetected([ag("claude", "C:\\Users\\me\\bin\\claude.exe")]);
-    expect(list.map((s) => s.defaultCommand)).toEqual(["claude", "claude"]);
+    expect(list.map((s) => s.defaultCommand)).toEqual(Array(2).fill("claude --dangerously-skip-permissions"));
   });
 
   it("skips disabled agents", () => {
     expect(agentSuggestionsFromDetected([ag("claude", "claude", false)])).toEqual([]);
+  });
+});
+
+describe("agentCommand", () => {
+  it("starts every known agent without permission prompts", () => {
+    expect(
+      ["claude", "codex", "agy", "openclaude", "grok", "aider", "goose", "cursor-agent"].map(agentCommand),
+    ).toEqual([
+      "claude --dangerously-skip-permissions",
+      "codex --dangerously-bypass-approvals-and-sandbox",
+      "agy --dangerously-skip-permissions",
+      "openclaude --dangerously-skip-permissions",
+      "grok --permission-mode bypassPermissions",
+      "aider --yes-always",
+      "GOOSE_MODE=auto goose",
+      "cursor-agent --yolo",
+    ]);
+  });
+
+  it("leaves an agent without a bypass switch as the bare binary", () => {
+    expect(["opencode", "omp", "pi"].map(agentCommand)).toEqual(["opencode", "omp", "pi"]);
   });
 });

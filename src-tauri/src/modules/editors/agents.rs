@@ -1,6 +1,17 @@
 use crate::modules::agent::launch_cmd::DEFAULT_AGENTS;
 use crate::modules::editors::detect::{DetectedEditor, DetectedKind};
 
+/// Agents Kex only finds on disk, so they can be offered as Actions; they have no session
+/// integration and must stay out of `DEFAULT_AGENTS`, which drives detection inside a PTY.
+const DETECT_ONLY_AGENTS: &[&str] = &[
+    "agy",
+    "openclaude",
+    "grok",
+    "aider",
+    "goose",
+    "cursor-agent",
+];
+
 fn display_name(agent: &str) -> Option<&'static str> {
     Some(match agent {
         "claude" => "Claude Code",
@@ -8,6 +19,12 @@ fn display_name(agent: &str) -> Option<&'static str> {
         "opencode" => "OpenCode",
         "omp" => "OMP",
         "pi" => "Pi",
+        "agy" => "Antigravity",
+        "openclaude" => "OpenClaude",
+        "grok" => "Grok",
+        "aider" => "Aider",
+        "goose" => "Goose",
+        "cursor-agent" => "Cursor Agent",
         _ => return None,
     })
 }
@@ -23,7 +40,13 @@ pub fn detect_agents() -> Vec<DetectedEditor> {
     #[cfg(unix)]
     {
         let path = unix_lookup::login_path();
-        detect_agents_with(|name| unix_lookup::find_in_path(&path, name))
+        let fallback = dirs::home_dir()
+            .map(|home| unix_lookup::install_dirs(&home, cfg!(target_os = "macos")))
+            .unwrap_or_default();
+        detect_agents_with(|name| {
+            unix_lookup::find_in_path(&path, name)
+                .or_else(|| unix_lookup::find_in_dirs(&fallback, name))
+        })
     }
     #[cfg(windows)]
     {
@@ -38,6 +61,7 @@ pub fn detect_agents() -> Vec<DetectedEditor> {
 fn detect_agents_with(lookup: impl Fn(&str) -> Option<String>) -> Vec<DetectedEditor> {
     DEFAULT_AGENTS
         .iter()
+        .chain(DETECT_ONLY_AGENTS)
         .filter(|name| is_plain_name(name))
         .filter_map(|name| {
             let binary = lookup(name)?;
@@ -58,7 +82,7 @@ mod unix_lookup {
     use std::io::Read;
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::process::CommandExt;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
@@ -182,6 +206,50 @@ mod unix_lookup {
             .and_then(|p| p.to_str().map(str::to_string))
     }
 
+    // Where an agent CLI lands when the login shell does not export it: version-manager shims,
+    // the per-user bins of npm, pnpm and bun, Homebrew, and the installers' own directories.
+    pub fn install_dirs(home: &Path, macos: bool) -> Vec<PathBuf> {
+        let mut dirs: Vec<PathBuf> = [
+            ".volta/bin",
+            ".asdf/shims",
+            ".local/share/mise/shims",
+            ".local/bin",
+            ".yarn/bin",
+            ".bun/bin",
+            ".opencode/bin",
+            ".nix-profile/bin",
+        ]
+        .iter()
+        .map(|d| home.join(d))
+        .collect();
+        dirs.push(home.join(if macos {
+            "Library/pnpm"
+        } else {
+            ".local/share/pnpm"
+        }));
+        if macos {
+            dirs.push(PathBuf::from("/opt/homebrew/bin"));
+        }
+        dirs.extend(
+            [
+                "/usr/local/bin",
+                "/snap/bin",
+                "/home/linuxbrew/.linuxbrew/bin",
+                "/nix/var/nix/profiles/default/bin",
+            ]
+            .iter()
+            .map(PathBuf::from),
+        );
+        dirs
+    }
+
+    pub fn find_in_dirs(dirs: &[PathBuf], name: &str) -> Option<String> {
+        dirs.iter()
+            .map(|dir| dir.join(name))
+            .find(|candidate| is_executable(candidate))
+            .and_then(|p| p.to_str().map(str::to_string))
+    }
+
     fn is_executable(p: &Path) -> bool {
         std::fs::metadata(p)
             .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
@@ -210,12 +278,27 @@ mod tests {
     fn display_names() {
         let found = detect_agents_with(|n| Some(n.to_string()));
         let names: Vec<_> = found.iter().map(|d| d.name.as_str()).collect();
-        assert_eq!(names, ["Claude Code", "Codex", "OpenCode", "OMP", "Pi"]);
+        assert_eq!(
+            names,
+            [
+                "Claude Code",
+                "Codex",
+                "OpenCode",
+                "OMP",
+                "Pi",
+                "Antigravity",
+                "OpenClaude",
+                "Grok",
+                "Aider",
+                "Goose",
+                "Cursor Agent"
+            ]
+        );
     }
 
     #[test]
     fn every_default_agent_has_a_display_name() {
-        for agent in DEFAULT_AGENTS {
+        for agent in DEFAULT_AGENTS.iter().chain(DETECT_ONLY_AGENTS) {
             assert!(
                 display_name(agent).is_some(),
                 "{agent} has no display name: add it to display_name"
@@ -233,7 +316,13 @@ mod tests {
 
     #[test]
     fn only_plain_names_are_looked_up() {
-        assert!(DEFAULT_AGENTS.iter().all(|n| is_plain_name(n)));
+        assert!(DEFAULT_AGENTS
+            .iter()
+            .chain(DETECT_ONLY_AGENTS)
+            .all(|n| is_plain_name(n)));
+        assert!(DETECT_ONLY_AGENTS
+            .iter()
+            .all(|n| !DEFAULT_AGENTS.contains(n)));
         assert!(!is_plain_name("a;b"));
         assert!(!is_plain_name("../x"));
         assert!(!is_plain_name("a b"));
@@ -267,6 +356,23 @@ mod tests {
             assert_eq!(find_in_path(&path, "claude"), Some(claude));
             assert_eq!(find_in_path(&path, "pi"), Some(pi));
             assert_eq!(find_in_path(&path, "codex"), None);
+        }
+
+        #[test]
+        fn falls_back_to_install_dirs_in_order() {
+            let home = tempfile::tempdir().unwrap();
+            let local = home.path().join(".local/bin");
+            let bun = home.path().join(".bun/bin");
+            std::fs::create_dir_all(&local).unwrap();
+            std::fs::create_dir_all(&bun).unwrap();
+            script(&bun, "goose", "", 0o755);
+            let agy = script(&local, "agy", "", 0o755);
+            let goose_local = script(&local, "goose", "", 0o755);
+            let dirs = install_dirs(home.path(), false);
+            assert_eq!(find_in_dirs(&dirs, "agy"), Some(agy));
+            assert_eq!(find_in_dirs(&dirs, "goose"), Some(goose_local));
+            assert_eq!(find_in_dirs(&dirs, "aider"), None);
+            assert!(install_dirs(home.path(), true).contains(&"/opt/homebrew/bin".into()));
         }
 
         #[test]

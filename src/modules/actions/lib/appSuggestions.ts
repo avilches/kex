@@ -134,9 +134,30 @@ export function suggestionsFromDetected(detected: readonly DetectedEditor[]): Ap
 
 const AGENT_VARIANTS = ["workspace", "context"] as const satisfies readonly ScriptCwdMode[];
 
+/** Each agent starts without asking for permissions. Agents absent here have no such switch. */
+const AGENT_BYPASS: Readonly<Record<string, string>> = {
+  claude: "--dangerously-skip-permissions",
+  codex: "--dangerously-bypass-approvals-and-sandbox",
+  agy: "--dangerously-skip-permissions",
+  openclaude: "--dangerously-skip-permissions",
+  grok: "--permission-mode bypassPermissions",
+  aider: "--yes-always",
+  "cursor-agent": "--yolo",
+};
+
+/** Goose takes its mode from the environment, so it goes before the binary. */
+const AGENT_ENV: Readonly<Record<string, string>> = { goose: "GOOSE_MODE=auto" };
+
+export function agentCommand(id: string): string {
+  const env = AGENT_ENV[id];
+  const flags = AGENT_BYPASS[id];
+  return [env, id, flags].filter(Boolean).join(" ");
+}
+
 /** Two presets per enabled agent, starting in the workspace root or in the current directory.
- * The command is the agent id, which is the bare binary name the scan looked up, so the Action
- * stays portable across machines and never carries a resolved path or a Windows `.exe`. */
+ * The command is the bare binary name the scan looked up plus its bypass-permissions switch, so
+ * the Action stays portable across machines and never carries a resolved path or a Windows
+ * `.exe`. */
 export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]): AppSuggestion[] {
   return agents
     .filter((a) => a.enabled !== false)
@@ -146,7 +167,7 @@ export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]):
         appId: agent.id,
         name: agent.name,
         iconId: agent.id,
-        defaultCommand: agent.id,
+        defaultCommand: agentCommand(agent.id),
         kind: "agent" as const,
         cwdMode,
       })),

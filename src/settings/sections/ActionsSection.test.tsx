@@ -73,7 +73,7 @@ describe("ActionsSection", () => {
     const item = options().find((o) => o.textContent === "Claude CodeWorkspace");
     act(() => void (item as HTMLElement).click());
     const next = change.mock.calls[0]![0]([]);
-    expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace" });
+    expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude --dangerously-skip-permissions", appId: "claude", cwdMode: "workspace" });
     unmount();
   });
 

@@ -76,14 +76,14 @@ beforeEach(() => {
 
 describe("agent seeding on scan", () => {
   it("seeds global agent Actions and sets the flag", async () => {
-    h.scan.mockResolvedValue([agent("claude"), agent("pi")]);
+    h.scan.mockResolvedValue([agent("opencode"), agent("pi")]);
     await runEditorScan();
-    expect(seededCommands().sort()).toEqual(["claude", "pi"]);
+    expect(seededCommands().sort()).toEqual(["opencode", "pi"]);
     expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
   });
 
   it("does not seed again after the Actions are deleted", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
     usePreferencesStore.setState({ actions: [] });
     await runEditorScan();
@@ -98,24 +98,24 @@ describe("agent seeding on scan", () => {
   });
 
   it("does not seed a disabled agent nor set the flag for it", async () => {
-    h.scan.mockResolvedValue([agent("claude", false)]);
-    usePreferencesStore.setState({ detectedEditors: [agent("claude", false)] });
+    h.scan.mockResolvedValue([agent("opencode", false)]);
+    usePreferencesStore.setState({ detectedEditors: [agent("opencode", false)] });
     await runEditorScan();
     expect(seededCommands()).toEqual([]);
     expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
   });
 
   it("runs one scan at a time in a window, so two calls at once seed once", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     const add = vi.spyOn(globalActions, "add");
     await Promise.all([runEditorScan(), runEditorScan()]);
     expect(add).toHaveBeenCalledTimes(1);
-    expect(seededCommands()).toEqual(["claude"]);
+    expect(seededCommands()).toEqual(["opencode"]);
     add.mockRestore();
   });
 
   it("keeps the flag false when the Actions write fails", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     h.failActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
@@ -124,7 +124,7 @@ describe("agent seeding on scan", () => {
   });
 
   it("sets the flag only after the write succeeded", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     let flagAtWrite: boolean | undefined;
     const add = vi.spyOn(globalActions, "add").mockImplementation(async (a) => {
       flagAtWrite = usePreferencesStore.getState().agentActionsSeeded;
@@ -137,11 +137,11 @@ describe("agent seeding on scan", () => {
   });
 
   it("marks seeded without adding when the Actions are already there", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
     usePreferencesStore.setState({ agentActionsSeeded: false });
     await runEditorScan();
-    expect(seededCommands()).toEqual(["claude"]);
+    expect(seededCommands()).toEqual(["opencode"]);
     expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
   });
 
@@ -151,14 +151,14 @@ describe("agent seeding on scan", () => {
     h.hydration = new Promise<void>((r) => {
       hydrate = r;
     });
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     const run = runEditorScan();
     await new Promise<void>((r) => setTimeout(r, 0));
     expect(h.writes).toEqual([]);
     usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: false });
     hydrate();
     await run;
-    expect(seededCommands()).toEqual(["pnpm build", "claude"]);
+    expect(seededCommands()).toEqual(["pnpm build", "opencode"]);
   });
 
   it("does not reseed when the hydrated flag says the agents were already seeded", async () => {
@@ -167,7 +167,7 @@ describe("agent seeding on scan", () => {
     h.hydration = new Promise<void>((r) => {
       hydrate = r;
     });
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     const run = runEditorScan();
     await new Promise<void>((r) => setTimeout(r, 0));
     usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: true });
@@ -207,7 +207,7 @@ describe("app seeding on scan", () => {
   });
 
   it("seeds agents and leaves the app flag unset when there are no editors", async () => {
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
     expect(prefs().agentActionsSeeded).toBe(true);
     expect(prefs().appActionsSeeded).toBe(false);
@@ -216,22 +216,22 @@ describe("app seeding on scan", () => {
   it("seeds apps and leaves the agent flag unset when there are no agents", async () => {
     h.scan.mockResolvedValue([editor("zed")]);
     await runEditorScan();
-    h.scan.mockResolvedValue([editor("zed"), agent("claude")]);
+    h.scan.mockResolvedValue([editor("zed"), agent("opencode")]);
     await runEditorScan();
-    expect(seededCommands()).toContain("claude");
+    expect(seededCommands()).toContain("opencode");
     expect(prefs().agentActionsSeeded).toBe(true);
   });
 
   it("seeds only the apps when the agents flag was already true, without touching the agents", async () => {
     usePreferencesStore.setState({ agentActionsSeeded: true });
-    h.scan.mockResolvedValue([agent("claude"), editor("zed")]);
+    h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     await runEditorScan();
     expect(prefs().actions.map((a) => a.kind)).toEqual(["app"]);
     expect(prefs().appActionsSeeded).toBe(true);
   });
 
   it("seeds agents and apps together, each flag set", async () => {
-    h.scan.mockResolvedValue([agent("claude"), editor("zed")]);
+    h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     await runEditorScan();
     expect(prefs().actions.map((a) => [a.kind, a.ownButton]).sort()).toEqual([
       ["agent", true],
@@ -241,7 +241,7 @@ describe("app seeding on scan", () => {
   });
 
   it("keeps the app flag false when the apps write fails, and keeps the agent flag", async () => {
-    h.scan.mockResolvedValue([agent("claude"), editor("zed")]);
+    h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     h.failAppActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
@@ -250,7 +250,7 @@ describe("app seeding on scan", () => {
   });
 
   it("does not attempt the apps nor set any flag when the agents write fails", async () => {
-    h.scan.mockResolvedValue([agent("claude"), editor("zed")]);
+    h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     h.failActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
@@ -276,15 +276,15 @@ describe("app seeding on scan", () => {
 describe("startup scan", () => {
   it("scans and seeds in the window that wins the claim", async () => {
     h.claim.mockResolvedValue(true);
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     await runStartupEditorScan();
     expect(h.scan).toHaveBeenCalledTimes(1);
-    expect(seededCommands()).toEqual(["claude"]);
+    expect(seededCommands()).toEqual(["opencode"]);
   });
 
   it("does not scan nor seed in a window that loses the claim", async () => {
     h.claim.mockResolvedValue(false);
-    h.scan.mockResolvedValue([agent("claude")]);
+    h.scan.mockResolvedValue([agent("opencode")]);
     await runStartupEditorScan();
     expect(h.scan).not.toHaveBeenCalled();
     expect(seededCommands()).toEqual([]);
