@@ -23,7 +23,6 @@ import {
   parseBarZone,
   resolveDrop,
   SETTINGS_LABELS,
-  scriptsFirst,
   scriptSubtitle,
   soleIconButtons,
   WORKSPACE_UNSET,
@@ -497,12 +496,11 @@ describe("buildActionsBarModel place", () => {
   });
 });
 
-describe("appsFirst and scriptsFirst", () => {
+describe("appsFirst", () => {
   const mixed = [script({ id: "s1" }), app({ id: "a1" }), script({ id: "s2" }), app({ id: "a2" })];
 
   it("partition by kind and keep the order inside each kind", () => {
     expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "a2", "s1", "s2"]);
-    expect(scriptsFirst(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "a2"]);
   });
 });
 
@@ -652,10 +650,9 @@ describe("agents", () => {
     ...o,
   });
 
-  it("orders the Header apps, agents, scripts and Settings scripts, apps, agents", () => {
+  it("orders the Header apps, agents, scripts", () => {
     const mixed = [agent({ id: "g1" }), script({ id: "s1" }), app({ id: "a1" }), agent({ id: "g2" }), script({ id: "s2" })];
     expect(appsFirst(mixed).map((a) => a.id)).toEqual(["a1", "g1", "g2", "s1", "s2"]);
-    expect(scriptsFirst(mixed).map((a) => a.id)).toEqual(["s1", "s2", "a1", "g1", "g2"]);
   });
 
   it("never reports a state other than idle, even with a mark under its id", () => {

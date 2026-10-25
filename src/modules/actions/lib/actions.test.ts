@@ -3,7 +3,6 @@ import {
   addAction,
   adoptActionAt,
   normalizeActions,
-  partitionForHeader,
   promoteToGlobal,
   removeAction,
   reorderActions,
@@ -163,23 +162,6 @@ describe("promoteToGlobal", () => {
     const r = promoteToGlobal(w, g, "zz", () => "unused");
     expect(r.workspace).toBe(w);
     expect(r.global).toBe(g);
-  });
-});
-
-describe("partitionForHeader", () => {
-  it("keeps own-button actions in user order and groups the rest by kind", () => {
-    const list = [
-      act("s1"),
-      act("a1", { kind: "app" as const, ownButton: true }),
-      act("s2", { ownButton: true }),
-      act("a2", { kind: "app" as const }),
-      act("g1", { kind: "agent" as const }),
-    ];
-    const p = partitionForHeader(list);
-    expect(p.ownButtons.map((a) => a.id)).toEqual(["a1", "s2"]);
-    expect(p.scripts.map((a) => a.id)).toEqual(["s1"]);
-    expect(p.apps.map((a) => a.id)).toEqual(["a2"]);
-    expect(p.agents.map((a) => a.id)).toEqual(["g1"]);
   });
 });
 

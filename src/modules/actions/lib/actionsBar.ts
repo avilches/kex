@@ -300,14 +300,10 @@ function byKinds<T extends Pick<Action, "kind">>(actions: readonly T[], kinds: r
   return kinds.flatMap((kind) => actions.filter((a) => a.kind === kind));
 }
 
-// The Header shows apps, then agents, then scripts, each keeping the user's order; Settings
-// lists scripts, apps and agents, so neither interleaves the kinds.
+// The Header shows apps, then agents, then scripts, each keeping the user's order, so it never
+// interleaves the kinds.
 export function appsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
   return byKinds(actions, HEADER_KINDS);
-}
-
-export function scriptsFirst<T extends Pick<Action, "kind">>(actions: readonly T[]): T[] {
-  return byKinds(actions, SETTINGS_KINDS);
 }
 
 // The own buttons the bar may draw, in order: those the place shows. Each list comes already

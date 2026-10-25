@@ -4,13 +4,11 @@ export {
   adoptActionAt,
   normalizeAction,
   normalizeActions,
-  partitionForHeader,
   promoteToGlobal,
   removeAction,
   reorderActions,
   reorderBefore,
   updateAction,
-  type HeaderPartition,
 } from "./lib/actions";
 export type { Action } from "./lib/types";
 export { ActionIcon } from "./ActionIcon";
