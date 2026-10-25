@@ -283,16 +283,17 @@ const DYNAMIC_VARS = ["cwd", "dir", "branch", "repo"];
 
 // What running the Action here would do: its kind, the command it ends up with and the
 // folder it starts in. Null when that cannot be told (a variable with no value, a command
-// that does not expand), so such an Action is never compared.
+// that does not expand, a start folder that is unknown), so such an Action is never compared.
 function effectKey(action: Action, ctx: BarContext): string | null {
   const folders = ctx.folders ?? {};
   try {
     if (isApp(action)) {
       if (missingVariables(action.command, ctx.vars).length > 0) return null;
-      const spawn = folders.workspaceRoot?.trim() || folders.workspaceCwd;
-      return JSON.stringify([action.kind, expandCommandArgv(action.command, ctx.vars), folderKey(spawn)]);
+      const spawn = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
+      return spawn ? JSON.stringify([action.kind, expandCommandArgv(action.command, ctx.vars), spawn]) : null;
     }
     const start = folderKey(resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders }));
+    if (!start) return null;
     if (isAgent(action)) return JSON.stringify([action.kind, action.command, start]);
     if (missingVariables(action.command, ctx.vars).length > 0) return null;
     return JSON.stringify([action.kind, expandCommandShell(action.command, ctx.vars, ctx.shell), start]);
@@ -304,8 +305,10 @@ function effectKey(action: Action, ctx: BarContext): string | null {
 // Twins: Actions that depend on the focused tab and would do exactly what another one does
 // right now (an agent in the workspace folder and the same agent in the current folder, with
 // the focus at the root). The bar hides them so the same effect is not offered twice. With
-// the same effect, a button beats a menu entry; with the same placement, a static Action
-// beats a dynamic one, and two of the same sort are the user's own doing, so both stay. A
+// the same effect, a button beats a menu entry even when both are static (the menu copy of a
+// button is hidden, so moving a button to the menu makes it vanish while a button twin exists);
+// with the same placement, a static Action beats a dynamic one, and two of the same sort are
+// the user's own doing, so both stay. A
 // script that is not idle is never hidden, and a blocked Action neither hides nor survives.
 // Nothing is hidden without a real context, or while the workspace sleeps.
 export function twinIds(

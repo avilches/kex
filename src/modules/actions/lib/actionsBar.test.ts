@@ -924,6 +924,38 @@ describe("twinIds", () => {
     expect(ids([app({ id: "n", command: "code {filepath}" }), app({ id: "m", command: "code {filepath}" })], at("/p"))).toEqual([]);
   });
 
+  it("never compares Actions whose start folder is unknown", () => {
+    const noFolders: BarContext = { vars: { ...vars, workspace: "", cwd: "/x" }, shell: "posix", folders: { focusFolder: null, workspaceRoot: null, workspaceCwd: null } };
+    const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "context" });
+    const home = script({ id: "h", command: "ls /x", cwdMode: "home" });
+    expect(ids([dynamic, home], noFolders)).toEqual([]);
+  });
+
+  it("hides the menu copy of a button even when both are static", () => {
+    const button = script({ id: "b", ownButton: true });
+    const menu = script({ id: "m", ownButton: false });
+    expect(ids([button, menu], at("/p"))).toEqual(["m"]);
+  });
+
+  it("finds a twin across the workspace and global scopes", () => {
+    const model = buildActionsBarModel({
+      local: [workspaceAgent],
+      global: [{ ...contextAgent, id: "g" }],
+      context: at("/p"),
+      states: none,
+      activeId: undefined,
+    });
+    expect(model.buttons.map((b) => b.id)).toEqual(["w"]);
+  });
+
+  it("leaves at least the static button in a three-way set", () => {
+    const staticButton = agent({ id: "s" });
+    const dynamicMenu = agent({ id: "dm", cwdMode: "context", ownButton: false });
+    const dynamicButton = agent({ id: "db", cwdMode: "context" });
+    const hidden = ids([dynamicButton, dynamicMenu, staticButton], at("/p"));
+    expect(hidden).toEqual(["db", "dm"]);
+  });
+
   it("does not let an Action the place hides hide another one", () => {
     const file = { file: true, folder: false };
     const byWorkspace = app({ id: "w", command: "code /p" });
