@@ -47,7 +47,7 @@ function openAdd(c: HTMLElement) {
   act(() => void [...column.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Add")!.click());
 }
 
-const commandField = () => document.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement | null;
+const commandField = () => document.querySelector("textarea[aria-label='Command'], textarea[aria-label='Script']") as HTMLTextAreaElement | null;
 
 describe("ActionsSection", () => {
   beforeEach(() => {

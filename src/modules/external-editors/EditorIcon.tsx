@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { DocumentCodeIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-export function EditorIcon({ id, size = 14 }: { id: string; size?: number }) {
+export function EditorIcon({ id, size = 14, className }: { id: string; size?: number; className?: string }) {
   const [src, setSrc] = useState(`/assets/editors/${id}.svg`);
   const [failed, setFailed] = useState(false);
 
@@ -13,7 +14,7 @@ export function EditorIcon({ id, size = 14 }: { id: string; size?: number }) {
   }, [id]);
 
   if (failed) {
-    return <HugeiconsIcon icon={DocumentCodeIcon} size={size} strokeWidth={1.75} />;
+    return <HugeiconsIcon icon={DocumentCodeIcon} size={size} strokeWidth={1.75} className={className} />;
   }
   return (
     <img
@@ -21,7 +22,7 @@ export function EditorIcon({ id, size = 14 }: { id: string; size?: number }) {
       alt=""
       width={size}
       height={size}
-      className="shrink-0"
+      className={cn("shrink-0", className)}
       onError={() => {
         if (src.endsWith(".svg")) {
           setSrc(`/assets/editors/${id}.png`);

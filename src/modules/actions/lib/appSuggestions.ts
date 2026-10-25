@@ -17,7 +17,7 @@ export type AppSuggestion = {
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   key: "custom",
-  name: "Custom app",
+  name: "Custom",
   iconId: null,
   defaultCommand: "",
 };

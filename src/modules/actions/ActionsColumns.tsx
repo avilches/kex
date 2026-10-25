@@ -81,9 +81,9 @@ function actionFromSuggestion(s: AppSuggestion): Action {
 
 const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "This workspace" };
 
-// Both scopes side by side: Global on the left, the current workspace on the right, and a
+// Both scopes side by side: the current workspace on the left, Global on the right, and a
 // drag from one column to the other moves the Action. An Action is edited in a modal, never
-// inline. A new command is a draft until it has a command, because an Action with no command
+// inline. A new action is a draft until it has a command, because an Action with no command
 // is not valid and the stores refuse it; closing the modal forgets a draft with none. An app
 // preset arrives with a command, so it is handed straight to the store. Editing a preset
 // changes it into the user's own (see `ownedAfterEdit`).
@@ -241,7 +241,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
         onDragCancel={dragCancel}
       >
         <div className="grid grid-cols-2 items-start gap-4">
-          {(["global", "workspace"] as const).map((scope) => (
+          {(["workspace", "global"] as const).map((scope) => (
             <Column
               key={scope}
               scope={scope}
@@ -261,7 +261,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
       </DndContext>
 
       <p className="text-[11px] text-muted-foreground">
-        Command examples: <span className="font-mono">pnpm dev</span> for a script,{" "}
+        Examples: <span className="font-mono">pnpm dev</span> for a script,{" "}
         <span className="font-mono">pycharm {"{workspace}"}</span> for an app. Drag an Action to the other column to move
         it between global and this workspace.
       </p>

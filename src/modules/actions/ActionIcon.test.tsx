@@ -31,4 +31,15 @@ describe("ActionIcon", () => {
     expect(custom.container.querySelector("svg")).not.toBeNull();
     custom.unmount();
   });
+
+  it("fill sizes the icon to the two lines next to it, in em of the inherited font", () => {
+    const app = render({ action: { appId: "zed", runInTerminal: false }, fill: true });
+    const box = app.container.querySelector("[data-action-icon-fill]")!;
+    expect(box.className).toContain("size-[calc(1.25em+11.875px)]");
+    expect(box.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
+    app.unmount();
+    const glyph = render({ action: { runInTerminal: true }, fill: true });
+    expect(glyph.container.querySelector("[data-action-icon-fill] svg")).not.toBeNull();
+    glyph.unmount();
+  });
 });

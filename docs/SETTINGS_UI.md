@@ -64,8 +64,8 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   sin variables (una app, o un script con Run in Workspace root) sale en gris mientras el workspace no tenga
   raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
   propia variable.
-- **Editor de Actions en Settings**: dos columnas, Global y This workspace (con el nombre del workspace debajo), cada una con
-  un unico combo Add (Add Command primero, luego los presets de apps y la app propia). El
+- **Editor de Actions en Settings**: dos columnas, This workspace (con el nombre del workspace debajo) a la izquierda y Global a la derecha, cada una con
+  un unico combo Add (Add script primero, luego el grupo Applications con Custom arriba y los presets de apps). El
   combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
   los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el `appId` no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
@@ -80,8 +80,12 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   una app es un preset solo por su comando: al cambiarlo deja de serlo (`ownedAfterEdit`,
   conserva el icono en `iconId`) y el preset vuelve al combo, y si el comando vuelve a ser el
   del preset lo recupera; el nombre y Own button / Inside the combo no cuentan.
-  El combo Add pone Add Command y Custom app arriba y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
+  El combo Add pone Add script arriba y Custom como primera app y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.
+  Donde un nombre lleva dos lineas (fila de Settings, boton del Header, menu, combo Add) el icono de app mide lo que las dos lineas
+  (`ActionIcon fill`: `1.25em + 11.875px`, la altura de `leading-tight` mas la linea de 9.5px) y el play/stop de un script ocupa
+  toda la altura de su fila, igual que el hover del nombre. El selector de ambito del modal son dos botones pequenos arriba a la
+  derecha (This workspace, Global), sin radio.
 - **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
   pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y
   `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Set a root to
