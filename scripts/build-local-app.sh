@@ -7,8 +7,18 @@
 # inside a Kex terminal tab, so killing the app would kill the shell running
 # it. Quit and reopen Kex yourself once the copy is done.
 #
-# CLI: scripts/build-local-app.sh
+# --performance keeps readable function names in the bundle (no minify), so the
+# in-app profiler and native samples can name the code that is slow. The bundle
+# is bigger, so use it only to investigate performance.
+#
+# CLI: scripts/build-local-app.sh [--performance]
 set -euo pipefail
+
+case "${1:-}" in
+  "") ;;
+  --performance) export KEX_BUILD_PERFORMANCE=1 ;;
+  *) echo "Usage: build-local-app.sh [--performance]" >&2; exit 1 ;;
+esac
 
 if [[ "$(uname)" != "Darwin" ]]; then
   echo "build-local-app.sh only supports macOS (installs into /Applications)." >&2

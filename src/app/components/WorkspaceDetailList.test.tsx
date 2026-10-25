@@ -308,11 +308,24 @@ describe("WorkspaceDetailList context menu", () => {
   it("offers the tab actions and none of the New ones", () => {
     const { unmount } = mountWithMenu();
     const text = document.body.textContent ?? "";
-    for (const label of ["Rename Tab", "Lock Tab", "Close Tab", "Close Other Tabs", "Close All Tabs", "Move to Workspace"]) {
+    for (const label of ["Rename Tab", "Lock Tab", "Close Tab", "Close Other Tabs", "Move to Workspace"]) {
       expect(text).toContain(label);
     }
     expect(text).not.toContain("New Terminal");
     expect(text).not.toContain("New Browser");
+    expect(text).not.toContain("Close All Tabs");
+    unmount();
+  });
+
+  it("Lock Tab keeps the menu open for toggling in place", () => {
+    const { unmount } = mountWithMenu();
+    const item = (label: string) =>
+      Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((e) => e.textContent?.startsWith(label)) as HTMLElement;
+    act(() => item("Lock Tab").click());
+    expect(actions.onUpdateTab).toHaveBeenCalledWith("t-work", expect.any(Function));
+    // The lock item prevents the Radix close, so the menu is still there.
+    const stillOpen = item("Lock Tab") !== undefined;
+    expect(stillOpen).toBe(true);
     unmount();
   });
 
@@ -351,7 +364,6 @@ describe("WorkspaceDetailList hibernated", () => {
               paneTabCount: () => 3,
               onClose: vi.fn(),
               onCloseOtherTabs: vi.fn(),
-              onCloseAllTabs: vi.fn(),
               onRenameTab: vi.fn(),
               onUpdateTab: vi.fn(),
               onSaveTab: vi.fn(),

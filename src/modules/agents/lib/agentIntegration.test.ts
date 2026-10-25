@@ -31,7 +31,7 @@ beforeEach(() => {
 describe("installAgent", () => {
   it("installs Claude hooks, turns agent notifications on and records the install", async () => {
     await installAgent("claude");
-    expect(invoke).toHaveBeenCalledWith("agent_enable_claude_hooks");
+    expect(invoke).toHaveBeenCalledWith("agent_enable_claude_hooks", { refresh: true });
     expect(setAgentNotifications).toHaveBeenCalledWith(true);
     expect(suggestions.claude).toMatchObject({ installedOnce: true });
   });

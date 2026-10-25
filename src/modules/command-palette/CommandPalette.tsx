@@ -9,6 +9,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { pathBasename } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
+import { type BarItem, paletteActions } from "@/modules/actions/lib/actionsBar";
+import { useActionsBarModel } from "@/modules/actions/lib/useActionsBar";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -35,7 +37,7 @@ import type { ClosedTabEntry } from "./lib/closedEntries";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
-import { mergeRows } from "./lib/mergeRows";
+import { actionRowKey, mergeRows } from "./lib/mergeRows";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruSnapshot, recordUse } from "./lib/mru";
 import { commandRowKey } from "./lib/rankCommands";
@@ -45,7 +47,9 @@ import { type TerminalTarget, terminalTargetOf } from "./lib/terminalTarget";
 import { enterHintOf } from "./lib/enterHint";
 import { registerPaletteControl } from "./lib/paletteControl";
 import {
+  actionMenuItems,
   closedMenuItems,
+  highlightedActionOf,
   highlightedClosedOf,
   highlightedTabOf,
   type RowMenuItemId,
@@ -63,8 +67,13 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** Gives the focus back to the active tab when the palette is closed with Escape. */
   restoreFocus: () => void;
-  initialMode?: "commands" | "content";
+  initialMode?: "commands" | "content" | "history";
   commandItems: PaletteItem[];
+  /** The active workspace while the palette is open (null otherwise): the Actions it lists are the Header's. */
+  actionsWorkspace: Parameters<typeof useActionsBarModel>[0]["workspace"];
+  onRunAction: (item: BarItem) => void;
+  onStopAction: (item: BarItem) => void;
+  onEditAction: (item: BarItem) => void;
   workspaceRoot: string | null;
   onOpenContentHit: (path: string, line: number) => void;
   insertCommand: ((cmd: string) => void) | null;
@@ -103,6 +112,10 @@ export function CommandPalette({
   restoreFocus,
   initialMode,
   commandItems,
+  actionsWorkspace,
+  onRunAction,
+  onStopAction,
+  onEditAction,
   workspaceRoot,
   onOpenContentHit,
   insertCommand,
@@ -120,6 +133,8 @@ export function CommandPalette({
   onCloseTab,
 }: Props) {
   const [query, setQuery] = useState("");
+  const barModel = useActionsBarModel({ workspace: open ? actionsWorkspace : null });
+  const actionItems = useMemo(() => paletteActions(barModel), [barModel]);
   const { contentStyle, handles } = usePaletteWidth();
   const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
   const [value, setValue] = useState("");
@@ -147,15 +162,17 @@ export function CommandPalette({
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
   const learned = useMemo(() => (open ? learnedSnapshot() : {}), [open]);
 
-  const inCommands = !inThemes && parsed.mode === "commands";
+  const actionsOnly = parsed.mode === "actions";
+  const inCommands = !inThemes && (parsed.mode === "commands" || actionsOnly);
   const merged = useMemo(
     () =>
       inCommands
         ? mergeRows({
-            commands: commandItems,
-            tabs: tabEntries,
-            workspaces: workspaceEntries,
-            closed: closedEntries,
+            commands: actionsOnly ? [] : commandItems,
+            actions: actionItems,
+            tabs: actionsOnly ? [] : tabEntries,
+            workspaces: actionsOnly ? [] : workspaceEntries,
+            closed: actionsOnly ? [] : closedEntries,
             term: parsed.term,
             activeTabId,
             learned,
@@ -164,7 +181,9 @@ export function CommandPalette({
         : [],
     [
       inCommands,
+      actionsOnly,
       commandItems,
+      actionItems,
       tabEntries,
       workspaceEntries,
       closedEntries,
@@ -181,6 +200,10 @@ export function CommandPalette({
   const footerEnterHint = inCommands ? enterHintOf(value, merged) : "Select";
   const highlightedClosed = useMemo(
     () => (open && inCommands ? highlightedClosedOf(value, merged) : null),
+    [open, inCommands, value, merged],
+  );
+  const highlightedAction = useMemo(
+    () => (open && inCommands ? highlightedActionOf(value, merged) : null),
     [open, inCommands, value, merged],
   );
   const highlightedTab = useMemo(
@@ -263,7 +286,7 @@ export function CommandPalette({
       setValue(lastContentValue);
       restored = true;
     } else {
-      setQuery(initialMode === "content" ? "#" : "");
+      setQuery(initialMode === "content" ? "#" : initialMode === "history" ? ">" : "");
       setPage("root");
     }
     contentRestoredRef.current = restored;
@@ -436,6 +459,38 @@ export function CommandPalette({
     [openRowMenu],
   );
 
+  const runActionRow = useCallback(
+    (id: RowMenuItemId, item: BarItem) => {
+      closeRowMenu();
+      if (id === "run") {
+        recordChoice(parsed.term, actionRowKey(item.id));
+        runAfterClose(() => onRunAction(item));
+      } else if (id === "stop") {
+        runAfterClose(() => onStopAction(item));
+      } else if (id === "edit") {
+        runAfterClose(() => onEditAction(item));
+      }
+    },
+    [closeRowMenu, parsed.term, runAfterClose, onRunAction, onStopAction, onEditAction],
+  );
+
+  const openActionMenu = useCallback(
+    (
+      item: BarItem,
+      row: Element | null | undefined,
+      pointer?: { clientX: number; clientY: number },
+    ) => {
+      const box = boxRef.current;
+      if (!box || !row) return;
+      openRowMenu(
+        actionRowKey(item.id),
+        actionMenuItems(item),
+        anchorOf(box, row as HTMLElement, pointer),
+      );
+    },
+    [openRowMenu],
+  );
+
   const openTabMenu = useCallback(
     (
       entry: TabEntry,
@@ -503,9 +558,11 @@ export function CommandPalette({
         const key = rowMenu.menu.rowKey;
         const entry = highlightedTabOf(key, merged);
         const closed = highlightedClosedOf(key, merged);
+        const action = highlightedActionOf(key, merged);
         const run = (item: { id: RowMenuItemId }) => {
           if (entry) runTabAction(item.id, entry);
           else if (closed) runClosedAction(item.id, closed);
+          else if (action) runActionRow(item.id, action);
         };
         if (rowMenu.handleKey(e, run)) return;
       }
@@ -515,6 +572,7 @@ export function CommandPalette({
         const row = boxRef.current?.querySelector('[cmdk-item][aria-selected="true"]');
         if (highlightedTab) openTabMenu(highlightedTab, row);
         else if (highlightedClosed) openClosedMenu(highlightedClosed, row);
+        else if (highlightedAction) openActionMenu(highlightedAction, row);
         return;
       }
       if (!inSubpage) return;
@@ -538,8 +596,11 @@ export function CommandPalette({
       runClosedAction,
       highlightedTab,
       highlightedClosed,
+      highlightedAction,
       openTabMenu,
       openClosedMenu,
+      openActionMenu,
+      runActionRow,
     ],
   );
 
@@ -551,7 +612,9 @@ export function CommandPalette({
         ? "Find text in files..."
         : parsed.mode === "history"
           ? "Search command history..."
-          : "Type a command, tab or workspace, > for history, # to find in files";
+          : actionsOnly
+            ? "Search actions..."
+            : "Type a command, tab or workspace, > history, # files, / actions";
 
   return (
     <CommandDialog
@@ -694,9 +757,9 @@ export function CommandPalette({
                   <StatusItem label="No other workspaces" />
                 ) : null}
               </CommandGroup>
-            ) : parsed.mode === "commands" ? (
+            ) : parsed.mode === "commands" || actionsOnly ? (
               merged.length === 0 ? (
-                <EmptyHint />
+                <EmptyHint actionsOnly={actionsOnly} />
               ) : (
                 <MergedList
                   rows={merged}
@@ -718,6 +781,12 @@ export function CommandPalette({
                   onRunClosed={(entry) =>
                     runAfterClose(() => onRunClosed(entry))
                   }
+                  onRunAction={(item) => runActionRow("run", item)}
+                  onContextMenuAction={(item, e) => {
+                    e.preventDefault();
+                    setValue(actionRowKey(item.id));
+                    openActionMenu(item, e.currentTarget, e);
+                  }}
                   onContextMenuClosed={(entry, e) => {
                     e.preventDefault();
                     setValue(entry.key);
@@ -826,8 +895,10 @@ export function CommandPalette({
               const key = rowMenu.menu?.rowKey ?? "";
               const entry = highlightedTabOf(key, merged);
               const closed = highlightedClosedOf(key, merged);
+              const action = highlightedActionOf(key, merged);
               if (entry) runTabAction(id, entry);
               else if (closed) runClosedAction(id, closed);
+              else if (action) runActionRow(id, action);
             }}
             onActive={(active) => rowMenu.setActive(active)}
           />
@@ -840,20 +911,20 @@ export function CommandPalette({
             </kbd>
             {footerEnterHint}
           </span>
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
-              {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
-            </kbd>
-            <span className="shrink-0">
-              {terminalTarget ? "Open terminal" : "New terminal"}
-            </span>
-            {terminalTarget ? (
+          {terminalTarget ? (
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <kbd className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
+                {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
+              </kbd>
+              <span className="shrink-0">Open terminal</span>
               <span className="min-w-0 truncate font-mono text-[10.5px]">
                 {terminalTarget.cwd}
               </span>
-            ) : null}
-          </span>
-          {highlightedTab || highlightedClosed ? (
+            </span>
+          ) : (
+            <span className="flex-1" />
+          )}
+          {highlightedTab || highlightedClosed || highlightedAction ? (
             <span className="flex shrink-0 items-center gap-1.5">
               <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px]">
                 Tab
@@ -929,11 +1000,15 @@ function StatusItem({
   );
 }
 
-function EmptyHint() {
+function EmptyHint({ actionsOnly }: { actionsOnly: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
       <HugeiconsIcon icon={CommandIcon} size={18} strokeWidth={1.5} />
-      <span>No commands found. Type ? to see search modes.</span>
+      <span>
+        {actionsOnly
+          ? "No actions found."
+          : "No commands found. Type ? to see search modes."}
+      </span>
     </div>
   );
 }

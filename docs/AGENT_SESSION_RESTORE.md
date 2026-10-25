@@ -110,6 +110,98 @@ Every PTY session receives a `KEX_TAB_ID` environment variable (a UUID matching 
 state). This is injected in `pty/shell_init.rs` → `apply_common` and is available to all processes running inside the
 terminal, including hook scripts.
 
+### Which events Kex registers
+
+`agent_enable_claude_hooks` does not write all 11 events into `~/.claude/settings.json`: it runs `claude --version`
+(2 s timeout, on the blocking pool, never on the UI thread) and registers only the events that version knows. Claude
+Code 1.0.23 to 2.1.100 discard the whole `settings.json` when `hooks` holds a key they do not recognise, and newer ones
+print an "Unknown hook event" warning on every start. The table lives in `agent/claude_version.rs` (`hook_events_for`,
+pure and tested at each boundary). First release per event: `Notification` 1.0.23, `Stop` 1.0.31, `SubagentStop` 1.0.41,
+`UserPromptSubmit` 1.0.53, `SessionStart` 1.0.62, `SessionEnd` 1.0.85, `SubagentStart` 2.0.43, `PermissionRequest`
+2.0.45, `StopFailure` 2.1.78, `PostCompact` 2.1.76, `MessageDisplay` 2.1.152 (this one from Claude's CHANGELOG, it is not in the fixture
+extracted from the npm releases). When the version cannot be read, only the six events present since 1.0.x are written.
+
+`claude --version` runs with the inherited PATH plus the install folders of the candidate list (`~/.local/bin`,
+`~/.npm-global/bin`, `~/.volta/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, ...) appended, so an npm install whose
+`#!/usr/bin/env node` would not find node with the minimal PATH of an app opened from the Finder still answers
+(`claude_version::widened_path`). An unknown version never takes anything away: the install only makes sure the six
+baseline events carry Kex's hook and leaves Kex's hook in any other event exactly as it is, so a `claude --version` that
+fails once cannot strip `PermissionRequest`, `StopFailure` and the rest from a working install. Pruning the events a
+version does not know happens only when the version is known and older (`merge_hooks` with `prune`, set by
+`claude_version::is_known`).
+
+The startup reinstall of each window calls `agent_enable_claude_hooks` with `refresh: false`, which reuses the version
+read in the last 60 s (`detect_claude_version_cached`), so opening several windows spawns `claude --version` once; the
+user's own install (Settings, the bell, the install toast) passes `refresh: true`. The cache lives in the Kex process, so
+a fresh Kex start always runs `claude --version` again; the only case it misses is a Claude update less than a minute
+before opening a new window of an already running Kex, which the next start or a manual Reinstall picks up.
+
+Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
+a downgrade to a version Kex can read removes Kex's hook from the events the older Claude does not know. Uninstalling
+removes Kex's hook from every known event whatever the installed version. `agent_claude_hooks_status` expects the
+events of the installed version (the six baseline ones when it is unknown, which is all the install guarantees then),
+so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v13` since every frame names its tab and PTY (`tab_id`, `pty_id`) for the app's single socket.
+
+### Status line (context and rate limits)
+
+Claude Code's `statusLine` is not a hook: it is one command that Claude runs on every status line tick (several a
+second while streaming) with the session's state on stdin, and shows its stdout under the prompt. The slot holds a
+single command, so `agent/statusline.rs` decides who owns it:
+
+- Empty slot (the `statusLine` key missing or `null`, nothing else): `agent_enable_claude_hooks` writes
+  `{"type":"command","command":"\"$HOME/.config/kex/hooks/statusline.sh\"  # kex-statusline"}`.
+- Kex's (a string `command` that ends, after trailing spaces, in the comment `# kex-statusline`): rewritten to the
+  current command, and removed on uninstall. A command that only contains the word (`~/bin/my-kex-statusline-hud.sh`)
+  is not Kex's.
+- The user's (anything else, a malformed slot included: a string or an array instead of an object, a typo such as
+  `cmd`, a `command` that is empty, blank or not a string): never replaced, never wrapped, never removed, byte for
+  byte (Orca's `applyManagedStatusLine` policy). Kex cannot tell a half-written entry of the user's from a stale one,
+  so it leaves it. Kex then shows no reading. This is the case on the development machine, whose
+  `settings.json` has its own HUD (`$HOME/.claude/hooks/run-hud.sh`). Wrapping was rejected: the user's command would
+  run under Kex's script, and a fault in it would break their status line.
+
+The startup reinstall runs the same install, so a user who empties the slot on purpose finds it taken by Kex again on
+the next start unless they turn the Claude Code integration off; putting any command of their own there keeps it. The
+same goes for deleting Kex's `statusLine` entry by hand: while the integration is on, the next reinstall (any Kex start)
+sees an empty slot and writes it back.
+Kex's entry is rewritten whole, so fields the user added to it (`padding`, for instance) are lost on the next install.
+
+`statusline.sh` (marker `kex-statusline-v1`) is written next to `trigger-event.sh` on every install, even when the slot
+is the user's, since it is inert until `settings.json` names it. It prints nothing (Claude would show it), reads stdin
+with the shell's own `read`, and exits without sending outside a Kex tab, for a tab or PTY id outside `[A-Za-z0-9_-]`
+and digits (both are pasted into the frame unescaped), and under `CLAUDE_JOB_DIR` (Claude daemon workers inherit a
+stale tab environment). The reading it cares about (`remaining_percentage` and the `rate_limits` object) is cut out of
+the payload with parameter expansion; an unchanged reading is sent again only after
+`KEX_STATUSLINE_MIN_POST_INTERVAL_SECONDS` (15 by default, Orca's value), a changed one at once. The clock is bash 5's
+`EPOCHSECONDS` or, on macOS where `/bin/sh` is bash 3.2, the payload's `cost.total_duration_ms`, so a skipped tick
+spawns no process at all. The last send is kept in `~/.config/kex/statusline/<tab_id>` (0600). The frame is the
+payload with `hook_event_name: "StatusLine"`, `agent`, `tab_id` and `pty_id` appended last (a repeated key keeps its
+last value, so the payload cannot pick the tab), sent to `$KEX_IPC` by `nc -U` (or `python3`) in the background, so the
+status line never waits on the socket. It is never spooled: an old reading is worthless.
+
+Measured on macOS with the real 1.3 KB tick (200 runs each, `/bin/sh` = bash 3.2): `sh -c 'cat >/dev/null'` 38 ms,
+the script on a throttled tick 30 ms, on a tick that sends 32 ms. The script costs no more than an empty shell, and the
+send does not block it. With a real interactive Claude Code 2.1.310 (`CLAUDE_CONFIG_DIR` in a temporary folder, the
+script as its `statusLine` and a test socket), one short prompt produced two frames for the tab (the first tick with
+`used_percentage: null`, then 2%), and the status line showed nothing.
+
+What a tick carries (2.1.310, API billing, captured from an interactive session; Claude does not run the status line
+in `-p` mode): `session_id`, `transcript_path`, `cwd`, `prompt_id`, `session_name`, `effort.level`, `model.id`,
+`model.display_name`, `workspace.{current_dir,project_dir,added_dirs}`, `version`, `output_style.name`,
+`cost.{total_cost_usd,total_duration_ms,total_api_duration_ms,total_lines_added,total_lines_removed}`,
+`context_window.{total_input_tokens,total_output_tokens,context_window_size,current_usage,used_percentage,remaining_percentage}`
+(`current_usage` and both percentages are `null` until the first API answer), `exceeds_200k_tokens`, `prompt_cache`
+(after the first answer), `fast_mode` and `thinking.enabled`. `rate_limits` is absent with API billing; with a Claude
+subscription it is documented (and assumed by Orca) as `rate_limits.five_hour` and `rate_limits.seven_day`, each
+`{ used_percentage, resets_at }` in Unix seconds. That shape is not measured here: no subscription account was at hand.
+`agent::statusline::usage` also accepts `utilization` for the percentage, as Orca does.
+
+The tab shows the reading as a small number next to its title (`AgentUsageBadge`, `agents/lib/usage.ts`): the context
+used, or the rate limit window (`5h`, `7d`) once it reaches 80% and is above the context, since that is what would
+stop the agent first. Amber from 80%, the destructive color from 95%. The native tooltip lists every value and the
+reset times. The readings live in `useAgentStore().usage`, apart from the sessions, so a tick re-renders only that tab,
+and are dropped when the agent exits.
+
 ### SessionStart hook
 
 Triggered by Claude Code at session start. The hook command:
@@ -118,13 +210,17 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v9`) handles all 10 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v13`) handles all 11 registered Claude Code
 hook events the same way:
 
-1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
-   managed by Kex).
+0. Prints `{}` and a newline on stdout before anything else, early exits and a failed socket send included: some
+   Claude Code versions treat an empty hook stdout as a failure, and Claude reads `{}` as "no output" (it adds
+   nothing to the context of `SessionStart` and `UserPromptSubmit`).
+1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits (tab is not managed by
+   Kex), still after printing `{}`.
 2. Uses `jq` to re-serialize the payload tagged with `"agent"` set to the script's first argument, `claude` when
-   there is none (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
+   there is none, and with `tab_id` and `pty_id` set from `KEX_TAB_ID` and `KEX_PTY_ID` (added last, so a field of the
+   same name in the agent's payload is overwritten, never trusted) (Claude Code's hook command has no argument; the Codex handlers installed by `codex_hooks.rs`
    pass `codex`; OpenCode's plugin writes the socket itself with `agent: opencode`) and to extract
    `hook_event_name`, only to pick the handler. For `codex` only, a snake_case name (`session_start`,
    `user_prompt_submit`, `stop`, `permission_request`, `subagent_start`, `subagent_stop`) is turned into its PascalCase
@@ -135,11 +231,12 @@ hook events the same way:
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
    without rotation (TASK-557); removed with no replacement since nothing depended on it.
-3. Forwards the JSON payload, re-serialized by the `agent` tag, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
-   falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
-   `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
-4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
-   directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
+3. Forwards the JSON payload, re-serialized with those tags, to the app's single socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+   falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, the
+   event is spooled (below); if `KEX_IPC` is unset it is silently dropped.
+4. `pty/ipc.rs`, one listener thread for the whole app on `kex-ipc-<pid>.sock`, reads the line and routes it by
+   its `tab_id`/`pty_id` (`pty/hook_router.rs`, see `docs/IPC.md` for the `Live`/`Late`/`Spool` routes), then reads the
+   JSON directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
    `SessionEnd`, `PermissionRequest`, `MessageDisplay`, `SubagentStart`, `SubagentStop`) it emits `kex:agent-signal` directly with a `kind` matching
    the event name. None of this goes through `agent_detect.rs` or its OSC byte-level state machine.
@@ -181,13 +278,15 @@ resume and `/clear`, so a record dropped while the process is still running woul
 tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
 destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
+**Offline spool.** When neither `nc` nor `python3` can reach the socket (listener not started yet, failed to bind, gone), `trigger-event.sh` writes the payload as its own file in `~/.config/kex/spool/<tab_id>/`, named `<microseconds>-<pid>-<random>.json` so names sort in arrival order (`EPOCHREALTIME` on bash 5, GNU `date +%s%N`, whole seconds on macOS bash 3.2, whose same-second ties order by PID). The file is written under a dot name and renamed into place, so a visible file is always complete, and no existing file is ever rewritten, so concurrent hooks cannot lose each other's events. After each write the script prunes the directory to the newest 200 files and deletes files whose mtime is more than 7 days old (`find -mmin +10080`, portable to BSD and GNU), so a tab that never reopens cannot grow it without bound. The hub writes microseconds where the macOS script writes seconds, so within one and the same second a file of the hub sorts after a file of the script even when it was written first; both write only while the tab has no live PTY, so the overlap is two writers for one tab inside one second, and the drain then replays them in that order. The hub writes there too, in the same format (`ipc.rs::spool_event`, same caps by count), when a frame reaches the socket for a tab that has no PTY in this Kex right now (closed, hibernated, between two PTYs of a restart). When a PTY of the tab goes live (after its spawn succeeded; a spawn that fails leaves the spool untouched for the next one), `ipc.rs::drain_spool` hands the files to the dispatcher in name order, under the registry lock so a frame arriving meanwhile cannot overtake them, removing each one only after it is handed off (a crash mid-drain leaves exactly the undelivered files for the next start, at-least-once) and then the empty directory; dot files are in-flight temporaries and are skipped unless over a day old, and unreadable files are deleted. The script refuses a `KEX_TAB_ID` outside `[A-Za-z0-9_-]` and the hub a `tab_id` outside `^[A-Za-z0-9_-]{1,64}$`, for a frame, a spool write or a registration (`hook_router::is_safe_tab_id`), so the id cannot point outside the spool; directory and files are created 0700/0600. Stale `SessionEnd` and `StopFailure` are discarded (`stale_spooled_event_kind`) on a drain and before the hub spools anything; a late frame of a PTY the tab no longer runs on also loses its `SessionStart` and `UserPromptSubmit`, and so does a drained file whose `pty_id` is not the PTY going live, so a dead agent cannot overwrite the session of the new one. The hub prunes its own writes by count and by 7 days of age, like the script, and at its first start sweeps every tab directory the same way and removes the empty ones, so a tab that never reopens leaves nothing behind. Old `<tab_id>.jsonl` spool files from script v11 and earlier are no longer read (TASK-730, TASK-896).
+
 ### OpenCode plugin
 
 OpenCode has no hook commands; its extension surface is plugins (JS modules its own process loads from
 `~/.config/opencode/plugins/`). Kex ships `plugins/opencode-session.js` (`agent::OPENCODE_PLUGIN_SCRIPT`, marker
-`kex-opencode-v3`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
+`kex-opencode-v4`, embedded with `include_str!` and written atomically by `agent_setup_opencode`). When `KEX_IPC` and
 `KEX_TAB_ID` are present in the plugin host's environment it translates the session lifecycle into the frames Claude
-Code's hooks emit, sent directly on the socket:
+Code's hooks emit, sent directly on the socket, each tagged with `tab_id` and `pty_id` from the environment:
 
 - `SessionStart` once per session id, with `agent: "opencode"`, an empty `transcript_path` and a `cwd` (the session
   directory from `session.created`, `process.cwd()` otherwise). It is sent on `session.created` and, for a TUI resumed
@@ -224,7 +323,7 @@ The OSC/`AgentDetector` layer still detects plain `opencode` invocations like an
 
 OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
 `~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships one
-source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v4`, embedded with
+source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v6`, embedded with
 `include_str!`). `agent_setup_omp` and `agent_setup_pi` stamp the runtime name into the template's `agent` constant and
 write the result atomically into the matching folder, so one file reports `agent: omp` and the other `agent: pi`. Their
 status commands compare the whole installed file with the script stamped for that runtime, so an outdated copy, or one
@@ -257,7 +356,7 @@ Claude Code's hooks emit.
   `willContinue`; Pi ignores `agent_end` because it keeps working afterwards (retries, compaction, queued work) and
   only `agent_settled` is final.
 
-Frames go on the `KEX_IPC` socket (1 s send cap, silent failure), session ids come from
+Frames go on the `KEX_IPC` socket tagged with `tab_id` and `pty_id` (1 s send cap, silent failure), session ids come from
 `ctx.sessionManager.getSessionId()` and every send is gated on `KEX_IPC` + `KEX_TAB_ID`, so a bare `omp` or `pi` run is
 untouched. Child processes inheriting a parent's environment may load the extension again; the first loader asserts
 itself with `KEX_AGENT_STATUS_OWNED` (pid).
@@ -309,6 +408,11 @@ as for Claude. `SubagentStart` / `SubagentStop` feed the same subagent gate; Cod
 the ones it reported are kept until their own `SubagentStop`, as for OMP. The tab menu block offers Copy Session ID and
 Run on Start, and the transcript actions only when the frame named a rollout (`hasTranscriptActions`): with an empty
 path there is nothing to reveal, so it hides them, as for OpenCode, instead of "Transcript not created yet".
+
+The script now prints `{}` on stdout for Codex too (TASK-894). Not measured against a live Codex: the reasoning is that
+`{}` is valid JSON with no fields, which Codex's hook protocol treats as an empty result, and the same script output
+was verified to add no context and no warning on Claude Code 2.1.310. If a Codex build ever shows it as context,
+the fix is to skip the print when the first argument is `codex`.
 
 The provider row (`provider.rs`) reads Codex's own files and nothing else:
 
@@ -376,7 +480,7 @@ for one without (codex, opencode); with codex gaining a source the two had to be
 ### Launch command capture
 
 The original CLI invocation is captured from `OSC 133;C;<cmd>` (the shell integration "command started" signal).
-Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives on its own Unix socket thread,
+Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives on the app's hook listener thread,
 the command is bridged through a thread-safe stash:
 
 1. **PTY reader thread** (`session.rs`): `Transition::Started { cmd_string }` is emitted (from `agent_detect.rs`,
@@ -453,6 +557,7 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
       "launch_cmd": "claude --safe-mode --add-dir /extra",
       "title": "fixing the build",
       "notification": "attention",
+      "last_message": "The build is green again: the missing import is back and all tests pass.",
       "updated_at": 1718000000
     }
   }
@@ -468,6 +573,22 @@ else the session title); `notification` is the kind (`attention`, `finished` or 
 still had unread. Neither comes from the hooks: the frontend reports them through `agent_session_set_snapshot`
 (see *Name and notification* below). A later `SessionStart` rewrites the record but keeps both when the session id is the same (a resume keeps it; `/clear` or an agent launched by hand brings a new one and starts clean). An empty title
 never overwrites the stored one, because titles go empty while the app closes.
+
+`last_message` is optional as well: what the assistant said when its last turn ended, taken from the Stop hook's
+`last_assistant_message` (`ipc.rs` calls `session_store::set_last_message` on every Stop that carries the field, for the
+record of the same session id only). It is stored flattened (whitespace runs collapsed to one space) and clipped to
+`MAX_LAST_MESSAGE_CHARS` (280) characters, never bytes, with a trailing ellipsis (`clip_last_message`). The cap is there
+because `agent-sessions.json` is not encrypted and the text may hold anything the assistant printed: it is a preview to
+recognise the conversation by, not a copy of it. For the same reason, on unix `agent-sessions.json`, its temporary file
+and its `.bak` are written with mode 0600 (`write_private`, which also tightens a file an older Kex left with the default
+umask). A Stop whose message is empty (a turn that ended on a tool call) leaves
+the record untouched, message and `updated_at` included, so the preview keeps the last thing the assistant said; a Stop without the field (OpenCode's plugin today) leaves the record without one, and the UI shows only the folder
+and the time. The same write stamps `updated_at` with the end of the turn, so it reads as "when the session last
+answered". A resume of the same session keeps it; a new session id starts without it, like `title`. Kex does not read
+the `.jsonl` transcript to fill it or to show more than this one message: the hook already carries the text, and a
+transcript reader would have to follow the `uuid`/`parentUuid` chain to skip branches abandoned by `/rewind`, as Orca
+does, which is not worth it for a single line. `agent_session_previews` returns it, with `cwd_launch` and `updated_at`,
+for the rows of a hibernated workspace (`HibernatedOverlay`).
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 

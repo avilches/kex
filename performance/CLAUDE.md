@@ -47,8 +47,26 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   - `analyze`: reparto del hilo principal de uno o varios volcados, con la línea base al lado y un veredicto.
   - `profiler`: resumen de las líneas `[profiler]` (reparto de `rafShare`, fotogramas lentos, censo del DOM, peores
     ventanas y callbacks más caros).
+- **`scripts/run-performance.sh`**: abre `/Applications/Kex.app` con opciones de JavaScriptCore (`__XPC_JSC_<opcion>`)
+  que limitan el tamaño de función que el JIT intenta optimizar. Sin argumentos aplica los topes por defecto del script;
+  acepta `NOMBRE=VALOR` para probar otros y `--verify` para registrar las opciones recibidas. Se niega a arrancar si
+  Kex ya corre, porque el entorno solo vale al lanzar el proceso.
 - **Documentación**: `docs/BUILD.md` ("Profiling a slow window"), `docs/ARCHITECTURE.md` (mapa de módulos) y
   `docs/FORK.md` ("Performance profiler").
+
+## Congelones por el compilador JIT: qué se probó
+
+El 2026-10-24 el `WebContent` quedó bloqueado con el hilo principal esperando al JIT (`analyze` da `stalled`). El volcado
+nativo no nombra el JavaScript implicado. Lo que se sabe:
+
+- Solo las variables con prefijo `__XPC_` llegan al `WebContent`; `JSC_*` a secas no. `open -n --env` las entrega.
+- **No uses `reportDFGCompileTimes`**: el hilo del JIT pide el código fuente de un script cacheado de
+  `tauri://localhost` al formatear el nombre, solo es posible en el hilo principal, y WebKit mata el `WebContent`
+  (`EXC_BREAKPOINT`) en bucle: la vista se reinicia cada 5-10 s. Medido el 2026-10-25 con 7 crash reports.
+- `bash scripts/run-performance.sh` arranca Kex con topes de coste de bytecode para DFG y FTL. Es una prueba de si el
+  congelón desaparece: hipótesis, no medido. Si no cambia nada, probar `useFTLJIT=false`, y como último recurso
+  `useDFGJIT=false` (más lento en todo el JavaScript).
+- Comparar con `watch` (volcados automáticos) y con `profiler --hours` durante unos días.
 
 ## Cómo leer los resultados
 
@@ -69,6 +87,10 @@ los seis frames que lo registraron), `calls`, `ms`, `avg` y `max`. Entre episodi
 - `WebCore::timerFired` (en `analyze`, `run_from_timers`) engloba todo lo que se ejecuta desde un temporizador, el
   renderizado incluido. No lo sumes a los demás.
 - El JavaScript sale sin nombres en el volcado. Para saber qué código es, está el profiler.
+- `jit_wait` (`JITWorklist::suspendAllThreads`) es el hilo principal parado esperando a que el compilador JIT de
+  JavaScriptCore se pause. Una recolección de basura no puede empezar hasta entonces, así que sale también como `gc`
+  al 100 %: no es coste de renderizado ni de recolección, y `analyze` da el veredicto `stalled` cuando pasa del 20 %.
+  El volcado nombra la fase del JIT atascada en el hilo `JIT Worklist Helper Thread`.
 
 **Línea base del hilo principal** (porcentaje de las muestras, 2026-10-20 y 21):
 
@@ -98,7 +120,18 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
 - El presupuesto `backgroundMemoryBudgetMb` en 256 permite unas 35 terminales aparcadas, así que con 26 ninguna se
   libera. `WEBGL_MAX_CONTEXTS` es 7 y a los 30 s de ocultar una terminal se le suelta el WebGL.
 
+- 2026-10-24 16:23: volcado automático de un congelón con el hilo principal bloqueado todo el volcado (4727 muestras)
+  esperando al JIT. El hilo `JIT Worklist Helper Thread` pasó el 100 % compilando con `IntegerRangeOptimizationPhase`
+  de DFG (`mergeTo`, `mergeConstantsImpl`). El profiler de la misma franja registró un hueco de hasta 50,9 s entre
+  fotogramas. JavaScriptCore no tiene una opción para apagar esa fase: solo `useFTLJIT`, `useDFGJIT` y
+  `useConcurrentJIT`, y no se probó que lleguen por `JSC_*` a la webview de Tauri.
+- El monitor externo corre como LaunchAgent `com.avilches.kexperf-watch` (`~/Library/Logs/kexperf-watch.log`), sin
+  versionar: 3,4 s de CPU en 47 min y 17 MB de RSS.
+
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
+
+0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
+   Prueba: ningún método nombra la función (el registro del JIT mata la webview). Se prueba por efecto con `scripts/run-performance.sh`.
 
 1. **El spinner `braille`** (el usuario lo tiene): un único `setInterval` de 80 ms re-renderiza todos los spinners y
    cambia un carácter en cada uno, lo que fuerza estilos y layout en las filas `flex` de la barra de workspaces y de las
@@ -132,8 +165,9 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
   `src-tauri/Cargo.toml`, que deja de recortar solo las macros y los scripts de build; el ejecutable final sigue
   recortado (11,0 MB, frente a 13,8 MB sin recortar). La causa exacta no se investigó: se comprobó el efecto, no el
   motivo. Si reaparece el error, mira primero que esa sección siga en `Cargo.toml`.
-- Para nombres de función legibles en un release hay que compilar con `build.minify: false` en `vite.config.ts`, solo en
-  un worktree de usar y tirar. En el release normal las funciones locales salen con el nombre mutilado.
+- Para nombres de función legibles en un release, `pnpm build:local --performance` compila sin minify (el bundle del
+  frontend pasa de unos 11,7 MB a 16). En el release normal las funciones locales salen con el nombre mutilado. Instala
+  en `/Applications` como el build normal: vuelve a un `pnpm build:local` a secas cuando termines de investigar.
 - Instrumentar siempre en un worktree propio y no dejar ese código en `main`. Un volcado de `sample` desde un agente
   funciona sin permisos especiales.
 - Un volcado sano sirve de poco por sí solo: hace falta uno lento y uno sano del mismo estado para comparar.

@@ -23,7 +23,7 @@ function loadExtension(agent: "omp" | "pi", argv: string[] = []) {
   );
   const module = { exports: {} as { default?: (pi: unknown) => void } };
   const fakeProcess = {
-    env: { KEX_IPC: "/tmp/kex.sock", KEX_TAB_ID: "tab-1" } as Record<string, string>,
+    env: { KEX_IPC: "/tmp/kex.sock", KEX_TAB_ID: "tab-1", KEX_PTY_ID: "7" } as Record<string, string>,
     argv: ["bun", "/x/omp", ...argv],
     pid: 4242,
     cwd: () => "/work",
@@ -95,6 +95,15 @@ describe("kex-agent-status extension", () => {
       transcript_path: "/s/s1.jsonl",
       source: "startup",
     });
+  });
+
+  it("names its tab and PTY on every frame, since Kex has one socket for all tabs", async () => {
+    const x = loadExtension("omp");
+    x.fire("session_start", {}, x.ctx("s1"));
+    x.fire("before_agent_start", { prompt: "hi" }, x.ctx("s1"));
+    await settle();
+    expect(sent.length).toBeGreaterThan(1);
+    for (const f of sent) expect(f).toMatchObject({ tab_id: "tab-1", pty_id: "7" });
   });
 
   it("stamps the runtime name into every frame", async () => {

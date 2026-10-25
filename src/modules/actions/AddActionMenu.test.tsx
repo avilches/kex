@@ -43,12 +43,12 @@ function search(text: string) {
 }
 
 describe("AddActionMenu", () => {
-  it("lists Add Command first, the custom app second, then one entry per preset with its icon", () => {
+  it("lists Add script first, Custom second, then one entry per preset with its icon", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
-      "Add Commandruns in a terminal",
-      "Custom appwrite the command yourself",
+      "Add scriptruns in a terminal",
+      "Custom",
       "BBEditCurrent File",
       "ZedCurrent File",
       "ZedWorkspace",
@@ -66,17 +66,17 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
-  it("filters the entries from the search box, Add Command included", () => {
+  it("filters the entries from the search box, Add script included", () => {
     const view = mount();
     click(view.trigger);
     search("workspace");
     expect(view.options().map((o) => o.textContent)).toEqual(["ZedWorkspace"]);
     search("script");
-    expect(view.options().map((o) => o.textContent)).toEqual(["Add Commandruns in a terminal"]);
+    expect(view.options().map((o) => o.textContent)).toEqual(["Add scriptruns in a terminal"]);
     view.unmount();
   });
 
-  it("Add Command closes the combo and asks for a script", () => {
+  it("Add script closes the combo and asks for a script", () => {
     const view = mount();
     click(view.trigger);
     click(view.options()[0]!);

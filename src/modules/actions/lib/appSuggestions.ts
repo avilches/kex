@@ -22,7 +22,7 @@ export type AppSuggestion = SuggestionBase &
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   key: "custom",
-  name: "Custom app",
+  name: "Custom",
   iconId: null,
   defaultCommand: "",
   kind: "app",

@@ -1,3 +1,5 @@
+import { splitActionName } from "@/modules/actions/lib/actionName";
+import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { PaletteItem } from "../types";
 import {
   CLOSED_RECENT_LIMIT,
@@ -25,6 +27,7 @@ export type MergedRow =
       item: PaletteItem;
       highlight?: RowHighlight;
     }
+  | { kind: "action"; key: string; item: BarItem; highlight?: RowHighlight }
   | { kind: "tab"; key: string; entry: TabEntry; highlight?: RowHighlight }
   | {
       kind: "workspace";
@@ -49,6 +52,8 @@ export type RowHighlight = {
 
 export type MergeInput = {
   commands: PaletteItem[];
+  /** The workspace and global Actions the Header would offer right now, runnable ones only. */
+  actions?: BarItem[];
   tabs: TabEntry[];
   workspaces: WorkspaceEntry[];
   closed?: ClosedTabEntry[];
@@ -130,6 +135,26 @@ function commandHit(
   return top;
 }
 
+// An Action is found by the name it shows, by the value its template expands to or the folder a
+// script starts in (the line under the name), or by both read together ("pycharm hub").
+function actionPoints(item: BarItem, q: string): FieldScored | null {
+  const { main } = splitActionName(item.name);
+  const title = fuzzyHit(q, main);
+  if (title !== null)
+    return { points: title.points, highlight: asHighlight(title, "title") };
+  const subtitle = item.subtitle ?? "";
+  const detail = substringHit(q, subtitle);
+  if (detail !== null)
+    return {
+      points: SUBSTRING_BASE + detail.points,
+      highlight: asHighlight(detail, "detail"),
+    };
+  const expanded = subtitle ? fuzzyHit(q, `${main} ${subtitle}`) : null;
+  if (expanded !== null)
+    return { points: SUBSTRING_BASE - TIER_STEP + expanded.points };
+  return null;
+}
+
 // Every reopen counts, and counting outranks the tier of the field that matched: a folder the
 // user returns to twenty times should beat a live tab found by a scattered title match, which
 // is the whole point of keeping the history. It still sits below a precise live title hit
@@ -162,8 +187,11 @@ function closedPoints(entry: ClosedTabEntry, q: string): FieldScored | null {
   };
 }
 
+export const actionRowKey = (id: string): string => `act:${id}`;
+
 export function mergeRows(input: MergeInput): MergedRow[] {
   const { commands, tabs, workspaces, activeTabId, learned, mru } = input;
+  const userActions = input.actions ?? [];
   const closed = input.closed ?? [];
   const q = foldText(input.term.trim());
 
@@ -182,6 +210,9 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     const recentlyClosed = closed
       .slice(0, CLOSED_RECENT_LIMIT)
       .map((entry): MergedRow => ({ kind: "closed", key: entry.key, entry }));
+    const userRows = userActions.map(
+      (item): MergedRow => ({ kind: "action", key: actionRowKey(item.id), item }),
+    );
     const actions = [...commands]
       .sort((a, b) => mruRank(mru, b.id) - mruRank(mru, a.id))
       .map(
@@ -191,7 +222,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
           item,
         }),
       );
-    return [...recents, ...recentlyClosed, ...actions];
+    return [...recents, ...recentlyClosed, ...userRows, ...actions];
   }
 
   const scored: { row: MergedRow; points: number; recency: TabEntry | null }[] =
@@ -215,6 +246,16 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       recency: null,
     });
   });
+  for (const item of userActions) {
+    const r = actionPoints(item, q);
+    if (r === null) continue;
+    const key = actionRowKey(item.id);
+    scored.push({
+      row: { kind: "action", key, item, highlight: r.highlight },
+      points: r.points + learnedBoost(learned, q, key),
+      recency: null,
+    });
+  }
   for (const entry of tabs) {
     const r = tabPoints(entry, q);
     if (r === null) continue;

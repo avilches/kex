@@ -55,10 +55,10 @@ export function ActionRowView({ action, overlay, handleProps, onEdit, remove }: 
       <span {...handleProps} aria-label="Drag to reorder" className="shrink-0 cursor-grab text-muted-foreground">
         <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
       </span>
-      <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground" title={display}>
-        <ActionIcon action={action} size={14} />
+      <span className="flex min-w-0 flex-1 items-center gap-2" title={display}>
+        <ActionIcon action={action} size={14} fill />
+        <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
       </span>
-      <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
       <button type="button" title="Edit" aria-label="Edit action" onClick={onEdit} className={EDIT_BUTTON}>
         <HugeiconsIcon icon={PencilEdit02Icon} size={15} strokeWidth={2} />
       </button>

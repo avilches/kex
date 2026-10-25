@@ -21,6 +21,15 @@ describe("parseQuery", () => {
     });
   });
 
+  it("routes / to the Actions only", () => {
+    expect(parseQuery("/dev")).toMatchObject({ mode: "actions", term: "dev" });
+    expect(parseQuery("/")).toMatchObject({ mode: "actions", term: "" });
+  });
+
+  it("only reads / as a mode at the very start", () => {
+    expect(parseQuery("a/b")).toMatchObject({ mode: "commands", term: "a/b" });
+  });
+
   it("routes ? to help", () => {
     expect(parseQuery("?")).toMatchObject({ mode: "help", term: "" });
   });

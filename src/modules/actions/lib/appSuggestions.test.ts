@@ -65,7 +65,7 @@ describe("suggestionsFromDetected", () => {
 
 describe("custom app", () => {
   it("has an empty command, no app id and the generic icon", () => {
-    expect(CUSTOM_APP_SUGGESTION).toMatchObject({ name: "Custom app", defaultCommand: "", iconId: null });
+    expect(CUSTOM_APP_SUGGESTION).toMatchObject({ name: "Custom", defaultCommand: "", iconId: null });
     expect(CUSTOM_APP_SUGGESTION.appId).toBeUndefined();
   });
 });

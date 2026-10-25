@@ -48,3 +48,43 @@ contra la tabla real.
 Cualquier cosa que camine el árbol de procesos no puede depender del padre de sysinfo en
 macOS: hay ejecutables del sistema cuyos datos de proceso se esconden a propósito. La
 fuente del árbol y la fuente de las métricas pueden (y conviene que sean) distintas.
+
+---
+
+## Bug 2: omp se pasa por el prompt del shell y engaña al estado de prompt (RESUELTO)
+
+### Síntoma
+
+El atajo Ctrl+R (abrir la palette en modo `>`) se portaba bien con Claude Code en el
+terminal (bloqueado mientras corre) pero se abría igual con omp corriendo en otro
+terminal, aunque la regla era no disparar mientras un comando tenga el foreground.
+
+### Pistas falsas descartadas
+
+- Que omp no pasara por el preexec del shell: pasa, y el OSC 133 C del shell llega con
+  `omp` como comando.
+- Que omp corrija en alt-screen: corre inline, `isLeafAltScreen` es falso.
+
+### Causa raíz
+
+omp emite sus propios marcadores OSC 133 a propósito (en
+`packages/tui/src/chat/user-message.ts` del bundle: `133;A` delante del mensaje del
+usuario y `133;B` + `133;C` + `133;D;0` detrás) para que los terminales con blocks lo
+pinten como un bloque de comando. El `PromptTracker` del frontend recibe esa ráfaga y la
+lee como "el shell volvió al prompt": `A` limpia el comando en marcha, y el `C` llega sin
+texto (como el de bash), así que el store de comandos en marcha queda vacío mientras omp
+trabaja. Para el gate de Ctrl+R el terminal parecía libre.
+
+### Fix
+
+El gate de Ctrl+R (`shortcutsDisabled` en `App.tsx`) mantiene el chequeo síncrono barato,
+y el handler repite la decisión con `pty_has_foreground_process` (pgrep del primer hijo
+del shell): mientras cualquier proceso tenga el foreground, la palette no se abre. Esa
+comprobación es inmune a los marcadores falsos y cierra de paso la carrera de un comando
+que arranca justo entre la pulsación y el OSC 133 C.
+
+### Lección
+
+Ningún agente CLI es fuente de verdad del estado del shell: los que se integran con
+terminales de blocks emiten su propio OSC 133 y borran el nuestro. La única señal que no
+se puede falsificar es el árbol de procesos real.

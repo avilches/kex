@@ -115,7 +115,7 @@ fn setup_leaves_orca_and_kaji_handlers_and_tables_intact() {
     assert!(config_after.starts_with(&config_before));
     assert_eq!(kex_keys(&config_after, &source(&env)).len(), 6);
     assert_eq!(codex_integration::status(&env.paths), CodexStatus::UpToDate);
-    assert!(read(&env.paths.script).contains("kex-session-v9"));
+    assert!(read(&env.paths.script).contains("kex-session-v13"));
 }
 
 #[test]

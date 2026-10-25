@@ -1,20 +1,27 @@
 #![cfg(unix)]
 
-use std::io::{BufRead, BufReader};
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::io::{Read, Write};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 
-use crate::modules::agent::{live_model, session_store};
+use super::hook_router::{
+    frame_origin, is_safe_tab_id, late_frame_is_dropped, route, Route, TabRegistry,
+};
+use crate::modules::agent::{live_model, session_store, statusline};
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
 const AGENT_CWD_EVENT: &str = "kex:agent-cwd";
+const AGENT_USAGE_EVENT: &str = "kex:agent-usage";
+/// The frame `statusline.sh` sends for a Claude Code status line tick. Not a hook event.
+const STATUS_LINE_FRAME: &str = "StatusLine";
 
 /// Directory that holds this user's IPC sockets.
 ///
@@ -63,15 +70,16 @@ fn owned_runtime_subdir(base: &std::path::Path, uid: u32) -> PathBuf {
     }
 }
 
-fn socket_file_name(pid: u32, pty_id: u32) -> String {
-    format!("kex-ipc-{pid}-{pty_id}.sock")
+fn socket_file_name(pid: u32) -> String {
+    format!("kex-ipc-{pid}.sock")
 }
 
 fn socket_owner_pid(file_name: &str) -> Option<u32> {
-    let rest = file_name.strip_prefix("kex-ipc-")?.strip_suffix(".sock")?;
-    let (pid, pty_id) = rest.split_once('-')?;
-    pty_id.parse::<u32>().ok()?;
-    pid.parse().ok()
+    file_name
+        .strip_prefix("kex-ipc-")?
+        .strip_suffix(".sock")?
+        .parse()
+        .ok()
 }
 
 /// Names in `names` that are sockets of a Kex process that no longer exists.
@@ -104,40 +112,473 @@ fn sweep_orphaned_sockets(dir: &Path) {
     }
 }
 
-/// The path embeds this process's pid because several Kex instances (installed
-/// and dev) share `runtime_dir()` and each numbers its PTYs from 1.
-pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
-    static SWEEP: std::sync::Once = std::sync::Once::new();
-    let dir = runtime_dir();
-    SWEEP.call_once(|| sweep_orphaned_sockets(&dir));
-    socket_path_in(&dir, id)
+/// The path embeds this process's pid because several Kex instances (installed and dev) share
+/// `runtime_dir()`.
+fn socket_path_in(dir: &Path) -> PathBuf {
+    dir.join(socket_file_name(std::process::id()))
 }
 
-fn socket_path_in(dir: &Path, id: u32) -> PathBuf {
-    dir.join(socket_file_name(std::process::id(), id))
+/// Where hook frames end up once the transport has read them. Split from the transport so a
+/// test, or another platform's transport, drives the same routing without Tauri.
+trait HookSink: Send + Sync {
+    fn emit(&self, event: &str, payload: serde_json::Value);
+    fn live_model(&self, tab_id: &str, transcript_path: &str);
 }
 
-/// Stops the listener thread and removes the socket file when dropped.
-///
-/// `unlink`ing a Unix socket does NOT unblock a thread parked in
-/// `UnixListener::incoming()` (accept() keeps waiting on the now-unnamed
-/// socket). Without a wakeup, that thread (plus its AppHandle clone) would
-/// leak for the remaining lifetime of the process every time a tab closes.
-/// Fix: connect to our own socket first, which the listener's accept()
-/// receives as a real connection; the listener checks `shutdown` right after
-/// waking up and exits instead of processing it as a payload.
-pub struct IpcGuard {
+struct AppSink(AppHandle);
+
+impl HookSink for AppSink {
+    fn emit(&self, event: &str, payload: serde_json::Value) {
+        let _ = self.0.emit(event, payload);
+    }
+
+    fn live_model(&self, tab_id: &str, transcript_path: &str) {
+        live_model::emit_live_model(&self.0, tab_id, transcript_path);
+    }
+}
+
+/// Routes every hook frame of the app to its tab. The registry lock is held while a frame is
+/// routed and, when it must be, written to the spool, and across the drain that makes a PTY
+/// live, so a frame is either spooled before the drain reads the directory or routed live
+/// after it: none falls in between. Delivering a live frame happens after the lock is released.
+struct HookHub {
+    sink: Box<dyn HookSink>,
+    spool_base: Option<PathBuf>,
+    tabs: Mutex<TabRegistry>,
+}
+
+impl HookHub {
+    fn new(sink: Box<dyn HookSink>, spool_base: Option<PathBuf>) -> Self {
+        Self {
+            sink,
+            spool_base,
+            tabs: Mutex::new(TabRegistry::default()),
+        }
+    }
+
+    // Poison tolerance only matters in dev and test: release builds are panic = "abort".
+    fn tabs(&self) -> std::sync::MutexGuard<'_, TabRegistry> {
+        self.tabs.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The whole contract a transport has with the hub: one line is one frame.
+    fn handle_line(&self, line: &str) {
+        let route = {
+            let tabs = self.tabs();
+            let route = route(&frame_origin(line), |t| tabs.current(t));
+            if let Route::Spool { tab_id } = &route {
+                self.spool(line, tab_id);
+            }
+            route
+        };
+        match route {
+            Route::Live { tab_id, pty_id } => self.dispatch(line, &tab_id, pty_id),
+            Route::Late { tab_id, pty_id } => self.late(line, &tab_id, pty_id),
+            Route::Spool { .. } => {}
+            Route::Reject(why) => {
+                log::debug!("[ipc] {why}: {}", truncate_for_log(line, MAX_LOG_FIELD_LEN))
+            }
+        }
+    }
+
+    /// The tab's frames are spooled from now on until `activate`, so a PTY whose spawn fails
+    /// never consumes them.
+    fn register(&self, tab_id: &str, pty_id: u32) {
+        self.tabs().register(tab_id, pty_id);
+    }
+
+    /// Makes the PTY live and replays, in order, what the tab spooled while it had none.
+    fn activate(&self, tab_id: &str, pty_id: u32) {
+        let mut tabs = self.tabs();
+        if !tabs.activate(tab_id, pty_id) {
+            return;
+        }
+        if let Some(base) = &self.spool_base {
+            drain_spool(base, tab_id, |line| {
+                if let Some(kind) = stale_spooled_event_kind(line) {
+                    log::debug!("[ipc] discarded spooled {kind} event tab={tab_id}");
+                    return;
+                }
+                // Spooled while the PTY was pending, by a process of an earlier PTY of the tab:
+                // the same rules as a late frame, or the dead agent's SessionStart would
+                // overwrite the new session. Frames of the new child name this PTY and pass.
+                if frame_origin(line).pty_id != Some(pty_id) {
+                    let event = parse_payload(line).map(|p| p.event).unwrap_or_default();
+                    if late_frame_is_dropped(&event) {
+                        log::debug!("[ipc] discarded spooled late {event} event tab={tab_id}");
+                        return;
+                    }
+                }
+                self.dispatch(line, tab_id, pty_id);
+            });
+        }
+        log::debug!("[ipc] tab={tab_id} pty={pty_id} live");
+    }
+
+    fn unregister(&self, tab_id: &str, pty_id: u32) {
+        self.tabs().unregister(tab_id, pty_id);
+    }
+
+    fn dispatch(&self, line: &str, tab_id: &str, pty_id: u32) {
+        dispatch_with(
+            line,
+            tab_id,
+            pty_id,
+            &mut |event, payload| self.sink.emit(event, with_tab(event, payload, tab_id)),
+            &mut |transcript| self.sink.live_model(tab_id, transcript),
+        );
+    }
+
+    /// A frame that outlived the PTY that produced it, delivered to the tab's current PTY.
+    fn late(&self, line: &str, tab_id: &str, pty_id: u32) {
+        let event = parse_payload(line).map(|p| p.event).unwrap_or_default();
+        if late_frame_is_dropped(&event) {
+            log::debug!("[ipc] discarded late {event} event tab={tab_id}");
+            return;
+        }
+        self.dispatch(line, tab_id, pty_id);
+    }
+
+    /// The end-of-session signals are dropped here rather than on the drain: the drain would
+    /// discard them anyway, and a closed tab would keep a spool directory just for them.
+    fn spool(&self, line: &str, tab_id: &str) {
+        if let Some(kind) = stale_spooled_event_kind(line) {
+            log::debug!("[ipc] {kind} for tab={tab_id} with no PTY dropped");
+            return;
+        }
+        let Some(base) = &self.spool_base else {
+            return;
+        };
+        if let Err(e) = spool_event(base, tab_id, line) {
+            log::warn!("[ipc] failed to spool event for tab={tab_id}: {e}");
+        }
+    }
+}
+
+/// A hook signal names its tab: a frame replayed from the spool or arriving late is delivered
+/// while the frontend may not know the PTY id yet (`pty_open` has not returned, or a respawn
+/// cleared it), so it cannot be resolved by `id` alone.
+fn with_tab(event: &str, mut payload: serde_json::Value, tab_id: &str) -> serde_json::Value {
+    // `payload["tabId"] = ..` panics on a non-object value; release builds abort on a panic.
+    if let (true, Some(obj)) = (event == AGENT_EVENT, payload.as_object_mut()) {
+        obj.insert("tabId".into(), tab_id.into());
+    }
+    payload
+}
+
+/// Unregisters the tab's PTY when the PTY session drops. A tab whose PTY restarts registers the
+/// new one first, and `TabRegistry::unregister` ignores the stale PTY.
+pub struct TabLease {
+    hub: &'static HookHub,
+    tab_id: String,
+    pty_id: u32,
+}
+
+impl TabLease {
+    /// Called once the PTY's child is running: from here the tab's frames go to this PTY.
+    pub fn activate(&self) {
+        self.hub.activate(&self.tab_id, self.pty_id);
+    }
+}
+
+impl Drop for TabLease {
+    fn drop(&mut self) {
+        self.hub.unregister(&self.tab_id, self.pty_id);
+    }
+}
+
+const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
+// One thread serves every tab, so a connection gets this long in total, however it trickles
+// its bytes; the frames of the others wait in the socket backlog meanwhile, not lost. A frame
+// not complete by then is lost (logged). A local hook writes its frame in under a millisecond.
+const FRAME_DEADLINE: Duration = Duration::from_millis(500);
+
+/// The Unix transport: one socket and one accept thread for the life of the app. All it knows
+/// about a frame is that it is one line; the hub does the rest.
+struct HookServer {
     path: PathBuf,
     shutdown: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
 }
 
-impl Drop for IpcGuard {
+impl HookServer {
+    fn start(path: PathBuf, hub: &'static HookHub) -> std::io::Result<Self> {
+        // The pid in the name makes this path ours alone, so only a leftover of ours can be here.
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path)?;
+        // bind() honors the umask, which on a shared machine could leave the socket group or
+        // world accessible; force owner-only so another local user cannot send forged events.
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let stop = shutdown.clone();
+        let thread = thread::Builder::new()
+            .name("kex-ipc".into())
+            .spawn(move || serve(listener, hub, stop))?;
+        log::debug!("[ipc] listening path={path:?}");
+        Ok(Self {
+            path,
+            shutdown,
+            thread: Some(thread),
+        })
+    }
+}
+
+impl Drop for HookServer {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::SeqCst);
-        // Wake up the thread blocked in accept(); the connection itself
-        // carries no payload, the listener only uses it as a signal.
+        // Unlinking does not wake a thread parked in accept(), connecting does, and the loop
+        // checks the flag before reading.
         let _ = UnixStream::connect(&self.path);
         let _ = std::fs::remove_file(&self.path);
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+    }
+}
+
+fn serve(listener: UnixListener, hub: &'static HookHub, shutdown: Arc<AtomicBool>) {
+    let mut failures = 0u32;
+    for stream in listener.incoming() {
+        if shutdown.load(Ordering::SeqCst) {
+            break;
+        }
+        match stream {
+            Ok(stream) => {
+                failures = 0;
+                if let Some(line) = read_frame(stream, Instant::now() + FRAME_DEADLINE) {
+                    handle_guarded(hub, &line);
+                }
+            }
+            Err(e) => {
+                failures = failures.saturating_add(1);
+                let wait = accept_backoff(failures);
+                log::warn!("[ipc] accept failed ({e}), retrying in {wait:?}");
+                thread::sleep(wait);
+            }
+        }
+    }
+    log::debug!("[ipc] thread exiting");
+}
+
+const ACCEPT_BACKOFF_MAX: Duration = Duration::from_secs(1);
+
+/// The wait after the `failures`-th accept error in a row. Every one of them (EMFILE, ENFILE,
+/// ECONNABORTED) can clear on its own, and giving up would leave every tab without hooks for
+/// the rest of the session, so the loop only ever stops on shutdown.
+fn accept_backoff(failures: u32) -> Duration {
+    let ms = 10u64.saturating_mul(1u64 << failures.saturating_sub(1).min(16));
+    Duration::from_millis(ms).min(ACCEPT_BACKOFF_MAX)
+}
+
+/// Dev and test only (release is panic = "abort"): there the defence is a frame path with no
+/// unwrap, expect or unchecked indexing.
+fn handle_guarded(hub: &HookHub, line: &str) {
+    let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hub.handle_line(line)));
+    if handled.is_err() {
+        log::error!("[ipc] panic while handling a hook frame, frame dropped");
+    }
+}
+
+/// One line, read before `deadline`. A frame that is not complete by then, or that outgrows
+/// `MAX_FRAME_BYTES`, is dropped; one that ends at EOF without a newline is kept.
+fn read_frame(mut stream: UnixStream, deadline: Instant) -> Option<String> {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let left = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|d| !d.is_zero());
+        let Some(left) = left else {
+            log::warn!("[ipc] hook frame not complete within {FRAME_DEADLINE:?}, dropped");
+            return None;
+        };
+        // macOS answers EINVAL once the peer has closed, and then the read cannot block anyway.
+        let _ = stream.set_read_timeout(Some(left));
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                if let Some(end) = chunk[..n].iter().position(|&b| b == b'\n') {
+                    buf.extend_from_slice(&chunk[..end]);
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+                if buf.len() > MAX_FRAME_BYTES {
+                    return None;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                log::warn!("[ipc] hook frame not complete within {FRAME_DEADLINE:?}, dropped");
+                return None;
+            }
+            Err(_) => return None,
+        }
+    }
+    let line = String::from_utf8(buf).ok()?;
+    let line = line.trim();
+    (!line.is_empty()).then(|| line.to_string())
+}
+
+static HUB: OnceLock<HookHub> = OnceLock::new();
+static SERVER: Mutex<Option<HookServer>> = Mutex::new(None);
+static SOCKET: OnceLock<PathBuf> = OnceLock::new();
+
+fn hub(app: &AppHandle) -> &'static HookHub {
+    HUB.get_or_init(|| HookHub::new(Box::new(AppSink(app.clone())), spool_dir()))
+}
+
+/// The app's hook socket, started by the first PTY. A failed bind still returns the path, so
+/// the hook script spools what it cannot deliver instead of dropping it, and the next PTY
+/// tries the bind again.
+pub fn hook_socket(app: &AppHandle) -> PathBuf {
+    let path = SOCKET
+        .get_or_init(|| {
+            let dir = runtime_dir();
+            sweep_orphaned_sockets(&dir);
+            if let Some(base) = spool_dir() {
+                sweep_spool(&base);
+            }
+            socket_path_in(&dir)
+        })
+        .clone();
+    let mut server = SERVER.lock().unwrap_or_else(|e| e.into_inner());
+    ensure_server(&mut server, &path, |p| {
+        HookServer::start(p.to_path_buf(), hub(app))
+    });
+    path
+}
+
+/// Starts the server when none is running. The error is logged as a warning on every failed
+/// attempt, so a channel that stays down is visible in the log, not only on the first try.
+fn ensure_server<S>(
+    slot: &mut Option<S>,
+    path: &Path,
+    start: impl FnOnce(&Path) -> std::io::Result<S>,
+) {
+    if slot.is_some() {
+        return;
+    }
+    match start(path) {
+        Ok(server) => *slot = Some(server),
+        Err(e) => log::warn!(
+            "[ipc] hook server on {path:?} failed: {e}; agent hooks are spooled until a later terminal binds it"
+        ),
+    }
+}
+
+/// Claims `tab_id` for `pty_id`, pending until `TabLease::activate`. `None` for a tab id that
+/// could not name a spool directory.
+pub fn register_tab(app: &AppHandle, tab_id: &str, pty_id: u32) -> Option<TabLease> {
+    if !is_safe_tab_id(tab_id) {
+        log::warn!("[ipc] not registering unsafe tab id {tab_id:?}");
+        return None;
+    }
+    let hub = hub(app);
+    hub.register(tab_id, pty_id);
+    Some(TabLease {
+        hub,
+        tab_id: tab_id.to_string(),
+        pty_id,
+    })
+}
+
+/// Removes the socket file when the app exits; a crash leaves it for the next start's sweep.
+pub fn shutdown() {
+    drop(SERVER.lock().unwrap_or_else(|e| e.into_inner()).take());
+}
+
+const MAX_SPOOL_FILES: usize = 200;
+
+/// Same layout and guarantees as the script's `spool_event`: written under a dot name and
+/// renamed, owner-only, never rewriting a file, capped at the newest `MAX_SPOOL_FILES`.
+fn spool_event(base: &Path, tab_id: &str, line: &str) -> std::io::Result<()> {
+    static SEQ: AtomicU32 = AtomicU32::new(0);
+    let Some(dir) = spool_dir_for_tab(base, tab_id) else {
+        return Ok(());
+    };
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&dir)?;
+    let micros = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_micros());
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed) % 100_000;
+    let name = format!("{micros:016}-{:07}-{seq:05}.json", std::process::id());
+    let tmp = dir.join(format!(".{name}.tmp"));
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&tmp)?;
+    f.write_all(line.as_bytes())?;
+    f.write_all(b"\n")?;
+    drop(f);
+    std::fs::rename(&tmp, dir.join(name))?;
+    prune_spool(&dir);
+    Ok(())
+}
+
+// The same 7 days the script prunes with (`MAX_SPOOL_AGE_MINUTES`).
+const MAX_SPOOL_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// Keeps a tab's newest `MAX_SPOOL_FILES` events and deletes those older than `MAX_SPOOL_AGE`.
+fn prune_spool(dir: &Path) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut names: Vec<String> = Vec::new();
+    for e in rd.filter_map(Result::ok) {
+        let Ok(name) = e.file_name().into_string() else {
+            continue;
+        };
+        if name.starts_with('.') {
+            continue;
+        }
+        if is_older_than(&e.path(), MAX_SPOOL_AGE) {
+            let _ = std::fs::remove_file(e.path());
+        } else {
+            names.push(name);
+        }
+    }
+    if names.len() <= MAX_SPOOL_FILES {
+        return;
+    }
+    names.sort();
+    for name in &names[..names.len() - MAX_SPOOL_FILES] {
+        let _ = std::fs::remove_file(dir.join(name));
+    }
+}
+
+/// A tab that never reopens never drains its directory: once per app start, prune every tab's
+/// directory by age and remove the ones left empty. Directories whose name is not a tab id are
+/// not Kex's and are left alone.
+fn sweep_spool(base: &Path) {
+    let Ok(rd) = std::fs::read_dir(base) else {
+        return;
+    };
+    for e in rd.filter_map(Result::ok) {
+        let is_tab = e.file_name().to_str().is_some_and(is_safe_tab_id);
+        if !is_tab || !e.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        let dir = e.path();
+        prune_spool(&dir);
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for tmp in rd.filter_map(Result::ok) {
+                let dot = tmp.file_name().to_string_lossy().starts_with('.');
+                if dot && is_older_than(&tmp.path(), ORPHAN_TMP_MAX_AGE) {
+                    let _ = std::fs::remove_file(tmp.path());
+                }
+            }
+        }
+        // Fails while the directory still holds events, which is the point.
+        let _ = std::fs::remove_dir(&dir);
     }
 }
 
@@ -198,6 +639,8 @@ struct Payload {
     error_message: Option<String>,
     // PermissionRequest
     tool_name: Option<String>,
+    // PostCompact
+    compact_trigger: Option<String>,
     // MessageDisplay
     is_final: bool,
     turn_id: Option<String>,
@@ -246,138 +689,104 @@ fn parse_payload(json: &str) -> Option<Payload> {
         agent_description: v["description"].as_str().map(str::to_string),
         error_message: v["error_message"].as_str().map(str::to_string),
         tool_name: v["tool_name"].as_str().map(str::to_string),
+        compact_trigger: v["trigger"].as_str().map(str::to_string),
         is_final: v["final"].as_bool().unwrap_or(false),
         turn_id: v["turn_id"].as_str().map(str::to_string),
         delta: v["delta"].as_str().map(str::to_string),
     })
 }
 
-/// Directory `trigger-event.sh` spools undelivered hook events to when
-/// `send_ipc` cannot reach the socket (listener not accepting yet, crashed,
-/// or gone). Mirrors `session_hook_script_path` in `agent/mod.rs`.
+/// Directory undelivered hook events wait in: `trigger-event.sh` writes there when it cannot
+/// reach the socket, and the hub when a frame names a tab that has no PTY right now. Mirrors
+/// `session_hook_script_path` in `agent/mod.rs`.
 fn spool_dir() -> Option<PathBuf> {
     Some(dirs::home_dir()?.join(".config").join("kex").join("spool"))
 }
 
-fn spool_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
-    base.join(format!("{tab_id}.jsonl"))
+/// The directory holding one file per undelivered event of a tab.
+fn spool_dir_for_tab(base: &Path, tab_id: &str) -> Option<PathBuf> {
+    is_safe_tab_id(tab_id).then(|| base.join(tab_id))
 }
 
-/// The path a spool file is renamed to while being drained. See `drain_spool`
-/// for why the rename happens before reading.
-fn spool_draining_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
-    base.join(format!("{tab_id}.jsonl.draining"))
+const ORPHAN_TMP_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+fn is_older_than(path: &Path, age: std::time::Duration) -> bool {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|e| e > age)
 }
 
 /// Replays any hook events spooled to disk by `trigger-event.sh` because a
-/// live `send_ipc` delivery failed, handing each line to `on_line` (in
-/// production, `dispatch`) in the order they were appended.
+/// live `send_ipc` delivery failed, handing each payload to `on_line` (in
+/// production, `dispatch`) in file-name order, which is arrival order.
 ///
-/// Claims the spool file with a rename before reading it, rather than
-/// read-then-delete in place: a rename on the same filesystem is atomic, so
-/// any line `trigger-event.sh` appends after this point lands in a spool
-/// file created fresh by its next write, never in the file we just renamed
-/// away. Reading straight from the live path and deleting it afterwards
-/// would leave a window where a line appended between the read and the
-/// delete is silently dropped, exactly the bug this spool exists to
-/// prevent.
-///
-/// If a `.draining` file is already there, it is a leftover from a previous
-/// drain that crashed between the rename and the final `remove_file`; it is
-/// replayed first so those lines aren't lost, before claiming the live
-/// spool (if any) the same way.
+/// The script writes each event under a dot name and renames it into place,
+/// so a visible file is always complete, and it never rewrites an existing
+/// file, so there is nothing to claim or lock here. Each file is removed
+/// right after it is handed off: a crash mid-drain leaves exactly the
+/// undelivered files for the next drain, which is also how a half-drained
+/// directory recovers. That trades a possible duplicate (a crash between
+/// `on_line` and the remove) for never dropping an event, like the rest of
+/// this module (at-least-once). Dot files are the script's in-flight
+/// temporaries: left alone unless they are over a day old, when the writer
+/// is certainly dead. A file that cannot be read as text is deleted, since
+/// it would otherwise stay forever.
 fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
-    let draining_path = spool_draining_path_for_tab(base, tab_id);
-    drain_file(&draining_path, tab_id, &mut on_line);
-
-    let path = spool_path_for_tab(base, tab_id);
-    if let Err(e) = std::fs::rename(&path, &draining_path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            log::warn!("[ipc] failed to claim spool {path:?} for draining: {e}");
-        }
+    let Some(dir) = spool_dir_for_tab(base, tab_id) else {
+        log::warn!("[ipc] refusing to drain spool for unsafe tab id {tab_id:?}");
         return;
-    }
-    drain_file(&draining_path, tab_id, &mut on_line);
-}
-
-/// Reads `path` line by line, hands each non-blank line to `on_line`, then
-/// removes it. The file is removed only after every line has been handed
-/// off, so a crash mid-drain leaves it in place for the next attempt to
-/// replay. That trades a possible duplicate delivery for never silently
-/// dropping an event, which matches how the rest of this module treats
-/// agent signals (at-least-once, not exactly-once).
-fn drain_file(path: &Path, tab_id: &str, on_line: &mut impl FnMut(&str)) {
-    let contents = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+    };
+    let mut files: Vec<PathBuf> = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .filter_map(|e| {
+                if !e.file_name().to_string_lossy().starts_with('.') {
+                    return Some(e.path());
+                }
+                if is_older_than(&e.path(), ORPHAN_TMP_MAX_AGE) {
+                    let _ = std::fs::remove_file(e.path());
+                }
+                None
+            })
+            .collect(),
         Err(e) => {
-            log::warn!("[ipc] failed to read spool {path:?}: {e}");
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("[ipc] failed to read spool dir {dir:?}: {e}");
+            }
             return;
         }
     };
+    files.sort();
 
-    let lines: Vec<&str> = contents
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect();
-    if !lines.is_empty() {
-        for line in &lines {
-            on_line(line);
+    let mut drained = 0usize;
+    for path in &files {
+        match std::fs::read_to_string(path) {
+            Ok(contents) => {
+                let payload = contents.trim();
+                if !payload.is_empty() {
+                    on_line(payload);
+                    drained += 1;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                log::warn!("[ipc] discarding unreadable spooled event {path:?}: {e}");
+            }
         }
-        log::debug!(
-            "[ipc] drained {} spooled event(s) for tab={tab_id}",
-            lines.len()
-        );
-    }
-
-    if let Err(e) = std::fs::remove_file(path) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            log::warn!("[ipc] failed to remove drained spool {path:?}: {e}");
+        if let Err(e) = std::fs::remove_file(path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("[ipc] failed to remove drained event {path:?}: {e}");
+            }
         }
     }
-}
-
-/// Creates the socket, then spawns the listener thread. Returns an IpcGuard
-/// that stops the thread and removes the socket file when dropped.
-pub fn spawn_listener(
-    socket_path: PathBuf,
-    tab_id: String,
-    pty_id: u32,
-    app: AppHandle,
-) -> IpcGuard {
-    // The pid in the name makes this path ours alone, so only a leftover of ours can be here.
-    let _ = std::fs::remove_file(&socket_path);
-    let shutdown = Arc::new(AtomicBool::new(false));
-
-    let listener = match UnixListener::bind(&socket_path) {
-        Ok(l) => l,
-        Err(e) => {
-            log::warn!("[ipc] bind {:?} failed: {e}", socket_path);
-            return IpcGuard {
-                path: socket_path,
-                shutdown,
-            };
-        }
-    };
-    // bind() creates the socket file honoring the process umask, which on a
-    // shared machine could leave it group/world accessible; force it to
-    // owner-only regardless, so another local user cannot connect and send
-    // forged agent-hook events.
-    let _ = std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600));
-    log::debug!("[ipc] listening tab={tab_id} path={:?}", socket_path);
-
-    let thread_shutdown = shutdown.clone();
-    if let Err(e) = thread::Builder::new()
-        .name(format!("kex-ipc-{tab_id}"))
-        .spawn(move || run_listener(listener, tab_id, pty_id, app, thread_shutdown))
-    {
-        log::warn!("[ipc] failed to spawn listener thread: {e}");
+    if drained > 0 {
+        log::debug!("[ipc] drained {drained} spooled event(s) for tab={tab_id}");
     }
-    IpcGuard {
-        path: socket_path,
-        shutdown,
-    }
+    // Fails while a script still has a file in flight, which is fine.
+    let _ = std::fs::remove_dir(&dir);
 }
 
 /// True when a spooled line is a `SessionEnd`/`StopFailure` notification: a
@@ -387,51 +796,14 @@ pub fn spawn_listener(
 /// same tab and recorded a fresh session for it. Unparseable JSON is not
 /// stale (it isn't recognized as anything): let it reach `dispatch`, which
 /// has its own handling for that case.
+/// A status line reading is live-only too: an old one would misreport the session.
 fn stale_spooled_event_kind(json: &str) -> Option<String> {
     parse_payload(json)
         .map(|p| p.event)
-        .filter(|e| e == "SessionEnd" || e == "StopFailure")
+        .filter(|e| e == "SessionEnd" || e == "StopFailure" || e == STATUS_LINE_FRAME)
 }
 
-fn run_listener(
-    listener: UnixListener,
-    tab_id: String,
-    pty_id: u32,
-    app: AppHandle,
-    shutdown: Arc<AtomicBool>,
-) {
-    if let Some(base) = spool_dir() {
-        drain_spool(&base, &tab_id, |line| {
-            if let Some(kind) = stale_spooled_event_kind(line) {
-                log::debug!("[ipc] discarded stale spooled {kind} event tab={tab_id}");
-                return;
-            }
-            dispatch(line, &tab_id, pty_id, &app);
-        });
-    }
-
-    for stream in listener.incoming() {
-        if shutdown.load(Ordering::SeqCst) {
-            break;
-        }
-        match stream {
-            Ok(stream) => {
-                let mut line = String::new();
-                let _ = BufReader::new(stream).read_line(&mut line);
-                if !line.trim().is_empty() {
-                    dispatch(line.trim(), &tab_id, pty_id, &app);
-                }
-            }
-            Err(e) => {
-                log::debug!("[ipc] accept error (socket removed?): {e}");
-                break;
-            }
-        }
-    }
-    log::debug!("[ipc] thread exiting tab={tab_id}");
-}
-
-/// Debug logging in `dispatch` below echoes free-text agent payload fields
+/// Debug logging in `dispatch_with` below echoes free-text agent payload fields
 /// (prompt, message, diff deltas). A single "final" MessageDisplay for a
 /// long code review has been observed to carry 7000+ characters; left
 /// unbounded, a handful of such lines are enough to blow through the log
@@ -457,7 +829,7 @@ fn reports_agent_cwd(event: &str, source: &str, cwd: &str) -> bool {
         return false;
     }
     match event {
-        "SessionEnd" | "SubagentStart" | "SubagentStop" => false,
+        "SessionEnd" | "SubagentStart" | "SubagentStop" | STATUS_LINE_FRAME => false,
         "SessionStart" => source != "resume",
         _ => true,
     }
@@ -477,7 +849,38 @@ fn agent_signal(id: u32, kind: &str, agent: Option<&str>) -> serde_json::Value {
     })
 }
 
-fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
+fn post_compact_signal(id: u32, p: &Payload) -> serde_json::Value {
+    let mut sig = agent_signal(id, "PostCompact", p.agent.as_deref());
+    sig["trigger"] = p.compact_trigger.as_deref().unwrap_or("").into();
+    sig
+}
+
+/// A tick with nothing to show still goes out, empty, so a reading the session no longer has
+/// (after `/clear`) disappears from the tab.
+fn usage_signal(json: &str, tab_id: &str) -> serde_json::Value {
+    let usage = serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|v| statusline::usage(&v))
+        .unwrap_or_default();
+    serde_json::json!({ "tabId": tab_id, "usage": usage })
+}
+
+/// Events that reach the frontend as a signal with no side effect on the Rust side.
+fn passthrough_signal(p: &Payload, id: u32) -> Option<serde_json::Value> {
+    match p.event.as_str() {
+        "PostCompact" => Some(post_compact_signal(id, p)),
+        _ => None,
+    }
+}
+
+/// Every event goes through `emit`, so a test can see what a hook payload sends to the frontend.
+fn dispatch_with(
+    json: &str,
+    tab_id: &str,
+    pty_id: u32,
+    emit: &mut dyn FnMut(&str, serde_json::Value),
+    emit_live_model: &mut dyn FnMut(&str),
+) {
     let Some(p) = parse_payload(json) else {
         log::debug!(
             "[ipc] invalid JSON: {}",
@@ -494,12 +897,15 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     }
     if reports_agent_cwd(&p.event, p.source.as_deref().unwrap_or(""), &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
-        let _ = app.emit(
+        emit(
             AGENT_CWD_EVENT,
             serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }),
         );
     }
     match p.event.as_str() {
+        STATUS_LINE_FRAME => {
+            emit(AGENT_USAGE_EVENT, usage_signal(json, tab_id));
+        }
         "SessionStart" => {
             let source = p.source.as_deref().unwrap_or("");
             let session_title = p.session_title.as_deref().unwrap_or("");
@@ -519,7 +925,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 &p.cwd,
                 same_process,
             );
-            let _ = app.emit(
+            emit(
                 AGENT_SESSION_META_EVENT,
                 serde_json::json!({
                     "tabId":          tab_id,
@@ -536,7 +942,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         "SessionEnd" => {
             let reason = p.reason.as_deref().unwrap_or("");
             log::debug!("[ipc] SessionEnd tab={tab_id} reason={reason}");
-            let _ = app.emit(
+            emit(
                 AGENT_EVENT,
                 agent_signal(pty_id, "SessionEnd", p.agent.as_deref()),
             );
@@ -550,7 +956,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "UserPromptSubmit", p.agent.as_deref());
             sig["prompt"] = prompt.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "Notification" => {
             let notif_type = p.notif_type.as_deref().unwrap_or("");
@@ -569,7 +975,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "Notification", p.agent.as_deref());
             sig["message"] = msg.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
@@ -589,11 +995,14 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                     })
                 })
                 .collect();
+            if let Some(message) = p.last_message.as_deref() {
+                session_store::set_last_message(tab_id, &p.session_id, message);
+            }
             let mut sig = agent_signal(pty_id, "Stop", p.agent.as_deref());
             sig["message"] = last.into();
             sig["backgroundSubagents"] = subagents.into();
-            let _ = app.emit(AGENT_EVENT, sig);
-            live_model::emit_live_model(app, tab_id, &p.transcript_path);
+            emit(AGENT_EVENT, sig);
+            emit_live_model(&p.transcript_path);
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
@@ -603,14 +1012,14 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "StopFailure", p.agent.as_deref());
             sig["message"] = err.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "PermissionRequest" => {
             let tool = p.tool_name.as_deref().unwrap_or("");
             log::debug!("[ipc] PermissionRequest tab={tab_id} tool={tool}");
             let mut sig = agent_signal(pty_id, "PermissionRequest", p.agent.as_deref());
             sig["toolName"] = tool.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "SubagentStart" | "SubagentStop" => {
             let Some(agent_id) = p.agent_id.as_deref() else {
@@ -625,7 +1034,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             sig["agentId"] = agent_id.into();
             sig["agentType"] = agent_type.into();
             sig["agentDescription"] = p.agent_description.as_deref().unwrap_or("").into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
         "MessageDisplay" => {
             if !p.is_final {
@@ -639,11 +1048,15 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             let mut sig = agent_signal(pty_id, "MessageDisplay", p.agent.as_deref());
             sig["message"] = delta.into();
-            let _ = app.emit(AGENT_EVENT, sig);
+            emit(AGENT_EVENT, sig);
         }
-        other => {
-            log::debug!("[ipc] unhandled event {other} from tab={tab_id}");
-        }
+        other => match passthrough_signal(&p, pty_id) {
+            Some(sig) => {
+                log::debug!("[ipc] {other} tab={tab_id}");
+                emit(AGENT_EVENT, sig);
+            }
+            None => log::debug!("[ipc] unhandled event {other} from tab={tab_id}"),
+        },
     }
 }
 
@@ -669,38 +1082,37 @@ mod tests {
     }
 
     #[test]
-    fn socket_path_for_id_is_short_enough() {
-        let p = socket_path_in(&runtime_dir(), u32::MAX);
+    fn socket_path_is_short_enough() {
+        let p = socket_path_in(&runtime_dir());
         assert!(p.to_str().unwrap().len() < 104);
     }
 
     #[test]
-    fn same_pty_id_in_two_processes_gets_different_socket_names() {
-        assert_ne!(socket_file_name(100, 38), socket_file_name(200, 38));
+    fn two_processes_get_different_socket_names() {
+        assert_ne!(socket_file_name(100), socket_file_name(200));
     }
 
     #[test]
     fn socket_path_embeds_the_current_pid() {
-        let p = socket_path_in(Path::new("/x"), 7);
-        let expected = socket_file_name(std::process::id(), 7);
+        let p = socket_path_in(Path::new("/x"));
+        let expected = socket_file_name(std::process::id());
         assert_eq!(p.file_name().unwrap().to_str().unwrap(), expected);
     }
 
     #[test]
     fn orphan_cleanup_only_selects_dead_pids_and_matching_names() {
         let names: Vec<String> = [
-            "kex-ipc-100-1.sock",
-            "kex-ipc-200-1.sock",
-            "kex-ipc-300-2.sock",
-            "kex-ipc-5.sock",
-            "kex-ipc-abc-1.sock",
-            "kex-ipc-100-1.txt",
-            "other-100-1.sock",
+            "kex-ipc-100.sock",
+            "kex-ipc-200.sock",
+            "kex-ipc-300.sock",
+            "kex-ipc-abc.sock",
+            "kex-ipc-100.txt",
+            "other-100.sock",
         ]
         .map(String::from)
         .to_vec();
         let found = orphaned_sockets(&names, |pid| pid == 200);
-        assert_eq!(found, vec!["kex-ipc-100-1.sock", "kex-ipc-300-2.sock"]);
+        assert_eq!(found, vec!["kex-ipc-100.sock", "kex-ipc-300.sock"]);
     }
 
     #[test]
@@ -709,19 +1121,19 @@ mod tests {
         let mut child = std::process::Command::new("true").spawn().unwrap();
         let dead = child.id();
         child.wait().unwrap();
-        let orphan = socket_file_name(dead, 1);
-        let live = socket_file_name(std::process::id(), 1);
+        let orphan = socket_file_name(dead);
+        let live = socket_file_name(std::process::id());
         for name in [
             orphan.as_str(),
             live.as_str(),
-            "kex-ipc-5.sock",
+            "kex-ipc-x.sock",
             "notes.txt",
         ] {
             std::fs::write(dir.path().join(name), b"").unwrap();
         }
         sweep_orphaned_sockets(dir.path());
         assert!(!dir.path().join(&orphan).exists());
-        for name in [live.as_str(), "kex-ipc-5.sock", "notes.txt"] {
+        for name in [live.as_str(), "kex-ipc-x.sock", "notes.txt"] {
             assert!(dir.path().join(name).exists(), "{name} must survive");
         }
     }
@@ -794,85 +1206,596 @@ mod tests {
         assert_eq!(mode, 0o700);
     }
 
-    #[test]
-    fn spawn_listener_leaves_the_socket_file_owner_only() {
-        let base = tempfile::tempdir().unwrap();
-        let socket_path = base
-            .path()
-            .join(format!("kex-test-perms-{}.sock", std::process::id()));
-
-        // Use a Tauri-less path: bind directly the way spawn_listener does,
-        // without going through the full AppHandle machinery this test has
-        // no access to.
-        let listener = UnixListener::bind(&socket_path).unwrap();
-        std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        drop(listener);
-
-        let mode = std::fs::metadata(&socket_path)
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777;
-        assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
+    #[derive(Default)]
+    struct Recorder {
+        events: Mutex<Vec<(String, serde_json::Value)>>,
     }
 
-    #[test]
-    fn ipc_guard_removes_file_on_drop() {
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("kex-test-guard-{}.sock", std::process::id()));
-        std::fs::write(&path, b"").unwrap();
-        assert!(path.exists());
-        let guard = IpcGuard {
-            path: path.clone(),
-            shutdown: Arc::new(AtomicBool::new(false)),
-        };
-        drop(guard);
-        assert!(!path.exists());
+    impl Recorder {
+        fn signals(&self) -> Vec<(serde_json::Value, String)> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_EVENT)
+                .map(|(_, sig)| (sig["id"].clone(), sig["kind"].as_str().unwrap().to_string()))
+                .collect()
+        }
+
+        fn signal_tabs(&self) -> Vec<String> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_EVENT)
+                .map(|(_, sig)| sig["tabId"].as_str().unwrap_or("").to_string())
+                .collect()
+        }
+
+        fn meta_tabs(&self) -> Vec<String> {
+            self.events
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(e, _)| e == AGENT_SESSION_META_EVENT)
+                .map(|(_, m)| m["tabId"].as_str().unwrap().to_string())
+                .collect()
+        }
     }
 
-    #[test]
-    fn dropping_guard_unblocks_the_listener_thread() {
-        // Regression test for the leaked-thread bug: unlinking the socket file
-        // alone never wakes a thread parked in accept(), so this must join
-        // quickly rather than hang until the test harness kills it.
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("kex-test-wakeup-{}.sock", std::process::id()));
-        let _ = std::fs::remove_file(&path);
+    struct RecordingSink(Arc<Recorder>);
 
-        let listener = UnixListener::bind(&path).unwrap();
-        let shutdown = Arc::new(AtomicBool::new(false));
-        let thread_shutdown = shutdown.clone();
-        let handle = thread::spawn(move || {
-            for stream in listener.incoming() {
-                if thread_shutdown.load(Ordering::SeqCst) {
-                    break;
-                }
-                drop(stream);
+    impl HookSink for RecordingSink {
+        fn emit(&self, event: &str, payload: serde_json::Value) {
+            self.0
+                .events
+                .lock()
+                .unwrap()
+                .push((event.to_string(), payload));
+        }
+
+        fn live_model(&self, _: &str, _: &str) {}
+    }
+
+    fn test_hub(spool: Option<PathBuf>) -> (&'static HookHub, Arc<Recorder>) {
+        let rec = Arc::new(Recorder::default());
+        let hub = Box::leak(Box::new(HookHub::new(
+            Box::new(RecordingSink(rec.clone())),
+            spool,
+        )));
+        (hub, rec)
+    }
+
+    fn frame(event: &str, tab: &str, pty: u32, session: &str) -> String {
+        format!(
+            r#"{{"hook_event_name":"{event}","session_id":"{session}","tab_id":"{tab}","pty_id":"{pty}","cwd":""}}"#
+        )
+    }
+
+    fn send(path: &Path, line: &str) {
+        let mut s = UnixStream::connect(path).unwrap();
+        s.write_all(line.as_bytes()).unwrap();
+        s.write_all(b"\n").unwrap();
+    }
+
+    fn wait_until(mut done: impl FnMut() -> bool) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            if done() {
+                return true;
             }
-        });
+            thread::sleep(Duration::from_millis(10));
+        }
+        done()
+    }
 
-        // Give the thread a moment to reach accept() before we try to wake it.
-        thread::sleep(std::time::Duration::from_millis(50));
-
-        let guard = IpcGuard {
-            path: path.clone(),
-            shutdown,
-        };
-        drop(guard);
-
-        let joined = {
-            let (tx, rx) = std::sync::mpsc::channel();
-            thread::spawn(move || {
-                handle.join().ok();
-                let _ = tx.send(());
-            });
-            rx.recv_timeout(std::time::Duration::from_secs(2)).is_ok()
-        };
-        assert!(
-            joined,
-            "listener thread did not exit after guard was dropped"
-        );
+    #[test]
+    fn the_hook_server_socket_is_owner_only_and_removed_on_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-perm.sock");
+        let (hub, _) = test_hub(None);
+        let server = HookServer::start(path.clone(), hub).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
+        drop(server);
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn dropping_the_hook_server_joins_its_thread() {
+        // Unlinking alone never wakes a thread parked in accept(); Drop joins it, so a missing
+        // wakeup would hang here instead of passing.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-join.sock");
+        let (hub, _) = test_hub(None);
+        let server = HookServer::start(path, hub).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let (tx, rx) = std::sync::mpsc::channel();
+        thread::spawn(move || {
+            drop(server);
+            let _ = tx.send(());
+        });
+        assert!(rx.recv_timeout(Duration::from_secs(2)).is_ok());
+    }
+
+    #[test]
+    fn one_listener_keeps_two_concurrent_tabs_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-two.sock");
+        let (hub, rec) = test_hub(None);
+        live(hub, "tab-a", 1);
+        live(hub, "tab-b", 2);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+
+        const PER_TAB: usize = 40;
+        let clients: Vec<_> = [("tab-a", 1u32), ("tab-b", 2u32)]
+            .into_iter()
+            .map(|(tab, pty)| {
+                let path = path.clone();
+                thread::spawn(move || {
+                    for i in 0..PER_TAB {
+                        let kind = if i == 0 { "SessionStart" } else { "Stop" };
+                        send(&path, &frame(kind, tab, pty, &format!("{tab}-s")));
+                    }
+                })
+            })
+            .collect();
+        for c in clients {
+            c.join().unwrap();
+        }
+
+        assert!(wait_until(
+            || rec.events.lock().unwrap().len() == 2 * PER_TAB
+        ));
+        let signals = rec.signals();
+        let of = |id: u32| signals.iter().filter(|(i, _)| *i == id).count();
+        assert_eq!(of(1), PER_TAB - 1);
+        assert_eq!(of(2), PER_TAB - 1);
+        let mut metas = rec.meta_tabs();
+        metas.sort();
+        assert_eq!(metas, vec!["tab-a", "tab-b"]);
+        for (_, payload) in rec.events.lock().unwrap().iter() {
+            if let Some(sid) = payload["sessionId"].as_str() {
+                assert!(sid.starts_with(payload["tabId"].as_str().unwrap()));
+            }
+        }
+    }
+
+    #[test]
+    fn a_frame_cannot_reach_a_tab_through_another_tabs_pty() {
+        let (hub, rec) = test_hub(None);
+        live(hub, "tab-a", 1);
+        live(hub, "tab-b", 2);
+        hub.handle_line(&frame("Stop", "tab-b", 1, "s"));
+        assert_eq!(rec.signals(), vec![(2.into(), "Stop".to_string())]);
+    }
+
+    #[test]
+    fn frames_without_a_safe_tab_are_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        live(hub, "tab-a", 1);
+        hub.handle_line(r#"{"hook_event_name":"Stop","session_id":"s"}"#);
+        hub.handle_line(r#"{"hook_event_name":"Stop","tab_id":"../x","pty_id":"1"}"#);
+        hub.handle_line("not json");
+        assert!(rec.events.lock().unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    fn live(hub: &'static HookHub, tab: &str, pty: u32) {
+        hub.register(tab, pty);
+        hub.activate(tab, pty);
+    }
+
+    #[test]
+    fn a_late_frame_of_a_restarted_pty_reaches_the_new_one_without_rewriting_or_ending_it() {
+        let (hub, rec) = test_hub(None);
+        let old = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 1,
+        };
+        live(hub, "tab-a", 1);
+        live(hub, "tab-a", 2);
+        drop(old);
+        for kind in [
+            "Stop",
+            "SessionEnd",
+            "StopFailure",
+            "SessionStart",
+            "UserPromptSubmit",
+            "Notification",
+        ] {
+            hub.handle_line(&frame(kind, "tab-a", 1, "dead"));
+        }
+        hub.handle_line(&frame("UserPromptSubmit", "tab-a", 2, "s"));
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (2.into(), "Stop".to_string()),
+                (2.into(), "Notification".to_string()),
+                (2.into(), "UserPromptSubmit".to_string())
+            ]
+        );
+        assert!(
+            rec.meta_tabs().is_empty(),
+            "a late SessionStart records nothing"
+        );
+    }
+
+    #[test]
+    fn every_hook_signal_names_its_tab_live_late_or_replayed() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        live(hub, "tab-a", 2);
+        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
+        hub.handle_line(&frame("PermissionRequest", "tab-a", 2, "s"));
+        assert_eq!(rec.signal_tabs(), vec!["tab-a"; 3]);
+        assert!(rec
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(e, _)| e == AGENT_SESSION_META_EVENT || e == AGENT_CWD_EVENT)
+            .all(|(_, p)| p["tabId"] == "tab-a"));
+    }
+
+    struct PanickingSink;
+
+    impl HookSink for PanickingSink {
+        fn emit(&self, _: &str, _: serde_json::Value) {
+            panic!("sink failure");
+        }
+
+        fn live_model(&self, _: &str, _: &str) {}
+    }
+
+    #[test]
+    fn hostile_frames_never_panic_the_frame_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, _) = test_hub(Some(dir.path().to_path_buf()));
+        live(hub, "tab-a", 1);
+        let long = "€".repeat(10_000);
+        let frames = [
+            String::new(),
+            "null".into(),
+            "[]".into(),
+            "42".into(),
+            "\"str\"".into(),
+            r#"{"tab_id":"tab-a"}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":5}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":[1],"hook_event_name":"Stop","background_tasks":"x"}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"Stop","background_tasks":[1,null,{"type":"subagent","status":"running"}]}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"SubagentStart","agent_id":{}}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"SessionStart","session_id":7,"cwd":[]}"#
+                .into(),
+            r#"{"tab_id":"tab-a","pty_id":"1","hook_event_name":"Notification","notification_type":null}"#
+                .into(),
+            format!(
+                r#"{{"tab_id":"tab-a","pty_id":"1","hook_event_name":"UserPromptSubmit","prompt":"{long}"}}"#
+            ),
+            r#"{"tab_id":"tab-zz","pty_id":"1","hook_event_name":"Stop"}"#.into(),
+            r#"{"tab_id":"tab-a","pty_id":"999999","hook_event_name":"SessionStart"}"#.into(),
+            "{\"tab_id\":\"tab-a\",\u{0}}".into(),
+        ];
+        for f in &frames {
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| hub.handle_line(f)));
+            assert!(r.is_ok(), "panicked on {f:?}");
+        }
+        assert_eq!(with_tab(AGENT_EVENT, serde_json::json!(5), "t"), 5);
+    }
+
+    // Covers the dev and test builds only; release is panic = "abort" and relies on the frame
+    // path not panicking (see `hostile_frames_never_panic_the_frame_path`).
+    #[test]
+    fn a_panic_while_handling_a_frame_spares_the_listener_and_the_registry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-panic.sock");
+        let hub: &'static HookHub =
+            Box::leak(Box::new(HookHub::new(Box::new(PanickingSink), None)));
+        live(hub, "tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        thread::sleep(Duration::from_millis(100));
+        assert!(!hub.tabs.is_poisoned());
+        live(hub, "tab-b", 2);
+        assert_eq!(hub.tabs().current("tab-b"), Some(2));
+        UnixStream::connect(&path).expect("the listener is still accepting");
+
+        hub.tabs.clear_poison();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = hub.tabs.lock().unwrap();
+            panic!("poison it");
+        }));
+        assert!(hub.tabs.is_poisoned());
+        live(hub, "tab-c", 3);
+        assert_eq!(hub.tabs().current("tab-c"), Some(3));
+    }
+
+    #[test]
+    fn a_pty_that_never_goes_live_leaves_the_spool_for_the_next_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        let failed = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 2,
+        };
+        hub.register("tab-a", 2);
+        hub.handle_line(&frame("Stop", "tab-a", 2, "s"));
+        drop(failed);
+        assert!(rec.events.lock().unwrap().is_empty());
+        assert_eq!(
+            std::fs::read_dir(dir.path().join("tab-a")).unwrap().count(),
+            2
+        );
+
+        live(hub, "tab-a", 3);
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (3.into(), "Notification".to_string()),
+                (3.into(), "Stop".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn frames_of_the_old_pty_spooled_while_the_new_one_is_pending_cannot_rewrite_its_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        let old = TabLease {
+            hub,
+            tab_id: "tab-a".into(),
+            pty_id: 1,
+        };
+        live(hub, "tab-a", 1);
+        drop(old);
+        hub.register("tab-a", 2);
+        for kind in ["SessionStart", "UserPromptSubmit", "Notification"] {
+            hub.handle_line(&frame(kind, "tab-a", 1, "dead"));
+        }
+        hub.handle_line(&frame("SessionStart", "tab-a", 2, "new"));
+        assert!(
+            rec.events.lock().unwrap().is_empty(),
+            "pending: all spooled"
+        );
+
+        hub.activate("tab-a", 2);
+        assert_eq!(rec.signals(), vec![(2.into(), "Notification".to_string())]);
+        let metas: Vec<_> = rec
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(e, _)| e == AGENT_SESSION_META_EVENT)
+            .map(|(_, m)| m["sessionId"].as_str().unwrap_or("").to_string())
+            .collect();
+        assert_eq!(
+            metas,
+            vec!["new"],
+            "only the new child's SessionStart is recorded"
+        );
+    }
+
+    #[test]
+    fn frames_for_a_tab_between_ptys_are_spooled_and_replayed_on_its_next_pty() {
+        let dir = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(dir.path().to_path_buf()));
+        hub.handle_line(&frame("Notification", "tab-a", 1, "s"));
+        hub.handle_line(&frame("SessionEnd", "tab-a", 1, "s"));
+        hub.handle_line(&frame("Stop", "tab-a", 1, "s"));
+        assert!(rec.events.lock().unwrap().is_empty());
+        let spooled = std::fs::read_dir(dir.path().join("tab-a")).unwrap().count();
+        assert_eq!(spooled, 2, "SessionEnd is never spooled");
+
+        live(hub, "tab-a", 7);
+        assert_eq!(
+            rec.signals(),
+            vec![
+                (7.into(), "Notification".to_string()),
+                (7.into(), "Stop".to_string())
+            ]
+        );
+        assert!(!dir.path().join("tab-a").exists());
+    }
+
+    fn age(path: &Path, days: u64) {
+        let then = std::time::SystemTime::now() - Duration::from_secs(days * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(then)
+            .unwrap();
+    }
+
+    #[test]
+    fn the_hub_spool_drops_events_older_than_a_week() {
+        let dir = tempfile::tempdir().unwrap();
+        spool_event(dir.path(), "tab-age", "{\"n\":0}").unwrap();
+        let tab = dir.path().join("tab-age");
+        let old = std::fs::read_dir(&tab)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        age(&old, 8);
+        spool_event(dir.path(), "tab-age", "{\"n\":1}").unwrap();
+        let left: Vec<_> = std::fs::read_dir(&tab).unwrap().collect();
+        assert_eq!(left.len(), 1);
+        assert!(!old.exists());
+    }
+
+    #[test]
+    fn the_spool_sweep_removes_stale_and_empty_tab_directories_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        std::fs::create_dir(base.join("tab-empty")).unwrap();
+        std::fs::create_dir(base.join("tab-old")).unwrap();
+        let old = base.join("tab-old").join("0001-a.json");
+        std::fs::write(&old, "{}\n").unwrap();
+        age(&old, 8);
+        let tmp = base.join("tab-old").join(".0002-b.json.tmp");
+        std::fs::write(&tmp, "half").unwrap();
+        age(&tmp, 2);
+        std::fs::create_dir(base.join("tab-fresh")).unwrap();
+        std::fs::write(base.join("tab-fresh").join("0001-a.json"), "{}\n").unwrap();
+        std::fs::create_dir(base.join("not.a.tab")).unwrap();
+        std::fs::write(base.join("not.a.tab").join("x"), "keep").unwrap();
+        age(&base.join("not.a.tab").join("x"), 30);
+
+        sweep_spool(base);
+
+        assert!(!base.join("tab-empty").exists());
+        assert!(!base.join("tab-old").exists());
+        assert!(base.join("tab-fresh").join("0001-a.json").exists());
+        assert!(base.join("not.a.tab").join("x").exists());
+    }
+
+    #[test]
+    fn the_hub_spool_is_owner_only_and_capped() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..(MAX_SPOOL_FILES + 5) {
+            spool_event(dir.path(), "tab-cap", &format!("{{\"n\":{i}}}")).unwrap();
+        }
+        let tab = dir.path().join("tab-cap");
+        let mut names: Vec<_> = std::fs::read_dir(&tab)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        names.sort();
+        assert_eq!(names.len(), MAX_SPOOL_FILES);
+        let first = std::fs::read_to_string(&names[0]).unwrap();
+        assert_eq!(first.trim(), "{\"n\":5}", "the oldest are pruned");
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&tab), 0o700);
+        assert_eq!(mode(&names[0]), 0o600);
+    }
+
+    #[test]
+    fn a_client_that_never_writes_does_not_block_the_others_for_good() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-slow.sock");
+        let (hub, rec) = test_hub(None);
+        live(hub, "tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+        let _idle = UnixStream::connect(&path).unwrap();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        assert!(wait_until(|| rec.signals().len() == 1));
+    }
+
+    #[test]
+    fn a_client_that_trickles_bytes_is_cut_at_the_deadline_and_others_are_served() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kex-ipc-drip.sock");
+        let (hub, rec) = test_hub(None);
+        live(hub, "tab-a", 1);
+        let _server = HookServer::start(path.clone(), hub).unwrap();
+
+        let drip_path = path.clone();
+        let dripper = thread::spawn(move || {
+            let mut s = UnixStream::connect(&drip_path).unwrap();
+            let started = std::time::Instant::now();
+            while started.elapsed() < Duration::from_secs(10) {
+                if s.write_all(b"{").is_err() {
+                    return Some(started.elapsed());
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            None
+        });
+        thread::sleep(Duration::from_millis(100));
+        let sent_at = std::time::Instant::now();
+        send(&path, &frame("Stop", "tab-a", 1, "s"));
+        assert!(wait_until(|| rec.signals().len() == 1));
+        assert!(
+            sent_at.elapsed() < FRAME_DEADLINE * 3,
+            "the other client waited {:?}",
+            sent_at.elapsed()
+        );
+        let cut = dripper
+            .join()
+            .unwrap()
+            .expect("the trickling client was never cut");
+        assert!(cut < Duration::from_secs(3), "cut after {cut:?}");
+    }
+
+    #[test]
+    fn a_failed_bind_is_retried_until_one_succeeds_and_then_never_again() {
+        let mut slot: Option<u32> = None;
+        let mut calls = 0;
+        let path = Path::new("/x/kex-ipc-1.sock");
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Err(std::io::Error::other("busy"))
+        });
+        assert_eq!(slot, None);
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Ok(7)
+        });
+        assert_eq!(slot, Some(7));
+        ensure_server(&mut slot, path, |_| {
+            calls += 1;
+            Ok(8)
+        });
+        assert_eq!((slot, calls), (Some(7), 2));
+    }
+
+    #[test]
+    fn a_retried_bind_takes_over_a_path_that_was_unusable_before() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocked = dir.path().join("missing-dir").join("kex-ipc-r.sock");
+        let (hub, _) = test_hub(None);
+        let mut slot = None;
+        ensure_server(&mut slot, &blocked, |p| {
+            HookServer::start(p.to_path_buf(), hub)
+        });
+        assert!(slot.is_none());
+        std::fs::create_dir(blocked.parent().unwrap()).unwrap();
+        ensure_server(&mut slot, &blocked, |p| {
+            HookServer::start(p.to_path_buf(), hub)
+        });
+        assert!(slot.is_some());
+        assert!(UnixStream::connect(&blocked).is_ok());
+    }
+
+    #[test]
+    fn accept_errors_back_off_and_are_capped_instead_of_stopping_the_listener() {
+        assert_eq!(accept_backoff(1), Duration::from_millis(10));
+        assert_eq!(accept_backoff(2), Duration::from_millis(20));
+        assert_eq!(accept_backoff(5), Duration::from_millis(160));
+        assert_eq!(accept_backoff(8), ACCEPT_BACKOFF_MAX);
+        assert_eq!(accept_backoff(u32::MAX), ACCEPT_BACKOFF_MAX);
+        let mut prev = Duration::ZERO;
+        for n in 1..40 {
+            assert!(accept_backoff(n) >= prev);
+            prev = accept_backoff(n);
+        }
+    }
+
+    #[test]
+    fn read_frame_keeps_a_frame_ended_by_eof_and_drops_an_oversized_one() {
+        let (mut a, b) = UnixStream::pair().unwrap();
+        a.write_all(b"{\"x\":1}").unwrap();
+        drop(a);
+        let deadline = Instant::now() + FRAME_DEADLINE;
+        assert_eq!(read_frame(b, deadline).as_deref(), Some("{\"x\":1}"));
+
+        let (a, b) = UnixStream::pair().unwrap();
+        let writer = thread::spawn(move || {
+            let mut a = a;
+            let big = vec![b'a'; MAX_FRAME_BYTES + 16 * 1024];
+            let _ = a.write_all(&big);
+        });
+        assert_eq!(read_frame(b, Instant::now() + Duration::from_secs(5)), None);
+        writer.join().unwrap();
     }
 
     #[test]
@@ -1084,6 +2007,144 @@ mod tests {
     }
 
     #[test]
+    fn post_compact_reaches_the_frontend_as_a_signal_with_its_trigger() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","transcript_path":"","cwd":"/p","trigger":"manual"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "PostCompact");
+        assert!(reports_agent_cwd(&p.event, "", &p.cwd));
+        let sig = post_compact_signal(3, &p);
+        assert_eq!(sig["kind"], "PostCompact");
+        assert_eq!(sig["id"], 3);
+        assert_eq!(sig["agent"], "claude");
+        assert_eq!(sig["trigger"], "manual");
+    }
+
+    #[test]
+    fn dispatching_a_post_compact_payload_emits_its_signal() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","trigger":"manual"}"#;
+        let mut emitted = Vec::new();
+        dispatch_with(
+            json,
+            "tab-post-compact",
+            9,
+            &mut |event, payload| emitted.push((event.to_string(), payload)),
+            &mut |_| {},
+        );
+        let kinds: Vec<_> = emitted
+            .iter()
+            .filter(|(event, _)| event == AGENT_EVENT)
+            .map(|(_, sig)| {
+                (
+                    sig["kind"].clone(),
+                    sig["id"].clone(),
+                    sig["trigger"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![("PostCompact".into(), 9.into(), "manual".into())]
+        );
+    }
+
+    #[test]
+    fn post_compact_is_dispatched_as_a_passthrough_signal() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s","trigger":"auto"}"#;
+        let sig = passthrough_signal(&parse_payload(json).unwrap(), 5).expect("no signal");
+        assert_eq!(sig["kind"], "PostCompact");
+        assert_eq!(sig["trigger"], "auto");
+        let other = r#"{"hook_event_name":"PreToolUse","session_id":"s"}"#;
+        assert!(passthrough_signal(&parse_payload(other).unwrap(), 5).is_none());
+    }
+
+    fn dispatch_events(json: &str, tab: &str) -> Vec<(String, serde_json::Value)> {
+        let mut emitted = Vec::new();
+        dispatch_with(
+            json,
+            tab,
+            3,
+            &mut |event, payload| emitted.push((event.to_string(), payload)),
+            &mut |_| {},
+        );
+        emitted
+    }
+
+    #[test]
+    fn a_stop_with_a_message_reaches_the_session_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = dir.path().join("agent-sessions.json");
+        let tab = "tab-stop-wiring";
+        let preview = || session_store::session_previews(&[tab.to_string()]);
+        session_store::with_store_path(&store, || {
+            dispatch_events(
+                r#"{"hook_event_name":"SessionStart","session_id":"s1","transcript_path":"","cwd":"/w","source":"startup"}"#,
+                tab,
+            );
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"All\n tests pass"}"#,
+                tab,
+            );
+            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"  "}"#,
+                tab,
+            );
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"other","transcript_path":"","cwd":"/w","last_assistant_message":"stale"}"#,
+                tab,
+            );
+            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
+        });
+    }
+
+    #[test]
+    fn a_status_line_frame_emits_only_the_tab_usage() {
+        let json = r#"{"hook_event_name":"StatusLine","agent":"claude","tab_id":"tab-sl","pty_id":"3","cwd":"/w","session_id":"s","context_window":{"used_percentage":12},"rate_limits":{"five_hour":{"used_percentage":40,"resets_at":1792900000}}}"#;
+        let emitted = dispatch_events(json, "tab-sl");
+        assert_eq!(emitted.len(), 1, "no cwd, no agent signal: {emitted:?}");
+        let (event, payload) = &emitted[0];
+        assert_eq!(event, AGENT_USAGE_EVENT);
+        assert_eq!(payload["tabId"], "tab-sl");
+        assert_eq!(payload["usage"]["contextUsedPct"], 12.0);
+        assert_eq!(payload["usage"]["fiveHour"]["usedPct"], 40.0);
+        assert!(payload["usage"].get("sevenDay").is_none());
+    }
+
+    #[test]
+    fn a_status_line_frame_with_nothing_to_show_clears_the_reading() {
+        let json = r#"{"hook_event_name":"StatusLine","tab_id":"tab-sl","context_window":{"used_percentage":null}}"#;
+        let emitted = dispatch_events(json, "tab-sl");
+        assert_eq!(emitted[0].1["usage"], serde_json::json!({}));
+    }
+
+    #[test]
+    fn a_status_line_frame_is_never_spooled() {
+        let base = tempfile::tempdir().unwrap();
+        let (hub, rec) = test_hub(Some(base.path().to_path_buf()));
+        hub.handle_line(&frame("StatusLine", "tab-off", 1, "s"));
+        assert!(!base.path().join("tab-off").exists());
+        assert!(rec.events.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_late_status_line_frame_is_dropped() {
+        let (hub, rec) = test_hub(None);
+        hub.register("tab-late", 2);
+        hub.activate("tab-late", 2);
+        hub.handle_line(&frame("StatusLine", "tab-late", 1, "s"));
+        assert!(rec.events.lock().unwrap().is_empty());
+        hub.handle_line(&frame("StatusLine", "tab-late", 2, "s"));
+        assert_eq!(rec.events.lock().unwrap()[0].0, AGENT_USAGE_EVENT);
+    }
+
+    #[test]
+    fn post_compact_without_a_trigger_sends_an_empty_one() {
+        let json = r#"{"hook_event_name":"PostCompact","session_id":"s"}"#;
+        let sig = post_compact_signal(1, &parse_payload(json).unwrap());
+        assert_eq!(sig["trigger"], "");
+    }
+
+    #[test]
     fn parse_permission_request() {
         let json = r#"{"hook_event_name":"PermissionRequest","session_id":"s","transcript_path":"","cwd":"","tool_name":"bash"}"#;
         let p = parse_payload(json).unwrap();
@@ -1099,25 +2160,72 @@ mod tests {
         assert_eq!(p.delta.as_deref(), Some("hello"));
     }
 
+    fn spool_event_file(base: &Path, tab_id: &str, name: &str, body: &str) -> PathBuf {
+        let dir = spool_dir_for_tab(base, tab_id).unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, body).unwrap();
+        path
+    }
+
     #[test]
-    fn drain_spool_replays_lines_in_order_then_removes_the_file() {
+    fn drain_spool_replays_events_in_file_name_order_then_removes_them_and_the_directory() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-1";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "line-one\nline-two\nline-three\n").unwrap();
+        spool_event_file(dir.path(), tab_id, "0002-b.json", "line-two\n");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "line-three\n");
+        spool_event_file(dir.path(), tab_id, "0001-a.json", "line-one\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
         assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
-        assert!(
-            !path.exists(),
-            "spool file should be removed after a full drain"
-        );
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
     }
 
     #[test]
-    fn drain_spool_is_a_noop_when_no_spool_file_exists() {
+    fn drain_spool_never_touches_files_outside_the_spool_for_unsafe_tab_ids() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("spool");
+        std::fs::create_dir_all(&base).unwrap();
+        let victim = root.path().join("victim.json");
+        std::fs::write(&victim, "keep").unwrap();
+        let abs = root.path().to_string_lossy().to_string();
+        for tab in ["..", "../", abs.as_str(), "", "a/b"] {
+            let mut called = false;
+            drain_spool(&base, tab, |_| called = true);
+            assert!(!called, "{tab:?}");
+        }
+        assert!(victim.exists());
+    }
+
+    #[test]
+    fn drain_spool_deletes_unreadable_files_and_day_old_orphan_temporaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-junk";
+        let bad = spool_event_file(dir.path(), tab_id, "0001-a.json", "x");
+        std::fs::write(&bad, [0xff, 0xfe, 0xfd]).unwrap();
+        let old_tmp = spool_event_file(dir.path(), tab_id, ".0002-b.json.tmp", "half");
+        let two_days = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(&old_tmp)
+            .unwrap()
+            .set_modified(two_days)
+            .unwrap();
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "ok\n");
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+
+        assert_eq!(seen, vec!["ok"]);
+        assert!(!bad.exists());
+        assert!(!old_tmp.exists());
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
+    }
+
+    #[test]
+    fn drain_spool_is_a_noop_when_no_spool_directory_exists() {
         let dir = tempfile::tempdir().unwrap();
         let mut called = false;
         drain_spool(dir.path(), "tab-missing", |_| called = true);
@@ -1125,82 +2233,72 @@ mod tests {
     }
 
     #[test]
-    fn drain_spool_skips_blank_lines() {
+    fn drain_spool_skips_blank_files_and_in_flight_dot_files() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-2";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "\n  \nreal-line\n\n").unwrap();
+        spool_event_file(dir.path(), tab_id, "0001-a.json", "\n  \n");
+        let in_flight = spool_event_file(dir.path(), tab_id, ".0002-b.json.tmp", "half");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "real\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
-        assert_eq!(seen, vec!["real-line"]);
+
+        assert_eq!(seen, vec!["real"]);
+        assert!(
+            in_flight.exists(),
+            "a temporary being written is not ours to touch"
+        );
     }
 
     #[test]
-    fn drain_spool_leaves_other_tabs_spool_files_untouched() {
+    fn drain_spool_leaves_other_tabs_spool_directories_untouched() {
         let dir = tempfile::tempdir().unwrap();
-        let other_path = spool_path_for_tab(dir.path(), "tab-other");
-        std::fs::write(&other_path, "untouched\n").unwrap();
-
+        let other = spool_event_file(dir.path(), "tab-other", "0001-a.json", "other\n");
         let mut called = false;
         drain_spool(dir.path(), "tab-drain-3", |_| called = true);
-
         assert!(!called);
-        assert!(other_path.exists());
+        assert!(other.exists());
     }
 
     #[test]
-    fn drain_spool_claims_the_file_by_rename_before_reading_it() {
-        // A drain that read-then-deleted the live path in place would have a
-        // window where a line appended between the read and the delete is
-        // lost. Renaming first means the live path is gone (and free for a
-        // fresh append) the instant the rename succeeds, before any line has
-        // even been read.
+    fn drain_spool_resumes_a_directory_left_half_drained_by_a_crash() {
+        // A crash after the first event was handed off and removed leaves only
+        // the rest; a new file arriving meanwhile sorts after them.
         let dir = tempfile::tempdir().unwrap();
-        let tab_id = "tab-drain-rename";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&path, "line-one\n").unwrap();
+        let tab_id = "tab-drain-crash";
+        spool_event_file(dir.path(), tab_id, "0002-b.json", "second\n");
+        spool_event_file(dir.path(), tab_id, "0003-c.json", "third\n");
+        spool_event_file(dir.path(), tab_id, "0004-d.json", "fourth\n");
 
         let mut seen = Vec::new();
         drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
 
-        assert_eq!(seen, vec!["line-one"]);
-        assert!(!path.exists());
-        assert!(!draining_path.exists());
+        assert_eq!(seen, vec!["second", "third", "fourth"]);
+        assert!(!spool_dir_for_tab(dir.path(), tab_id).unwrap().exists());
     }
 
     #[test]
-    fn drain_spool_replays_a_leftover_draining_file_from_a_crashed_drain() {
-        // Simulates a process that renamed the live spool to `.draining` on a
-        // previous run but crashed before finishing (or before removing the
-        // file), then wrote a new live spool file afterwards. Both must be
-        // replayed, oldest first, and neither should clobber the other.
+    fn drain_spool_keeps_a_file_whose_handoff_did_not_finish() {
+        // The file is removed only after on_line returns, so a panic inside it
+        // (standing in for a crash) leaves the event for the next drain.
         let dir = tempfile::tempdir().unwrap();
-        let tab_id = "tab-drain-leftover";
-        let path = spool_path_for_tab(dir.path(), tab_id);
-        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
-        std::fs::write(&draining_path, "leftover-line\n").unwrap();
-        std::fs::write(&path, "fresh-line\n").unwrap();
+        let tab_id = "tab-drain-panic";
+        let kept = spool_event_file(dir.path(), tab_id, "0001-a.json", "boom\n");
 
-        let mut seen = Vec::new();
-        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            drain_spool(dir.path(), tab_id, |_| panic!("crash"));
+        }));
 
-        assert_eq!(seen, vec!["leftover-line", "fresh-line"]);
-        assert!(!path.exists());
-        assert!(!draining_path.exists());
+        assert!(result.is_err());
+        assert!(kept.exists());
     }
 
     #[test]
-    fn drain_spool_lines_parse_the_same_way_a_live_payload_does() {
-        // Proves a spooled line reaches dispatch's parsing exactly like a
-        // payload that arrived over the live socket: same parse_payload call,
-        // same JSON shape, same extracted event kind.
+    fn drain_spool_payloads_parse_the_same_way_a_live_payload_does() {
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-4";
-        let path = spool_path_for_tab(dir.path(), tab_id);
         let payload = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":"","stop_reason":"end_turn","last_assistant_message":"done"}"#;
-        std::fs::write(&path, format!("{payload}\n")).unwrap();
+        spool_event_file(dir.path(), tab_id, "0001-a.json", &format!("{payload}\n"));
 
         let mut events = Vec::new();
         drain_spool(dir.path(), tab_id, |line| {
@@ -1240,17 +2338,17 @@ mod tests {
         // still replay normally.
         let dir = tempfile::tempdir().unwrap();
         let tab_id = "tab-drain-stale";
-        let path = spool_path_for_tab(dir.path(), tab_id);
         let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
         let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
         let session_start =
             r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
         let notification = r#"{"hook_event_name":"Notification","session_id":"s","transcript_path":"","cwd":"","message":"hi","notification_type":"other"}"#;
-        std::fs::write(
-            &path,
-            format!("{session_end}\n{session_start}\n{stop_failure}\n{notification}\n"),
-        )
-        .unwrap();
+        for (i, body) in [session_end, session_start, stop_failure, notification]
+            .iter()
+            .enumerate()
+        {
+            spool_event_file(dir.path(), tab_id, &format!("000{i}-x.json"), body);
+        }
 
         let mut replayed = Vec::new();
         drain_spool(dir.path(), tab_id, |line| {

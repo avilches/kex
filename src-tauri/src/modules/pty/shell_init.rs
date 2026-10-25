@@ -133,12 +133,16 @@ pub fn build_command(
         let _ = workspace;
         let mut cmd = unix::build(cwd, blocks, tab_id.as_deref(), ipc_path, shell)?;
         cmd.env("TERMINAL_ID", id.to_string());
+        // Hook frames carry it so the shared socket can tell a frame of this PTY from a late
+        // one of a PTY the tab ran on before.
+        cmd.env("KEX_PTY_ID", id.to_string());
         Ok(cmd)
     }
     #[cfg(windows)]
     {
         let mut cmd = windows::build(cwd, workspace, blocks, tab_id.as_deref(), ipc_path, shell)?;
         cmd.env("TERMINAL_ID", id.to_string());
+        cmd.env("KEX_PTY_ID", id.to_string());
         Ok(cmd)
     }
 }

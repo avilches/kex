@@ -8,6 +8,7 @@ import { PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import type { GitStatusSnapshot } from "@/lib/native";
 import { cn } from "@/lib/utils";
+import { AgentUsageBadge } from "@/modules/agents/components/AgentUsageBadge";
 import {
   buildGitStatusMap,
   type GitStatusCode,
@@ -61,7 +62,6 @@ type Props = {
   onClose: (tabId: string) => void;
   onNewTerminal: () => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseAllTabs: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
   onNewBrowser: () => void;
@@ -118,7 +118,6 @@ function DraggableTab({
   onActivate,
   onClose,
   onCloseOtherTabs,
-  onCloseAllTabs,
   onRenameTab,
   onUpdateTab,
   onNoteHover,
@@ -137,7 +136,6 @@ function DraggableTab({
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseAllTabs: () => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
@@ -344,6 +342,9 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
+      {tab.kind === "terminal" && hasAgent && (
+        <AgentUsageBadge tabId={tab.id} />
+      )}
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[9px] text-primary">●</span>
       )}
@@ -432,7 +433,6 @@ function DraggableTab({
             onActivate={onActivate}
             onClose={onClose}
             onCloseOtherTabs={onCloseOtherTabs}
-            onCloseAllTabs={onCloseAllTabs}
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
           />
@@ -452,7 +452,6 @@ export function PaneTabBar({
   onClose,
   onNewTerminal,
   onCloseOtherTabs,
-  onCloseAllTabs,
   onSplitTerminalRight,
   onSplitTerminalDown,
   onNewBrowser,
@@ -677,7 +676,6 @@ export function PaneTabBar({
             onActivate={onActivate}
             onClose={onClose}
             onCloseOtherTabs={onCloseOtherTabs}
-            onCloseAllTabs={onCloseAllTabs}
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
             onNoteHover={onNoteHover}

@@ -169,6 +169,26 @@ export async function previewResumeCmd(tabId: string): Promise<RestorePlan | nul
   }
 }
 
+export type SessionPreview = {
+  tabId: string;
+  cwd: string;
+  lastMessage?: string | null;
+  // Seconds since the epoch.
+  updatedAt: number;
+};
+
+// What the recorded sessions among `tabIds` said last, where they ran and when. One call for
+// a whole workspace; read-only, and it never opens a transcript.
+export async function sessionPreviews(tabIds: string[]): Promise<SessionPreview[]> {
+  if (tabIds.length === 0) return [];
+  try {
+    return await invoke<SessionPreview[]>("agent_session_previews", { tabIds });
+  } catch (err) {
+    console.error("[agent-session] sessionPreviews error:", err);
+    return [];
+  }
+}
+
 export async function detachAgentSession(tabId: string): Promise<void> {
   restorePlans?.delete(tabId);
   await invoke("agent_detach_session", { tabId });

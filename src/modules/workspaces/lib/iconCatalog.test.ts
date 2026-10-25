@@ -42,6 +42,12 @@ describe("searchCatalog", () => {
     expect(searchCatalog(catalog, "wifi home", 10).map((e) => e.name)).toEqual(["HomeWifiIcon"]);
   });
 
+  it("also matches the full identifier, case-insensitively", () => {
+    expect(searchCatalog(catalog, "Home01Icon", 10).map((e) => e.name)).toEqual(["Home01Icon"]);
+    expect(searchCatalog(catalog, "homewifiicon", 10).map((e) => e.name)).toEqual(["HomeWifiIcon"]);
+    expect(searchCatalog(catalog, "AArrowDown", 10).map((e) => e.name)).toEqual(["AArrowDownIcon"]);
+  });
+
   it("honors the limit", () => {
     expect(searchCatalog(catalog, "home", 1)).toHaveLength(1);
   });

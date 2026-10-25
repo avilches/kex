@@ -8,6 +8,7 @@ export {
   interruptAgentLeaf,
   leafHasForegroundProcess,
   leafIdForPty,
+  leafPromptReady,
   leaveLeafScratchpad,
   navigateFocusedBlocks,
   refreshTerminalLeaf,

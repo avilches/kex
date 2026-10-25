@@ -131,6 +131,7 @@ type Props = {
   onOpenWorkspaceProperties?: () => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
+  openFiles?: ReadonlySet<string>;
   active?: boolean;
   initialExplorer?: ExplorerSnapshot | null;
   onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
@@ -392,6 +393,7 @@ export const FileExplorer = memo(
       onOpenWorkspaceProperties,
       gitStatus,
       onSearchClose,
+      openFiles,
       active = true,
       initialExplorer,
       onExplorerSnapshot,
@@ -1102,6 +1104,7 @@ export const FileExplorer = memo(
               gitStatusCode={row.gitStatusCode}
               gitColorScheme={gitColorScheme}
               gitignored={row.gitignored}
+              isOpenInTab={!row.isDir && openFiles?.has(row.path) === true}
               onOpenFile={onOpenFile}
               onSelectPath={(path) => {
                 setSelectedPath(path);

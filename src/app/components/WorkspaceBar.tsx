@@ -25,6 +25,7 @@ import {
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
+  CancelSquareIcon,
   ChevronRightIcon,
   Delete02Icon,
   Folder01Icon,
@@ -132,6 +133,7 @@ export type WorkspaceBarProps = {
   onRenameGroup: (groupId: string, label: string) => void;
   onReorderGroups: (fromId: string, toId: string) => void;
   onClose?: (id: string) => void;
+  onCloseAllTabs?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
   onWake?: (id: string) => void;
@@ -166,6 +168,7 @@ function SortableWorkspaceItem({
   workspaceGroups,
   onSelect,
   onClose,
+  onCloseAllTabs,
   onRename,
   onHibernate,
   onWake,
@@ -188,6 +191,7 @@ function SortableWorkspaceItem({
   workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
+  onCloseAllTabs?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
   onWake?: (id: string) => void;
@@ -628,6 +632,12 @@ function SortableWorkspaceItem({
               </ContextMenuRadioGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
+          {onCloseAllTabs && !ws.hibernated && ws.tabs.length > 0 && (
+            <ContextMenuItem onSelect={() => onCloseAllTabs(ws.id)}>
+              <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
+              Close All Tabs
+            </ContextMenuItem>
+          )}
           {onClose && (
             <ContextMenuItem
               onSelect={() => onClose(ws.id)}
@@ -1001,6 +1011,7 @@ export function WorkspaceBar({
   onRenameGroup,
   onReorderGroups,
   onClose,
+  onCloseAllTabs,
   onRename,
   onHibernate,
   onWake,
@@ -1273,6 +1284,7 @@ export function WorkspaceBar({
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
                                 onClose={onClose}
+                                onCloseAllTabs={onCloseAllTabs}
                                 onRename={onRename}
                                 onHibernate={onHibernate}
                                 onWake={onWake}
@@ -1307,6 +1319,7 @@ export function WorkspaceBar({
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
                                 onClose={onClose}
+                                onCloseAllTabs={onCloseAllTabs}
                                 onRename={onRename}
                                 onHibernate={onHibernate}
                                 onWake={onWake}

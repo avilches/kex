@@ -67,6 +67,9 @@ export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
   "pane.focusRight": "relative navigation with no target to pick",
   "nav.prev": "relative navigation with no target to pick",
   "nav.next": "relative navigation with no target to pick",
+  "palette.folderRoot": "only meaningful inside the new-terminal palette",
+  "palette.folderMain": "only meaningful inside the new-terminal palette",
+  "palette.folderHome": "only meaningful inside the new-terminal palette",
   "tab.selectByIndex": "handler is parametrised by the digit key",
   "workspace.selectByIndex": "handler is parametrised by the digit key",
 };
@@ -332,6 +335,7 @@ export function createCommandItems(
       group: "Search",
       keywords: ["history", "shell", "rerun", "previous commands"],
       icon: TerminalIcon,
+      shortcutId: "commandPalette.history",
       trailing: ">",
       run: noop,
     },

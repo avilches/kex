@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paletteShortcutUnavailable, shortcutUnavailable } from "./shortcutContext";
+import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "./shortcutContext";
 import type { Tab } from "./types";
 
 const terminal: Tab = { id: "t", kind: "terminal" };
@@ -50,5 +50,26 @@ describe("paletteShortcutUnavailable", () => {
 
   it("keeps every rule of shortcutUnavailable", () => {
     expect(paletteShortcutUnavailable("editor.save", base)).toBe(true);
+  });
+});
+
+describe("historyPaletteShortcutUnavailable", () => {
+  it("needs a terminal tab", () => {
+    expect(historyPaletteShortcutUnavailable({ activeTab: null, promptReady: true, runningCommand: null })).toBe(true);
+    expect(historyPaletteShortcutUnavailable({ activeTab: editor, promptReady: true, runningCommand: null })).toBe(true);
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null })).toBe(false);
+  });
+
+  it("needs the shell ready to receive a command", () => {
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: false, runningCommand: null })).toBe(true);
+  });
+
+  it("stays out while a command runs", () => {
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: "pnpm dev" })).toBe(true);
+  });
+
+  it("stays out while any foreground process owns the terminal, even with no running command reported", () => {
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: "bun" })).toBe(true);
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: null })).toBe(false);
   });
 });

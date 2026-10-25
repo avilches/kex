@@ -43,8 +43,7 @@ pub struct Session {
     //      terminating the pwsh tree before the master pipe drops. Without this,
     //      ClosePseudoConsole in `master`'s Drop can block waiting for conhost to
     //      drain pending output, freezing the Tauri worker thread that triggered the close.
-    //   2. `_ipc_guard` (Unix) - removes the socket file; the listener thread exits on
-    //      the next accept error.
+    //   2. `_hook_lease` (Unix) - stops routing this tab's hook frames to this PTY.
     //   3. `killer` - best-effort kill (redundant on Windows once Job closed, but
     //      harmless and required on Unix where there is no Job).
     //   4. `writer` - closes the input side of the master pipe.
@@ -53,7 +52,7 @@ pub struct Session {
     #[cfg(windows)]
     _job: Option<super::job::PtyJob>,
     #[cfg(unix)]
-    pub(super) _ipc_guard: Option<super::ipc::IpcGuard>,
+    pub(super) _hook_lease: Option<super::ipc::TabLease>,
     /// PID of the shell process. 0 means unknown; callers must skip checks when 0.
     pub shell_pid: u32,
     /// The frontend tab the session belongs to, which the Actions runner knows.
@@ -139,7 +138,7 @@ pub fn spawn(
     let pair = pty_system.openpty(size).map_err(|e| e.to_string())?;
 
     #[cfg(unix)]
-    let ipc_socket_path = super::ipc::socket_path_for_pty_id(id);
+    let ipc_socket_path = super::ipc::hook_socket(&app);
     #[cfg(unix)]
     let ipc_path_opt: Option<&str> = ipc_socket_path.to_str();
     #[cfg(not(unix))]
@@ -155,13 +154,12 @@ pub fn spawn(
         shell,
     )?;
 
+    // Claimed before the child starts, so its first hook frame is already kept for this tab;
+    // it only goes live (and drains the spool) once the spawn below has fully succeeded.
     #[cfg(unix)]
-    let ipc_guard = super::ipc::spawn_listener(
-        ipc_socket_path,
-        tab_id.clone().unwrap_or_default(),
-        id,
-        app.clone(),
-    );
+    let hook_lease = tab_id
+        .as_deref()
+        .and_then(|t| super::ipc::register_tab(&app, t, id));
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
 
@@ -191,11 +189,16 @@ pub fn spawn(
 
     let exited = Arc::new(AtomicBool::new(false));
 
+    #[cfg(unix)]
+    if let Some(lease) = &hook_lease {
+        lease.activate();
+    }
+
     let session = Arc::new(Session {
         #[cfg(windows)]
         _job: job,
         #[cfg(unix)]
-        _ipc_guard: Some(ipc_guard),
+        _hook_lease: hook_lease,
         shell_pid,
         script_tab_id: tab_id.clone(),
         killer: Mutex::new(killer),
@@ -427,7 +430,7 @@ mod tests {
 
         let session = Arc::new(Session {
             #[cfg(unix)]
-            _ipc_guard: None,
+            _hook_lease: None,
             shell_pid: child.process_id().unwrap_or(0),
             script_tab_id: None,
             killer: Mutex::new(killer),
@@ -479,7 +482,7 @@ mod tests {
 
         let session = Arc::new(Session {
             #[cfg(unix)]
-            _ipc_guard: None,
+            _hook_lease: None,
             shell_pid: 0,
             script_tab_id: None,
             killer: Mutex::new(killer),

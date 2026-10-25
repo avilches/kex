@@ -31,6 +31,7 @@ const PLUGIN = resolve(process.cwd(), "src-tauri/src/modules/agent/plugins/openc
 async function load(sessions: Record<string, { parentID?: string }> = {}): Promise<Handler> {
   process.env.KEX_IPC = "/tmp/kex-test.sock";
   process.env.KEX_TAB_ID = "tab-1";
+  process.env.KEX_PTY_ID = "7";
   const mod = (await import(/* @vite-ignore */ PLUGIN)) as {
     KexSessionPlugin: (ctx: unknown) => Promise<{ event: Handler }>;
   };
@@ -66,6 +67,14 @@ describe("opencode plugin", () => {
       KexSessionPlugin: (ctx: unknown) => Promise<Record<string, unknown>>;
     };
     expect(await mod.KexSessionPlugin({ client: {} })).toEqual({});
+  });
+
+  it("names its tab and PTY on every frame, since Kex has one socket for all tabs", async () => {
+    const event = await load();
+    await event({ event: created("ses_a") });
+    await event({ event: status("ses_a", "busy") });
+    expect(sent.length).toBe(2);
+    for (const f of sent) expect(f).toMatchObject({ tab_id: "tab-1", pty_id: "7" });
   });
 
   it("reports a new session, its turn and its end", async () => {

@@ -6,8 +6,8 @@ end up emitting `kex:agent-signal` to the frontend, but never touch each other:
 1. **OSC bytes in the PTY stream.** `agent_detect.rs` in the Rust PTY reader watches for `OSC 133` (shell
    integration) and `OSC 9` (Claude Code's built-in fallback notification). xterm.js in the frontend sees the same
    bytes in parallel via the Tauri channel. Neither consumer removes bytes from the stream.
-2. **Claude Code hook JSON over a Unix socket, one per PTY.** `trigger-event.sh` forwards the hook's payload
-   unmodified to `pty/ipc.rs::run_listener`, which parses it directly and emits `kex:agent-signal` (or, for
+2. **Claude Code hook JSON over one Unix socket for the whole app.** `trigger-event.sh` forwards the hook's payload,
+   tagged with its `tab_id` and `pty_id`, to the single listener in `pty/ipc.rs`, which routes it to the tab and parses it directly and emits `kex:agent-signal` (or, for
    `SessionStart`, records the session first). This path is entirely out of band from the PTY byte stream: it never
    passes through `agent_detect.rs`, and it does not touch the OSC-driven `armed` state kept there. See
    `docs/AGENT_SESSION_RESTORE.md` for the hook script and socket details.
@@ -69,7 +69,7 @@ Reglas que atraviesan todas las filas:
 
 ## Unix socket hook events (channel 2)
 
-`trigger-event.sh` reenvía el JSON del hook tal cual a `$KEX_IPC`. `pty/ipc.rs::dispatch` lo parsea y actúa
+`trigger-event.sh` reenvía el JSON del hook a `$KEX_IPC`, el socket único de la app, con `tab_id` y `pty_id` sacados de su entorno. `pty/ipc.rs::dispatch` lo parsea y actúa
 directamente, sin pasar por `agent_detect.rs`:
 
 | `hook_event_name` | Cuando | `ipc.rs::dispatch` (Rust) | `AgentNotificationsBridge` (TS) |
@@ -82,6 +82,7 @@ directamente, sin pasar por `agent_detect.rs`:
 | `StopFailure` | Claude Code falló con error | emit `kex:agent-signal` `kind: "StopFailure"` | route error + `store.finish()` + detach |
 | `SessionEnd` | Sesión terminó limpiamente | emit `kex:agent-signal` `kind: "SessionEnd"` | `store.finish()` + detach |
 | `PermissionRequest` | Claude Code pide permiso para usar una herramienta | emit `kex:agent-signal` `kind: "PermissionRequest"` | `setStatus("attention")` + route |
+| `PostCompact` | Termina un `/compact` (Claude Code 2.1.76 o posterior; payload `trigger` manual o auto) | emit `kex:agent-signal` `kind: "PostCompact"` con `trigger` | Un compact manual no emite `Stop`, así que deja la pestaña en `idle` (o `working` si quedan subagentes vivos), sin notificar. Uno `auto` ocurre dentro de un turno cuyo `Stop` aún llega: se ignora |
 | `MessageDisplay` | Mensaje final de un turno (campos por confirmar) | Si `final` es falso, ignorado; si es verdad, emit `kex:agent-signal` `kind: "MessageDisplay"` | `ensureSession` (sin efecto adicional hoy) |
 
 Ningún evento de este canal arma ni desarma `agent_detect.rs`: `armed` ahí solo reacciona a `OSC 133`/`OSC 9`
@@ -200,7 +201,7 @@ entera. Cuando el usuario envía el siguiente prompt, `trigger-event.sh` reenví
 
 ## Zero cost when idle
 
-El detector del canal 1 corre enteramente en el filtro de bytes del PTY. El listener del canal 2 (un hilo por PTY,
+El detector del canal 1 corre enteramente en el filtro de bytes del PTY. El listener del canal 2 (un unico hilo para toda la app,
 bloqueado en `accept()`) tampoco hace trabajo mientras no llega ningún hook. En ninguno de los dos casos hay timers
 ni peticiones en background cuando no hay ningún agente corriendo.
 
@@ -210,9 +211,11 @@ ni peticiones en background cuando no hay ningún agente corriendo.
 
 Hooks can be installed from the notification bell popover. `agent_enable_claude_hooks`:
 - Reads `~/.claude/settings.json` atomically
-- Injects hook entries for all 10 events handled by `trigger-event.sh` (`SessionStart`, `UserPromptSubmit`,
-  `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`, `SubagentStart`,
-  `SubagentStop`) without touching unrelated settings
+- Injects hook entries for the events of `trigger-event.sh` that the installed Claude Code knows (up to 11: `SessionStart`,
+  `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
+  `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
+- Points an empty `statusLine` at `statusline.sh`, which feeds the context and rate limit reading shown on the tab; a
+  status line of the user's is left as it is (`docs/AGENT_SESSION_RESTORE.md`, "Status line")
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 

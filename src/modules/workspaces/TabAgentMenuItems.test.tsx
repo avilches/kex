@@ -35,7 +35,6 @@ function open(onRevealInExplorer: (p: string) => void = noop, extra?: React.Reac
     paneTabCount: () => 1,
     onClose: noop,
     onCloseOtherTabs: noop,
-    onCloseAllTabs: noop,
     onRenameTab: noop,
     onUpdateTab: noop,
     onSaveTab: noop,

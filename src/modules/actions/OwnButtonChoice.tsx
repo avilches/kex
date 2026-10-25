@@ -33,7 +33,7 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[11px] text-muted-foreground">Where it shows in the header</span>
-      <div className="flex items-stretch gap-3">
+      <div className="flex items-center gap-3">
         <RadioGroup
           value={value}
           onValueChange={(v) => onChange(v === "button")}
@@ -77,10 +77,10 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
                 {scope === "global" ? "Global actions" : "Workspace actions"}
               </span>
               <span className="flex min-h-9 items-center gap-2 rounded px-1.5 py-0.5 text-[12px] hover:bg-accent">
-                <span className="flex shrink-0 items-center justify-center">
-                  <ActionIcon action={action} size={14} />
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <ActionIcon action={action} size={14} fill />
+                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
                 </span>
-                <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
               </span>
             </div>
           )}

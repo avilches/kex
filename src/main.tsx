@@ -50,7 +50,7 @@ await initWorkspaceState();
 // - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
 if (startupPrefs) {
   if (startupPrefs.agentNotifications) {
-    invoke("agent_enable_claude_hooks").catch(() => {});
+    invoke("agent_enable_claude_hooks", { refresh: false }).catch(() => {});
   } else {
     invoke("agent_disable_claude_hooks").catch(() => {});
   }

@@ -363,7 +363,7 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 ### F1 El plugin global carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OpenCode integration"
-- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v3` en la primera linea)
+- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v4` en la primera linea)
 - [ ] Lanzar `opencode --print-logs` desde un terminal de Kex y crear una sesion nueva: en el log no debe aparecer ningun error del plugin (la carga del directorio global es automatica en 1.19.x)
 - [ ] Reiniciar: el campanazo ya no muestra el boton OpenCode (status via `agent_opencode_plugin_status`)
 
@@ -399,7 +399,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ### G1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OMP integration"
-- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v4` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v6` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
 - [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
 
@@ -436,7 +436,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install Pi integration"
-- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v4` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
+- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v6` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
 - [ ] Lanzar `pi` desde un terminal de Kex: sin errores de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton Pi (status via `agent_pi_extension_status`)
 
@@ -463,7 +463,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### I1 Kex mantiene al dia lo que instalaste
 
 - [ ] Instalar OMP, Pi y OpenCode desde Settings > General. Cerrar Kex y editar a mano la primera linea de uno de los ficheros (por ejemplo `// kex-agent-status-v1`)
-- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v4` sin pulsar nada
+- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v6` sin pulsar nada
 - [ ] Borrar a mano `~/.pi/agent/extensions/kex-agent-status.ts` y reabrir Kex: el fichero NO reaparece y la fila de Pi dice "Not installed"
 - [ ] Poner en ese mismo sitio un fichero propio (`export default () => {}`) y reabrir Kex: no se toca
 
@@ -541,7 +541,7 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 - [ ] "Preview" abre el diff con una pestana por fichero (`hooks.json`, `config.toml` y `trigger-event.sh` si no estaba instalado). Ninguna pestana lleva nota; el diff de `hooks.json` solo muestra lineas anadidas (nunca cambios de indentacion o de espacios en lo que no es de Kex)
 - [ ] Instalar. Esperado en `hooks.json`: seis handlers (`SessionStart`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SubagentStart`, `SubagentStop`) cuyo comando es `[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" codex || true  # kex-session-hook`
 - [ ] Esperado en `config.toml`: seis tablas `[hooks.state."<ruta de hooks.json>:<evento>:<grupo>:<handler>"]` con `trusted_hash = "sha256:..."`
-- [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v9`
+- [ ] `head -2 ~/.config/kex/hooks/trigger-event.sh` muestra `# kex-session-v13`
 - [ ] Reiniciar Kex: el campanazo ya no ofrece Codex y la fila de Settings dice "Installed"
 - [ ] Instalar otra vez (o reiniciar): idempotente, ni `hooks.json` ni `config.toml` cambian (`shasum` antes y despues)
 

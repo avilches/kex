@@ -890,6 +890,8 @@ El socket de hooks se llamaba `kex-ipc-<pty_id>.sock` y vive en un directorio po
 
 El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, de forma que dos instancias vivas nunca comparten ruta. La primera vez que se construye una ruta se borran los `kex-ipc-<pid>-*.sock` cuyo pid ya no existe (`kill(pid, 0)` con ESRCH); los de pids vivos y los ficheros que no encajan en el patron no se tocan (`orphaned_sockets`, funcion pura con tests). Los sockets del formato antiguo `kex-ipc-<n>.sock` que ya hubiera en disco no se barren (no hay migracion); se borran a mano con `rm $TMPDIR/kex-ipc-$(id -u)/kex-ipc-[0-9]*.sock`.
 
+Desde TASK-736 hay un solo socket por proceso, `kex-ipc-<pid>.sock`, y no uno por PTY; el pid en el nombre sigue siendo lo que separa las instancias, y el barrido de pids muertos es el mismo. Los `kex-ipc-<pid>-<pty_id>.sock` que deje una version anterior no encajan en el patron nuevo y no se barren.
+
 ### Leccion
 
 Un recurso con nombre derivado de un contador por proceso no es unico en una ruta compartida entre procesos. Si varias instancias de la app pueden convivir (instalada y dev), el nombre debe incluir algo propio del proceso, y borrar por ruta solo es seguro si esa ruta no la puede usar nadie mas.
@@ -1264,3 +1266,42 @@ Action no esta. Test: `ActionsColumns.test.tsx`, "a stale list drops the Action"
 
 Un estado "en transito" que se limpia al primer eco no cubre ecos desordenados: mantenerlo hasta que
 termine la sesion que lo necesita (aqui, la vida del modal).
+
+## Bug 26: el listener unico de hooks descartaba todas las tramas en macOS (RESUELTO, TASK-736)
+
+### Sintoma
+
+Al cambiar la lectura de cada conexion del socket de hooks por un plazo total (`read_frame` con un `Instant` limite y
+`set_read_timeout` con el tiempo restante antes de cada `read`), ningun hook llegaba: los tests del listener con dos
+pestanas y con un cliente lento fallaban, y tambien uno que solo escribia `{"x":1}` y cerraba.
+
+### Pistas falsas descartadas
+
+- La logica del plazo (`checked_duration_since`, tiempo cero) era correcta.
+- No era el tope de 4 MiB ni la deteccion del salto de linea.
+
+### Causa raiz
+
+En macOS `setsockopt(SO_RCVTIMEO)` sobre un socket Unix cuyo extremo ya cerro devuelve `EINVAL`. El codigo trataba ese
+error como fallo de la conexion y devolvia `None`. Los clientes reales (`nc -U`, el `python3` del script, los plugins
+con `client.end`) escriben y cierran enseguida, asi que casi siempre el listener ponia el timeout despues del cierre.
+
+### Fix
+
+Ignorar el error de `set_read_timeout`: si el otro extremo cerro, el `read` no puede bloquear y devuelve los datos
+pendientes y luego EOF.
+
+### Leccion
+
+En macOS no se puede usar el resultado de `set_read_timeout` como senal de que la conexion sirve. Un test con un cliente
+que escribe y cierra antes de que el servidor lea lo descubre en el momento.
+
+## Nota: un Kex instalado y uno Dev se reescriben el script de hooks (TASK-736)
+
+`~/.config/kex/hooks/trigger-event.sh` es un solo fichero para todas las instancias, y cada una lo reescribe al arrancar
+si su contenido no coincide con el que lleva embebido (`install_session_hook_script`). Con un Kex instalado anterior a
+TASK-736 (script `kex-session-v12`) y un Kex Dev con el listener unico (`kex-session-v13`) abiertos a la vez, gana el
+ultimo que arranco. Si gana el v12, sus tramas no llevan `tab_id`, y el listener unico de la Dev las rechaza (`Reject`,
+log en debug): las pestanas de la Dev se quedan sin estado de agente hasta que la Dev vuelva a escribir el script (al
+reiniciarla). Si gana el v13, el Kex instalado recibe en su socket por PTY tramas con `tab_id` y `pty_id`, que ignora,
+y sigue funcionando. No hay compatibilidad hacia atras: se resuelve actualizando el instalado.

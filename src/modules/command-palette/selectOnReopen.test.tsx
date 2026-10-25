@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render } from "@testing-library/react";
-import { createElement, useState } from "react";
+import { createElement, type FunctionComponent, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -50,7 +50,9 @@ declare global {
 
 const noop = () => {};
 
-function PaletteHarness() {
+const PaletteHarness: FunctionComponent<{
+  initialMode?: "commands" | "content" | "history";
+}> = ({ initialMode = "content" }) => {
   const [open, setOpen] = useState(true);
   window.__setOpen = setOpen;
   return (
@@ -58,8 +60,12 @@ function PaletteHarness() {
       open={open}
       onOpenChange={setOpen}
       restoreFocus={() => {}}
-      initialMode="content"
+      initialMode={initialMode}
       commandItems={[]}
+      actionsWorkspace={null}
+      onRunAction={noop}
+      onStopAction={noop}
+      onEditAction={noop}
       workspaceRoot={null}
       onOpenContentHit={noop}
       insertCommand={null}
@@ -112,6 +118,16 @@ describe("palette focus", () => {
     } finally {
       decoy.remove();
     }
+  });
+});
+
+describe("palette history mode", () => {
+  afterEach(() => cleanup());
+
+  it("opens with the > sigil when the initial mode is history", async () => {
+    render(createElement(PaletteHarness, { initialMode: "history" }));
+    await settle(30);
+    expect(inputEl().value).toBe(">");
   });
 });
 

@@ -11,6 +11,8 @@ export function enterHintOf(value: string, rows: readonly MergedRow[]): string {
       return "Select workspace";
     case "closed":
       return "Reopen";
+    case "action":
+      return row.item.state === "idle" ? "Run action" : "Show script";
     case "command":
       return "Run action";
   }

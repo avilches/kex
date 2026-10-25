@@ -1,13 +1,16 @@
-// kex-opencode-v3
+// kex-opencode-v4
 // Kex (app.betauer.kex) status reporter for OpenCode. OpenCode loads plugins from
 // ~/.config/opencode/plugins/ automatically; this one turns the session lifecycle into the
-// frames Claude Code's hooks emit on Kex's per-terminal socket, so a closed tab can be resumed
-// and the tab shows working/attention. Outside Kex (no KEX_IPC env set) it does nothing.
+// frames Claude Code's hooks emit on Kex's socket, so a closed tab can be resumed and the tab
+// shows working/attention. Outside Kex (no KEX_IPC env set) it does nothing.
 import net from "node:net"
 
 export const KexSessionPlugin = async ({ client }) => {
   const socketPath = process.env.KEX_IPC
-  if (!socketPath || !process.env.KEX_TAB_ID) return {}
+  const tabId = process.env.KEX_TAB_ID
+  if (!socketPath || !tabId) return {}
+  // One socket serves every tab of Kex: the frame names the tab and the PTY it runs on.
+  const origin = { tab_id: tabId, pty_id: process.env.KEX_PTY_ID || "" }
 
   // Every id the plugin has registered as a main session, and the parent of each subagent
   // session it has learned about (null while the lookup is pending is never stored).
@@ -32,7 +35,7 @@ export const KexSessionPlugin = async ({ client }) => {
         // confirms the write must not park this handler forever.
         const timer = setTimeout(finish, 2000)
         client.on("error", finish)
-        client.on("connect", () => { client.end(JSON.stringify(frame) + "\n", finish) })
+        client.on("connect", () => { client.end(JSON.stringify({ ...frame, ...origin }) + "\n", finish) })
       } catch {
         resolve()
       }

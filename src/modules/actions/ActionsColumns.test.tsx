@@ -65,7 +65,7 @@ const column = (c: HTMLElement, s: "global" | "workspace") => c.querySelector(`[
 const addTrigger = (c: HTMLElement, s: "global" | "workspace") =>
   [...column(c, s).querySelectorAll("button")].find((b) => b.textContent?.trim() === "Add");
 const options = () => [...document.querySelectorAll("[cmdk-item]")];
-const commandField = () => document.querySelector("textarea[aria-label='Command']") as HTMLTextAreaElement | null;
+const commandField = () => document.querySelector("textarea[aria-label='Command'], textarea[aria-label='Script']") as HTMLTextAreaElement | null;
 const nameField = () => document.querySelector("input[aria-label='Action name']") as HTMLInputElement | null;
 const dialogButton = (text: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 const pencil = (c: HTMLElement, n = 0) => c.querySelectorAll("button[aria-label='Edit action']")[n];
@@ -131,15 +131,15 @@ describe("ActionsColumns", () => {
     app.unmount();
   });
 
-  it("has one Add combo per column, Add Command first", () => {
+  it("has one Add combo per column, Add script first", () => {
     const { container, unmount } = mount([], []);
-    expect(column(container, "global").textContent).not.toContain("Add Command");
+    expect(column(container, "global").textContent).not.toContain("Add script");
     click(addTrigger(container, "global"));
-    expect(options()[0]!.textContent).toContain("Add Command");
+    expect(options()[0]!.textContent).toContain("Add script");
     unmount();
   });
 
-  it("Add Command opens a script draft that reaches its scope's store once it has a command", () => {
+  it("Add script opens a script draft that reaches its scope's store once it has a command", () => {
     const { container, g, w, unmount } = mount([], []);
     click(addTrigger(container, "workspace"));
     click(options()[0]);
@@ -188,7 +188,7 @@ describe("ActionsColumns", () => {
   it("the custom app starts an empty app draft in the modal", () => {
     const { container, g, unmount } = mount([], [], { suggestions: [] });
     click(addTrigger(container, "global"));
-    click(options().find((o) => o.textContent?.includes("Custom app")));
+    click(options().find((o) => o.textContent?.includes("Custom")));
     expect(g.onAdd).not.toHaveBeenCalled();
     expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     typeField(commandField()!, "code {filepath}");
@@ -271,6 +271,22 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
+  it("Enter in the name field saves what is typed and closes the modal", () => {
+    const { container, g, unmount } = mount([saved]);
+    click(pencil(container));
+    act(() => nameField()!.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(nameField()!, "Server");
+      nameField()!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(g.onUpdate).not.toHaveBeenCalled();
+    act(() => nameField()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(nameField()).toBeNull();
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ name: "Server" }));
+    unmount();
+  });
+
   it("flags an empty command and saves nothing for it", () => {
     const { container, g, unmount } = mount([saved]);
     click(pencil(container));
@@ -282,7 +298,7 @@ describe("ActionsColumns", () => {
       setter.call(field, "");
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(document.body.textContent).toContain("Command is required");
+    expect(document.body.textContent).toContain("Script is required");
     act(() => void field.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
     expect(g.onUpdate).not.toHaveBeenCalled();
     expect(commandField()!.value).toBe("pnpm dev");
@@ -354,20 +370,19 @@ describe("ActionsColumns", () => {
     own.unmount();
   });
 
-  it("the scope radio is two boxed options laid out like the column headers", () => {
+  it("the scope choice is two small buttons, This workspace first, with the hints on hover", () => {
     const { container, unmount } = mount([saved], []);
     click(pencil(container));
-    const text = document.querySelector("[aria-label='Where it is available']")!.textContent ?? "";
-    expect(text).toContain("Global");
-    expect(text).toContain("every workspace");
-    expect(text).toContain("This workspace");
-    expect(text).toContain("Dashboard");
+    const group = document.querySelector("[aria-label='Where it is available']")!;
+    const buttons = [...group.querySelectorAll("button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["This workspace", "Global"]);
+    expect(buttons.map((b) => b.getAttribute("title"))).toEqual(["Dashboard", "every workspace"]);
     unmount();
   });
 
   it("the preview keeps the Actions combo, and the open one has its group title and the line under the name", () => {
     const combo = mount([saved], [savedApp]);
-    click(pencil(combo.container));
+    click(pencil(combo.container, 1));
     const preview = () => document.querySelector("[data-own-button-preview]")!;
     expect(preview().querySelector("[data-preview-combo]")).not.toBeNull();
     expect(preview().textContent).toContain("Global actions");

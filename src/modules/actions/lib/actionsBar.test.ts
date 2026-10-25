@@ -21,6 +21,7 @@ import {
   MENUS_RESERVE,
   ownButtonsThatFit,
   ownButtonWidth,
+  paletteActions,
   parseBarZone,
   resolveDrop,
   SETTINGS_LABELS,
@@ -764,5 +765,34 @@ describe("agents", () => {
     expect(resolveDrop(bar, [], "g", "s")).toBeNull();
     expect(resolveDrop([...bar, { id: "ga", global: true, action: app({ id: "ga" }) }], [], "a", "gg")).toBeNull();
     expect(resolveDrop(bar, [], "a", "gg")).toEqual({ id: "a", from: "workspace", to: "global", wasButton: true, button: true });
+  });
+});
+
+describe("paletteActions", () => {
+  const build = (states = new Map<string, "running">()) =>
+    buildActionsBarModel({
+      local: [script({ id: "s1", name: "dev" }), app({ id: "a1", command: "code {filepath}" })],
+      global: [script({ id: "g1", name: "lint" })],
+      context: ctx,
+      states,
+      activeId: undefined,
+    });
+
+  it("lists the Actions that can run, workspace ones before global ones", () => {
+    expect(paletteActions(build()).map((i) => i.id)).toEqual(["s1", "g1"]);
+  });
+
+  it("leaves out the ones that cannot run now", () => {
+    expect(paletteActions(build()).map((i) => i.id)).not.toContain("a1");
+  });
+
+  it("keeps a running script so it can be shown or stopped", () => {
+    const model = buildActionsBarModel({
+      local: [script({ id: "s1", command: "pnpm dev {filepath}" })],
+      context: ctx,
+      states: new Map([["s1", "running" as const]]),
+      activeId: undefined,
+    });
+    expect(paletteActions(model).map((i) => i.id)).toEqual(["s1"]);
   });
 });

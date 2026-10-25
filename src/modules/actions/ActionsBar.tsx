@@ -93,14 +93,14 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
         else run(item.action);
       }}
       className={cn(
-        "flex size-[22px] shrink-0 items-center justify-center rounded transition-colors",
+        "flex shrink-0 items-center justify-center rounded-md transition-colors",
         busy && "text-destructive hover:bg-destructive/15",
         !busy && !blocked && "text-green-500 hover:bg-green-500/15",
         blocked && "cursor-not-allowed text-muted-foreground/40",
         className,
       )}
     >
-      <HugeiconsIcon icon={busy ? StopIcon : PlayIcon} size={12} strokeWidth={2} />
+      <HugeiconsIcon icon={busy ? StopIcon : PlayIcon} size={14} strokeWidth={2} />
     </button>
   );
 }
@@ -131,7 +131,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
         item.active && "ring-1 ring-border",
       )}
     >
-      {script && <ScriptControl item={item} {...h} className="ml-0.5" />}
+      {script && <ScriptControl item={item} {...h} className="size-8" />}
       <button
         type="button"
         title={ownButtonTitle(item)}
@@ -143,10 +143,14 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
           "hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
         )}
       >
-        {!script && <ActionIcon action={item.action} size={14} />}
-        {!iconOnly && (
-          <span className="max-w-[120px] min-w-0">
-            <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
+        {iconOnly ? (
+          <ActionIcon action={item.action} size={14} />
+        ) : (
+          <span className="flex min-w-0 items-center gap-1.5">
+            {!script && <ActionIcon action={item.action} size={14} fill />}
+            <span className="max-w-[120px] min-w-0">
+              <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
+            </span>
           </span>
         )}
       </button>
@@ -342,7 +346,8 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
   const blocked = item.state === "idle" && item.disabledReason !== null;
   const text = (
     <>
-      <span className={cn("flex min-w-0 flex-1", blocked && "opacity-60")}>
+      <span className={cn("flex min-w-0 flex-1 items-center gap-2", blocked && "opacity-60")}>
+        {!script && <ActionIcon action={item.action} size={14} fill />}
         <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
       </span>
       {blocked && item.subtitle !== WORKSPACE_UNSET && (
@@ -376,7 +381,7 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
       >
         {script ? (
           <>
-            <ScriptControl item={item} {...h} />
+            <ScriptControl item={item} {...h} className="min-h-9 w-9 self-stretch" />
             <DropdownMenuItem
               {...common}
               className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
@@ -394,7 +399,6 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
             className="flex min-h-9 min-w-0 flex-1 items-center gap-2 overflow-hidden py-0.5 pr-3"
             onSelect={() => nameClick(item, h)}
           >
-            <span className="flex shrink-0 items-center justify-center"><ActionIcon action={item.action} size={14} /></span>
             {text}
           </DropdownMenuItem>
         )}
@@ -523,7 +527,7 @@ function AddActionMenu({ onAdd, reveal, dragging }: { onAdd: () => void; reveal:
   return (
     <button
       type="button"
-      title="Add an action: run a command or open an app"
+      title="Add an action: run a script or open an app"
       aria-haspopup="menu"
       onClick={onAdd}
       className={cn(

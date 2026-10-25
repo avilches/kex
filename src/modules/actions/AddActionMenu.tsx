@@ -1,6 +1,6 @@
 import { Add01Icon, ChevronDownIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -19,20 +19,15 @@ import { actionRowTitle, scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBa
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionKind } from "./lib/types";
 
-const GROUPS: readonly { kind: ActionKind; heading: string }[] = [
-  { kind: "app", heading: "Applications" },
-  { kind: "agent", heading: "Agents" },
-];
-
 type Props = {
   suggestions: readonly AppSuggestion[];
   onAddCommand: () => void;
   onPickApp: (suggestion: AppSuggestion) => void;
 };
 
-// The one Add control of a column: a searchable combo whose first entries are Add Command and
-// the custom app, then one alphabetical entry per detected app preset and, in their own
-// section, per detected agent preset (icon, and under it what the preset points at or the
+// The one Add control of a column: a searchable combo whose first entry is Add script, then the
+// Applications group: Custom, then one alphabetical entry per detected app preset, and the Agents
+// group with one per detected agent preset (icon, and under it what the preset points at or the
 // folder it starts in). Presets keep the combo open so several can be installed in a row;
 // the entries that open an editor close it. Installed presets never show up in the list.
 export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
@@ -54,8 +49,8 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
             <CommandEmpty>Nothing found.</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                value="add-command"
-                keywords={["command", "script", "terminal"]}
+                value="add-script"
+                keywords={["script", "command", "terminal"]}
                 onSelect={() => {
                   setOpen(false);
                   onAddCommand();
@@ -65,9 +60,12 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                 <span className="flex size-5 shrink-0 items-center justify-center">
                   <HugeiconsIcon icon={ComputerTerminal01Icon} size={13} strokeWidth={1.75} />
                 </span>
-                <span className="min-w-0 flex-1 truncate">Add Command</span>
+                <span className="min-w-0 flex-1 truncate">Add script</span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">runs in a terminal</span>
               </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup heading="Applications">
               <CommandItem
                 value={CUSTOM_APP_SUGGESTION.key}
                 onSelect={() => {
@@ -80,41 +78,46 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
                   <ActionIcon action={{ kind: "app" }} size={13} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{CUSTOM_APP_SUGGESTION.name}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">write the command yourself</span>
               </CommandItem>
+              {presetItems(suggestions, "app", onPickApp)}
             </CommandGroup>
-            {GROUPS.map((group) => {
-              const items = suggestions.filter((s) => s.kind === group.kind).sort(compareByName);
-              if (items.length === 0) return null;
-              return (
-                <Fragment key={group.kind}>
-                  <CommandSeparator />
-                  <CommandGroup heading={group.heading}>
-                    {items.map((s) => {
-                      const sub = scriptSubtitle({ name: s.name, kind: s.kind, cwdMode: s.cwdMode }, SETTINGS_LABELS);
-                      return (
-                        <CommandItem
-                          key={s.key}
-                          value={s.key}
-                          keywords={[s.name, s.defaultCommand]}
-                          onSelect={() => onPickApp(s)}
-                          title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
-                          className="text-[12px]"
-                        >
-                          <span className="flex size-5 shrink-0 items-center justify-center">
-                            <ActionIcon action={{ appId: s.appId, kind: s.kind }} size={13} />
-                          </span>
-                          <ActionNameLines name={s.name} value={sub.text ?? undefined} startTrim={sub.startTrim} />
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </Fragment>
-              );
-            })}
+            {suggestions.some((s) => s.kind === "agent") && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   );
+}
+
+function presetItems(
+  suggestions: readonly AppSuggestion[],
+  kind: ActionKind,
+  onPickApp: (suggestion: AppSuggestion) => void,
+) {
+  return suggestions
+    .filter((s) => s.kind === kind)
+    .sort(compareByName)
+    .map((s) => {
+      const sub = scriptSubtitle({ name: s.name, kind: s.kind, cwdMode: s.cwdMode }, SETTINGS_LABELS);
+      return (
+        <CommandItem
+          key={s.key}
+          value={s.key}
+          keywords={[s.name, s.defaultCommand]}
+          onSelect={() => onPickApp(s)}
+          title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
+          className="text-[12px]"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <ActionIcon action={{ appId: s.appId, kind: s.kind }} size={13} fill />
+            <ActionNameLines name={s.name} value={sub.text ?? undefined} startTrim={sub.startTrim} />
+          </span>
+        </CommandItem>
+      );
+    });
 }
