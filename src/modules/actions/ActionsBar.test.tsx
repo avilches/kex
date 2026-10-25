@@ -180,13 +180,13 @@ describe("ActionsMenu", () => {
     return { container, handlers, onEdit, open, unmount: () => act(() => root.unmount()) };
   }
 
-  it("pools every non-own Action into one menu: workspace scope, then global", () => {
+  it("pools every non-own Action into one menu: global scope, then workspace", () => {
     const view = mountMenu([item(app)], [item({ ...script, id: "g1" })]);
     view.open();
     const menu = document.querySelector("[role='menu']")!;
-    expect(menu.textContent).toContain("Workspace actions");
     expect(menu.textContent).toContain("Global actions");
-    expect([...menu.querySelectorAll("[role='menuitem']")].slice(0, 2).map((r) => r.textContent)).toEqual(["PyCharm", "dev"]);
+    expect(menu.textContent).toContain("Workspace actions");
+    expect([...menu.querySelectorAll("[role='menuitem']")].slice(0, 2).map((r) => r.textContent)).toEqual(["dev", "PyCharm"]);
     view.unmount();
   });
 

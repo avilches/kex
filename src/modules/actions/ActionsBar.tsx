@@ -507,9 +507,9 @@ export function ActionsMenu({
           onRestoreFocus();
         }}
       >
-        <MenuSection id={DROP_MENU_WORKSPACE} label="Workspace actions" items={items} dragging={dragging} {...row} />
-        {(items.length > 0 || dragging) && (globalItems.length > 0 || dragging) && <DropdownMenuSeparator />}
         <MenuSection id={DROP_MENU_GLOBAL} label="Global actions" items={globalItems} dragging={dragging} {...row} />
+        {(globalItems.length > 0 || dragging) && (items.length > 0 || dragging) && <DropdownMenuSeparator />}
+        <MenuSection id={DROP_MENU_WORKSPACE} label="Workspace actions" items={items} dragging={dragging} {...row} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onConfigure} className="text-muted-foreground">
           <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
