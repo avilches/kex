@@ -57,8 +57,10 @@ mod unix_lookup {
     use std::ffi::{OsStr, OsString};
     use std::io::Read;
     use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::process::CommandExt;
     use std::path::Path;
     use std::process::{Command, Stdio};
+    use std::sync::mpsc;
     use std::time::{Duration, Instant};
 
     const LOGIN_SHELL_TIMEOUT: Duration = Duration::from_secs(3);
@@ -74,9 +76,15 @@ mod unix_lookup {
         }
     }
 
+    const PATH_BEGIN: &str = "__KEX_PATH_BEGIN__";
+    const PATH_END: &str = "__KEX_PATH_END__";
+    // A fixed string, never built from user text; the markers keep rc-file noise out of the parse.
+    const PROBE: &str =
+        "echo __KEX_PATH_BEGIN__; /usr/bin/printenv PATH; echo __KEX_PATH_END__";
+
     pub(super) fn read_login_path(shell: &str, timeout: Duration) -> Option<OsString> {
         let mut cmd = Command::new(shell);
-        cmd.args(["-l", "-i", "-c", "/usr/bin/printenv PATH"])
+        cmd.args(["-l", "-i", "-c", PROBE])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
@@ -86,37 +94,76 @@ mod unix_lookup {
                 None => cmd.env_remove(key),
             };
         }
-        let mut child = cmd.spawn().ok()?;
-        let mut stdout = child.stdout.take()?;
-        let reader = std::thread::spawn(move || {
-            let mut buf = Vec::new();
-            let _ = stdout.read_to_end(&mut buf);
-            buf
-        });
-        let deadline = Instant::now() + timeout;
-        loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(20))
+        // A new session has no controlling tty, so an interactive shell cannot stop on it, and
+        // the whole group (rc-file background jobs included) can be killed at once.
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
                 }
-                _ => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    log::warn!("login shell PATH lookup did not finish in time");
-                    return None;
-                }
-            }
+                Ok(())
+            });
         }
-        let out = reader.join().ok()?;
-        parse_printenv_output(&String::from_utf8_lossy(&out)).map(OsString::from)
+        let out = run_bounded(cmd, timeout)?;
+        parse_marked_path(&String::from_utf8_lossy(&out)).map(OsString::from)
     }
 
-    pub(super) fn parse_printenv_output(out: &str) -> Option<String> {
-        out.lines()
-            .map(str::trim)
-            .rfind(|l| !l.is_empty())
-            .filter(|l| l.contains('/'))
+    // One deadline bounds the whole probe: a background job that inherits stdout keeps the pipe
+    // open after the shell exits, so the read stops at the end marker or the deadline, not EOF.
+    pub(super) fn run_bounded(mut cmd: Command, timeout: Duration) -> Option<Vec<u8>> {
+        let deadline = Instant::now() + timeout;
+        let mut child = cmd.spawn().ok()?;
+        let mut stdout = child.stdout.take()?;
+        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        std::thread::spawn(move || {
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = stdout.read(&mut chunk) {
+                if n == 0 || tx.send(chunk[..n].to_vec()).is_err() {
+                    break;
+                }
+            }
+        });
+        let mut buf = Vec::new();
+        let complete = loop {
+            if marked_section(&String::from_utf8_lossy(&buf)).is_some() {
+                break true;
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            match rx.recv_timeout(left) {
+                Ok(chunk) => buf.extend_from_slice(&chunk),
+                Err(mpsc::RecvTimeoutError::Disconnected) => break true,
+                Err(mpsc::RecvTimeoutError::Timeout) => break false,
+            }
+        };
+        // Everything left in the group was started by the probe; killing it before reaping the
+        // leader keeps the group id from being reused and frees the reader thread.
+        kill_group(&child);
+        let _ = child.kill();
+        let _ = child.wait();
+        if !complete {
+            log::warn!("login shell PATH lookup did not finish in time");
+            return None;
+        }
+        Some(buf)
+    }
+
+    fn kill_group(child: &std::process::Child) {
+        if let Ok(pid) = libc::pid_t::try_from(child.id()) {
+            unsafe {
+                libc::kill(-pid, libc::SIGKILL);
+            }
+        }
+    }
+
+    fn marked_section(out: &str) -> Option<&str> {
+        let begin = out.find(PATH_BEGIN)? + PATH_BEGIN.len();
+        let len = out[begin..].find(PATH_END)?;
+        Some(&out[begin..begin + len])
+    }
+
+    pub(super) fn parse_marked_path(out: &str) -> Option<String> {
+        Some(marked_section(out)?.trim())
+            .filter(|p| !p.is_empty())
             .map(str::to_string)
     }
 
@@ -188,8 +235,9 @@ mod tests {
         use super::super::unix_lookup::*;
         use std::ffi::OsStr;
         use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::process::CommandExt;
         use std::path::Path;
-        use std::time::Duration;
+        use std::time::{Duration, Instant};
 
         fn script(dir: &Path, name: &str, body: &str, mode: u32) -> String {
             let p = dir.join(name);
@@ -212,14 +260,24 @@ mod tests {
         }
 
         #[test]
-        fn takes_the_last_line_of_noisy_shell_output() {
-            let out = "welcome banner\n\n/opt/homebrew/bin:/usr/bin\n\n";
+        fn takes_only_the_text_between_the_markers() {
+            let out = "welcome /bin/banner\n__KEX_PATH_BEGIN__\n/opt/homebrew/bin:/usr/bin\n__KEX_PATH_END__\nbye /logout\n";
             assert_eq!(
-                parse_printenv_output(out).as_deref(),
+                parse_marked_path(out).as_deref(),
                 Some("/opt/homebrew/bin:/usr/bin")
             );
-            assert_eq!(parse_printenv_output(""), None);
-            assert_eq!(parse_printenv_output("no path here"), None);
+        }
+
+        #[test]
+        fn missing_markers_or_an_empty_path_give_nothing() {
+            assert_eq!(parse_marked_path(""), None);
+            assert_eq!(parse_marked_path("/usr/bin:/bin\n"), None);
+            assert_eq!(parse_marked_path("__KEX_PATH_BEGIN__\n/usr/bin"), None);
+            assert_eq!(parse_marked_path("/usr/bin __KEX_PATH_END__"), None);
+            assert_eq!(
+                parse_marked_path("__KEX_PATH_BEGIN__\n\n__KEX_PATH_END__"),
+                None
+            );
         }
 
         #[test]
@@ -231,16 +289,57 @@ mod tests {
             assert_eq!(merged, "/home/u/.local/bin:/usr/bin:/bin");
         }
 
+        // The fake "shell" ignores its arguments, so each script stands in for a login shell.
         #[test]
         fn reads_path_from_a_shell_and_gives_up_on_a_hung_one() {
             let dir = tempfile::tempdir().unwrap();
-            let ok = script(dir.path(), "ok.sh", "echo noise\necho /x/bin:/y/bin\n", 0o755);
+            let ok = script(
+                dir.path(),
+                "ok.sh",
+                "echo noise\necho __KEX_PATH_BEGIN__\necho /x/bin:/y/bin\necho __KEX_PATH_END__\necho logout\n",
+                0o755,
+            );
             let hung = script(dir.path(), "hung.sh", "sleep 5\n", 0o755);
+            let unmarked = script(dir.path(), "plain.sh", "echo /x/bin\n", 0o755);
             assert_eq!(
                 read_login_path(&ok, Duration::from_secs(5)).unwrap(),
                 "/x/bin:/y/bin"
             );
             assert_eq!(read_login_path(&hung, Duration::from_millis(200)), None);
+            assert_eq!(read_login_path(&unmarked, Duration::from_secs(5)), None);
+        }
+
+        #[test]
+        fn a_background_job_holding_stdout_does_not_hang_the_probe() {
+            let dir = tempfile::tempdir().unwrap();
+            let done = script(
+                dir.path(),
+                "bg-done.sh",
+                "sleep 30 &\necho __KEX_PATH_BEGIN__\necho /x/bin\necho __KEX_PATH_END__\n",
+                0o755,
+            );
+            let silent = script(dir.path(), "bg-silent.sh", "sleep 30 &\n", 0o755);
+            let start = Instant::now();
+            assert_eq!(
+                read_login_path(&done, Duration::from_secs(5)).unwrap(),
+                "/x/bin"
+            );
+            assert!(start.elapsed() < Duration::from_secs(2));
+            let start = Instant::now();
+            assert_eq!(read_login_path(&silent, Duration::from_millis(300)), None);
+            assert!(start.elapsed() < Duration::from_secs(2));
+        }
+
+        #[test]
+        fn the_deadline_bounds_an_injected_command_that_never_closes_stdout() {
+            let mut cmd = std::process::Command::new("/bin/sh");
+            cmd.args(["-c", "sleep 30 & sleep 30"])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .process_group(0);
+            let start = Instant::now();
+            assert_eq!(run_bounded(cmd, Duration::from_millis(200)), None);
+            assert!(start.elapsed() < Duration::from_secs(2));
         }
     }
 }
