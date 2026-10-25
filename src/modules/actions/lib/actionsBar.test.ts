@@ -34,7 +34,7 @@ import type { Action } from "./types";
 const script = (o: Partial<Action> = {}): Action => ({
   id: "s1",
   name: "dev",
-  kind: "script" as const,
+  kind: "script",
   command: "pnpm dev",
   cwdMode: "workspace",
   ownButton: false,
@@ -43,7 +43,7 @@ const script = (o: Partial<Action> = {}): Action => ({
 const app = (o: Partial<Action> = {}): Action => ({
   id: "a1",
   name: "PyCharm",
-  kind: "app" as const,
+  kind: "app",
   command: "pycharm {workspace}",
   ownButton: false,
   ...o,
@@ -423,7 +423,7 @@ describe("scriptSubtitle", () => {
 
   it("keeps the subtitle of the variable in the name, and leaves apps alone", () => {
     expect(scriptSubtitle(script({ name: "Agent {cwd}", cwdMode: "fixed", cwd: "/x" }), ctx).text).toBe("/p");
-    expect(scriptSubtitle({ name: "dev", kind: "app" as const }, ctx).text).toBeNull();
+    expect(scriptSubtitle({ name: "dev", kind: "app" }, ctx).text).toBeNull();
   });
 });
 
@@ -643,7 +643,7 @@ describe("agents", () => {
   const agent = (o: Partial<Action> = {}): Action => ({
     id: "g1",
     name: "Claude Code",
-    kind: "agent" as const,
+    kind: "agent",
     command: "claude",
     appId: "claude",
     cwdMode: "context",

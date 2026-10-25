@@ -137,6 +137,6 @@ describe("uninstalledSuggestions", () => {
   it("hides nothing for a different command, nor for a script that has the command", () => {
     const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed -n {workspace}", appId: "zed", ownButton: false }];
     expect(uninstalledSuggestions(suggestions, installed)).toEqual(suggestions);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {workspace}", kind: "script" as const }])).toEqual(suggestions);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {workspace}", kind: "script" }])).toEqual(suggestions);
   });
 });

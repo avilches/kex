@@ -98,7 +98,7 @@ describe("actionsToUnlink", () => {
   });
 
   it("lists Actions that switched between script and app", () => {
-    expect(actionsToUnlink([a], [{ ...a, kind: "app" as const }])).toEqual(["a"]);
+    expect(actionsToUnlink([a], [{ ...a, kind: "app" }])).toEqual(["a"]);
   });
 
   it("ignores edits that keep the Action what it was", () => {
@@ -121,7 +121,7 @@ describe("unlinkRemovedActions", () => {
   it("drops the link when the Action stops being a script", () => {
     linkActionTab("a", "t1");
     setScriptRunning("t1", "running");
-    unlinkRemovedActions([a], [{ ...a, kind: "app" as const }]);
+    unlinkRemovedActions([a], [{ ...a, kind: "app" }]);
     expect(getActionTab("a")).toBeUndefined();
     expect(getScriptRunningSnapshot().has("t1")).toBe(false);
   });
