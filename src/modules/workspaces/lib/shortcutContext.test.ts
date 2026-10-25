@@ -67,4 +67,9 @@ describe("historyPaletteShortcutUnavailable", () => {
   it("stays out while a command runs", () => {
     expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: "pnpm dev" })).toBe(true);
   });
+
+  it("stays out while any foreground process owns the terminal, even with no running command reported", () => {
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: "bun" })).toBe(true);
+    expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: null })).toBe(false);
+  });
 });

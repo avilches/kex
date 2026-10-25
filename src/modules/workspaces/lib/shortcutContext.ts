@@ -45,11 +45,14 @@ export type HistoryPaletteSignals = {
   promptReady: boolean;
   /** Command the shell integration reports as running in that leaf, if any. */
   runningCommand: string | null;
+  /** Fresh process-tree check; some agents (omp) fake the shell's OSC 133 prompt
+   * markers, which clears the running command, so only this sees them. */
+  foregroundProcess?: string | null;
 };
 
 // Ctrl+R hands the shell's reverse search to the palette's > history mode. It may only claim
 // the key where a command could be typed into the terminal; otherwise the shell keeps it.
 export function historyPaletteShortcutUnavailable(s: HistoryPaletteSignals): boolean {
   if (s.activeTab?.kind !== "terminal") return true;
-  return !s.promptReady || s.runningCommand !== null;
+  return !s.promptReady || s.runningCommand !== null || !!s.foregroundProcess;
 }

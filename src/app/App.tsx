@@ -2940,7 +2940,16 @@ export default function App() {
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
-      "commandPalette.history": () => openCommandPalette("history"),
+      "commandPalette.history": () => {
+        // The sync gate in shortcutsDisabled cannot see an agent that fakes the
+        // shell's prompt markers (omp renders OSC 133 A/B/C/D around each user
+        // message, which clears the running command); the process tree can.
+        const tabId = activeTabId;
+        if (!tabId || activeTab?.kind !== "terminal") return;
+        void leafHasForegroundProcess(tabId).then((foreground) => {
+          if (foreground === null) openCommandPalette("history");
+        });
+      },
       "palette.folderRoot": () => void runPaletteShortcut("folderRoot"),
       "palette.folderMain": () => void runPaletteShortcut("folderMain"),
       "palette.folderHome": () => void runPaletteShortcut("folderHome"),
