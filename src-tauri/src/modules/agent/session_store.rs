@@ -131,7 +131,27 @@ pub fn split_orphans(
     plans.into_iter().partition(|p| known.contains(&p.tab_id))
 }
 
+#[cfg(test)]
+thread_local! {
+    static STORE_OVERRIDE: std::cell::RefCell<Option<PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Points this thread's store at `path` while `f` runs, so a test can drive the public entry
+/// points (the IPC dispatcher) without the process-wide `DATA_DIR`.
+#[cfg(test)]
+pub fn with_store_path<R>(path: &Path, f: impl FnOnce() -> R) -> R {
+    STORE_OVERRIDE.with(|o| *o.borrow_mut() = Some(path.to_path_buf()));
+    let out = f();
+    STORE_OVERRIDE.with(|o| *o.borrow_mut() = None);
+    out
+}
+
 fn store_path() -> Option<PathBuf> {
+    #[cfg(test)]
+    if let Some(path) = STORE_OVERRIDE.with(|o| o.borrow().clone()) {
+        return Some(path);
+    }
     DATA_DIR.get().map(|d| d.join("agent-sessions.json"))
 }
 
@@ -693,6 +713,8 @@ fn now_secs() -> u64 {
 /// Stores the assistant's last message of a Stop and stamps `updated_at` with the end of the
 /// turn. Only for a recorded tab of the same session id, like `set_snapshot`. A Stop without
 /// the field (agents whose hook never sends it) must not call this: the record keeps no message.
+/// A message with nothing visible (a turn that ended on a tool call) leaves the record as it is,
+/// so the preview keeps the last thing the assistant actually said.
 pub fn set_last_message(tab_id: &str, session_id: &str, message: &str) -> bool {
     match store_path() {
         Some(path) => set_last_message_at_path(&path, tab_id, session_id, message, now_secs()),
@@ -707,6 +729,9 @@ fn set_last_message_at_path(
     message: &str,
     now: u64,
 ) -> bool {
+    let Some(clipped) = clip_last_message(message) else {
+        return false;
+    };
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     let Ok(content) = std::fs::read_to_string(path) else {
         return false;
@@ -720,7 +745,7 @@ fn set_last_message_at_path(
     if record.session_id != session_id {
         return false;
     }
-    record.last_message = clip_last_message(message);
+    record.last_message = Some(clipped);
     record.updated_at = now;
     let Ok(out) = serde_json::to_string_pretty(&store) else {
         return false;
@@ -2352,15 +2377,21 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_stop_message_clears_the_previous_one() {
+    fn an_empty_stop_message_leaves_the_record_untouched() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
         set_last_message_at_path(&path, "tab-1", "abc", "old answer", 100);
+        let before = std::fs::read_to_string(&path).unwrap();
 
-        set_last_message_at_path(&path, "tab-1", "abc", "  ", 200);
+        assert!(!set_last_message_at_path(
+            &path, "tab-1", "abc", "  \n", 200
+        ));
 
-        assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
+        let rec = &read_store(&path).tabs["tab-1"];
+        assert_eq!(rec.last_message.as_deref(), Some("old answer"));
+        assert_eq!(rec.updated_at, 100);
     }
 
     #[cfg(unix)]

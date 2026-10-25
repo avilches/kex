@@ -2070,6 +2070,34 @@ mod tests {
     }
 
     #[test]
+    fn a_stop_with_a_message_reaches_the_session_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = dir.path().join("agent-sessions.json");
+        let tab = "tab-stop-wiring";
+        let preview = || session_store::session_previews(&[tab.to_string()]);
+        session_store::with_store_path(&store, || {
+            dispatch_events(
+                r#"{"hook_event_name":"SessionStart","session_id":"s1","transcript_path":"","cwd":"/w","source":"startup"}"#,
+                tab,
+            );
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"All\n tests pass"}"#,
+                tab,
+            );
+            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"  "}"#,
+                tab,
+            );
+            dispatch_events(
+                r#"{"hook_event_name":"Stop","session_id":"other","transcript_path":"","cwd":"/w","last_assistant_message":"stale"}"#,
+                tab,
+            );
+            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
+        });
+    }
+
+    #[test]
     fn a_status_line_frame_emits_only_the_tab_usage() {
         let json = r#"{"hook_event_name":"StatusLine","agent":"claude","tab_id":"tab-sl","pty_id":"3","cwd":"/w","session_id":"s","context_window":{"used_percentage":12},"rate_limits":{"five_hour":{"used_percentage":40,"resets_at":1792900000}}}"#;
         let emitted = dispatch_events(json, "tab-sl");
