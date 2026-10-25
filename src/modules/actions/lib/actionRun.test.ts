@@ -312,11 +312,18 @@ describe("pickRunnableAction", () => {
     expect(pickRunnableAction([a, b], "gone")).toBe(a);
   });
 
-  it("skips hidden twins, the active one included", () => {
-    expect(pickRunnableAction([a, b], "a", new Set(["a"]))).toBe(b);
-    expect(pickRunnableAction([a, b], "b", new Set(["a"]))).toBe(b);
+  it("prefers a visible Action over a hidden one when the active one is not runnable", () => {
     expect(pickRunnableAction([a, b], undefined, new Set(["a"]))).toBe(b);
-    expect(pickRunnableAction([a], "a", new Set(["a"]))).toBeUndefined();
+    expect(pickRunnableAction([empty, a, b], "e", new Set(["a"]))).toBe(b);
+  });
+
+  it("still picks the active Action when it is hidden, its twin does the same", () => {
+    expect(pickRunnableAction([a, b], "a", new Set(["a"]))).toBe(a);
+  });
+
+  it("falls back to the hidden ones when nothing visible can run", () => {
+    expect(pickRunnableAction([a], undefined, new Set(["a"]))).toBe(a);
+    expect(pickRunnableAction([a, empty], "gone", new Set(["a"]))).toBe(a);
   });
 
   it("returns nothing when no Action has a command", () => {
