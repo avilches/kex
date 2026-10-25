@@ -6,6 +6,7 @@ pub mod fs;
 pub mod git;
 pub mod history;
 pub mod proc;
+pub mod profile;
 pub mod pty;
 pub mod shell;
 pub mod tab_history;
