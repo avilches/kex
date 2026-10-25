@@ -434,7 +434,7 @@ export function ThemeTable({
         </div>
       </div>
 
-      <div className="flex max-h-[340px] flex-col gap-1 overflow-y-auto pr-0.5">
+      <div className="flex flex-col gap-1">
         {rows.map((r) => {
           const t = r.theme;
           const active = t.id === themeId;
