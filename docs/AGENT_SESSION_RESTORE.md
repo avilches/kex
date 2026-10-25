@@ -121,10 +121,20 @@ pure and tested at each boundary). First release per event: `Notification` 1.0.2
 2.0.45, `StopFailure` 2.1.78, `PostCompact` 2.1.76, `MessageDisplay` 2.1.152 (this one from Claude's CHANGELOG, it is not in the fixture
 extracted from the npm releases). When the version cannot be read, only the six events present since 1.0.x are written.
 
+`claude --version` runs with the inherited PATH plus the install folders of the candidate list (`~/.local/bin`,
+`~/.npm-global/bin`, `~/.volta/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, ...) appended, so an npm install whose
+`#!/usr/bin/env node` would not find node with the minimal PATH of an app opened from the Finder still answers
+(`claude_version::widened_path`). An unknown version never takes anything away: the install only makes sure the six
+baseline events carry Kex's hook and leaves Kex's hook in any other event exactly as it is, so a `claude --version` that
+fails once cannot strip `PermissionRequest`, `StopFailure` and the rest from a working install. Pruning the events a
+version does not know happens only when the version is known and older (`merge_hooks` with `prune`, set by
+`claude_version::is_known`).
+
 Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
-a downgrade removes Kex's hook from the events the older Claude does not know. Uninstalling removes Kex's hook from
-every known event whatever the installed version. `agent_claude_hooks_status` expects the events of the installed
-version, so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v13` since every frame names its tab and PTY (`tab_id`, `pty_id`) for the app's single socket.
+a downgrade to a version Kex can read removes Kex's hook from the events the older Claude does not know. Uninstalling
+removes Kex's hook from every known event whatever the installed version. `agent_claude_hooks_status` expects the
+events of the installed version (the six baseline ones when it is unknown, which is all the install guarantees then),
+so the "installed" state stays coherent. `SESSION_HOOK_SCRIPT_VERSION` is `kex-session-v13` since every frame names its tab and PTY (`tab_id`, `pty_id`) for the app's single socket.
 
 ### Status line (context and rate limits)
 

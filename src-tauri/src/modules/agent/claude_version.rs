@@ -55,6 +55,12 @@ pub fn hook_events_for(version: Option<&str>) -> Vec<&'static str> {
         .collect()
 }
 
+/// Whether `claude --version` gave something Kex can compare. Only a known version may take
+/// events away from settings.json: an unknown one only ever adds the baseline.
+pub fn is_known(version: Option<&str>) -> bool {
+    version.and_then(parse_version).is_some()
+}
+
 /// Every event Kex knows, whatever the installed version: what an uninstall cleans.
 pub fn known_events() -> impl Iterator<Item = &'static str> {
     EVENT_SINCE.iter().map(|(event, _)| *event)
@@ -71,6 +77,15 @@ fn candidates_for(home: Option<&std::path::Path>, windows: bool) -> Vec<std::pat
         &["claude"]
     };
     let mut list: Vec<std::path::PathBuf> = names.iter().map(std::path::PathBuf::from).collect();
+    for dir in install_dirs(home, windows) {
+        for name in names {
+            list.push(dir.join(name));
+        }
+    }
+    list
+}
+
+fn install_dirs(home: Option<&std::path::Path>, windows: bool) -> Vec<std::path::PathBuf> {
     let mut dirs: Vec<std::path::PathBuf> = Vec::new();
     if let Some(home) = home {
         for sub in [
@@ -92,12 +107,26 @@ fn candidates_for(home: Option<&std::path::Path>, windows: bool) -> Vec<std::pat
         dirs.push("/opt/homebrew/bin".into());
         dirs.push("/usr/local/bin".into());
     }
-    for dir in dirs {
-        for name in names {
-            list.push(dir.join(name));
+    dirs
+}
+
+/// The child's PATH: the inherited one first, then the install folders it lacks. An npm install
+/// of Claude starts with `#!/usr/bin/env node`, and the minimal PATH of an app opened from the
+/// Finder holds no node, so without them the script fails before printing its version.
+fn widened_path(
+    current: Option<&std::ffi::OsStr>,
+    home: Option<&std::path::Path>,
+    windows: bool,
+) -> Option<std::ffi::OsString> {
+    let mut list: Vec<std::path::PathBuf> = current
+        .map(|p| std::env::split_paths(p).collect())
+        .unwrap_or_default();
+    for dir in install_dirs(home, windows) {
+        if !list.contains(&dir) {
+            list.push(dir);
         }
     }
-    list
+    std::env::join_paths(list).ok()
 }
 
 fn candidates() -> Vec<std::path::PathBuf> {
@@ -106,6 +135,13 @@ fn candidates() -> Vec<std::path::PathBuf> {
 
 fn run_with_timeout(program: &std::path::Path, timeout: Duration) -> Option<String> {
     let mut cmd = Command::new(program);
+    if let Some(path) = widened_path(
+        std::env::var_os("PATH").as_deref(),
+        dirs::home_dir().as_deref(),
+        cfg!(windows),
+    ) {
+        cmd.env("PATH", path);
+    }
     cmd.arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -342,6 +378,49 @@ mod tests {
             "/opt/homebrew/bin/claude",
         ] {
             assert!(list.contains(&std::path::PathBuf::from(want)), "{want}");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_child_path_keeps_the_inherited_one_first_and_adds_node_folders() {
+        let home = std::path::Path::new("/h");
+        let got = widened_path(
+            Some(std::ffi::OsStr::new("/usr/bin:/bin:/usr/local/bin")),
+            Some(home),
+            false,
+        )
+        .unwrap();
+        let dirs: Vec<_> = std::env::split_paths(&got).collect();
+        let at = |d: &str| dirs.iter().position(|p| p == std::path::Path::new(d));
+        assert_eq!(at("/usr/bin"), Some(0));
+        assert_eq!(at("/bin"), Some(1));
+        assert_eq!(at("/usr/local/bin"), Some(2));
+        assert!(at("/opt/homebrew/bin").is_some());
+        assert!(at("/h/.volta/bin").is_some() && at("/h/.local/bin").is_some());
+        let local = std::path::Path::new("/usr/local/bin");
+        assert_eq!(dirs.iter().filter(|p| *p == local).count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_child_path_without_an_inherited_one_is_the_install_folders() {
+        let got = widened_path(None, None, false).unwrap();
+        let dirs: Vec<_> = std::env::split_paths(&got).collect();
+        assert_eq!(
+            dirs,
+            vec![
+                std::path::PathBuf::from("/opt/homebrew/bin"),
+                std::path::PathBuf::from("/usr/local/bin")
+            ]
+        );
+    }
+
+    #[test]
+    fn only_a_parsed_version_counts_as_known() {
+        assert!(is_known(Some("2.1.310 (Claude Code)")));
+        for v in [None, Some(""), Some("garbage"), Some("2.1")] {
+            assert!(!is_known(v), "{v:?}");
         }
     }
 

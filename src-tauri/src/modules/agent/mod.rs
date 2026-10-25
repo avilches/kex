@@ -135,10 +135,11 @@ fn remove_hooks(mut root: Value) -> Value {
     root
 }
 
-/// Writes Kex's hook for each event in `events`. An event Kex knows but the installed Claude
-/// does not (after a downgrade) loses Kex's hook, and its key goes when nothing else is left in
-/// it, because an unknown key makes old releases discard the whole file.
-fn merge_hooks(mut root: Value, events: &[&str]) -> Value {
+/// Writes Kex's hook for each event in `events`. With `prune`, an event Kex knows but the
+/// installed Claude does not (after a downgrade) loses Kex's hook, and its key goes when nothing
+/// else is left in it, because an unknown key makes old releases discard the whole file. Without
+/// it (the version could not be read) the hooks Kex wrote in other events stay as they are.
+fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Value {
     if !root.is_object() {
         root = json!({});
     }
@@ -149,7 +150,7 @@ fn merge_hooks(mut root: Value, events: &[&str]) -> Value {
     }
     let hooks = hooks.as_object_mut().unwrap();
 
-    for event in claude_version::known_events().filter(|e| !events.contains(e)) {
+    for event in claude_version::known_events().filter(|e| prune && !events.contains(e)) {
         let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) else {
             continue;
         };
@@ -296,6 +297,7 @@ fn plan_settings(
         statusline::install(merge_hooks(
             existing.clone(),
             &claude_version::hook_events_for(version),
+            claude_version::is_known(version),
         ))
     } else {
         statusline::remove(remove_hooks(existing.clone()))
@@ -1206,7 +1208,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input.clone(), &all());
+        let out = merge_hooks(input.clone(), &all(), true);
         assert_eq!(out["permissions"], input["permissions"]);
         let arr = out["hooks"]["UserPromptSubmit"].as_array().unwrap();
         assert!(arr.len() >= 2);
@@ -1239,7 +1241,7 @@ mod tests {
 
     #[test]
     fn adds_session_hooks_to_empty_config() {
-        let out = merge_hooks(json!({}), &all());
+        let out = merge_hooks(json!({}), &all(), true);
         // Every subscribed event must have the session hook.
         for event in all() {
             let arr = out["hooks"][event].as_array().unwrap();
@@ -1266,8 +1268,8 @@ mod tests {
 
     #[test]
     fn session_hooks_are_idempotent() {
-        let once = merge_hooks(json!({}), &all());
-        let twice = merge_hooks(once.clone(), &all());
+        let once = merge_hooks(json!({}), &all(), true);
+        let twice = merge_hooks(once.clone(), &all(), true);
         for event in all() {
             assert_eq!(
                 twice["hooks"][event].as_array().unwrap().len(),
@@ -1295,7 +1297,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input, &all());
+        let out = merge_hooks(input, &all(), true);
         // Each event: foreign hook preserved at index 0, session hook appended.
         assert_eq!(out["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
         assert_eq!(
@@ -1348,7 +1350,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input, &all());
+        let out = merge_hooks(input, &all(), true);
         // Old notify hooks must be gone; only session hook remains.
         for event in ["UserPromptSubmit", "Notification", "Stop"] {
             let arr = out["hooks"][event].as_array().unwrap();
@@ -1767,8 +1769,48 @@ mod tests {
     }
 
     #[test]
+    fn an_unknown_version_never_prunes_the_events_kex_already_hooked() {
+        let path = std::path::Path::new("/x/s.json");
+        let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
+        assert_eq!(plan_settings(&full, path, true, None).unwrap(), None);
+    }
+
+    #[test]
+    fn an_unknown_version_adds_the_baseline_and_keeps_the_rest() {
+        let path = std::path::Path::new("/x/s.json");
+        let partial = merge_hooks(json!({}), &["PermissionRequest", "PostCompact"], true);
+        let text = serde_json::to_string_pretty(&statusline::install(partial)).unwrap();
+        let out: Value =
+            serde_json::from_str(&plan_settings(&text, path, true, None).unwrap().unwrap())
+                .unwrap();
+        for event in claude_version::hook_events_for(None) {
+            assert!(hooked(&out, event), "{event} missing");
+        }
+        assert!(hooked(&out, "PermissionRequest") && hooked(&out, "PostCompact"));
+        assert!(out["hooks"].get("MessageDisplay").is_none());
+    }
+
+    #[test]
+    fn a_known_older_version_prunes_the_events_it_does_not_have() {
+        let path = std::path::Path::new("/x/s.json");
+        let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
+        let out: Value = serde_json::from_str(
+            &plan_settings(&full, path, true, Some("2.0.50"))
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        for event in ["StopFailure", "MessageDisplay", "PostCompact"] {
+            assert!(out["hooks"].get(event).is_none(), "{event} kept");
+        }
+        for event in ["PermissionRequest", "SubagentStart", "Stop"] {
+            assert!(hooked(&out, event), "{event} missing");
+        }
+    }
+
+    #[test]
     fn uninstall_removes_kex_from_every_known_event() {
-        let full = merge_hooks(json!({}), &all());
+        let full = merge_hooks(json!({}), &all(), true);
         let out = remove_hooks(full);
         for event in all() {
             assert!(!hooked(&out, event), "{event} still hooked");
