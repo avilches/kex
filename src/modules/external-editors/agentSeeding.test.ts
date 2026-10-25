@@ -98,7 +98,7 @@ describe("agent seeding on scan", () => {
     expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
   });
 
-  it("seeds once for two concurrent scans, through the serialized queue", async () => {
+  it("runs one scan at a time in a window, so two calls at once seed once", async () => {
     h.scan.mockResolvedValue([agent("claude")]);
     const add = vi.spyOn(globalActions, "add");
     await Promise.all([runEditorScan(), runEditorScan()]);

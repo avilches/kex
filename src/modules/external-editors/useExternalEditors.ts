@@ -49,8 +49,8 @@ export function mergeEnabled(
 // others never seed in parallel; they get the Actions and the flag through the preferences echo.
 async function seedAgentActions(agents: DetectedEditor[]): Promise<void> {
   const seeded = usePreferencesStore.getState().agentActionsSeeded;
-  if (seeded || !agents.some((a) => a.enabled !== false)) return;
   const plan = planAgentSeed({ seeded, agents, existing: globalActions.get() });
+  if (!plan) return;
   await Promise.all(plan.map((a) => globalActions.add(a)));
   await setAgentActionsSeeded(true);
 }
