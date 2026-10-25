@@ -34,6 +34,7 @@ fn detect_entry(entry: &EditorEntry) -> Option<DetectedEditor> {
 
 // ---- helpers ----------------------------------------
 
+#[cfg(target_os = "macos")]
 pub(crate) fn extract_first_app_path(output: &str) -> Option<String> {
     output
         .lines()
@@ -365,6 +366,7 @@ fn detect_via_which(entry: &EditorEntry) -> Option<DetectedEditor> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn extract_first_app_path_returns_first_line() {
         let output =
@@ -375,12 +377,14 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn extract_first_app_path_returns_none_for_empty() {
         assert_eq!(extract_first_app_path(""), None);
         assert_eq!(extract_first_app_path("   \n  "), None);
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn extract_first_app_path_trims_whitespace() {
         let output = "  /Applications/Zed.app  \n";
