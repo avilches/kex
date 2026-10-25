@@ -475,6 +475,10 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
 /// is print-mode (`-p` / `--print`), the session is not persisted.
 ///
+/// A SessionStart that brings no stashed command, is not same-process and introduces a
+/// session id different from the one on record (a child agent of the one running in the
+/// tab) does not replace the record; the kept record's launch knowledge is returned.
+///
 /// `same_process` is true for a SessionStart that continues the agent process already running
 /// in the tab (`/clear`, `/compact`, `/resume`): no new command line went through the shell, so the
 /// launch command of the previous record still describes it.
@@ -580,6 +584,20 @@ fn record_session_at_path_with(
             store = parsed;
             valid_existing = Some(s);
         }
+    }
+    // A child agent launched inside the tab (by the agent working there or by a script)
+    // inherits KEX_TAB_ID through the environment, so its SessionStart names this tab but
+    // brings no launch line and, with a different session id, must not take the record from
+    // the agent that is really running (TASK-898).
+    let unverified_launch = record.launch_cmd.is_none() && !same_process;
+    let known = store.tabs.get(tab_id);
+    if unverified_launch && known.is_some_and(|previous| previous.session_id != session_id) {
+        log::info!(
+            "[agent-session] skip record: session {session_id} of tab={tab_id} launched \
+             without the tab shell; session {} keeps the record",
+            known.map(|p| p.session_id.as_str()).unwrap_or_default()
+        );
+        return known.is_some_and(|p| p.launch_cmd.is_some());
     }
     // SessionStart fires again on every resume and replaces the record; the name and the
     // pending notification it held must survive until the frontend reports new ones. A resume
@@ -1388,7 +1406,11 @@ mod tests {
 
         stash_cmd("tab-new-sess", "claude-max".to_string());
         record_session_at_path_with(&path, "tab-new-sess", "claude", "a", "", "/tmp/p", false);
-        assert!(!record_session_at_path_with(
+
+        // A new claude launched by hand carries its own line from the tab's shell: the
+        // record is replaced and the old launch command must not leak into it.
+        stash_cmd("tab-new-sess", "claude".to_string());
+        assert!(record_session_at_path_with(
             &path,
             "tab-new-sess",
             "claude",
@@ -1397,6 +1419,10 @@ mod tests {
             "/tmp/p",
             false
         ));
+        assert_eq!(
+            read_store(&path).tabs["tab-new-sess"].launch_cmd.as_deref(),
+            Some("claude")
+        );
     }
 
     #[test]
@@ -1425,35 +1451,6 @@ mod tests {
             "/tmp/p",
             false
         ));
-    }
-
-    #[test]
-    fn a_new_launch_without_a_recognised_command_does_not_inherit_the_old_one() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("agent-sessions.json");
-
-        stash_cmd("tab-new-unrecognised", "claude-max".to_string());
-        record_session_at_path_with(
-            &path,
-            "tab-new-unrecognised",
-            "claude",
-            "old",
-            "/tmp/s.jsonl",
-            "/tmp/p",
-            false,
-        );
-        assert!(!record_session_at_path_with(
-            &path,
-            "tab-new-unrecognised",
-            "claude",
-            "new",
-            "/tmp/s.jsonl",
-            "/tmp/p",
-            false
-        ));
-        let store: SessionStore =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(store.tabs["tab-new-unrecognised"].launch_cmd, None);
     }
 
     #[test]
@@ -2448,6 +2445,8 @@ mod tests {
             Some("answer")
         );
 
+        // A claude launched by hand brings its own session id and starts with no message.
+        stash_cmd("tab-1", "claude".to_string());
         record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s.jsonl", "/tmp/p");
         assert_eq!(read_store(&path).tabs["tab-1"].last_message, None);
     }
@@ -2523,12 +2522,111 @@ mod tests {
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
         set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "finished");
 
+        // A claude launched by hand went through the tab's shell, so its line is stashed
+        // and the new session takes the record.
+        stash_cmd("tab-1", "claude".to_string());
         record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s2.jsonl", "/tmp/p");
 
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.session_id, "def");
         assert_eq!(rec.title, None);
         assert_eq!(rec.notification, None);
+    }
+
+    #[test]
+    fn a_child_session_started_without_the_tab_shell_does_not_take_the_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-child", "claude-ibm".to_string());
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-child",
+            "claude",
+            "parent",
+            "/tmp/parent.jsonl",
+            "/Users/me/project",
+            false
+        ));
+
+        // The child inherited KEX_TAB_ID from the parent's environment, so its SessionStart
+        // names the tab with its own session id and a foreign cwd, and no line went through
+        // the tab's shell to stash.
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-child",
+            "claude",
+            "child",
+            "/tmp/child.jsonl",
+            "/private/tmp/elsewhere",
+            false
+        ));
+
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let rec = &store.tabs["tab-child"];
+        assert_eq!(rec.session_id, "parent");
+        assert_eq!(rec.cwd_launch, "/Users/me/project");
+        assert_eq!(rec.launch_cmd.as_deref(), Some("claude-ibm"));
+    }
+
+    #[test]
+    fn a_child_without_a_stash_reports_the_kept_record_launch_knowledge() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        // No prior record: the first unverified SessionStart records as before.
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-first",
+            "claude",
+            "s1",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+
+        // With a known record in place, a stranger session is refused and the returned
+        // launch knowledge is the record's, so the tab icon does not go struck.
+        stash_cmd("tab-kept", "claude-ibm".to_string());
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-kept",
+            "claude",
+            "parent",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+        assert!(record_session_at_path_with(
+            &path,
+            "tab-kept",
+            "claude",
+            "child",
+            "/tmp/s2.jsonl",
+            "/private/tmp/elsewhere",
+            false
+        ));
+        // Even a record with an unknown launch command is protected: the refusal reports
+        // what the kept record says (false here), not today's replacement.
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-plain",
+            "claude",
+            "p",
+            "/tmp/s.jsonl",
+            "/tmp/p",
+            false
+        ));
+        assert!(!record_session_at_path_with(
+            &path,
+            "tab-plain",
+            "claude",
+            "c",
+            "/tmp/s2.jsonl",
+            "/private/tmp/x",
+            false
+        ));
     }
 
     #[test]

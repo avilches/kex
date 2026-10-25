@@ -253,6 +253,22 @@ tab (`/clear`, `/compact` and `/resume` inside it), so no new line went through 
 agent exits, so a launch that never reached `SessionStart` cannot leak its command into the next one.
 `launchKnown: false` means that a restore can only use the agent's plain command.
 
+A `SessionStart` that arrives with no stashed command, is not `same_process`, and introduces a session id
+different from the one on record does not replace it (TASK-898). That is the shape of a child agent started
+inside the tab (by the agent working there or by a script) inheriting `KEX_TAB_ID`/`KEX_PTY_ID` through the
+environment: it never went through the tab's shell, so nothing could be stashed, and believing it would leave
+the tab with a struck icon (`launch_cmd` gone to `None`) and a restore plan pointing at a child that is gone.
+The real agent keeps emitting `UserPromptSubmit`/`Stop`, but only `SessionStart` writes the record, so nothing
+else would repair it. Only three shapes may replace a record already on the tab: the same session id (a
+duplicate or re-registered `SessionStart`, a resume), a `same_process` SessionStart (`/clear`, `/compact`,
+`resume`), and a launch that went
+through the tab's own shell (its line is stashed by `OSC 133;C` which `record_session` consumes, print-mode runs
+filtered). The replacement is refused with a `skip record` log and `record_session` returns the kept record's
+`launch_cmd` state, so `kex:agent-session-meta` does not strike the icon of an agent that is still recorded.
+The session of a child agent still reaches the frontend as signals and is shown while it runs, but it is never
+the stored record of the tab, and the rule holds for the five recognised agents (`claude`, `codex`, `opencode`,
+`omp`, `pi`), since the inheritance through the environment is generic.
+
 In the frontend, `AgentNotificationsBridge.handleSessionMeta` creates the tab's agent session (idle) if none exists yet
 and stores `launchKnown` in `session.meta`. Without this the icon of an agent launched by an unrecognised script
 would only appear with the first prompt, because the hooks other than `SessionStart` are the only ones that emit
