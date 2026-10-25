@@ -5,6 +5,7 @@ import {
   actionShownAt,
   actionSubtitle,
   actionTarget,
+  agentCommandProblem,
   appsFirst,
   barZoneId,
   buildActionsBarModel,
@@ -703,6 +704,16 @@ describe("agents", () => {
   it("reads braces and quotes literally, and refuses a control character", () => {
     expect(actionAvailability(agent({ command: "claude {x} 'a" }), ctx)).toBeNull();
     expect(actionAvailability(agent({ command: "claude\nrm" }), ctx)).toMatch(/control character/);
+  });
+
+  it("refuses bidi overrides and isolates, and nothing just outside those ranges", () => {
+    for (const cp of [0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069]) {
+      const command = `claude ${String.fromCodePoint(cp)}x`;
+      expect(agentCommandProblem(command), cp.toString(16)).toMatch(/text direction/);
+    }
+    for (const cp of [0x2030, 0x202f, 0x2065, 0x206a]) {
+      expect(agentCommandProblem(`claude ${String.fromCodePoint(cp)}`), cp.toString(16)).toBeNull();
+    }
   });
 
   it("is titled Run with its name", () => {

@@ -355,4 +355,11 @@ describe("planActionRun, agents", () => {
       expect(planActionRun(agent({ command }), ctx())).toMatchObject({ kind: "blocked", reason: expect.stringMatching(/control character/) });
     }
   });
+
+  it("refuses a bidi override in the command", () => {
+    expect(planActionRun(agent({ command: "claude \u202e--x" }), ctx())).toMatchObject({
+      kind: "blocked",
+      reason: expect.stringMatching(/text direction/),
+    });
+  });
 });

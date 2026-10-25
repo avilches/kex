@@ -129,10 +129,14 @@ export const WORKSPACE_UNSET = "Set a root to this workspace";
 
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+// Bidi overrides and isolates would make the command shown in Settings differ from what is typed.
+const BIDI = /[\u202a-\u202e\u2066-\u2069]/;
 
 /** An agent command is typed verbatim as one line, so a control character (a newline too) refuses it. */
 export function agentCommandProblem(command: string): string | null {
-  return CONTROL.test(command) ? "the command has a control character" : null;
+  if (CONTROL.test(command)) return "the command has a control character";
+  if (BIDI.test(command)) return "the command has a text direction character";
+  return null;
 }
 
 // Settings has no focused tab to read values from, so under an app name and on its hover it
