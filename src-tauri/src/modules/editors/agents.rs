@@ -79,8 +79,7 @@ mod unix_lookup {
     const PATH_BEGIN: &str = "__KEX_PATH_BEGIN__";
     const PATH_END: &str = "__KEX_PATH_END__";
     // A fixed string, never built from user text; the markers keep rc-file noise out of the parse.
-    const PROBE: &str =
-        "echo __KEX_PATH_BEGIN__; /usr/bin/printenv PATH; echo __KEX_PATH_END__";
+    const PROBE: &str = "echo __KEX_PATH_BEGIN__; /usr/bin/printenv PATH; echo __KEX_PATH_END__";
 
     pub(super) fn read_login_path(shell: &str, timeout: Duration) -> Option<OsString> {
         let mut cmd = Command::new(shell);
