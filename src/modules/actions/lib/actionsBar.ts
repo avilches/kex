@@ -1,4 +1,4 @@
-import { folderKey, resolveScriptCwd, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
+import { folderKey, resolveScriptCwd, scriptCwdProblem, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
 import { commandProblem, commandVariablesUsed, expandCommandArgv, expandCommandShell, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
@@ -292,8 +292,9 @@ function effectKey(action: Action, ctx: BarContext): string | null {
       const spawn = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
       return spawn ? JSON.stringify([action.kind, expandCommandArgv(action.command, ctx.vars), spawn]) : null;
     }
-    const start = folderKey(resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders }));
-    if (!start) return null;
+    const raw = resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders });
+    if (!raw || scriptCwdProblem(raw)) return null;
+    const start = folderKey(raw);
     if (isAgent(action)) return JSON.stringify([action.kind, action.command, start]);
     if (missingVariables(action.command, ctx.vars).length > 0) return null;
     return JSON.stringify([action.kind, expandCommandShell(action.command, ctx.vars, ctx.shell), start]);
@@ -309,7 +310,8 @@ function effectKey(action: Action, ctx: BarContext): string | null {
 // button is hidden, so moving a button to the menu makes it vanish while a button twin exists);
 // with the same placement, a static Action beats a dynamic one, and two of the same sort are
 // the user's own doing, so both stay. A
-// script that is not idle is never hidden, and a blocked Action neither hides nor survives.
+// script that is not idle is never hidden, and a blocked Action (or one whose start folder the
+// runner would refuse) neither hides nor survives.
 // Nothing is hidden without a real context, or while the workspace sleeps.
 export function twinIds(
   actions: readonly Action[],

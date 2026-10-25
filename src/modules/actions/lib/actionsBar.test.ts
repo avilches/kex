@@ -924,6 +924,14 @@ describe("twinIds", () => {
     expect(ids([app({ id: "n", command: "code {filepath}" }), app({ id: "m", command: "code {filepath}" })], at("/p"))).toEqual([]);
   });
 
+  it("never compares an Action whose start folder the runner would refuse", () => {
+    const broken = script({ id: "b", command: "ls", cwdMode: "fixed", cwd: "\\foo", ownButton: true });
+    const working = script({ id: "w", command: "ls", cwdMode: "fixed", cwd: "/foo", ownButton: false });
+    expect(ids([broken, working], at("/p"))).toEqual([]);
+    const control = script({ id: "k", command: "ls", cwdMode: "fixed", cwd: "/foo\u0001", ownButton: true });
+    expect(ids([control, working], at("/p"))).toEqual([]);
+  });
+
   it("never compares Actions whose start folder is unknown", () => {
     const noFolders: BarContext = { vars: { ...vars, workspace: "", cwd: "/x" }, shell: "posix", folders: { focusFolder: null, workspaceRoot: null, workspaceCwd: null } };
     const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "context" });
