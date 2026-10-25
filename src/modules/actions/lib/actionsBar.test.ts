@@ -694,6 +694,16 @@ describe("agents", () => {
     expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current directory");
   });
 
+  it("names the workspace folder the run falls back to for a fixed mode with no folder", () => {
+    const folders = { focusFolder: "/root/src", workspaceRoot: "/root", workspaceCwd: "/cwd" };
+    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true });
+    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "  " }), { ...ctx, folders: { ...folders, workspaceRoot: null } })).toEqual({
+      text: "/cwd",
+      startTrim: true,
+    });
+    expect(scriptSubtitle(agent({ cwdMode: "fixed" }), SETTINGS_LABELS).text).toBe("Workspace");
+  });
+
   it("is grey with the root message when it starts in a rootless workspace", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
     const m = buildActionsBarModel({ local: [agent({ cwdMode: "workspace" })], context: rootless, states: new Map(), activeId: undefined });

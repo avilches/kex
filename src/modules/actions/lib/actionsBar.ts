@@ -204,12 +204,14 @@ export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" 
 function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
   const mode = action.cwdMode ?? "home";
   const real = ctx && !ctx.labels ? ctx : null;
+  const fixed = action.cwd?.trim() || undefined;
   if (mode === "home") return { text: "Home", startTrim: false };
-  if (mode === "fixed") return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
+  if (mode === "fixed" && fixed) return { text: fixed, startTrim: true };
   if (mode === "workspace" && ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
+  // A fixed mode with no folder runs in the workspace folder, as resolveScriptCwd does.
   if (!real) return { text: mode === "context" ? "Current directory" : "Workspace", startTrim: false };
   const start = real.folders
-    ? resolveScriptCwd({ mode, ...real.folders })
+    ? resolveScriptCwd({ mode, fixedFolder: fixed, ...real.folders })
     : mode === "context"
       ? real.vars.cwd
       : real.vars.workspace;
