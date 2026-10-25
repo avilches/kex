@@ -297,7 +297,10 @@ was removed). Still open:
 - Orca forwards more events than Kex. TASK-895 added `PostCompact` and left
   out `PreToolUse`, `PostToolUse`, `PostToolUseFailure` and `TeammateIdle`
   (a bash, jq and nc launch per tool call for an uncertain benefit).
-- No `statusLine` integration for usage limits (TASK-738).
+- `statusLine` (TASK-738): same policy as Orca, a user-owned status line is
+  left alone and Kex only takes an empty slot. Orca sends only ticks that carry
+  `rate_limits`; Kex also sends the context use, which API-billed sessions have,
+  and throttles an unchanged reading to one per 15 s per tab, like Orca.
 - No viewer for a session that has no live terminal (TASK-737).
 
 Kex registers only events that exist in Claude Code. Orca also registers
@@ -384,10 +387,10 @@ Code used was 2.1.310 (`claude --version`).
 - **`statusLine` is single-slot and this machine already uses it.**
   `~/.claude/settings.json` has
   `"statusLine": {"type": "command", "command": "$HOME/.claude/hooks/run-hud.sh"}`.
-  Orca leaves a user-owned `statusLine` alone, so copying it as is would do
-  nothing here. Claude does not run the `statusLine` command in `-p` mode, so
-  the stdin it receives was not captured; do it in an interactive session
-  first (TASK-738).
+  Orca leaves a user-owned `statusLine` alone, and so does Kex since TASK-738,
+  so Kex shows no reading on this machine. Claude does not run the `statusLine`
+  command in `-p` mode; the stdin of an interactive 2.1.310 session is listed
+  in `docs/AGENT_SESSION_RESTORE.md`, "Status line".
 - **`Stop` already carries the assistant's last message.**
   `ipc.rs` reads `last_assistant_message` into `last_message` and sends it to
   the frontend as `message`; it is just not stored in `SessionRecord` (TASK-737).

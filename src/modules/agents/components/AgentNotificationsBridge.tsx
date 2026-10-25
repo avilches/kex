@@ -15,6 +15,7 @@ import { isHibernating } from "../lib/hibernatingTabs";
 import { detachesRecord, endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
 import { stopOutcome } from "../lib/subagentGate";
 import type { AgentSession, AgentSignal } from "../lib/types";
+import type { AgentUsage } from "../lib/usage";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
 import { suggestIntegration } from "./IntegrationSuggestionToast";
@@ -319,6 +320,10 @@ export function AgentNotificationsBridge({
 
   useTauriListen<{ tabId: string; cwd: string }>("kex:agent-cwd", (e) =>
     handleAgentCwd(e.payload.tabId, e.payload.cwd),
+  );
+
+  useTauriListen<{ tabId: string; usage: AgentUsage }>("kex:agent-usage", (e) =>
+    useAgentStore.getState().setUsage(e.payload.tabId, e.payload.usage),
   );
 
   return null;
