@@ -603,8 +603,8 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     ro.observe(ref.current);
     return () => ro.disconnect();
   }, []);
-  const model = useActionsBarModel({ workspace, room });
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const model = useActionsBarModel({ workspace, room, showTwins: held || draggingId !== null });
   const menuItems = [...model.menu.workspace, ...model.menu.global];
   const fromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX) ?? false;
   const dragged = draggingId

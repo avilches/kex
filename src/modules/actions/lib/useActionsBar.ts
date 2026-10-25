@@ -30,16 +30,22 @@ type Input = {
   workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction" | "hibernated"> | null;
   /** Pixels the bar has; absent until measured, which shows every own button. */
   room?: number;
+  /** Show every Action, twins included (a modifier is held or a drag is in flight). */
+  showTwins?: boolean;
 };
 
 const NONE: readonly Action[] = [];
+const NO_TWINS: ReadonlySet<string> = new Set();
 
-export function useActionsBarModel({ workspace, room }: Input): BarModel {
+export function useActionsBarModel({ workspace, room, showTwins }: Input): BarModel {
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
   const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
-  const hidden = useMemo(() => twinIds([...local, ...global], context, states, context?.place), [local, global, context, states]);
+  const hidden = useMemo(
+    () => (showTwins ? NO_TWINS : twinIds([...local, ...global], context, states, context?.place)),
+    [local, global, context, states, showTwins],
+  );
   const ownButtonsShown = useMemo(
     () =>
       room === undefined

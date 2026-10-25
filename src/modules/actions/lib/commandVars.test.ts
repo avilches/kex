@@ -103,3 +103,14 @@ describe("inWorktree", () => {
     expect(inWorktree(null, "/w")).toBeNull();
   });
 });
+
+describe("a root made of whitespace", () => {
+  it("is no workspace for the bar and the runner alike", () => {
+    const blank = buildCommandVars(editor, { cwd: "/x", workspaceRoot: "   " }, git, "MacBook");
+    expect(blank.workspace).toBe("");
+    const agent: Action = { id: "g", name: "claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: false };
+    const ctx = runCtx({ vars: blank, folders: { workspaceRoot: "   ", workspaceCwd: "/x" } });
+    expect(actionAvailability(agent, { vars: blank, shell: "posix" })).not.toBeNull();
+    expect(planActionRun(agent, ctx).kind).toBe("blocked");
+  });
+});
