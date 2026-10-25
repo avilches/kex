@@ -435,7 +435,7 @@ Upstream Terax keeps a workspace whose last tab closed, as an empty chip in the 
 - **Rule**: a workspace that reaches zero tabs is closed by a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it (tab close, shell exit, moving or dragging the last tab to another workspace, bulk closes such as Close All Tabs). Two exceptions keep it with its empty pane: the window's only workspace, and one holding scripts with a command, whose deletion the close confirmation dialog still protects.
 - **WorkspaceBar**: an empty workspace shows no chevron for its nested tab list but stays expanded: `applyCloseTab` resets `detailExpanded` to true when it empties the sole pane, so a tab opened into the workspace appears in the nested list without a toggle.
 
-### Actions: scripts and apps in the Header
+### Actions: scripts, apps and agents in the Header
 
 Kex replaces the upstream "Open in editor" button and its own earlier Scripts and Run button with one entity, the **Action**: a saved command template that is a script (typed into a terminal, can be stopped), an app (spawned in the background) or an agent (see Agent Actions below). Not present in upstream Terax. Architecture and details are in `ARCHITECTURE.md` 3.11 (app detection) and 3.12 (Actions).
 
