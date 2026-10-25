@@ -24,6 +24,7 @@ describe("AgentUsageBadge", () => {
     const badge = container.querySelector("span");
     expect(badge?.textContent).toBe("42%");
     expect(badge?.getAttribute("title")).toBe("Context: 42% used");
+    expect(badge?.getAttribute("aria-label")).toBe("Context: 42% used");
     act(() => useAgentStore.getState().setUsage("tab-1", {}));
     expect(container.innerHTML).toBe("");
   });

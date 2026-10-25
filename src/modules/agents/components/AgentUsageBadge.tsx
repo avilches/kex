@@ -20,6 +20,7 @@ export function AgentUsageBadge({ tabId }: { tabId: string }) {
         LEVEL_CLASS[badge.level],
       )}
       title={badge.title}
+      aria-label={badge.title}
     >
       {badge.label}
     </span>
