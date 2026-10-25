@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# kex-session-v9
+# kex-session-v13
+# Some Claude Code versions treat an empty hook stdout as a failure, so `{}` goes out first,
+# before any early exit or socket work; Claude reads it as "no output" (no context, no warning).
+printf '{}\n'
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 
@@ -8,8 +11,11 @@ PAYLOAD="$(cat)"
 # The hook command passes the agent as the first argument (Codex's handlers pass "codex");
 # Claude Code's command has none, so it defaults to "claude". OpenCode's plugin writes
 # the socket itself with "agent":"opencode".
+# Kex has one socket for every tab, so the frame names its tab and PTY. Both come from the
+# environment Kex gave the terminal and are set last, so the agent's payload cannot pick them.
 AGENT="${1:-claude}"
-PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" '. + {"agent": $agent}')"
+PAYLOAD="$(printf '%s' "$PAYLOAD" | jq -c --arg agent "$AGENT" --arg tab "$KEX_TAB_ID" --arg pty "${KEX_PTY_ID:-}" \
+    '. + {"agent": $agent, "tab_id": $tab, "pty_id": $pty}')"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Codex documents PascalCase event names, which is unmeasured, so its snake_case spelling
@@ -30,38 +36,69 @@ if [ "$AGENT" = "codex" ]; then
     fi
 fi
 
-# Caps the per-tab spool file so a tab that never reopens in Kex (and so
-# never drains it) can't grow the file without bound.
-MAX_SPOOL_LINES=200
+# Caps on a tab's spool directory, so a tab that never reopens in Kex (and so never drains
+# it) can't grow it without bound. Files older than the age cap are deleted too.
+MAX_SPOOL_FILES=200
+MAX_SPOOL_AGE_MINUTES=10080
 
-# Appends the undelivered payload to a per-tab spool file that Kex's IPC
-# listener replays on startup, so a failed send loses no event. Oldest lines
-# are dropped first once the cap is hit, keeping the most recent state.
-spool_event() {
-    local spool_dir="$HOME/.config/kex/spool"
-    local spool_file="$spool_dir/$KEX_TAB_ID.jsonl"
-    mkdir -p "$spool_dir" 2>/dev/null || return 0
-    printf '%s\n' "$PAYLOAD" >> "$spool_file"
-    local lines
-    lines="$(wc -l < "$spool_file" 2>/dev/null)"
-    if [ -n "$lines" ] && [ "$lines" -gt "$MAX_SPOOL_LINES" ]; then
-        # A fixed temp name would race two overlapping rotations (same tab,
-        # both crossing the line cap) onto the same file, letting one mv
-        # clobber the other's freshly-appended line. Suffix with our own PID
-        # so each rotation gets its own temp file.
-        # tail reads the file at an instant before the mv below lands, so a third
-        # invocation that appends a line in that gap (with the file already at the
-        # cap) can lose it. Accepted without a lock: hooks for the same tab fire
-        # serially in normal use, and adding sync (e.g. an mkdir-based mutex) would
-        # complicate a script that runs on every hook event to close a case that
-        # doesn't happen in practice.
-        local rotate_tmp="$spool_file.tmp.$$"
-        tail -n "$MAX_SPOOL_LINES" "$spool_file" > "$rotate_tmp" 2>/dev/null \
-            && mv "$rotate_tmp" "$spool_file"
+# Sortable, collision-free file name: microsecond timestamp (EPOCHREALTIME on bash 5, GNU date
+# %N, or whole seconds on macOS where bash is 3.2 and BSD date has no %N), then PID and RANDOM.
+# On the seconds fallback, events of one second order by PID, which only matters for hooks that
+# fire within the same second.
+spool_name() {
+    local now
+    if [ -n "$EPOCHREALTIME" ]; then
+        now="${EPOCHREALTIME/[.,]/}"
+    else
+        now="$(date +%s%N 2>/dev/null)"
+        case "$now" in
+            ''|*[!0-9]*) now="$(date +%s)000000" ;;
+            *) now="${now%???}" ;;
+        esac
+    fi
+    printf '%016d-%07d-%05d.json' "$now" "$$" "$RANDOM"
+}
+
+# Keeps the newest MAX_SPOOL_FILES events and drops what is too old. It only deletes.
+prune_spool() {
+    local dir="$1" count excess f
+    find "$dir" -maxdepth 1 -type f -mmin +"$MAX_SPOOL_AGE_MINUTES" -exec rm -f {} + 2>/dev/null
+    count="$(ls -1 "$dir" 2>/dev/null | wc -l | tr -d ' ')"
+    if [ -n "$count" ] && [ "$count" -gt "$MAX_SPOOL_FILES" ]; then
+        excess=$((count - MAX_SPOOL_FILES))
+        ls -1 "$dir" 2>/dev/null | sort | head -n "$excess" | while IFS= read -r f; do
+            rm -f "$dir/$f"
+        done
     fi
 }
 
-# Send raw payload to KEX_IPC Unix socket.
+# Writes the undelivered payload as its own file in a per-tab spool directory that Kex's IPC
+# listener replays on startup, so a failed send loses no event. Nothing already there is ever
+# rewritten, so concurrent invocations cannot lose each other's events. The file is written
+# under a dot name and renamed, so the listener never reads a half-written one. The listener
+# removes the emptied directory after draining, which can land between our mkdir and mv; hence the retry.
+spool_event() {
+    # The tab id becomes a directory name; nid() ids are [A-Za-z0-9_-], anything else could
+    # point outside the spool.
+    case "$KEX_TAB_ID" in
+        ''|*[!A-Za-z0-9_-]*) return 0 ;;
+    esac
+    local dir="$HOME/.config/kex/spool/$KEX_TAB_ID" name attempt
+    name="$(spool_name)"
+    # Payloads carry prompts and paths: keep the directory 0700 and the files 0600.
+    umask 077
+    for attempt in 1 2 3; do
+        mkdir -p "$dir" 2>/dev/null || return 0
+        if printf '%s\n' "$PAYLOAD" > "$dir/.$name.tmp" 2>/dev/null \
+            && mv "$dir/.$name.tmp" "$dir/$name" 2>/dev/null; then
+            prune_spool "$dir"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# Send the payload to the KEX_IPC Unix socket, shared by every tab of this Kex.
 # Uses nc -U (BSD/OpenBSD netcat on macOS + most Linux), falls back to python3.
 # Spools the event to disk if KEX_IPC is set but neither delivery path works.
 send_ipc() {
@@ -120,8 +157,12 @@ handle_SubagentStop() {
     send_ipc
 }
 
+handle_PostCompact() {
+    send_ipc
+}
+
 case "$EVENT" in
-    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay|SubagentStart|SubagentStop)
+    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay|SubagentStart|SubagentStop|PostCompact)
         "handle_${EVENT}" ;;
     *) exit 0 ;;
 esac

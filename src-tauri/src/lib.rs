@@ -534,6 +534,13 @@ fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::Res
     agent::session_store::preview_resume_cmd(&tab_id)
 }
 
+/// Last assistant message, launch folder and time of the recorded sessions among `tab_ids`, for
+/// the rows of a hibernated workspace. Read-only, and never opens a transcript.
+#[tauri::command]
+fn agent_session_previews(tab_ids: Vec<String>) -> Vec<agent::session_store::SessionPreview> {
+    agent::session_store::session_previews(&tab_ids)
+}
+
 /// Why `path` cannot host a restored terminal (missing, not a folder, unreadable), or `None`.
 #[tauri::command]
 async fn check_launch_dir(path: String) -> Option<String> {
@@ -990,6 +997,7 @@ pub fn run() {
             agent::os_notify::agent_os_notify,
             agent_session_restore_plan,
             agent_session_preview_cmd,
+            agent_session_previews,
             tab_history::tab_history_list,
             tab_history::tab_history_record,
             tab_history::tab_history_touch,
@@ -1007,6 +1015,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                pty::shutdown_hook_server();
+                return;
+            }
             // Dock icon click with no open windows: open a new window.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {

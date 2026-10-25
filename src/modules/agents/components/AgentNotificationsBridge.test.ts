@@ -8,14 +8,25 @@ import type { AgentSession } from "../lib/types";
 import { isHibernating } from "../lib/hibernatingTabs";
 import { clearOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { useAgentStore } from "../store/agentStore";
-import { handleSessionMeta, handleSignal, type Ctx } from "./AgentNotificationsBridge";
+import {
+  handleSessionMeta,
+  handleSignal,
+  handleUsage,
+  type Ctx,
+} from "./AgentNotificationsBridge";
+
+const UNKNOWN_PTY = vi.hoisted(() => 999);
 
 vi.mock("@/modules/workspaces", () => ({
-  findTabPane: () => ({ tab: { kind: "terminal", cwd: "/p/proj", title: "" } }),
+  findTabPane: vi.fn((_tree: unknown, tabId: string) =>
+    tabId === "tab-elsewhere"
+      ? null
+      : { tab: { kind: "terminal", cwd: "/p/proj", title: "" } },
+  ),
   focusedTabId: vi.fn(() => null),
 }));
 vi.mock("@/modules/terminal", () => ({
-  leafIdForPty: (id: number) => `tab-${id}`,
+  leafIdForPty: (id: number) => (id === UNKNOWN_PTY ? null : `tab-${id}`),
 }));
 vi.mock("@/modules/terminal/lib/oscTitleStore", () => ({
   getOscTitle: () => undefined,
@@ -62,6 +73,73 @@ function sig(kind: AgentSignal["kind"], extra: Partial<AgentSignal> = {}): Agent
 
 const session = () => useAgentStore.getState().sessions["tab-1"];
 const sub = (id: string) => ({ id, agentType: "Explore", description: "" });
+
+describe("handleSignal tab resolution", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+    vi.mocked(focusedTabId).mockReturnValue(null);
+  });
+
+  test("a hook signal whose PTY the frontend does not know yet reaches the tab it names", () => {
+    handleSignal(sig("UserPromptSubmit", { id: UNKNOWN_PTY, tabId: "tab-7" }), ctx());
+    expect(useAgentStore.getState().sessions["tab-7"]?.status).toBe("working");
+  });
+
+  test("the tab a hook signal names wins over the one its PTY id maps to", () => {
+    handleSignal(sig("UserPromptSubmit", { id: 1, tabId: "tab-7" }), ctx());
+    expect(useAgentStore.getState().sessions["tab-7"]?.status).toBe("working");
+    expect(useAgentStore.getState().sessions["tab-1"]).toBeUndefined();
+  });
+
+  test("a PTY reader signal without a tab still resolves by its PTY id", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    expect(session()?.status).toBe("working");
+  });
+
+  test("a signal with neither a tab nor a known PTY is dropped", () => {
+    handleSignal(sig("UserPromptSubmit", { id: UNKNOWN_PTY }), ctx());
+    expect(useAgentStore.getState().sessions).toEqual({});
+  });
+});
+
+describe("handleSignal PostCompact", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+    vi.mocked(routeAgentNotification).mockClear();
+    vi.mocked(focusedTabId).mockReturnValue(null);
+  });
+
+  test("a manual compact leaves a working tab idle without notifying", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session().status).toBe("idle");
+    expect(routeAgentNotification).not.toHaveBeenCalled();
+  });
+
+  test("a compact whose trigger is empty behaves like a manual one", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "" }), ctx());
+    expect(session().status).toBe("idle");
+  });
+
+  test("an automatic compact inside a turn keeps the tab working", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("PostCompact", { trigger: "auto" }), ctx());
+    expect(session().status).toBe("working");
+  });
+
+  test("a compact with a live subagent stays working", () => {
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    handleSignal(sig("SubagentStart", { agentId: "a1", agentType: "Explore" }), ctx());
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session().status).toBe("working");
+  });
+
+  test("a compact with no session on the tab does nothing", () => {
+    handleSignal(sig("PostCompact", { trigger: "manual" }), ctx());
+    expect(session()).toBeUndefined();
+  });
+});
 
 describe("handleSignal with background subagents", () => {
   beforeEach(() => {
@@ -284,5 +362,19 @@ describe("handleSignal: the tab title when the agent ends", () => {
     expect(session()).toBeUndefined();
     expect(clearOscTitle).not.toHaveBeenCalled();
     expect(invoke).not.toHaveBeenCalledWith("agent_detach_session", { tabId: "tab-1" });
+  });
+});
+
+describe("handleUsage", () => {
+  beforeEach(() => useAgentStore.setState({ usage: {} }));
+
+  test("stores the reading of a tab that lives in this window", () => {
+    handleUsage({ tabId: "tab-1", usage: { contextUsedPct: 12 } }, ctx());
+    expect(useAgentStore.getState().usage["tab-1"]).toEqual({ contextUsedPct: 12 });
+  });
+
+  test("ignores the reading of a tab that no workspace of this window holds", () => {
+    handleUsage({ tabId: "tab-elsewhere", usage: { contextUsedPct: 12 } }, ctx());
+    expect(useAgentStore.getState().usage).toEqual({});
   });
 });

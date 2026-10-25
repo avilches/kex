@@ -8,6 +8,7 @@ import { PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import type { GitStatusSnapshot } from "@/lib/native";
 import { cn } from "@/lib/utils";
+import { AgentUsageBadge } from "@/modules/agents/components/AgentUsageBadge";
 import {
   buildGitStatusMap,
   type GitStatusCode,
@@ -341,6 +342,9 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
+      {tab.kind === "terminal" && hasAgent && (
+        <AgentUsageBadge tabId={tab.id} />
+      )}
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[9px] text-primary">●</span>
       )}

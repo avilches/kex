@@ -807,13 +807,26 @@ function header(): HTMLElement {
 }
 
 function tabBar(): HTMLElement {
-  const tab = (label: string, cls: string, dot = "") =>
+  const tab = (
+    label: string,
+    cls: string,
+    dot = "",
+    usage = "",
+    usageCls = "",
+  ) =>
     h(
       "div",
       {
         class: `flex items-center gap-1.5 rounded px-2 py-1 text-[12px] ${cls}`,
       },
       h("span", {}, label),
+      usage
+        ? h(
+            "span",
+            { class: `text-[10px] tabular-nums leading-none ${usageCls}` },
+            usage,
+          )
+        : "",
       dot ? h("span", { class: dot }) : "",
     );
   const active = tab(
@@ -841,6 +854,15 @@ function tabBar(): HTMLElement {
       "bg-muted/40",
       "ml-0.5 inline-block size-[6px] rounded-full bg-amber-400",
     ),
+    tab("context", "bg-muted/40", "", "42%", "text-muted-foreground"),
+    tab(
+      "limit high",
+      "bg-muted/40",
+      "",
+      "5h 86%",
+      "text-amber-500 dark:text-amber-400",
+    ),
+    tab("limit critical", "bg-muted/40", "", "7d 97%", "text-destructive"),
     tab(
       "restore error",
       "bg-muted/40 text-destructive/70",
@@ -1185,6 +1207,20 @@ function hibernatedOverlay(): HTMLElement {
     }),
     h("span", { class: "text-[15px] text-foreground" }, "kex"),
     h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
+    h(
+      "div",
+      {
+        class: "flex w-80 flex-col gap-0.5 border-l border-border/60 pl-2",
+        "data-surface": "hibernated-session-preview",
+      },
+      h("span", { class: "text-[12px] text-foreground" }, "fixing the build"),
+      h(
+        "span",
+        { class: "line-clamp-2 text-[11.5px] leading-snug text-foreground/80" },
+        "The build is green again: the missing import is back and all tests pass.",
+      ),
+      h("span", { class: "truncate text-[11px] opacity-60" }, "~/code/kex · 2h ago"),
+    ),
     h(
       "span",
       {

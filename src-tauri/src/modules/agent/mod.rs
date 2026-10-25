@@ -1,3 +1,4 @@
+pub mod claude_version;
 pub mod codex_hooks;
 pub mod codex_integration;
 pub mod codex_trust;
@@ -7,6 +8,7 @@ pub mod live_model;
 pub mod os_notify;
 pub mod provider;
 pub mod session_store;
+pub mod statusline;
 
 use serde_json::{json, Value};
 
@@ -25,7 +27,11 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
 // v8: the script tags its frames with its first argument, defaulting to "claude" (see trigger-event.sh).
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v9";
+// v10: the script prints `{}` on stdout before anything else.
+// v11: the script forwards PostCompact.
+// v12: undelivered events are spooled as one file per event instead of a rotated .jsonl.
+// v13: every frame carries `tab_id` and `pty_id`, since one socket serves every tab.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v13";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -40,6 +46,7 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v9";
 //   MessageDisplay:     TBD
 //   SubagentStart:      agent_id, agent_type
 //   SubagentStop:       agent_id, agent_type
+//   PostCompact:        trigger (manual|auto)
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
 // OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, and OMP/Pi
@@ -47,7 +54,7 @@ const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 // integrations ship as static scripts instead of merged settings. The OpenCode status greps
 // the installed file for a version marker; the OMP and Pi statuses compare the whole file with
 // the script stamped for that runtime, so an outdated or wrongly stamped copy counts as not installed.
-const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v3";
+const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v4";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
 const AGENT_EXTENSION_TEMPLATE: &str = include_str!("plugins/kex-agent-status.ts");
 
@@ -55,27 +62,20 @@ fn agent_extension_script(agent: &str) -> String {
     AGENT_EXTENSION_TEMPLATE.replace("__KEX_AGENT__", agent)
 }
 
-// All 10 events handled by trigger-event.sh in v8.
-const SESSION_HOOK_EVENTS: [&str; 10] = [
-    "SessionStart",
-    "UserPromptSubmit",
-    "Notification",
-    "Stop",
-    "StopFailure",
-    "SessionEnd",
-    "PermissionRequest",
-    "MessageDisplay",
-    "SubagentStart",
-    "SubagentStop",
-];
-
-fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
+fn kex_hooks_dir() -> Result<std::path::PathBuf, String> {
     Ok(dirs::home_dir()
         .ok_or_else(|| "could not resolve home dir".to_string())?
         .join(".config")
         .join("kex")
-        .join("hooks")
-        .join("trigger-event.sh"))
+        .join("hooks"))
+}
+
+fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
+    Ok(kex_hooks_dir()?.join("trigger-event.sh"))
+}
+
+fn statusline_script_path() -> Result<std::path::PathBuf, String> {
+    Ok(kex_hooks_dir()?.join(statusline::SCRIPT_FILE))
 }
 
 fn session_hook_cmd() -> String {
@@ -120,8 +120,8 @@ fn remove_hooks(mut root: Value) -> Value {
         Some(h) => h.as_object_mut().unwrap(),
         None => return root,
     };
-    // Remove session hooks from all v5 events.
-    for event in SESSION_HOOK_EVENTS {
+    // Every event Kex knows, not only those the installed Claude would get today.
+    for event in claude_version::known_events() {
         if let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) {
             arr.retain(|g| !is_session_hook(g) && !is_empty_group(g));
         }
@@ -135,7 +135,11 @@ fn remove_hooks(mut root: Value) -> Value {
     root
 }
 
-fn merge_hooks(mut root: Value) -> Value {
+/// Writes Kex's hook for each event in `events`. With `prune`, an event Kex knows but the
+/// installed Claude does not (after a downgrade) loses Kex's hook, and its key goes when nothing
+/// else is left in it, because an unknown key makes old releases discard the whole file. Without
+/// it (the version could not be read) the hooks Kex wrote in other events stay as they are.
+fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Value {
     if !root.is_object() {
         root = json!({});
     }
@@ -146,7 +150,17 @@ fn merge_hooks(mut root: Value) -> Value {
     }
     let hooks = hooks.as_object_mut().unwrap();
 
-    for event in SESSION_HOOK_EVENTS {
+    for event in claude_version::known_events().filter(|e| prune && !events.contains(e)) {
+        let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) else {
+            continue;
+        };
+        arr.retain(|g| !is_session_hook(g) && !is_empty_group(g));
+        if arr.is_empty() {
+            hooks.remove(event);
+        }
+    }
+
+    for &event in events {
         let arr = hooks.entry(event).or_insert_with(|| json!([]));
         if !arr.is_array() {
             *arr = json!([]);
@@ -184,8 +198,13 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
 
 /// Writes trigger-event.sh, shared by the Claude Code and Codex hooks, only when it differs.
 fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), String> {
+    install_script(script_path, SESSION_HOOK_SCRIPT)
+}
+
+/// Writes an executable script atomically, only when its content differs.
+fn install_script(script_path: &std::path::Path, content: &str) -> Result<(), String> {
     let current = std::fs::read_to_string(script_path).unwrap_or_default();
-    if current == SESSION_HOOK_SCRIPT {
+    if current == content {
         return Ok(());
     }
     let script_dir = script_path
@@ -194,8 +213,7 @@ fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), Stri
     std::fs::create_dir_all(script_dir)
         .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
     let script_tmp = script_path.with_extension("sh.kex-tmp");
-    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
-        .map_err(|e| format!("write session hook tmp: {e}"))?;
+    std::fs::write(&script_tmp, content).map_err(|e| format!("write hook script tmp: {e}"))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -208,27 +226,48 @@ fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), Stri
     })
 }
 
+/// `claude --version` runs on the blocking pool so the UI thread and the async runtime stay free.
+async fn detect_version(refresh: bool) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_version::detect_claude_version_cached(refresh)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// `refresh` is for the user's own install: it runs `claude --version` again. The startup sync of
+/// every window passes false and reuses the answer of the last minute; a new Kex process starts
+/// with no answer, so a Claude update is still seen on the next start.
 #[tauri::command]
-pub fn agent_enable_claude_hooks() -> Result<(), String> {
+pub async fn agent_enable_claude_hooks(refresh: bool) -> Result<(), String> {
+    let version = detect_version(refresh).await;
     install_session_hook_script(&session_hook_script_path()?)?;
+    // Written even while the user's own status line keeps the slot: the file is inert until
+    // settings.json names it.
+    install_script(&statusline_script_path()?, statusline::SCRIPT)?;
 
     let path = settings_path()?;
     let dir = path.parent().unwrap();
     std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
-    apply_settings(&path, true)
+    apply_settings(&path, true, version.as_deref())
 }
 
 /// Reads the settings file, and when the hooks need to change writes the new text atomically.
 /// Writing nothing when nothing changes avoids reformatting the user's file on repeated runs
 /// (the startup reinstall path).
-fn apply_settings(path: &std::path::Path, install: bool) -> Result<(), String> {
+fn apply_settings(
+    path: &std::path::Path,
+    install: bool,
+    version: Option<&str>,
+) -> Result<(), String> {
     let existing_str = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && !install => return Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("read {}: {e}", path.display())),
     };
-    let Some(out) = plan_settings(&existing_str, path, install)? else {
+    let Some(out) = plan_settings(&existing_str, path, install, version)? else {
         return Ok(());
     };
     // Atomic write via temp file so a crash mid-write never truncates the file.
@@ -247,6 +286,7 @@ fn plan_settings(
     existing_str: &str,
     path: &std::path::Path,
     install: bool,
+    version: Option<&str>,
 ) -> Result<Option<String>, String> {
     let existing = existing_config(
         if existing_str.is_empty() {
@@ -257,9 +297,13 @@ fn plan_settings(
         path,
     )?;
     let next = if install {
-        merge_hooks(existing.clone())
+        statusline::install(merge_hooks(
+            existing.clone(),
+            &claude_version::hook_events_for(version),
+            claude_version::is_known(version),
+        ))
     } else {
-        remove_hooks(existing.clone())
+        statusline::remove(remove_hooks(existing.clone()))
     };
     if next == existing {
         return Ok(None);
@@ -270,7 +314,7 @@ fn plan_settings(
 
 #[tauri::command]
 pub fn agent_disable_claude_hooks() -> Result<(), String> {
-    apply_settings(&settings_path()?, false)
+    apply_settings(&settings_path()?, false, None)
 }
 
 #[tauri::command]
@@ -612,22 +656,27 @@ fn changed(
     }]
 }
 
+/// A script a Claude install writes: where it goes and what is there now.
+struct ScriptFile<'a> {
+    path: &'a std::path::Path,
+    current: Option<&'a str>,
+    content: &'static str,
+}
+
 fn claude_preview(
     settings_path: &std::path::Path,
-    script_path: &std::path::Path,
     settings: Option<&str>,
-    script: Option<&str>,
+    scripts: &[ScriptFile],
     install: bool,
+    version: Option<&str>,
 ) -> Result<Vec<FilePreview>, String> {
-    let after = plan_settings(settings.unwrap_or(""), settings_path, install)?
+    let after = plan_settings(settings.unwrap_or(""), settings_path, install, version)?
         .or_else(|| settings.map(str::to_string));
     let mut files = changed(settings_path, settings, after);
     if install {
-        files.extend(changed(
-            script_path,
-            script,
-            Some(SESSION_HOOK_SCRIPT.to_string()),
-        ));
+        for s in scripts {
+            files.extend(changed(s.path, s.current, Some(s.content.to_string())));
+        }
     }
     Ok(files)
 }
@@ -661,18 +710,39 @@ fn read_optional(path: &std::path::Path) -> Result<Option<String>, String> {
 /// Dry run of an install or an uninstall: the files that would change with their text before
 /// and after. Writes nothing.
 #[tauri::command]
-pub fn agent_integration_preview(agent: String, install: bool) -> Result<Vec<FilePreview>, String> {
+pub async fn agent_integration_preview(
+    agent: String,
+    install: bool,
+) -> Result<Vec<FilePreview>, String> {
     if agent == "claude" {
+        let version = if install {
+            detect_version(false).await
+        } else {
+            None
+        };
         let settings_path = settings_path()?;
         let script_path = session_hook_script_path()?;
+        let statusline_path = statusline_script_path()?;
         let settings = read_optional(&settings_path)?;
         let script = read_optional(&script_path)?;
+        let statusline_script = read_optional(&statusline_path)?;
         return claude_preview(
             &settings_path,
-            &script_path,
             settings.as_deref(),
-            script.as_deref(),
+            &[
+                ScriptFile {
+                    path: &script_path,
+                    current: script.as_deref(),
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &statusline_path,
+                    current: statusline_script.as_deref(),
+                    content: statusline::SCRIPT,
+                },
+            ],
             install,
+            version.as_deref(),
         );
     }
     match resolve_integration(&agent)? {
@@ -695,7 +765,8 @@ pub async fn agent_session_set_snapshot(
 }
 
 #[tauri::command]
-pub fn agent_claude_hooks_status() -> bool {
+pub async fn agent_claude_hooks_status() -> bool {
+    let version = detect_version(false).await;
     let Some(content) = settings_path()
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
@@ -705,26 +776,47 @@ pub fn agent_claude_hooks_status() -> bool {
     let Ok(root) = serde_json::from_str::<Value>(&content) else {
         return false;
     };
-    // Every subscribed event must have the session hook.
-    let all_hooks_present = SESSION_HOOK_EVENTS.iter().all(|event| {
-        root["hooks"][event]
-            .as_array()
-            .is_some_and(|arr| arr.iter().any(is_session_hook))
-    });
+    // Every event this Claude version knows must have the session hook.
+    let all_hooks_present = claude_version::hook_events_for(version.as_deref())
+        .iter()
+        .all(|event| {
+            root["hooks"][event]
+                .as_array()
+                .is_some_and(|arr| arr.iter().any(is_session_hook))
+        });
     if !all_hooks_present {
         return false;
     }
-    // Check that the session hook script is up-to-date.
-    session_hook_script_path()
-        .ok()
+    // A status line of the user's keeps the slot, which is not a missing install.
+    let statusline_ok = match statusline::slot(&root) {
+        statusline::Slot::Foreign => true,
+        statusline::Slot::Empty => false,
+        statusline::Slot::Kex => script_has(statusline_script_path(), statusline::SCRIPT_VERSION),
+    };
+    statusline_ok && script_has(session_hook_script_path(), SESSION_HOOK_SCRIPT_VERSION)
+}
+
+fn script_has(path: Result<std::path::PathBuf, String>, version: &str) -> bool {
+    path.ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .unwrap_or_default()
-        .contains(SESSION_HOOK_SCRIPT_VERSION)
+        .is_some_and(|c| c.contains(version))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LATEST: Option<&str> = Some("2.1.310");
+
+    fn all() -> Vec<&'static str> {
+        claude_version::known_events().collect()
+    }
+
+    fn hooked(root: &Value, event: &str) -> bool {
+        root["hooks"][event]
+            .as_array()
+            .is_some_and(|a| a.iter().any(is_session_hook))
+    }
 
     #[cfg(unix)]
     const STOP_FRAME: &str = r#"{"hook_event_name":"Stop","session_id":"s1"}"#;
@@ -739,6 +831,16 @@ mod tests {
         arg: Option<&str>,
         tab_id: Option<&str>,
         payload: &str,
+    ) -> Option<String> {
+        run_trigger_script_env(arg, tab_id, payload, &[])
+    }
+
+    #[cfg(unix)]
+    fn run_trigger_script_env(
+        arg: Option<&str>,
+        tab_id: Option<&str>,
+        payload: &str,
+        env: &[(&str, &str)],
     ) -> Option<String> {
         use std::io::{BufRead, BufReader, Write};
         use std::os::unix::net::UnixListener;
@@ -758,10 +860,12 @@ mod tests {
             .env("KEX_TERMINAL", "1")
             .env("KEX_IPC", &sock)
             .env_remove("KEX_TAB_ID")
+            .env_remove("KEX_PTY_ID")
             .stdin(Stdio::piped());
         if let Some(t) = tab_id {
             cmd.env("KEX_TAB_ID", t);
         }
+        cmd.envs(env.iter().copied());
         let mut child = cmd.spawn().unwrap();
         child
             .stdin
@@ -779,12 +883,73 @@ mod tests {
     }
 
     #[cfg(unix)]
+    fn trigger_script_stdout(env: &[(&str, &str)], remove: &[&str]) -> String {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("trigger-event.sh");
+        std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
+        let mut cmd = Command::new("bash");
+        cmd.arg(&script)
+            .env("HOME", dir.path())
+            .env_remove("KEX_TERMINAL")
+            .env_remove("KEX_TAB_ID")
+            .env_remove("KEX_IPC")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped());
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+        for k in remove {
+            cmd.env_remove(k);
+        }
+        let mut child = cmd.spawn().unwrap();
+        let mut stdin = child.stdin.take().unwrap();
+        let _ = stdin.write_all(STOP_FRAME.as_bytes());
+        drop(stdin);
+        let out = child.wait_with_output().unwrap();
+        String::from_utf8(out.stdout).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prints_an_empty_object_even_when_the_socket_is_unreachable() {
+        let out = trigger_script_stdout(
+            &[
+                ("KEX_TERMINAL", "1"),
+                ("KEX_TAB_ID", "tab-1"),
+                ("KEX_IPC", "/nonexistent/kex.sock"),
+            ],
+            &[],
+        );
+        assert_eq!(out, "{}\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prints_an_empty_object_on_the_early_exits() {
+        assert_eq!(trigger_script_stdout(&[], &[]), "{}\n");
+        assert_eq!(trigger_script_stdout(&[("KEX_TERMINAL", "1")], &[]), "{}\n");
+    }
+
+    #[cfg(unix)]
     #[test]
     fn trigger_script_tags_codex_when_given_the_codex_argument() {
         let frame = run_trigger_script(Some("codex"), Some("tab-1")).unwrap();
         let v: Value = serde_json::from_str(&frame).unwrap();
         assert_eq!(v["agent"], "codex");
         assert_eq!(v["session_id"], "s1");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_forwards_post_compact() {
+        let payload = r#"{"hook_event_name":"PostCompact","session_id":"s1","trigger":"manual"}"#;
+        let frame = run_trigger_script_with(None, Some("tab-1"), payload).expect("not sent");
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["hook_event_name"], "PostCompact");
+        assert_eq!(v["trigger"], "manual");
     }
 
     #[cfg(unix)]
@@ -819,10 +984,215 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn trigger_script_names_the_tab_and_pty_from_the_environment_only() {
+        let payload =
+            r#"{"hook_event_name":"Stop","session_id":"s1","tab_id":"tab-other","pty_id":"99"}"#;
+        let frame = run_trigger_script_with(None, Some("tab-1"), payload).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(v["tab_id"], "tab-1");
+        assert_eq!(v["pty_id"], "", "KEX_PTY_ID is unset in this run");
+        let frame =
+            run_trigger_script_env(None, Some("tab-1"), payload, &[("KEX_PTY_ID", "7")]).unwrap();
+        let v: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(
+            (v["tab_id"].as_str(), v["pty_id"].as_str()),
+            (Some("tab-1"), Some("7"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn trigger_script_defaults_to_claude_without_an_argument() {
         let frame = run_trigger_script(None, Some("tab-1")).unwrap();
         let v: Value = serde_json::from_str(&frame).unwrap();
         assert_eq!(v["agent"], "claude");
+    }
+
+    #[cfg(unix)]
+    fn spool_script(home: &std::path::Path) -> std::path::PathBuf {
+        let script = home.join("trigger-event.sh");
+        std::fs::write(&script, SESSION_HOOK_SCRIPT).unwrap();
+        script
+    }
+
+    #[cfg(unix)]
+    fn spawn_spooling_script(
+        script: &std::path::Path,
+        home: &std::path::Path,
+        payload: &str,
+    ) -> std::process::Child {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let mut child = Command::new("bash")
+            .arg(script)
+            .env("HOME", home)
+            .env("KEX_TERMINAL", "1")
+            .env("KEX_TAB_ID", "tab-spool")
+            .env("KEX_IPC", home.join("missing.sock"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        // The script may exit before reading when nothing needs the payload.
+        let _ = child.stdin.take().unwrap().write_all(payload.as_bytes());
+        child
+    }
+
+    #[cfg(unix)]
+    fn spooled_files(home: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let dir = home.join(".config/kex/spool/tab-spool");
+        let mut files: Vec<_> = std::fs::read_dir(dir)
+            .map(|rd| rd.filter_map(Result::ok).map(|e| e.path()).collect())
+            .unwrap_or_default();
+        files.sort();
+        files
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_spools_30_concurrent_events_without_losing_any() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let children: Vec<_> = (0..30)
+            .map(|i| {
+                let payload =
+                    format!(r#"{{"hook_event_name":"Notification","session_id":"s{i}"}}"#);
+                spawn_spooling_script(&script, dir.path(), &payload)
+            })
+            .collect();
+        for mut c in children {
+            assert!(c.wait().unwrap().success());
+        }
+
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 30);
+        assert!(files
+            .iter()
+            .all(|f| !f.file_name().unwrap().to_string_lossy().starts_with('.')));
+        let mut sessions: Vec<_> = files
+            .iter()
+            .map(|f| {
+                let v: serde_json::Value =
+                    serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap();
+                v["session_id"].as_str().unwrap().to_string()
+            })
+            .collect();
+        sessions.sort();
+        let mut expected: Vec<_> = (0..30).map(|i| format!("s{i}")).collect();
+        expected.sort();
+        assert_eq!(sessions, expected);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_spool_names_sort_in_arrival_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        for i in 0..3 {
+            let payload = format!(r#"{{"hook_event_name":"Notification","session_id":"s{i}"}}"#);
+            spawn_spooling_script(&script, dir.path(), &payload)
+                .wait()
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(1100));
+        }
+        let order: Vec<_> = spooled_files(dir.path())
+            .iter()
+            .map(|f| std::fs::read_to_string(f).unwrap())
+            .collect();
+        for (i, body) in order.iter().enumerate() {
+            assert!(body.contains(&format!("\"s{i}\"")), "{order:?}");
+        }
+        assert_eq!(order.len(), 3);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_spools_with_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let payload = r#"{"hook_event_name":"Notification","session_id":"s"}"#;
+        spawn_spooling_script(&script, dir.path(), payload)
+            .wait()
+            .unwrap();
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 1);
+        let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&files[0]), 0o600);
+        assert_eq!(mode(files[0].parent().unwrap()), 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_refuses_tab_ids_that_could_escape_the_spool() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        let victim = outside.join("victim.json");
+        std::fs::write(&victim, "keep").unwrap();
+        let abs = outside.to_string_lossy().to_string();
+        for tab in ["..", "../outside", abs.as_str(), "a/b", ".", ""] {
+            let mut child = Command::new("bash")
+                .arg(&script)
+                .env("HOME", dir.path())
+                .env("KEX_TERMINAL", "1")
+                .env("KEX_TAB_ID", tab)
+                .env("KEX_IPC", dir.path().join("missing.sock"))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap();
+            let _ = child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(br#"{"hook_event_name":"Notification","session_id":"s"}"#);
+            assert!(child.wait().unwrap().success());
+        }
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+        assert_eq!(std::fs::read_dir(&outside).unwrap().count(), 1);
+        assert!(!dir.path().join(".config/kex/spool").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trigger_script_prunes_the_spool_by_count_and_by_age() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = spool_script(dir.path());
+        let spool = dir.path().join(".config/kex/spool/tab-spool");
+        std::fs::create_dir_all(&spool).unwrap();
+        for i in 0..205 {
+            std::fs::write(spool.join(format!("{i:016}-0000001-00000.json")), "{}\n").unwrap();
+        }
+        let old = spool.join("0000000000000000-old.json");
+        std::fs::write(&old, "{}\n").unwrap();
+        let week_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(9 * 86400);
+        std::fs::File::options()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_modified(week_ago)
+            .unwrap();
+
+        let payload = r#"{"hook_event_name":"Notification","session_id":"new"}"#;
+        assert!(spawn_spooling_script(&script, dir.path(), payload)
+            .wait()
+            .unwrap()
+            .success());
+
+        let files = spooled_files(dir.path());
+        assert_eq!(files.len(), 200);
+        assert!(!old.exists());
+        assert!(
+            !spool.join(format!("{:016}-0000001-00000.json", 0)).exists(),
+            "the oldest by name goes first"
+        );
+        let newest = files.last().unwrap();
+        assert!(std::fs::read_to_string(newest).unwrap().contains("\"new\""));
     }
 
     #[cfg(unix)]
@@ -841,7 +1211,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input.clone());
+        let out = merge_hooks(input.clone(), &all(), true);
         assert_eq!(out["permissions"], input["permissions"]);
         let arr = out["hooks"]["UserPromptSubmit"].as_array().unwrap();
         assert!(arr.len() >= 2);
@@ -852,14 +1222,14 @@ mod tests {
     fn installing_into_a_foreign_style_settings_file_only_adds_lines() {
         let path = std::path::Path::new("/x/settings.json");
         let src = "{\n\t\"model\" : \"a\\/b\",\n\t\"permissions\":{\"allow\":[ \"x\" ]}\n}\n";
-        let out = plan_settings(src, path, true).unwrap().unwrap();
+        let out = plan_settings(src, path, true, LATEST).unwrap().unwrap();
         let kept: Vec<&str> = src
             .lines()
             .filter(|l| l.contains("model") || l.contains("permissions"))
             .collect();
         assert!(kept.iter().all(|l| out.contains(l)));
         assert!(out.contains("\"SessionStart\"") || out.contains("\"Stop\""));
-        let removed = plan_settings(&out, path, false).unwrap().unwrap();
+        let removed = plan_settings(&out, path, false, None).unwrap().unwrap();
         assert!(removed.contains("\"permissions\":{\"allow\":[ \"x\" ]}"));
     }
 
@@ -874,9 +1244,9 @@ mod tests {
 
     #[test]
     fn adds_session_hooks_to_empty_config() {
-        let out = merge_hooks(json!({}));
+        let out = merge_hooks(json!({}), &all(), true);
         // Every subscribed event must have the session hook.
-        for event in SESSION_HOOK_EVENTS {
+        for event in all() {
             let arr = out["hooks"][event].as_array().unwrap();
             assert!(!arr.is_empty(), "{event} missing");
             let cmd = arr[0]["hooks"][0]["command"].as_str().unwrap();
@@ -895,15 +1265,15 @@ mod tests {
 
     #[test]
     fn subscribes_to_subagent_events() {
-        assert!(SESSION_HOOK_EVENTS.contains(&"SubagentStart"));
-        assert!(SESSION_HOOK_EVENTS.contains(&"SubagentStop"));
+        assert!(all().contains(&"SubagentStart"));
+        assert!(all().contains(&"SubagentStop"));
     }
 
     #[test]
     fn session_hooks_are_idempotent() {
-        let once = merge_hooks(json!({}));
-        let twice = merge_hooks(once.clone());
-        for event in SESSION_HOOK_EVENTS {
+        let once = merge_hooks(json!({}), &all(), true);
+        let twice = merge_hooks(once.clone(), &all(), true);
+        for event in all() {
             assert_eq!(
                 twice["hooks"][event].as_array().unwrap().len(),
                 once["hooks"][event].as_array().unwrap().len(),
@@ -930,7 +1300,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input);
+        let out = merge_hooks(input, &all(), true);
         // Each event: foreign hook preserved at index 0, session hook appended.
         assert_eq!(out["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
         assert_eq!(
@@ -983,7 +1353,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input);
+        let out = merge_hooks(input, &all(), true);
         // Old notify hooks must be gone; only session hook remains.
         for event in ["UserPromptSubmit", "Notification", "Stop"] {
             let arr = out["hooks"][event].as_array().unwrap();
@@ -1155,41 +1525,137 @@ mod tests {
         let original = "{\n    \"theme\": \"dark\"\n}\n";
         std::fs::write(&settings, original).unwrap();
         let script = dir.path().join("trigger-event.sh");
+        let status = dir.path().join("statusline.sh");
+        let scripts = |hook: Option<&'static str>, line: Option<&'static str>| {
+            [
+                ScriptFile {
+                    path: &script,
+                    current: hook,
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &status,
+                    current: line,
+                    content: statusline::SCRIPT,
+                },
+            ]
+            .into_iter()
+            .collect::<Vec<_>>()
+        };
 
-        let files = claude_preview(&settings, &script, Some(original), None, true).unwrap();
+        let files = claude_preview(
+            &settings,
+            Some(original),
+            &scripts(None, None),
+            true,
+            LATEST,
+        )
+        .unwrap();
         assert_eq!(std::fs::read_to_string(&settings).unwrap(), original);
-        assert!(!script.exists());
-        assert_eq!(files.len(), 2);
+        assert!(!script.exists() && !status.exists());
+        assert_eq!(files.len(), 3);
         assert_eq!(files[1].before, None);
         assert_eq!(files[1].after.as_deref(), Some(SESSION_HOOK_SCRIPT));
+        assert_eq!(files[2].after.as_deref(), Some(statusline::SCRIPT));
 
-        apply_settings(&settings, true).unwrap();
+        apply_settings(&settings, true, LATEST).unwrap();
         let written = std::fs::read_to_string(&settings).unwrap();
         assert_eq!(files[0].after.as_deref(), Some(written.as_str()));
+        assert!(written.contains("kex-statusline"));
 
-        let removal = claude_preview(&settings, &script, Some(&written), None, false).unwrap();
+        let removal =
+            claude_preview(&settings, Some(&written), &scripts(None, None), false, None).unwrap();
         assert_eq!(removal.len(), 1);
-        apply_settings(&settings, false).unwrap();
+        apply_settings(&settings, false, None).unwrap();
         let cleaned = std::fs::read_to_string(&settings).unwrap();
         assert_eq!(removal[0].after.as_deref(), Some(cleaned.as_str()));
         assert!(cleaned.contains("\"theme\""));
+        assert!(!cleaned.contains("statusLine"));
     }
 
     #[test]
     fn claude_preview_of_an_up_to_date_install_is_empty() {
         let dir = tempfile::tempdir().unwrap();
         let settings = dir.path().join("settings.json");
-        apply_settings(&settings, true).unwrap();
+        apply_settings(&settings, true, LATEST).unwrap();
         let text = std::fs::read_to_string(&settings).unwrap();
         let files = claude_preview(
             &settings,
-            &dir.path().join("t.sh"),
             Some(&text),
-            Some(SESSION_HOOK_SCRIPT),
+            &[
+                ScriptFile {
+                    path: &dir.path().join("t.sh"),
+                    current: Some(SESSION_HOOK_SCRIPT),
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &dir.path().join("s.sh"),
+                    current: Some(statusline::SCRIPT),
+                    content: statusline::SCRIPT,
+                },
+            ],
             true,
+            LATEST,
         )
         .unwrap();
         assert!(files.is_empty());
+    }
+
+    // The user's own status line as this machine has it, written in a layout of its own.
+    const FOREIGN_STATUSLINE: &str = "{\n  \"statusLine\": {\"type\":\"command\", \"command\": \"$HOME/.claude/hooks/run-hud.sh\"},\n  \"theme\": \"dark\"\n}\n";
+
+    fn status_line_text(settings: &str) -> String {
+        let start = settings.find("\"statusLine\"").expect("no statusLine key");
+        let end = start + settings[start..].find('}').unwrap() + 1;
+        settings[start..end].to_string()
+    }
+
+    #[test]
+    fn a_foreign_status_line_stays_byte_for_byte_through_install_and_uninstall() {
+        let path = std::path::Path::new("/x/settings.json");
+        let before = status_line_text(FOREIGN_STATUSLINE);
+        let installed = plan_settings(FOREIGN_STATUSLINE, path, true, LATEST)
+            .unwrap()
+            .unwrap();
+        assert_eq!(status_line_text(&installed), before);
+        assert!(!installed.contains("kex-statusline"));
+        assert!(hooked(&serde_json::from_str(&installed).unwrap(), "Stop"));
+        assert_eq!(plan_settings(&installed, path, true, LATEST).unwrap(), None);
+        let removed = plan_settings(&installed, path, false, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(status_line_text(&removed), before);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_foreign_status_line_on_disk_is_never_rewritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = dir.path().join("settings.json");
+        std::fs::write(&settings, FOREIGN_STATUSLINE).unwrap();
+        apply_settings(&settings, true, LATEST).unwrap();
+        let after_install = std::fs::read_to_string(&settings).unwrap();
+        assert_eq!(
+            status_line_text(&after_install),
+            status_line_text(FOREIGN_STATUSLINE)
+        );
+        apply_settings(&settings, false, None).unwrap();
+        assert_eq!(
+            status_line_text(&std::fs::read_to_string(&settings).unwrap()),
+            status_line_text(FOREIGN_STATUSLINE)
+        );
+    }
+
+    #[test]
+    fn kex_takes_an_empty_slot_and_gives_it_back_on_uninstall() {
+        let path = std::path::Path::new("/x/settings.json");
+        let src = "{\n  \"theme\": \"dark\"\n}\n";
+        let out = plan_settings(src, path, true, LATEST).unwrap().unwrap();
+        let root: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(statusline::slot(&root), statusline::Slot::Kex);
+        let removed = plan_settings(&out, path, false, None).unwrap().unwrap();
+        assert!(!removed.contains("statusLine"));
+        assert!(removed.contains("\"theme\": \"dark\""));
     }
 
     #[test]
@@ -1265,5 +1731,92 @@ mod tests {
             &agent_extension_script("omp")
         ));
         assert!(!agent_file_matches(file, &agent_extension_script("pi")));
+    }
+
+    #[test]
+    fn an_unknown_version_installs_only_the_1_0_events() {
+        let out: Value = serde_json::from_str(
+            &plan_settings("", std::path::Path::new("/x/s.json"), true, None)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        let keys: Vec<&String> = out["hooks"].as_object().unwrap().keys().collect();
+        assert_eq!(keys.len(), 6, "{keys:?}");
+        assert!(!hooked(&out, "MessageDisplay") && !hooked(&out, "StopFailure"));
+    }
+
+    #[test]
+    fn a_claude_update_adds_the_new_events_on_the_next_install() {
+        let path = std::path::Path::new("/x/s.json");
+        let old = plan_settings("", path, true, Some("2.0.50"))
+            .unwrap()
+            .unwrap();
+        assert!(!old.contains("MessageDisplay") && !old.contains("StopFailure"));
+        assert!(old.contains("PermissionRequest"));
+        let new = plan_settings(&old, path, true, LATEST).unwrap().unwrap();
+        assert!(new.contains("MessageDisplay") && new.contains("StopFailure"));
+        assert_eq!(plan_settings(&new, path, true, LATEST).unwrap(), None);
+    }
+
+    #[test]
+    fn a_claude_downgrade_drops_the_events_it_does_not_know() {
+        let path = std::path::Path::new("/x/s.json");
+        let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
+        let down = plan_settings(&full, path, true, Some("1.0.90"))
+            .unwrap()
+            .unwrap();
+        let root: Value = serde_json::from_str(&down).unwrap();
+        assert!(root["hooks"].get("MessageDisplay").is_none());
+        assert!(hooked(&root, "Stop"));
+    }
+
+    #[test]
+    fn an_unknown_version_never_prunes_the_events_kex_already_hooked() {
+        let path = std::path::Path::new("/x/s.json");
+        let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
+        assert_eq!(plan_settings(&full, path, true, None).unwrap(), None);
+    }
+
+    #[test]
+    fn an_unknown_version_adds_the_baseline_and_keeps_the_rest() {
+        let path = std::path::Path::new("/x/s.json");
+        let partial = merge_hooks(json!({}), &["PermissionRequest", "PostCompact"], true);
+        let text = serde_json::to_string_pretty(&statusline::install(partial)).unwrap();
+        let out: Value =
+            serde_json::from_str(&plan_settings(&text, path, true, None).unwrap().unwrap())
+                .unwrap();
+        for event in claude_version::hook_events_for(None) {
+            assert!(hooked(&out, event), "{event} missing");
+        }
+        assert!(hooked(&out, "PermissionRequest") && hooked(&out, "PostCompact"));
+        assert!(out["hooks"].get("MessageDisplay").is_none());
+    }
+
+    #[test]
+    fn a_known_older_version_prunes_the_events_it_does_not_have() {
+        let path = std::path::Path::new("/x/s.json");
+        let full = plan_settings("", path, true, LATEST).unwrap().unwrap();
+        let out: Value = serde_json::from_str(
+            &plan_settings(&full, path, true, Some("2.0.50"))
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        for event in ["StopFailure", "MessageDisplay", "PostCompact"] {
+            assert!(out["hooks"].get(event).is_none(), "{event} kept");
+        }
+        for event in ["PermissionRequest", "SubagentStart", "Stop"] {
+            assert!(hooked(&out, event), "{event} missing");
+        }
+    }
+
+    #[test]
+    fn uninstall_removes_kex_from_every_known_event() {
+        let full = merge_hooks(json!({}), &all(), true);
+        let out = remove_hooks(full);
+        for event in all() {
+            assert!(!hooked(&out, event), "{event} still hooked");
+        }
     }
 }

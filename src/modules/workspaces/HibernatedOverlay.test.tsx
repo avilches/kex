@@ -25,11 +25,20 @@ const sessionRestore = vi.hoisted(() => ({
       _tabId: string,
     ): Promise<{ agent: string | null; resumeCmd: string } | null> => null,
   ),
+  sessionPreviews: vi.fn(
+    async (
+      _tabIds: string[],
+    ): Promise<
+      { tabId: string; cwd: string; lastMessage?: string | null; updatedAt: number }[]
+    > => [],
+  ),
 }));
 
 vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
   previewResumeCmd: sessionRestore.previewResumeCmd,
+  sessionPreviews: sessionRestore.sessionPreviews,
 }));
+vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 
 import { HibernatedOverlay } from "./HibernatedOverlay";
 import type { Workspace } from "./lib/types";
@@ -199,5 +208,56 @@ describe("HibernatedOverlay sleeping snapshot", () => {
       <HibernatedOverlay workspace={persisted} active onWake={() => {}} />,
     );
     expect(sessionRestore.previewResumeCmd).not.toHaveBeenCalled();
+  });
+});
+
+describe("HibernatedOverlay session previews", () => {
+  beforeEach(() => {
+    state.dragging = null;
+    state.isOver = false;
+    sessionRestore.previewResumeCmd.mockReset();
+    sessionRestore.previewResumeCmd.mockResolvedValue(null);
+    sessionRestore.sessionPreviews.mockReset();
+  });
+  afterEach(cleanup);
+
+  it("shows the last assistant message with the folder and the time", async () => {
+    sessionRestore.sessionPreviews.mockResolvedValue([
+      {
+        tabId: "t1",
+        cwd: "/Users/me/code/kex",
+        lastMessage: "All tests pass.",
+        updatedAt: Math.floor(Date.now() / 1000) - 2 * 3600,
+      },
+    ]);
+    const view = mount();
+    await vi.waitFor(() => expect(view.getByText("All tests pass.")).toBeTruthy());
+    expect(view.getByText("~/code/kex \u00b7 2h ago")).toBeTruthy();
+    expect(sessionRestore.sessionPreviews).toHaveBeenCalledWith(["t1"]);
+  });
+
+  it("shows only the folder and time when the agent sent no message", async () => {
+    sessionRestore.sessionPreviews.mockResolvedValue([
+      { tabId: "t1", cwd: "/tmp/p", updatedAt: Math.floor(Date.now() / 1000) },
+    ]);
+    const view = mount();
+    await vi.waitFor(() =>
+      expect(view.getByText("/tmp/p \u00b7 less than a minute ago")).toBeTruthy(),
+    );
+    expect(view.container.querySelector(".line-clamp-2")).toBeNull();
+  });
+
+  it("does not read the store while the overlay is not the active workspace", () => {
+    mount(false);
+    expect(sessionRestore.sessionPreviews).not.toHaveBeenCalled();
+  });
+
+  it("asks once for the same tabs across re-renders", async () => {
+    sessionRestore.sessionPreviews.mockResolvedValue([]);
+    const view = mount();
+    view.rerender(
+      <HibernatedOverlay workspace={{ ...workspaceB, title: "Beta v2" }} active onWake={() => {}} />,
+    );
+    await vi.waitFor(() => expect(sessionRestore.sessionPreviews).toHaveBeenCalledTimes(1));
   });
 });

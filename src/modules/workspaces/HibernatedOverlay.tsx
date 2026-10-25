@@ -1,7 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { cachedHomeDir } from "@/lib/homeDir";
+import {
+  previewResumeCmd,
+  sessionPreviews,
+  type SessionPreview,
+} from "@/modules/agents/lib/agentSessionRestore";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { useDroppable } from "@dnd-kit/core";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
@@ -13,6 +18,10 @@ import {
   shouldPlayHibernateFx,
 } from "./lib/hibernateFx";
 import { allPanes, focusedTab } from "./lib/splitNode";
+import {
+  describeSessionPreview,
+  previewRequestKey,
+} from "./lib/sessionPreview";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
 import { tabIcon } from "./lib/tabTitle";
 import type { Tab, TabHibernation, Workspace } from "./lib/types";
@@ -68,7 +77,74 @@ function useSleepingSnapshot(tab: Tab): TabHibernation | undefined {
   return saved ?? fetched;
 }
 
-function SleepingTabRow({ tab }: { tab: Tab }) {
+// One read of agent-sessions.json for every terminal tab of the workspace, redone each time
+// the overlay is shown so a message stored by the last Stop before hibernating is there.
+function useSessionPreviews(
+  tabs: Tab[],
+  active: boolean,
+): Map<string, SessionPreview> {
+  const ids = useMemo(
+    () => tabs.filter((t) => t.kind === "terminal").map((t) => t.id),
+    [tabs],
+  );
+  const key = previewRequestKey(ids);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
+  const [previews, setPreviews] = useState<Map<string, SessionPreview>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    if (!active || key === "") return;
+    let cancelled = false;
+    void sessionPreviews(idsRef.current).then((list) => {
+      if (!cancelled) setPreviews(new Map(list.map((p) => [p.tabId, p])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, key]);
+  return previews;
+}
+
+function SessionPreviewLine({
+  preview,
+  now,
+}: {
+  preview: SessionPreview;
+  now: number;
+}) {
+  const line = describeSessionPreview(preview, now, cachedHomeDir());
+  return (
+    <span className="col-span-2 flex flex-col gap-0.5 pb-1.5 pl-7 pr-2 [contain:inline-size]">
+      {line.message && (
+        <span
+          title={line.message}
+          className="line-clamp-2 text-[11.5px] leading-snug text-foreground/80"
+        >
+          {line.message}
+        </span>
+      )}
+      {line.meta && (
+        <span
+          title={line.metaTitle}
+          className="truncate text-[11px] opacity-60"
+        >
+          {line.meta}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SleepingTabRow({
+  tab,
+  preview,
+  now,
+}: {
+  tab: Tab;
+  preview?: SessionPreview;
+  now: number;
+}) {
   const info = useAgentTabTitle(tab);
   const snapshot = useSleepingSnapshot(tab);
   const title =
@@ -99,6 +175,7 @@ function SleepingTabRow({ tab }: { tab: Tab }) {
           {command}
         </span>
       </span>
+      {preview && <SessionPreviewLine preview={preview} now={now} />}
     </li>
   );
 }
@@ -124,7 +201,8 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
     () => allPanes(workspace.paneTree).flatMap((p) => p.tabs),
     [workspace.paneTree],
   );
-  const now = useNow(active && workspace.hibernatedAt !== undefined);
+  const now = useNow(active);
+  const previews = useSessionPreviews(tabs, active);
   const [fx] = useState(() =>
     shouldPlayHibernateFx(workspaceId, workspace.hibernatedAt),
   );
@@ -176,7 +254,12 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
           )}
         >
           {tabs.map((tab) => (
-            <SleepingTabRow key={tab.id} tab={tab} />
+            <SleepingTabRow
+              key={tab.id}
+              tab={tab}
+              preview={previews.get(tab.id)}
+              now={now}
+            />
           ))}
         </ul>
       )}

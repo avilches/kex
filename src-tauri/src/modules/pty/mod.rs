@@ -1,5 +1,7 @@
 mod agent_detect;
 mod da_filter;
+#[cfg_attr(not(unix), allow(dead_code))]
+mod hook_router;
 #[cfg(unix)]
 mod ipc;
 #[cfg(windows)]
@@ -48,6 +50,12 @@ impl PtyState {
     pub(super) fn take(&self, id: u32) -> Option<Arc<Session>> {
         self.sessions.write().unwrap().remove(&id)
     }
+}
+
+/// Removes the app's hook socket file on exit.
+pub fn shutdown_hook_server() {
+    #[cfg(unix)]
+    ipc::shutdown();
 }
 
 #[tauri::command]

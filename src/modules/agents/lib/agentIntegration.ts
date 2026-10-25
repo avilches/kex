@@ -25,7 +25,7 @@ export async function installAgent(agent: AgentId): Promise<void> {
   if (isIntegrationAgent(agent)) {
     await installIntegration(agent, updateInstalledIntegrations);
   } else {
-    await invoke("agent_enable_claude_hooks");
+    await invoke("agent_enable_claude_hooks", { refresh: true });
     await setAgentNotifications(true);
   }
   // Never suggested again, even if the user removes it later. The install itself already
