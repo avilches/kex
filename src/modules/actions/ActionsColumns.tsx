@@ -77,7 +77,7 @@ function actionFromSuggestion(s: AppSuggestion): Action {
     kind: s.kind,
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
-    ...(s.kind === "agent" && s.cwdMode ? { cwdMode: s.cwdMode } : {}),
+    ...(s.kind === "agent" ? { cwdMode: s.cwdMode } : {}),
     ownButton: false,
   };
 }

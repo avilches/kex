@@ -4,7 +4,7 @@ import { splitActionName } from "./actionName";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import type { Action, ActionKind } from "./types";
 
-export type AppSuggestion = {
+type SuggestionBase = {
   /** Unique within a list: the app id, plus the variable the preset points at. */
   key: string;
   /** Detected app it comes from, absent for the custom app. */
@@ -14,10 +14,11 @@ export type AppSuggestion = {
   iconId: string | null;
   /** Editable template that goes through the argv expander. */
   defaultCommand: string;
-  kind: ActionKind;
-  /** Agents only: where the preset starts the agent. */
-  cwdMode?: ScriptCwdMode;
 };
+
+// An agent preset always says where it starts, so creating one never falls back to Home.
+export type AppSuggestion = SuggestionBase &
+  ({ kind: "app"; cwdMode?: undefined } | { kind: "agent"; cwdMode: ScriptCwdMode });
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   key: "custom",
