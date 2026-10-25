@@ -78,7 +78,7 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
-import { runEditorScan } from "@/modules/external-editors";
+import { runStartupEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
@@ -488,7 +488,7 @@ export default function App() {
   // ── Editor scan on startup ────────────────────────────────────────────────
 
   useEffect(() => {
-    void runEditorScan();
+    void runStartupEditorScan();
   }, []);
 
   // ── Workspace state persistence ───────────────────────────────────────────

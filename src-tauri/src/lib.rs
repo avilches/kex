@@ -950,6 +950,7 @@ pub fn run() {
             shell::shell_bg_kill,
             shell::shell_bg_list,
             editors::editor_scan,
+            editors::claim_startup_scan,
             actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,

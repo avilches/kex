@@ -4,13 +4,14 @@ import type { DetectedEditor } from "./types";
 
 const h = vi.hoisted(() => ({
   scan: vi.fn(),
+  claim: vi.fn(),
   writes: [] as Action[][],
   failActions: false,
   failFlag: false,
   hydration: Promise.resolve() as Promise<void>,
 }));
 
-vi.mock("@/lib/native", () => ({ native: { editorScan: h.scan } }));
+vi.mock("@/lib/native", () => ({ native: { editorScan: h.scan, claimStartupScan: h.claim } }));
 
 vi.mock("@/modules/settings/preferences", async () => {
   const { create } = await import("zustand");
@@ -43,7 +44,7 @@ vi.mock("@/modules/settings/store", async () => {
 
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
-import { runEditorScan } from "./useExternalEditors";
+import { runEditorScan, runStartupEditorScan } from "./useExternalEditors";
 
 const agent = (id: string, enabled?: boolean): DetectedEditor => ({
   id,
@@ -58,6 +59,7 @@ const seededCommands = () => usePreferencesStore.getState().actions.map((a) => a
 
 beforeEach(() => {
   h.scan.mockReset();
+  h.claim.mockReset();
   h.writes.length = 0;
   h.failActions = false;
   h.failFlag = false;
@@ -166,5 +168,32 @@ describe("agent seeding on scan", () => {
     await run;
     expect(h.writes).toEqual([]);
     expect(seededCommands()).toEqual(["pnpm build"]);
+  });
+});
+
+describe("startup scan", () => {
+  it("scans and seeds in the window that wins the claim", async () => {
+    h.claim.mockResolvedValue(true);
+    h.scan.mockResolvedValue([agent("claude")]);
+    await runStartupEditorScan();
+    expect(h.scan).toHaveBeenCalledTimes(1);
+    expect(seededCommands()).toEqual(["claude"]);
+  });
+
+  it("does not scan nor seed in a window that loses the claim", async () => {
+    h.claim.mockResolvedValue(false);
+    h.scan.mockResolvedValue([agent("claude")]);
+    await runStartupEditorScan();
+    expect(h.scan).not.toHaveBeenCalled();
+    expect(seededCommands()).toEqual([]);
+    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
+  });
+
+  it("does not scan when the claim itself fails", async () => {
+    h.claim.mockRejectedValue(new Error("ipc"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await runStartupEditorScan();
+    expect(h.scan).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });

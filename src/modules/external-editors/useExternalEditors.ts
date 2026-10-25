@@ -45,8 +45,8 @@ export function mergeEnabled(
 
 // The plan is computed from the live flag and the live Actions right before the writes, which go
 // through the serialized queue. A partial failure leaves the flag false and the next scan only
-// adds what is still missing. With several windows scanning at startup each write replaces the
-// whole list, so the last writer wins and the result is one copy with no duplicates.
+// adds what is still missing. Only one window scans at startup (`runStartupEditorScan`), so the
+// others never seed in parallel; they get the Actions and the flag through the preferences echo.
 async function seedAgentActions(agents: DetectedEditor[]): Promise<void> {
   const seeded = usePreferencesStore.getState().agentActionsSeeded;
   if (seeded || !agents.some((a) => a.enabled !== false)) return;
@@ -73,6 +73,17 @@ export async function runEditorScan(): Promise<void> {
     scanning = false;
     notifyScanning();
   }
+}
+
+/** Startup scan: runs in the one window that wins the per-launch claim, never in the others. */
+export async function runStartupEditorScan(): Promise<void> {
+  let won = false;
+  try {
+    won = await native.claimStartupScan();
+  } catch (e) {
+    console.error("claim_startup_scan failed:", e);
+  }
+  if (won) await runEditorScan();
 }
 
 export function useExternalEditors() {

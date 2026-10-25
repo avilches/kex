@@ -402,6 +402,7 @@ export const native = {
     }),
   editorScan: (): Promise<DetectedEditor[]> =>
     invoke<DetectedEditor[]>("editor_scan"),
+  claimStartupScan: (): Promise<boolean> => invoke<boolean>("claim_startup_scan"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
   /** Count of descendant processes signaled for the script of this tab; 0 means the program is gone. */
