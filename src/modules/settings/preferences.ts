@@ -29,6 +29,16 @@ export const usePreferencesStore = create<State>((set) => ({
   init: async () => {
     if (initialized) return;
     initialized = true;
+    const early: Array<[string, unknown]> = [];
+    let loaded = false;
+    try {
+      await onPreferencesChange((key, value) => {
+        if (loaded) set({ [key]: value } as Partial<State>);
+        else early.push([key, value]);
+      });
+    } catch (err) {
+      console.error("Failed to subscribe to preference changes:", err);
+    }
     try {
       const prefs = await loadPreferences();
       set({ ...prefs, hydrated: true });
@@ -36,9 +46,9 @@ export const usePreferencesStore = create<State>((set) => ({
       console.error("Failed to load preferences, using defaults:", err);
       set({ ...DEFAULT_PREFERENCES, hydrated: true });
     }
+    // Events that landed during the disk read are newer than it, so they go on top.
+    for (const [key, value] of early) set({ [key]: value } as Partial<State>);
+    loaded = true;
     markHydrated();
-    void onPreferencesChange((key, value) => {
-      set({ [key]: value } as Partial<State>);
-    });
   },
 }));
