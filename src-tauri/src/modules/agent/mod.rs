@@ -8,6 +8,7 @@ pub mod live_model;
 pub mod os_notify;
 pub mod provider;
 pub mod session_store;
+pub mod statusline;
 
 use serde_json::{json, Value};
 
@@ -61,13 +62,20 @@ fn agent_extension_script(agent: &str) -> String {
     AGENT_EXTENSION_TEMPLATE.replace("__KEX_AGENT__", agent)
 }
 
-fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
+fn kex_hooks_dir() -> Result<std::path::PathBuf, String> {
     Ok(dirs::home_dir()
         .ok_or_else(|| "could not resolve home dir".to_string())?
         .join(".config")
         .join("kex")
-        .join("hooks")
-        .join("trigger-event.sh"))
+        .join("hooks"))
+}
+
+fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
+    Ok(kex_hooks_dir()?.join("trigger-event.sh"))
+}
+
+fn statusline_script_path() -> Result<std::path::PathBuf, String> {
+    Ok(kex_hooks_dir()?.join(statusline::SCRIPT_FILE))
 }
 
 fn session_hook_cmd() -> String {
@@ -189,8 +197,13 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
 
 /// Writes trigger-event.sh, shared by the Claude Code and Codex hooks, only when it differs.
 fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), String> {
+    install_script(script_path, SESSION_HOOK_SCRIPT)
+}
+
+/// Writes an executable script atomically, only when its content differs.
+fn install_script(script_path: &std::path::Path, content: &str) -> Result<(), String> {
     let current = std::fs::read_to_string(script_path).unwrap_or_default();
-    if current == SESSION_HOOK_SCRIPT {
+    if current == content {
         return Ok(());
     }
     let script_dir = script_path
@@ -199,8 +212,7 @@ fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), Stri
     std::fs::create_dir_all(script_dir)
         .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
     let script_tmp = script_path.with_extension("sh.kex-tmp");
-    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
-        .map_err(|e| format!("write session hook tmp: {e}"))?;
+    std::fs::write(&script_tmp, content).map_err(|e| format!("write hook script tmp: {e}"))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -227,6 +239,9 @@ async fn detect_version(refresh: bool) -> Option<String> {
 pub async fn agent_enable_claude_hooks() -> Result<(), String> {
     let version = detect_version(true).await;
     install_session_hook_script(&session_hook_script_path()?)?;
+    // Written even while the user's own status line keeps the slot: the file is inert until
+    // settings.json names it.
+    install_script(&statusline_script_path()?, statusline::SCRIPT)?;
 
     let path = settings_path()?;
     let dir = path.parent().unwrap();
@@ -278,9 +293,12 @@ fn plan_settings(
         path,
     )?;
     let next = if install {
-        merge_hooks(existing.clone(), &claude_version::hook_events_for(version))
+        statusline::install(merge_hooks(
+            existing.clone(),
+            &claude_version::hook_events_for(version),
+        ))
     } else {
-        remove_hooks(existing.clone())
+        statusline::remove(remove_hooks(existing.clone()))
     };
     if next == existing {
         return Ok(None);
@@ -633,11 +651,17 @@ fn changed(
     }]
 }
 
+/// A script a Claude install writes: where it goes and what is there now.
+struct ScriptFile<'a> {
+    path: &'a std::path::Path,
+    current: Option<&'a str>,
+    content: &'static str,
+}
+
 fn claude_preview(
     settings_path: &std::path::Path,
-    script_path: &std::path::Path,
     settings: Option<&str>,
-    script: Option<&str>,
+    scripts: &[ScriptFile],
     install: bool,
     version: Option<&str>,
 ) -> Result<Vec<FilePreview>, String> {
@@ -645,11 +669,9 @@ fn claude_preview(
         .or_else(|| settings.map(str::to_string));
     let mut files = changed(settings_path, settings, after);
     if install {
-        files.extend(changed(
-            script_path,
-            script,
-            Some(SESSION_HOOK_SCRIPT.to_string()),
-        ));
+        for s in scripts {
+            files.extend(changed(s.path, s.current, Some(s.content.to_string())));
+        }
     }
     Ok(files)
 }
@@ -695,13 +717,25 @@ pub async fn agent_integration_preview(
         };
         let settings_path = settings_path()?;
         let script_path = session_hook_script_path()?;
+        let statusline_path = statusline_script_path()?;
         let settings = read_optional(&settings_path)?;
         let script = read_optional(&script_path)?;
+        let statusline_script = read_optional(&statusline_path)?;
         return claude_preview(
             &settings_path,
-            &script_path,
             settings.as_deref(),
-            script.as_deref(),
+            &[
+                ScriptFile {
+                    path: &script_path,
+                    current: script.as_deref(),
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &statusline_path,
+                    current: statusline_script.as_deref(),
+                    content: statusline::SCRIPT,
+                },
+            ],
             install,
             version.as_deref(),
         );
@@ -748,12 +782,19 @@ pub async fn agent_claude_hooks_status() -> bool {
     if !all_hooks_present {
         return false;
     }
-    // Check that the session hook script is up-to-date.
-    session_hook_script_path()
-        .ok()
+    // A status line of the user's keeps the slot, which is not a missing install.
+    let statusline_ok = match statusline::slot(&root) {
+        statusline::Slot::Foreign => true,
+        statusline::Slot::Empty => false,
+        statusline::Slot::Kex => script_has(statusline_script_path(), statusline::SCRIPT_VERSION),
+    };
+    statusline_ok && script_has(session_hook_script_path(), SESSION_HOOK_SCRIPT_VERSION)
+}
+
+fn script_has(path: Result<std::path::PathBuf, String>, version: &str) -> bool {
+    path.ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .unwrap_or_default()
-        .contains(SESSION_HOOK_SCRIPT_VERSION)
+        .is_some_and(|c| c.contains(version))
 }
 
 #[cfg(test)]
@@ -1479,25 +1520,52 @@ mod tests {
         let original = "{\n    \"theme\": \"dark\"\n}\n";
         std::fs::write(&settings, original).unwrap();
         let script = dir.path().join("trigger-event.sh");
+        let status = dir.path().join("statusline.sh");
+        let scripts = |hook: Option<&'static str>, line: Option<&'static str>| {
+            [
+                ScriptFile {
+                    path: &script,
+                    current: hook,
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &status,
+                    current: line,
+                    content: statusline::SCRIPT,
+                },
+            ]
+            .into_iter()
+            .collect::<Vec<_>>()
+        };
 
-        let files = claude_preview(&settings, &script, Some(original), None, true, LATEST).unwrap();
+        let files = claude_preview(
+            &settings,
+            Some(original),
+            &scripts(None, None),
+            true,
+            LATEST,
+        )
+        .unwrap();
         assert_eq!(std::fs::read_to_string(&settings).unwrap(), original);
-        assert!(!script.exists());
-        assert_eq!(files.len(), 2);
+        assert!(!script.exists() && !status.exists());
+        assert_eq!(files.len(), 3);
         assert_eq!(files[1].before, None);
         assert_eq!(files[1].after.as_deref(), Some(SESSION_HOOK_SCRIPT));
+        assert_eq!(files[2].after.as_deref(), Some(statusline::SCRIPT));
 
         apply_settings(&settings, true, LATEST).unwrap();
         let written = std::fs::read_to_string(&settings).unwrap();
         assert_eq!(files[0].after.as_deref(), Some(written.as_str()));
+        assert!(written.contains("kex-statusline"));
 
         let removal =
-            claude_preview(&settings, &script, Some(&written), None, false, None).unwrap();
+            claude_preview(&settings, Some(&written), &scripts(None, None), false, None).unwrap();
         assert_eq!(removal.len(), 1);
         apply_settings(&settings, false, None).unwrap();
         let cleaned = std::fs::read_to_string(&settings).unwrap();
         assert_eq!(removal[0].after.as_deref(), Some(cleaned.as_str()));
         assert!(cleaned.contains("\"theme\""));
+        assert!(!cleaned.contains("statusLine"));
     }
 
     #[test]
@@ -1508,14 +1576,81 @@ mod tests {
         let text = std::fs::read_to_string(&settings).unwrap();
         let files = claude_preview(
             &settings,
-            &dir.path().join("t.sh"),
             Some(&text),
-            Some(SESSION_HOOK_SCRIPT),
+            &[
+                ScriptFile {
+                    path: &dir.path().join("t.sh"),
+                    current: Some(SESSION_HOOK_SCRIPT),
+                    content: SESSION_HOOK_SCRIPT,
+                },
+                ScriptFile {
+                    path: &dir.path().join("s.sh"),
+                    current: Some(statusline::SCRIPT),
+                    content: statusline::SCRIPT,
+                },
+            ],
             true,
             LATEST,
         )
         .unwrap();
         assert!(files.is_empty());
+    }
+
+    // The user's own status line as this machine has it, written in a layout of its own.
+    const FOREIGN_STATUSLINE: &str = "{\n  \"statusLine\": {\"type\":\"command\", \"command\": \"$HOME/.claude/hooks/run-hud.sh\"},\n  \"theme\": \"dark\"\n}\n";
+
+    fn status_line_text(settings: &str) -> String {
+        let start = settings.find("\"statusLine\"").expect("no statusLine key");
+        let end = start + settings[start..].find('}').unwrap() + 1;
+        settings[start..end].to_string()
+    }
+
+    #[test]
+    fn a_foreign_status_line_stays_byte_for_byte_through_install_and_uninstall() {
+        let path = std::path::Path::new("/x/settings.json");
+        let before = status_line_text(FOREIGN_STATUSLINE);
+        let installed = plan_settings(FOREIGN_STATUSLINE, path, true, LATEST)
+            .unwrap()
+            .unwrap();
+        assert_eq!(status_line_text(&installed), before);
+        assert!(!installed.contains("kex-statusline"));
+        assert!(hooked(&serde_json::from_str(&installed).unwrap(), "Stop"));
+        assert_eq!(plan_settings(&installed, path, true, LATEST).unwrap(), None);
+        let removed = plan_settings(&installed, path, false, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(status_line_text(&removed), before);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_foreign_status_line_on_disk_is_never_rewritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = dir.path().join("settings.json");
+        std::fs::write(&settings, FOREIGN_STATUSLINE).unwrap();
+        apply_settings(&settings, true, LATEST).unwrap();
+        let after_install = std::fs::read_to_string(&settings).unwrap();
+        assert_eq!(
+            status_line_text(&after_install),
+            status_line_text(FOREIGN_STATUSLINE)
+        );
+        apply_settings(&settings, false, None).unwrap();
+        assert_eq!(
+            status_line_text(&std::fs::read_to_string(&settings).unwrap()),
+            status_line_text(FOREIGN_STATUSLINE)
+        );
+    }
+
+    #[test]
+    fn kex_takes_an_empty_slot_and_gives_it_back_on_uninstall() {
+        let path = std::path::Path::new("/x/settings.json");
+        let src = "{\n  \"theme\": \"dark\"\n}\n";
+        let out = plan_settings(src, path, true, LATEST).unwrap().unwrap();
+        let root: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(statusline::slot(&root), statusline::Slot::Kex);
+        let removed = plan_settings(&out, path, false, None).unwrap().unwrap();
+        assert!(!removed.contains("statusLine"));
+        assert!(removed.contains("\"theme\": \"dark\""));
     }
 
     #[test]
