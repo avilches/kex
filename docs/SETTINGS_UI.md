@@ -115,3 +115,12 @@ Diferencias importantes respecto a inputs generales:
 
 Para botones de tab dentro de dialogs/modals (como `WorkspaceSettingsDialog`):
 - Anadir `outline-none focus-visible:outline-none` para eliminar el borde de foco del sistema operativo.
+
+## Editor de textos en dev
+
+Solo con `pnpm tauri dev` (el modulo se carga detras de `import.meta.env.DEV`, un build de produccion no lo lleva): clic derecho sobre un texto de la ventana de Settings, o sobre un icono con tooltip o un campo con placeholder que no sea un input, abre un editor (`src/settings/devTextEditor/SettingsTextEditor.tsx`) con Save y Restore. El cambio se ve al instante y se re-aplica solo cuando React repinta o cambias de seccion (`reconcile.ts`, un `MutationObserver`). Sobre un `input`, `textarea` o `select` se conserva el menu nativo.
+
+- La fuente de verdad es `SETTINGS_TEXTS.md` en la raiz del repo (ignorado por git), que lee y escribe el plugin `scripts/settings-texts-plugin.ts` por `GET/POST /__kex-settings-texts`. Por eso el cambio sobrevive a recargar o a cerrar y reabrir Settings, y desaparece cuando un agente aplica la entrada y la borra del fichero.
+- Cada entrada lleva la seccion, el texto original y el nuevo, como cadenas JSON. El fichero trae la instruccion para el agente en su cabecera.
+- Un cambio se identifica por el texto exacto que se ve, no por su sitio en el codigo: el mismo texto en dos sitios cambia en los dos. Un texto con valores interpolados se guarda como se ve.
+- Guardar un texto igual al original equivale a Restaurar.

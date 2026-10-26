@@ -22,6 +22,10 @@ hand them to each `claude` opened in its terminals, and `CLAUDE_CODE_CHILD_SESSI
 transcripts ("Transcript saving is off"), so session restore never finds a JSONL and always falls back to
 `--session-id`. Variables you export in your shell rc still reach each tab, because the tab's shell re-reads it.
 
+In `pnpm tauri dev` the Settings window can edit its own texts: a right-click on a text opens a small editor and
+saves the pending edits to `SETTINGS_TEXTS.md` (git-ignored) through a dev-only Vite endpoint
+(`/__kex-settings-texts`, `scripts/settings-texts-plugin.ts`), ready to hand to an agent. See `docs/SETTINGS_UI.md`.
+
 ### Theme preview page
 
 `pnpm dev` also serves `http://localhost:1420/theme-preview.html` (on the port Vite prints if `KEX_DEV_PORT` is set; `theme-preview.html` +

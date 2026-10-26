@@ -10,6 +10,7 @@ import {
   type UserConfig,
 } from "vite";
 import Inspect from "vite-plugin-inspect";
+import { settingsTextsPlugin } from "./scripts/settings-texts-plugin";
 import { themeWritePlugin } from "./scripts/theme-write-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -41,6 +42,9 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
     // Lets the theme preview write a theme back into its source file
     // (POST /__kex-theme-write). Dev only, never in a production build.
     ...(mode === "development" ? [themeWritePlugin()] : []),
+    // Reads and writes SETTINGS_TEXTS.md for the Settings text editor
+    // (GET/POST /__kex-settings-texts). Dev only, never in a production build.
+    ...(mode === "development" ? [settingsTextsPlugin()] : []),
     ...(analyze
       ? [
           (await import("rollup-plugin-visualizer")).visualizer({

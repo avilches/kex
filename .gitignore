@@ -36,3 +36,6 @@ stats.html
 # clon nuevo no tendría con qué rehacerlos. La tabla está en CLAUDE.md.
 /user-data/*
 !/user-data/create-links.sh
+
+# Borrador del editor de textos de Settings (solo dev, lo regenera el servidor de Vite)
+SETTINGS_TEXTS.md
