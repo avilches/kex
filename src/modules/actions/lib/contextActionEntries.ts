@@ -1,6 +1,6 @@
 import { folderKey } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { actionAvailability, actionTarget, agentTitle, actionRowTitle, byKind, scriptSubtitle, twinIds, type BarContext } from "./actionsBar";
+import { actionAvailability, actionTarget, agentTitle, actionRowTitle, byKind, scriptSubtitle, twinIds, type BarContext, type SubtitleLead } from "./actionsBar";
 import { isAgent, isApp, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -14,8 +14,8 @@ export type ContextActionEntry = {
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
   subtitleTrim: boolean;
-  /** The subtitle names the workspace root and draws its pin. */
-  subtitleRoot: boolean;
+  /** The icon drawn before the subtitle. */
+  subtitleLead: SubtitleLead | null;
   /** The hover words of an enabled row (where it opens); null says nothing. */
   title: string | null;
 };
@@ -35,7 +35,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, withAgents = fal
       reason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      subtitleRoot: !!subtitle.root,
+      subtitleLead: subtitle.lead ?? null,
       title: isAgent(action) ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }

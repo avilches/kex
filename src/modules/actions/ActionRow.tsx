@@ -57,7 +57,7 @@ export function ActionRowView({ action, overlay, handleProps, onEdit, remove }: 
       </span>
       <span className="flex min-w-0 flex-1 items-center gap-2" title={display}>
         <ActionIcon action={action} size={14} fill />
-        <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} root={subtitle.root} />
+        <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} lead={subtitle.lead} />
       </span>
       <button type="button" title="Edit" aria-label="Edit action" onClick={onEdit} className={EDIT_BUTTON}>
         <HugeiconsIcon icon={PencilEdit02Icon} size={15} strokeWidth={2} />

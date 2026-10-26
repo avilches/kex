@@ -153,7 +153,7 @@ describe("menuEntries", () => {
     disabledReason: null,
     subtitle: null,
     subtitleTrim: false,
-    subtitleRoot: false,
+    subtitleLead: null,
     title: null,
     iconOnly: false,
     ...over,
@@ -388,8 +388,8 @@ describe("actionShownAt", () => {
 
 describe("actionSubtitle", () => {
   it("shows the root for the workspace variable, Workspace in Settings, and the file name alone for the file", () => {
-    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: vars.workspace, startTrim: true, root: true });
-    expect(actionSubtitle("PyCharm {workspace}", SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
+    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: vars.workspace, startTrim: true, lead: "root" });
+    expect(actionSubtitle("PyCharm {workspace}", SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
     expect(actionSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toEqual({
       text: "a.ts",
       startTrim: false,
@@ -397,7 +397,7 @@ describe("actionSubtitle", () => {
   });
 
   it("keeps the path of a folder Action and marks it for a start cut", () => {
-    expect(actionSubtitle("Agent {cwd}", ctx)).toEqual({ text: "/p", startTrim: true });
+    expect(actionSubtitle("Agent {cwd}", ctx)).toEqual({ text: "/p", startTrim: true, lead: "tab" });
     expect(actionSubtitle("Math {branch}", ctx)).toEqual({ text: "{branch}", startTrim: false });
   });
 
@@ -418,15 +418,15 @@ describe("scriptSubtitle", () => {
   const script = (over: Partial<Action> = {}) => ({ name: "dev", kind: "script" as const, ...over });
 
   it("says where a script runs when its name has no variable", () => {
-    expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Home", startTrim: false });
-    expect(scriptSubtitle(script({ cwdMode: "workspace" }), ctx)).toEqual({ text: vars.workspace, startTrim: true, root: true });
-    expect(scriptSubtitle(script({ cwdMode: "context" }), ctx)).toEqual({ text: "/p", startTrim: true });
+    expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Home", startTrim: false, lead: "home" });
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), ctx)).toEqual({ text: vars.workspace, startTrim: true, lead: "root" });
+    expect(scriptSubtitle(script({ cwdMode: "context" }), ctx)).toEqual({ text: "/p", startTrim: true, lead: "tab" });
     expect(scriptSubtitle(script({ cwdMode: "fixed", cwd: "/srv/app" }), ctx)).toEqual({ text: "/srv/app", startTrim: true });
   });
 
   it("uses the generic words in Settings, which has no folder to show", () => {
     expect(scriptSubtitle(script({ cwdMode: "context" }), SETTINGS_LABELS).text).toBe("Current folder");
-    expect(scriptSubtitle(script({ cwdMode: "workspace" }), SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
   });
 
   it("falls back to the generic words with no folder, and says when the root is missing", () => {
@@ -521,7 +521,7 @@ describe("byKind", () => {
 
 describe("Settings labels", () => {
   it("say what the variable stands for in the subtitle and the hover, never the raw template", () => {
-    expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current folder", startTrim: true });
+    expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current folder", startTrim: true, lead: "tab" });
     expect(actionSubtitle("Code {filepath}", SETTINGS_LABELS).text).toBe("Current file");
     expect(actionRowTitle("Rust {cwd}", false, null, SETTINGS_LABELS)).toBe("Open Rust in Current folder");
     expect(actionRowTitle("Code {filepath}", false, null, SETTINGS_LABELS)).toBe("Open Current file with Code");
@@ -703,32 +703,32 @@ describe("agents", () => {
 
   it("shows the folder it starts in on its second line", () => {
     const sub = (o: Partial<Action>, c: Parameters<typeof scriptSubtitle>[1] = ctx) => scriptSubtitle(agent(o), c);
-    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true, root: true });
-    expect(sub({ cwdMode: "context" })).toEqual({ text: "/p", startTrim: true });
+    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true, lead: "root" });
+    expect(sub({ cwdMode: "context" })).toEqual({ text: "/p", startTrim: true, lead: "tab" });
     expect(sub({ cwdMode: "home" }).text).toBe("Home");
     expect(sub({ cwdMode: "fixed", cwd: "/srv" })).toEqual({ text: "/srv", startTrim: true });
     expect(sub({ cwdMode: "context" }, SETTINGS_LABELS).text).toBe("Current folder");
-    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
+    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
   });
 
   it("names the folder the runner falls back to when the focused tab has none", () => {
     const sub = (o: Partial<Action>, folders: NonNullable<Parameters<typeof scriptSubtitle>[1]>["folders"]) =>
       scriptSubtitle(agent(o), { ...ctx, folders });
     const noFocus = { focusFolder: null, workspaceRoot: "/root", workspaceCwd: "/cwd" };
-    expect(sub({ cwdMode: "context" }, noFocus)).toEqual({ text: "/root", startTrim: true });
-    expect(sub({ cwdMode: "context" }, { ...noFocus, workspaceRoot: null })).toEqual({ text: "/cwd", startTrim: true });
-    expect(sub({ cwdMode: "context" }, { ...noFocus, focusFolder: "/root/src" })).toEqual({ text: "/root/src", startTrim: true });
+    expect(sub({ cwdMode: "context" }, noFocus)).toEqual({ text: "/root", startTrim: true, lead: "tab" });
+    expect(sub({ cwdMode: "context" }, { ...noFocus, workspaceRoot: null })).toEqual({ text: "/cwd", startTrim: true, lead: "tab" });
+    expect(sub({ cwdMode: "context" }, { ...noFocus, focusFolder: "/root/src" })).toEqual({ text: "/root/src", startTrim: true, lead: "tab" });
     expect(sub({ cwdMode: "context" }, { focusFolder: null, workspaceRoot: null, workspaceCwd: null }).text).toBeNull();
     expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current folder");
   });
 
   it("names the workspace folder the run falls back to for a fixed mode with no folder", () => {
     const folders = { focusFolder: "/root/src", workspaceRoot: "/root", workspaceCwd: "/cwd" };
-    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true, root: true });
+    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true, lead: "root" });
     expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "  " }), { ...ctx, folders: { ...folders, workspaceRoot: null } })).toEqual({
       text: "/cwd",
       startTrim: true,
-      root: true,
+      lead: "root",
     });
     expect(scriptSubtitle(agent({ cwdMode: "fixed" }), SETTINGS_LABELS).text).toBe("Workspace root");
   });
@@ -1024,20 +1024,20 @@ describe("buildActionsBarModel arranging", () => {
 
   it("names what each variable stands for instead of today's value", () => {
     const m = build(true);
-    expect(m.buttons.map((b) => [b.subtitle, b.subtitleRoot])).toEqual([
-      ["Workspace root", true],
-      ["Current folder", false],
-      ["Current file", false],
+    expect(m.buttons.map((b) => [b.subtitle, b.subtitleLead])).toEqual([
+      ["Workspace root", "root"],
+      ["Current folder", "tab"],
+      ["Current file", null],
     ]);
     expect(m.buttons[0]?.title).toBe("Open PyCharm in Workspace root");
   });
 
   it("shows the real values otherwise, the pin only on the workspace root", () => {
     const m = build(false);
-    expect(m.buttons.map((b) => [b.subtitle, b.subtitleRoot])).toEqual([
-      [vars.workspace, true],
-      ["/p", false],
-      ["{filepath}", false],
+    expect(m.buttons.map((b) => [b.subtitle, b.subtitleLead])).toEqual([
+      [vars.workspace, "root"],
+      ["/p", "tab"],
+      ["{filepath}", null],
     ]);
   });
 

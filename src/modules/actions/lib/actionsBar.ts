@@ -154,13 +154,15 @@ export const SETTINGS_LABELS: BarContext = {
   labels: true,
 };
 
+export type SubtitleLead = "root" | "home" | "tab";
+
 export type ActionSubtitle = {
   /** The line under the name; null leaves the name lineless. */
   text: string | null;
   /** True when the value is a path rendered with its start cut instead of its tail. */
   startTrim: boolean;
-  /** The line names the workspace root, the path or the words for it: it carries the pin. */
-  root?: boolean;
+  /** The icon drawn before the line: the workspace root pin, Home, or the current tab's folder. */
+  lead?: SubtitleLead;
 };
 
 // The line under the name says what the Action points at in words, not the raw template:
@@ -174,12 +176,12 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
   const value = ctx?.vars[varName];
   if (varName === "workspace") {
     if (!value) return { text: WORKSPACE_UNSET, startTrim: false };
-    return { text: value, startTrim: !ctx?.labels, root: true };
+    return { text: value, startTrim: !ctx?.labels, lead: "root" };
   }
   if (value && (varName === "filepath" || varName === "filename")) {
     return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false };
   }
-  if (value) return { text: value, startTrim: varName === "cwd" };
+  if (value) return { text: value, startTrim: varName === "cwd", ...(varName === "cwd" ? { lead: "tab" as const } : {}) };
   return { text: variable, startTrim: false };
 }
 
@@ -191,13 +193,13 @@ export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" 
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
-  if (mode === "home") return { text: "Home", startTrim: false };
+  if (mode === "home") return { text: "Home", startTrim: false, lead: "home" };
   if (mode === "fixed") {
     return action.cwd ? { text: action.cwd, startTrim: true } : { text: null, startTrim: false };
   }
   if (mode === "context") {
     const cwd = ctx && !ctx.labels ? ctx.vars.cwd : "";
-    return cwd ? { text: cwd, startTrim: true } : { text: "Current folder", startTrim: false };
+    return cwd ? { text: cwd, startTrim: true, lead: "tab" } : { text: "Current folder", startTrim: false, lead: "tab" };
   }
   return workspaceLine(ctx);
 }
@@ -206,8 +208,8 @@ export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" 
 function workspaceLine(ctx: BarContext | null): ActionSubtitle {
   const root = ctx?.vars.workspace;
   if (ctx && !root) return { text: WORKSPACE_UNSET, startTrim: false };
-  if (!ctx || ctx.labels) return { text: "Workspace root", startTrim: false, root: true };
-  return { text: root!, startTrim: true, root: true };
+  if (!ctx || ctx.labels) return { text: "Workspace root", startTrim: false, lead: "root" };
+  return { text: root!, startTrim: true, lead: "root" };
 }
 
 // An agent has no template, so its name has no variable: the line always says the folder it
@@ -216,17 +218,17 @@ function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext 
   const mode = action.cwdMode ?? "home";
   const real = ctx && !ctx.labels ? ctx : null;
   const fixed = action.cwd?.trim() || undefined;
-  if (mode === "home") return { text: "Home", startTrim: false };
+  if (mode === "home") return { text: "Home", startTrim: false, lead: "home" };
   if (mode === "fixed" && fixed) return { text: fixed, startTrim: true };
   if (mode === "workspace" && ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
   // A fixed mode with no folder runs in the workspace folder, as resolveScriptCwd does.
-  if (!real) return mode === "context" ? { text: "Current folder", startTrim: false } : workspaceLine(ctx);
+  if (!real) return mode === "context" ? { text: "Current folder", startTrim: false, lead: "tab" } : workspaceLine(ctx);
   const start = real.folders
     ? resolveScriptCwd({ mode, fixedFolder: fixed, ...real.folders })
     : mode === "context"
       ? real.vars.cwd
       : real.vars.workspace;
-  return start ? { text: start, startTrim: true, ...(mode === "context" ? {} : { root: true }) } : { text: null, startTrim: false };
+  return start ? { text: start, startTrim: true, lead: mode === "context" ? "tab" : "root" } : { text: null, startTrim: false };
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.
@@ -379,8 +381,8 @@ export type BarItem = {
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
   subtitleTrim: boolean;
-  /** The subtitle names the workspace root and draws its pin. */
-  subtitleRoot: boolean;
+  /** The icon drawn before the subtitle. */
+  subtitleLead: SubtitleLead | null;
   /** The hover words of the row, or null to say nothing. */
   title: string | null;
   /** An own button drawn as its app icon alone. */
@@ -587,7 +589,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       disabledReason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      subtitleRoot: !!subtitle.root,
+      subtitleLead: subtitle.lead ?? null,
       title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, words),
       iconOnly: false,
     };
