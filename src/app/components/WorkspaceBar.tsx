@@ -295,6 +295,24 @@ function SortableWorkspaceItem({
   const expanded = showDetail && !!ws.detailExpanded;
   const agentCount = activeAgentCount(agentEntries);
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const setRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tab count and focus are the triggers, the effect reads only the DOM
+  useEffect(() => {
+    if (!active) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const target =
+      root.querySelector<HTMLElement>("[data-focused-tab]") ?? root;
+    target.scrollIntoView({ block: "nearest" });
+  }, [active, ws.tabs.length, ws.focusedTabId, expanded]);
+
   const sideControl =
     "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
@@ -355,7 +373,7 @@ function SortableWorkspaceItem({
 
   const button = (
     <div
-      ref={setNodeRef}
+      ref={setRootRef}
       className="group relative w-full px-1.5"
       style={style}
       onPointerEnter={() => {
