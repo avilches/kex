@@ -378,14 +378,6 @@ export function ThemeTable({
             {(hoverTheme ?? activeTheme).name}
           </span>
           <ShellPreview theme={hoverTheme ?? activeTheme} mode={mode} />
-          <label className="flex items-center gap-1.5 px-0.5 pt-1 text-[11px] font-medium text-foreground/80">
-            <Checkbox
-              id="theme-auto"
-              checked={!themeAuto}
-              onCheckedChange={(v) => toggleAuto(v !== true)}
-            />
-            Separate editor and terminal themes
-          </label>
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
@@ -431,6 +423,15 @@ export function ThemeTable({
           </div>
         </div>
       </div>
+
+      <label className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-foreground/80">
+        <Checkbox
+          id="theme-auto"
+          checked={!themeAuto}
+          onCheckedChange={(v) => toggleAuto(v !== true)}
+        />
+        Separate editor and terminal themes
+      </label>
 
       <div className="flex flex-col gap-1">
         {rows.map((r) => {
