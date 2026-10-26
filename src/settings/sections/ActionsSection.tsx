@@ -77,8 +77,8 @@ export function ActionsSection({ target = null }: { target?: ActionsRequest | nu
       </div>
 
       <p className="-mt-2 text-[11.5px] text-muted-foreground">
-        Global actions are available in every workspace; the ones of the current workspace only in it. A script runs in a
-        terminal and can be stopped; an app opens in the background; an agent starts in a new terminal tab on every click.
+        Global actions are available in any workspace; the ones of the current workspace only in it. Drag actions to the other
+        column to move them between global and this workspace.
       </p>
 
       <ActionsColumns

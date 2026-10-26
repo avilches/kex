@@ -18,13 +18,13 @@ export function AgentIntegrations() {
       <div className="flex flex-col gap-2.5">
         <Benefit
           icon={Notification03Icon}
-          title="Spinner and attention dot"
+          title="Spinner and notifications"
           text="See when your agent is working or needs you. Kex is notified when your agent or its subagents finish."
         />
         <Benefit
           icon={Refresh01Icon}
           title="Sessions survive"
-          text="Undo a closed tab or hibernate one without losing your session."
+          text="Undo a closed tab or hibernate one without losing your session transcript."
         />
       </div>
       <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border/60 bg-card/60">

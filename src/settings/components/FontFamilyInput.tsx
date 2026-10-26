@@ -38,7 +38,7 @@ export function FontFamilyInput({
   return (
     <SettingRow
       title="Font family"
-      description="Comma-separated list with per-glyph fallback. Clear it to restore the platform default."
+      description="Comma-separated list with per-glyph fallback."
     >
       <div className="flex items-center gap-2">
         <Input
