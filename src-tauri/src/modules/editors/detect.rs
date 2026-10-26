@@ -23,9 +23,27 @@ pub struct DetectedEditor {
 }
 
 pub fn detect_all() -> Vec<DetectedEditor> {
-    let mut all: Vec<DetectedEditor> = CATALOG.iter().filter_map(detect_entry).collect();
+    let found = CATALOG
+        .iter()
+        .filter_map(|entry| detect_entry(entry).map(|d| (entry, d)))
+        .collect();
+    let mut all = without_alternates(found);
     all.extend(crate::modules::editors::agents::detect_agents());
     all
+}
+
+/// An alternate (a release channel such as Zed Preview) stays only when its main app was not found.
+fn without_alternates(found: Vec<(&EditorEntry, DetectedEditor)>) -> Vec<DetectedEditor> {
+    let ids: Vec<String> = found.iter().map(|(_, d)| d.id.clone()).collect();
+    found
+        .into_iter()
+        .filter(|(entry, _)| {
+            !entry
+                .alternative_to
+                .is_some_and(|main| ids.iter().any(|id| id == main))
+        })
+        .map(|(_, d)| d)
+        .collect()
 }
 
 fn detect_entry(entry: &EditorEntry) -> Option<DetectedEditor> {
@@ -392,6 +410,75 @@ mod tests {
             extract_first_app_path(output),
             Some("/Applications/Zed.app".to_string())
         );
+    }
+
+    fn entry(id: &'static str, alternative_to: Option<&'static str>) -> EditorEntry {
+        EditorEntry {
+            id,
+            name: id,
+            bundle_id: None,
+            cli_binary: id,
+            args_before_path: &[],
+            macos_app_name: None,
+            alternative_to,
+        }
+    }
+
+    fn found(entry: &EditorEntry) -> (&EditorEntry, DetectedEditor) {
+        let detected = DetectedEditor {
+            id: entry.id.to_string(),
+            name: entry.name.to_string(),
+            binary: entry.cli_binary.to_string(),
+            args_before_path: Vec::new(),
+            kind: DetectedKind::Editor,
+        };
+        (entry, detected)
+    }
+
+    fn ids(list: &[DetectedEditor]) -> Vec<&str> {
+        list.iter().map(|d| d.id.as_str()).collect()
+    }
+
+    #[test]
+    fn an_alternate_is_left_out_when_its_main_app_was_found() {
+        let (zed, preview) = (entry("zed", None), entry("zed-preview", Some("zed")));
+        let kept = without_alternates(vec![found(&zed), found(&preview)]);
+        assert_eq!(ids(&kept), ["zed"]);
+    }
+
+    #[test]
+    fn an_alternate_stays_when_its_main_app_is_missing() {
+        let preview = entry("zed-preview", Some("zed"));
+        let kept = without_alternates(vec![found(&preview)]);
+        assert_eq!(ids(&kept), ["zed-preview"]);
+    }
+
+    #[test]
+    fn the_order_of_the_scan_does_not_matter() {
+        let (zed, preview) = (entry("zed", None), entry("zed-preview", Some("zed")));
+        let kept = without_alternates(vec![found(&preview), found(&zed)]);
+        assert_eq!(ids(&kept), ["zed"]);
+    }
+
+    #[test]
+    fn apps_that_are_not_alternates_are_all_kept() {
+        let (a, b) = (entry("a", None), entry("b", None));
+        let kept = without_alternates(vec![found(&a), found(&b)]);
+        assert_eq!(ids(&kept), ["a", "b"]);
+    }
+
+    #[test]
+    fn every_alternate_in_the_catalog_names_a_main_app_that_is_in_it() {
+        for e in CATALOG {
+            if let Some(main) = e.alternative_to {
+                let target = CATALOG.iter().find(|m| m.id == main);
+                assert!(
+                    target.is_some_and(|m| m.alternative_to.is_none()),
+                    "{}",
+                    e.id
+                );
+            }
+        }
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]

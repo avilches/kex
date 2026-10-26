@@ -264,6 +264,7 @@ Kex finds the editors, IDEs and tools installed on the machine so that app Actio
 - A CLI binary name for `which`/`where` PATH lookup
 - `args_before_path`: arguments injected between the binary and the target path at launch time
 - `macos_app_name`: JetBrains `open -na <App>.app` fallback
+- `alternative_to`: the id of the main app when this one is a release channel of it (Zed Preview, VS Code Insiders, Android Studio Canary); `detect_all()` leaves it out when the main app was found, so only the main one is listed and seeded, and keeps it when the main one is missing
 
 The frontend catalog additionally carries `group` and `type` metadata: the target type (`"file"` for the VS Code family and text editors, `"workspace"` for JetBrains and Xcode) decides which variable an app suggestion ends with (`{filepath}` or `{workspace}`; JetBrains offers no file variant because its editors only open a workspace or a folder).
 
