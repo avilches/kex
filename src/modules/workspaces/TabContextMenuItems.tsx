@@ -191,7 +191,7 @@ export function TabContextMenuItems({
               <Shortcut id="tab.focusOnExplorer" />
             </ContextMenuItem>
           )}
-          {isAutofocusTab(tab) && autofocusMode !== "always" && (
+          {isAutofocusTab(tab) && autofocusMode === "manual" && (
             <ContextMenuItem
               onSelect={() =>
                 onUpdateTab?.(tab.id, (p) =>

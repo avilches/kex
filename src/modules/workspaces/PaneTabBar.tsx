@@ -372,7 +372,7 @@ function DraggableTab({
           {statusIndicator}
         </span>
       )}
-      {isAutofocusTab(tab) && tab.autofocus && autofocusMode !== "always" && (
+      {isAutofocusTab(tab) && tab.autofocus && autofocusMode === "manual" && (
         <span
           className="ml-0.5 shrink-0 text-muted-foreground"
           title="Autofocus: this tab drives the sidebar"
