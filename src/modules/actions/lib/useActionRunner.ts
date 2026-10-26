@@ -43,6 +43,8 @@ export type RunOverlay = {
   focusFolder?: string;
   /** Where a spawned app is launched from; the folder or file folder of the row. */
   spawnCwd?: string;
+  /** The workspace to run in when it is not the active one (a row of the new terminal palette). */
+  workspaceId?: string;
 };
 
 type TerminalHandle = { write: (data: string) => void };
@@ -53,6 +55,7 @@ type Found = { workspace: Workspace; pane: { id: string }; tab: Tab } | null;
 export type ActionRunnerDeps = {
   activeWorkspace: Workspace | undefined;
   activeWorkspaceId: string;
+  findWorkspace: (workspaceId: string) => Workspace | undefined;
   findTabGlobal: (tabId: string) => Found;
   setActiveWorkspaceId: (id: string) => void;
   activateTab: (workspaceId: string, tabId: string) => void;
@@ -145,6 +148,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
   const {
     activeWorkspace,
     activeWorkspaceId,
+    findWorkspace,
     findTabGlobal,
     setActiveWorkspaceId,
     activateTab,
@@ -254,9 +258,11 @@ export function useActionRunner(deps: ActionRunnerDeps) {
 
   const runAction = useCallback(
     (action: Action, overlay?: RunOverlay) => {
-      const ws = activeWorkspace;
+      const ws = overlay?.workspaceId ? findWorkspace(overlay.workspaceId) : activeWorkspace;
       if (!ws) return;
       const plan = planActionRun(action, contextFor(action, ws, deps, overlay));
+      const opensTab = plan.kind === "new-tab" || plan.kind === "new-agent-tab";
+      if (opensTab && ws.id !== activeWorkspaceId) setActiveWorkspaceId(ws.id);
       switch (plan.kind) {
         case "blocked":
           if (!plan.silent) toast.error(plan.reason, { duration: 4000 });
@@ -300,7 +306,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeWorkspace, openAgentTab, openScriptTab, revealActionTab, scheduleAgentWrite, scheduleWrite, deps.focusFolder, findTabGlobal],
+    [activeWorkspace, activeWorkspaceId, findWorkspace, setActiveWorkspaceId, openAgentTab, openScriptTab, revealActionTab, scheduleAgentWrite, scheduleWrite, deps.focusFolder, findTabGlobal],
   );
 
   const stopAction = useCallback(

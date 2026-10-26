@@ -73,6 +73,21 @@ describe("folderMenuItems", () => {
       "Hide worktrees",
     );
   });
+
+  it("ends with the Actions that run in the folder, the first one under a rule", () => {
+    const items = folderMenuItems({
+      path: "/a/b",
+      worktrees: null,
+      actions: [
+        { id: "g1", label: "Claude Code", title: "Claude Code in /a/b" },
+        { id: "s1", label: "Dev server", title: null },
+      ],
+    });
+    expect(items.map((i) => i.id)).toEqual(["pick", "copy", "action", "action"]);
+    expect(items[2]).toMatchObject({ actionId: "g1", label: "Claude Code", separatorBefore: true });
+    expect(items[3]).toMatchObject({ actionId: "s1" });
+    expect(items[3].separatorBefore).toBeUndefined();
+  });
 });
 
 describe("stepEnabled", () => {

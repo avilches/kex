@@ -52,11 +52,12 @@ const ws = (o: Partial<Workspace> = {}): Workspace => ({
   ...o,
 });
 
-function setup(workspace: Workspace, found: Record<string, Tab> = {}) {
+function setup(workspace: Workspace, found: Record<string, Tab> = {}, others: Workspace[] = []) {
   const write = vi.fn();
   const deps = {
     activeWorkspace: workspace,
     activeWorkspaceId: workspace.id,
+    findWorkspace: (id: string) => [workspace, ...others].find((w) => w.id === id),
     findTabGlobal: (id: string) =>
       found[id] ? { workspace, pane: { id: "p-other" }, tab: found[id] } : null,
     setActiveWorkspaceId: vi.fn(),
@@ -206,6 +207,23 @@ describe("useActionRunner", () => {
     deps.terminalHandles.current.set(tabs[0].id, { write });
     act(() => void vi.advanceTimersByTime(500));
     expect(write).toHaveBeenCalledWith("claude\r");
+  });
+
+  it("runs an agent in the workspace its overlay names, and makes it the active one", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "context", ownButton: true };
+    const other = ws({ id: "w2", workspaceRoot: "/o", cwd: "/o", paneTree: { kind: "pane", id: "p9", tabs: [], activeTabId: null }, activePaneId: "p9" });
+    const { deps, result } = setup(ws(), {}, [other]);
+    act(() => result.current.runAction(agent, { focusFolder: "/o/src", workspaceId: "w2" }));
+    expect(deps.setActiveWorkspaceId).toHaveBeenCalledWith("w2");
+    expect(deps.openTab).toHaveBeenCalledTimes(1);
+    expect(deps.openTab).toHaveBeenCalledWith("w2", "p9", expect.objectContaining({ kind: "terminal", cwd: "/o/src" }));
+  });
+
+  it("does not change the active workspace for a run in the active one", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const { deps, result } = setup(ws());
+    act(() => result.current.runAction(agent, { workspaceId: "w1" }));
+    expect(deps.setActiveWorkspaceId).not.toHaveBeenCalled();
   });
 
   it("types an agent's line when its terminal handle only appears on a later retry", () => {

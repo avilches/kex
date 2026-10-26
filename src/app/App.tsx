@@ -854,9 +854,15 @@ export default function App() {
     setActiveMarkdownHandle(null);
   }, []);
 
+  const findWorkspaceById = useCallback(
+    (id: string) => workspacesRef.current.find((w) => w.id === id),
+    [],
+  );
+
   const { toggleActiveAction, runAction, stopAction, focusActionTab } = useActionRunner({
     activeWorkspace,
     activeWorkspaceId,
+    findWorkspace: findWorkspaceById,
     findTabGlobal,
     setActiveWorkspaceId,
     activateTab,
@@ -4240,6 +4246,7 @@ export default function App() {
             groups={folderGroups}
             onPick={onFolderPick}
             onToggleWorktrees={onFolderToggleWorktrees}
+            workspaceOf={findWorkspaceById}
           />
 
           <NewEditorDialog
