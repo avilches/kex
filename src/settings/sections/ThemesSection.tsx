@@ -85,8 +85,7 @@ export function ThemesSection() {
           void handleThemeFiles(e.dataTransfer.files);
         }}
       >
-        <div className="flex items-center justify-between">
-          <span className="text-[12.5px] font-medium">Theme</span>
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"

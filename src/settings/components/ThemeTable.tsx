@@ -367,17 +367,7 @@ export function ThemeTable({
   return (
     <div className="flex flex-col gap-2.5">
       <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
-        <div className="flex items-center justify-between px-2">
-          <span>Theme</span>
-          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
-            <Checkbox
-              id="theme-auto"
-              checked={themeAuto}
-              onCheckedChange={(v) => toggleAuto(v === true)}
-            />
-            Auto
-          </label>
-        </div>
+        <span />
         <span className="px-2">Editor</span>
         <span className="px-2">Terminal</span>
       </div>
@@ -388,6 +378,14 @@ export function ThemeTable({
             {(hoverTheme ?? activeTheme).name}
           </span>
           <ShellPreview theme={hoverTheme ?? activeTheme} mode={mode} />
+          <label className="flex items-center gap-1.5 px-0.5 pt-1 text-[11px] font-medium text-foreground/80">
+            <Checkbox
+              id="theme-auto"
+              checked={themeAuto}
+              onCheckedChange={(v) => toggleAuto(v === true)}
+            />
+            Auto
+          </label>
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
@@ -482,6 +480,7 @@ export function ThemeTable({
               <Cell
                 info={r.editorInfo}
                 onPick={() => {
+                  if (themeAuto) return selectTheme(t.id);
                   setPickedEditorRow(t.id);
                   void setEditorTheme(
                     formatEditorRowPref(t.id, r.editorMode === mode ? undefined : r.editorMode),
@@ -510,6 +509,7 @@ export function ThemeTable({
               <Cell
                 info={r.terminalInfo}
                 onPick={() => {
+                  if (themeAuto) return selectTheme(t.id);
                   void setTerminalTheme(
                     formatTerminalPref(t.id, r.terminalMode === mode ? undefined : r.terminalMode),
                   );
