@@ -8,7 +8,7 @@ import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, createElement, useEffect, useState } from "react";
+import { type JSX, Suspense, createElement, lazy, useEffect, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
@@ -35,6 +35,11 @@ const COMPONENTS: Record<SettingsSection, (props: never) => JSX.Element> = {
   shortcuts: ShortcutsSection,
   about: AboutSection,
 };
+
+// Dev-only text editor (right-click a text). The DEV guard lets the bundler drop the module from builds.
+const SettingsTextEditor = import.meta.env.DEV
+  ? lazy(() => import("./devTextEditor/SettingsTextEditor"))
+  : null;
 
 const SECTIONS = SETTINGS_SECTIONS.map((s) => ({ ...s, component: COMPONENTS[s.id] }));
 
@@ -202,6 +207,11 @@ export function SettingsApp() {
       </div>
 
       <DuplicateQuitModal />
+      {SettingsTextEditor && (
+        <Suspense fallback={null}>
+          <SettingsTextEditor section={active} />
+        </Suspense>
+      )}
     </div>
   );
 }
