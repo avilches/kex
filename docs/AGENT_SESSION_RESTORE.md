@@ -544,7 +544,7 @@ answered". A resume of the same session keeps it; a new session id starts withou
 the `.jsonl` transcript to fill it or to show more than this one message: the hook already carries the text, and a
 transcript reader would have to follow the `uuid`/`parentUuid` chain to skip branches abandoned by `/rewind`, as Orca
 does, which is not worth it for a single line. `agent_session_previews` returns it, with `cwd_launch` and `updated_at`,
-for the rows of a hibernated workspace (`HibernatedOverlay`).
+for a hibernated tab (`HibernatedTab`).
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
@@ -832,8 +832,10 @@ states.
 
 Reopening a closed workspace runs the same lookup for each of its terminal tabs, keyed by the old id and seeded
 under the new one, and moves the stashed attention sessions and notifications to the new ids with
-`restoreClosedSession`. A workspace closed while hibernated keeps its terminal ids and skips this: its stored sessions
-are untouched and the normal wake-up restores them.
+`restoreClosedSession`. The terminals that were hibernated when the workspace closed keep their ids and skip this: their stored sessions
+are untouched and the normal wake-up restores them (`reviveWorkspace` keeps the id of a tab only when it carries
+`hibernation`). Reopening a single closed tab that was hibernated gives it a new id: `buildReopenedTab` drops
+`hibernation`, and the plan is seeded under the new id from a lookup by the old one, like for any closed agent tab.
 
 This is a fresh lookup, not a cached one: whether the resume command ends up as `--resume <id>` or
 `--session-id <id>` depends on whether the JSONL transcript exists yet, which can change between the moment the
@@ -931,11 +933,13 @@ Actions:
 
 ---
 
-## Hibernating a workspace
+## Hibernating a tab
 
-Hibernating a workspace kills its PTYs, and each kill produces an `exited` signal. The stored
-session record in `agent-sessions.json` must survive that exit, because waking the workspace
-restores the agent from it. A normal exit detaches the record (`agent_detach_session`).
+Hibernating a terminal tab (`Tab.hibernation`) kills its PTY, and each kill produces an `exited` signal. The stored
+session record in `agent-sessions.json` must survive that exit, because waking the tab restores the agent from it.
+"Hibernate all" in a workspace menu does the same for each awake terminal of the workspace. The wake
+(`wakeTabs`) seeds each tab's resume plan under the same tab id (`seedWakePlans`, same "Run on start" gate as the reopen
+flow), clears `hibernatingTabs` and drops `hibernation`; the terminal that mounts consumes the plan when it spawns. A normal exit detaches the record (`agent_detach_session`).
 
 - `lib/hibernatingTabs.ts` keeps an in-memory set of the tab ids being killed for hibernation.
   `markHibernating` and `unmarkHibernating` maintain it; `isHibernating` reads it. It is never persisted.
@@ -950,9 +954,9 @@ already returns `null` and `handleSignal` returns before reaching the detach. Th
 protection explicit instead of depending on the order.
 
 `window_state.rs` `terminal_tab_ids` is what `agent_session_restore_plan` uses to find orphan
-records: a stored session whose tab is in no window is dropped. A hibernated workspace keeps its
-tabs in the saved state (flagged, not removed), so its records are not orphans. A regression test
-pins that, so a later change cannot make hibernated tabs look gone.
+records: a stored session whose tab is in no window is dropped. A hibernated tab stays in the saved state
+(carrying `hibernation`, not removed), so its record is not an orphan. A regression test
+(`terminal_tab_ids_includes_hibernated_tabs`) pins that, so a later change cannot make hibernated tabs look gone.
 
 ---
 

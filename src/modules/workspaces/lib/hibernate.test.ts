@@ -2,21 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   applyHibernate,
   applyWake,
+  awakeTerminalTabs,
   blockedWhileHibernated,
   commandBlockedWhileHibernated,
   editorTabIds,
-  menuBlockedWhileHibernated,
+  isHibernatedTab,
   isPendingStale,
+  liveTerminalIds,
   workspaceDialogPending,
   enableRunOnStart,
   formatHibernatedFor,
-  stripTabs,
-  strippedTree,
+  restoreCommandFor,
   terminalTabs,
 } from "./hibernate";
-import type { SplitNode, Tab, Workspace } from "./types";
+import type { SplitNode, Tab, TabHibernation, Workspace } from "./types";
 
-const term = (id: string, over: Partial<Extract<Tab, { kind: "terminal" }>> = {}): Tab => ({
+type Terminal = Extract<Tab, { kind: "terminal" }>;
+
+const term = (id: string, over: Partial<Terminal> = {}): Tab => ({
   id,
   kind: "terminal",
   ...over,
@@ -40,7 +43,7 @@ const tree: SplitNode = {
   id: "s1",
   orientation: "horizontal",
   dividerPosition: 0.4,
-  first: { kind: "pane", id: "p1", tabs: [term("t1"), editor("e1", true)], activeTabId: "t1" },
+  first: { kind: "pane", id: "p1", tabs: [term("t1"), editor("e1", true), term("t2")], activeTabId: "t1" },
   second: { kind: "pane", id: "p2", tabs: [md("m1", true)], activeTabId: "m1" },
 };
 
@@ -52,72 +55,71 @@ const ws = (over: Partial<Workspace> = {}): Workspace => ({
   ...over,
 });
 
-describe("stripTabs", () => {
-  it("keeps the split structure and divider and empties every pane", () => {
-    const out = stripTabs(tree);
-    expect(out.kind).toBe("split");
-    if (out.kind !== "split") return;
-    expect(out.dividerPosition).toBe(0.4);
-    expect(out.id).toBe("s1");
-    expect(out.first).toMatchObject({ kind: "pane", id: "p1", tabs: [], activeTabId: null });
-    expect(out.second).toMatchObject({ kind: "pane", id: "p2", tabs: [], activeTabId: null });
-  });
-});
+const snap = (over: Partial<TabHibernation> = {}): TabHibernation => ({ at: 1000, agent: "claude", command: "claude --resume abc", ...over });
+const paneTabs = (w: Workspace, which: "first" | "second" = "first") =>
+  ((w.paneTree as Extract<SplitNode, { kind: "split" }>)[which] as Extract<SplitNode, { kind: "pane" }>).tabs;
 
 describe("applyHibernate", () => {
-  it("flags only the target workspace and leaves its tab structure intact", () => {
-    const out = applyHibernate([ws(), ws({ id: "w2" })], "w1");
-    expect(out[0]!.hibernated).toBe(true);
-    expect(out[1]!.hibernated).toBeUndefined();
-    expect(terminalTabs(out[0]!).map((t) => t.id)).toEqual(["t1"]);
-  });
-
-  it("turns off floating on browser tabs so the window is not reopened on restart", () => {
-    const b: Tab = { id: "b1", kind: "browser", url: "https://x.test", floating: true };
-    const w = ws({ paneTree: { kind: "pane", id: "p1", tabs: [b], activeTabId: "b1" } });
-    const out = applyHibernate([w], "w1")[0]!;
-    const pane = out.paneTree as Extract<SplitNode, { kind: "pane" }>;
-    const tab = pane.tabs[0]!;
-    expect(tab.kind === "browser" && tab.floating).toBe(false);
-  });
-
-  it("clears dirty on editor and markdown tabs, which are about to be unmounted", () => {
-    const out = applyHibernate([ws()], "w1")[0]!;
-    const tabs = out.paneTree as Extract<SplitNode, { kind: "split" }>;
-    const e = (tabs.first as Extract<SplitNode, { kind: "pane" }>).tabs[1]!;
-    const m = (tabs.second as Extract<SplitNode, { kind: "pane" }>).tabs[0]!;
-    expect(e.kind === "editor" && e.dirty).toBe(false);
-    expect(m.kind === "markdown" && m.dirty).toBe(false);
-  });
-});
-
-describe("applyHibernate timestamp", () => {
-  it("stamps the moment of hibernation and keeps the first one if repeated", () => {
-    const once = applyHibernate([ws()], "w1", 1000);
-    expect(once[0]!.hibernatedAt).toBe(1000);
-    expect(applyHibernate(once, "w1", 5000)[0]!.hibernatedAt).toBe(1000);
-  });
-
-  it("drops the timestamp on wake", () => {
-    const out = applyWake(applyHibernate([ws()], "w1", 1000), "w1")[0]!;
-    expect("hibernatedAt" in out).toBe(false);
-  });
-});
-
-describe("tab snapshots", () => {
-  const snap = { agent: "claude", command: "claude --resume abc" };
-  const firstTab = (w: Workspace) => (w.paneTree as Extract<SplitNode, { kind: "split" }>).first as Extract<SplitNode, { kind: "pane" }>;
-
-  it("stores the snapshot on the terminal tab it belongs to and on no other", () => {
-    const out = applyHibernate([ws()], "w1", 1000, { t1: snap })[0]!;
-    const tabs = firstTab(out).tabs;
-    expect((tabs[0] as Extract<Tab, { kind: "terminal" }>).hibernation).toEqual(snap);
+  it("puts the snapshot on the terminal tabs it belongs to and on no other", () => {
+    const out = applyHibernate([ws()], "w1", { t1: snap() })[0]!;
+    const tabs = paneTabs(out);
+    expect((tabs[0] as Terminal).hibernation).toEqual(snap());
     expect("hibernation" in tabs[1]!).toBe(false);
+    expect("hibernation" in tabs[2]!).toBe(false);
   });
 
-  it("drops the snapshot on wake", () => {
-    const woke = applyWake(applyHibernate([ws()], "w1", 1000, { t1: snap }), "w1")[0]!;
-    expect("hibernation" in firstTab(woke).tabs[0]!).toBe(false);
+  it("leaves the workspace and its other tabs untouched", () => {
+    const other = ws({ id: "w2" });
+    const out = applyHibernate([ws(), other], "w1", { t1: snap() });
+    expect(out[1]).toBe(other);
+    expect(out[0]!.activePaneId).toBe("p1");
+    expect(editorTabIds(out[0]!)).toEqual(["e1", "m1"]);
+    expect(paneTabs(out[0]!, "second")[0]).toEqual(md("m1", true));
+  });
+
+  it("never flags an editor, a markdown or a browser tab, whatever the snapshots say", () => {
+    const out = applyHibernate([ws()], "w1", { e1: snap(), m1: snap() })[0]!;
+    expect("hibernation" in paneTabs(out)[1]!).toBe(false);
+    expect("hibernation" in paneTabs(out, "second")[0]!).toBe(false);
+    expect(paneTabs(out)[1]).toMatchObject({ dirty: true });
+  });
+
+  it("keeps the first snapshot of a tab that is already asleep", () => {
+    const once = applyHibernate([ws()], "w1", { t1: snap({ at: 1 }) });
+    const twice = applyHibernate(once, "w1", { t1: snap({ at: 2 }) });
+    expect((paneTabs(twice[0]!)[0] as Terminal).hibernation!.at).toBe(1);
+  });
+
+  it("does not touch a workspace that is not the target", () => {
+    const only = [ws({ id: "w2" })];
+    expect(applyHibernate(only, "w1", { t1: snap() })[0]).toBe(only[0]);
+  });
+});
+
+describe("applyWake", () => {
+  it("removes the sleep from the asked tabs only and keeps everything else", () => {
+    const asleep = applyHibernate([ws()], "w1", { t1: snap(), t2: snap() });
+    const out = applyWake(asleep, "w1", new Set(["t1"]))[0]!;
+    const tabs = paneTabs(out);
+    expect("hibernation" in tabs[0]!).toBe(false);
+    expect((tabs[2] as Terminal).hibernation).toEqual(snap());
+    expect(tabs[0]).toEqual(term("t1"));
+  });
+
+  it("leaves other workspaces alone", () => {
+    const list = applyHibernate([ws(), ws({ id: "w2" })], "w2", { t1: snap() });
+    const out = applyWake(list, "w1", new Set(["t1"]));
+    expect(out[1]).toBe(list[1]);
+  });
+});
+
+describe("isHibernatedTab", () => {
+  it("is true only for a terminal that carries the sleep", () => {
+    expect(isHibernatedTab(term("a", { hibernation: snap() } as Partial<Terminal>))).toBe(true);
+    expect(isHibernatedTab(term("a"))).toBe(false);
+    expect(isHibernatedTab(editor("e", false))).toBe(false);
+    expect(isHibernatedTab(null)).toBe(false);
+    expect(isHibernatedTab(undefined)).toBe(false);
   });
 });
 
@@ -139,79 +141,77 @@ describe("formatHibernatedFor", () => {
   });
 });
 
-describe("applyWake", () => {
-  it("removes the flag and keeps everything else", () => {
-    const hib = applyHibernate([ws()], "w1");
-    const out = applyWake(hib, "w1")[0]!;
-    expect("hibernated" in out).toBe(false);
-    expect(out.paneTree).toEqual(hib[0]!.paneTree);
-  });
-});
-
-describe("strippedTree", () => {
-  it("returns the same reference for the same input tree", () => {
-    expect(strippedTree(tree)).toBe(strippedTree(tree));
-  });
-});
-
 describe("blockedWhileHibernated", () => {
-  it("blocks tab, pane, terminal, editor and script shortcuts", () => {
-    for (const id of ["tab.new", "tab.close", "tab.rename", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
-      expect(blockedWhileHibernated(id)).toBe(true);
+  it("blocks what acts on a live terminal", () => {
+    for (const id of ["terminal.clear", "terminal.scratchpad", "search.focus"] as const) {
+      expect(blockedWhileHibernated(id), id).toBe(true);
     }
   });
 
-  it("blocks the Sidebar, explorer and zen shortcuts, which change state nobody can see", () => {
-    for (const id of ["sidebar.toggle", "sidebar.showGit", "explorer.search", "explorer.toggleHidden", "view.zenMode"] as const) {
-      expect(blockedWhileHibernated(id)).toBe(true);
+  it("lets tab, pane, sidebar, explorer and editor shortcuts through: a sleeping tab is still a tab", () => {
+    for (const id of ["tab.new", "tab.close", "tab.rename", "tab.next", "pane.splitRight", "sidebar.toggle", "sidebar.showGit", "explorer.search", "view.zenMode", "workspace.run"] as const) {
+      expect(blockedWhileHibernated(id), id).toBe(false);
     }
   });
 
-  it("lets workspace.close through: a sleeping workspace closes only with its own shortcut", () => {
-    expect(blockedWhileHibernated("workspace.close")).toBe(false);
-  });
-
-  it("lets reopen-closed through: it acts on the closed stack, not on the sleeping workspace", () => {
-    expect(blockedWhileHibernated("tab.reopenClosed")).toBe(false);
+  it("lets the toggle itself through, so the tab can be woken from the keyboard", () => {
+    expect(blockedWhileHibernated("tab.hibernate")).toBe(false);
   });
 
   it("lets workspace, window, view and settings shortcuts through", () => {
-    for (const id of ["workspace.new", "nav.next", "window.new", "view.zoomIn", "settings.open"] as const) {
+    for (const id of ["workspace.close", "tab.reopenClosed", "workspace.new", "nav.next", "window.new", "view.zoomIn", "settings.open"] as const) {
       expect(blockedWhileHibernated(id)).toBe(false);
     }
   });
 });
 
-describe("menuBlockedWhileHibernated", () => {
-  it("blocks the tab and Sidebar menu items", () => {
-    for (const id of ["new_terminal", "new_browser", "close_tab", "close_others", "close_all", "toggle_sidebar", "toggle_git", "toggle_hidden", "toggle_sidebar_side"]) {
-      expect(menuBlockedWhileHibernated(id)).toBe(true);
-    }
-  });
-
-  it("lets the workspace, window and settings items through", () => {
-    for (const id of ["new_workspace", "settings", "toggle_autosave"]) expect(menuBlockedWhileHibernated(id)).toBe(false);
-  });
-});
-
 describe("commandBlockedWhileHibernated", () => {
-  it("blocks palette commands that act on tabs, panes, git or the Sidebar", () => {
-    for (const id of ["tab.new", "tab.close", "pane.splitRight", "terminal.clear", "view.zenMode", "sidebar.toggle", "git.graph", "git.source", "history.open", "workspace.runScripts"]) {
-      expect(commandBlockedWhileHibernated(id)).toBe(true);
-    }
+  it("blocks the palette commands that act on a live terminal", () => {
+    for (const id of ["terminal.clear", "history.open"]) expect(commandBlockedWhileHibernated(id), id).toBe(true);
   });
 
-  it("keeps settings, new workspace, new window and workspace properties", () => {
-    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "theme.pick"]) {
-      expect(commandBlockedWhileHibernated(id)).toBe(false);
+  it("keeps git, search, sidebar and workspace commands", () => {
+    for (const id of ["tab.new", "pane.splitRight", "git.graph", "git.source", "search.content", "workspace.runScripts", "settings.open", "workspace.new"]) {
+      expect(commandBlockedWhileHibernated(id), id).toBe(false);
     }
   });
 });
 
 describe("tab selectors", () => {
   it("lists terminals and editor-like tabs across the whole tree", () => {
-    expect(terminalTabs(ws()).map((t) => t.id)).toEqual(["t1"]);
+    expect(terminalTabs(ws()).map((t) => t.id)).toEqual(["t1", "t2"]);
     expect(editorTabIds(ws())).toEqual(["e1", "m1"]);
+  });
+
+  it("lists only the terminals that are still awake", () => {
+    const out = applyHibernate([ws()], "w1", { t1: snap() })[0]!;
+    expect(awakeTerminalTabs(out).map((t) => t.id)).toEqual(["t2"]);
+    expect(terminalTabs(out)).toHaveLength(2);
+  });
+});
+
+describe("liveTerminalIds", () => {
+  it("leaves out the sleeping terminals, so the sweep disposes their session and frees the render slot", () => {
+    const list = [applyHibernate([ws()], "w1", { t1: snap() })[0]!, ws({ id: "w2", paneTree: { kind: "pane", id: "px", tabs: [term("t9")], activeTabId: "t9" } })];
+    expect([...liveTerminalIds(list)].sort()).toEqual(["t2", "t9"]);
+  });
+
+  it("is back to every terminal once the tab wakes", () => {
+    const asleep = applyHibernate([ws()], "w1", { t1: snap() });
+    const woken = applyWake(asleep, "w1", new Set(["t1"]));
+    expect([...liveTerminalIds(woken)].sort()).toEqual(["t1", "t2"]);
+  });
+
+  it("ignores editors and markdown tabs", () => {
+    expect(liveTerminalIds([ws({ paneTree: { kind: "pane", id: "p", tabs: [editor("e", false), md("m", false)], activeTabId: "e" } })]).size).toBe(0);
+  });
+});
+
+describe("restoreCommandFor", () => {
+  it("prefers the agent resume command, then the Run on start command, else nothing", () => {
+    expect(restoreCommandFor(term("t") as Terminal, { resumeCmd: " claude --resume x " })).toBe("claude --resume x");
+    expect(restoreCommandFor(term("t", { restoreOnRestart: true, persistentCommand: "make" }) as Terminal, null)).toBe("make");
+    expect(restoreCommandFor(term("t", { persistentCommand: "make" }) as Terminal, null)).toBeUndefined();
   });
 });
 
@@ -257,7 +257,7 @@ describe("isPendingStale", () => {
 describe("workspaceDialogPending", () => {
   it("is true while either the hibernate or the close dialog is open", () => {
     expect(workspaceDialogPending(null, undefined)).toBe(false);
-    expect(workspaceDialogPending("w1", undefined)).toBe(true);
+    expect(workspaceDialogPending({ workspaceId: "w1", tabIds: ["t1"] }, undefined)).toBe(true);
     expect(workspaceDialogPending(null, "w2")).toBe(true);
   });
 });

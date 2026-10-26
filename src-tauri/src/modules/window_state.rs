@@ -940,14 +940,18 @@ mod tests {
     }
 
     #[test]
-    fn terminal_tab_ids_includes_hibernated_workspaces() {
+    fn terminal_tab_ids_includes_hibernated_tabs() {
         let dir = TempDir::new().unwrap();
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.add_window("w-main".to_string());
-        let mut ws = ws_with_tabs(&[("tab-a", "terminal")]);
-        ws[0]["hibernated"] = serde_json::json!(true);
+        let mut ws = ws_with_tabs(&[("tab-a", "terminal"), ("tab-b", "terminal")]);
+        ws[0]["paneTree"]["pane"]["tabs"][0]["hibernation"] = serde_json::json!({"at": 1});
         mgr.update_workspace("w-main", ws, 0);
 
-        assert_eq!(mgr.terminal_tab_ids(), HashSet::from(["tab-a".to_string()]));
+        let known = mgr.terminal_tab_ids();
+        assert_eq!(
+            known,
+            HashSet::from(["tab-a".to_string(), "tab-b".to_string()])
+        );
     }
 }

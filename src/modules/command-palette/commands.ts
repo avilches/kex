@@ -448,6 +448,6 @@ export function createCommandItems(
   const all = [...base, ...generated, ...settings];
   if (!ctx.hibernated) return all;
   return all.map((item) =>
-    commandBlockedWhileHibernated(item.id) ? { ...item, disabledReason: "Workspace hibernated" } : item,
+    commandBlockedWhileHibernated(item.id) ? { ...item, disabledReason: "Tab hibernated" } : item,
   );
 }

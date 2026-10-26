@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { Tab, SplitNode, PaneNode, Workspace } from "./types";
-import { applyWake } from "./hibernate";
 import { addAction, removeAction, type Action } from "@/modules/actions";
 import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
@@ -276,15 +275,6 @@ describe("emptyWorkspaceToClose", () => {
     const blank = ws({ title: "  ", paneTree: emptyTree, activePaneId: "p1" });
     expect(emptyWorkspaceToClose([fullWs, blank])?.id).toBe("w1");
   });
-
-  it("ignores hibernated workspaces, which keep their tabs in the tree", () => {
-    const hibernated = ws({
-      paneTree: { kind: "pane", id: "p1", tabs: [term("t1")], activeTabId: "t1" },
-      activePaneId: "p1",
-      hibernated: true,
-    });
-    expect(emptyWorkspaceToClose([fullWs, hibernated])).toBeNull();
-  });
 });
 
 describe("pushMru", () => {
@@ -322,6 +312,18 @@ describe("collectRunningTerminals", () => {
       () => undefined,
     );
     expect(out.map((r) => r.tabId)).toEqual(["t1", "t3"]);
+  });
+
+  it("does not ask about a sleeping terminal, which has no process", async () => {
+    const asleep: Tab = { id: "t2", kind: "terminal", hibernation: { at: 1 } };
+    const asked: string[] = [];
+    const out = await collectRunningTerminals(
+      wsWith([term("t1"), asleep]),
+      async (id) => (asked.push(id), "node"),
+      () => undefined,
+    );
+    expect(asked).toEqual(["t1"]);
+    expect(out.map((r) => r.tabId)).toEqual(["t1"]);
   });
 
   it("labels with command, then process name, then title, then 'shell'", async () => {
@@ -483,17 +485,12 @@ describe("applyMoveTabToWorkspace", () => {
     expect(target.activePaneId).toBe("dp1");
   });
 
-  it("refuses to move a tab into a hibernated workspace", () => {
-    const input = [src(), dst({ hibernated: true })];
-    expect(applyMoveTabToWorkspace(input, "src", "t1", autoDest, 8)).toBe(input);
-  });
-
-  it("moves the tab into a hibernated workspace once it has been woken", () => {
-    const woken = applyWake([src(), dst({ hibernated: true })], "dst");
-    const out = applyMoveTabToWorkspace(woken, "src", "t1", autoDest, 8);
+  it("moves a hibernated tab with its sleep intact", () => {
+    const sleeping: Tab = { id: "t1", kind: "terminal", hibernation: { at: 7, agent: "claude" } };
+    const input = [src({ paneTree: leaf("sp1", [sleeping, term("t2")]) }), dst()];
+    const out = applyMoveTabToWorkspace(input, "src", "t1", autoDest, 8);
     const target = out.find((w) => w.id === "dst")!;
-    expect(target.hibernated).toBeUndefined();
-    expect(JSON.stringify(target.paneTree)).toContain('"id":"t1"');
+    expect(JSON.stringify(target.paneTree)).toContain('"hibernation":{"at":7,"agent":"claude"}');
   });
 
   it("keeps the source workspace with an empty pane when its last tab leaves", () => {
@@ -566,19 +563,12 @@ describe("applyMoveTabToWorkspace", () => {
 
 describe("planWake", () => {
   it("asks for a resume plan only on terminals that did not opt out of Run on start", () => {
-    const w = ws({
-      paneTree: {
-        kind: "pane",
-        id: "p1",
-        activeTabId: "a",
-        tabs: [
-          { id: "a", kind: "terminal" },
-          { id: "b", kind: "terminal", restoreOnRestart: false },
-          { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
-        ],
-      },
-    });
-    expect(planWake(w)).toEqual(["a"]);
+    const tabs: Tab[] = [
+      { id: "a", kind: "terminal" },
+      { id: "b", kind: "terminal", restoreOnRestart: false },
+      { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
+    ];
+    expect(planWake(tabs)).toEqual(["a"]);
   });
 });
 
@@ -587,19 +577,12 @@ describe("seedWakePlans", () => {
 
   it("seeds the plan under the same tab id for each terminal that has one", async () => {
     const seeded: [string, unknown][] = [];
-    const w = ws({
-      paneTree: {
-        kind: "pane",
-        id: "p1",
-        activeTabId: "a",
-        tabs: [
-          { id: "a", kind: "terminal" },
-          { id: "b", kind: "terminal" },
-        ],
-      },
-    });
+    const tabs: Tab[] = [
+      { id: "a", kind: "terminal" },
+      { id: "b", kind: "terminal" },
+    ];
     await seedWakePlans(
-      w,
+      tabs,
       async (id) => (id === "a" ? plan : null),
       (id, p) => seeded.push([id, p]),
     );
@@ -608,15 +591,8 @@ describe("seedWakePlans", () => {
 
   it("does not look up terminals that opted out", async () => {
     const asked: string[] = [];
-    const w = ws({
-      paneTree: {
-        kind: "pane",
-        id: "p1",
-        activeTabId: "a",
-        tabs: [{ id: "a", kind: "terminal", restoreOnRestart: false }],
-      },
-    });
-    await seedWakePlans(w, async (id) => (asked.push(id), null), () => {});
+    const tabs: Tab[] = [{ id: "a", kind: "terminal", restoreOnRestart: false }];
+    await seedWakePlans(tabs, async (id) => (asked.push(id), null), () => {});
     expect(asked).toEqual([]);
   });
 });

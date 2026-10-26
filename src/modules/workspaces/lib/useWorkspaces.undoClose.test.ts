@@ -32,6 +32,7 @@ import type { Tab, Workspace } from "./types";
 type Hook = ReturnType<typeof useWorkspaces>;
 
 const term = (id: string, restoreOnRestart?: boolean): Tab => ({ id, kind: "terminal", restoreOnRestart });
+const sleeping = (id: string): Tab => ({ id, kind: "terminal", hibernation: { at: 1, agent: "claude" } });
 const editor = (id: string): Tab => ({ id, kind: "editor", path: `/tmp/${id}`, dirty: false, preview: false });
 
 const planFor = (tabId: string): RestorePlan => ({
@@ -173,15 +174,17 @@ describe("undo close workspace", () => {
     expect(view.h.workspaces.map((w) => w.id)).toEqual(["a", "b"]);
   });
 
-  it("restores a hibernated workspace still hibernated, keeping its terminal ids", async () => {
-    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1")], { hibernated: true })]);
+  it("restores a workspace with a hibernated tab still asleep and with the same id", async () => {
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [sleeping("b1"), term("b2")])]);
     act(() => view!.h.closeWorkspace("b"));
     await act(async () => {
       await view!.h.reopenClosed();
     });
     const restored = view.h.workspaces[1]!;
-    expect(restored.hibernated).toBe(true);
-    expect(tabIds(restored)).toEqual(["b1"]);
+    const [first, second] = allPanes(restored.paneTree)[0]!.tabs;
+    expect(first).toMatchObject({ id: "b1", hibernation: { at: 1, agent: "claude" } });
+    expect(second!.id).not.toBe("b2");
+    expect((second as { hibernation?: unknown }).hibernation).toBeUndefined();
   });
 
   it("moves the agent session and its resume plan to the reopened tab's new id", async () => {
@@ -269,13 +272,13 @@ describe("undo close workspace", () => {
     expect(seedRestorePlan).not.toHaveBeenCalledWith(newB1, expect.anything());
   });
 
-  it("keeps hibernated terminal ids and does not touch their stored sessions", async () => {
+  it("keeps the id of a hibernated tab and does not look up or seed a plan for it", async () => {
     useAgentStore.setState({
       sessions: { b1: session("b1") },
       notifications: [attentionNote("b1")],
       closedSessions: {},
     });
-    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1")], { hibernated: true })]);
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [sleeping("b1")])]);
 
     act(() => view!.h.closeWorkspace("b"));
     await act(async () => {
@@ -289,5 +292,33 @@ describe("undo close workspace", () => {
     const store = useAgentStore.getState();
     expect(store.sessions.b1).toMatchObject({ tabId: "b1", status: "attention" });
     expect(store.notifications).toEqual([expect.objectContaining({ tabId: "b1" })]);
+  });
+});
+
+describe("undo close of a hibernated tab", () => {
+  let view: ReturnType<typeof mount> | undefined;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
+  });
+  afterEach(() => view?.unmount());
+
+  it("closes it without a session to stash and reopens it awake with a new id and a seeded plan", async () => {
+    vi.mocked(previewResumeCmd).mockResolvedValue(planFor("b1"));
+    view = mount([makeWs("b", [sleeping("b1"), term("b2")])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    expect(tabIds(view.h.workspaces[0])).toEqual(["b2"]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    const ids = tabIds(view.h.workspaces[0]);
+    expect(ids).toHaveLength(2);
+    const reopened = allPanes(view.h.workspaces[0]!.paneTree)[0]!.tabs.find((t) => t.id !== "b2")!;
+    expect(reopened.id).not.toBe("b1");
+    expect((reopened as { hibernation?: unknown }).hibernation).toBeUndefined();
+    expect(previewResumeCmd).toHaveBeenCalledWith("b1");
+    expect(seedRestorePlan).toHaveBeenCalledWith(reopened.id, expect.objectContaining({ tabId: "b1" }));
   });
 });

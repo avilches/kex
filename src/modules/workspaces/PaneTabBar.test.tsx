@@ -28,6 +28,7 @@ function setup(initial: Tab) {
     tab = { ...tab, title };
   });
   const onActivate = vi.fn();
+  const onWake = vi.fn();
   const noop = () => {};
   const ui = () => (
     <DndContext>
@@ -48,12 +49,13 @@ function setup(initial: Tab) {
         onSplitBrowserDown={noop}
         onRenameTab={onRenameTab}
         onUpdateTab={onUpdateTab}
+        onWake={onWake}
       />
     </DndContext>
   );
   const view = render(ui());
   const rerender = () => view.rerender(ui());
-  return { onUpdateTab, onRenameTab, onActivate, rerender, getTab: () => tab };
+  return { onUpdateTab, onRenameTab, onActivate, onWake, rerender, getTab: () => tab };
 }
 
 describe("PaneTabBar rename and note", () => {
@@ -131,5 +133,32 @@ describe("PaneTabBar plus button", () => {
     const strip = document.querySelector("[data-tab-id]")!.parentElement!;
     expect(strip.contains(plus)).toBe(false);
     expect(strip.className).toContain("overflow-x-auto");
+  });
+});
+
+describe("PaneTabBar with a hibernated tab", () => {
+  beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const tabEl = () => document.querySelector('[data-tab-id="tab-1"]') as HTMLElement;
+
+  it("shows the sleeping icon, a click only activates and a double click wakes", () => {
+    const { onActivate, onWake } = setup({ id: "tab-1", kind: "terminal", hibernation: { at: 1 } });
+    expect(tabEl().querySelector('[title^="Hibernated"]')).not.toBeNull();
+    fireEvent.click(tabEl());
+    expect(onActivate).toHaveBeenCalledWith("tab-1");
+    expect(onWake).not.toHaveBeenCalled();
+    fireEvent.doubleClick(tabEl());
+    expect(onWake).toHaveBeenCalledWith("tab-1");
+  });
+
+  it("a double click on an awake tab wakes nothing and shows no sleeping icon", () => {
+    const { onWake } = setup({ id: "tab-1", kind: "terminal" });
+    expect(tabEl().querySelector('[title^="Hibernated"]')).toBeNull();
+    fireEvent.doubleClick(tabEl());
+    expect(onWake).not.toHaveBeenCalled();
   });
 });

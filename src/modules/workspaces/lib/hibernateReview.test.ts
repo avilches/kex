@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
+import { busyTabIds, hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, tabsReview, type HibernateLive } from "./hibernateReview";
 import type { Tab, Workspace } from "./types";
 
 const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
@@ -212,5 +212,64 @@ describe("liveAgent", () => {
 
   it("keeps a real agent session", () => {
     expect(liveAgent({ agent: "claude", status: "working", restoreError: false })).toMatchObject({ agent: "claude", status: "working" });
+  });
+});
+
+describe("tabsReview", () => {
+  const editor = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false } as Tab;
+
+  it("reviews only the tabs it is given, never documents", () => {
+    const tabs = [term("t1"), term("t2"), editor];
+    const r = tabsReview(tabs, live({ t1: { agent: "claude", status: "working" } }, { t2: "npm run dev" }));
+    expect(r.busy.map((b) => b.tabId)).toEqual(["t1"]);
+    expect(r.commands.map((c) => c.tabId)).toEqual(["t2"]);
+    expect(r.docs).toEqual([]);
+  });
+
+  it("is empty for a shell with nothing running, which sleeps without asking", () => {
+    expect(isReviewEmpty(tabsReview([term("t1")], live()))).toBe(true);
+  });
+
+  it("is empty for a command that comes back with Run on start", () => {
+    const tab = term("t1", { restoreOnRestart: true, persistentCommand: "make" });
+    expect(isReviewEmpty(tabsReview([tab], live({}, { t1: "make" })))).toBe(true);
+  });
+
+  it("lists a running script as busy with the Action it belongs to", () => {
+    const r = tabsReview([term("t1")], live({}, {}, { t1: "running" }, { t1: { name: "dev", command: "pnpm dev" } }));
+    expect(r.busy).toEqual([expect.objectContaining({ tabId: "t1", kind: "script", name: "dev", stopping: false })]);
+  });
+
+  it("skips a tab that is already asleep", () => {
+    const sleeping = term("t1", { hibernation: { at: 1 } });
+    expect(isReviewEmpty(tabsReview([sleeping], live({ t1: { agent: "claude", status: "working" } }, { t1: "x" })))).toBe(true);
+  });
+});
+
+describe("busyTabIds", () => {
+  it("collects working agents, running scripts and agents waiting for the user", () => {
+    const tabs = [term("t1"), term("t2"), term("t3"), term("t4")];
+    const ids = busyTabIds(
+      tabs,
+      live(
+        { t1: { agent: "claude", status: "working" }, t3: { agent: "claude", status: "attention" }, t4: { agent: "claude", status: "idle" } },
+        {},
+        { t2: "running" },
+        { t2: { name: "dev", command: "pnpm dev" } },
+      ),
+    );
+    expect([...ids].sort()).toEqual(["t1", "t2", "t3"]);
+  });
+});
+
+describe("hibernateReview with sleeping tabs", () => {
+  it("ignores a hibernated terminal: closing a workspace has nothing to lose in it", () => {
+    const sleeping = term("t1", { persistentCommand: "make", restoreOnRestart: false, hibernation: { at: 1 } });
+    expect(isReviewEmpty(hibernateReview(ws([sleeping]), live()))).toBe(true);
+  });
+
+  it("still reports unsaved documents next to the terminals", () => {
+    const doc = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false } as Tab;
+    expect(hibernateReview(ws([term("t1"), doc]), live()).docs.map((d) => d.tabId)).toEqual(["e1"]);
   });
 });

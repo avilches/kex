@@ -114,12 +114,18 @@ describe("actionAvailability", () => {
     expect(actionAvailability(app({ command: 'code "{cwd}' }), ctx)).toMatch(/quote/i);
   });
 
-  it("reports a hibernated workspace instead of doing nothing, ahead of every other reason", () => {
+  it("reports a hibernated focused tab for what depends on it, ahead of every other reason", () => {
     const asleep = { ...ctx, hibernated: true };
-    expect(actionAvailability(app(), asleep)).toBe("workspace is hibernated");
-    expect(actionAvailability(script(), asleep)).toBe("workspace is hibernated");
-    expect(actionAvailability(app({ command: "code {filepath}" }), asleep)).toBe("workspace is hibernated");
+    expect(actionAvailability(app({ command: "code {cwd}" }), asleep)).toBe("tab is hibernated");
+    expect(actionAvailability(script({ command: "ls {branch}" }), asleep)).toBe("tab is hibernated");
+    expect(actionAvailability(script({ cwdMode: "context" }), asleep)).toBe("tab is hibernated");
     expect(actionAvailability(app({ command: "  " }), asleep)).toBe("it has no command");
+  });
+
+  it("leaves available what does not depend on the focused tab while it sleeps", () => {
+    const asleep = { ...ctx, hibernated: true };
+    expect(actionAvailability(app(), asleep)).toBeNull();
+    expect(actionAvailability(script(), asleep)).toBeNull();
   });
 
   it("has no context outside a workspace: everything with a variable waits", () => {
@@ -284,14 +290,18 @@ describe("buildActionsBarModel", () => {
     expect(m.buttons[0]).toMatchObject({ state: "running", disabledReason: null, stoppable: true });
   });
 
-  it("marks every Action of a hibernated workspace unavailable but lets a running script be stopped", () => {
+  it("marks what depends on a hibernated focused tab unavailable but lets a running script be stopped", () => {
     const m = buildActionsBarModel({
-      local: [script({ id: "s1", ownButton: true }), script({ id: "s2", ownButton: true }), app({ id: "a1", ownButton: true })],
+      local: [
+        script({ id: "s1", ownButton: true }),
+        script({ id: "s2", ownButton: true, cwdMode: "context" }),
+        app({ id: "a1", ownButton: true, command: "pycharm {cwd}" }),
+      ],
       context: { ...ctx, hibernated: true },
       states: new Map([["s1", "running"]]),
       activeId: undefined,
     });
-    expect(m.buttons.map((b) => b.disabledReason)).toEqual([null, "workspace is hibernated", "workspace is hibernated"]);
+    expect(m.buttons.map((b) => b.disabledReason)).toEqual([null, "tab is hibernated", "tab is hibernated"]);
   });
 
   it("reports empty only when there are no Actions at all", () => {
@@ -911,7 +921,7 @@ describe("twinIds", () => {
     expect(ids([menu, inWorkspace], at("/p"), new Map([["m", "running"]]))).toEqual([]);
   });
 
-  it("does nothing without a context, in Settings or while hibernated", () => {
+  it("does nothing without a context, in Settings or while the focused tab is hibernated", () => {
     expect(ids([workspaceAgent, contextAgent], null)).toEqual([]);
     expect(ids([workspaceAgent, contextAgent], { ...at("/p"), labels: true })).toEqual([]);
     expect(ids([workspaceAgent, contextAgent], { ...at("/p"), hibernated: true })).toEqual([]);

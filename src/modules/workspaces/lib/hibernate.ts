@@ -3,96 +3,60 @@ import { allPanes } from "./splitNode";
 import type { SplitNode, Tab, TabHibernation, Workspace } from "./types";
 
 type TerminalTab = Extract<Tab, { kind: "terminal" }>;
+export type SleepingTab = TerminalTab & { hibernation: TabHibernation };
 
-export function stripTabs(node: SplitNode): SplitNode {
-  if (node.kind === "pane") return { ...node, tabs: [], activeTabId: null };
-  return { ...node, first: stripTabs(node.first), second: stripTabs(node.second) };
+export function isHibernatedTab(tab: Tab | null | undefined): tab is SleepingTab {
+  return tab?.kind === "terminal" && tab.hibernation !== undefined;
 }
 
-const strippedCache = new WeakMap<SplitNode, SplitNode>();
-
-export function strippedTree(node: SplitNode): SplitNode {
-  let out = strippedCache.get(node);
-  if (!out) {
-    out = stripTabs(node);
-    strippedCache.set(node, out);
-  }
-  return out;
-}
-
-// Shortcuts that act on tabs, terminals, editors or scripts have nothing to act
-// on while the workspace is asleep (its tabs are in the tree but not mounted), and
-// the Sidebar and the zen layout are not shown, so changing their state would only
-// surprise the user on wake. A sleeping workspace closes only through its own shortcut.
-const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path.", "sidebar.", "explorer."];
-const BLOCKED_IDS: readonly ShortcutId[] = ["search.focus", "workspace.run", "view.zenMode"];
-
-// Reopening what was closed acts on the closed stack, not on the sleeping workspace:
-// a tab of a hibernated workspace is skipped there, and a closed workspace comes back.
-const ALLOWED_IDS: readonly ShortcutId[] = ["tab.reopenClosed"];
+// A sleeping tab has no terminal behind it, so only what acts on a live terminal is
+// blocked; tab, pane, sidebar and explorer shortcuts work on it like on any other tab.
+const BLOCKED_PREFIXES = ["terminal."];
+const BLOCKED_IDS: readonly ShortcutId[] = ["search.focus"];
 
 export function blockedWhileHibernated(id: ShortcutId): boolean {
-  if (ALLOWED_IDS.includes(id)) return false;
   return BLOCKED_IDS.includes(id) || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
 }
 
-// Native menu items (ids from the Rust menu) that act on tabs or on the Sidebar. The same
-// set is greyed out by `sync_menu` and ignored by the dispatcher while the workspace sleeps.
-const BLOCKED_MENU_IDS: readonly string[] = [
-  "new_terminal",
-  "new_browser",
-  "close_tab",
-  "close_others",
-  "close_all",
-  "toggle_sidebar",
-  "toggle_explorer",
-  "toggle_git",
-  "toggle_history",
-  "toggle_hidden",
-  "toggle_sidebar_side",
-];
-
-export function menuBlockedWhileHibernated(menuId: string): boolean {
-  return BLOCKED_MENU_IDS.includes(menuId);
-}
-
-// Palette commands share the shortcut ids; these have none (or act on what a sleeping workspace lacks).
-const BLOCKED_COMMAND_IDS: readonly string[] = ["git.graph", "git.source", "search.content", "history.open", "workspace.runScripts"];
+// Palette commands share the shortcut ids; these have none and act on a live terminal.
+const BLOCKED_COMMAND_IDS: readonly string[] = ["history.open"];
 
 export function commandBlockedWhileHibernated(commandId: string): boolean {
   return BLOCKED_COMMAND_IDS.includes(commandId) || blockedWhileHibernated(commandId as ShortcutId);
 }
 
-// Editors are about to be unmounted (their unsaved state goes with them) and a
-// floating browser window is destroyed, so neither flag may outlive hibernation.
-function clearTransientTabState(node: SplitNode, snapshots: Readonly<Record<string, TabHibernation>>): SplitNode {
-  if (node.kind === "pane") {
-    return {
-      ...node,
-      tabs: node.tabs.map((t) => {
-        if (t.kind === "terminal") return snapshots[t.id] ? { ...t, hibernation: snapshots[t.id] } : t;
-        if (t.kind === "editor" || t.kind === "markdown") return { ...t, dirty: false };
-        if (t.kind === "browser") return { ...t, floating: false };
-        return t;
-      }),
-    };
-  }
-  return { ...node, first: clearTransientTabState(node.first, snapshots), second: clearTransientTabState(node.second, snapshots) };
+function mapTabs(node: SplitNode, fn: (t: Tab) => Tab): SplitNode {
+  if (node.kind === "pane") return { ...node, tabs: node.tabs.map(fn) };
+  return { ...node, first: mapTabs(node.first, fn), second: mapTabs(node.second, fn) };
 }
 
 export function applyHibernate(
   workspaces: Workspace[],
   workspaceId: string,
-  now: number = Date.now(),
-  snapshots: Readonly<Record<string, TabHibernation>> = {},
+  snapshots: Readonly<Record<string, TabHibernation>>,
 ): Workspace[] {
   return workspaces.map((w) =>
     w.id === workspaceId
       ? {
           ...w,
-          hibernated: true,
-          hibernatedAt: w.hibernated ? w.hibernatedAt : now,
-          paneTree: clearTransientTabState(w.paneTree, snapshots),
+          paneTree: mapTabs(w.paneTree, (t) =>
+            t.kind === "terminal" && !t.hibernation && snapshots[t.id] ? { ...t, hibernation: snapshots[t.id] } : t,
+          ),
+        }
+      : w,
+  );
+}
+
+export function applyWake(workspaces: Workspace[], workspaceId: string, tabIds: ReadonlySet<string>): Workspace[] {
+  return workspaces.map((w) =>
+    w.id === workspaceId
+      ? {
+          ...w,
+          paneTree: mapTabs(w.paneTree, (t) => {
+            if (t.kind !== "terminal" || !t.hibernation || !tabIds.has(t.id)) return t;
+            const { hibernation: _hibernation, ...rest } = t;
+            return rest;
+          }),
         }
       : w,
   );
@@ -110,37 +74,23 @@ export function formatHibernatedFor(ms: number): string {
   return unit(Math.floor(hours / 24), "d", hours % 24, "h");
 }
 
-function clearTabSnapshots(node: SplitNode): SplitNode {
-  if (node.kind === "pane") {
-    return {
-      ...node,
-      tabs: node.tabs.map((t) => {
-        if (t.kind !== "terminal" || !t.hibernation) return t;
-        const { hibernation: _hibernation, ...rest } = t;
-        return rest;
-      }),
-    };
-  }
-  return { ...node, first: clearTabSnapshots(node.first), second: clearTabSnapshots(node.second) };
-}
-
-export function applyWake(workspaces: Workspace[], workspaceId: string): Workspace[] {
-  return workspaces.map((w) => {
-    if (w.id !== workspaceId) return w;
-    const { hibernated: _hibernated, hibernatedAt: _hibernatedAt, ...rest } = w;
-    return { ...rest, paneTree: clearTabSnapshots(rest.paneTree) };
-  });
-}
-
-// A workspace with no tabs has nothing to put to sleep.
-export function hasTabs(ws: Workspace): boolean {
-  return allPanes(ws.paneTree).some((p) => p.tabs.length > 0);
+// The terminals that can still be put to sleep.
+export function awakeTerminalTabs(ws: Workspace): TerminalTab[] {
+  return terminalTabs(ws).filter((t) => !t.hibernation);
 }
 
 export function terminalTabs(ws: Workspace): TerminalTab[] {
   return allPanes(ws.paneTree)
     .flatMap((p) => p.tabs)
     .filter((t): t is TerminalTab => t.kind === "terminal");
+}
+
+// The terminals that own a session (PTY and render slot): every terminal tab that is awake. The
+// sweep that disposes sessions leaves the sleeping ones out, which is what frees their slot.
+export function liveTerminalIds(workspaces: readonly Workspace[]): Set<string> {
+  const ids = new Set<string>();
+  for (const ws of workspaces) for (const t of awakeTerminalTabs(ws)) ids.add(t.id);
+  return ids;
 }
 
 export function editorTabIds(ws: Workspace): string[] {
@@ -169,7 +119,7 @@ export function isPendingStale(pendingId: string | null, workspaces: readonly { 
 }
 
 // The global shortcut listener runs in capture phase before the Radix dialog, so a modal
-// does not block it; any workspace dialog awaiting an answer must disable them.
-export function workspaceDialogPending(hibernatePendingId: string | null, closePendingId: string | null | undefined): boolean {
-  return hibernatePendingId !== null || (closePendingId ?? null) !== null;
+// does not block it; any dialog awaiting an answer must disable them.
+export function workspaceDialogPending(hibernatePending: unknown, closePendingId: string | null | undefined): boolean {
+  return hibernatePending != null || (closePendingId ?? null) !== null;
 }

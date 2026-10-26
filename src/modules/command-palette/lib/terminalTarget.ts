@@ -6,7 +6,6 @@ import type { MergedRow } from "./mergeRows";
 export type TerminalTarget = {
   cwd: string;
   workspaceId: string;
-  hibernated: boolean;
   besideTabId: string | null;
 };
 
@@ -16,13 +15,13 @@ export function terminalTargetOf(
 ): TerminalTarget | null {
   for (const row of rows) {
     if (row.kind === "tab" && value === `tab:${row.entry.tabId}`) {
-      const { cwd, workspaceId, hibernated, tabId } = row.entry;
-      return cwd ? { cwd, workspaceId, hibernated, besideTabId: tabId } : null;
+      const { cwd, workspaceId, tabId } = row.entry;
+      return cwd ? { cwd, workspaceId, besideTabId: tabId } : null;
     }
     if (row.kind === "closed" && value === row.entry.key) {
-      const { kind, path, workspaceId, hibernated } = row.entry;
+      const { kind, path, workspaceId } = row.entry;
       const cwd = kind === "terminal" ? path : pathDirname(path);
-      return cwd ? { cwd, workspaceId, hibernated, besideTabId: null } : null;
+      return cwd ? { cwd, workspaceId, besideTabId: null } : null;
     }
   }
   return null;

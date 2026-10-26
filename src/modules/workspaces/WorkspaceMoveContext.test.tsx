@@ -35,9 +35,9 @@ describe("WorkspaceMoveProvider", () => {
     expect(targets.map((t) => [t.id, t.title])).toEqual([["a", "Kex"], ["b", "Kex"]]);
   });
 
-  it("lists hibernated workspaces flagged, with their icon", () => {
-    const targets = targetsOf([ws({ id: "a", icon: "rocket", hibernated: true }), ws({ id: "b" })]);
-    expect(targets[0]).toMatchObject({ id: "a", icon: "rocket", hibernated: true });
-    expect(targets[1]).toMatchObject({ id: "b", hibernated: false });
+  it("lists each workspace with its icon", () => {
+    const targets = targetsOf([ws({ id: "a", icon: "rocket" }), ws({ id: "b" })]);
+    expect(targets[0]).toMatchObject({ id: "a", icon: "rocket" });
+    expect(targets[1]).toMatchObject({ id: "b" });
   });
 });

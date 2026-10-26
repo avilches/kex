@@ -2,134 +2,135 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
-import { hasTabs, restoreCommandFor, terminalTabs } from "./hibernate";
+import { awakeTerminalTabs, restoreCommandFor } from "./hibernate";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
-import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
+import { busyTabIds, isReviewEmpty, liveAgent, tabsReview, type HibernateLive } from "./hibernateReview";
+import { visibleTabIds } from "./autoHibernate";
 import { liveScripts } from "./liveScripts";
 import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
-import type { TabHibernation, Workspace } from "./types";
+import type { Tab, TabHibernation, Workspace } from "./types";
+
+type TerminalTab = Extract<Tab, { kind: "terminal" }>;
+
+export type PendingHibernate = { workspaceId: string; tabIds: string[] };
 
 export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
-  // Saves every dirty document of the workspace whatever the autosave
-  // preference says; resolves false when any save failed.
-  saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
-  isActive: (workspaceId: string) => boolean;
-  // Lets the dirty flags written by the flush reach the workspace state.
-  settle: () => Promise<void>;
+  activeWorkspaceId: () => string | null;
   live: (ws: Workspace) => HibernateLive;
   finishAgent: (tabId: string) => void;
-  destroyFloats: (workspaceId: string) => Promise<void>;
-  // Title, agent and restore command of every terminal tab, read while the PTYs are still alive.
-  snapshotTabs: (workspace: Workspace) => Promise<Record<string, TabHibernation>>;
+  // Title, agent and restore command of the tabs, read while their PTYs are still alive.
+  snapshotTabs: (tabs: TerminalTab[]) => Promise<Record<string, TabHibernation>>;
   hibernate: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
-  setPending: (workspaceId: string | null) => void;
+  setPending: (pending: PendingHibernate | null) => void;
 };
 
 export function createHibernateFlow(d: HibernateFlowDeps) {
   const inFlight = new Set<string>();
 
+  const awake = (ws: Workspace, tabIds: readonly string[]) => {
+    const wanted = new Set(tabIds);
+    return awakeTerminalTabs(ws).filter((t) => wanted.has(t.id));
+  };
+
+  // Tabs an unattended hibernation may take: out of sight, not busy and with nothing that
+  // would be lost.
+  const unattended = (ws: Workspace, tabIds: readonly string[]) => {
+    const tabs = awake(ws, tabIds);
+    const live = d.live(ws);
+    const visible = visibleTabIds([ws], ws.id === d.activeWorkspaceId() ? ws.id : null);
+    const busy = busyTabIds(tabs, live);
+    const lost = new Set(tabsReview(tabs, live).commands.map((c) => c.tabId));
+    return tabs.filter((t) => !visible.has(t.id) && !busy.has(t.id) && !lost.has(t.id));
+  };
+
   // `stillValid` is checked after the only await, right before anything irreversible: marking
-  // the tabs and ending their agent sessions would leave orphan records if the workspace were
-  // not hibernated afterwards. Mark, finish and hibernate run with no await between them.
-  async function perform(workspaceId: string, stillValid?: (ws: Workspace) => boolean): Promise<boolean> {
+  // the tabs and ending their agent sessions would leave orphan records if they were not put to
+  // sleep afterwards. Mark, finish and hibernate run with no await between them.
+  async function perform(
+    workspaceId: string,
+    tabIds: readonly string[],
+    stillValid?: (ws: Workspace, tabIds: readonly string[]) => TerminalTab[],
+  ): Promise<boolean> {
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated || !hasTabs(ws) || inFlight.has(workspaceId)) return false;
-    inFlight.add(workspaceId);
+    if (!ws) return false;
+    const tabs = awake(ws, tabIds).filter((t) => !inFlight.has(t.id));
+    if (tabs.length === 0) return false;
+    const ids = tabs.map((t) => t.id);
+    for (const id of ids) inFlight.add(id);
     try {
       // First, so the dialog stops watching the stores this call is about to change.
       d.setPending(null);
-      const [, snapshots] = await Promise.all([
-        d.destroyFloats(workspaceId),
-        ws.hibernated ? {} : d.snapshotTabs(ws),
-      ]);
+      const snapshots = await d.snapshotTabs(tabs);
       const current = d.getWorkspace(workspaceId);
-      if (!current || current.hibernated || !hasTabs(current) || (stillValid && !stillValid(current))) return false;
-      const ids = terminalTabs(current).map((t) => t.id);
-      markHibernating(ids);
+      if (!current) return false;
+      const still = (stillValid ?? awake)(current, ids);
+      if (still.length === 0) return false;
+      const stillIds = still.map((t) => t.id);
+      markHibernating(stillIds);
       try {
-        for (const id of ids) d.finishAgent(id);
+        for (const id of stillIds) d.finishAgent(id);
         d.hibernate(workspaceId, snapshots);
       } catch (e) {
-        unmarkHibernating(ids);
+        unmarkHibernating(stillIds);
         throw e;
       }
       return true;
     } finally {
-      inFlight.delete(workspaceId);
+      for (const id of ids) inFlight.delete(id);
     }
   }
 
-  // The review was empty when it was taken; the user may have edited a document, or activated
-  // the workspace of an unattended hibernation, since.
-  const stillEmpty = (ws: Workspace) => isReviewEmpty(hibernateReview(ws, d.live(ws)));
-
-  async function request(workspaceId: string): Promise<void> {
-    const first = d.getWorkspace(workspaceId);
-    if (!first || first.hibernated || !hasTabs(first)) return;
-    // Whatever the autosave preference says: unsaved text outlives a hibernation only in memory.
-    // A document that fails to save stays dirty and shows up in the dialog.
-    await d.saveWorkspaceDocs(workspaceId);
-    await d.settle();
+  async function request(workspaceId: string, tabIds: readonly string[]): Promise<void> {
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated || !hasTabs(ws)) return;
-    if (isReviewEmpty(hibernateReview(ws, d.live(ws)))) {
-      await perform(workspaceId, stillEmpty);
+    if (!ws) return;
+    const tabs = awake(ws, tabIds);
+    if (tabs.length === 0) return;
+    if (isReviewEmpty(tabsReview(tabs, d.live(ws)))) {
+      await perform(workspaceId, tabIds);
       return;
     }
-    d.setPending(workspaceId);
+    d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id) });
   }
 
-  // Unattended variant: saves what is dirty and hibernates only when nothing
-  // is left to ask about (no busy tab, no unsaved document, no command that
-  // would be lost). It never opens the dialog.
-  async function requestAuto(workspaceId: string): Promise<boolean> {
-    const first = d.getWorkspace(workspaceId);
-    if (!first || first.hibernated || !hasTabs(first) || inFlight.has(workspaceId) || d.isActive(workspaceId)) {
-      return false;
-    }
-    if (!(await d.saveWorkspaceDocs(workspaceId))) return false;
-    await d.settle();
+  // Unattended variant: hibernates only the tabs nobody is looking at and nothing would be
+  // lost in. It never opens the dialog.
+  async function requestAuto(workspaceId: string, tabIds: readonly string[]): Promise<boolean> {
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated || !hasTabs(ws) || d.isActive(workspaceId)) return false;
-    const live = d.live(ws);
-    if (!isReviewEmpty(hibernateReview(ws, live))) return false;
-    if (terminalTabs(ws).some((t) => live.agentOf(t.id)?.status === "attention")) return false;
-    return perform(workspaceId, (current) => !d.isActive(workspaceId) && stillEmpty(current));
+    if (!ws) return false;
+    const ids = unattended(ws, tabIds).filter((t) => !inFlight.has(t.id)).map((t) => t.id);
+    if (ids.length === 0) return false;
+    return perform(workspaceId, ids, unattended);
   }
 
   return { request, requestAuto, perform };
 }
 
-async function snapshotTerminalTabs(ws: Workspace): Promise<Record<string, TabHibernation>> {
+async function snapshotTerminalTabs(tabs: TerminalTab[]): Promise<Record<string, TabHibernation>> {
   await flushAgentTitles();
   await flushSidebarSnapshots();
   const sessions = useAgentStore.getState().sessions;
+  const at = Date.now();
   const entries = await Promise.all(
-    terminalTabs(ws).map(async (tab): Promise<[string, TabHibernation]> => {
+    tabs.map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      return [tab.id, { agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab) }];
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab) }];
     }),
   );
   return Object.fromEntries(entries);
 }
 
-const nextFrames = () =>
-  new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-
 type HookDeps = {
   workspacesRef: { current: Workspace[] };
-  saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
-  isActive: (workspaceId: string) => boolean;
+  activeWorkspaceIdRef: { current: string | null };
   hibernateWorkspace: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
-  destroyWorkspaceFloats: (workspaceId: string, workspaces: Workspace[]) => Promise<void>;
 };
 
 export function useHibernateFlow(deps: HookDeps) {
-  const [pendingWorkspaceId, setPendingWorkspaceId] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingHibernate | null>(null);
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
@@ -137,9 +138,7 @@ export function useHibernateFlow(deps: HookDeps) {
     () =>
       createHibernateFlow({
         getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
-        saveWorkspaceDocs: (id) => depsRef.current.saveWorkspaceDocs(id),
-        isActive: (id) => depsRef.current.isActive(id),
-        settle: nextFrames,
+        activeWorkspaceId: () => depsRef.current.activeWorkspaceIdRef.current,
         live: (ws) => {
           const sessions = useAgentStore.getState().sessions;
           const commands = getRunningCommandsSnapshot();
@@ -150,18 +149,17 @@ export function useHibernateFlow(deps: HookDeps) {
           };
         },
         finishAgent: (id) => useAgentStore.getState().finish(id),
-        destroyFloats: (id) => depsRef.current.destroyWorkspaceFloats(id, depsRef.current.workspacesRef.current),
         snapshotTabs: snapshotTerminalTabs,
         hibernate: (id, snapshots) => depsRef.current.hibernateWorkspace(id, snapshots),
-        setPending: setPendingWorkspaceId,
+        setPending,
       }),
     [],
   );
 
-  const cancel = useCallback(() => setPendingWorkspaceId(null), []);
+  const cancel = useCallback(() => setPending(null), []);
 
   return {
-    pendingWorkspaceId,
+    pending,
     requestHibernate: flow.request,
     requestAutoHibernate: flow.requestAuto,
     performHibernate: flow.perform,

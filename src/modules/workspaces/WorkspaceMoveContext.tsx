@@ -5,7 +5,7 @@ import type { Workspace } from "./lib/types";
 import { resolveWorkspaceColor } from "./lib/workspaceColor";
 import { workspaceTitleNow } from "./lib/workspaceTitle";
 
-export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; icon?: string; hibernated: boolean };
+export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; icon?: string };
 
 type WorkspaceMoveValue = {
   targets: WorkspaceMoveTarget[];
@@ -35,7 +35,7 @@ export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props
     workspaceTitleNow({ ...w, focusedTab: focusedTab(w.paneTree, w.activePaneId) }),
   );
   const key = workspaces
-    .map((w, i) => `${w.id}\u0000${titles[i]}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}\u0000${w.hibernated ? 1 : 0}`)
+    .map((w, i) => `${w.id}\u0000${titles[i]}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
@@ -45,7 +45,6 @@ export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props
         title: titles[i] || "shell",
         color: resolveWorkspaceColor(w.color, w.id),
         icon: w.icon,
-        hibernated: w.hibernated === true,
       })),
     [key],
   );

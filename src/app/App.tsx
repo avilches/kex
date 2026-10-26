@@ -7,14 +7,15 @@ import { openFilePaths } from "@/modules/explorer/lib/openFiles";
 import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import { domFocusHoldsOsRefocus } from "@/app/lib/osRefocus";
 import {
-  menuBlockedWhileHibernated,
   workspaceDialogPending,
+  isHibernatedTab,
+  liveTerminalIds,
   editorTabIds,
+  awakeTerminalTabs,
   enableRunOnStart,
   isPendingStale,
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
-import { claimToggle } from "@/modules/workspaces/lib/hibernateFx";
 import { tabDisplayTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
@@ -332,7 +333,7 @@ export default function App() {
     setAgentTitles,
     clearAgentTitles,
     applyExplorerSnapshotBatch,
-    wakeWorkspace,
+    wakeTabs,
     activateTab,
     revealTab,
     closeTab,
@@ -404,11 +405,10 @@ export default function App() {
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
-  const activeWorkspaceHibernated = !!activeWorkspace?.hibernated;
   // One place covers tab clicks, shortcuts, new tabs, workspace switches and startup.
   useEffect(() => {
-    if (activeTabId && !activeWorkspaceHibernated) recordTabUse(activeTabId);
-  }, [activeTabId, activeWorkspaceHibernated]);
+    if (activeTabId) recordTabUse(activeTabId);
+  }, [activeTabId]);
 
   // Usage-based history: every real change of the focused location counts once, including
   // opening a tab and returning to one that was already open. Re-renders that keep the same
@@ -420,14 +420,14 @@ export default function App() {
       : null;
   const lastNotedTabRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeTab || !activeWorkspace || activeWorkspaceHibernated || !activeTabHistoryKey) {
+    if (!activeTab || !activeWorkspace || !activeTabHistoryKey) {
       lastNotedTabRef.current = null;
       return;
     }
     if (lastNotedTabRef.current === activeTabHistoryKey) return;
     lastNotedTabRef.current = activeTabHistoryKey;
     noteTabUse(activeTab, activeWorkspace.id);
-  }, [activeTab, activeWorkspace, activeWorkspaceHibernated, activeTabHistoryKey]);
+  }, [activeTab, activeWorkspace, activeTabHistoryKey]);
 
   // Returns focus to the active tab after a transient interruption -- a
   // dropdown, dialog, or context menu closing -- instead of leaving it on
@@ -783,15 +783,7 @@ export default function App() {
   const liveTabIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const live = new Set<string>();
-    for (const ws of workspaces) {
-      if (ws.hibernated) continue;
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const tab of pane.tabs) {
-          if (tab.kind === "terminal") live.add(tab.id);
-        }
-      }
-    }
+    const live = liveTerminalIds(workspaces);
     for (const id of liveTabIdsRef.current) {
       if (!live.has(id)) {
         useAgentStore.getState().finish(id);
@@ -865,6 +857,7 @@ export default function App() {
     openTab,
     splitPaneAndOpenTab,
     setScriptPaneId,
+    wakeTab: (workspaceId, tabId) => wakeTabs(workspaceId, [tabId]),
     terminalHandles,
     scriptCommandSeen,
     focusFolder: scriptFocusFolderRef,
@@ -2026,27 +2019,6 @@ export default function App() {
     [onActivateTabStable, findTabGlobal, setActiveWorkspaceId],
   );
 
-  const saveWorkspaceDocs = useCallback(
-    async (workspaceId: string) => {
-      const ws = workspacesRef.current.find((w) => w.id === workspaceId);
-      if (!ws) return false;
-      const ids = allPanes(ws.paneTree)
-        .flatMap((p) => p.tabs)
-        .filter((t) => t.kind === "editor" || t.kind === "markdown")
-        .map((t) => t.id);
-      const results = await Promise.all(
-        ids.map((id) =>
-          saveTab(id).then(
-            () => true,
-            () => false,
-          ),
-        ),
-      );
-      return results.every(Boolean);
-    },
-    [saveTab],
-  );
-
   useEffect(() => startAgentTitleSync(setAgentTitles, clearAgentTitles), [setAgentTitles, clearAgentTitles]);
   useEffect(
     () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
@@ -2070,23 +2042,48 @@ export default function App() {
 
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
-    saveWorkspaceDocs,
-    isActive: (id) => activeWorkspaceIdRef.current === id,
+    activeWorkspaceIdRef,
     hibernateWorkspace,
-    destroyWorkspaceFloats,
   });
   const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;
-  useAutoHibernate({ workspacesRef, activeWorkspaceId, activeWorkspaceIdRef, requestAutoHibernate });
-  const pendingHibernateRef = useRef<string | null>(null);
-  pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
+  useAutoHibernate({ workspacesRef, activeWorkspaceIdRef, requestAutoHibernate });
+  const pendingHibernateRef = useRef(hibernateFlow.pending);
+  pendingHibernateRef.current = hibernateFlow.pending;
   const { cancel: cancelHibernate } = hibernateFlow;
   useEffect(() => {
-    if (isPendingStale(hibernateFlow.pendingWorkspaceId, workspaces)) cancelHibernate();
-  }, [hibernateFlow.pendingWorkspaceId, workspaces, cancelHibernate]);
+    if (isPendingStale(hibernateFlow.pending?.workspaceId ?? null, workspaces)) cancelHibernate();
+  }, [hibernateFlow.pending, workspaces, cancelHibernate]);
   const handleHibernateFromDialog = useCallback(() => {
-    const id = pendingHibernateRef.current;
-    if (id) void performHibernate(id);
+    const pending = pendingHibernateRef.current;
+    if (pending) void performHibernate(pending.workspaceId, pending.tabIds);
   }, [performHibernate]);
+
+  // Wakes a sleeping tab and gives it the focus once it is mounted again.
+  const wakeAndFocusTab = useCallback(
+    async (tabId: string) => {
+      const found = findTabGlobal(tabId);
+      if (!found) return;
+      await wakeTabs(found.workspace.id, [tabId]);
+      setTimeout(() => focusTab(tabId), 50);
+    },
+    [findTabGlobal, wakeTabs, focusTab],
+  );
+  const toggleTabHibernate = useCallback(
+    (tabId: string) => {
+      const found = findTabGlobal(tabId);
+      if (!found || found.tab.kind !== "terminal") return;
+      if (found.tab.hibernation) void wakeAndFocusTab(tabId);
+      else void requestHibernate(found.workspace.id, [tabId]);
+    },
+    [findTabGlobal, wakeAndFocusTab, requestHibernate],
+  );
+  const hibernateAllInWorkspace = useCallback(
+    (workspaceId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+      if (ws) void requestHibernate(workspaceId, awakeTerminalTabs(ws).map((t) => t.id));
+    },
+    [requestHibernate],
+  );
 
   const closeFlow = useCloseWorkspaceFlow({
     workspacesRef,
@@ -2620,6 +2617,7 @@ export default function App() {
       onRenameFile: (tabId, newName) => {
         void handleRenameFileFromTab(tabId, newName);
       },
+      onWakeTab: (tabId) => void wakeAndFocusTab(tabId),
       onFocusOnExplorer: (filePath, pendingAction) =>
         focusSidebar(filePath, { fromShortcut: true, pendingAction }),
       onSetAsRoot: handleSetAsRoot,
@@ -2652,6 +2650,7 @@ export default function App() {
       newWorkspaceFromFolder,
       openFolderInTerminal,
       handleAddToGitignore,
+      wakeAndFocusTab,
     ],
   );
 
@@ -2721,7 +2720,7 @@ export default function App() {
 
   const handleCloseActiveTab = useCallback(() => {
     // The native menu reaches this without passing through `shortcutsDisabled`.
-    if (!activeWorkspace || activeWorkspace.hibernated) return;
+    if (!activeWorkspace) return;
     if (!activeTabId) {
       // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
       void requestCloseWorkspace(activeWorkspace.id);
@@ -2753,7 +2752,7 @@ export default function App() {
   // not just the focused one. Locked tabs are protected like in the pane action.
   const closeAllTabsInWorkspace = useCallback((workspaceId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
-    if (!ws || ws.hibernated) return;
+    if (!ws) return;
     const ids = allPanes(ws.paneTree).flatMap((pane) => bulkClosableIds(pane.tabs));
     if (ids.length) void closeTabsRef.current(ids);
   }, []);
@@ -2762,7 +2761,9 @@ export default function App() {
   tabCallbacksRef.current = tabCallbacks;
   const saveTabRef = useRef(saveTabReportingErrors);
   saveTabRef.current = saveTabReportingErrors;
-  const sidebarTabMenu = useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef });
+  const toggleHibernateRef = useRef(toggleTabHibernate);
+  toggleHibernateRef.current = toggleTabHibernate;
+  const sidebarTabMenu = useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, toggleHibernateRef, tabCallbacksRef });
   const sidebarGit = useMemo<SidebarGit>(
     () => ({
       workspaceId: activeWorkspaceId,
@@ -2790,7 +2791,7 @@ export default function App() {
       );
       const navWorkspaces = visible.map((w) => {
         const tabs =
-          w.detailExpanded && !w.hibernated
+          w.detailExpanded
             ? allPanes(w.paneTree).flatMap((p) => p.tabs)
             : [];
         const agentTabIds = new Set(
@@ -2905,11 +2906,10 @@ export default function App() {
   const openTerminalAtPaletteTarget = useCallback(
     async (target: TerminalTarget) => {
       setCommandPaletteOpen(false);
-      if (target.hibernated) await wakeWorkspace(target.workspaceId);
       const ws =
         workspacesRef.current.find((w) => w.id === target.workspaceId) ??
         workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
-      if (!ws || ws.hibernated) return;
+      if (!ws) return;
       const beside = target.besideTabId
         ? findTabPane(ws.paneTree, target.besideTabId)
         : null;
@@ -2923,7 +2923,7 @@ export default function App() {
       openTab(ws.id, pane.id, { id, kind: "terminal", cwd: target.cwd }, index);
       activateTab(ws.id, id);
     },
-    [wakeWorkspace, setActiveWorkspaceId, openTab, activateTab],
+    [setActiveWorkspaceId, openTab, activateTab],
   );
   const dismissPalettes = useCallback(() => {
     setCommandPaletteOpen(false);
@@ -2978,10 +2978,8 @@ export default function App() {
           }
         }
       },
-      "workspace.hibernate": () => {
-        if (!activeWorkspace || !claimToggle(activeWorkspace.id)) return;
-        if (activeWorkspace.hibernated) void wakeWorkspace(activeWorkspace.id);
-        else void requestHibernate(activeWorkspace.id);
+      "tab.hibernate": () => {
+        if (activeTabId) toggleTabHibernate(activeTabId);
       },
       "workspace.run": () => {
         if (activeWorkspace) toggleActiveAction();
@@ -3267,24 +3265,24 @@ export default function App() {
       toggleOverlayPreview,
       toggleSplitPreview,
       toggleActiveAction,
-      requestHibernate,
+      activeTabId,
+      toggleTabHibernate,
     ],
   );
 
   const shortcutContext = useMemo(
     () => ({
-      hibernated: !!activeWorkspace?.hibernated,
       activeTab,
       hasWorkspaceRoot: !!activeWorkspace?.workspaceRoot,
       scriptCount: activeWorkspace?.actions?.length ?? 0,
     }),
-    [activeWorkspace?.hibernated, activeWorkspace?.workspaceRoot, activeWorkspace?.actions, activeTab],
+    [activeWorkspace?.workspaceRoot, activeWorkspace?.actions, activeTab],
   );
 
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
-      if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
+      if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
       if (shortcutUnavailable(id, shortcutContext)) return true;
       if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
       if (
@@ -3319,7 +3317,7 @@ export default function App() {
 
       return false;
     },
-    [shortcutContext, hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id],
+    [shortcutContext, hibernateFlow.pending, closeFlow.pending?.id],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -3327,20 +3325,12 @@ export default function App() {
   // ── Agent activation ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    useAgentStore.getState().setTabLocations(
-      tabLocations(workspaces.filter((w) => !w.hibernated)),
-    );
+    useAgentStore.getState().setTabLocations(tabLocations(workspaces));
     useAgentStore.getState().setUserTabTitles(userTabTitles(workspaces));
   }, [workspaces]);
 
   const onActivateAgent = useCallback(
     (_storedWorkspaceId: string, tabId: string) => {
-      const asleep = workspacesRef.current.find((w) => w.hibernated && findTabPane(w.paneTree, tabId));
-      if (asleep) {
-        setActiveWorkspaceId(asleep.id);
-        onActivateTabStable(asleep.id, tabId);
-        return;
-      }
       const live = useAgentStore.getState().tabLocations?.[tabId];
       if (!live) return;
       setActiveWorkspaceId(live);
@@ -3379,7 +3369,6 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
-    if (activeWorkspace?.hibernated && menuBlockedWhileHibernated(id)) return;
     switch (id) {
       case "settings":
         void openSettingsWindow();
@@ -3459,10 +3448,9 @@ export default function App() {
         activeView: sidebarView,
         sidebarSide: sidebarSide,
         showHidden: activeShowHidden,
-        hibernated: !!activeWorkspace?.hibernated,
       },
     }).catch((e) => console.error("[kex] sync_menu failed:", e));
-  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden, activeWorkspace?.hibernated]);
+  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
@@ -3615,16 +3603,6 @@ export default function App() {
       }
       let target = workspacesRef.current.find((w) => w.id === row.workspaceId);
       if (!target) return;
-      if (target.hibernated) await wakeWorkspace(target.id);
-      target = workspacesRef.current.find((w) => w.id === row.workspaceId);
-      if (target?.hibernated) target = undefined;
-      if (!target) {
-        toast.info("That workspace could not be woken, opened in the active one");
-        target = workspacesRef.current.find(
-          (w) => w.id === activeWorkspaceIdRef.current,
-        );
-      }
-      if (!target) return;
       setActiveWorkspaceId(target.id);
       // openTab inserts right after the pane's focused tab and makes the new tab active.
       openTab(target.id, target.activePaneId, {
@@ -3638,7 +3616,6 @@ export default function App() {
       canSplitTerminal,
       splitAndOpenTerminal,
       openTab,
-      wakeWorkspace,
       setActiveWorkspaceId,
     ],
   );
@@ -3666,15 +3643,8 @@ export default function App() {
 
   const onPaletteRunClosed = useCallback(
     async (entry: ClosedTabEntry) => {
-      if (
-        workspacesRef.current.find((w) => w.id === entry.workspaceId)?.hibernated
-      ) {
-        await wakeWorkspace(entry.workspaceId);
-      }
       let target = workspacesRef.current.find((w) => w.id === entry.workspaceId);
-      if (target?.hibernated) target = undefined;
       if (!target) {
-        toast.info("That workspace could not be woken, opened in the active one");
         target = workspacesRef.current.find(
           (w) => w.id === activeWorkspaceIdRef.current,
         );
@@ -3691,12 +3661,12 @@ export default function App() {
         openFileInTab(entry.path, true, target.id);
       }
     },
-    [wakeWorkspace, setActiveWorkspaceId, openTab, openFileInTab],
+    [setActiveWorkspaceId, openTab, openFileInTab],
   );
   const onPaletteSelectTab = useCallback(
     (entry: TabEntry) => {
       void selectTab(entry, {
-        wake: wakeWorkspace,
+        wake: (workspaceId, tabId) => wakeTabs(workspaceId, [tabId]),
         goToTab: (id) => {
           goToTab(id);
           // A woken tab is not mounted yet, so the focus the line above asked for found nothing.
@@ -3704,10 +3674,9 @@ export default function App() {
         },
       });
     },
-    [wakeWorkspace, goToTab, focusTab],
+    [wakeTabs, goToTab, focusTab],
   );
   const onPaletteCloseTab = useCallback((entry: TabEntry) => {
-    if (entry.hibernated) return;
     if (entry.tab.locked) {
       flashLockIcon(entry.tabId);
       return;
@@ -3716,9 +3685,9 @@ export default function App() {
   }, []);
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {
-      void selectWorkspace(entry, { wake: wakeWorkspace, activate: setActiveWorkspaceId });
+      selectWorkspace(entry, { activate: setActiveWorkspaceId });
     },
-    [wakeWorkspace, setActiveWorkspaceId],
+    [setActiveWorkspaceId],
   );
 
   const commandPaletteItems = useMemo(
@@ -3761,7 +3730,7 @@ export default function App() {
               );
             },
             hasActiveTerminal: activeTab?.kind === "terminal",
-            hibernated: !!activeWorkspace?.hibernated,
+            hibernated: isHibernatedTab(activeTab),
             activePaneTabCount: activePane?.tabs.length ?? 0,
             hasActiveTab: !!activeTab,
             hasActiveTabTitle: !!activeTab?.title,
@@ -3918,8 +3887,7 @@ export default function App() {
           .filter(Boolean)
           .join(","),
         detailExpanded: w.detailExpanded,
-        hibernated: w.hibernated,
-        hibernatedAt: w.hibernatedAt,
+        canHibernate: awakeTerminalTabs(w).length > 0,
       })),
     [workspaces],
   );
@@ -3974,8 +3942,8 @@ export default function App() {
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onCloseAllTabs={(wsId) => void closeAllTabsInWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
-              onHibernate={(id) => void hibernateFlow.requestHibernate(id)}
-              onWake={(id) => void wakeWorkspace(id)}
+              onHibernate={hibernateAllInWorkspace}
+              onWakeTab={(_workspaceId, tabId) => void wakeAndFocusTab(tabId)}
               onOpenSettings={(id) =>
                 useWorkspaceSettingsStore.getState().openSettings(id)
               }
@@ -4001,7 +3969,7 @@ export default function App() {
                 className="min-h-0 flex-1"
               >
                 {/* Tool sidebar on LEFT when sidebarSide === "left" */}
-                {sidebarOpen && !activeWorkspace?.hibernated && sidebarSide === "left" && (
+                {sidebarOpen && sidebarSide === "left" && (
                   <>
                     <ResizablePanel
                       id="tool-sidebar"
@@ -4081,7 +4049,6 @@ export default function App() {
                           workspaces={workspaces}
                           activeWorkspaceId={activeWorkspaceId}
                           expandedPaneId={zenPaneId}
-                          onWake={(id) => void wakeWorkspace(id)}
                           onActivateTab={onActivateTabStable}
                           onCloseTab={onCloseTabStable}
                           onCloseManyTabs={onCloseManyTabsStable}
@@ -4113,7 +4080,7 @@ export default function App() {
                 </ResizablePanel>
 
                 {/* Tool sidebar on RIGHT when sidebarSide === "right" (default) */}
-                {sidebarOpen && !activeWorkspace?.hibernated && sidebarSide === "right" && (
+                {sidebarOpen && sidebarSide === "right" && (
                   <>
                     <ResizableHandle />
                     <ResizablePanel
@@ -4265,11 +4232,12 @@ export default function App() {
 
           <HibernateDialog
             workspace={
-              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId) ??
+              workspaces.find((w) => w.id === hibernateFlow.pending?.workspaceId) ??
               null
             }
+            tabIds={hibernateFlow.pending?.tabIds}
             groupLabel={groupLabelOf(
-              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId)?.groupId,
+              workspaces.find((w) => w.id === hibernateFlow.pending?.workspaceId)?.groupId,
               groups,
             )}
             onClose={hibernateFlow.cancel}
@@ -4288,7 +4256,7 @@ export default function App() {
               terminalHandles.current.get(row.tabId)?.write("\x03");
             }}
             onEnableRunOnStart={(tabId, running) => {
-              const id = hibernateFlow.pendingWorkspaceId;
+              const id = hibernateFlow.pending?.workspaceId;
               if (!id) return;
               const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
               updateTabData(id, tabId, (t) =>

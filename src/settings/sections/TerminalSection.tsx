@@ -31,6 +31,11 @@ import {
   estimateTerminalBytes,
 } from "@/modules/terminal/lib/backgroundMemoryBudget";
 import {
+  autoHibernateModes,
+  AUTO_HIBERNATE_LABELS,
+  type AutoHibernate,
+} from "@/modules/workspaces/lib/autoHibernate";
+import {
   type CursorInactiveStyle,
   type CursorStyle,
   type TerminalNewFolderMode,
@@ -56,6 +61,7 @@ import {
   TERMINAL_FONT_SIZE_MIN,
   TERMINAL_LINE_HEIGHT_DEFAULT,
   TERMINAL_SCROLLBACK_PRESETS,
+  setAutoHibernate,
   setTerminalBackgroundMemoryBudget,
   setTerminalCursorBlink,
   setTerminalCursorInactiveStyle,
@@ -98,6 +104,8 @@ type ShellInfo = { name: string; path: string; integrated: boolean };
 const SHELL_AUTO = "auto";
 
 export function TerminalSection() {
+  const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
+  const hibernateModes = autoHibernateModes(import.meta.env.DEV);
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalFontWeight = usePreferencesStore((s) => s.terminalFontWeight);
@@ -562,6 +570,24 @@ export function TerminalSection() {
             checked={terminalCursorBlink}
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
+        </SettingRow>
+        <SettingRow
+          title="Auto-hibernate"
+          description="Hibernate a terminal tab after it has been out of sight for this long. It frees the terminal and its process, and a tab that held an agent resumes it when restored. Only tabs that are not visible are hibernated: none with an agent working or waiting for you, none with a script running, and none with a command that would not come back (turn on Run on start to keep it). Empty shells are hibernated too."
+        >
+          <RadioGroup
+            value={autoHibernate}
+            onValueChange={(v) => void setAutoHibernate(v as AutoHibernate)}
+          >
+            {hibernateModes.map((mode) => (
+              <div key={mode} className="flex items-center gap-2">
+                <RadioGroupItem value={mode} id={`auto-hibernate-${mode}`} />
+                <label htmlFor={`auto-hibernate-${mode}`} className="cursor-pointer text-[12px]">
+                  {AUTO_HIBERNATE_LABELS[mode]}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
         </SettingRow>
       </div>
     </div>

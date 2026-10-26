@@ -23,10 +23,11 @@ function setup() {
   const closeTabsRef = { current: closeTabs };
   const tabCallbacksRef = { current: {} as { onRenameTab?: (id: string, t?: string) => void } };
   const saveTabRef = { current: vi.fn() };
+  const toggleHibernateRef = { current: vi.fn() };
   const hook = renderHook(() =>
-    useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef }),
+    useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, toggleHibernateRef, tabCallbacksRef }),
   );
-  return { hook, workspacesRef, closeTabs, saveTabRef, tabCallbacksRef };
+  return { hook, workspacesRef, closeTabs, saveTabRef, toggleHibernateRef, tabCallbacksRef };
 }
 
 describe("useSidebarTabMenuActions", () => {
@@ -34,6 +35,12 @@ describe("useSidebarTabMenuActions", () => {
     const { hook, saveTabRef } = setup();
     hook.result.current.onSaveTab("a");
     expect(saveTabRef.current).toHaveBeenCalledWith("a");
+  });
+
+  it("toggles hibernation through the latest callback", () => {
+    const { hook, toggleHibernateRef } = setup();
+    hook.result.current.onToggleHibernate("a");
+    expect(toggleHibernateRef.current).toHaveBeenCalledWith("a");
   });
 
   it("resolves the root a relative path is measured from: pinned root, then filesystem root", () => {

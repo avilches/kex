@@ -7,10 +7,7 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 }));
 
 import {
-  activityStamps,
-  flushWorkspaceState,
   getSavedWorkspaceState,
-  saveWorkspaceState,
   initWorkspaceState,
   sanitizeTab,
   sanitizeWorkspace,
@@ -143,48 +140,13 @@ describe("initWorkspaceState", () => {
     });
   });
 
-  it("restores every saved workspace as it was, keeping hibernated ones hibernated", async () => {
-    invokeMock.mockResolvedValue({
-      workspaces: [saved("a"), { ...saved("b"), hibernated: true }, saved("c")],
-      activeIndex: 0,
-    });
+  it("restores every saved workspace as it was, keeping the hibernated tabs hibernated", async () => {
+    const sleepy = saved("b");
+    (sleepy as { paneTree: { tabs: unknown[] } }).paneTree.tabs = [{ id: "t1", kind: "terminal", hibernation: { at: 5 } }];
+    invokeMock.mockResolvedValue({ workspaces: [saved("a"), sleepy, saved("c")], activeIndex: 0 });
     await initWorkspaceState();
     const state = getSavedWorkspaceState()!;
     expect(state.activeIndex).toBe(0);
-    expect(state.workspaces.map((w) => w.hibernated)).toEqual([undefined, true, undefined]);
-  });
-});
-
-describe("activity stamps glue", () => {
-  const body = (id: string, over: Partial<Workspace> = {}): Workspace => ({
-    id,
-    title: id,
-    paneTree: { kind: "pane", id: `p-${id}`, tabs: [], activeTabId: null },
-    activePaneId: `p-${id}`,
-    ...over,
-  });
-
-  beforeEach(() => {
-    invokeMock.mockReset();
-    activityStamps.clear();
-  });
-
-  it("seeds activityStamps from the saved lastActiveAt on startup", async () => {
-    invokeMock.mockResolvedValueOnce({
-      workspaces: [body("a", { lastActiveAt: 10 }), body("b")],
-      activeIndex: 0,
-    });
-    await initWorkspaceState();
-    expect([...activityStamps]).toEqual([["a", 10]]);
-  });
-
-  it("merges the live stamps into the saved bodies", async () => {
-    invokeMock.mockResolvedValue(undefined);
-    activityStamps.set("a", 42);
-    saveWorkspaceState([body("a"), body("b")], 0);
-    await flushWorkspaceState();
-    const args = invokeMock.mock.calls.find((c) => c[0] === "window_save_workspace_state")![1];
-    expect(args.workspaces[0].lastActiveAt).toBe(42);
-    expect(args.workspaces[1].lastActiveAt).toBeUndefined();
+    expect(state.workspaces[1]!.paneTree).toMatchObject({ tabs: [{ id: "t1", hibernation: { at: 5 } }] });
   });
 });

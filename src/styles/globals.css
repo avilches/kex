@@ -412,49 +412,6 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
    * no spatial movement, so it does not trigger motion sensitivity. */
 }
 
-/* Hibernate/wake transitions. The pane overlay shares its background with the
- * empty panes below, so a tinted wash is what makes the transition visible:
- * it closes inward on hibernate and opens outward on wake. The chip layer
- * sweeps across the WorkspaceBar button in both directions. */
-@keyframes hib-iris-in { 0% { clip-path: circle(75% at 50% 50%); opacity: 1; } 100% { clip-path: circle(0% at 50% 50%); opacity: 0; } }
-@keyframes hib-iris-out { 0% { clip-path: circle(0% at 50% 50%); opacity: 1; } 100% { clip-path: circle(75% at 50% 50%); opacity: 0; } }
-@keyframes hib-item-in { 0% { opacity: 0; transform: translateY(14px) scale(0.96); filter: blur(6px); } 100% { opacity: 1; transform: none; filter: none; } }
-@keyframes hib-icon-drift { 0% { opacity: 0; transform: translateY(18px) scale(0.85); } 100% { opacity: 0.7; transform: none; } }
-@keyframes hib-chip-pop { 0% { transform: scale(1); } 25% { transform: scale(1.07); } 100% { transform: scale(1); } }
-.hib-wash { pointer-events: none; position: absolute; inset: 0; z-index: 30; background: color-mix(in srgb, var(--foreground) 9%, transparent); }
-.hib-wash-in { animation: hib-iris-in 1100ms var(--ease-premium) both; }
-.hib-wash-out { animation: hib-iris-out 1200ms var(--ease-premium) both; }
-.hib-item { animation: hib-item-in 800ms var(--ease-premium) both; }
-.hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
-.hib-chip-pop { animation: hib-chip-pop 700ms var(--ease-premium); }
-
-/* Hibernated workspace chip: a muted flat veil over the
- * normal chip. It reveals from right to left on hibernate and retracts from
- * left to right on wake, and it is the final state either way. */
-@keyframes ws-hib-in { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
-@keyframes ws-hib-out { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
-.ws-hib-look {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-color: color-mix(in srgb, var(--background) 62%, transparent);
-}
-.ws-hib-look-focused { box-shadow: inset 0 0 0 1px var(--ring); }
-.ws-hib-look-in { animation: ws-hib-in 800ms var(--ease-premium) both; }
-.ws-hib-look-out { animation: ws-hib-out 800ms var(--ease-premium) both; }
-
-/* The hibernate effects are decoration. The veil on the chip stays as the final
- * state; only its sweep and every other movement or wash go away. */
-@media (prefers-reduced-motion: reduce) {
-  .hib-wash { display: none; }
-  .hib-item,
-  .hib-ov-icon,
-  .hib-chip-pop,
-  .ws-hib-look-in,
-  .ws-hib-look-out { animation: none; }
-}
-
 /* Blinking block of the "cursor" spinner style (components/ui/spinner.tsx). */
 @keyframes kex-spinner-blink {
   0%,

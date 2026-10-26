@@ -24,7 +24,7 @@ export function AgentIntegrations() {
         <Benefit
           icon={Refresh01Icon}
           title="Sessions survive"
-          text="Undo a closed tab or hibernate a workspace without losing your session."
+          text="Undo a closed tab or hibernate one without losing your session."
         />
       </div>
       <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border/60 bg-card/60">

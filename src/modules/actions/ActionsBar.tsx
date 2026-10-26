@@ -542,7 +542,7 @@ function AddActionMenu({ onAdd, reveal, dragging }: { onAdd: () => void; reveal:
 }
 
 type BarProps = {
-  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction" | "hibernated"> | null;
+  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
   controller: BarController;
   onConfigure: () => void;
   onAddAction: () => void;

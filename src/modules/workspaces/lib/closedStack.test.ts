@@ -74,28 +74,11 @@ describe("pickReopen", () => {
     expect(out.remaining).toEqual([]);
   });
 
-  it("skips a hibernated entry, keeps it, and reopens the next one", () => {
-    const hib = tabEntry("t2", "w1", "p1");
-    const awake = tabEntry("t1", "w2", "p3");
-    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
-    const out = pickReopen([hib, awake], workspaces);
-    expect(out.picked).toEqual({ kind: "tab", entry: awake, workspaceId: "w2", paneId: "p3" });
-    expect(out.remaining).toEqual([hib]);
-  });
-
-  it("keeps hibernated entries and picks nothing when all are hibernated", () => {
-    const e = tabEntry("t1", "w1", "p1");
-    const out = pickReopen([e], [{ ...makeWs("w1", "p1"), hibernated: true }]);
-    expect(out.picked).toBeNull();
-    expect(out.remaining).toEqual([e]);
-  });
-
-  it("picks the kept entry first once its workspace wakes up", () => {
-    const hib = tabEntry("t2", "w1", "p1");
-    const older = tabEntry("t1", "w2", "p3");
-    const first = pickReopen([hib, older], [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")]);
-    const second = pickReopen(first.remaining, [makeWs("w1", "p1"), makeWs("w2", "p3")]);
-    expect(second.picked).toMatchObject({ entry: hib });
+  it("reopens a tab that was hibernated when it closed like any other entry", () => {
+    const e = { ...tabEntry("t2", "w1", "p1"), tab: { ...term("t2"), hibernation: { at: 1 } } as Tab };
+    const out = pickReopen([e], [makeWs("w1", "p1")]);
+    expect(out.picked).toEqual({ kind: "tab", entry: e, workspaceId: "w1", paneId: "p1" });
+    expect(out.remaining).toEqual([]);
   });
 
   it("returns nothing for an empty stack", () => {
@@ -254,15 +237,16 @@ describe("reviveWorkspace", () => {
     expect(out[2]).toMatchObject({ floating: false });
   });
 
-  it("keeps the terminal ids of a hibernated workspace, whose stored sessions are indexed by them", () => {
-    const tabs: Tab[] = [term("a"), { id: "e", kind: "editor", path: "/f", dirty: false, preview: false }];
-    const ws = { ...makeWs("w1", "p1", tabs), hibernated: true };
-    const { workspace, idMap } = reviveWorkspace(ws, counter());
+  it("keeps the id and the sleep of a hibernated terminal, whose stored session is indexed by it", () => {
+    const sleeping: Tab = { id: "a", kind: "terminal", hibernation: { at: 5, agent: "claude" } };
+    const tabs: Tab[] = [sleeping, term("b"), { id: "e", kind: "editor", path: "/f", dirty: false, preview: false }];
+    const { workspace, idMap } = reviveWorkspace(makeWs("w1", "p1", tabs), counter());
     const out = allPanes(workspace.paneTree)[0]!.tabs;
-    expect(out[0]!.id).toBe("a");
+    expect(out[0]).toEqual(sleeping);
     expect(out[1]!.id).toBe("new-1");
+    expect(out[2]!.id).toBe("new-2");
     expect(idMap.get("a")).toBe("a");
-    expect(workspace.hibernated).toBe(true);
+    expect(idMap.get("b")).toBe("new-1");
   });
 
   it("does not mutate the original", () => {
@@ -303,6 +287,11 @@ describe("buildReopenedTab", () => {
   it("unlocks a reopened terminal tab but keeps everything else", () => {
     const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
     expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
+  });
+
+  it("reopens a hibernated terminal awake, with its new id", () => {
+    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", hibernation: { at: 1, agent: "claude", command: "claude --resume", title: "x" } };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false });
   });
 
   it("unlocks a reopened git-diff tab and drops its preview state", () => {

@@ -33,7 +33,6 @@ const sources = (over: Partial<TabSources> = {}): TabSources => ({
   agentSessionOf: () => undefined,
   visualOf: () => null,
   lastUsed: () => 0,
-  workspaceActiveAt: () => 0,
   ...over,
 });
 
@@ -90,9 +89,7 @@ describe("buildTabEntries", () => {
 
   it("falls back to the hibernation snapshot for a sleeping terminal", () => {
     const list = [
-      workspace("ws-1", "One", [term("tab-1", { hibernation: { agent: "claude", command: "npm test" } })], {
-        hibernated: true,
-      }),
+      workspace("ws-1", "One", [term("tab-1", { hibernation: { at: 1, agent: "claude", command: "npm test" } })]),
     ];
     const [e] = buildTabEntries(list, sources());
     expect(e.hibernated).toBe(true);
@@ -149,13 +146,13 @@ describe("buildTabEntries", () => {
     expect(wb.color).toBeNull();
   });
 
-  it("carries last use, indicator and workspace activity", () => {
+  it("carries last use and indicator", () => {
     const list = [workspace("ws-1", "One", [term("tab-1")])];
     const [e] = buildTabEntries(
       list,
-      sources({ lastUsed: () => 50, visualOf: () => "working", workspaceActiveAt: () => 70 }),
+      sources({ lastUsed: () => 50, visualOf: () => "working" }),
     );
-    expect([e.lastUsedAt, e.indicator, e.workspaceActiveAt]).toEqual([50, "working", 70]);
+    expect([e.lastUsedAt, e.indicator]).toEqual([50, "working"]);
   });
 
   it("carries the live tab, its agent session and whether it is running", () => {
@@ -180,15 +177,9 @@ describe("buildWorkspaceEntries", () => {
     const list = [workspace("ws-1", "One", [term("tab-1"), term("tab-2")], { color: "#fff" })];
     const [w] = buildWorkspaceEntries(
       list,
-      sources({ lastUsed: (id) => (id === "tab-2" ? 90 : 10), workspaceActiveAt: () => 40 }),
+      sources({ lastUsed: (id) => (id === "tab-2" ? 90 : 10) }),
     );
     expect(w).toMatchObject({ workspaceId: "ws-1", title: "One", color: "#fff", tabCount: 2, lastUsedAt: 90 });
-  });
-
-  it("falls back to the workspace activity when no tab was ever used", () => {
-    const list = [workspace("ws-1", "One", [term("tab-1")])];
-    const [w] = buildWorkspaceEntries(list, sources({ workspaceActiveAt: () => 40 }));
-    expect(w.lastUsedAt).toBe(40);
   });
 
   it("resolves the title through the sources instead of showing the raw template", () => {

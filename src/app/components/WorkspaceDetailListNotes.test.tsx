@@ -34,6 +34,7 @@ function mount(visibleTabIds: string, tabs: Tab[] = baseTabs) {
     onRenameTab: () => {},
     onUpdateTab,
     onSaveTab: () => {},
+    onToggleHibernate: () => {},
     onRevealInExplorer: () => {},
     workspaceRoot: () => null,
   };

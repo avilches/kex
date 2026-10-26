@@ -101,7 +101,7 @@ export function TabItem({
       {entry.hibernated ? (
         <span
           role="img"
-          aria-label="Workspace is hibernated"
+          aria-label="Tab is hibernated"
           className="shrink-0"
         >
           <HugeiconsIcon

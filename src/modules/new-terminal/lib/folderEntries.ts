@@ -52,7 +52,6 @@ export type FolderRow = {
   // or on the repository heading while the focus is elsewhere.
   repoHint: RepoHint | null;
   workspaceId: string;
-  hibernated: boolean;
 };
 
 export type FolderGroup = {
@@ -61,7 +60,6 @@ export type FolderGroup = {
   workspaceColor: string | null;
   workspaceIcon: string | null;
   active: boolean;
-  hibernated: boolean;
   rows: FolderRow[];
 };
 
@@ -165,7 +163,6 @@ function rowOf(
   b: Builder,
   path: string,
   workspaceId: string,
-  hibernated: boolean,
   label: FolderRowLabel | null,
   extras: Partial<RowExtras> = {},
 ): FolderRow {
@@ -191,7 +188,6 @@ function rowOf(
     nested: extras.nested ?? false,
     repoHint: null,
     workspaceId,
-    hibernated,
   };
 }
 
@@ -323,14 +319,13 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       workspaceColor: e ? e.color : resolveWorkspaceColor(ws.color, ws.id),
       workspaceIcon: e?.icon ?? ws.icon ?? null,
       active,
-      hibernated: !!ws.hibernated,
     };
   };
   const rootOf = (ws: Workspace) => ws.workspaceRoot ?? ws.fsRoot ?? null;
   const looseOf = (ws: Workspace): FolderRow[] => {
     const rows: FolderRow[] = [];
     for (const e of byWorkspace.get(ws.id) ?? []) {
-      pushUnique(b, rows, rowOf(b, e.cwd, e.workspaceId, e.hibernated, null));
+      pushUnique(b, rows, rowOf(b, e.cwd, e.workspaceId, null));
     }
     return rows;
   };
@@ -338,12 +333,11 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   const raws: RawGroup[] = [];
   const activeWs = input.workspaces.find((w) => w.id === input.activeWorkspaceId);
   if (activeWs) {
-    const sleeping = !!activeWs.hibernated;
     const pinned: FolderRow[] = [];
     const currentRows: FolderRow[] = [];
     const cwd = input.activeTabEntry?.cwd;
     if (cwd) {
-      pushUnique(b, currentRows, rowOf(b, cwd, activeWs.id, sleeping, "Current tab"));
+      pushUnique(b, currentRows, rowOf(b, cwd, activeWs.id, "Current tab"));
     }
     // A folder that is several of these at once is one row carrying all its labels and keys.
     const addFixed = (
@@ -354,7 +348,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     ) => {
       const same = [...currentRows, ...pinned].find((r) => r.path === path);
       if (!same) {
-        pinned.push(rowOf(b, path, activeWs.id, sleeping, label, { pinned: true, slot, ...extras }));
+        pinned.push(rowOf(b, path, activeWs.id, label, { pinned: true, slot, ...extras }));
         return;
       }
       same.labels.push(label);
@@ -389,7 +383,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const rootPath = rootOf(ws);
     const rootRows: FolderRow[] = [];
     if (rootPath) {
-      pushUnique(b, rootRows, rowOf(b, rootPath, ws.id, !!ws.hibernated, "Workspace Root"));
+      pushUnique(b, rootRows, rowOf(b, rootPath, ws.id, "Workspace Root"));
     }
     const loose = looseOf(ws);
     if (rootRows.length + loose.length === 0) continue;
@@ -405,7 +399,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     const added = missingWorktrees(b, key)
       .filter((w) => only === null || w.path === only)
       .map((w) =>
-        rowOf(b, w.path, workspaceId, raw.head.hibernated, w.isMain ? "Main checkout" : null, {
+        rowOf(b, w.path, workspaceId, w.isMain ? "Main checkout" : null, {
           branch: w.branch,
           repoKey: key,
           nested: true,

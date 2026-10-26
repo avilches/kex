@@ -4,11 +4,10 @@ import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
+import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
@@ -22,6 +21,7 @@ import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { type Tab, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -134,17 +134,6 @@ function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   );
 }
 
-function RestoreWorkspaceItem({ onWake }: { onWake: () => void }) {
-  const label = useShortcutLabel("workspace.hibernate");
-  return (
-    <ContextMenuItem onSelect={onWake}>
-      <HugeiconsIcon icon={UploadCircle01Icon} size={14} strokeWidth={2} />
-      Restore Workspace
-      {label && <ContextMenuShortcut>{label}</ContextMenuShortcut>}
-    </ContextMenuItem>
-  );
-}
-
 function DetailTabMenu({
   tab,
   workspaceId,
@@ -180,7 +169,6 @@ function DetailTabRow({
   color,
   prevTabId,
   insertSide,
-  hibernated,
   onActivate,
   onWake,
   onNoteHover,
@@ -195,7 +183,6 @@ function DetailTabRow({
   color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
-  hibernated: boolean;
   onActivate: (tabId: string) => void;
   onWake?: () => void;
   onNoteHover: (tabId: string, hovering: boolean) => void;
@@ -205,10 +192,10 @@ function DetailTabRow({
   const title = info?.displayTitle ?? tab.id;
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
-  // A sleeping tab can only be looked at: the workspace has to be restored before anything else.
-  const isLocked = !hibernated && (tab.locked ?? false);
+  const hibernated = isHibernatedTab(tab);
+  const isLocked = tab.locked ?? false;
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
-  const hasNote = !hibernated && tab.note !== undefined;
+  const hasNote = tab.note !== undefined;
   const tooltip = useTabTooltip(tab, info?.agentSession);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const sidebarGit = useSidebarGit();
@@ -221,12 +208,11 @@ function DetailTabRow({
     [sidebarGit, workspaceId, tab, resolvedMode],
   );
   const solidChip = focused && color !== null;
-  const showAutofocus = !hibernated && isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
+  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
     data: { type: "tab" },
-    disabled: hibernated,
   });
 
   const tabDragActive = useWorkspaceDnd().draggingItem?.kind === "tab";
@@ -237,7 +223,7 @@ function DetailTabRow({
   const { setNodeRef: setDropRef } = useDroppable({
     id: `${SIDE_ROW_DROP_PREFIX}${tab.id}`,
     data: dropData,
-    disabled: !tabDragActive || hibernated,
+    disabled: !tabDragActive,
   });
 
   const rowRef = useRef<HTMLButtonElement | null>(null);
@@ -283,11 +269,12 @@ function DetailTabRow({
               onPointerEnter={tooltip.onPointerEnter}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
+              onDoubleClick={hibernated ? onWake : undefined}
               onMouseDown={(e) => {
                 if (e.button === 1) e.preventDefault();
               }}
               onAuxClick={(e) => {
-                if (e.button === 1 && !hibernated) {
+                if (e.button === 1) {
                   e.stopPropagation();
                   onClose(tab.id);
                 }
@@ -338,6 +325,9 @@ function DetailTabRow({
               >
                 {title}
               </span>
+              {hibernated && (
+                <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} className="shrink-0 opacity-60" />
+              )}
               {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
                 <span className="shrink-0 text-[9px] text-primary">●</span>
               )}
@@ -356,11 +346,7 @@ function DetailTabRow({
             if (useTabRenameStore.getState().renamingTabId !== tab.id) rowRef.current?.focus();
           }}
         >
-          {hibernated ? (
-            onWake && <RestoreWorkspaceItem onWake={onWake} />
-          ) : (
-            <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
-          )}
+          <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
@@ -402,7 +388,7 @@ function DetailTabRow({
         >
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
-      ) : hibernated ? null : (
+            ) : (
         <>
           {visual !== null && (
             <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
@@ -432,7 +418,6 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   focusedTabId,
   color = null,
   visibleTabIds = "",
-  hibernated = false,
   onActivate,
   onWake,
 }: {
@@ -443,9 +428,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   focusedTabId: string | null;
   color?: string | null;
   visibleTabIds?: string;
-  hibernated?: boolean;
   onActivate: (tabId: string) => void;
-  onWake?: () => void;
+  onWake?: (tabId: string) => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
   const rows = useMemo(() => {
@@ -538,7 +522,6 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               "group/block",
               subs.length > 0 && "rounded-md",
               subs.length > 0 && !focused && "hover:bg-foreground/[0.08]",
-              hibernated && "opacity-40",
             )}
             style={grouped ? focusChipStyle(chipColor) : undefined}
           >
@@ -552,9 +535,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               color={chipColor}
               prevTabId={rows[i - 1]?.tabId ?? null}
               insertSide={insert?.tabId === row.tabId ? insert.side : null}
-              hibernated={hibernated}
               onActivate={onActivate}
-              onWake={onWake}
+              onWake={onWake ? () => onWake(row.tabId) : undefined}
               onNoteHover={handleNoteHover}
               onNoteToggle={handleNoteToggle}
             />

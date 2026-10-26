@@ -3,12 +3,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  autoHibernateModes,
-  AUTO_HIBERNATE_LABELS,
-  type AutoHibernate,
-} from "@/modules/workspaces/lib/autoHibernate";
-import {
-  setAutoHibernate,
   setRandomWorkspaceColor,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
@@ -25,8 +19,6 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
-  const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
-  const modes = autoHibernateModes(import.meta.env.DEV);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
@@ -50,24 +42,6 @@ export function WorkspacesSection() {
       <SectionHeader title="Workspaces" />
 
       <div className="flex flex-col gap-2">
-        <SettingRow
-          title="Auto-hibernate"
-          description="Hibernate a workspace after it has been inactive for this long. Only workspaces without activity are hibernated: not the one you are in, none with an agent working or a script running, and only when every command in them has Run on start enabled, so nothing is lost. Unsaved documents are saved first; if saving fails, the workspace is not hibernated."
-        >
-          <RadioGroup
-            value={autoHibernate}
-            onValueChange={(v) => void setAutoHibernate(v as AutoHibernate)}
-          >
-            {modes.map((mode) => (
-              <div key={mode} className="flex items-center gap-2">
-                <RadioGroupItem value={mode} id={`auto-hibernate-${mode}`} />
-                <label htmlFor={`auto-hibernate-${mode}`} className="cursor-pointer text-[12px]">
-                  {AUTO_HIBERNATE_LABELS[mode]}
-                </label>
-              </div>
-            ))}
-          </RadioGroup>
-        </SettingRow>
         <SettingRow
           title="Set a random color to new workspaces"
           description="Assign a color automatically when a new workspace is created."

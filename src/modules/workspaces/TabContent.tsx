@@ -25,6 +25,8 @@ import {
   setEditorViewForExt,
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { HibernatedTab } from "./HibernatedTab";
+import { isHibernatedTab } from "./lib/hibernate";
 import type { Tab } from "./lib/types";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
@@ -105,6 +107,8 @@ export type TabCallbacks = {
   // Git history callbacks
   onOpenCommitFile?: (input: CommitFileDiffOpenInput) => void;
   onGitHistorySearchHandle?: (tabId: string, handle: GitHistorySearchHandle | null) => void;
+  // Wakes a hibernated terminal tab
+  onWakeTab?: (tabId: string) => void;
   // Tab rename
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   // Tab data update (used by tab bar lock/restore toggles)
@@ -243,6 +247,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
             onAddToGitignore={callbacks.onAddToGitignore}
           />
           <div className="relative min-h-0 flex-1">
+            {isHibernatedTab(tab) ? (
+              <HibernatedTab tab={tab} visible={visible} onWake={() => callbacks.onWakeTab?.(tab.id)} />
+            ) : (
             <TerminalPane
               ref={(h) => {
                 (terminalRef as React.MutableRefObject<TerminalPaneHandle | null>).current = h;
@@ -264,6 +271,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
               onRunningCommand={callbacks.onRunningCommand}
               onScratchpadEnabled={callbacks.onScratchpadEnabled}
             />
+            )}
           </div>
         </div>
       );

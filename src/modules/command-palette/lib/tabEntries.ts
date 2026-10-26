@@ -1,4 +1,5 @@
 import type { AgentSession } from "@/modules/agents/lib/types";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
@@ -15,7 +16,6 @@ export type TabSources = {
   agentSessionOf(tabId: string): AgentSession | undefined;
   visualOf(tabId: string): AgentEntryVisual | null;
   lastUsed(tabId: string): number;
-  workspaceActiveAt(workspaceId: string): number;
 };
 
 export type TabEntry = {
@@ -24,6 +24,7 @@ export type TabEntry = {
   workspaceTitle: string;
   workspaceColor: string | null;
   workspaceIcon: string | null;
+  // The terminal behind the tab is asleep.
   hibernated: boolean;
   kind: Tab["kind"];
   title: string;
@@ -44,7 +45,6 @@ export type TabEntry = {
   agentSession: AgentSession | undefined;
   running: boolean;
   lastUsedAt: number;
-  workspaceActiveAt: number;
   order: number;
 };
 
@@ -53,7 +53,6 @@ export type WorkspaceEntry = {
   title: string;
   color: string | null;
   icon: string | null;
-  hibernated: boolean;
   tabCount: number;
   lastUsedAt: number;
 };
@@ -76,7 +75,6 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
   const out: TabEntry[] = [];
   let order = 0;
   for (const ws of workspaces) {
-    const workspaceActiveAt = src.workspaceActiveAt(ws.id);
     const workspaceTitle = src.workspaceTitle(ws);
     for (const pane of allPanes(ws.paneTree)) {
       for (const tab of pane.tabs) {
@@ -89,7 +87,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           workspaceTitle,
           workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
           workspaceIcon: ws.icon ?? null,
-          hibernated: !!ws.hibernated,
+          hibernated: isHibernatedTab(tab),
           kind: tab.kind,
           title: src.displayTitle(tab),
           note: tab.note?.trim() ? tab.note : null,
@@ -105,7 +103,6 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           agentSession: src.agentSessionOf(tab.id),
           running: !!src.runningCommand(tab.id),
           lastUsedAt: src.lastUsed(tab.id),
-          workspaceActiveAt,
           order: order++,
         });
       }
@@ -123,9 +120,8 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
       title: src.workspaceTitle(ws),
       color: resolveWorkspaceColor(ws.color, ws.id),
       icon: ws.icon ?? null,
-      hibernated: !!ws.hibernated,
       tabCount: tabs.length,
-      lastUsedAt: newestTab || src.workspaceActiveAt(ws.id),
+      lastUsedAt: newestTab,
     };
   });
 }

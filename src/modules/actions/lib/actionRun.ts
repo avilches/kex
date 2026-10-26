@@ -8,7 +8,7 @@ import {
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
-import { agentCommandProblem, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
+import { agentCommandProblem, dependsOnFocusedTab, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -24,9 +24,12 @@ export type LinkedTab = {
   /** The user is running a command of their own there. */
   foreignCommand: boolean;
   cwd: string | undefined;
+  /** The tab is asleep: "empty" came back as a bare shell, "busy" would come back running something. */
+  sleeping: "empty" | "busy" | null;
 };
 
 export type RunContext = {
+  /** The focused tab is asleep, so what depends on it has nothing to read. */
   hibernated: boolean;
   shell: ScriptShell;
   /** Raw values for the command variables ({cwd}, {workspace}, {filepath}...); "" means no value. */
@@ -48,7 +51,7 @@ export type RunPlan =
   | { kind: "blocked"; reason: string; silent?: boolean }
   | { kind: "spawn-app"; argv: string[] }
   | { kind: "already-running"; tabId: string }
-  | { kind: "reuse-tab"; tabId: string; input: string }
+  | { kind: "reuse-tab"; tabId: string; input: string; wake: boolean }
   | { kind: "new-agent-tab"; input: string; cwd: string | undefined; title: string }
   | {
       kind: "new-tab";
@@ -122,8 +125,9 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
   // when the folder it would get is the one the tab has; otherwise the terminal is born
   // in the folder, with no `cd` line typed at all.
   const sameFolder = link?.exists && equalFolder(link.cwd, cwd);
-  if (sameFolder && link.terminal && !link.foreignCommand) {
-    return { kind: "reuse-tab", tabId: link.tabId, input };
+  // A sleeping tab that would wake into a command of its own is not free to type in.
+  if (sameFolder && link.terminal && !link.foreignCommand && link.sleeping !== "busy") {
+    return { kind: "reuse-tab", tabId: link.tabId, input, wake: link.sleeping === "empty" };
   }
   return { kind: "new-tab", placement: newTabPlacement(ctx), input, cwd, title: label(action) };
 }
@@ -153,7 +157,7 @@ function planAgent(action: Action, ctx: RunContext): RunPlan {
  * tab never keeps it from running. An app is spawned and needs no tab.
  */
 export function planActionRun(action: Action, ctx: RunContext): RunPlan {
-  if (ctx.hibernated) return { kind: "blocked", reason: "", silent: true };
+  if (ctx.hibernated && dependsOnFocusedTab(action)) return { kind: "blocked", reason: "", silent: true };
   if (action.command.trim() === "") return blocked(action, "it has no command");
   if (isAgent(action)) return planAgent(action, ctx);
   return isScript(action) ? planScript(action, ctx) : planApp(action, ctx);

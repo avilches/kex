@@ -127,15 +127,15 @@ describe("palette catalog", () => {
 
   it("runs the app handler of a generated shortcut row", () => {
     const handler = vi.fn();
-    const row = createCommandItems(ctx({ shortcutHandlers: { "workspace.hibernate": handler } })).find(
-      (i) => i.shortcutId === "workspace.hibernate",
+    const row = createCommandItems(ctx({ shortcutHandlers: { "tab.hibernate": handler } })).find(
+      (i) => i.shortcutId === "tab.hibernate",
     );
     row?.run();
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("disables a generated row with no handler", () => {
-    const row = items.find((i) => i.shortcutId === "workspace.hibernate");
+    const row = items.find((i) => i.shortcutId === "tab.hibernate");
     expect(row?.disabledReason).toBeTruthy();
   });
 
@@ -216,30 +216,30 @@ describe("palette catalog", () => {
   });
 });
 
-describe("createCommandItems while the workspace is hibernated", () => {
+describe("createCommandItems while the focused tab is hibernated", () => {
   const byId = (hibernated: boolean, over: Partial<CommandPaletteActionContext> = {}) =>
     new Map(createCommandItems(ctx({ hibernated, ...over })).map((i) => [i.id, i]));
 
-  it("disables every command that acts on tabs, panes, git or the Sidebar", () => {
+  it("disables the commands that act on a live terminal", () => {
     const items = byId(true);
-    for (const id of ["tab.new", "tab.newBrowser", "tab.close", "terminal.clear", "pane.splitRight", "pane.splitDown", "git.graph", "git.source", "search.focus", "explorer.search", "sidebar.toggle", "history.open", "search.content", "workspace.runScripts"]) {
-      expect(items.get(id)?.disabledReason, id).toBe("Workspace hibernated");
+    for (const id of ["terminal.clear", "search.focus", "history.open"]) {
+      expect(items.get(id)?.disabledReason, id).toBe("Tab hibernated");
     }
   });
 
   it("also disables the generated rows of blocked shortcuts", () => {
-    const items = byId(true, { shortcutHandlers: { "tab.rename": vi.fn() } });
-    expect(items.get("tab.rename")?.disabledReason).toBe("Workspace hibernated");
+    const items = byId(true, { shortcutHandlers: { "terminal.scratchpad": vi.fn() } });
+    expect(items.get("terminal.scratchpad")?.disabledReason).toBe("Tab hibernated");
   });
 
-  it("leaves settings, new workspace, new window and workspace properties usable", () => {
+  it("leaves everything that does not act on a live terminal usable", () => {
     const items = byId(true);
-    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "tab.reopenClosed", "settings.section.general"]) {
+    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "tab.reopenClosed", "settings.section.general", "tab.new", "tab.close", "pane.splitRight", "sidebar.toggle", "git.graph"]) {
       expect(items.get(id)?.disabledReason, id).toBeUndefined();
     }
   });
 
-  it("changes nothing for an awake workspace", () => {
+  it("changes nothing for an awake tab", () => {
     expect(byId(false).get("tab.new")?.disabledReason).toBeUndefined();
   });
 });

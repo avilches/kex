@@ -42,7 +42,6 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   agentSession: over.agentSession ?? undefined,
   running: over.running ?? false,
   lastUsedAt: over.lastUsedAt ?? 0,
-  workspaceActiveAt: over.workspaceActiveAt ?? 0,
   order: over.order ?? 0,
 });
 
@@ -171,19 +170,6 @@ describe("buildFolderGroups", () => {
       entries: [entry({ workspaceId: "ws-1", cwd: "/dotfiles" })],
     });
     expect(groups.map((g) => g.workspaceId)).toEqual(["ws-1"]);
-  });
-
-  it("keeps hibernated workspaces with their tag", () => {
-    const sleeping = ws({ id: "ws-4", title: "Sleeping", workspaceRoot: "/sleep", hibernated: true });
-    const groups = build({
-      workspaces: [active, sleeping],
-      entries: [entry({ workspaceId: "ws-4", cwd: "/sleep/sub", hibernated: true })],
-    });
-    expect(groups[1].hibernated).toBe(true);
-    expect(groups[1].rows.map((r) => [r.labels[0] ?? null, r.hibernated])).toEqual([
-      ["Workspace Root", true],
-      [null, true],
-    ]);
   });
 
   it("drops browser tabs, which carry no folder", () => {
@@ -668,8 +654,8 @@ describe("filterFolderGroups", () => {
     const shown = build({
       workspaces: [active, other],
       workspaceEntries: [
-        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, hibernated: false, tabCount: 1, lastUsedAt: 0 },
-        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, hibernated: false, tabCount: 1, lastUsedAt: 0 },
+        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, tabCount: 1, lastUsedAt: 0 },
+        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, tabCount: 1, lastUsedAt: 0 },
       ],
       home: "/Users/a",
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
@@ -747,7 +733,6 @@ describe("resolved workspace identity", () => {
     title: "Kex",
     color: null,
     icon: null,
-    hibernated: false,
     tabCount: 1,
     lastUsedAt: 0,
     ...over,
@@ -755,12 +740,12 @@ describe("resolved workspace identity", () => {
 
   it("titles a group with the expanded template, not the raw one", () => {
     const raw = ws({ id: "ws-1", title: "{repo} | {tab}", workspaceRoot: "/repo" });
-    const blank = ws({ id: "ws-2", title: "", workspaceRoot: "/sleep", hibernated: true });
+    const blank = ws({ id: "ws-2", title: "", workspaceRoot: "/sleep" });
     const groups = build({
       workspaces: [raw, blank],
       workspaceEntries: [
         wsEntry({ workspaceId: "ws-1", title: "Kex | zsh", icon: "Folder01Icon", color: "#4f8fff" }),
-        wsEntry({ workspaceId: "ws-2", title: "~/sleep", hibernated: true }),
+        wsEntry({ workspaceId: "ws-2", title: "~/sleep" }),
       ],
     });
     expect(groups.map((g) => g.workspaceTitle)).toEqual(["Kex | zsh", "~/sleep"]);

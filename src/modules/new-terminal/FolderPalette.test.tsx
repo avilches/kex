@@ -29,7 +29,6 @@ const row = (over: RowOver = {}): FolderRow => ({
   repoHint: over.repoHint ?? null,
   matchOffset: over.matchOffset ?? 0,
   workspaceId: over.workspaceId ?? "ws-1",
-  hibernated: over.hibernated ?? false,
 });
 
 const group = (over: Partial<FolderGroup> = {}): FolderGroup => ({
@@ -38,7 +37,6 @@ const group = (over: Partial<FolderGroup> = {}): FolderGroup => ({
   workspaceColor: over.workspaceColor ?? null,
   workspaceIcon: over.workspaceIcon ?? null,
   active: over.active ?? false,
-  hibernated: over.hibernated ?? false,
   rows: over.rows ?? [],
 });
 
@@ -166,29 +164,6 @@ describe("FolderPalette", () => {
     expect(visible).toHaveLength(1);
     expect(visible[0].textContent).toContain("/dotfiles");
     expect(visible[0].textContent).not.toContain("worktrees");
-  });
-
-  it("marks a hibernated workspace in its heading and leaves its rows undimmed", async () => {
-    render(
-      createElement(FolderPalette, {
-        open: true,
-        onOpenChange: vi.fn(),
-        restoreFocus: vi.fn(),
-        groups: [
-          group({
-            workspaceId: "ws-3",
-            workspaceTitle: "Sleepy",
-            hibernated: true,
-            rows: [row({ workspaceId: "ws-3", path: "/sleepy", hibernated: true })],
-          }),
-        ],
-        onPick: vi.fn(),
-        onToggleWorktrees: vi.fn(),
-      }),
-    );
-    await settle();
-    expect(document.querySelector('[aria-label="Workspace is hibernated"]')).not.toBeNull();
-    expect(itemEls()[0].className).not.toContain("opacity-60");
   });
 
   it("shows the branch after the folder and only the label on the right", async () => {

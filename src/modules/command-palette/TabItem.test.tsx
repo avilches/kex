@@ -29,7 +29,6 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   agentSession: undefined,
   running: false,
   lastUsedAt: 0,
-  workspaceActiveAt: 0,
   order: 0,
   ...over,
 });
@@ -90,7 +89,7 @@ describe("TabItem", () => {
 
   it("marks a hibernated tab", () => {
     row(entry({ hibernated: true }));
-    expect(screen.getByLabelText("Workspace is hibernated")).toBeTruthy();
+    expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
   });
 
   it("shows the absolute path on the second line", () => {

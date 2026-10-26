@@ -19,7 +19,7 @@ import {
   subscribeToRunningCommands,
   subscribeToScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
+import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, tabsReview, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import type { RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { allPanes, focusedTab } from "@/modules/workspaces/lib/splitNode";
@@ -60,6 +60,8 @@ function CommandOnly({ command }: { command: string }) {
 
 type Props = {
   workspace: Workspace | null;
+  // "hibernate" mode: the tabs about to sleep; the rest of the workspace is not reviewed.
+  tabIds?: string[];
   groupLabel?: string;
   // "close" reuses the hibernate review to warn about what closing destroys.
   mode?: "hibernate" | "close";
@@ -73,23 +75,26 @@ type Props = {
   onStopBusy: (row: BusyRow) => void;
 };
 
-export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", processes = [], onClose, onHibernate, onSaveTab, onGoToTab, onEnableRunOnStart, onStopBusy }: Props) {
+export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hibernate", processes = [], onClose, onHibernate, onSaveTab, onGoToTab, onEnableRunOnStart, onStopBusy }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const scriptStates = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
   const globalActionList = usePreferencesStore((s) => s.actions);
-  const review = useMemo(
-    () =>
-      workspace
-        ? hibernateReview(workspace, {
-            agentOf: (id) => liveAgent(sessions[id]),
-            runningCommand: (id) => commands.get(id),
-            scriptState: (id) => scriptStates.get(id),
-            actionOf: (id) => scriptActionOf(id, [workspace.actions ?? [], globalActionList]),
-          })
-        : null,
-    [workspace, sessions, commands, scriptStates, globalActionList],
-  );
+  const review = useMemo(() => {
+    if (!workspace) return null;
+    const live = {
+      agentOf: (id: string) => liveAgent(sessions[id]),
+      runningCommand: (id: string) => commands.get(id),
+      scriptState: (id: string) => scriptStates.get(id),
+      actionOf: (id: string) => scriptActionOf(id, [workspace.actions ?? [], globalActionList]),
+    };
+    if (mode === "close") return hibernateReview(workspace, live);
+    const wanted = new Set(tabIds);
+    return tabsReview(
+      allPanes(workspace.paneTree).flatMap((p) => p.tabs).filter((t) => wanted.has(t.id)),
+      live,
+    );
+  }, [workspace, tabIds, mode, sessions, commands, scriptStates, globalActionList]);
 
   const closing = mode === "close";
   const [failures, setFailures] = useState<Record<string, string>>({});
@@ -112,8 +117,6 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   };
   const blockedByFailure = isBlockedByFailures(review?.docs ?? [], failures, discarded);
   const deletedScripts = workspace ? actionsToDelete(workspace) : 0;
-  // A hibernated workspace has no mounted editors, so there is nothing to save through.
-  const canSave = !workspace?.hibernated;
   const agents = review?.busy.filter((b) => b.kind === "agent") ?? [];
   const scripts = review?.busy.filter((b) => b.kind === "script") ?? [];
   const onlyAgentsPending =
@@ -143,7 +146,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
       <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
         <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
           <AlertDialogTitle className="flex items-center gap-2">
-            {closing ? "Close workspace?" : "Hibernate workspace?"}
+            {closing ? "Close workspace?" : tabIds && tabIds.length === 1 ? "Hibernate tab?" : "Hibernate tabs?"}
           </AlertDialogTitle>
           <div className="flex w-full min-w-0 items-center gap-2 text-sm font-medium">
             {titleWs && (
@@ -179,7 +182,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                     <Button
                       size="sm"
                       variant="outline"
-                      title="Run this agent again when the workspace is restored"
+                      title="Run this agent again when the tab is restored"
                       onClick={() => onEnableRunOnStart(b.tabId, commands.get(b.tabId))}
                     >
                       Run on start
@@ -189,7 +192,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                     <Button
                       size="sm"
                       variant="outline"
-                      title="Interrupt this agent so the workspace can hibernate now"
+                      title="Interrupt this agent so it can hibernate now"
                       onClick={() => onStopBusy(b)}
                     >
                       Kill
@@ -201,7 +204,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             </div>
             {!closing && onlyAgentsPending && (
               <p className="text-[12px] text-muted-foreground">
-                The workspace will hibernate as soon as they are done.
+                {tabIds && tabIds.length === 1 ? "The tab" : "The tabs"} will hibernate as soon as the agents are done.
               </p>
             )}
           </section>
@@ -266,11 +269,9 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                         )}
                       </span>
                     ) : (
-                      canSave && (
-                        <Button size="sm" variant="outline" className="shrink-0" title="Save this document" onClick={() => void saveDocs([d.tabId])}>
-                          Save
-                        </Button>
-                      )
+                      <Button size="sm" variant="outline" className="shrink-0" title="Save this document" onClick={() => void saveDocs([d.tabId])}>
+                        Save
+                      </Button>
                     )}
                   </div>
                   {failure !== undefined && !isDiscarded && (
@@ -279,7 +280,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                 </div>
               );
             })}
-            {canSave && review.docs.length > 2 && (
+            {review.docs.length > 2 && (
               <Button
                 size="sm"
                 className="self-end"
@@ -326,7 +327,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                   size="sm"
                   variant="outline"
                   className="shrink-0"
-                  title="Run this command again when the workspace is restored"
+                  title="Run this command again when the tab is restored"
                   onClick={() => onEnableRunOnStart(c.tabId, commands.get(c.tabId))}
                 >
                   Run on start

@@ -33,7 +33,6 @@ import {
   GitBranchIcon,
   Home01Icon,
   PinIcon,
-  SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -335,15 +334,6 @@ function GroupHeading({
       <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
         <HighlightText text={group.workspaceTitle} indices={titleIndices} />
       </span>
-      {group.hibernated ? (
-        <span
-          role="img"
-          aria-label="Workspace is hibernated"
-          className="shrink-0"
-        >
-          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-        </span>
-      ) : null}
     </span>
   );
 }

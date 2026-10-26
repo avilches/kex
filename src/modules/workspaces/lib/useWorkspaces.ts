@@ -23,9 +23,8 @@ import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
-import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
+import { applyHibernate, applyWake, terminalTabs } from "./hibernate";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
-import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import {
   allPaneIds,
   allPanes,
@@ -66,17 +65,17 @@ export function needsResumePlanLookup(tab: Tab): boolean {
   return tab.kind === "terminal" && tab.restoreOnRestart !== false;
 }
 
-export function planWake(ws: Workspace): string[] {
-  return terminalTabs(ws).filter(needsResumePlanLookup).map((t) => t.id);
+export function planWake(tabs: readonly Tab[]): string[] {
+  return tabs.filter(needsResumePlanLookup).map((t) => t.id);
 }
 
 export async function seedWakePlans(
-  ws: Workspace,
+  tabs: readonly Tab[],
   lookup: (tabId: string) => Promise<RestorePlan | null>,
   seed: (tabId: string, plan: RestorePlan) => void,
 ): Promise<void> {
   await Promise.all(
-    planWake(ws).map(async (tabId) => {
+    planWake(tabs).map(async (tabId) => {
       const plan = await lookup(tabId);
       if (plan) seed(tabId, plan);
     }),
@@ -383,7 +382,6 @@ export function applyMoveTabToWorkspace(
 
   if (dest.workspaceId === sourceWorkspaceId) return workspaces;
   const target = workspaces.find((w) => w.id === dest.workspaceId);
-  if (target?.hibernated) return workspaces;
   const attached = target ? attachTab(target, tab, dest.placement, paneLimit) : null;
   if (!attached) return workspaces;
   return applyCloseTab(workspaces, sourceWorkspaceId, tabId).map((w) =>
@@ -398,7 +396,7 @@ export async function collectRunningTerminals(
 ): Promise<{ tabId: string; label: string }[]> {
   const terminals = allPanes(ws.paneTree)
     .flatMap((p) => p.tabs)
-    .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal");
+    .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal" && !tab.hibernation);
   const checked = await Promise.all(
     terminals.map(async (tab) => {
       const processName = await getForegroundProcess(tab.id);
@@ -553,7 +551,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const closing = workspacesRef.current.find((w) => w.id === id);
     if (closing) {
       const stash = useAgentStore.getState().stashClosedSession;
-      if (!closing.hibernated) for (const t of terminalTabs(closing)) stash(t.id);
+      for (const t of terminalTabs(closing)) stash(t.id);
       for (const pane of allPanes(closing.paneTree))
         for (const tab of pane.tabs) recordTabClosed(tab, id);
       closedTabsRef.current = captureClosedWorkspace(
@@ -704,7 +702,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
-        if (w.id !== workspaceId || w.hibernated) return w;
+        if (w.id !== workspaceId) return w;
         const { workspacePaneLimit } = usePreferencesStore.getState();
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
@@ -720,7 +718,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
-    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
@@ -792,6 +789,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       const found = findTabPane(ws.paneTree, tabId);
       if (found) {
         recordTabClosed(found.tab, workspaceId);
+        if (found.tab.kind === "terminal" && found.tab.hibernation) unmarkHibernating([tabId]);
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
           kind: "tab",
@@ -827,17 +825,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
     if (picked.kind === "workspace") {
       const { workspace, idMap } = reviveWorkspace(picked.entry.workspace);
-      if (!workspace.hibernated) {
-        await Promise.all(
-          terminalTabs(picked.entry.workspace).map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)),
-        );
-      }
+      // A sleeping tab keeps its id, and its plan is seeded when it wakes.
+      const renamed = terminalTabs(picked.entry.workspace).filter((t) => !t.hibernation);
+      await Promise.all(renamed.map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)));
       setWorkspaces((prev) => insertRestoredWorkspace(prev, workspace, picked.entry.index));
       selectWorkspace(workspace.id);
-      if (!workspace.hibernated) {
-        const agents = useAgentStore.getState();
-        for (const [oldId, newId] of idMap) agents.restoreClosedSession(oldId, newId, workspace.id);
-      }
+      const agents = useAgentStore.getState();
+      for (const [oldId, newId] of idMap) agents.restoreClosedSession(oldId, newId, workspace.id);
       return;
     }
 
@@ -854,7 +848,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, selectWorkspace]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
-    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const sealedTab = newTab;
     recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
@@ -1104,44 +1097,35 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => clearAgentTitlesFn(prev, tabIds));
   }, []);
 
-  const hibernateWorkspace = useCallback((workspaceId: string, snapshots?: Record<string, TabHibernation>) => {
-    setWorkspaces((prev) => applyHibernate(prev, workspaceId, Date.now(), snapshots));
+  const hibernateWorkspace = useCallback((workspaceId: string, snapshots: Record<string, TabHibernation>) => {
+    setWorkspaces((prev) => applyHibernate(prev, workspaceId, snapshots));
   }, []);
 
-  const wakeWorkspace = useCallback(async (workspaceId: string) => {
+  // Seeds each tab's resume plan first, so the terminal that mounts finds it when it spawns.
+  const wakeTabs = useCallback(async (workspaceId: string, tabIds: readonly string[]) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
-    if (!ws?.hibernated) return;
-    await runOnce(wakesInFlight, workspaceId, async () => {
-      await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
-      discardUnflushedBuffers(editorTabIds(ws));
-      unmarkHibernating(terminalTabs(ws).map((t) => t.id));
-      setWorkspaces((prev) => applyWake(prev, workspaceId));
+    if (!ws) return;
+    const wanted = new Set(tabIds);
+    const tabs = terminalTabs(ws).filter((t) => t.hibernation && wanted.has(t.id));
+    if (tabs.length === 0) return;
+    await runOnce(wakesInFlight, tabs.map((t) => t.id).sort().join(","), async () => {
+      await seedWakePlans(tabs, previewResumeCmd, seedRestorePlan);
+      unmarkHibernating(tabs.map((t) => t.id));
+      setWorkspaces((prev) => applyWake(prev, workspaceId, new Set(tabs.map((t) => t.id))));
     });
   }, []);
 
-  // A hibernated destination is woken first instead of refused. The move is
-  // validated before waking so an impossible one does not wake anything, and
-  // again after it in case the tab went away meanwhile. The updater wakes `prev`
-  // itself as a safety net; wakeWorkspace awaits any wake already in flight.
   const moveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
       const dest = buildMoveDestination(request);
       const { workspacePaneLimit } = usePreferencesStore.getState();
       const apply = (list: Workspace[]) =>
-        applyMoveTabToWorkspace(applyWake(list, dest.workspaceId), sourceWorkspaceId, tabId, dest, workspacePaneLimit);
-      const canMove = () => {
-        const base = applyWake(workspacesRef.current, dest.workspaceId);
-        return applyMoveTabToWorkspace(base, sourceWorkspaceId, tabId, dest, workspacePaneLimit) !== base;
-      };
-      if (!canMove()) return null;
-      if (request.kind !== "new") {
-        await wakeWorkspace(request.workspaceId);
-        if (!canMove()) return null;
-      }
+        applyMoveTabToWorkspace(list, sourceWorkspaceId, tabId, dest, workspacePaneLimit);
+      if (apply(workspacesRef.current) === workspacesRef.current) return null;
       setWorkspaces(apply);
       return dest.workspaceId;
     },
-    [wakeWorkspace],
+    [],
   );
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -1192,7 +1176,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     hibernateWorkspace,
     setAgentTitles,
     clearAgentTitles,
-    wakeWorkspace,
+    wakeTabs,
     activateTab,
     revealTab,
     closeTab,

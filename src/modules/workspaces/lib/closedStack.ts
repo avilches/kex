@@ -24,7 +24,10 @@ export function buildReopenedTab(tab: Tab, newId: string): Tab {
   const base = { ...tab, id: newId };
   if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
   if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
-  if (base.kind === "terminal") return { ...base, locked: false };
+  if (base.kind === "terminal") {
+    const { hibernation: _hibernation, ...awake } = base;
+    return { ...awake, locked: false };
+  }
   return base;
 }
 
@@ -76,8 +79,7 @@ export type ReopenPick =
   | { kind: "workspace"; entry: ClosedWorkspaceEntry };
 
 // Walks the closed stack from the newest entry. A tab entry whose workspace no
-// longer exists is dropped for good; one whose workspace is hibernated is kept
-// in place and skipped, so it becomes the next undo once the workspace wakes.
+// longer exists is dropped for good.
 // A tab is never reopened in a workspace other than the one it was closed in.
 // A workspace entry is picked unless that workspace is already open.
 export function pickReopen(
@@ -94,10 +96,6 @@ export function pickReopen(
     }
     const ws = workspaces.find((w) => w.id === entry.workspaceId);
     if (!ws) continue;
-    if (ws.hibernated) {
-      remaining.push(entry);
-      continue;
-    }
     const paneId = findPane(ws.paneTree, entry.paneId) ? entry.paneId : ws.activePaneId;
     return { picked: { kind: "tab", entry, workspaceId: ws.id, paneId }, remaining: after };
   }
@@ -145,9 +143,9 @@ function reviveTab(tab: Tab, id: string): Tab {
 
 // Gives a closed workspace the tabs it needs to mount again. Every tab gets a
 // fresh id: the old ones carry marks that outlive the close (abandoned editor
-// buffers, agent records). The exception is a hibernated workspace's terminals,
-// which never had a PTY to kill and whose stored agent session is indexed by the
-// tab id the wake-up will look up. Scripts follow their tab to its new id.
+// buffers, agent records). The exception is the hibernated terminals, which never
+// had a PTY to kill and whose stored agent session is indexed by the tab id the
+// wake-up will look up. Scripts follow their tab to its new id.
 export function reviveWorkspace(
   ws: Workspace,
   mint: () => string = newTabId,
@@ -158,7 +156,7 @@ export function reviveWorkspace(
       return { ...node, first: reviveTree(node.first), second: reviveTree(node.second) };
     }
     const tabs = node.tabs.map((t) => {
-      const id = ws.hibernated && t.kind === "terminal" ? t.id : mint();
+      const id = t.kind === "terminal" && t.hibernation ? t.id : mint();
       idMap.set(t.id, id);
       return reviveTab(t, id);
     });

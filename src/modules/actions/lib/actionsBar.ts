@@ -72,7 +72,7 @@ export function ownButtonsThatFit(
 export type BarContext = {
   vars: Readonly<Record<string, string>>;
   shell: CommandShell;
-  /** The workspace is asleep: nothing can run until it wakes. */
+  /** The focused tab is asleep: what depends on it cannot run until it wakes. */
   hibernated?: boolean;
   /** The vars are words for what a variable stands for, not values (Settings has no tab). */
   labels?: boolean;
@@ -258,7 +258,7 @@ export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): bo
 // so a missing root blocks it too, with the words the row shows for that case.
 export function actionAvailability(action: Action, ctx: BarContext | null): string | null {
   if (action.command.trim() === "") return "it has no command";
-  if (ctx?.hibernated) return "workspace is hibernated";
+  if (ctx?.hibernated && dependsOnFocusedTab(action)) return "tab is hibernated";
   if (isAgent(action)) {
     const problem = agentCommandProblem(action.command);
     if (problem) return problem;
@@ -280,6 +280,12 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
 }
 
 const DYNAMIC_VARS = ["cwd", "dir", "branch", "repo"];
+
+// Its values or its start folder come from the focused tab, so it changes with the focus.
+export function dependsOnFocusedTab(action: Action): boolean {
+  if (action.cwdMode === "context") return true;
+  return !isAgent(action) && DYNAMIC_VARS.some((v) => commandVariablesUsed(action.command).has(v));
+}
 
 // What running the Action here would do: its kind, the command it ends up with and the
 // folder it starts in. Null when that cannot be told (a variable with no value, a command
@@ -313,7 +319,7 @@ function effectKey(action: Action, ctx: BarContext): string | null {
 // the user's own doing, so both stay. A
 // script that is not idle is never hidden, and a blocked Action (or one whose start folder the
 // runner would refuse) neither hides nor survives.
-// Nothing is hidden without a real context, or while the workspace sleeps.
+// Nothing is hidden without a real context, or while the focused tab sleeps.
 export function twinIds(
   actions: readonly Action[],
   ctx: BarContext | null,
@@ -329,8 +335,7 @@ export function twinIds(
     if (!shownAtPlace(action, state, place)) continue;
     const key = effectKey(action, ctx);
     if (!key) continue;
-    const used = commandVariablesUsed(action.command);
-    const dynamic = (!isAgent(action) && DYNAMIC_VARS.some((v) => used.has(v))) || action.cwdMode === "context";
+    const dynamic = dependsOnFocusedTab(action);
     const group = groups.get(key) ?? [];
     group.push({ action, dynamic, idle: state === "idle" });
     groups.set(key, group);

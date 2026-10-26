@@ -34,7 +34,6 @@ const tab = (tabId: string, over: Partial<TabEntry> = {}): TabEntry => ({
   agentSession: undefined,
   running: false,
   lastUsedAt: 0,
-  workspaceActiveAt: 0,
   order: n++,
   ...over,
 });
@@ -43,7 +42,6 @@ const ws = (workspaceId: string, title: string): WorkspaceEntry => ({
   title,
   color: null,
   icon: null,
-  hibernated: false,
   tabCount: 1,
   lastUsedAt: 0,
 });
@@ -62,7 +60,6 @@ const closed = (
   workspaceTitle: "Work",
   workspaceColor: null,
   workspaceIcon: null,
-  hibernated: false,
   ...over,
 });
 
@@ -83,11 +80,11 @@ describe("mergeRows", () => {
     const rows = mergeRows(
       input({
         term: "hibernate",
-        commands: [cmd("workspace.hibernate", "Hibernate Workspace")],
+        commands: [cmd("tab.hibernate", "Hibernate Tab")],
         tabs: [tab("t1", { title: "my hibernate notes" })],
       }),
     );
-    expect(keys(rows)[0]).toBe("cmd:workspace.hibernate");
+    expect(keys(rows)[0]).toBe("cmd:tab.hibernate");
   });
 
   it("puts a tab that matches better than a command before it", () => {
@@ -394,11 +391,11 @@ describe("mergeRows", () => {
       cmd("sidebar.showExplorer", "Explorer (cycle root)", "Sidebar"),
       cmd("search.focus", "Find in current tab", "Search"),
       cmd("settings.section.terminal", "Terminal settings", "Settings"),
-      cmd("workspace.hibernate", "Hibernate Workspace"),
+      cmd("tab.hibernate", "Hibernate Tab"),
     ];
     const k = keys(mergeRows(input({ term: "ser", commands })));
     expect(k).not.toContain("cmd:sidebar.showExplorer");
-    expect(k).not.toContain("cmd:workspace.hibernate");
+    expect(k).not.toContain("cmd:tab.hibernate");
   });
 
   it("does not match on the internal id", () => {
@@ -414,7 +411,7 @@ describe("mergeRows", () => {
     ).toEqual([]);
   });
 
-  it("puts the recents of hibernated workspaces after the awake ones, even when newer", () => {
+  it("puts the recents of hibernated tabs after the awake ones, even when newer", () => {
     const tabs = [
       tab("sleepy-new", { hibernated: true, lastUsedAt: 900 }),
       tab("awake-old", { lastUsedAt: 10 }),
@@ -427,17 +424,9 @@ describe("mergeRows", () => {
     ]);
   });
 
-  it("orders never-used recents by workspace activity, then tree order", () => {
-    const tabs = [
-      tab("a", { workspaceActiveAt: 5 }),
-      tab("b", { workspaceActiveAt: 9 }),
-      tab("c", { workspaceActiveAt: 9 }),
-    ];
-    expect(keys(mergeRows(input({ tabs })))).toEqual([
-      "tab:b",
-      "tab:c",
-      "tab:a",
-    ]);
+  it("orders never-used recents by tree order", () => {
+    const tabs = [tab("a", {}), tab("b", {}), tab("c", {})];
+    expect(keys(mergeRows(input({ tabs })))).toEqual(["tab:a", "tab:b", "tab:c"]);
   });
 
   it("does not let a learned command appear for text it does not match", () => {

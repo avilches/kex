@@ -58,7 +58,7 @@ describe("resolveAgentTabTitle - persisted agentTitle fills the wake window", ()
 });
 
 describe("resolveAgentTabTitle - a sleeping tab keeps the name it had", () => {
-  const asleep = (title: string): Tab => ({ ...woken("older"), hibernation: { title } });
+  const asleep = (title: string): Tab => ({ ...woken("older"), hibernation: { at: 1, title } });
 
   it("shows the title saved at hibernation, whatever the live sources say", () => {
     const info = resolveAgentTabTitle(asleep("npm test · main"), "vitest", "live", undefined);
@@ -67,7 +67,7 @@ describe("resolveAgentTabTitle - a sleeping tab keeps the name it had", () => {
   });
 
   it("a snapshot without a title falls back to the usual resolution", () => {
-    const info = resolveAgentTabTitle({ ...woken("older"), hibernation: { agent: "claude" } }, null, undefined, undefined);
+    const info = resolveAgentTabTitle({ ...woken("older"), hibernation: { at: 1, agent: "claude" } }, null, undefined, undefined);
     expect(info.displayTitle).toBe("older · me");
   });
 });

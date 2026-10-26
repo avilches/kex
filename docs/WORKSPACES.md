@@ -192,7 +192,7 @@ A leaf whose start cannot happen (unusable restore directory, `openPty` failing)
 Open terminal without restoring and the pending restore (Retry restore / Discard restore plan in the Run on Start menu)
 are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
 
-### Visible vs. hibernated
+### Visible vs. parked
 
 When `visible` becomes **true**:
 - If no slot is bound yet: `bindLeafToSlot` → `acquireSlot` (pool assigns a slot, replays snapshot
@@ -231,96 +231,136 @@ are dropped and the message `[kex: dropped output during hibernation]` is prepen
 The PTY process itself is never paused - the OS shell keeps running and output keeps arriving;
 only the rendering is deferred.
 
-### Hibernated workspaces
+### Hibernated tabs
 
-Not to be confused with the dormant ring above: a hibernated workspace (`Workspace.hibernated`)
-has no mounted tabs at all. Its tabs stay in the persisted `paneTree`, but `WorkspaceView` renders
-`strippedTree(ws.paneTree)` (a memoized copy with every pane emptied) and passes `hibernated` down
-through `SplitNodeView` to `PaneView`, which returns a bordered empty box right before its main
-`return` (after the last hook). `HibernatedOverlay` (large sleeping icon, `WorkspaceMark` and name, "Hibernated for 3h 20m" from `Workspace.hibernatedAt` via `formatHibernatedFor`, and a primary Restore button with the undo icon; wired to
-`wakeWorkspace` through the `onWake` prop) covers the workspace. Under the name it lists every tab with its icon, title and, in monospace, the command the restore will run (the agent resume command or the run-on-start command). A terminal tab with a recorded agent session adds a second line under it: the last thing the assistant said (`SessionRecord.last_message`, clamped to two lines with the full text in the native tooltip) and, below, the launch folder with the home abbreviated to `~` and how long ago the last turn ended (`describeSessionPreview` in `lib/sessionPreview.ts`; the tooltip has the full folder and the absolute time). An agent whose Stop carries no message gets only the folder and time line, and a tab without a record gets nothing. The overlay reads all of them with one `agent_session_previews` call each time it becomes the active workspace (never while it is in the background, and not again while the same terminal tabs are shown). The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and window close flush it), so it survives a restart. When the agent session really ends (`exited` while the tab is not hibernating), the title goes away again: `AgentNotificationsBridge` clears the live `oscTitleStore` entry and the sync deletes the persisted `Tab.agentTitle` through `clearAgentTitles` (`revoke` -> `clearAgentTitles` in the hook); a session that dies without the signal (manual detach, a discarded restore placeholder) is reaped by the same sync scan, so a tab whose agent is gone falls back to its default template. The drop is shielded while the workspace hibernates or a restore plan/snapshot may still claim the tab, and it waits until the launch-time restore plans are loaded; the user rename (`tab.title`) always wins over anything else. The live OSC title dies with the PTY too, and the resumed agent sends no new one until it boots, so after a wake (and during the app-restart restore) `resolveAgentTabTitle` (`useAgentTabTitle.ts`) falls back to that same `Tab.agentTitle` until a live OSC title arrives; the live title always wins. The agent and the resume command die with the PTY, so `createHibernateFlow` captures them as `Tab.hibernation` (`TabHibernation`) before ending the agent sessions, together with `title`, the whole display title the tab shows at that instant (`tabDisplayTitleNow`, so `{cmd|osc} · {branch|dir}` keeps its command part); `resolveAgentTabTitle` returns it verbatim while the tab sleeps, in the overlay and in the WorkspaceBar rows alike. `applyHibernate` stores them and `applyWake` drops them. A workspace hibernated at startup has no snapshot: the overlay asks `previewResumeCmd` for the same plan the wake uses. The Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width. Waking remounts the Sidebar, which gets its `Workspace.sidebar` (view, open folders, selection, scroll) back; hibernating flushes the pending Sidebar snapshots first. A workspace switch or a wake does not itself trigger the autofocus reveal (`autofocusDecision`), so the explorer does not jump away from the restored state; a later change inside the woken workspace does, such as focusing another tab or a resumed agent in the focused tab reporting the worktree it entered.
+Not to be confused with the dormant ring above: a hibernated tab is a terminal tab (`Tab.hibernation`,
+`TabHibernation`: `at`, `agent`, `command`, `title`) with no PTY and no render slot. Its presence is the flag, and it is
+persisted with the tab; the workspace knows nothing about it. Only terminals (and the agents in them) hibernate: editors,
+browsers and the rest never do. The tab keeps its id, its place in the `paneTree`, its note, color, lock and title.
 
-- The live-tab sweep in `App.tsx` skips hibernated workspaces, so their terminals leave the live
-  set and are disposed by the normal path (PTY closed). That sweep now also calls
-  `useAgentStore.getState().finish(id)` for every terminal that leaves the set (close, move to
-  another window, hibernate): the `exited` signal arrives after the session is disposed and
-  `leafIdForPty` returns `null`, so without it a phantom spinner would stay.
-- `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
-  reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
-  `hibernated`; the terminals mount again and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes by workspace id: a second wake (double click, or `moveTabToWorkspace`) awaits the first one's promise, so it never proceeds before the resume plans are seeded. In the WorkspaceBar a hibernated item keeps its nested tab list: hibernating or waking never touches `detailExpanded`, and the chevron expands or collapses it as in an awake workspace. Clicking one of those tabs (`onActivateAgent`) selects the workspace and the tab without waking it, so the hibernated overlay is what shows (its rows are dimmed with `opacity-40`, like the veil over the workspace chip, and are inert: no drag, no drop target, no close, unlock, note or autofocus controls, and the context menu holds only "Restore Workspace" with the `workspace.hibernate` shortcut); the sleeping icon (which turns into the undo icon on hover) and a double click on the item still wake it.
-- A workspace with no tabs is never hibernated: `createHibernateFlow` (`request`, `requestAuto` and `perform`) checks `hasTabs` and the WorkspaceBar hides the Hibernate menu item.
-- Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
-  `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
-  `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
-  blocks the shortcuts that need tabs, the Sidebar, the explorer or the zen layout (`blockedWhileHibernated`), `tab.close` (Cmd+W, also from the native menu through `handleCloseActiveTab`) included: a sleeping workspace closes only with `workspace.close`. The native menu (`sync_menu` greys out the tab and Sidebar items, and the dispatcher ignores them anyway: `menuBlockedWhileHibernated`) and the command palette (`createCommandItems` disables the same actions with the reason "Workspace hibernated": `commandBlockedWhileHibernated`) follow the same rule. Running an Action does nothing (`planActionRun` blocks it silently) and the Header's Actions bar shows every Action as unavailable with the reason "workspace is hibernated", except a script that was already running, which can still be stopped,
-  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is dimmed and inert.
+- **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the frozen title, the restore command in
+  monospace, "Hibernated for 3h 20m" from `hibernation.at` via `formatHibernatedFor`, and a primary Restore button) in
+  place of `TerminalPane` for a sleeping terminal; the terminal path bar stays. A terminal tab with a recorded agent
+  session adds the last thing the assistant said (`SessionRecord.last_message`, clamped to two lines with the full text in
+  the native tooltip) and, below, the launch folder with the home abbreviated to `~` and how long ago the last turn ended
+  (`describeSessionPreview` in `lib/sessionPreview.ts`). It reads them with one `agent_session_previews` call each time the
+  tab becomes visible, never while it is in the background. The rest of the workspace (other tabs, panes, Sidebar) is
+  untouched.
+- **Click, double click, shortcuts.** A click on a sleeping tab (pane tab bar, nested list of the WorkspaceBar, palette)
+  only focuses it and shows the placeholder. A double click on the tab, the Restore button, the tab context menu item
+  "Restore", the command palette ("Restore and go to Tab") and the shortcut `tab.hibernate` wake it. The next and previous
+  tab shortcuts move over it without waking it. The sleeping icon sits in the tab bar, in the nested list and in the palette.
+- **Titles.** The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC
+  or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the
+  first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and
+  window close flush it), so it survives a restart. When the agent session really ends (`exited` while the tab is not
+  hibernating), the title goes away again: `AgentNotificationsBridge` clears the live `oscTitleStore` entry and the sync
+  deletes the persisted `Tab.agentTitle` through `clearAgentTitles`; a session that dies without the signal is reaped by
+  the same sync scan. The drop is shielded while the tab hibernates or a restore plan/snapshot may still claim it. The live
+  OSC title dies with the PTY, so `resolveAgentTabTitle` (`useAgentTabTitle.ts`) returns `hibernation.title` verbatim while
+  the tab sleeps (the whole display title it had at that instant, `tabDisplayTitleNow`, so `{cmd|osc} · {branch|dir}` keeps
+  its command part), and after a wake falls back to `Tab.agentTitle` until a live OSC title arrives.
+- **Slot release.** The live-tab sweep in `App.tsx` uses `liveTerminalIds` (`lib/hibernate.ts`), which leaves the sleeping
+  terminals out. A tab that leaves the set unmounts its `TerminalPane` and goes through `disposeSession`, which closes the
+  PTY and calls `disposeLeafSlot` (the renderer pool looks the slot up by `currentLeafId` and disposes it), so a sleeping tab
+  inside a live pane holds no xterm instance, WebGL context or parked slot. The sweep also calls
+  `useAgentStore.getState().finish(id)` for every terminal that leaves the set (close, move to another window, hibernate):
+  the `exited` signal arrives after the session is disposed and `leafIdForPty` returns `null`, so without it a phantom
+  spinner would stay. `liveTerminalIds` has a test that locks it.
+- **Wake.** `wakeTabs(workspaceId, tabIds)` in `useWorkspaces` seeds the agent resume plans (`seedWakePlans`, same "Run on
+  start" gate as the reopen flow), clears `hibernatingTabs` and drops `hibernation` from the tabs (`applyWake`); the
+  terminals mount again with the same id and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes
+  by tab ids: a second wake (double click) awaits the first one's promise, so it never proceeds before the resume plans are
+  seeded. `App.tsx` focuses the woken tab once it is mounted.
+- **What a sleeping tab still does.** It can be closed (no confirmation, no process collection:
+  `collectRunningTerminals` and the close guards skip it, and its `hibernatingTabs` mark is dropped), renamed, pinned,
+  locked, given a note, moved between panes and workspaces and dragged like any other tab, keeping its state (the nested list
+  keeps its drag, note and lock controls on it). The context menu of a terminal tab has "Hibernate" or "Restore". Opening
+  tabs, splitting panes, the Sidebar, the explorer and the zen layout work in a workspace full of sleeping tabs.
+- **What is blocked.** Only what acts on a live terminal while the focused tab sleeps: `shortcutUnavailable` and
+  `blockedWhileHibernated` cover `terminal.*` (clear, scratchpad) and `search.focus`; the command palette disables the same
+  commands (`commandBlockedWhileHibernated`, reason "Tab hibernated", plus `history.open`). The native menu has nothing to
+  grey out: `sync_menu` no longer receives a hibernated flag. Actions that depend on the focused tab (a `{cwd}`, `{dir}`,
+  `{branch}` or `{repo}` variable, or Run in folder = Current tab folder, `dependsOnFocusedTab`) are blocked silently
+  (`planActionRun`) and shown unavailable with the reason "tab is hibernated" in the Header bar, the menu and the palette;
+  the others run.
+- **Run on a sleeping tab.** A script whose linked tab is asleep (`LinkedTab.sleeping`): if the tab would come back as a
+  bare shell (no agent and no restore command in its `hibernation`) `planActionRun` plans a `reuse-tab` with `wake: true` and
+  the runner wakes it (`wakeTab`) before typing the command; if it would come back running something (Run on start command
+  or agent) it opens a new tab instead.
+- **Workspace context menu.** The WorkspaceBar menu has "Hibernate all" (when the workspace has an awake terminal): it
+  hibernates every awake terminal of the workspace with a single review. There is no workspace-level hibernate flag, overlay
+  or Restore any more.
+- A tab that is not a terminal, or is already asleep, is never hibernated: `createHibernateFlow` (`request`, `requestAuto`
+  and `perform`) filter with `awakeTerminalTabs`.
+- `setTabLocations` receives every workspace; a hibernated tab has no agent session, so it has no notification to jump to.
 
 #### Hibernate and wake flow
 
-The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) and the
-WorkspaceBar context menu entry "Hibernate" (any workspace, without switching the active one;
-hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
-`requestHibernate` from `useHibernateFlow` (`lib/useHibernateFlow.ts`; the framework-free
-`createHibernateFlow` holds the logic so it is testable without React):
+The shortcut `tab.hibernate` (Cmd+Alt+Z on the focused tab, toggles: hibernates or wakes; never blocked), the tab context
+menu item "Hibernate" and the workspace context menu item "Hibernate all" call `requestHibernate(workspaceId, tabIds)`
+from `useHibernateFlow` (`lib/useHibernateFlow.ts`; the framework-free `createHibernateFlow` holds the logic so it is
+testable without React):
 
-1. With autosave on, `flushDirtyEditors` runs and two animation frames pass so the dirty flags
-   reach the workspace state.
-2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: busy tabs (agents still
-   working and script Actions in `running` or `waiting`), unsaved documents and commands without
-   "Run on start". An agent only counts as coming back when it has a stored session (`hasResumed`);
-   a busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a command. If the review is empty the
-   workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
-3. `performHibernate` clears the pending id and destroys the floating browsers. Then, with no await
-   left, it rechecks (for the automatic and no-dialog paths: the review is still empty and the
-   workspace is still not the active one), marks the terminal tabs with `markHibernating` (so the
-   exit of their PTYs is not reported as an agent failure), calls `finish` on each agent session and
-   calls `hibernateWorkspace`; if the recheck fails or hibernating throws, nothing stays marked. A set of
-   in-flight workspace ids makes a double trigger hibernate once.
+1. `tabsReview` (`lib/hibernateReview.ts`) lists what would be lost in those tabs: busy tabs (agents still working and
+   script Actions in `running` or `waiting`) and commands without "Run on start". There are no documents: editors do not
+   hibernate. (`hibernateReview`, the workspace-level version, is the one closing a workspace uses: it adds the unsaved
+   documents and ignores sleeping tabs.) An agent only counts as coming back when it has a stored session (`hasResumed`); a
+   busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a
+   command. An empty shell is not listed: it sleeps without asking. If the review is empty the tabs hibernate immediately;
+   otherwise `pending` (`{ workspaceId, tabIds }`) opens `HibernateDialog` with one row per tab to review.
+2. `performHibernate` clears the pending request and takes the snapshots (`snapshotTerminalTabs`: title, agent and restore
+   command of each tab, read while the PTYs are alive, after flushing the agent titles and the Sidebar snapshots). Then,
+   with no await left, it rechecks (for the automatic path: the tab is still hidden, not busy and has nothing to lose),
+   marks the tabs with `markHibernating` (so the exit of their PTYs is not reported as an agent failure), calls `finish` on
+   each agent session and calls `hibernateWorkspace` (`applyHibernate`); if the recheck fails or hibernating throws, nothing
+   stays marked. A set of in-flight tab ids makes a double trigger hibernate once.
 
-The dialog title names the workspace and starts with a `WorkspaceMark` (`modules/workspaces/WorkspaceMark.tsx`): the workspace icon painted in its color, or a color dot when it has no icon, plus a sleeping icon if it is hibernated. The Header title and the "Move to Workspace" menu use the same mark. A muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
+The dialog title says "Hibernate tab?" or "Hibernate tabs?" and starts with the workspace's `WorkspaceMark`
+(`modules/workspaces/WorkspaceMark.tsx`): the workspace icon painted in its color, or a color dot when it has no icon. A
+muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title
+keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears
+while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
 While the dialog is open `shortcutsDisabled` returns true for every shortcut (the global listener
 runs in capture phase, before the Radix modal); Escape is not a registered shortcut and still closes it.
 `HibernateDialog` is reactive: it recomputes the review from the agent store, the running
 commands store and the script state map, so a row disappears when its agent finishes or when "Run on start" is enabled
-(`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
-empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
-(script: the dialog only marks the tab and types Ctrl+C, no moving focus and no signal stage; the row unsticks when the shell reports the end of the command, and a Ctrl+C-immune program from here keeps the disabled "Stopping" row until its terminal tab is closed). Closing a workspace (hibernated or awake) abandons its carried buffers (`abandonUnflushedBuffers`: an awake workspace's editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are refused) and clears its
-hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see ARCHITECTURE 5.7a), and sends every tab it held to the persistent closed-tab history first. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
-is described above (`wakeWorkspace`).
+(`enableRunOnStart`), and the dialog closes and hibernates on its own once the lists are
+empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it
+hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script
+cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C
+plus status idle, the session survives) or "Stop"
+(script: the dialog only marks the tab and types Ctrl+C, no moving focus and no signal stage; the row unsticks when the
+shell reports the end of the command, and a Ctrl+C-immune program from here keeps the disabled "Stopping" row until its
+terminal tab is closed). In `mode="close"` the same dialog is fed by the workspace-level `hibernateReview` (it keeps the
+unsaved-document rows with Save and Save all). Closing a workspace abandons its carried buffers (`abandonUnflushedBuffers`:
+the editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are
+refused) and clears its hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the
+whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see
+ARCHITECTURE 5.7a), and sends every tab it held to the persistent closed-tab history first. Row buttons are plain `Button`s,
+not `AlertDialogAction`, so they do not close it.
 
 #### Auto-hibernate
 
-The `autoHibernate` preference (Settings > Workspaces: Never, 30 minutes, 4 hours, 2 days; default 4 hours)
-hibernates idle workspaces. `useAutoHibernate` checks every minute, and once right at startup. A workspace is idle
-for the time since it was last the active one. That moment is kept in `activityStamps` (`workspaceState.ts`), a
-module-level map outside React state so the minutely renewal does not re-render the tree. `touchActivity` renews the
-awake active workspace each tick, and also every awake workspace with a "working" agent (the spinner in the
-WorkspaceBar), so its countdown only runs while no agent is busy in it; it gives a workspace without a stamp "now". A hibernated workspace is stamped only
-when it changes state (hibernated, or woken), tracked with a set of the previously hibernated ids, so its persisted body
-does not change every minute while waking it still restarts its clock. The switch effect (`stampSwitch`) stamps the
-workspace being left and the one entered. Every tick schedules the normal debounced `saveWorkspaceState`, whose
-`buildArgs` merges the stamps into each body as `lastActiveAt` (`withActivity`). `initWorkspaceState` seeds the map from
-the saved `lastActiveAt` (`seedActivity`, which drops non-finite values and clamps future ones to now), so the clocks
-survive a restart: a non-active workspace that was idle past the delay becomes due on the first tick. The workspace
-active at startup is renewed by that same tick and is never a candidate. `autoHibernateCandidates` never picks the
-active or an already hibernated workspace. For each candidate `createHibernateFlow().requestAuto` saves every dirty editor and
-markdown tab of that workspace even with autosave off (`saveWorkspaceDocs`; a failed save aborts), waits for the
-dirty flags to settle and then runs the same `hibernateReview` as the manual flow: it hibernates only if the review
-is empty, that is, no agent working, no script running, no unsaved document and no command without "Run on start".
-An agent in `attention` (waiting for the user) also blocks it, and `requestAuto` re-checks that the workspace is still
-not the active one after saving, so entering a queued workspace mid-check cancels it. Waking a hibernated workspace
-restarts its clock, so it is not hibernated again at the next tick. Changing the
-setting keeps the existing clocks. A document with a pending reload conflict (changed on disk while dirty)
-blocks it: `useDocument.save` throws `CONFLICT_SAVE_ERROR` while the conflict overlay is up, so `saveWorkspaceDocs`
-fails. The same guard applies to every save path (manual save reports it as a toast, the autosave timer and the
-unmount flush skip the write and the unmount carries the buffer in memory instead). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
-awake until the next check.
+The `autoHibernate` preference (Settings > Terminal: Never, 30 minutes, 4 hours, 2 days, and 1 minute only in the dev
+build; default 4 hours) hibernates terminal tabs that nobody is looking at. `useAutoHibernate` checks every minute, and
+once right at startup. A tab is a candidate when it is not visible (not the active tab of any pane of the active workspace)
+and has been so for the whole delay. The moment it stopped being visible lives in `hiddenSince`, a module-level map in
+`useAutoHibernate.ts` (so the minutely renewal does not re-render the tree); `touchHiddenSince` (`lib/autoHibernate.ts`)
+stamps a tab the first time it is seen hidden, deletes the stamp of a visible, sleeping or vanished tab, and renews the stamp
+of a busy tab (a working agent, a running script, or an agent in `attention`, from `busyTabIds`), so its countdown only
+runs while nothing works in it. The stamps are never persisted: after a restart every hidden tab starts counting again.
+For each workspace with candidates `createHibernateFlow().requestAuto(workspaceId, tabIds)` keeps only the tabs that are
+still hidden, not busy and with nothing to lose (`tabsReview` has no busy tab and no command without "Run on start"), and
+hibernates them together; the rest stay awake until the next check. Empty shells do hibernate. It re-checks after taking the
+snapshots, so a tab that became visible meanwhile is left alone. Unsaved documents play no part: editors never hibernate.
+`requestAuto` never opens `HibernateDialog`.
 
 #### Startup
 
-There is no startup hibernation: `initWorkspaceState` restores the saved workspaces untouched. A workspace that
-was hibernated stays so; every other one mounts, including its "Run on start" commands and agent sessions. Their
-`lastActiveAt` is seeded into `activityStamps`, so auto-hibernate resumes the idle timer where it was.
+There is no startup hibernation: `initWorkspaceState` restores the saved workspaces untouched. A tab that was hibernated
+stays so (its `hibernation` is in the persisted tab, and the stored agent session is kept because the tab is still known to
+`terminal_tab_ids`); every other terminal mounts, including its "Run on start" commands and agent sessions.
 
 ---
 
@@ -571,7 +611,7 @@ drag is cancelled with Esc or dropped where nothing happens. While the pointer i
 Dropping the tab there, without waiting for the 600 ms switch, moves it with the `auto` placement
 (`handleDragEnd` checks the hovered workspace before looking at `over`): the tab goes into the rightmost
 pane, with no split (see below). While a drag is on, Escape is caught in the capture phase and replayed
-on the document, because a focused terminal swallows it before dnd-kit's sensor sees it. The tab's own workspace is not a target (`canDropTabOnWorkspace`): it does not light up and dropping there does nothing. A hibernated workspace is a target: it is woken before the tab lands (`moveTabToWorkspace`, async, so `handleDragEnd` restores the origin workspace only once it settles). Once the 600 ms switch shows a hibernated workspace, its `HibernatedOverlay` is itself a droppable (`hibernated:<id>`, enabled only for a tab dragged from another workspace, ringed while hovered) because it has no panes to drop on; `resolveTabDrop` turns it into the same `auto` transfer. Known limitation: workspaces inside a
+on the document, because a focused terminal swallows it before dnd-kit's sensor sees it. The tab's own workspace is not a target (`canDropTabOnWorkspace`): it does not light up and dropping there does nothing. Known limitation: workspaces inside a
 collapsed group are not on screen, so they cannot be hover targets.
 
 ---
@@ -586,7 +626,7 @@ split) the same array is returned and nothing moves. `lib/tabTransfer.ts` holds 
 (`attachTab`, `workspaceForTab`).
 
 The context menu of a tab has "Move to Workspace" (`TabContextMenuItems.tsx`, the menu body shared by the pane tab and the sidebar rows, fed by `WorkspaceMoveContext`):
-"New", then every other workspace with a dot of its color, hibernated ones included (marked Zzz; choosing one wakes it before the tab lands), and its icon when it has one. Choosing a workspace uses the `auto`
+"New", then every other workspace with a dot of its color, and its icon when it has one. Choosing a workspace uses the `auto`
 placement: no pane is ever split, the tab goes into the rightmost pane (`rightmostPane`: right half of a
 side-by-side split, top half of a stacked one). The user stays in the current workspace, unless the
 moved tab was the current tab of its workspace (menu or drag): then the destination workspace is selected and the tab focused in it (`handleMoveTabFollowingFocus`, focus after 50 ms because the refs are only fresh after the commit). "New" creates a workspace right after the source (same group) whose

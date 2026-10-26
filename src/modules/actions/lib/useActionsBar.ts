@@ -27,7 +27,7 @@ export type BarController = {
 };
 
 type Input = {
-  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction" | "hibernated"> | null;
+  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
   /** Pixels the bar has; absent until measured, which shows every own button. */
   room?: number;
   /** Show every Action, twins included (a modifier is held or a drag is in flight). */

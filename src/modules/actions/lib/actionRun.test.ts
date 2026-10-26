@@ -37,6 +37,7 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
   terminal: true,
   markRunning: false,
   foreignCommand: false,
+  sleeping: null,
   cwd: "/w",
   ...o,
 });
@@ -103,16 +104,27 @@ describe("planActionRun, scripts", () => {
     expect(planActionRun(script(), ctx({ link: link({ markRunning: true, exists: false }) })).kind).toBe("new-tab");
   });
 
-  it("is silent while the workspace sleeps", () => {
-    expect(planActionRun(script(), ctx({ hibernated: true }))).toEqual({ kind: "blocked", reason: "", silent: true });
+  it("is silent while the focused tab sleeps and the script depends on it", () => {
+    const silent = { kind: "blocked", reason: "", silent: true };
+    expect(planActionRun(script({ command: "ls {cwd}" }), ctx({ hibernated: true }))).toEqual(silent);
+    expect(planActionRun(script({ cwdMode: "context" }), ctx({ hibernated: true }))).toEqual(silent);
   });
 
-  it("is silent while the workspace sleeps even when the command is empty", () => {
-    expect(planActionRun(script({ command: " " }), ctx({ hibernated: true }))).toEqual({
-      kind: "blocked",
-      reason: "",
-      silent: true,
-    });
+  it("still runs a script that does not depend on the focused tab while it sleeps", () => {
+    expect(planActionRun(script(), ctx({ hibernated: true })).kind).toBe("new-tab");
+  });
+
+  it("wakes and reuses a sleeping linked shell that would come back empty", () => {
+    const plan = planActionRun(script(), ctx({ link: link({ sleeping: "empty" }) }));
+    expect(plan).toMatchObject({ kind: "reuse-tab", tabId: "tab-9", wake: true });
+  });
+
+  it("does not wake a linked tab that would come back running a command: it opens a new one", () => {
+    expect(planActionRun(script(), ctx({ link: link({ sleeping: "busy" }) })).kind).toBe("new-tab");
+  });
+
+  it("reuses an awake linked terminal without waking anything", () => {
+    expect(planActionRun(script(), ctx({ link: link() }))).toMatchObject({ kind: "reuse-tab", wake: false });
   });
 
   it("refuses an empty command by name", () => {
@@ -246,8 +258,9 @@ describe("planActionRun, apps", () => {
     expect(plan.kind).toBe("blocked");
   });
 
-  it("is silent while the workspace sleeps", () => {
-    expect(planActionRun(app(), ctx({ hibernated: true }))).toMatchObject({ kind: "blocked", silent: true });
+  it("is silent while the focused tab sleeps and the app reads its folder", () => {
+    expect(planActionRun(app({ command: "code {cwd}" }), ctx({ hibernated: true }))).toMatchObject({ kind: "blocked", silent: true });
+    expect(planActionRun(app(), ctx({ hibernated: true })).kind).toBe("spawn-app");
   });
 });
 

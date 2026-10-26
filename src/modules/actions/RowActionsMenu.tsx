@@ -31,7 +31,7 @@ import type { Action } from "@/modules/actions/lib/types";
 const NONE: readonly Action[] = [];
 const EMPTY_GROUPS: ContextActionGroups = { workspace: [], global: [] };
 
-type MenuWorkspace = Pick<Workspace, "actions" | "cwd" | "workspaceRoot" | "hibernated"> | null;
+type MenuWorkspace = Pick<Workspace, "actions" | "cwd" | "workspaceRoot"> | null;
 
 // A place a menu opened on, seen as the tab an Action would run from: the row itself is
 // the terminal of a folder row and the editor of a file row, so the same values the Header
@@ -66,9 +66,9 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
   const groups = useMemo(
     () =>
       vars
-        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell, hibernated: !!ws?.hibernated })
+        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell })
         : EMPTY_GROUPS,
-    [vars, global, shell, ws?.actions, ws?.hibernated],
+    [vars, global, shell, ws?.actions],
   );
   const overlay = useMemo<RunOverlay | null>(
     () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),

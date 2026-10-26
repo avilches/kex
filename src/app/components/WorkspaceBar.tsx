@@ -35,7 +35,6 @@ import {
   PencilEdit01Icon,
   Settings01Icon,
   SleepingIcon,
-  UploadCircle01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
@@ -52,7 +51,6 @@ import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { SlideReveal } from "@/app/components/SlideReveal";
-import { isFreshHibernate, useJustWoken } from "@/modules/workspaces/lib/hibernateFx";
 import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
@@ -115,8 +113,8 @@ type WorkspaceItem = {
   // Comma-joined active tab of every pane: the tabs whose note a pane can draw.
   visibleTabIds?: string;
   detailExpanded?: boolean;
-  hibernated?: boolean;
-  hibernatedAt?: number;
+  // Some terminal of the workspace is awake, so "Hibernate all" has something to do.
+  canHibernate?: boolean;
 };
 
 export type WorkspaceBarProps = {
@@ -136,7 +134,7 @@ export type WorkspaceBarProps = {
   onCloseAllTabs?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
-  onWake?: (id: string) => void;
+  onWakeTab?: (workspaceId: string, tabId: string) => void;
   onOpenSettings: (id: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
@@ -171,7 +169,7 @@ function SortableWorkspaceItem({
   onCloseAllTabs,
   onRename,
   onHibernate,
-  onWake,
+  onWakeTab,
   onOpenSettings,
   onSetColor,
   onSetIcon,
@@ -194,7 +192,7 @@ function SortableWorkspaceItem({
   onCloseAllTabs?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
-  onWake?: (id: string) => void;
+  onWakeTab?: (workspaceId: string, tabId: string) => void;
   onOpenSettings: (id: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
@@ -222,7 +220,7 @@ function SortableWorkspaceItem({
   const tabDragActive = dragging?.kind === "tab";
   const canDrop = dragging?.kind === "tab" && canDropTabOnWorkspace(dragging.workspaceId, ws);
   const dropHover = canDrop && dropTarget.id === ws.id;
-  const lit = (active && !ws.hibernated) || dropHover;
+  const lit = active || dropHover;
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -250,7 +248,6 @@ function SortableWorkspaceItem({
 
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
   const renameLabel = getShortcutLabel("workspace.rename", shortcuts);
-  const hibernateLabel = getShortcutLabel("workspace.hibernate", shortcuts);
   const settingsLabel = getShortcutLabel("workspace.settings", shortcuts);
   const closeLabel = getShortcutLabel("workspace.close", shortcuts);
 
@@ -293,10 +290,6 @@ function SortableWorkspaceItem({
     return () => clearTitleDraft(ws.id);
   }, [isRenaming, ws.id]);
 
-  const wokenAt = useJustWoken(ws.hibernated);
-  const fresh = !!ws.hibernated && isFreshHibernate(ws.hibernatedAt);
-  const chipFx = fresh ? "in" : wokenAt !== null ? "out" : null;
-  const hibernatedLook = ws.hibernated ? (fresh ? "in" : "static") : chipFx;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
   const expanded = showDetail && !!ws.detailExpanded;
@@ -387,14 +380,12 @@ function SortableWorkspaceItem({
             if (active) onRestoreFocus();
             else onSelect(ws.id);
           }}
-          onDoubleClick={() => (ws.hibernated ? onWake?.(ws.id) : onOpenSettings(ws.id))}
+          onDoubleClick={() => onOpenSettings(ws.id)}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             compact
               ? "h-9 justify-center text-[13px]"
               : "h-9 gap-2 px-2.5 text-[13px]",
-            hibernatedLook && "relative overflow-hidden",
-            chipFx && "hib-chip-pop",
             lit
               ? "text-foreground"
               : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
@@ -421,17 +412,6 @@ function SortableWorkspaceItem({
           {...listeners}
           aria-pressed={active}
         >
-          {hibernatedLook && (
-            <span
-              key={hibernatedLook === "out" ? wokenAt : ws.hibernatedAt}
-              aria-hidden
-              className={cn(
-                "ws-hib-look",
-                hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`,
-                active && ws.hibernated && "ws-hib-look-focused",
-              )}
-            />
-          )}
           {compact ? (
             ws.icon && getWorkspaceIcon(ws.icon) ? (
               <HugeiconsIcon
@@ -454,7 +434,6 @@ function SortableWorkspaceItem({
                 />
               )}
               <span className="truncate">{shownTitle || ws.kind}</span>
-              {ws.hibernated && <span aria-hidden className="ml-auto size-[13px] shrink-0" />}
               {agentCount > 0 && (
                 <span
                   title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
@@ -468,21 +447,6 @@ function SortableWorkspaceItem({
           )}
         </button>
         {!compact && detailToggle}
-        {!compact && ws.hibernated && (
-          <button
-            type="button"
-            title="Restore"
-            aria-label="Restore"
-            className={cn(
-              sideControl,
-              "group/wake right-4 opacity-0 transition-opacity group-hover:opacity-60 group-focus-within:opacity-60 hover:!opacity-100 focus-visible:!opacity-100",
-            )}
-            onClick={() => onWake?.(ws.id)}
-          >
-            <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover/wake:hidden group-focus-visible/wake:hidden" />
-            <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover/wake:block group-focus-visible/wake:block" />
-          </button>
-        )}
         {agentIndicator}
         {displayColor && (
           <span
@@ -498,11 +462,10 @@ function SortableWorkspaceItem({
           tabs={ws.tabs}
           entries={agentEntries}
           filter={detailFilter}
-          focusedTabId={active && !ws.hibernated ? ws.focusedTabId : null}
+          focusedTabId={active ? ws.focusedTabId : null}
           color={displayColor}
-          visibleTabIds={active && !ws.hibernated ? ws.visibleTabIds : ""}
-          hibernated={ws.hibernated}
-          onWake={onWake ? () => onWake(ws.id) : undefined}
+          visibleTabIds={active ? ws.visibleTabIds : ""}
+          onWake={onWakeTab ? (tabId) => onWakeTab(ws.id, tabId) : undefined}
           onActivate={activateDetailTab}
         />
       </SlideReveal>
@@ -541,25 +504,12 @@ function SortableWorkspaceItem({
               <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>
             )}
           </ContextMenuItem>
-          {ws.hibernated
-            ? onWake && (
-                <ContextMenuItem onSelect={() => onWake(ws.id)}>
-                  <HugeiconsIcon icon={UploadCircle01Icon} size={14} strokeWidth={2} />
-                  Restore
-                  {hibernateLabel && (
-                    <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
-                  )}
-                </ContextMenuItem>
-              )
-            : onHibernate && ws.tabs.length > 0 && (
-                <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
-                  <HugeiconsIcon icon={SleepingIcon} size={14} strokeWidth={2} />
-                  Hibernate
-                  {hibernateLabel && (
-                    <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
-                  )}
-                </ContextMenuItem>
-              )}
+          {onHibernate && ws.canHibernate && (
+            <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
+              <HugeiconsIcon icon={SleepingIcon} size={14} strokeWidth={2} />
+              Hibernate all
+            </ContextMenuItem>
+          )}
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
@@ -632,7 +582,7 @@ function SortableWorkspaceItem({
               </ContextMenuRadioGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
-          {onCloseAllTabs && !ws.hibernated && ws.tabs.length > 0 && (
+          {onCloseAllTabs && ws.tabs.length > 0 && (
             <ContextMenuItem onSelect={() => onCloseAllTabs(ws.id)}>
               <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
               Close All Tabs
@@ -1014,7 +964,7 @@ export function WorkspaceBar({
   onCloseAllTabs,
   onRename,
   onHibernate,
-  onWake,
+  onWakeTab,
   onOpenSettings,
   onSetColor,
   onSetIcon,
@@ -1287,7 +1237,7 @@ export function WorkspaceBar({
                                 onCloseAllTabs={onCloseAllTabs}
                                 onRename={onRename}
                                 onHibernate={onHibernate}
-                                onWake={onWake}
+                                onWakeTab={onWakeTab}
                                 onOpenSettings={onOpenSettings}
                                 onSetColor={onSetColor}
                                 onSetIcon={onSetIcon}
@@ -1322,7 +1272,7 @@ export function WorkspaceBar({
                                 onCloseAllTabs={onCloseAllTabs}
                                 onRename={onRename}
                                 onHibernate={onHibernate}
-                                onWake={onWake}
+                                onWakeTab={onWakeTab}
                                 onOpenSettings={onOpenSettings}
                                 onSetColor={onSetColor}
                                 onSetIcon={onSetIcon}

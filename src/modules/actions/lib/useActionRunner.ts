@@ -20,6 +20,7 @@ import {
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
 import { buildCommandVars, focusPlace, inWorktree } from "./commandVars";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { twinIds } from "./actionsBar";
 import { getActionStatesSnapshot } from "./useActionStates";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
@@ -66,6 +67,8 @@ export type ActionRunnerDeps = {
     tab: Tab,
   ) => string;
   setScriptPaneId: (workspaceId: string, paneId: string) => void;
+  /** Wakes a hibernated terminal tab; resolves once it is mounting again. */
+  wakeTab: (workspaceId: string, tabId: string) => Promise<void>;
   terminalHandles: MutableRefObject<Map<string, TerminalHandle>>;
   scriptCommandSeen: MutableRefObject<Set<string>>;
   /** Folder of the focused tab, with the agent worktree already applied. */
@@ -87,6 +90,11 @@ function warnMissingFolder(cwd: string | undefined, title: string) {
     });
 }
 
+function sleepingKind(tab: Tab | undefined): LinkedTab["sleeping"] {
+  if (!isHibernatedTab(tab)) return null;
+  return tab.hibernation.command || tab.hibernation.agent ? "busy" : "empty";
+}
+
 function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   const tabId = getActionTab(actionId);
   if (!tabId) return null;
@@ -100,6 +108,7 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
     markRunning: !!mark,
     foreignCommand: terminal && !mark && deps.scriptCommandSeen.current.has(tabId),
     cwd: found && found.tab.kind === "terminal" ? found.tab.cwd : undefined,
+    sleeping: sleepingKind(found?.tab),
   };
 }
 
@@ -126,7 +135,7 @@ function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps
   const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
-    hibernated: !!ws.hibernated,
+    hibernated: isHibernatedTab(focused),
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
     vars: { ...buildCommandVars(focused, ws, info, getSystemInfo().host), ...overlay?.vars },
     folders: {
@@ -274,10 +283,11 @@ export function useActionRunner(deps: ActionRunnerDeps) {
           flashTab(plan.tabId);
           return;
         case "reuse-tab":
+          if (plan.wake) void deps.wakeTab(ws.id, plan.tabId);
           revealActionTab(plan.tabId);
           setScriptRunning(plan.tabId, "running");
           setScriptCommand(plan.tabId, action.command);
-          scheduleWrite(plan.tabId, plan.input, WRITE_DELAY_REUSED_MS);
+          scheduleWrite(plan.tabId, plan.input, plan.wake ? WRITE_DELAY_NEW_MS : WRITE_DELAY_REUSED_MS);
           return;
         case "new-agent-tab": {
           const tabId = newTabId();

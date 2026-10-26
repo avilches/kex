@@ -1,25 +1,36 @@
 import { useEffect, useRef } from "react";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { autoHibernateTick, hibernatedIds, stampSwitch } from "./autoHibernate";
+import { autoHibernateTick } from "./autoHibernate";
+import { busyTabIds, liveAgent } from "./hibernateReview";
+import { liveScripts } from "./liveScripts";
+import { allPanes } from "./splitNode";
+import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
 import type { Workspace } from "./types";
-import { activityStamps, saveWorkspaceState } from "./workspaceState";
 
 const CHECK_EVERY_MS = 60_000;
 
-function busyWorkspaceIds(): Set<string> {
+const hiddenSince = new Map<string, number>();
+
+function busyIds(workspaces: readonly Workspace[]): Set<string> {
+  const sessions = useAgentStore.getState().sessions;
+  const commands = getRunningCommandsSnapshot();
   const ids = new Set<string>();
-  for (const session of Object.values(useAgentStore.getState().sessions)) {
-    if (session.status === "working") ids.add(session.workspaceId);
+  for (const ws of workspaces) {
+    const live = {
+      agentOf: (id: string) => liveAgent(sessions[id]),
+      runningCommand: (id: string) => commands.get(id),
+      ...liveScripts(ws),
+    };
+    for (const id of busyTabIds(allPanes(ws.paneTree).flatMap((p) => p.tabs), live)) ids.add(id);
   }
   return ids;
 }
 
 type Deps = {
   workspacesRef: { current: Workspace[] };
-  activeWorkspaceId: string | null;
   activeWorkspaceIdRef: { current: string | null };
-  requestAutoHibernate: (workspaceId: string) => Promise<boolean>;
+  requestAutoHibernate: (workspaceId: string, tabIds: string[]) => Promise<boolean>;
 };
 
 export function useAutoHibernate(deps: Deps) {
@@ -27,17 +38,7 @@ export function useAutoHibernate(deps: Deps) {
   depsRef.current = deps;
   const mode = usePreferencesStore((s) => s.autoHibernate);
 
-  const previousActiveRef = useRef<string | null>(null);
   useEffect(() => {
-    const previous = previousActiveRef.current;
-    previousActiveRef.current = deps.activeWorkspaceId;
-    stampSwitch(activityStamps, depsRef.current.workspacesRef.current, previous, deps.activeWorkspaceId, Date.now());
-  }, [deps.activeWorkspaceId]);
-
-  const hibernatedSeenRef = useRef<Set<string> | null>(null);
-
-  useEffect(() => {
-    hibernatedSeenRef.current ??= hibernatedIds(depsRef.current.workspacesRef.current);
     let running = false;
     const tick = async () => {
       const busy = running;
@@ -48,14 +49,11 @@ export function useAutoHibernate(deps: Deps) {
         await autoHibernateTick({
           workspaces,
           activeId: activeWorkspaceIdRef.current,
-          stamps: activityStamps,
-          hibernatedSeen: hibernatedSeenRef.current!,
-          busyIds: busyWorkspaceIds(),
+          stamps: hiddenSince,
+          busyTabIds: busyIds(workspaces),
           mode,
           busy,
           now: Date.now(),
-          save: () =>
-            saveWorkspaceState(workspaces, workspaces.findIndex((w) => w.id === activeWorkspaceIdRef.current)),
           request: requestAutoHibernate,
         });
       } finally {

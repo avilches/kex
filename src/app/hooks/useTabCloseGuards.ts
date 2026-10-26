@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { leafHasForegroundProcess } from "@/modules/terminal";
 import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import {
   runCloseQueue,
@@ -108,7 +109,8 @@ export function useTabCloseGuards({
               dirty: found.tab.dirty,
             };
           },
-          hasForegroundProcess: (id) => leafHasForegroundProcess(id),
+          // A sleeping tab has no process to warn about.
+          hasForegroundProcess: async (id) => (isHibernatedTab(findTab(id)?.tab) ? null : leafHasForegroundProcess(id)),
           isWarnEnabled,
           setWarnEnabled,
           isAutoSaveEnabled,

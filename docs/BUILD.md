@@ -47,7 +47,7 @@ token. It is dev only and not part of `pnpm build`.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
   two approximations of the real window: the WorkspaceBar (group header, workspace chips, one expanded
-  with its tab list and a focused tab, one hibernated), an Explorer Sidebar and a Source Control sidebar
+  with its tab list, a focused tab and a hibernated tab), an Explorer Sidebar and a Source Control sidebar
   side by side, the Header, the tab bar with agent chips, the terminal and editor panes, and below them
   the Live Preview pair. The Explorer uses the real Catppuccin file and folder icons
   (`iconResolver.ts`) and the same row classes as `TreeRow.tsx` (normal, gitignored, selected). The

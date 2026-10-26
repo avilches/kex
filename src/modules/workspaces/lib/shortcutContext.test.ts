@@ -6,12 +6,23 @@ const terminal: Tab = { id: "t", kind: "terminal" };
 const editor: Tab = { id: "e", kind: "editor", path: "/p/a.ts", dirty: false, preview: false };
 const markdown: Tab = { id: "m", kind: "markdown", path: "/p/a.md" };
 
-const base = { hibernated: false, activeTab: terminal, hasWorkspaceRoot: true, scriptCount: 1 };
+const sleeping: Tab = { id: "s", kind: "terminal", hibernation: { at: 1 } };
+const base = { activeTab: terminal, hasWorkspaceRoot: true, scriptCount: 1 };
 
 describe("shortcutUnavailable", () => {
-  it("blocks the shortcuts a hibernated workspace refuses", () => {
-    expect(shortcutUnavailable("tab.rename", { ...base, hibernated: true })).toBe(true);
-    expect(shortcutUnavailable("tab.rename", base)).toBe(false);
+  it("blocks only what acts on a live terminal while the focused tab sleeps", () => {
+    const asleep = { ...base, activeTab: sleeping };
+    for (const id of ["terminal.clear", "terminal.scratchpad", "search.focus"] as const) {
+      expect(shortcutUnavailable(id, asleep), id).toBe(true);
+      expect(shortcutUnavailable(id, base), id).toBe(false);
+    }
+  });
+
+  it("leaves tab, pane, sidebar, explorer and hibernate usable on a sleeping tab", () => {
+    const asleep = { ...base, activeTab: sleeping };
+    for (const id of ["tab.hibernate", "tab.rename", "tab.close", "tab.next", "pane.splitRight", "sidebar.toggle", "explorer.search", "workspace.run"] as const) {
+      expect(shortcutUnavailable(id, asleep), id).toBe(false);
+    }
   });
 
   it("needs an editor tab for undo, redo and the editor-only actions", () => {

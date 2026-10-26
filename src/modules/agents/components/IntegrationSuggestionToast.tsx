@@ -25,7 +25,7 @@ export function showIntegrationSuggestion(agent: AgentId): void {
   const name = AGENT_LABELS[agent];
   toast(`${name} is running without the Kex integration`, {
     description:
-      "Install it to see the spinner and attention dot in the tab, and to keep your session when you undo a closed tab or hibernate a workspace.",
+      "Install it to see the spinner and attention dot in the tab, and to keep your session when you undo a closed tab or hibernate one.",
     icon: <AgentIcon agent={agent} size={18} />,
     action: { label: "Install", onClick: () => void installWithToast(agent) },
     id: `integration-${agent}`,

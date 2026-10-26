@@ -21,6 +21,7 @@ import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   CrosshairIcon,
   LockKeyIcon,
+  SleepingIcon,
   StickyNote03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -32,6 +33,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { isHibernatedTab } from "./lib/hibernate";
 import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
 import { tabFolder } from "./lib/tabPath";
 import { TabBarIcon } from "./lib/tabBarIcon";
@@ -70,6 +72,7 @@ type Props = {
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
+  onWake?: (tabId: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 };
@@ -121,6 +124,7 @@ function DraggableTab({
   onRenameTab,
   onUpdateTab,
   onNoteHover,
+  onWake,
   gitStatusMap,
   gitStatus,
   gitColorScheme,
@@ -139,6 +143,7 @@ function DraggableTab({
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
+  onWake?: (tabId: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
@@ -169,6 +174,7 @@ function DraggableTab({
     disabled: !isWorkspaceActive,
   });
   const active = tab.id === activeTabId;
+  const sleeping = isHibernatedTab(tab);
   // Every tab can be locked, no exception.
   const isLocked = tab.locked ?? false;
   const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
@@ -239,6 +245,7 @@ function DraggableTab({
       title={tooltip.title}
       onPointerEnter={tooltip.onPointerEnter}
       onClick={() => onActivate(tab.id)}
+      onDoubleClick={sleeping ? () => onWake?.(tab.id) : undefined}
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault();
         // This div is draggable (dnd-kit's useDraggable sets tabIndex=0), so
@@ -344,6 +351,11 @@ function DraggableTab({
       </span>
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[9px] text-primary">●</span>
+      )}
+      {sleeping && (
+        <span className="ml-0.5 shrink-0 text-muted-foreground" title="Hibernated: double click to restore">
+          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+        </span>
       )}
       {tab.note !== undefined && (
         <TabNoteButton
@@ -457,6 +469,7 @@ export function PaneTabBar({
   onRenameTab,
   onUpdateTab,
   onNoteHover,
+  onWake,
   gitStatus,
   gitColorScheme,
 }: Props) {
@@ -676,6 +689,7 @@ export function PaneTabBar({
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
             onNoteHover={onNoteHover}
+            onWake={onWake}
             gitStatusMap={gitStatusMap}
             gitStatus={gitStatus}
             gitColorScheme={gitColorScheme}

@@ -7,13 +7,13 @@ import { terminalTargetOf } from "./terminalTarget";
 const tab = (tabId: string, cwd: string): MergedRow => ({
   kind: "tab",
   key: `tab:${tabId}`,
-  entry: { tabId, cwd, workspaceId: "ws", hibernated: false } as TabEntry,
+  entry: { tabId, cwd, workspaceId: "ws" } as TabEntry,
 });
 
 const closed = (kind: "terminal" | "file", path: string): MergedRow => ({
   kind: "closed",
   key: `closed:${kind}:${path}`,
-  entry: { kind, path, key: `closed:${kind}:${path}`, workspaceId: "ws2", hibernated: true } as ClosedTabEntry,
+  entry: { kind, path, key: `closed:${kind}:${path}`, workspaceId: "ws2" } as ClosedTabEntry,
 });
 
 describe("terminalTargetOf", () => {
@@ -37,7 +37,6 @@ describe("terminalTargetOf", () => {
     expect(terminalTargetOf("tab:a", rows)).toEqual({
       cwd: "/work/a",
       workspaceId: "ws",
-      hibernated: false,
       besideTabId: "a",
     });
   });

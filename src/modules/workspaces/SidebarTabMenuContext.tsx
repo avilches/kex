@@ -13,6 +13,8 @@ export type SidebarTabMenuActions = {
   onRenameTab: (tabId: string, title: string | undefined) => void;
   onUpdateTab: (tabId: string, updater: (p: Tab) => Tab) => void;
   onSaveTab: (tabId: string) => void;
+  // Puts the terminal to sleep, or wakes it when it is asleep.
+  onToggleHibernate: (tabId: string) => void;
   onRevealInExplorer: (path: string) => void;
   workspaceRoot: (workspaceId: string) => string | null;
 };
@@ -26,6 +28,7 @@ const SidebarTabMenuContext = createContext<SidebarTabMenuActions>({
   onRenameTab: noop,
   onUpdateTab: noop,
   onSaveTab: noop,
+  onToggleHibernate: noop,
   onRevealInExplorer: noop,
   workspaceRoot: () => null,
 });
@@ -40,6 +43,7 @@ type ActionSources = {
   workspacesRef: RefObject<Pick<Workspace, "id" | "paneTree" | "workspaceRoot" | "fsRoot">[]>;
   closeTabsRef: RefObject<(tabIds: string[]) => unknown>;
   saveTabRef: RefObject<(tabId: string) => unknown>;
+  toggleHibernateRef: RefObject<(tabId: string) => unknown>;
   tabCallbacksRef: RefObject<{
     onRenameTab?: SidebarTabMenuActions["onRenameTab"];
     onUpdateTab?: SidebarTabMenuActions["onUpdateTab"];
@@ -53,6 +57,7 @@ export function useSidebarTabMenuActions({
   workspacesRef,
   closeTabsRef,
   saveTabRef,
+  toggleHibernateRef,
   tabCallbacksRef,
 }: ActionSources): SidebarTabMenuActions {
   return useMemo(() => {
@@ -65,6 +70,7 @@ export function useSidebarTabMenuActions({
       onClose: (tabId) => void closeTabsRef.current([tabId]),
       onCloseOtherTabs: (tabId) => closeIds(tabId),
       onSaveTab: (tabId) => void saveTabRef.current(tabId),
+      onToggleHibernate: (tabId) => void toggleHibernateRef.current(tabId),
       onRenameTab: (tabId, title) => tabCallbacksRef.current.onRenameTab?.(tabId, title),
       onUpdateTab: (tabId, updater) => tabCallbacksRef.current.onUpdateTab?.(tabId, updater),
       onRevealInExplorer: (path) => tabCallbacksRef.current.onFocusOnExplorer?.(path),
@@ -73,5 +79,5 @@ export function useSidebarTabMenuActions({
         return ws?.workspaceRoot ?? ws?.fsRoot ?? null;
       },
     };
-  }, [workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef]);
+  }, [workspacesRef, closeTabsRef, saveTabRef, toggleHibernateRef, tabCallbacksRef]);
 }

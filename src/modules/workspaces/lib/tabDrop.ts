@@ -10,9 +10,6 @@ export type TabDropAction =
   | { kind: "split"; workspaceId: string; tabId: string; paneId: string; direction: SplitDirection }
   | { kind: "transfer"; sourceWorkspaceId: string; tabId: string; request: TabMoveRequest };
 
-// A hibernated workspace has no panes to drop on, so its overlay is one droppable.
-export const HIBERNATED_DROP_PREFIX = "hibernated:";
-
 // Insertion at an explicit index of a pane, used for the very top of a sidebar list.
 export const PANE_INDEX_PREFIX = "pane-index:";
 
@@ -60,17 +57,6 @@ export function resolveTabDrop(
     const targetWs = workspaces.find((w) => paneId && findPane(w.paneTree, paneId));
     if (!paneId || !targetWs || !Number.isInteger(index) || index < 0) return null;
     return placeAt(source, tabId, { wsId: targetWs.id, paneId }, index);
-  }
-
-  if (overId.startsWith(HIBERNATED_DROP_PREFIX)) {
-    const workspaceId = overId.slice(HIBERNATED_DROP_PREFIX.length);
-    if (!workspaceId || workspaceId === source.wsId || !workspaces.some((w) => w.id === workspaceId)) return null;
-    return {
-      kind: "transfer",
-      sourceWorkspaceId: source.wsId,
-      tabId,
-      request: { kind: "auto", workspaceId },
-    };
   }
 
   if (!overId.startsWith("zone:")) return null;

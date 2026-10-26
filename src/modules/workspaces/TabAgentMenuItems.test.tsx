@@ -38,6 +38,7 @@ function open(onRevealInExplorer: (p: string) => void = noop, extra?: React.Reac
     onRenameTab: noop,
     onUpdateTab: noop,
     onSaveTab: noop,
+    onToggleHibernate: noop,
     onRevealInExplorer,
     workspaceRoot: () => null,
   };

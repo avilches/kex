@@ -1,7 +1,7 @@
 export type NavWorkspace = {
   id: string;
-  // Tab ids in the order the sidebar detail list shows them. Empty when the
-  // workspace is hibernated, its detail is collapsed or the filter hides all.
+  // Tab ids in the order the sidebar detail list shows them. Empty when its
+  // detail is collapsed or the filter hides all.
   rowTabIds: string[];
 };
 

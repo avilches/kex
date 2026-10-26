@@ -375,19 +375,19 @@ describe("commandPalette.history", () => {
   });
 });
 
-describe("workspace.hibernate", () => {
+describe("tab.hibernate", () => {
   it("is registered on Mod+Alt+Z and nothing else uses that chord", () => {
-    const sc = SHORTCUTS.find((s) => s.id === "workspace.hibernate");
+    const sc = SHORTCUTS.find((s) => s.id === "tab.hibernate");
     expect(sc?.defaultBindings).toEqual([{ [MOD_PROP]: true, alt: true, key: "z" }]);
     const clashes = SHORTCUTS.filter(
       (s) =>
-        s.id !== "workspace.hibernate" &&
+        s.id !== "tab.hibernate" &&
         s.defaultBindings.some((b) => b.key === "z" && b.alt && b[MOD_PROP]),
     );
     expect(clashes).toEqual([]);
   });
 
-  it("stays usable while the workspace is hibernated, so it can be toggled", () => {
-    expect(blockedWhileHibernated("workspace.hibernate")).toBe(false);
+  it("stays usable on a hibernated tab, so it can be toggled", () => {
+    expect(blockedWhileHibernated("tab.hibernate")).toBe(false);
   });
 });

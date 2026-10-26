@@ -16,7 +16,7 @@ import { rowTabAt } from "./rowTab";
 const NONE: readonly Action[] = [];
 const EMPTY: ContextActionGroups = { workspace: [], global: [] };
 
-type MenuWorkspace = Pick<Workspace, "actions" | "cwd" | "workspaceRoot" | "hibernated"> | null;
+type MenuWorkspace = Pick<Workspace, "actions" | "cwd" | "workspaceRoot"> | null;
 
 // The Actions a pane's new-tab menu offers, seen from the folder the pane works in (the
 // workspace folder when it has none yet), and the values to run them with.
@@ -41,11 +41,10 @@ export function useNewTabActions(ws: MenuWorkspace, paneFolder: string | null): 
         ? newTabActionEntries(ws?.actions ?? NONE, global, {
             vars,
             shell,
-            hibernated: !!ws?.hibernated,
             folders: { focusFolder: folder, workspaceRoot: ws?.workspaceRoot ?? null, workspaceCwd: ws?.cwd ?? null },
           }, states)
         : EMPTY,
-    [vars, global, shell, states, folder, ws?.actions, ws?.hibernated, ws?.workspaceRoot, ws?.cwd],
+    [vars, global, shell, states, folder, ws?.actions, ws?.workspaceRoot, ws?.cwd],
   );
   const overlay = useMemo<RunOverlay | null>(
     () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),

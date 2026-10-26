@@ -701,7 +701,7 @@ fn set_snapshot_at_path(
 
 // A preview to recognise the conversation by, not a transcript: agent-sessions.json is not
 // encrypted, so the less of what the assistant said lands there the better. 280 characters
-// fill the two clamped lines of the hibernated overlay with room to spare.
+// fill the two clamped lines of the hibernated tab placeholder with room to spare.
 pub const MAX_LAST_MESSAGE_CHARS: usize = 280;
 
 /// The stored form of a Stop's `last_assistant_message`: whitespace runs (newlines, code

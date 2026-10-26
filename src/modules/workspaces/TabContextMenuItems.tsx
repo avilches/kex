@@ -14,6 +14,7 @@ import {
   SleepingIcon,
   SquareUnlock02Icon,
   StickyNote03Icon,
+  UploadCircle01Icon,
 } from "@hugeicons/core-free-icons";
 import {
   ContextMenuItem,
@@ -77,7 +78,7 @@ export function TabContextMenuItems({
   const { targets, moveTab } = useWorkspaceMove();
   const startRename = useTabRenameStore((s) => s.startRename);
   const otherTargets = targets.filter((t) => t.id !== workspaceId);
-  const { onSaveTab, onRevealInExplorer } = useSidebarTabMenu();
+  const { onSaveTab, onToggleHibernate, onRevealInExplorer } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
   const focusFilePath = tabFilePath(tab);
@@ -226,14 +227,6 @@ export function TabContextMenuItems({
                 >
                   <WorkspaceMark id={t.id} color={t.color} icon={t.icon} />
                   <span className="truncate">{t.title}</span>
-                  {t.hibernated && (
-                    <HugeiconsIcon
-                      icon={SleepingIcon}
-                      size={13}
-                      strokeWidth={1.75}
-                      className="ml-auto shrink-0 text-muted-foreground opacity-60"
-                    />
-                  )}
                 </ContextMenuItem>
               ))}
             </ContextMenuSubContent>
@@ -248,6 +241,13 @@ export function TabContextMenuItems({
         {runOnStart}
       </TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
+      {tab.kind === "terminal" && (
+        <ContextMenuItem onSelect={() => onToggleHibernate(tab.id)}>
+          <HugeiconsIcon icon={tab.hibernation ? UploadCircle01Icon : SleepingIcon} size={14} strokeWidth={2} />
+          {tab.hibernation ? "Restore" : "Hibernate"}
+          <Shortcut id="tab.hibernate" />
+        </ContextMenuItem>
+      )}
       <ContextMenuItem
         // preventDefault keeps the menu open: the point of Lock/Unlock from the
         // menu is toggling in place, so the item flips to Unlock Tab and stays.

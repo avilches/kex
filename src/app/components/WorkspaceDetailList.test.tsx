@@ -262,6 +262,7 @@ describe("WorkspaceDetailList context menu", () => {
     onRenameTab: vi.fn(),
     onUpdateTab: vi.fn(),
     onSaveTab: vi.fn(),
+    onToggleHibernate: vi.fn(),
     onRevealInExplorer: vi.fn(),
     workspaceRoot: () => null,
   };
@@ -350,8 +351,11 @@ describe("WorkspaceDetailList context menu", () => {
   });
 });
 
-describe("WorkspaceDetailList hibernated", () => {
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn()) {
+describe("WorkspaceDetailList with a hibernated tab", () => {
+  const sleeping = (t: Tab): Tab =>
+    t.id === "t-plain" ? ({ ...t, locked: true, note: "n", hibernation: { at: 1 } } as Tab) : t;
+
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn()) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -367,17 +371,17 @@ describe("WorkspaceDetailList hibernated", () => {
               onRenameTab: vi.fn(),
               onUpdateTab: vi.fn(),
               onSaveTab: vi.fn(),
+              onToggleHibernate,
               onRevealInExplorer: vi.fn(),
               workspaceRoot: () => null,
             },
           },
           createElement(WorkspaceDetailList, {
             workspaceId: "ws-1",
-            tabs: tabs.map((t) => (t.kind === "terminal" ? { ...t, locked: true, note: "n" } : t)),
+            tabs: tabs.map(sleeping),
             entries: [],
             filter: { ...base },
             focusedTabId: null,
-            hibernated: true,
             onActivate,
             onWake,
           }),
@@ -388,27 +392,47 @@ describe("WorkspaceDetailList hibernated", () => {
     return { container, rows, onWake, onActivate, unmount: track(root) };
   }
 
-  it("has no close, unlock or note controls, but still activates on click", () => {
-    const { container, rows, onActivate, unmount } = mountAsleep();
+  it("marks the sleeping row and keeps its lock, note and close controls", () => {
+    const { container, rows, unmount } = mountAsleep();
+    const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
-    expect(
-      container.querySelector('button[aria-label="Close tab"], button[aria-label="Unlock tab"], button[aria-label="Tab note"]'),
-    ).toBeNull();
-    act(() => rows()[0].click());
-    expect(onActivate).toHaveBeenCalledWith("t-work");
+    expect(sleepingRow.querySelector("svg.opacity-60")).not.toBeNull();
+    expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
+    expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
+    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
     unmount();
   });
 
-  it("the context menu only offers Restore Workspace", () => {
-    const { rows, onWake, unmount } = mountAsleep();
+  it("a single click only activates, a double click wakes only the sleeping row", () => {
+    const { rows, onWake, onActivate, unmount } = mountAsleep();
+    const [work, , , plain] = rows();
+    act(() => plain.click());
+    expect(onActivate).toHaveBeenCalledWith("t-plain");
+    expect(onWake).not.toHaveBeenCalled();
     act(() => {
-      rows()[0].dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 4, clientY: 4 }));
+      work.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     });
-    const items = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'));
-    expect(items).toHaveLength(1);
-    expect(items[0].textContent).toMatch(/^Restore Workspace.+/);
-    act(() => items[0].click());
-    expect(onWake).toHaveBeenCalled();
+    expect(onWake).not.toHaveBeenCalled();
+    act(() => {
+      plain.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    expect(onWake).toHaveBeenCalledWith("t-plain");
+    unmount();
+  });
+
+  it("the context menu of a sleeping row offers Restore, an awake one Hibernate", () => {
+    const { rows, unmount } = mountAsleep();
+    const menuLabels = (row: HTMLElement) => {
+      act(() => {
+        row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 4, clientY: 4 }));
+      });
+      const labels = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((e) => e.textContent ?? "");
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      return labels;
+    };
+    expect(menuLabels(rows()[3]).some((l) => l.startsWith("Restore"))).toBe(true);
     unmount();
   });
 });

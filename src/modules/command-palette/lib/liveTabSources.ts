@@ -6,7 +6,6 @@ import { getRunningCommand } from "@/modules/workspaces/lib/terminalEphemeralSto
 import { tabDisplayTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { tabUseSnapshot } from "@/modules/workspaces/lib/tabUse";
 import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
-import { activityStamps } from "@/modules/workspaces/lib/workspaceState";
 import type { TabSources } from "./tabEntries";
 
 // Reads every store once, at the moment the palette opens. Thin on purpose: the logic is in tabEntries.
@@ -33,6 +32,5 @@ export function liveTabSources(): TabSources {
     agentSessionOf: (id) => agents.sessions[id],
     visualOf: (id) => visual.get(id) ?? null,
     lastUsed: (id) => use[id] ?? 0,
-    workspaceActiveAt: (id) => activityStamps.get(id) ?? 0,
   };
 }

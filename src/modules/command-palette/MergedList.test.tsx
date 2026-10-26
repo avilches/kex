@@ -40,7 +40,6 @@ const tab: TabEntry = {
   agentSession: undefined,
   running: false,
   lastUsedAt: 0,
-  workspaceActiveAt: 0,
   order: 0,
 };
 

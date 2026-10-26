@@ -66,6 +66,7 @@ function setup(workspace: Workspace, found: Record<string, Tab> = {}) {
     openTab: vi.fn(),
     splitPaneAndOpenTab: vi.fn(() => "p-scripts"),
     setScriptPaneId: vi.fn(),
+    wakeTab: vi.fn(async () => {}),
     terminalHandles: { current: new Map([["any", { write }]]) },
     scriptCommandSeen: { current: new Set<string>() },
     focusFolder: { current: null as string | null },
@@ -147,6 +148,27 @@ describe("useActionRunner", () => {
     expect(getScriptRunningSnapshot().get("tab-old")).toBe("running");
   });
 
+  it("wakes a linked sleeping shell with nothing to restore and reuses it", () => {
+    linkActionTab(script.id, "tab-old");
+    const asleep: Tab = { id: "tab-old", kind: "terminal", cwd: "/w", hibernation: { at: 1 } };
+    const { deps, result } = setup(ws(), { "tab-old": asleep });
+    act(() => result.current.runAction(script));
+    expect(deps.wakeTab).toHaveBeenCalledWith("w1", "tab-old");
+    expect(deps.openTab).not.toHaveBeenCalled();
+    expect(deps.splitPaneAndOpenTab).not.toHaveBeenCalled();
+    expect(getScriptRunningSnapshot().get("tab-old")).toBe("running");
+  });
+
+  it("opens a new tab instead of waking one that would come back running its Run on start command", () => {
+    linkActionTab(script.id, "tab-old");
+    const asleep: Tab = { id: "tab-old", kind: "terminal", cwd: "/w", hibernation: { at: 1, command: "pnpm dev" } };
+    const { deps, result } = setup(ws(), { "tab-old": asleep });
+    act(() => result.current.runAction(script));
+    expect(deps.wakeTab).not.toHaveBeenCalled();
+    expect(deps.splitPaneAndOpenTab).toHaveBeenCalledTimes(1);
+    clearScriptRunningEntry(getActionTab(script.id) as string);
+  });
+
   it("adds to the scripts pane when it exists", () => {
     const withPane = ws({
       scriptPaneId: "p2",
@@ -181,11 +203,15 @@ describe("useActionRunner", () => {
     expect(toastError).toHaveBeenCalledWith("Code not run: {workspace} has no value here", { duration: 4000 });
   });
 
-  it("stays quiet while the workspace sleeps", () => {
-    const { result } = setup(ws({ hibernated: true }));
-    act(() => result.current.runAction(script));
+  it("stays quiet while the focused tab sleeps and the Action reads its folder", () => {
+    const here: Action = { ...script, id: "ac-here", command: "ls {cwd}" };
+    const asleep: Tab = { id: "tab-user", kind: "terminal", hibernation: { at: 1 } };
+    const { result } = setup(
+      ws({ paneTree: { kind: "pane", id: "p1", tabs: [asleep], activeTabId: "tab-user" } }),
+    );
+    act(() => result.current.runAction(here));
     expect(toastError).not.toHaveBeenCalled();
-    expect(getActionTab(script.id)).toBeUndefined();
+    expect(getActionTab(here.id)).toBeUndefined();
   });
 
   it("opens a new tab per click of an agent, with no link and no running mark", () => {

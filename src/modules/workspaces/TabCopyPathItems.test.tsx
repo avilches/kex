@@ -26,6 +26,7 @@ function open(tab: Tab, root: string | null = "/repo") {
     onRenameTab: noop,
     onUpdateTab: noop,
     onSaveTab: noop,
+    onToggleHibernate: noop,
     onRevealInExplorer: noop,
     workspaceRoot: () => root,
   };

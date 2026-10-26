@@ -6,10 +6,11 @@ import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
 export type ScriptCwdMode = "home" | "workspace" | "context" | "fixed";
 
-// What the sleeping overlay shows for a terminal tab besides its title: the agent and the
-// restore command are gone with the PTY, so they are captured when the workspace goes to sleep.
-// `title` is the name the tab showed when it went to sleep, kept because the process that fed it is gone.
-export type TabHibernation = { agent?: string; command?: string; title?: string };
+// A terminal tab that is asleep: no PTY, no render slot, same id. Its presence is the flag.
+// What the placeholder shows besides the title (the agent and the restore command) is gone with the
+// PTY, so it is captured when the tab goes to sleep. `title` is the name the tab showed then, kept
+// because the process that fed it is gone. `at` is the epoch ms it went to sleep.
+export type TabHibernation = { at: number; agent?: string; command?: string; title?: string };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no
 // exception. `autofocus` lives here too so any new path-bearing kind opts in
@@ -109,15 +110,6 @@ export type Workspace = {
   activeAction?: string;
   // The nested tab list under this workspace in the WorkspaceBar is open.
   detailExpanded?: boolean;
-  // The workspace keeps its pane tree and tabs in the JSON but mounts none of
-  // them; waking it brings editors, commands and agents back.
-  hibernated?: boolean;
-  // Epoch ms when it was hibernated; absent in workspaces hibernated before it existed.
-  hibernatedAt?: number;
-  // Epoch ms of the last time it was the active workspace, for auto-hibernate across restarts.
-  // Only the value loaded at startup lives in state; the live one is in the activity stamps
-  // and is merged in when the body is saved.
-  lastActiveAt?: number;
 };
 
 // Actions with a command: the ones a workspace close would delete. The close-workspace

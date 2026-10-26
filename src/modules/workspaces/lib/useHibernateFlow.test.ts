@@ -4,118 +4,105 @@ import { createHibernateFlow, type HibernateFlowDeps } from "./useHibernateFlow"
 import type { Tab, Workspace } from "./types";
 
 const term = (id: string, over: Record<string, unknown> = {}): Tab => ({ id, kind: "terminal", ...over }) as Tab;
-const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace =>
+const ws = (tabs: Tab[], activeTabId: string | null = tabs[0]?.id ?? null): Workspace =>
   ({
     id: "w1",
     title: "W",
-    paneTree: { kind: "pane", id: "p1", tabs, activeTabId: tabs[0]?.id ?? null },
+    paneTree: { kind: "pane", id: "p1", tabs, activeTabId },
     activePaneId: "p1",
-    ...over,
   }) as Workspace;
+
+const idle = { agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined, actionOf: () => undefined };
 
 function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
   const calls: string[] = [];
   const deps: HibernateFlowDeps = {
     getWorkspace: () => workspace,
-    saveWorkspaceDocs: async () => true,
-    isActive: () => false,
-    settle: async () => void calls.push("settle"),
-    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined, actionOf: () => undefined }),
+    activeWorkspaceId: () => null,
+    live: () => idle,
     finishAgent: (id) => void calls.push(`finish:${id}`),
-    destroyFloats: async () => void calls.push("floats"),
-    snapshotTabs: async () => ({}),
-    hibernate: () => void calls.push("hibernate"),
-    setPending: (id) => void calls.push(`pending:${id}`),
+    snapshotTabs: async (tabs) => Object.fromEntries(tabs.map((t) => [t.id, { at: 1 }])),
+    hibernate: (_id, snapshots) => void calls.push(`hibernate:${Object.keys(snapshots).join(",")}`),
+    setPending: (p) => void calls.push(p ? `pending:${p.workspaceId}:${p.tabIds.join(",")}` : "pending:null"),
     ...over,
   };
   return { flow: createHibernateFlow(deps), calls };
 }
 
 describe("createHibernateFlow", () => {
-  beforeEach(() => unmarkHibernating(["t1", "t2"]));
+  beforeEach(() => unmarkHibernating(["t1", "t2", "t3"]));
 
   it("hibernates straight away when there is nothing to warn about", async () => {
     const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
-    await flow.request("w1");
-    expect(calls).toContain("hibernate");
-    expect(calls).not.toContain("pending:w1");
+    await flow.request("w1", ["t1"]);
+    expect(calls).toContain("hibernate:t1");
+    expect(calls.some((c) => c.startsWith("pending:w1"))).toBe(false);
   });
 
-  it("never hibernates a workspace without tabs, whichever way it is asked", async () => {
-    const { flow, calls } = setup(ws([]));
-    await flow.request("w1");
-    expect(await flow.requestAuto("w1")).toBe(false);
-    expect(await flow.perform("w1")).toBe(false);
-    expect(calls).not.toContain("hibernate");
-    expect(calls).not.toContain("pending:w1");
+  it("hibernates an empty shell without asking", async () => {
+    const { flow, calls } = setup(ws([term("t1")]));
+    await flow.request("w1", ["t1"]);
+    expect(calls).toContain("hibernate:t1");
   });
 
-  it("hands the tab snapshots taken before the hibernation to the hibernate step", async () => {
-    const snap = { command: "claude --resume abc" };
+  it("only touches the tabs it was asked for, and only terminals", async () => {
+    const editor = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
+    const { flow, calls } = setup(ws([term("t1"), term("t2"), editor]));
+    await flow.request("w1", ["t2", "e1"]);
+    expect(calls).toContain("hibernate:t2");
+    expect(isHibernating("t1")).toBe(false);
+  });
+
+  it("never hibernates a tab that is already asleep, or an unknown one", async () => {
+    const { flow, calls } = setup(ws([term("t1", { hibernation: { at: 1 } })]));
+    await flow.request("w1", ["t1", "ghost"]);
+    expect(await flow.perform("w1", ["t1"])).toBe(false);
+    expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("hands the snapshots taken before the hibernation to the hibernate step", async () => {
+    const snap = { at: 7, command: "claude --resume abc" };
     let received: unknown;
     const { flow } = setup(ws([term("t1")]), {
       snapshotTabs: async () => ({ t1: snap }),
       hibernate: (_id, snapshots) => void (received = snapshots),
     });
-    await flow.request("w1");
+    await flow.request("w1", ["t1"]);
     expect(received).toEqual({ t1: snap });
   });
 
-  it("opens the dialog instead when a command would be lost", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), {
-      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined, actionOf: () => undefined }),
+  it("opens the dialog with just the tabs that were asked for when a command would be lost", async () => {
+    const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
+      live: () => ({ ...idle, runningCommand: (id: string) => (id === "t1" ? "npm run dev" : undefined) }),
     });
-    await flow.request("w1");
-    expect(calls).toContain("pending:w1");
-    expect(calls).not.toContain("hibernate");
+    await flow.request("w1", ["t1", "t2"]);
+    expect(calls).toContain("pending:w1:t1,t2");
+    expect(calls.some((c) => c.startsWith("hibernate"))).toBe(false);
   });
 
-  it("saves every document whatever the autosave preference says, then lets the state settle before reviewing", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), {
-      saveWorkspaceDocs: async () => (calls.push("save"), true),
+  it("opens the dialog for a working agent and for a running script", async () => {
+    const working = { agent: "claude", status: "working" as const, resumable: true };
+    const a = setup(ws([term("t1", { restoreOnRestart: true })]), { live: () => ({ ...idle, agentOf: () => working }) });
+    await a.flow.request("w1", ["t1"]);
+    expect(a.calls).toContain("pending:w1:t1");
+
+    const b = setup(ws([term("t1")]), {
+      live: () => ({
+        ...idle,
+        scriptState: () => "running",
+        actionOf: () => ({ name: "dev", command: "pnpm dev" }),
+      }),
     });
-    await flow.request("w1");
-    expect(calls.indexOf("save")).toBeLessThan(calls.indexOf("settle"));
-    expect(calls.indexOf("settle")).toBeLessThan(calls.indexOf("hibernate"));
+    await b.flow.request("w1", ["t1"]);
+    expect(b.calls).toContain("pending:w1:t1");
   });
 
-  it("opens the dialog for a document whose save failed instead of hibernating", async () => {
-    const dirty = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
-    const { flow, calls } = setup(ws([dirty]), { saveWorkspaceDocs: async () => false });
-    await flow.request("w1");
-    expect(calls).toContain("pending:w1");
-    expect(calls).not.toContain("hibernate");
-  });
-
-  it("closes floats, then marks tabs and finishes each agent session right before flagging", async () => {
+  it("marks the tabs and finishes each agent session right before flagging them", async () => {
     const { flow, calls } = setup(ws([term("t1"), term("t2")]));
-    await flow.perform("w1");
+    await flow.perform("w1", ["t1", "t2"]);
     expect(isHibernating("t1") && isHibernating("t2")).toBe(true);
-    expect(calls).toEqual(["pending:null", "floats", "finish:t1", "finish:t2", "hibernate"]);
-  });
-
-  it("leaves tabs unmarked and agents untouched when the workspace turns active while floats close", async () => {
-    let active = false;
-    const { flow, calls } = setup(ws([term("t1")]), {
-      isActive: () => active,
-      destroyFloats: async () => void (active = true),
-    });
-    expect(await flow.requestAuto("w1")).toBe(false);
-    expect(isHibernating("t1")).toBe(false);
-    expect(calls.some((c) => c.startsWith("finish") || c === "hibernate")).toBe(false);
-  });
-
-  it("aborts when a document became dirty while floats closed", async () => {
-    let tabs: Tab[] = [term("t1")];
-    const { flow, calls } = setup(ws(tabs), {
-      getWorkspace: () => ws(tabs),
-      destroyFloats: async () => {
-        tabs = [term("t1"), { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab];
-      },
-    });
-    await flow.request("w1");
-    expect(isHibernating("t1")).toBe(false);
-    expect(calls).not.toContain("hibernate");
+    expect(calls).toEqual(["pending:null", "finish:t1", "finish:t2", "hibernate:t1,t2"]);
   });
 
   it("unmarks the tabs when hibernating throws", async () => {
@@ -124,89 +111,84 @@ describe("createHibernateFlow", () => {
         throw new Error("x");
       },
     });
-    await expect(flow.perform("w1")).rejects.toThrow("x");
+    await expect(flow.perform("w1", ["t1"])).rejects.toThrow("x");
     expect(isHibernating("t1")).toBe(false);
   });
 
   it("hibernates once when performed twice at the same time", async () => {
     const { flow, calls } = setup(ws([term("t1")]));
-    await Promise.all([flow.perform("w1"), flow.perform("w1")]);
-    expect(calls.filter((c) => c === "hibernate")).toHaveLength(1);
-  });
-
-  it("ignores a workspace that is already hibernated", async () => {
-    const { flow, calls } = setup(ws([term("t1")], { hibernated: true }));
-    await flow.request("w1");
-    await flow.perform("w1");
-    expect(calls).toEqual([]);
+    await Promise.all([flow.perform("w1", ["t1"]), flow.perform("w1", ["t1"])]);
+    expect(calls.filter((c) => c.startsWith("hibernate"))).toHaveLength(1);
   });
 
   describe("requestAuto", () => {
-    const busy = { agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined, actionOf: () => undefined };
-
-    it("hibernates when nothing would be lost", async () => {
+    it("hibernates a hidden tab when nothing would be lost", async () => {
       const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
-      expect(await flow.requestAuto("w1")).toBe(true);
-      expect(calls).toContain("hibernate");
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(true);
+      expect(calls).toContain("hibernate:t1");
     });
 
-    it("saves the documents before hibernating", async () => {
-      const saved: string[] = [];
+    it("hibernates an empty shell", async () => {
+      const { flow } = setup(ws([term("t1")]));
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(true);
+    });
+
+    it("leaves a tab alone while it is visible, and takes the hidden ones of the same workspace", async () => {
+      const { flow, calls } = setup(ws([term("t1"), term("t2")], "t1"), { activeWorkspaceId: () => "w1" });
+      expect(await flow.requestAuto("w1", ["t1", "t2"])).toBe(true);
+      expect(calls).toContain("hibernate:t2");
+      expect(isHibernating("t1")).toBe(false);
+    });
+
+    it("does nothing when the only tab is visible", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { activeWorkspaceId: () => "w1" });
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it("does nothing when the tab turns visible while its snapshot is taken", async () => {
+      let active: string | null = null;
       const { flow, calls } = setup(ws([term("t1")]), {
-        saveWorkspaceDocs: async (id) => (saved.push(id), true),
+        activeWorkspaceId: () => active,
+        snapshotTabs: async () => ((active = "w1"), { t1: { at: 1 } }),
       });
-      await flow.requestAuto("w1");
-      expect(saved).toEqual(["w1"]);
-      expect(calls).toContain("hibernate");
-    });
-
-    it("does nothing when the workspace becomes active while it was saving", async () => {
-      let active = false;
-      const { flow, calls } = setup(ws([term("t1")]), {
-        saveWorkspaceDocs: async () => ((active = true), true),
-        isActive: () => active,
-      });
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
-    });
-
-    it("does nothing for the active workspace", async () => {
-      const { flow, calls } = setup(ws([term("t1")]), { isActive: () => true });
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
+      expect(isHibernating("t1")).toBe(false);
+      expect(calls.some((c) => c.startsWith("finish") || c.startsWith("hibernate"))).toBe(false);
     });
 
     it("does nothing when an agent is waiting for the user", async () => {
       const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true })]), {
-        live: () => ({
-          agentOf: () => ({ agent: "claude", status: "attention", resumable: true }),
-          runningCommand: () => undefined,
-          scriptState: () => undefined,
-          actionOf: () => undefined,
-        }),
+        live: () => ({ ...idle, agentOf: () => ({ agent: "claude", status: "attention", resumable: true }) }),
       });
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
+      expect(calls).toEqual([]);
     });
 
-    it("does nothing when a save fails", async () => {
-      const { flow, calls } = setup(ws([term("t1")]), { saveWorkspaceDocs: async () => false });
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
+    it("does nothing for a working agent or a running script", async () => {
+      const working = setup(ws([term("t1", { restoreOnRestart: true })]), {
+        live: () => ({ ...idle, agentOf: () => ({ agent: "claude", status: "working", resumable: true }) }),
+      });
+      expect(await working.flow.requestAuto("w1", ["t1"])).toBe(false);
+      const script = setup(ws([term("t1")]), {
+        live: () => ({ ...idle, scriptState: () => "running", actionOf: () => ({ name: "dev", command: "pnpm dev" }) }),
+      });
+      expect(await script.flow.requestAuto("w1", ["t1"])).toBe(false);
     });
 
     it("does nothing, and never opens the dialog, when a command would be lost", async () => {
-      const { flow, calls } = setup(ws([term("t1")]), { live: () => busy });
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
-      expect(calls).not.toContain("pending:w1");
+      const { flow, calls } = setup(ws([term("t1")]), { live: () => ({ ...idle, runningCommand: () => "npm run dev" }) });
+      expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
+      expect(calls).toEqual([]);
     });
 
-    it("does nothing when a document is still dirty after saving", async () => {
-      const dirty = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
-      const { flow, calls } = setup(ws([dirty]));
-      expect(await flow.requestAuto("w1")).toBe(false);
-      expect(calls).not.toContain("hibernate");
+    it("skips only the tabs that would lose something", async () => {
+      const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
+        live: () => ({ ...idle, runningCommand: (id: string) => (id === "t1" ? "npm run dev" : undefined) }),
+      });
+      expect(await flow.requestAuto("w1", ["t1", "t2"])).toBe(true);
+      expect(calls).toContain("hibernate:t2");
+      expect(isHibernating("t1")).toBe(false);
     });
   });
 });

@@ -36,10 +36,10 @@ describe("tabMenuItems", () => {
     expect(items.every((i) => !i.disabled)).toBe(true);
   });
 
-  it("says restore for a hibernated tab and cannot close it", () => {
+  it("says restore for a hibernated tab and can still close it", () => {
     const items = tabMenuItems(entry({ hibernated: true }));
     expect(items[0].label).toBe("Restore and go to Tab");
-    expect(items[3].disabled).toBe(true);
+    expect(items[3].disabled).toBeFalsy();
   });
 
   it("cannot close a locked tab", () => {

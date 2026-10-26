@@ -66,11 +66,6 @@ describe("contextActionEntries", () => {
     expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "needs a git branch" });
   });
 
-  it("a hibernated workspace mutes everything", () => {
-    const groups = contextActionEntries([action("agent {cwd}")], [], { ...ctx(), hibernated: true });
-    expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "workspace is hibernated" });
-  });
-
   it("Actions with no command are skipped", () => {
     const groups = contextActionEntries([action("  "), action("agent {cwd}")], [], ctx());
     expect(groups.workspace).toHaveLength(1);

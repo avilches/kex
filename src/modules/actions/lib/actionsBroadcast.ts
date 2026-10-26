@@ -52,7 +52,7 @@ const applyEdit = (m: WorkspaceActionsMutators, edit: ActionsEdit): void => {
 type Props = {
   /** Null only while there is no workspace at all, in which case nothing is pushed. */
   workspace:
-    | Pick<Workspace, "id" | "title" | "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "hibernated">
+    | Pick<Workspace, "id" | "title" | "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions">
     | null;
   mutators: WorkspaceActionsMutators;
 };

@@ -19,6 +19,7 @@ export type ShortcutId =
   | "tab.rename"
   | "tab.note"
   | "tab.lock"
+  | "tab.hibernate"
   | "tab.focusOnExplorer"
   | "tab.toggleAutofocus"
   | "file.rename"
@@ -54,7 +55,6 @@ export type ShortcutId =
   | "workspace.rename"
   | "workspace.settings"
   | "workspace.run"
-  | "workspace.hibernate"
   | "nav.prev"
   | "nav.next"
   | "workspace.selectByIndex"
@@ -137,9 +137,9 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ key: "F12" }],
   },
   {
-    id: "workspace.hibernate",
-    label: "Hibernate Workspace",
-    group: "General",
+    id: "tab.hibernate",
+    label: "Hibernate Tab",
+    group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
   },
   {

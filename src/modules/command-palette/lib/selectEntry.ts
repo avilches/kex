@@ -1,18 +1,17 @@
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
-// A hibernated workspace keeps its tabs in the tree, so navigating after the wake always finds the tab.
+// A hibernated tab stays in the tree, so navigating after the wake always finds it.
 export async function selectTab(
   entry: Pick<TabEntry, "tabId" | "workspaceId" | "hibernated">,
-  deps: { wake(workspaceId: string): Promise<void>; goToTab(tabId: string): void },
+  deps: { wake(workspaceId: string, tabId: string): Promise<void>; goToTab(tabId: string): void },
 ): Promise<void> {
-  if (entry.hibernated) await deps.wake(entry.workspaceId);
+  if (entry.hibernated) await deps.wake(entry.workspaceId, entry.tabId);
   deps.goToTab(entry.tabId);
 }
 
-export async function selectWorkspace(
-  entry: Pick<WorkspaceEntry, "workspaceId" | "hibernated">,
-  deps: { wake(workspaceId: string): Promise<void>; activate(workspaceId: string): void },
-): Promise<void> {
-  if (entry.hibernated) await deps.wake(entry.workspaceId);
+export function selectWorkspace(
+  entry: Pick<WorkspaceEntry, "workspaceId">,
+  deps: { activate(workspaceId: string): void },
+): void {
   deps.activate(entry.workspaceId);
 }

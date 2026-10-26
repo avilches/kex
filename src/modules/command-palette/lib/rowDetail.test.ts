@@ -24,7 +24,6 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   agentSession: undefined,
   running: false,
   lastUsedAt: 0,
-  workspaceActiveAt: 0,
   order: 0,
   ...over,
 });

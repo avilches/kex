@@ -649,32 +649,23 @@ function sidebarFrame(
 // ---------------------------------------------------------------------------
 // Workspace bar
 
-type TabRow = { title: string; kind: "terminal" | "file"; focused?: boolean };
+type TabRow = { title: string; kind: "terminal" | "file"; focused?: boolean; hibernated?: boolean };
 
 function workspaceItem(opts: {
   title: string;
   active?: boolean;
-  hibernated?: boolean;
   expanded?: boolean;
   tabs?: TabRow[];
 }): HTMLElement {
   const row = h(
     "button",
     {
-      class: `flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition-all ${opts.hibernated ? "relative overflow-hidden " : ""}${opts.active ? "text-foreground" : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground"}`,
+      class: `flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition-all ${opts.active ? "text-foreground" : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground"}`,
       style: opts.active ? "box-shadow:inset 0 0 0 1px var(--ring)" : "",
       "data-workspace": opts.title,
       "data-active": String(!!opts.active),
     },
-    opts.hibernated ? h("span", { class: "ws-hib-look absolute inset-0" }) : "",
     h("span", { class: "min-w-0 flex-1 truncate" }, opts.title),
-    opts.hibernated
-      ? h(
-          "span",
-          { class: "shrink-0 opacity-60" },
-          icon(SleepingIcon, 13, 1.75),
-        )
-      : "",
   );
   const wrap = h("div", { class: "flex w-full flex-col gap-px px-1.5" }, row);
   if (opts.expanded && opts.tabs) {
@@ -699,6 +690,9 @@ function workspaceItem(opts: {
               : fileIcon(t.title),
           ),
           h("span", { class: "min-w-0 truncate" }, t.title),
+          t.hibernated
+            ? h("span", { class: "shrink-0 opacity-60" }, icon(SleepingIcon, 11, 1.75))
+            : "",
         ),
       );
     }
@@ -716,6 +710,7 @@ function workspaceBar(): HTMLElement {
       title,
       kind,
       focused: title === focusedTitle,
+      hibernated: title === "build · idle",
     }));
   const newButton = h(
     "button",
@@ -773,12 +768,13 @@ function workspaceBar(): HTMLElement {
           ["package.json in Kex", "file"],
           ["demo-git · main", "terminal"],
           ["~/Work/Proy/Repos/demo-gitde...", "terminal"],
+          ["build · idle", "terminal"],
           ["file-tiptap.md", "file"],
         ],
         "~/Work/Proy/Repos/demo-gitde...",
       ),
     }),
-    workspaceItem({ title: "old", hibernated: true }),
+    workspaceItem({ title: "old" }),
     h("div", { class: "mt-1 flex justify-center" }, newButton),
   );
 }
@@ -1156,7 +1152,7 @@ function appView(): HTMLElement {
     ),
     titled("Editor pane focused, terminal pane unfocused", appFrame("editor")),
     titled(
-      "Hibernated workspace: chip in the bar and overlay",
+      "Hibernated terminal tab: its row in the bar and its placeholder",
       h(
         "div",
         {
@@ -1164,26 +1160,26 @@ function appView(): HTMLElement {
           "data-view": "hibernated",
         },
         workspaceBar(),
-        hibernatedOverlay(),
+        hibernatedTab(),
       ),
     ),
   );
 }
 
-// Copies HibernatedOverlay.tsx at rest: the .hib-wash tint only exists during
-// the entrance animation, so it is drawn here as a strip to show its color.
-function hibernatedOverlay(): HTMLElement {
+// Copies HibernatedTab.tsx: what a hibernated terminal tab shows in place of its terminal.
+function hibernatedTab(): HTMLElement {
   return h(
     "div",
     {
       class:
         "relative flex h-[300px] flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-md border border-border bg-background text-muted-foreground",
-      "data-surface": "hibernated-overlay",
+      "data-surface": "hibernated-tab",
     },
     h("div", {
       class: "size-16 rounded-full border border-current opacity-70",
     }),
-    h("span", { class: "text-[15px] text-foreground" }, "kex"),
+    h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
+    h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
     h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
     h(
       "div",
@@ -1191,7 +1187,6 @@ function hibernatedOverlay(): HTMLElement {
         class: "flex w-80 flex-col gap-0.5 border-l border-border/60 pl-2",
         "data-surface": "hibernated-session-preview",
       },
-      h("span", { class: "text-[12px] text-foreground" }, "fixing the build"),
       h(
         "span",
         { class: "line-clamp-2 text-[11.5px] leading-snug text-foreground/80" },
@@ -1207,11 +1202,6 @@ function hibernatedOverlay(): HTMLElement {
       },
       "Restore",
     ),
-    h("span", {
-      class: "hib-wash",
-      style: "inset:auto 0 0 0;height:18px",
-      "data-surface": "hibernated-wash",
-    }),
   );
 }
 
@@ -1447,8 +1437,8 @@ function dialogsView(): HTMLElement {
       footer: [dialogButton("Cancel"), dialogButton("Close workspace", "default")],
     }),
     dialogFrame({
-      id: "hibernate-workspace",
-      title: "Hibernate workspace?",
+      id: "hibernate-tab",
+      title: "Hibernate tab?",
       name: dialogName(dot("#a855f7"), "Notes and drafts"),
       body: [
         dialogSection(
@@ -1458,13 +1448,12 @@ function dialogsView(): HTMLElement {
         h(
           "p",
           { class: "text-[12px] text-muted-foreground" },
-          "The workspace will hibernate as soon as they are done.",
+          "The tab will hibernate as soon as the agents are done.",
         ),
         dialogSection(
           "Commands that will not come back",
           dialogRow(term(12), "server", "pnpm dev", dialogButton("Run on start", "outline", true)),
         ),
-        dialogSection("Unsaved documents", dialogDocRow("notes.md")),
       ],
       footer: [dialogButton("Close"), dialogButton("Hibernate now", "default")],
     }),
@@ -2165,12 +2154,6 @@ function dump(): Record<string, string> {
     }[c] as GitStatusCode;
     const v = gitStatusHexColor(code, state.scheme, state.mode);
     if (v) out[`git-${c}`] = toHex(v);
-  }
-  for (const el of document.querySelectorAll<HTMLElement>("[data-surface]")) {
-    const key = el.dataset.surface!;
-    if (key === "hibernated-chip-veil" || key === "hibernated-wash") {
-      out[key] = toHex(getComputedStyle(el).backgroundColor);
-    }
   }
   return out;
 }

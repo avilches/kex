@@ -22,7 +22,6 @@ import {
   AlertCircleIcon,
   ArrowTurnBackwardIcon,
   CommandIcon,
-  SleepingIcon,
   TerminalIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -737,20 +736,6 @@ export function CommandPalette({
                     <span className="min-w-0 flex-1 truncate">
                       {entry.title}
                     </span>
-                    {entry.hibernated ? (
-                      <span
-                        role="img"
-                        aria-label="Workspace is hibernated"
-                        className="shrink-0"
-                      >
-                        <HugeiconsIcon
-                          icon={SleepingIcon}
-                          size={12}
-                          strokeWidth={1.75}
-                          className="text-muted-foreground"
-                        />
-                      </span>
-                    ) : null}
                   </CommandItem>
                 ))}
                 {workspaceTargets.length === 0 ? (

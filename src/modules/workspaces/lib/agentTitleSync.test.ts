@@ -114,7 +114,7 @@ describe("startAgentTitleSync - revocation", () => {
     expect(revoke).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the persisted title while the workspace hibernates: the wake reclaims it", () => {
+  it("keeps the persisted title while the tab hibernates: the wake reclaims it", () => {
     vi.mocked(isHibernating).mockReturnValue(true);
     setOscTitle("tab-1", "pi > Kex");
     stop = startAgentTitleSync(save, revoke);

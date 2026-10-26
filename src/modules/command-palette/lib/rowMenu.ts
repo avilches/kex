@@ -78,7 +78,7 @@ export function tabEntryCopyPath(entry: TabEntry): string | null {
 }
 
 export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
-  const closable = !entry.hibernated && !entry.tab.locked;
+  const closable = !entry.tab.locked;
   return [
     {
       id: "go",

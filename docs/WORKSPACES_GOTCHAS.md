@@ -1007,11 +1007,11 @@ Un texto que llega de la shell es la linea que escribio el usuario, no un comand
 
 ### Sintoma
 
-Hibernado, el overlay de `HibernatedOverlay` muestra bien el nombre que el agente envio por OSC. Al pulsar Restore, la barra de tabs vuelve a mostrar el titulo generico (la carpeta, o `claude --resume ...` en cuanto se teclea el comando) durante los segundos que tarda Claude Code en arrancar, y solo entonces aparece el nombre bueno.
+Hibernado, el placeholder de `HibernatedTab` (entonces el overlay del workspace) muestra bien el nombre que el agente envio por OSC. Al pulsar Restore, la barra de tabs vuelve a mostrar el titulo generico (la carpeta, o `claude --resume ...` en cuanto se teclea el comando) durante los segundos que tarda Claude Code en arrancar, y solo entonces aparece el nombre bueno.
 
 ### Pistas falsas descartadas
 
-- Que el nombre no estuviera persistido: si lo esta, como `Tab.agentTitle` en el JSON del workspace, actualizado en memoria por `agentTitleSync` (ventana compartida de 10 s, flush al hibernar y al cerrar). El overlay lo lee y por eso hibernado se ve bien.
+- Que el nombre no estuviera persistido: si lo esta, como `Tab.agentTitle` en el JSON del workspace, actualizado en memoria por `agentTitleSync` (ventana compartida de 10 s, flush al hibernar y al cerrar). El placeholder lo lee y por eso hibernado se ve bien.
 - Que hiciera falta que el evento de OSC escribiese el dato del tab en memoria: ya lo hace ese sync. El problema no era de escritura sino de lectura.
 - Que la sesion del agente rellenara el hueco: se cerro con `finishAgent` al hibernar y no vuelve hasta que el agente restaurado registra su SessionStart.
 
@@ -1305,3 +1305,28 @@ ultimo que arranco. Si gana el v12, sus tramas no llevan `tab_id`, y el listener
 log en debug): las pestanas de la Dev se quedan sin estado de agente hasta que la Dev vuelva a escribir el script (al
 reiniciarla). Si gana el v13, el Kex instalado recibe en su socket por PTY tramas con `tab_id` y `pty_id`, que ignora,
 y sigue funcionando. No hay compatibilidad hacia atras: se resuelve actualizando el instalado.
+
+## Nota: hibernar por tab, los invariantes que se rompen sin avisar (TASK-901)
+
+La hibernacion paso de ser una bandera del workspace a ser un estado del tab (`Tab.hibernation`). Un tab dormido conserva
+su id, y de eso cuelgan varias cosas que no fallan con ruido si se tocan mal:
+
+- **El registro de sesion del agente se indexa por id de tab.** Se conserva porque `hibernatingTabs` hace que la senal
+  `exited` del PTY recien matado no llame a `agent_detach_session`, y porque `window_state.rs` `terminal_tab_ids` cuenta
+  los tabs dormidos como conocidos (`split_orphans` borraria el registro de un tab que no esta en ninguna ventana). El test
+  `terminal_tab_ids_includes_hibernated_tabs` lo fija. Cerrar un tab dormido hay que quitarlo de `hibernatingTabs` (`closeTab`), o la marca
+  se queda para siempre.
+- **Deshacer el cierre de un tab dormido lo reabre despierto.** `buildReopenedTab` quita `hibernation`; si no, el tab
+  nuevo (con id nuevo) montaria como un placeholder sin PTY y sin plan de resume sembrado. Deshacer el cierre de un
+  workspace hace lo contrario con los tabs dormidos: `reviveWorkspace` les conserva el id y la bandera, porque su plan
+  se siembra al despertar y no al reabrir, y solo a los demas terminales les da id nuevo.
+- **Desmontar el `TerminalPane` no libera el slot.** Lo libera el barrido de `App.tsx` (`liveTerminalIds`, que deja fuera
+  los dormidos) llamando a `disposeSession`, que cierra el PTY y `disposeLeafSlot`. Si un tab dormido siguiera en ese
+  conjunto, su xterm y su contexto WebGL se quedarian vivos dentro de un pane vivo. Lo cubre el test de `liveTerminalIds`.
+- **Correr un script sobre un tab dormido.** Si el tab enlazado se despertaria como una shell vacia (su `hibernation` no
+  tiene ni `command` ni `agent`) se despierta y se reutiliza; si se despertaria ejecutando algo, se abre uno nuevo, o el
+  comando se teclearia encima del Run on start. La decision usa la instantanea (`LinkedTab.sleeping`), no el plan de resume, que es
+  asincrono.
+- **Bloquear lo justo.** Con el tab enfocado dormido solo se bloquea lo que actua sobre una terminal viva
+  (`terminal.*`, `search.focus`, `history.open`) y las Actions que dependen del tab enfocado. Bloquear tambien tab, pane,
+  sidebar o el menu nativo (como hacia la version por workspace) deja inutil un workspace entero por un solo tab dormido.

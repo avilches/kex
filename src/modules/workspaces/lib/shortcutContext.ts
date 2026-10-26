@@ -1,18 +1,17 @@
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
-import { blockedWhileHibernated } from "./hibernate";
+import { blockedWhileHibernated, isHibernatedTab } from "./hibernate";
 import { isPreviewableEditorTab } from "./previewableTab";
 import type { Tab } from "./types";
 
 export type ShortcutContext = {
-  hibernated: boolean;
   activeTab: Tab | null;
   hasWorkspaceRoot: boolean;
   scriptCount: number;
 };
 
-// Shortcuts that must not fire for the current workspace and tab. Used by the global listener.
+// Shortcuts that must not fire for the current tab. Used by the global listener.
 export function shortcutUnavailable(id: ShortcutId, c: ShortcutContext): boolean {
-  if (c.hibernated && blockedWhileHibernated(id)) return true;
+  if (isHibernatedTab(c.activeTab) && blockedWhileHibernated(id)) return true;
   const kind = c.activeTab?.kind;
   switch (id) {
     case "editor.undo":

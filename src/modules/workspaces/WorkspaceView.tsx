@@ -6,9 +6,6 @@ import { useEffect } from "react";
 import { allPanes } from "./lib/splitNode";
 import type { Workspace } from "./lib/types";
 import { SplitNodeView } from "./SplitNodeView";
-import { HibernatedOverlay } from "./HibernatedOverlay";
-import { useJustWoken } from "./lib/hibernateFx";
-import { strippedTree } from "./lib/hibernate";
 import type { TabCallbacks } from "./TabContent";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -38,14 +35,12 @@ type Props = {
   onFocusFloatBrowserTab?: (tabId: string) => void;
   onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
-  onWake: (workspaceId: string) => void;
 };
 
 export function WorkspaceView({
   workspaces,
   activeWorkspaceId,
   expandedPaneId,
-  onWake,
   ...rest
 }: Props) {
   const { draggingItem } = useWorkspaceDnd();
@@ -76,8 +71,7 @@ export function WorkspaceView({
         >
           <WorkspaceColorProvider value={resolveWorkspaceColor(ws.color, ws.id)}>
           <SplitNodeView
-            node={ws.hibernated ? strippedTree(ws.paneTree) : ws.paneTree}
-            hibernated={ws.hibernated}
+            node={ws.paneTree}
             workspaceId={ws.id}
             workspaceCwd={ws.cwd}
             activePaneId={ws.activePaneId}
@@ -104,18 +98,8 @@ export function WorkspaceView({
             welcomeActions={rest.welcomeActions}
           />
           </WorkspaceColorProvider>
-          <WakeWash hibernated={ws.hibernated} />
-          {ws.hibernated && (
-            <HibernatedOverlay workspace={ws} active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />
-          )}
         </div>
       ))}
     </div>
   );
-}
-
-function WakeWash({ hibernated }: { hibernated: boolean | undefined }) {
-  const wokenAt = useJustWoken(hibernated);
-  if (wokenAt === null) return null;
-  return <span key={wokenAt} aria-hidden className="hib-wash hib-wash-out" />;
 }

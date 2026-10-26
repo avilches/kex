@@ -1,3 +1,4 @@
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { useMemo } from "react";
 import { IS_WINDOWS } from "@/lib/platform";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -24,7 +25,7 @@ export type ActionContext = {
 // The values an Action would see if it ran right now from this workspace, the same ones the
 // runner builds. Settings has no workspace, so its editor passes none and gets no values.
 export function useActionContext(
-  ws: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "hibernated"> | null,
+  ws: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot"> | null,
 ): ActionContext | null {
   const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
@@ -35,7 +36,7 @@ export function useActionContext(
   // The focused tab owns the folder: a command that ends in it can have changed the branch.
   const info = useDirGit(dir, focused?.id);
   const vars = ws ? buildCommandVars(focused, ws, info, sys.host) : null;
-  const hibernated = !!ws?.hibernated;
+  const hibernated = isHibernatedTab(focused);
   const folders = {
     focusFolder: tabFolder(focused),
     workspaceRoot: ws?.workspaceRoot ?? null,
