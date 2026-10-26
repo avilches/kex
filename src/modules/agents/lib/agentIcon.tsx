@@ -6,7 +6,7 @@ import ompUrl from "@/modules/agents/assets/omp-color.svg";
 import agyUrl from "@/modules/agents/assets/agy.png";
 import cursorAgentUrl from "@/modules/agents/assets/cursor-agent.png";
 import gooseUrl from "@/modules/agents/assets/goose.png";
-import grokUrl from "@/modules/agents/assets/grok.png";
+import grokUrl from "@/modules/agents/assets/grok.svg";
 import openClaudeUrl from "@/modules/agents/assets/openclaude.png";
 
 // By exact id, so an unknown agent whose name contains a known one gets the generic icon.
@@ -130,7 +130,7 @@ export function AgentIcon({
         width={size}
         height={size}
         className={className}
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size, objectFit: "contain" }}
       />
     );
   }
