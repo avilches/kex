@@ -445,7 +445,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
   performanceProfiler: false,
-  autofocusMode: "manual",
+  autofocusMode: "noRoot",
   autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
