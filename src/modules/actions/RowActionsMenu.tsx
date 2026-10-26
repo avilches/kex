@@ -111,7 +111,7 @@ function EntryItem({ entry, overlay, run }: { entry: ContextActionEntry; overlay
     >
       <ActionIcon action={entry.action} size={14} fill />
       <span className={cn("min-w-0 flex-1", !entry.enabled && "opacity-60")}>
-        <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
+        <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} root={entry.subtitleRoot} />
       </span>
       {!entry.enabled && entry.reason && entry.subtitle !== WORKSPACE_UNSET && (
         <span className="shrink-0 text-[10px] text-muted-foreground/70">{entry.reason}</span>

@@ -304,7 +304,7 @@ fn prepare_add(workspace: &WorkspaceEnv, paths: Vec<String>) -> Vec<(PathBuf, St
 fn check_capacity(watched: usize, new_dirs: usize) -> Result<(), String> {
     if watched + new_dirs > MAX_WATCHES {
         return Err(format!(
-            "too many watched directories (limit {MAX_WATCHES})"
+            "too many watched folders (limit {MAX_WATCHES})"
         ));
     }
     Ok(())

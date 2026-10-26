@@ -100,7 +100,7 @@ pub fn spawn(
     }
     if let Some(ref dir) = cwd {
         if !resolve_path(dir, &workspace).is_dir() {
-            return Err(format!("cwd is not a directory: {dir}"));
+            return Err(format!("cwd is not a folder: {dir}"));
         }
     }
 

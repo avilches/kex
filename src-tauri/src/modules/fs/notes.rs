@@ -233,7 +233,7 @@ pub async fn notes_read_dirs(
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
     tauri::async_runtime::spawn_blocking(move || read_dirs_blocking(&root_path, &folders))
         .await

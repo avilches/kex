@@ -26,7 +26,7 @@ export function NewTabActionItems({ folder }: { folder: string | null }) {
             <DropdownMenuItem key={entry.action.id} title={entry.title ?? undefined} onSelect={() => run(entry.action, overlay)}>
               <ActionIcon action={entry.action} size={14} fill />
               <span className="min-w-0 flex-1">
-                <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} />
+                <ActionNameLines name={entry.action.name} value={entry.subtitle} startTrim={entry.subtitleTrim} root={entry.subtitleRoot} />
               </span>
             </DropdownMenuItem>
           ))}

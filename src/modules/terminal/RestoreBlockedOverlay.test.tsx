@@ -16,7 +16,7 @@ import type { RestoreBlock } from "./lib/restoreStart";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const block = {
-  reason: "Directory not found: /mnt/Taxes",
+  reason: "Folder not found: /mnt/Taxes",
   dir: "/mnt/Taxes",
   command: "claude --resume 'abc'",
   agent: "claude",
@@ -46,7 +46,7 @@ describe("RestoreBlockedOverlay", () => {
   it("shows the reason, the directory and the command", () => {
     const { container, unmount } = mount();
     const text = container.textContent ?? "";
-    expect(text).toContain("Directory not found: /mnt/Taxes");
+    expect(text).toContain("Folder not found: /mnt/Taxes");
     expect(text).toContain("claude --resume 'abc'");
     expect(container.querySelectorAll("code")[0].textContent).toBe("/mnt/Taxes");
     unmount();

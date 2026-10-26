@@ -55,7 +55,7 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
               <span className="flex h-9 min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2">
                 <ActionIcon action={action} size={13} fill />
                 <span className="max-w-[110px] min-w-0">
-                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
+                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} root={subtitle.root} />
                 </span>
               </span>
             )}
@@ -79,7 +79,7 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
               <span className="flex min-h-9 items-center gap-2 rounded px-1.5 py-0.5 text-[12px] hover:bg-accent">
                 <span className="flex min-w-0 flex-1 items-center gap-2">
                   <ActionIcon action={action} size={14} fill />
-                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} />
+                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} root={subtitle.root} />
                 </span>
               </span>
             </div>

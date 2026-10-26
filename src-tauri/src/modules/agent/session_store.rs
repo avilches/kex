@@ -276,13 +276,13 @@ pub fn launch_dir_problem(path: &str) -> Option<String> {
     let p = Path::new(path);
     match std::fs::metadata(p) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Some(format!("Directory not found: {path}"))
+            Some(format!("Folder not found: {path}"))
         }
-        Err(e) => Some(format!("Cannot access directory: {path} ({e})")),
-        Ok(m) if !m.is_dir() => Some(format!("Not a directory: {path}")),
+        Err(e) => Some(format!("Cannot access folder: {path} ({e})")),
+        Ok(m) if !m.is_dir() => Some(format!("Not a folder: {path}")),
         Ok(_) => std::fs::read_dir(p)
             .err()
-            .map(|e| format!("Cannot access directory: {path} ({e})")),
+            .map(|e| format!("Cannot access folder: {path} ({e})")),
     }
 }
 
@@ -1532,7 +1532,7 @@ mod tests {
 
         let plan = preview_resume_cmd_from_path("tab-1", &store_path).expect("plan with error");
         assert_eq!(plan.resume_cmd, "");
-        assert!(plan.error_reason.contains("Directory not found"));
+        assert!(plan.error_reason.contains("Folder not found"));
 
         // Unlike load_restore_plan, this must never touch the store file on disk.
         let after = std::fs::read_to_string(&store_path).unwrap();
@@ -1787,7 +1787,7 @@ mod tests {
 
         let (plan, store_path) = plan_for_transcript(dir.path(), &lines, &missing);
 
-        assert!(plan.error_reason.contains("Directory not found"));
+        assert!(plan.error_reason.contains("Folder not found"));
         assert_eq!(plan.resume_cmd, "");
         let store: SessionStore =
             serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
@@ -1837,7 +1837,7 @@ mod tests {
 
         let plans = load_restore_plan_from_path(&store_path);
 
-        assert!(plans[0].error_reason.contains("Directory not found"));
+        assert!(plans[0].error_reason.contains("Folder not found"));
         assert!(plans[0].attempted_cmd.contains("--session-id 'abc-123'"));
         let store: SessionStore =
             serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
@@ -1856,7 +1856,7 @@ mod tests {
         let missing = dir.path().join("gone").display().to_string();
         assert_eq!(
             launch_dir_problem(&missing),
-            Some(format!("Directory not found: {missing}"))
+            Some(format!("Folder not found: {missing}"))
         );
     }
 
@@ -1868,7 +1868,7 @@ mod tests {
         let file = file.display().to_string();
         assert_eq!(
             launch_dir_problem(&file),
-            Some(format!("Not a directory: {file}"))
+            Some(format!("Not a folder: {file}"))
         );
     }
 
@@ -1884,7 +1884,7 @@ mod tests {
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
         // Root can read anything, so only assert when the permission bits were honored.
         if let Some(r) = reason {
-            assert!(r.starts_with("Cannot access directory"), "{r}");
+            assert!(r.starts_with("Cannot access folder"), "{r}");
         }
     }
 

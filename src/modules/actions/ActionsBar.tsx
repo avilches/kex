@@ -149,7 +149,7 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
           <span className="flex min-w-0 items-center gap-1.5">
             {!script && <ActionIcon action={item.action} size={14} fill />}
             <span className="max-w-[120px] min-w-0">
-              <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
+              <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} root={item.subtitleRoot} />
             </span>
           </span>
         )}
@@ -348,7 +348,7 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
     <>
       <span className={cn("flex min-w-0 flex-1 items-center gap-2", blocked && "opacity-60")}>
         {!script && <ActionIcon action={item.action} size={14} fill />}
-        <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} />
+        <ActionNameLines name={item.name} value={item.subtitle} startTrim={item.subtitleTrim} root={item.subtitleRoot} />
       </span>
       {blocked && item.subtitle !== WORKSPACE_UNSET && (
         <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
@@ -604,7 +604,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
     return () => ro.disconnect();
   }, []);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const model = useActionsBarModel({ workspace, room, showTwins: held || draggingId !== null });
+  const model = useActionsBarModel({ workspace, room, arranging: held || draggingId !== null });
   const menuItems = [...model.menu.workspace, ...model.menu.global];
   const fromMenu = draggingId?.startsWith(MENU_DRAG_PREFIX) ?? false;
   const dragged = draggingId

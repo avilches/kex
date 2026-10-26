@@ -14,6 +14,8 @@ export type ContextActionEntry = {
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
   subtitleTrim: boolean;
+  /** The subtitle names the workspace root and draws its pin. */
+  subtitleRoot: boolean;
   /** The hover words of an enabled row (where it opens); null says nothing. */
   title: string | null;
 };
@@ -33,6 +35,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, withAgents = fal
       reason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
+      subtitleRoot: !!subtitle.root,
       title: isAgent(action) ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }

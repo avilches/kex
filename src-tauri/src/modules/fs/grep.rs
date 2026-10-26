@@ -216,7 +216,7 @@ pub fn fs_grep(
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
     let cap = max_results
         .unwrap_or(DEFAULT_MAX_RESULTS)
@@ -267,7 +267,7 @@ pub fn fs_grep_interactive(
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
     let cap = max_results
         .unwrap_or(DEFAULT_MAX_RESULTS)
@@ -318,7 +318,7 @@ pub fn fs_glob(
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
     let cap = max_results.unwrap_or(500).clamp(1, HARD_MAX_RESULTS);
 

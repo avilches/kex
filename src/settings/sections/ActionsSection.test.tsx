@@ -70,7 +70,7 @@ describe("ActionsSection", () => {
     agents = [{ id: "claude", name: "Claude Code", binary: "/usr/local/bin/claude", argsBeforePath: [], kind: "agent" }];
     const { container, unmount } = mount();
     openAdd(container);
-    const item = options().find((o) => o.textContent === "Claude CodeWorkspace");
+    const item = options().find((o) => o.textContent === "Claude CodeWorkspace root");
     act(() => void (item as HTMLElement).click());
     const next = change.mock.calls[0]![0]([]);
     expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace" });
@@ -88,7 +88,7 @@ describe("ActionsSection", () => {
   it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
     openAdd(container);
-    const item = options().find((o) => o.textContent?.includes("PyCharmWorkspace"));
+    const item = options().find((o) => o.textContent?.includes("PyCharmWorkspace root"));
     act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
@@ -149,10 +149,10 @@ describe("ActionsSection", () => {
   it("installs several presets in one combo session: a pick keeps the combo open", () => {
     const { container, unmount } = mount();
     openAdd(container);
-    act(() => void (options().find((o) => o.textContent?.includes("PyCharmWorkspace")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent?.includes("PyCharmWorkspace root")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     expect(options().length).toBeGreaterThan(1);
-    act(() => void (options().find((o) => o.textContent?.includes("ZedCurrent File")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent?.includes("ZedCurrent file")) as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(2);
     unmount();
   });

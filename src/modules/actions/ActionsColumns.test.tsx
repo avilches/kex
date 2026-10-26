@@ -178,7 +178,7 @@ describe("ActionsColumns", () => {
   it("an app preset goes straight to the store with its appId and opens no modal", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
-    click(options().find((o) => o.textContent?.includes("ZedWorkspace")));
+    click(options().find((o) => o.textContent?.includes("ZedWorkspace root")));
     expect(g.onAdd).toHaveBeenCalledTimes(1);
     expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed" });
     expect(commandField()).toBeNull();
@@ -205,7 +205,7 @@ describe("ActionsColumns", () => {
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Claude Code"));
     expect(text.indexOf("Claude Code")).toBeLessThan(text.indexOf("Scripts"));
     expect(text.indexOf("Applications")).toBeLessThan(text.indexOf("Zed"));
-    expect(text).toContain("Current directory");
+    expect(text).toContain("Current folder");
     unmount();
   });
 
@@ -213,7 +213,7 @@ describe("ActionsColumns", () => {
     const { container, g, unmount } = mount([], [], { suggestions: [claudeWs, claudeCtx] });
     click(addTrigger(container, "global"));
     const entries = options().filter((o) => o.textContent?.startsWith("Claude Code"));
-    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace", "Claude CodeCurrent directory"]);
+    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace root", "Claude CodeCurrent folder"]);
     click(entries[1]);
     expect(g.onAdd.mock.calls[0]![0]).toMatchObject({
       name: "Claude Code",
@@ -243,7 +243,7 @@ describe("ActionsColumns", () => {
   it("the combo never offers a preset that is already installed", () => {
     const { container, unmount } = mount([preset], [], { suggestions: [zed] });
     click(addTrigger(container, "global"));
-    expect(options().filter((o) => o.textContent?.includes("ZedWorkspace"))).toHaveLength(0);
+    expect(options().filter((o) => o.textContent?.includes("ZedWorkspace root"))).toHaveLength(0);
     unmount();
   });
 

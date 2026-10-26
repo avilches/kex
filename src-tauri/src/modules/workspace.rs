@@ -131,7 +131,7 @@ pub fn authorize_user_spawn_cwd(
     let canonical =
         std::fs::canonicalize(&resolved).map_err(|e| format!("cwd not accessible: {e}"))?;
     if !canonical.is_dir() {
-        return Err(format!("cwd is not a directory: {}", canonical.display()));
+        return Err(format!("cwd is not a folder: {}", canonical.display()));
     }
     registry.authorize(&canonical).map_err(|e| e.to_string())?;
     Ok(Some(canonical))
@@ -151,7 +151,7 @@ pub fn validate_spawn_cwd(
     let canonical =
         std::fs::canonicalize(&resolved).map_err(|e| format!("cwd not accessible: {e}"))?;
     if !canonical.is_dir() {
-        return Err(format!("cwd is not a directory: {}", canonical.display()));
+        return Err(format!("cwd is not a folder: {}", canonical.display()));
     }
     Ok(Some(canonical))
 }

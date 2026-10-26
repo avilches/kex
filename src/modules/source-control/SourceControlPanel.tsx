@@ -799,7 +799,7 @@ export const SourceControlPanel = memo(
         workspace: currentWorkspaceEnv(),
       });
       if (entries.length > 0) {
-        setCloneError("The directory is not empty. Remove all files before cloning.");
+        setCloneError("The folder is not empty. Remove all files before cloning.");
         return;
       }
     } catch {
