@@ -75,12 +75,20 @@ describe("AgentIcon", () => {
   });
 
   it("draws the detect-only agents as images", () => {
-    for (const agent of ["agy", "openclaude", "grok", "goose"]) {
+    for (const agent of ["agy", "openclaude", "grok"]) {
       const root = render(<AgentIcon agent={agent} size={14} />);
       expect(root.querySelector("img"), agent).not.toBeNull();
       expect(root.querySelector("svg"), agent).toBeNull();
       host?.remove();
     }
+  });
+
+  it("draws Goose as an inline monochrome svg", () => {
+    const root = render(<AgentIcon agent="goose" size={14} />);
+    const svg = root.querySelector("svg");
+    expect(svg?.getAttribute("aria-label")).toBe("goose");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(root.querySelector("img")).toBeNull();
   });
 
   it("draws Cursor Agent as the inline Cursor cube", () => {

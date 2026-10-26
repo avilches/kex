@@ -65,7 +65,7 @@ Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.ts
   raiz, porque ejecutaria en ella; las acciones atadas a una carpeta o un fichero siguen su
   propia variable.
 - **Editor de Actions en Settings**: dos columnas, This workspace (con el nombre del workspace debajo) a la izquierda y Global a la derecha, cada una con
-  un unico combo Add (Add script primero, luego el grupo Applications con Custom arriba y los presets de apps). El
+  un unico combo Add (Add script primero, luego el grupo Agents con los presets de agentes y luego el grupo Applications con Custom arriba y los presets de apps). El
   combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
   los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el `appId` no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
