@@ -325,7 +325,7 @@ function DetailTabRow({
               >
                 {title}
               </span>
-              {hibernated && (
+              {hibernated && isLocked && (
                 <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} className="shrink-0 opacity-60" />
               )}
               {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
@@ -390,6 +390,14 @@ function DetailTabRow({
         </button>
             ) : (
         <>
+          {hibernated && (
+            <span
+              title="Hibernated"
+              className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center opacity-60 transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0"
+            >
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            </span>
+          )}
           {visual !== null && (
             <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
               <StatusMark visual={visual} />
