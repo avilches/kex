@@ -39,7 +39,7 @@ export function commandVariableDocs(): readonly CommandVariableDoc[] {
 export const CWD_MODE_LABELS: Record<ScriptCwdMode, string> = {
   home: "Home",
   workspace: "Workspace root",
-  context: "Current tab folder (from terminal or editor)",
+  context: "Current folder",
   fixed: "Absolute path",
 };
 

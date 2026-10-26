@@ -281,7 +281,7 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   `blockedWhileHibernated` cover `terminal.*` (clear, scratchpad) and `search.focus`; the command palette disables the same
   commands (`commandBlockedWhileHibernated`, reason "Tab hibernated", plus `history.open`). The native menu has nothing to
   grey out: `sync_menu` no longer receives a hibernated flag. Actions that depend on the focused tab (a `{cwd}`, `{dir}`,
-  `{branch}` or `{repo}` variable, or Run in folder = Current tab folder, `dependsOnFocusedTab`) are blocked silently
+  `{branch}` or `{repo}` variable, or Run in folder = Current folder, `dependsOnFocusedTab`) are blocked silently
   (`planActionRun`) and shown unavailable with the reason "tab is hibernated" in the Header bar, the menu and the palette;
   the others run.
 - **Run on a sleeping tab.** A script whose linked tab is asleep (`LinkedTab.sleeping`): if the tab would come back as a
