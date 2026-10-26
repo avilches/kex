@@ -93,6 +93,15 @@ export function GeneralSection() {
               </div>
             )}
             <div className="flex items-start gap-2">
+              <RadioGroupItem value="noRoot" id="autofocus-no-root" className="mt-0.5" />
+              <label htmlFor="autofocus-no-root" className="cursor-pointer text-[12px]">
+                Only if no workspace root is defined{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Every tab refreshes the sidebar when selected, but only in workspaces without a root; per-tab toggles are hidden but each tab keeps its saved setting
+                </span>
+              </label>
+            </div>
+            <div className="flex items-start gap-2">
               <RadioGroupItem value="always" id="autofocus-always" className="mt-0.5" />
               <label htmlFor="autofocus-always" className="cursor-pointer text-[12px]">
                 Always{" "}

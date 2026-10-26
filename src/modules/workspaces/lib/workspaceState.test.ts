@@ -28,13 +28,20 @@ describe("isAutofocusActive", () => {
   const web: Tab = { id: "b1", kind: "browser", url: "https://x" };
 
   it("follows the per-tab flag in manual mode", () => {
-    expect(isAutofocusActive(on, "manual")).toBe(true);
-    expect(isAutofocusActive(off, "manual")).toBe(false);
+    expect(isAutofocusActive(on, "manual", true)).toBe(true);
+    expect(isAutofocusActive(off, "manual", false)).toBe(false);
   });
 
   it("is true for every capable tab in always mode, never for the rest", () => {
-    expect(isAutofocusActive(off, "always")).toBe(true);
-    expect(isAutofocusActive(web, "always")).toBe(false);
+    expect(isAutofocusActive(off, "always", true)).toBe(true);
+    expect(isAutofocusActive(web, "always", true)).toBe(false);
+  });
+
+  it("in noRoot mode is true only without a workspace root, ignoring the per-tab flag", () => {
+    expect(isAutofocusActive(off, "noRoot", false)).toBe(true);
+    expect(isAutofocusActive(off, "noRoot", true)).toBe(false);
+    expect(isAutofocusActive(on, "noRoot", true)).toBe(false);
+    expect(isAutofocusActive(web, "noRoot", false)).toBe(false);
   });
 });
 

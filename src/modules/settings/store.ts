@@ -33,7 +33,7 @@ export type ThemePref = "system" | "light" | "dark";
 type TabBarStyle = "connected" | "pill";
 
 export type GitColorScheme = "vscode" | "jetbrains";
-export type AutofocusMode = "manual" | "always";
+export type AutofocusMode = "manual" | "noRoot" | "always";
 
 export type ScmViewMode = "list" | "tree";
 export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
@@ -631,7 +631,7 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.performanceProfiler,
     autofocusMode: (() => {
       const v = getGeneral<string>(KEY_AUTOFOCUS_MODE);
-      if (v === "manual" || v === "always") return v;
+      if (v === "manual" || v === "noRoot" || v === "always") return v;
       return DEFAULT_PREFERENCES.autofocusMode;
     })(),
     autofocusNewTabs:

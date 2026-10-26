@@ -1306,7 +1306,7 @@ export const FileExplorer = memo(
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
           </Button>
-          {autofocusMode !== "always" && (
+          {autofocusMode === "manual" && (
             <Button
               variant="ghost"
               size="icon"

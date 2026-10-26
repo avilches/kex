@@ -208,7 +208,7 @@ function DetailTabRow({
     [sidebarGit, workspaceId, tab, resolvedMode],
   );
   const solidChip = focused && color !== null;
-  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
+  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode === "manual";
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),

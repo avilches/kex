@@ -1151,7 +1151,7 @@ export default function App() {
   const prevAutofocusRef = useRef<AutofocusKey | undefined>(undefined);
   useEffect(() => {
     const ap = activeTab;
-    const target = ap && isAutofocusActive(ap, autofocusMode) ? activeTabFocusTarget : null;
+    const target = ap && isAutofocusActive(ap, autofocusMode, !!activeWorkspace?.workspaceRoot) ? activeTabFocusTarget : null;
     const next: AutofocusKey = {
       workspaceId: activeWorkspaceId,
       signal: target ? `${activeTabId}|${agentWorktree ?? ""}` : null,
@@ -1159,7 +1159,7 @@ export default function App() {
     const fire = autofocusDecision(prevAutofocusRef.current, next);
     prevAutofocusRef.current = next;
     if (fire && target) focusSidebar(target, { fromShortcut: false });
-  }, [activeWorkspaceId, activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
+  }, [activeWorkspaceId, activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode, activeWorkspace?.workspaceRoot]);
 
   useEffect(() => {
     lastFocusFolderRef.current = null;
@@ -2443,7 +2443,11 @@ export default function App() {
             if (
               found.workspace.id === activeWorkspace?.id &&
               found.tab.kind === "terminal" &&
-              isAutofocusActive(found.tab, autofocusMode)
+              isAutofocusActive(
+                found.tab,
+                autofocusMode,
+                !!found.workspace.workspaceRoot,
+              )
             ) {
               focusSidebar(
                 useAgentStore.getState().sessions[tabId]?.meta?.worktreeCwd ??
@@ -3199,7 +3203,7 @@ export default function App() {
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
-        if (autofocusMode === "always") return;
+        if (autofocusMode !== "manual") return;
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
