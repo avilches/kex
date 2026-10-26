@@ -545,10 +545,6 @@ fn record_session_at_path_with(
         log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
         return false;
     }
-    log::info!(
-        "[agent-session] record tab={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
-         launch_cmd={launch_cmd:?}"
-    );
     let now = now_secs();
     let mut record = SessionRecord {
         agent: Some(agent.to_string()),
@@ -599,6 +595,13 @@ fn record_session_at_path_with(
         );
         return known.is_some_and(|p| p.launch_cmd.is_some());
     }
+    // The arrival line goes here, after the gate, so a refused SessionStart never
+    // looks like a stored record in the log (TASK-898).
+    log::info!(
+        "[agent-session] record tab={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
+         launch_cmd={:?}",
+        record.launch_cmd
+    );
     // SessionStart fires again on every resume and replaces the record; the name and the
     // pending notification it held must survive until the frontend reports new ones. A resume
     // keeps the session id, while /clear or an agent launched by hand brings a new one, which
