@@ -112,7 +112,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-3rem)] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[560px]"
+        className="inset-0 m-auto h-fit max-h-[calc(100vh-3rem)] translate-x-0 translate-y-0 grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[560px]"
         onInteractOutside={(e) => {
           if (selectGuard.current) e.preventDefault();
         }}
