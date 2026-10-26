@@ -15,7 +15,8 @@ export type RowMenuItemId =
   | "worktrees"
   | "run"
   | "stop"
-  | "edit";
+  | "edit"
+  | "action";
 
 export type RowMenuItem = {
   id: RowMenuItemId;
@@ -26,6 +27,10 @@ export type RowMenuItem = {
   disabled?: boolean;
   // Full text for the tooltip when the label shortens something, such as a folder path.
   title?: string;
+  // The Action an "action" item runs.
+  actionId?: string;
+  // First item of the Actions block: a rule above it.
+  separatorBefore?: boolean;
 };
 
 export function highlightedTabOf(value: string, rows: readonly MergedRow[]): TabEntry | null {
@@ -100,6 +105,8 @@ export type FolderMenuTarget = {
   path: string;
   // The worktrees action of the row's repository, null when the row has none.
   worktrees: { kind: "show"; count: number } | { kind: "hide" } | null;
+  // The Actions that run in the row's folder, in the order the menu lists them.
+  actions?: readonly { id: string; label: string; title: string | null }[];
 };
 
 export function worktreesLabel(hint: NonNullable<FolderMenuTarget["worktrees"]>): string {
@@ -124,6 +131,15 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
     });
   }
   items.push({ id: "copy", label: "Copy Absolute Path", shortcutId: "path.copy" });
+  target.actions?.forEach((action, i) =>
+    items.push({
+      id: "action",
+      actionId: action.id,
+      label: action.label,
+      ...(action.title ? { title: action.title } : {}),
+      ...(i === 0 ? { separatorBefore: true } : {}),
+    }),
+  );
   return items;
 }
 

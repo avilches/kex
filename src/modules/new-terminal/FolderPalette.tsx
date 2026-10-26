@@ -12,8 +12,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { registerPaletteControl } from "@/modules/command-palette/lib/paletteControl";
+import { ActionIcon } from "@/modules/actions/ActionIcon";
+import { splitActionName } from "@/modules/actions/lib/actionName";
+import type { Action } from "@/modules/actions/lib/types";
+import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
+import { useFolderRowActions } from "@/modules/actions/lib/useNewTabActions";
+import { useActionMenuApi } from "@/modules/actions/RowActionsMenu";
 import {
   folderMenuItems,
+  type RowMenuItem,
   worktreesLabel,
 } from "@/modules/command-palette/lib/rowMenu";
 import {
@@ -27,6 +34,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts";
 import { PALETTE_WIDTH_CLASS, usePaletteWidth } from "@/modules/command-palette/PaletteWidth";
 import { useRestoreFocusOnEscape } from "@/modules/command-palette/useRestoreFocusOnEscape";
+import type { Workspace } from "@/modules/workspaces/lib/types";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import {
   ComputerTerminal01Icon,
@@ -82,6 +90,8 @@ type Props = {
   onPick: (row: FolderRow) => void;
   /** Cmd+T on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
   onToggleWorktrees: (row: FolderRow) => void;
+  /** The workspace a row belongs to: its Actions are the ones its menu offers, run there. */
+  workspaceOf: (workspaceId: string) => Workspace | undefined;
 };
 
 export function FolderPalette({
@@ -91,6 +101,7 @@ export function FolderPalette({
   groups,
   onPick,
   onToggleWorktrees,
+  workspaceOf,
 }: Props) {
   const [query, setQuery] = useState("");
   const { contentStyle, handles } = usePaletteWidth();
@@ -129,6 +140,12 @@ export function FolderPalette({
 
   const rowMenu = useRowMenu();
   const { close: closeRowMenu, open: openRowMenu } = rowMenu;
+  const runAction = useActionMenuApi()?.run;
+  const rowActions = useFolderRowActions();
+  const menuActions = useRef<{ byId: Map<string, Action>; overlay: RunOverlay | null }>({
+    byId: new Map(),
+    overlay: null,
+  });
   const boxRef = useRef<HTMLDivElement>(null);
 
   const toggleWorktrees = useCallback(
@@ -153,22 +170,36 @@ export function FolderPalette({
   ) => {
     const box = boxRef.current;
     if (!row || !box || !el) return;
+    const { groups: found, overlay } = rowActions(workspaceOf(row.workspaceId), row.path, row.branch);
+    const entries = [...found.workspace, ...found.global];
+    menuActions.current = { byId: new Map(entries.map((e) => [e.action.id, e.action])), overlay };
     openRowMenu(
       row.key,
       folderMenuItems({
         path: row.path,
         worktrees: row.repoKey && row.repoHint ? row.repoHint : null,
+        actions: entries.map((e) => ({
+          id: e.action.id,
+          label: splitActionName(e.action.name).main,
+          title: e.title,
+        })),
       }),
       anchorOf(box, el, pointer),
     );
   };
 
-  const runMenuItem = (id: string, row: FolderRow | undefined) => {
+  const runMenuItem = (id: string, row: FolderRow | undefined, item?: RowMenuItem) => {
     closeRowMenu();
     if (!row) return;
     if (id === "pick") onPick(row);
     else if (id === "worktrees") toggleWorktrees(row);
     else if (id === "copy") copyPath(row);
+    else if (id === "action") {
+      const action = item?.actionId ? menuActions.current.byId.get(item.actionId) : undefined;
+      if (!action || !runAction) return;
+      onOpenChange(false);
+      runAction(action, menuActions.current.overlay ?? undefined);
+    }
   };
 
   const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick });
@@ -203,7 +234,7 @@ export function FolderPalette({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (rowMenu.menu) {
       const row = rowOf(rowMenu.menu.rowKey);
-      if (rowMenu.handleKey(e, (item) => runMenuItem(item.id, row))) return;
+      if (rowMenu.handleKey(e, (item) => runMenuItem(item.id, row, item))) return;
     }
     if (e.key !== "Tab" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
     e.preventDefault();
@@ -305,8 +336,12 @@ export function FolderPalette({
         {rowMenu.menu ? (
           <RowMenu
             menu={rowMenu.menu}
-            onRun={(id) => runMenuItem(id, rowOf(rowMenu.menu?.rowKey))}
+            onRun={(id, item) => runMenuItem(id, rowOf(rowMenu.menu?.rowKey), item)}
             onActive={rowMenu.setActive}
+            iconFor={(item) => {
+              const action = item.actionId ? menuActions.current.byId.get(item.actionId) : undefined;
+              return action ? <ActionIcon action={action} size={14} /> : null;
+            }}
           />
         ) : null}
         </div>

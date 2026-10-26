@@ -85,6 +85,7 @@ function mount(onPick: (row: FolderRow) => void) {
       groups,
       onPick,
       onToggleWorktrees: vi.fn(),
+      workspaceOf: () => undefined,
     }),
   );
 }
@@ -139,6 +140,7 @@ describe("FolderPalette", () => {
         ],
         onPick: vi.fn(),
         onToggleWorktrees: vi.fn(),
+        workspaceOf: () => undefined,
       }),
     );
     await settle();
@@ -183,6 +185,7 @@ describe("FolderPalette", () => {
         ],
         onPick: vi.fn(),
         onToggleWorktrees: vi.fn(),
+        workspaceOf: () => undefined,
       }),
     );
     await settle();
@@ -220,6 +223,7 @@ describe("FolderPalette", () => {
           groups,
           onPick,
           onToggleWorktrees,
+          workspaceOf: () => undefined,
         }),
       );
 
@@ -570,6 +574,7 @@ describe("FolderPalette", () => {
           groups: rows,
           onPick,
           onToggleWorktrees: vi.fn(),
+          workspaceOf: () => undefined,
         }),
       );
 
@@ -719,6 +724,7 @@ describe("FolderPalette", () => {
         groups: [group({ rows: [row({ path: "/repo/src", branch: "feat/login", key: "ws-1:/repo/src" })] })],
         onPick: vi.fn(),
         onToggleWorktrees: vi.fn(),
+        workspaceOf: () => undefined,
       }),
     );
     await settle();
@@ -740,6 +746,7 @@ describe("FolderPalette", () => {
         groups,
         onPick,
         onToggleWorktrees: vi.fn(),
+        workspaceOf: () => undefined,
       });
     }
 
