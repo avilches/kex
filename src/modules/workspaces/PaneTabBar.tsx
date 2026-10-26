@@ -352,11 +352,6 @@ function DraggableTab({
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[9px] text-primary">●</span>
       )}
-      {sleeping && (
-        <span className="ml-0.5 shrink-0 text-muted-foreground" title="Hibernated: double click to restore">
-          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-        </span>
-      )}
       {tab.note !== undefined && (
         <TabNoteButton
           open={isTabNoteOpen(tab)}
@@ -381,6 +376,12 @@ function DraggableTab({
         </span>
       )}
       {isLocked ? (
+        <>
+        {sleeping && (
+          <span className="ml-0.5 shrink-0 text-muted-foreground" title="Hibernated: double click to restore">
+            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+          </span>
+        )}
         <button
           type="button"
           className="relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
@@ -395,8 +396,17 @@ function DraggableTab({
           <FlashOverlay token={lockFlashToken} />
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
+        </>
       ) : (
         <span className="relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center">
+          {sleeping && (
+            <span
+              className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground transition-opacity group-hover:opacity-0"
+              title="Hibernated: double click to restore"
+            >
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            </span>
+          )}
           {statusIndicator && (
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
               {statusIndicator}
