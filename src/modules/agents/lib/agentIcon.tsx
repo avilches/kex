@@ -3,8 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import claudeCodeUrl from "@/modules/agents/assets/claudecode-color.svg";
 import geminiCliUrl from "@/modules/agents/assets/geminicli-color.svg";
 import ompUrl from "@/modules/agents/assets/omp-color.svg";
-import agyUrl from "@/modules/agents/assets/agy.png";
-import cursorAgentUrl from "@/modules/agents/assets/cursor-agent.png";
+import agyUrl from "@/modules/agents/assets/agy.svg";
 import gooseUrl from "@/modules/agents/assets/goose.png";
 import grokUrl from "@/modules/agents/assets/grok.svg";
 import openClaudeUrl from "@/modules/agents/assets/openclaude.png";
@@ -15,7 +14,6 @@ const SVG_URLS = new Map([
   ["gemini", geminiCliUrl],
   ["omp", ompUrl],
   ["agy", agyUrl],
-  ["cursor-agent", cursorAgentUrl],
   ["goose", gooseUrl],
   ["grok", grokUrl],
   ["openclaude", openClaudeUrl],
@@ -72,6 +70,15 @@ function OpenCodeMark({ size, className }: { size: number; className?: string })
   );
 }
 
+// The Cursor cube, the same mark as the editor icon, drawn inline so it follows the text color.
+function CursorMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <InlineMark size={size} className={className} label="cursor" viewBox="0 0 32 32">
+      <path fillRule="evenodd" d="m16 30 12-20v14zM4 10l12-8 12 8zm0 0 12 6v14L4 24z" />
+    </InlineMark>
+  );
+}
+
 // The aider.chat pinned-tab mark, drawn inline so it follows the text color.
 function AiderMark({ size, className }: { size: number; className?: string }) {
   return (
@@ -120,6 +127,7 @@ export function AgentIcon({
   if (id === "opencode") return <OpenCodeMark size={size} className={className} />;
   if (id === "codex") return <CodexMark size={size} className={className} />;
   if (id === "aider") return <AiderMark size={size} className={className} />;
+  if (id === "cursor-agent") return <CursorMark size={size} className={className} />;
 
   const svgUrl = SVG_URLS.get(id);
   if (svgUrl) {

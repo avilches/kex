@@ -259,7 +259,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   have none. The goose prefix needs a POSIX-style or fish shell. The Action modal of an agent shows a Yolo checkbox when its
   binary is one of these (`lib/agentYolo.ts`, read from the command, not from `appId`): checking it appends the switch (the
   goose assignment goes before the binary), unchecking removes it wherever it is. Their icons live in `AgentIcon`
-  (`agents/lib/agentIcon.tsx`): the PNG marks Orca bundles for agy, openclaude, grok, goose and cursor-agent, and aider's
+  (`agents/lib/agentIcon.tsx`): the PNG marks Orca bundles for openclaude and goose, an SVG for agy and grok (black background added), the Cursor cube inline for cursor-agent, and aider's
   pinned-tab mark inline. The Add combo lists Add script first, then Agents, then Applications.
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
