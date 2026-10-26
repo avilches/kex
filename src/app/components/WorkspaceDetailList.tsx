@@ -281,7 +281,7 @@ function DetailTabRow({
               }}
               className={cn(
                 "relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[12px] transition-colors select-none",
-                isDragging && "opacity-40",
+                (isDragging || hibernated) && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
                   : hasSubagents

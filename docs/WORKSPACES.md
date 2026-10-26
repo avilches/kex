@@ -249,7 +249,7 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
 - **Click, double click, shortcuts.** A click on a sleeping tab (pane tab bar, nested list of the WorkspaceBar, palette)
   only focuses it and shows the placeholder. A double click on the tab, the Restore button, the tab context menu item
   "Restore", the command palette ("Restore and go to Tab") and the shortcut `tab.hibernate` wake it. The next and previous
-  tab shortcuts move over it without waking it. The sleeping icon sits in the tab bar, in the nested list and in the palette.
+  tab shortcuts move over it without waking it. The sleeping icon sits in the tab bar, in the nested list and in the palette; in the first two it takes the close button's slot (fading out on hover so the X shows) and the tab or row is dimmed with `opacity-40`.
 - **Titles.** The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC
   or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the
   first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and

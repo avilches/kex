@@ -282,6 +282,7 @@ function DraggableTab({
                 : "bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ],
         isThisDragging && "opacity-40",
+        sleeping && !isThisDragging && "opacity-40",
       )}
     >
       {/* Droppable half-zones - coordinates-based, no pointer events needed */}

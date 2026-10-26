@@ -678,7 +678,7 @@ function workspaceItem(opts: {
         h(
           "div",
           {
-            class: `relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[12px] ${t.focused ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.08]"}`,
+            class: `relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[12px] ${t.hibernated ? "opacity-40" : ""} ${t.focused ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.08]"}`,
             style: t.focused ? "box-shadow:inset 0 0 0 1px var(--ring)" : "",
             "data-tab": t.title,
           },
@@ -691,7 +691,7 @@ function workspaceItem(opts: {
           ),
           h("span", { class: "min-w-0 truncate" }, t.title),
           t.hibernated
-            ? h("span", { class: "shrink-0 opacity-60" }, icon(SleepingIcon, 11, 1.75))
+            ? h("span", { class: "absolute right-1.5 top-1/2 -translate-y-1/2 opacity-60" }, icon(SleepingIcon, 12, 1.75))
             : "",
         ),
       );
