@@ -29,6 +29,8 @@ export type RowMenuItem = {
   title?: string;
   // The Action an "action" item runs.
   actionId?: string;
+  // The 1-9 key that runs it while the menu is open (Cmd+digit).
+  digit?: number;
   // First item of the Actions block: a rule above it.
   separatorBefore?: boolean;
   // First Action of a scope: a title above it, like the Header combo.
@@ -146,6 +148,7 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
       id: "action",
       actionId: action.id,
       label: action.label,
+      ...(i < 9 ? { digit: i + 1 } : {}),
       ...(action.title ? { title: action.title } : {}),
       ...(i === 0 || (titled && firstOfScope) ? { separatorBefore: true } : {}),
       ...(titled && firstOfScope

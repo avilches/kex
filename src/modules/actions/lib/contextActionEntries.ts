@@ -62,10 +62,9 @@ function runsInFolder(action: Action, atWorkspace: boolean): boolean {
   return atWorkspace;
 }
 
-/** What the new-tab surfaces (the + menu of a pane, the new terminal palette) offer: the scripts
- * and agents, which open a terminal, that run in the folder (a folder command, or one starting
- * in the current directory), and the workspace ones only while that folder is the workspace's.
- * Apps open no terminal, so they are never here. Only the runnable ones, with the twins the
+/** What the new-tab surfaces (the + menu of a pane, the new terminal palette) offer: the agents
+ * that run in the folder (a folder command, or one starting in the current directory), and the
+ * workspace ones only while that folder is the workspace's. Scripts and apps are never here. Only the runnable ones, with the twins the
  * Header hides left out (an agent in the current directory and in the workspace are one entry
  * at the workspace root). */
 export function newTabActionEntries(
@@ -78,7 +77,7 @@ export function newTabActionEntries(
   const workspaceFolder = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
   const atWorkspace = workspaceFolder !== "" && folderKey(folders.focusFolder) === workspaceFolder;
   const pick = (actions: readonly Action[]) =>
-    actions.filter((a) => a.command.trim() !== "" && !isApp(a) && runsInFolder(a, atWorkspace) && actionAvailability(a, ctx) === null);
+    actions.filter((a) => a.command.trim() !== "" && isAgent(a) && runsInFolder(a, atWorkspace) && actionAvailability(a, ctx) === null);
   const l = pick(local);
   const g = pick(global);
   const hidden = twinIds([...l, ...g], ctx, states, { file: false, folder: true });

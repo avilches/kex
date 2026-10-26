@@ -11,6 +11,7 @@ export type ShortcutId =
   | "palette.folderRoot"
   | "palette.folderMain"
   | "palette.folderHome"
+  | "palette.menuAction"
   | "tab.new"
   | "tab.newBrowser"
   | "tab.newEditor"
@@ -173,6 +174,13 @@ export const SHORTCUTS: Shortcut[] = [
     label: "New Terminal: Home",
     group: "Palette",
     defaultBindings: [{ [MOD_PROP]: true, key: "3" }],
+  },
+  {
+    id: "palette.menuAction",
+    label: "New Terminal: Run Menu Action 1–9",
+    group: "Palette",
+    // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
+    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "workspace.selectByIndex",
@@ -570,7 +578,7 @@ export function matchBinding(
   // representative digit; ANY digit in range counts as a hit (the handler
   // reads e.key for the actual index). Workspaces use 1-9 (0 stays Reset Zoom);
   // tabs use 0-9 (0 = last tab).
-  if (id === "workspace.selectByIndex") {
+  if (id === "workspace.selectByIndex" || id === "palette.menuAction") {
     if (!/^[1-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;
   } else if (id === "tab.selectByIndex") {
     if (!/^[0-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;

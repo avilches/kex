@@ -207,13 +207,26 @@ export function FolderPalette({
     }
   };
 
-  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick });
-  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick };
+  // Cmd+digit runs the Nth Action of the open row menu; with no menu open, 1-3 pick the fixed folders.
+  const runDigit = (digit: number) => {
+    const menu = rowMenu.menu;
+    const item = menu?.items.find((i) => i.digit === digit);
+    if (menu && item) runMenuItem(item.id, rowOf(menu.rowKey), item);
+  };
+
+  const menuOpen = rowMenu.menu !== null;
+  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen });
+  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen };
   // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
-    return registerPaletteControl((action) => {
+    return registerPaletteControl((action, digit) => {
       if (action === "closeTab") return false;
+      const byDigit = action === "menuAction" || (latest.current.menuOpen && action in SLOT_ACTION);
+      if (byDigit) {
+        if (digit) latest.current.runDigit(digit);
+        return true;
+      }
       const { toggleWorktrees: toggle, copyPath: copy, rowOf: find } = latest.current;
       if (action in SLOT_ACTION) {
         const slot = SLOT_ACTION[action as keyof typeof SLOT_ACTION];

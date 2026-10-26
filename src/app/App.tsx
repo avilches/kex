@@ -2953,9 +2953,10 @@ export default function App() {
           if (foreground === null) openCommandPalette("history");
         });
       },
-      "palette.folderRoot": () => void runPaletteShortcut("folderRoot"),
-      "palette.folderMain": () => void runPaletteShortcut("folderMain"),
-      "palette.folderHome": () => void runPaletteShortcut("folderHome"),
+      "palette.folderRoot": () => void runPaletteShortcut("folderRoot", 1),
+      "palette.folderMain": () => void runPaletteShortcut("folderMain", 2),
+      "palette.folderHome": () => void runPaletteShortcut("folderHome", 3),
+      "palette.menuAction": (e) => void runPaletteShortcut("menuAction", parseInt(e.key, 10)),
       "tab.new": () => {
         if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;

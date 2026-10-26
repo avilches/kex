@@ -37,6 +37,12 @@ const ICONS = {
   action: PlayIcon,
 } as const;
 
+// The binding of the wildcard menu-action shortcut with its digit swapped for this item's.
+function digitLabel(userShortcuts: Parameters<typeof getShortcutLabel>[1], digit: number): string | null {
+  const label = getShortcutLabel("palette.menuAction", userShortcuts);
+  return label ? `${label.slice(0, -1)}${digit}` : null;
+}
+
 export type RowMenuState = {
   rowKey: string;
   items: RowMenuItem[];
@@ -181,7 +187,11 @@ export function RowMenu({
       onPointerDown={(e) => e.stopPropagation()}
     >
       {menu.items.map((item, i) => {
-        const label = item.shortcutId ? getShortcutLabel(item.shortcutId, userShortcuts) : null;
+        const label = item.shortcutId
+          ? getShortcutLabel(item.shortcutId, userShortcuts)
+          : item.digit
+            ? digitLabel(userShortcuts, item.digit)
+            : null;
         const own = iconFor?.(item);
         return (
           <Fragment key={item.actionId ?? item.id}>

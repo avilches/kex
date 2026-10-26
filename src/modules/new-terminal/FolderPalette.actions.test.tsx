@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Action } from "@/modules/actions/lib/types";
 import { ActionMenuProvider } from "@/modules/actions/RowActionsMenu";
+import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { FolderPalette } from "./FolderPalette";
@@ -88,34 +89,50 @@ describe("FolderPalette row menu Actions", () => {
     usePreferencesStore.setState({ actions: [] });
   });
 
-  it("in a subfolder lists the agents and scripts of the current directory, never an app or a workspace one", async () => {
+  it("in a subfolder lists the agents of the current directory, never a script, an app or a workspace one", async () => {
     mount("/o/src", workspace());
     await openMenu();
     expect(menuLabels()).toEqual([
       expect.stringContaining("New Tab in src"),
       expect.stringContaining("Copy Absolute Path"),
-      "Claude Code",
-      "Dev",
+      expect.stringContaining("Claude Code"),
     ]);
   });
 
   it("at the workspace folder adds the workspace agent", async () => {
     mount("/o", workspace());
     await openMenu();
-    expect(menuLabels()).toContain("Codex");
-    expect(menuLabels()).not.toContain("Zed");
+    expect(menuLabels().some((l) => l?.startsWith("Codex"))).toBe(true);
+    expect(menuLabels().some((l) => l?.startsWith("Zed"))).toBe(false);
   });
 
   it("running one closes the palette and runs it in the workspace of the row", async () => {
     const run = mount("/o/src", workspace());
     await openMenu();
-    const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === "Claude Code");
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.startsWith("Claude Code"));
     await act(async () => {
       fireEvent.click(item as Element);
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0][0]).toMatchObject({ id: "g1" });
     expect(run.mock.calls[0][1]).toMatchObject({ workspaceId: "ws-2", focusFolder: "/o/src" });
+  });
+
+  it("Cmd+digit runs the Nth Action of the open menu, and does nothing without a menu", async () => {
+    const run = mount("/o", workspace());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    await act(async () => {
+      runPaletteShortcut("menuAction", 1);
+    });
+    expect(run).not.toHaveBeenCalled();
+    await openMenu();
+    await act(async () => {
+      runPaletteShortcut("folderMain", 2);
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][0]).toMatchObject({ id: "g2" });
   });
 
   it("a row whose workspace is unknown offers no Actions", async () => {

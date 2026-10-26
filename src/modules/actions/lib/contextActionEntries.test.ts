@@ -105,34 +105,34 @@ describe("newTabActionEntries", () => {
   const none = new Map();
   const commands = (entries: { action: Action }[]) => entries.map((e) => e.action.command);
 
-  it("in a subfolder offers the folder Actions and the current-directory scripts and agents, not the workspace ones", () => {
+  it("in a subfolder offers the current-directory agents, not the workspace ones", () => {
     const groups = newTabActionEntries(
       [script("echo {cwd}"), script("pnpm dev"), script("echo {filepath}"), agent("claude", "context"), agent("codex", "workspace")],
       [{ ...script("make"), cwdMode: "context" }, script("pnpm test")],
       at("/w/src"),
       none,
     );
-    expect(commands(groups.workspace)).toEqual(["claude", "echo {cwd}"]);
-    expect(commands(groups.global)).toEqual(["make"]);
+    expect(commands(groups.workspace)).toEqual(["claude"]);
+    expect(groups.global).toEqual([]);
   });
 
-  it("never offers an app, since it opens no terminal", () => {
-    const groups = newTabActionEntries([action("code {cwd}"), action("code {workspace}")], [action("zed {cwd}")], at("/w"), none);
+  it("never offers an app or a script", () => {
+    const groups = newTabActionEntries([action("code {cwd}"), action("code {workspace}"), script("echo {cwd}")], [action("zed {cwd}"), script("make")], at("/w"), none);
     expect(groups).toEqual({ workspace: [], global: [] });
   });
 
   it("at the workspace folder adds the workspace Actions and hides the twin that does the same", () => {
     const groups = newTabActionEntries(
-      [script("echo {cwd}"), script("echo {workspace}"), agent("claude", "context"), agent("claude", "workspace")],
+      [script("echo {cwd}"), agent("claude", "context"), agent("claude", "workspace")],
       [],
       at("/w"),
       none,
     );
-    expect(commands(groups.workspace)).toEqual(["claude", "echo {workspace}"]);
+    expect(commands(groups.workspace)).toEqual(["claude"]);
   });
 
   it("leaves out the ones that cannot run here", () => {
-    const groups = newTabActionEntries([script("gh pr d {branch}")], [], { ...at("/w/src"), vars: vars({ branch: "" }) }, none);
+    const groups = newTabActionEntries([agent("claude", "workspace")], [], at("/w/src"), none);
     expect(groups.workspace).toEqual([]);
   });
 });
