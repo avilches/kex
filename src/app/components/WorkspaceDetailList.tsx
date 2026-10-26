@@ -526,6 +526,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
         return (
           <div
             key={row.tabId}
+            data-focused-tab={focused || undefined}
             className={cn(
               "group/block",
               subs.length > 0 && "rounded-md",
