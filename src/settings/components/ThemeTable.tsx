@@ -381,10 +381,10 @@ export function ThemeTable({
           <label className="flex items-center gap-1.5 px-0.5 pt-1 text-[11px] font-medium text-foreground/80">
             <Checkbox
               id="theme-auto"
-              checked={themeAuto}
-              onCheckedChange={(v) => toggleAuto(v === true)}
+              checked={!themeAuto}
+              onCheckedChange={(v) => toggleAuto(v !== true)}
             />
-            Auto
+            Separate editor and terminal themes
           </label>
         </div>
         <div className="flex flex-col gap-1 px-1">
