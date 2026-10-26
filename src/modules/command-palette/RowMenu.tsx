@@ -38,7 +38,7 @@ const ICONS = {
 } as const;
 
 // The binding of the wildcard menu-action shortcut with its digit swapped for this item's.
-function digitLabel(userShortcuts: Parameters<typeof getShortcutLabel>[1], digit: number): string | null {
+export function digitLabel(userShortcuts: Parameters<typeof getShortcutLabel>[1], digit: number): string | null {
   const label = getShortcutLabel("palette.menuAction", userShortcuts);
   return label ? `${label.slice(0, -1)}${digit}` : null;
 }

@@ -135,6 +135,16 @@ describe("FolderPalette row menu Actions", () => {
     expect(run.mock.calls[0][0]).toMatchObject({ id: "g2" });
   });
 
+  it("the footer advertises the agent keys only while the open menu has agents", async () => {
+    mount("/o/src", workspace());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    expect(document.body.textContent).not.toContain("Run agent");
+    await openMenu();
+    expect(document.body.textContent).toContain("Run agent");
+  });
+
   it("a row whose workspace is unknown offers no Actions", async () => {
     mount("/o/src", undefined);
     await openMenu();

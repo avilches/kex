@@ -26,6 +26,7 @@ import {
 import {
   anchorOf,
   keepInputFocus,
+  digitLabel,
   RowMenu,
   useRowMenu,
 } from "@/modules/command-palette/RowMenu";
@@ -363,7 +364,10 @@ export function FolderPalette({
           />
         ) : null}
         </div>
-        <FolderFooter groups={groups} />
+        <FolderFooter
+          groups={groups}
+          agentCount={rowMenu.menu?.items.filter((i) => i.digit).length ?? 0}
+        />
       </Command>
     </CommandDialog>
   );
@@ -529,7 +533,14 @@ function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
 }
 
 // What each key does on the highlighted row.
-function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
+function FolderFooter({
+  groups,
+  agentCount,
+}: {
+  groups: readonly FolderGroup[];
+  /** Agents the open row menu runs with Cmd+digit; they take the keys of the fixed folders. */
+  agentCount: number;
+}) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const value = useCommandState((state) => state.value);
   const all = groups.flatMap((g) => g.rows);
@@ -549,7 +560,17 @@ function FolderFooter({ groups }: { groups: readonly FolderGroup[] }) {
           {worktreesLabel(row.repoHint)}
         </span>
       ) : null}
-      {(["root", "main", "home"] as const).map((slot) => {
+      {agentCount > 0 ? (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <kbd className={kbd}>
+            {agentCount === 1
+              ? digitLabel(userShortcuts, 1)
+              : `${digitLabel(userShortcuts, 1)}\u2013${agentCount}`}
+          </kbd>
+          Run agent
+        </span>
+      ) : null}
+      {(agentCount > 0 ? [] : (["root", "main", "home"] as const)).map((slot) => {
         const fixed = all.find((r) => r.slots.includes(slot));
         if (!fixed) return null;
         return (
