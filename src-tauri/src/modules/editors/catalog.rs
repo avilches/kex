@@ -13,6 +13,8 @@ pub struct EditorEntry {
     pub args_before_path: &'static [&'static str],
     /// macOS app display name for `open -na` fallback (JetBrains only).
     pub macos_app_name: Option<&'static str>,
+    /// Id of the main app this one is a release channel of; it is left out when that one is found.
+    pub alternative_to: Option<&'static str>,
 }
 
 pub static CATALOG: &[EditorEntry] = &[
@@ -24,6 +26,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "code",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "vscode-insiders",
@@ -32,6 +35,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "code-insiders",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: Some("vscode"),
     },
     EditorEntry {
         id: "vscodium",
@@ -40,6 +44,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "codium",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "cursor",
@@ -48,6 +53,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "cursor",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "windsurf",
@@ -56,6 +62,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "windsurf",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "zed",
@@ -64,6 +71,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "zed",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "zed-preview",
@@ -72,6 +80,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "zed",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: Some("zed"),
     },
     EditorEntry {
         id: "kiro",
@@ -80,6 +89,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "kiro",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "trae",
@@ -88,6 +98,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "trae",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "antigravity",
@@ -96,6 +107,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "antigravity",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "trae-solo",
@@ -104,6 +116,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "trae",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     // --- Text editors ---
     EditorEntry {
@@ -113,6 +126,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "subl",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "atom",
@@ -121,6 +135,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "atom",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "bbedit",
@@ -129,6 +144,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "bbedit",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "cotedit",
@@ -137,6 +153,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "cot",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     EditorEntry {
         id: "coderunner",
@@ -145,6 +162,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
     // --- JetBrains IDEs ---
     EditorEntry {
@@ -154,6 +172,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "idea",
         args_before_path: &[],
         macos_app_name: Some("IntelliJ IDEA"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "pycharm",
@@ -162,6 +181,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "pycharm",
         args_before_path: &[],
         macos_app_name: Some("PyCharm"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "webstorm",
@@ -170,6 +190,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "webstorm",
         args_before_path: &[],
         macos_app_name: Some("WebStorm"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "goland",
@@ -178,6 +199,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "goland",
         args_before_path: &[],
         macos_app_name: Some("GoLand"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "rubymine",
@@ -186,6 +208,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "rubymine",
         args_before_path: &[],
         macos_app_name: Some("RubyMine"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "rustrover",
@@ -194,6 +217,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "rustrover",
         args_before_path: &[],
         macos_app_name: Some("RustRover"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "android-studio",
@@ -202,6 +226,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "studio",
         args_before_path: &[],
         macos_app_name: Some("Android Studio"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "rider",
@@ -210,6 +235,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "rider",
         args_before_path: &[],
         macos_app_name: Some("Rider"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "appcode",
@@ -218,6 +244,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "appcode",
         args_before_path: &[],
         macos_app_name: Some("AppCode"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "clion",
@@ -226,6 +253,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "clion",
         args_before_path: &[],
         macos_app_name: Some("CLion"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "phpstorm",
@@ -234,6 +262,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "phpstorm",
         args_before_path: &[],
         macos_app_name: Some("PhpStorm"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "mps",
@@ -242,6 +271,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "mps",
         args_before_path: &[],
         macos_app_name: Some("MPS"),
+        alternative_to: None,
     },
     EditorEntry {
         id: "android-studio-canary",
@@ -250,6 +280,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "studio",
         args_before_path: &[],
         macos_app_name: Some("Android Studio Canary"),
+        alternative_to: Some("android-studio"),
     },
     // --- Other IDEs ---
     EditorEntry {
@@ -259,6 +290,7 @@ pub static CATALOG: &[EditorEntry] = &[
         cli_binary: "xed",
         args_before_path: &[],
         macos_app_name: None,
+        alternative_to: None,
     },
 ];
 
