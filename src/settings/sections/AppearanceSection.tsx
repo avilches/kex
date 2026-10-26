@@ -32,6 +32,7 @@ import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { INPUT_CLASS } from "../components/inputClass";
 import { SectionHeader } from "../components/SectionHeader";
+import { ThemeModeSelector } from "../components/ThemeModeSelector";
 import { SliderRow } from "../components/SliderRow";
 import { TitleTemplatesBlock } from "../components/TitleTemplatesBlock";
 
@@ -112,7 +113,7 @@ export function AppearanceSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="Appearance" />
+      <SectionHeader title="Appearance" right={<ThemeModeSelector />} />
 
       <div className="flex flex-col gap-2">
         <FieldLabel>UI</FieldLabel>
