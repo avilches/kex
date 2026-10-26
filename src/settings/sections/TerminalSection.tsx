@@ -177,7 +177,7 @@ export function TerminalSection() {
         title="Default shell"
         description={
           shells.find((s) => s.path === terminalShell)?.integrated === false
-            ? "Command blocks and directory tracking are unavailable for this shell."
+            ? "Command blocks and folder tracking are unavailable for this shell."
             : "Shell for new terminal tabs. Existing tabs keep their shell."
         }
       >

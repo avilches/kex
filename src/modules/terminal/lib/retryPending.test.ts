@@ -86,12 +86,12 @@ describe("retryPendingFlow", () => {
   });
 
   it("saved command with a still-bad dir: keeps pending with the new reason and writes nothing", async () => {
-    const t = mk(cmdBlock, { checkDir: () => Promise.resolve("not a directory") });
+    const t = mk(cmdBlock, { checkDir: () => Promise.resolve("not a folder") });
     await retryPendingFlow(t.d);
-    expect(t.pending()?.reason).toBe("not a directory");
+    expect(t.pending()?.reason).toBe("not a folder");
     expect(t.calls.write).not.toHaveBeenCalled();
     expect(t.calls.markBlocked).not.toHaveBeenCalled();
-    expect(t.calls.stillBlocked).toHaveBeenCalledWith(expect.objectContaining({ reason: "not a directory" }));
+    expect(t.calls.stillBlocked).toHaveBeenCalledWith(expect.objectContaining({ reason: "not a folder" }));
   });
 
   it("bails out and clears pending when an agent already runs in the shell", async () => {

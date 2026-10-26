@@ -27,7 +27,7 @@ const base = { runOnStart: true, plan: null, persistentCommand: undefined, initi
 
 describe("decideStart", () => {
   it("spawns plain at the initial cwd when Run on Start is off, even with a failing plan", () => {
-    const d = decideStart({ ...base, runOnStart: false, plan: plan({ errorReason: "Directory not found: /work" }) });
+    const d = decideStart({ ...base, runOnStart: false, plan: plan({ errorReason: "Folder not found: /work" }) });
     expect(d).toEqual({ kind: "spawn", cwd: "/home", inject: "none" });
   });
 
@@ -39,12 +39,12 @@ describe("decideStart", () => {
   it("blocks on a plan error and carries directory, command, reason and agent", () => {
     const d = decideStart({
       ...base,
-      plan: plan({ errorReason: "Directory not found: /work", attemptedCmd: "claude --resume 'a'" }),
+      plan: plan({ errorReason: "Folder not found: /work", attemptedCmd: "claude --resume 'a'" }),
     });
     expect(d).toEqual({
       kind: "blocked",
       block: {
-        reason: "Directory not found: /work",
+        reason: "Folder not found: /work",
         dir: "/work",
         command: "claude --resume 'a'",
         agent: "claude",
@@ -63,10 +63,10 @@ describe("decideStart", () => {
   });
 
   it("blocks a saved command whose directory is unusable", () => {
-    const d = decideStart({ ...base, persistentCommand: "pnpm dev", dirProblem: "Not a directory: /home" });
+    const d = decideStart({ ...base, persistentCommand: "pnpm dev", dirProblem: "Not a folder: /home" });
     expect(d).toEqual({
       kind: "blocked",
-      block: { reason: "Not a directory: /home", dir: "/home", command: "pnpm dev", restorable: true },
+      block: { reason: "Not a folder: /home", dir: "/home", command: "pnpm dev", restorable: true },
     });
   });
 

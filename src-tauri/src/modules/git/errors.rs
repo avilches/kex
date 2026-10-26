@@ -50,7 +50,7 @@ impl Display for GitError {
                 f,
                 "git {found} is too old; Kex needs git {required} or newer.",
             ),
-            GitError::NotADirectory(p) => write!(f, "not a directory: {p}"),
+            GitError::NotADirectory(p) => write!(f, "not a folder: {p}"),
             GitError::PathOutsideWorkspace(p) => write!(
                 f,
                 "path is outside the authorized workspace: {}",

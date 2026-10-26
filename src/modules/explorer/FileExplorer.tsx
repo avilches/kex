@@ -947,7 +947,7 @@ export const FileExplorer = memo(
             className="text-muted-foreground"
           />
           <div className="text-xs text-muted-foreground">
-            No current directory
+            No current folder
           </div>
         </div>
       );

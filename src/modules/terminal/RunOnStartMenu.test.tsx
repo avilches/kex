@@ -30,7 +30,7 @@ beforeAll(() => {
 
 const tab = { id: "tab-1", kind: "terminal" } as unknown as Extract<Tab, { kind: "terminal" }>;
 const block = {
-  reason: "Directory not found: /mnt/Taxes",
+  reason: "Folder not found: /mnt/Taxes",
   dir: "/mnt/Taxes",
   command: "claude --resume 'abc'",
   agent: "claude",
@@ -93,7 +93,7 @@ describe("RunOnStartMenu pending restore", () => {
     const text = document.body.textContent ?? "";
     expect(text).not.toContain("Enabled");
     expect(text).toContain("Restore pending");
-    expect(text).toContain("Directory not found: /mnt/Taxes");
+    expect(text).toContain("Folder not found: /mnt/Taxes");
     expect(text).toContain("cd /mnt/Taxes");
     expect(text).toContain("claude --resume 'abc'");
     expect(trigger.className).toContain("text-destructive");
@@ -102,7 +102,7 @@ describe("RunOnStartMenu pending restore", () => {
     const spanWith = (s: string) =>
       [...document.body.querySelectorAll("span")].find((e) => e.textContent === s) as HTMLElement;
     expect(spanWith("Restore pending").className).toContain("text-destructive");
-    expect(spanWith("Directory not found: /mnt/Taxes").className).not.toContain("text-destructive");
+    expect(spanWith("Folder not found: /mnt/Taxes").className).not.toContain("text-destructive");
     const code = document.body.querySelector("code") as HTMLElement;
     expect(code.closest(".text-destructive")).toBeNull();
 

@@ -44,7 +44,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
             <span className="select-text break-words text-[12.5px] text-muted-foreground">{block.reason}</span>
           </div>
         </div>
-        <Field label="Directory" value={block.dir} />
+        <Field label="Folder" value={block.dir} />
         <Field label="Command" value={block.command} />
         {block.restorable && (
           <span className="text-[12px] text-muted-foreground">

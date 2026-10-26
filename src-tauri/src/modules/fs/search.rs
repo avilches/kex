@@ -86,7 +86,7 @@ pub async fn fs_search(
     let root_path = resolve_path(&root, &workspace);
 
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
 
     tauri::async_runtime::spawn_blocking(move || {
@@ -239,7 +239,7 @@ pub fn fs_list_files(
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
     if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
+        return Err(format!("not a folder: {root}"));
     }
 
     let walker = WalkBuilder::new(&root_path)
