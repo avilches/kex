@@ -12,3 +12,4 @@ export const newTabId       = () => `tab-${nid()}`;
 export const newThemeId     = () => `th-${nid()}`;
 export const newActionId    = () => `ac-${nid()}`;
 export const newGroupId     = () => `grp-${nid()}`;
+export const newCloseBatchId = () => `cb-${nid()}`;

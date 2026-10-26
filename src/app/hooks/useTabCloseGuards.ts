@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { newCloseBatchId } from "@/lib/ids";
 import { leafHasForegroundProcess } from "@/modules/terminal";
 import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
@@ -17,7 +18,7 @@ type FoundTab = {
 };
 
 type Params = {
-  disposeTab: (workspaceId: string, tabId: string) => void;
+  disposeTab: (workspaceId: string, tabId: string, batchId?: string) => void;
   findTab: (tabId: string) => FoundTab | null;
   saveTab: (tabId: string) => Promise<void>;
   reportSaveError: (tabId: string, error: unknown) => void;
@@ -98,6 +99,7 @@ export function useTabCloseGuards({
 
   const closeTabs = useCallback(
     async (tabIds: string[]): Promise<boolean> => {
+      const batchId = tabIds.length > 1 ? newCloseBatchId() : undefined;
       try {
         return await runCloseQueue(tabIds, {
           getTab: (id) => {
@@ -120,7 +122,7 @@ export function useTabCloseGuards({
           reportSaveError,
           closeTab: (id) => {
             const found = findTab(id);
-            if (found) disposeTab(found.workspace.id, id);
+            if (found) disposeTab(found.workspace.id, id, batchId);
           },
         });
       } catch (e) {

@@ -56,6 +56,7 @@ import {
   pickReopen,
   reviveWorkspace,
 } from "./closedStack";
+import { dismissCloseNotice, showCloseNotice } from "./closedNotice";
 
 // Whether a reopened closed tab is worth asking Rust for a live agent resume plan.
 // Mirrors the same "Run on start" gate the startup restore flow already applies
@@ -264,6 +265,27 @@ export const MRU_HISTORY_LIMIT = 50;
 
 export function pushMru(history: string[], tabId: string, limit = MRU_HISTORY_LIMIT): string[] {
   return [tabId, ...history.filter((id) => id !== tabId)].slice(0, limit);
+}
+
+export function applyOpenTab(
+  workspaces: Workspace[],
+  workspaceId: string,
+  paneId: string,
+  tab: Tab,
+  insertionIndex?: number,
+): Workspace[] {
+  return workspaces.map((w) => {
+    if (w.id !== workspaceId) return w;
+    return {
+      ...w,
+      paneTree: updatePane(w.paneTree, paneId, (p) => {
+        const idx = tabInsertionIndex(p.tabs, p.activeTabId, insertionIndex);
+        const newTabs = [...p.tabs];
+        newTabs.splice(idx, 0, tab);
+        return { ...p, tabs: newTabs, activeTabId: tab.id };
+      }),
+    };
+  });
 }
 
 export function applyCloseTab(
@@ -547,18 +569,23 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, []);
 
-  const closeWorkspace = useCallback((id: string) => {
+  // `explicit` is a close the user asked for: even a blank workspace is recorded.
+  const closeWorkspace = useCallback((id: string, explicit = false) => {
     const closing = workspacesRef.current.find((w) => w.id === id);
     if (closing) {
       const stash = useAgentStore.getState().stashClosedSession;
       for (const t of terminalTabs(closing)) stash(t.id);
       for (const pane of allPanes(closing.paneTree))
         for (const tab of pane.tabs) recordTabClosed(tab, id);
+      const before = closedTabsRef.current;
       closedTabsRef.current = captureClosedWorkspace(
-        closedTabsRef.current,
+        before,
         closing,
         workspacesRef.current.findIndex((w) => w.id === id),
+        undefined,
+        explicit,
       );
+      if (closedTabsRef.current !== before) showCloseNotice(closedTabsRef.current);
     }
     setWorkspaces((prev) => prev.filter((w) => w.id !== id));
     setActiveWorkspaceId((prev) => {
@@ -720,20 +747,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
     const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
-    setWorkspaces((prev) =>
-      prev.map((w) => {
-        if (w.id !== workspaceId) return w;
-        return {
-          ...w,
-          paneTree: updatePane(w.paneTree, paneId, (p) => {
-            const idx = tabInsertionIndex(p.tabs, p.activeTabId, insertionIndex);
-            const newTabs = [...p.tabs];
-            newTabs.splice(idx, 0, newTab);
-            return { ...p, tabs: newTabs, activeTabId: newTab.id };
-          }),
-        };
-      }),
-    );
+    setWorkspaces((prev) => applyOpenTab(prev, workspaceId, paneId, newTab, insertionIndex));
   }, [recordActivation]);
 
   const activateTab = useCallback((workspaceId: string, tabId: string) => {
@@ -781,7 +795,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, [recordActivation]);
 
-  const closeTab = useCallback((workspaceId: string, tabId: string) => {
+  const closeTab = useCallback((workspaceId: string, tabId: string, batchId?: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     let history: string[] | undefined;
     useAgentStore.getState().stashClosedSession(tabId);
@@ -798,7 +812,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           workspaceId,
           prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,
           lastOfWorkspace: workspaceTabCount(ws) === 1,
+          ...(batchId ? { batchId } : {}),
         });
+        showCloseNotice(closedTabsRef.current);
       }
     }
     // Applied to the ref right away too: closes batched in one tick must see
@@ -807,10 +823,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyCloseTab(prev, workspaceId, tabId, history));
   }, []);
 
-  const reopenClosed = useCallback(async () => {
+  // Reopens the newest entry; with `onlyBatch` it stops at an entry of another
+  // batch and leaves the stack alone. Returns what it reopened.
+  const reopenOne = useCallback(async (onlyBatch?: string): Promise<ClosedEntry | null> => {
     const { picked, remaining } = pickReopen(closedTabsRef.current, workspacesRef.current);
+    if (!picked) {
+      if (!onlyBatch) closedTabsRef.current = remaining;
+      return null;
+    }
+    if (onlyBatch && picked.entry.batchId !== onlyBatch) return null;
     closedTabsRef.current = remaining;
-    if (!picked) return;
 
     // A reopened terminal tab that used to run an agent gets the same live,
     // just-in-time resume plan the startup flow computes, keyed by the id the
@@ -829,10 +851,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       const renamed = terminalTabs(picked.entry.workspace).filter((t) => !t.hibernation);
       await Promise.all(renamed.map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)));
       setWorkspaces((prev) => insertRestoredWorkspace(prev, workspace, picked.entry.index));
+      // The ref follows right away so the next entry of a batch finds the workspace.
+      workspacesRef.current = insertRestoredWorkspace(workspacesRef.current, workspace, picked.entry.index);
       selectWorkspace(workspace.id);
       const agents = useAgentStore.getState();
       for (const [oldId, newId] of idMap) agents.restoreClosedSession(oldId, newId, workspace.id);
-      return;
+      return picked.entry;
     }
 
     const { entry } = picked;
@@ -843,9 +867,20 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
     const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
     openTab(picked.workspaceId, slot.paneId, newTab, slot.index);
+    workspacesRef.current = applyOpenTab(workspacesRef.current, picked.workspaceId, slot.paneId, withNewTabAutofocus(newTab), slot.index);
     selectWorkspace(picked.workspaceId);
     useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, picked.workspaceId);
+    return entry;
   }, [openTab, selectWorkspace]);
+
+  const reopenClosed = useCallback(async () => {
+    dismissCloseNotice();
+    const first = await reopenOne();
+    if (!first?.batchId) return;
+    while (await reopenOne(first.batchId)) {
+      // one undo returns every tab the same bulk close took
+    }
+  }, [reopenOne]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
     const sealedTab = newTab;
