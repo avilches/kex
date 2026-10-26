@@ -63,7 +63,7 @@ export function GeneralSection() {
               </span>
             </span>
             <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-              Tabs with autofocus refresh the sidebar when selected.
+              Autofocus refreshes the explorer with the terminal current folder changes with <code className="font-mono">cd</code> commands.
             </span>
           </div>
           <RadioGroup
@@ -76,17 +76,14 @@ export function GeneralSection() {
               <label htmlFor="autofocus-always" className="cursor-pointer text-[12px]">
                 Always{" "}
                 <span className="text-[10.5px] text-muted-foreground">
-                  Every tab refreshes the sidebar when selected; per-tab toggles are hidden but each tab keeps its saved setting
+                  Every tab refreshes the file explorer when selected.
                 </span>
               </label>
             </div>
             <div className="flex items-start gap-2">
               <RadioGroupItem value="noRoot" id="autofocus-no-root" className="mt-0.5" />
               <label htmlFor="autofocus-no-root" className="cursor-pointer text-[12px]">
-                Only if no workspace root is defined{" "}
-                <span className="text-[10.5px] text-muted-foreground">
-                  Every tab refreshes the sidebar when selected, but only in workspaces without a root; per-tab toggles are hidden but each tab keeps its saved setting
-                </span>
+                Only if no workspace root is defined
               </label>
             </div>
             <div className="flex items-start gap-2">
@@ -94,7 +91,7 @@ export function GeneralSection() {
               <label htmlFor="autofocus-manual" className="cursor-pointer text-[12px]">
                 Manual{" "}
                 <span className="text-[10.5px] text-muted-foreground">
-                  Only tabs where you turn it on from their context menu
+                  or tabs where you turn it on from their context menu.
                 </span>
               </label>
             </div>

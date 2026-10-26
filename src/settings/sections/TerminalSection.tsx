@@ -178,7 +178,7 @@ export function TerminalSection() {
         description={
           shells.find((s) => s.path === terminalShell)?.integrated === false
             ? "Command blocks and folder tracking are unavailable for this shell."
-            : "Shell for new terminal tabs. Existing tabs keep their shell."
+            : "Shell for new terminal tabs."
         }
       >
         <Select
@@ -204,7 +204,11 @@ export function TerminalSection() {
         description={
           terminalNewFolderMode === "ask"
             ? "Every new terminal asks for its folder with a palette."
-            : "Where new terminal tabs and splits open."
+            : terminalNewFolderMode === "home"
+              ? "Your home."
+              : terminalNewFolderMode === "workspace"
+                ? "The workspace root, or home if the workspace doesn't have a root defined."
+                : "Current folder from the terminal or editor."
         }
       >
         <Select
@@ -247,7 +251,7 @@ export function TerminalSection() {
                   strokeWidth={2}
                   className="text-muted-foreground"
                 />
-                Last folder from terminal or editor
+                Current folder
               </span>
             </SelectItem>
             <SelectItem value="ask" className="text-[12px]">
@@ -573,7 +577,7 @@ export function TerminalSection() {
         </SettingRow>
         <SettingRow
           title="Auto-hibernate"
-          description="Hibernate a terminal tab after it has been out of sight for this long. It frees the terminal and its process, and a tab that held an agent resumes it when restored. Only tabs that are not visible are hibernated: none with an agent working or waiting for you, none with a script running, and none with a command that would not come back (turn on Run on start to keep it). Empty shells are hibernated too."
+          description="Hibernate a terminal tab after it has been out of sight for this long. It frees the terminal and its process, and a tab that held an agent resumes it when restored. A working agent is never hibernated."
         >
           <RadioGroup
             value={autoHibernate}
