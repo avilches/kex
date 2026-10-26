@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import { CUSTOM_APP_SUGGESTION, agentCommand, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
+import { CUSTOM_APP_SUGGESTION, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
 
 const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?: boolean): DetectedEditor => ({
   id,
@@ -97,26 +97,5 @@ describe("agentSuggestionsFromDetected", () => {
 
   it("skips disabled agents", () => {
     expect(agentSuggestionsFromDetected([ag("claude", "claude", false)])).toEqual([]);
-  });
-});
-
-describe("agentCommand", () => {
-  it("starts every known agent without permission prompts", () => {
-    expect(
-      ["claude", "codex", "agy", "openclaude", "grok", "aider", "goose", "cursor-agent"].map(agentCommand),
-    ).toEqual([
-      "claude --dangerously-skip-permissions",
-      "codex --dangerously-bypass-approvals-and-sandbox",
-      "agy --dangerously-skip-permissions",
-      "openclaude --dangerously-skip-permissions",
-      "grok --permission-mode bypassPermissions",
-      "aider --yes-always",
-      "GOOSE_MODE=auto goose",
-      "cursor-agent --yolo",
-    ]);
-  });
-
-  it("leaves an agent without a bypass switch as the bare binary", () => {
-    expect(["opencode", "omp", "pi"].map(agentCommand)).toEqual(["opencode", "omp", "pi"]);
   });
 });

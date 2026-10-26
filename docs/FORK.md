@@ -256,7 +256,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   preset starts with its bypass switch (`agentCommand` in `appSuggestions.ts`): `--dangerously-skip-permissions` for
   claude, agy and openclaude, `--dangerously-bypass-approvals-and-sandbox` for codex, `--permission-mode bypassPermissions`
   for grok, `--yes-always` for aider, `--yolo` for cursor-agent and a `GOOSE_MODE=auto` prefix for goose; opencode, omp and pi
-  have none. The goose prefix needs a POSIX-style or fish shell.
+  have none. The goose prefix needs a POSIX-style or fish shell. The Action modal of an agent shows a Yolo checkbox when its
+  binary is one of these (`lib/agentYolo.ts`, read from the command, not from `appId`): checking it appends the switch (the
+  goose assignment goes before the binary), unchecking removes it wherever it is.
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to
