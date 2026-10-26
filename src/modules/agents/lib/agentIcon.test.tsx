@@ -74,6 +74,23 @@ describe("AgentIcon", () => {
     }
   });
 
+  it("draws the detect-only agents as images", () => {
+    for (const agent of ["agy", "openclaude", "grok", "goose", "cursor-agent"]) {
+      const root = render(<AgentIcon agent={agent} size={14} />);
+      expect(root.querySelector("img"), agent).not.toBeNull();
+      expect(root.querySelector("svg"), agent).toBeNull();
+      host?.remove();
+    }
+  });
+
+  it("draws Aider as an inline monochrome svg", () => {
+    const root = render(<AgentIcon agent="aider" size={14} />);
+    const svg = root.querySelector("svg");
+    expect(svg?.getAttribute("aria-label")).toBe("aider");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(root.querySelector("img")).toBeNull();
+  });
+
   it("keeps drawing the other known agents as images", () => {
     const root = render(<AgentIcon agent="omp" size={14} />);
     expect(root.querySelector("img")).not.toBeNull();

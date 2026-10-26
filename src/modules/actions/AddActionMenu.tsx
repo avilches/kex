@@ -26,9 +26,8 @@ type Props = {
 };
 
 // The one Add control of a column: a searchable combo whose first entry is Add script, then the
-// Applications group: Custom, then one alphabetical entry per detected app preset, and the Agents
-// group with one per detected agent preset (icon, and under it what the preset points at or the
-// folder it starts in). Presets keep the combo open so several can be installed in a row;
+// Agents group with one entry per detected agent preset (icon, and under it the folder it starts
+// in), and the Applications group: Custom, then one alphabetical entry per detected app preset. Presets keep the combo open so several can be installed in a row;
 // the entries that open an editor close it. Installed presets never show up in the list.
 export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
   const [open, setOpen] = useState(false);
@@ -47,12 +46,6 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
           <CommandInput placeholder="Search..." />
           <CommandList className="max-h-[min(34rem,calc(var(--radix-popover-content-available-height,34rem)-3.5rem))]">
             <CommandEmpty>Nothing found.</CommandEmpty>
-            {suggestions.some((s) => s.kind === "agent") && (
-              <>
-                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
-                <CommandSeparator />
-              </>
-            )}
             <CommandGroup>
               <CommandItem
                 value="add-script"
@@ -69,6 +62,12 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
+            {suggestions.some((s) => s.kind === "agent") && (
+              <>
+                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
+                <CommandSeparator />
+              </>
+            )}
             <CommandGroup heading="Applications">
               <CommandItem
                 value={CUSTOM_APP_SUGGESTION.key}

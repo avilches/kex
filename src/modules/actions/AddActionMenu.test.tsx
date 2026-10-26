@@ -113,13 +113,13 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
-  it("orders the combo as the Agents group, then Add script, then the Applications", () => {
+  it("orders the combo as Add script, then the Agents group, then the Applications", () => {
     const claude: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
     const view = mount([...suggestions, claude]);
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
-      "Claude CodeWorkspace root",
       "Add scriptruns in a terminal",
+      "Claude CodeWorkspace root",
       "Custom",
       "BBEditCurrent file",
       "ZedCurrent file",
