@@ -393,6 +393,7 @@ describe("actionSubtitle", () => {
     expect(actionSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toEqual({
       text: "a.ts",
       startTrim: false,
+      lead: "file",
     });
   });
 
@@ -1027,7 +1028,7 @@ describe("buildActionsBarModel arranging", () => {
     expect(m.buttons.map((b) => [b.subtitle, b.subtitleLead])).toEqual([
       ["Workspace root", "root"],
       ["Current folder", "tab"],
-      ["Current file", null],
+      ["Current file", "file"],
     ]);
     expect(m.buttons[0]?.title).toBe("Open PyCharm in Workspace root");
   });

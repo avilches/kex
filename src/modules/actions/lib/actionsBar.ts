@@ -154,14 +154,14 @@ export const SETTINGS_LABELS: BarContext = {
   labels: true,
 };
 
-export type SubtitleLead = "root" | "home" | "tab";
+export type SubtitleLead = "root" | "home" | "tab" | "file";
 
 export type ActionSubtitle = {
   /** The line under the name; null leaves the name lineless. */
   text: string | null;
   /** True when the value is a path rendered with its start cut instead of its tail. */
   startTrim: boolean;
-  /** The icon drawn before the line: the workspace root pin, Home, or the current tab's folder. */
+  /** The icon drawn before the line: the workspace root pin, Home, the current tab's folder, or a file. */
   lead?: SubtitleLead;
 };
 
@@ -179,7 +179,7 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
     return { text: value, startTrim: !ctx?.labels, lead: "root" };
   }
   if (value && (varName === "filepath" || varName === "filename")) {
-    return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false };
+    return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false, lead: "file" };
   }
   if (value) return { text: value, startTrim: varName === "cwd", ...(varName === "cwd" ? { lead: "tab" as const } : {}) };
   return { text: variable, startTrim: false };
