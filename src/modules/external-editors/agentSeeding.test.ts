@@ -19,7 +19,7 @@ vi.mock("@/modules/settings/preferences", async () => {
   return {
     usePreferencesStore: create(() => ({
       actions: [] as Action[],
-      agentActionsSeeded: false,
+      seededAgents: [] as string[],
       appActionsSeeded: false,
       detectedEditors: [] as DetectedEditor[],
     })),
@@ -41,9 +41,9 @@ vi.mock("@/modules/settings/store", async () => {
     setAppActionsSeeded: async (v: boolean) => {
       usePreferencesStore.setState({ appActionsSeeded: v });
     },
-    setAgentActionsSeeded: async (v: boolean) => {
+    setSeededAgents: async (v: string[]) => {
       if (h.failFlag) throw new Error("disk");
-      usePreferencesStore.setState({ agentActionsSeeded: v });
+      usePreferencesStore.setState({ seededAgents: v });
     },
   };
 });
@@ -71,15 +71,15 @@ beforeEach(() => {
   h.failFlag = false;
   h.failAppActions = false;
   h.hydration = Promise.resolve();
-  usePreferencesStore.setState({ actions: [], agentActionsSeeded: false, appActionsSeeded: false, detectedEditors: [] });
+  usePreferencesStore.setState({ actions: [], seededAgents: [], appActionsSeeded: false, detectedEditors: [] });
 });
 
 describe("agent seeding on scan", () => {
-  it("seeds global agent Actions and sets the flag", async () => {
+  it("seeds global agent Actions and records the agents", async () => {
     h.scan.mockResolvedValue([agent("opencode"), agent("pi")]);
     await runEditorScan();
     expect(seededCommands().sort()).toEqual(["opencode", "pi"]);
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
+    expect(usePreferencesStore.getState().seededAgents.sort()).toEqual(["opencode", "pi"]);
   });
 
   it("does not seed again after the Actions are deleted", async () => {
@@ -90,19 +90,19 @@ describe("agent seeding on scan", () => {
     expect(seededCommands()).toEqual([]);
   });
 
-  it("leaves the flag unset when no agents are found", async () => {
+  it("records nothing when no agents are found", async () => {
     h.scan.mockResolvedValue([]);
     await runEditorScan();
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
+    expect(usePreferencesStore.getState().seededAgents).toEqual([]);
     expect(h.writes).toEqual([]);
   });
 
-  it("does not seed a disabled agent nor set the flag for it", async () => {
+  it("does not seed a disabled agent nor record it", async () => {
     h.scan.mockResolvedValue([agent("opencode", false)]);
     usePreferencesStore.setState({ detectedEditors: [agent("opencode", false)] });
     await runEditorScan();
     expect(seededCommands()).toEqual([]);
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
+    expect(usePreferencesStore.getState().seededAgents).toEqual([]);
   });
 
   it("runs one scan at a time in a window, so two calls at once seed once", async () => {
@@ -114,35 +114,45 @@ describe("agent seeding on scan", () => {
     add.mockRestore();
   });
 
-  it("keeps the flag false when the Actions write fails", async () => {
+  it("records nothing when the Actions write fails", async () => {
     h.scan.mockResolvedValue([agent("opencode")]);
     h.failActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
+    expect(usePreferencesStore.getState().seededAgents).toEqual([]);
     expect(seededCommands()).toEqual([]);
   });
 
-  it("sets the flag only after the write succeeded", async () => {
+  it("records the agents only after the write succeeded", async () => {
     h.scan.mockResolvedValue([agent("opencode")]);
-    let flagAtWrite: boolean | undefined;
+    let seenAtWrite: string[] | undefined;
     const add = vi.spyOn(globalActions, "add").mockImplementation(async (a) => {
-      flagAtWrite = usePreferencesStore.getState().agentActionsSeeded;
+      seenAtWrite = usePreferencesStore.getState().seededAgents;
       return a;
     });
     await runEditorScan();
-    expect(flagAtWrite).toBe(false);
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
+    expect(seenAtWrite).toEqual([]);
+    expect(usePreferencesStore.getState().seededAgents).toEqual(["opencode"]);
     add.mockRestore();
   });
 
-  it("marks seeded without adding when the Actions are already there", async () => {
+  it("marks the agent seen without adding when its Action is already there", async () => {
     h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
-    usePreferencesStore.setState({ agentActionsSeeded: false });
+    usePreferencesStore.setState({ seededAgents: [] });
     await runEditorScan();
     expect(seededCommands()).toEqual(["opencode"]);
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(true);
+    expect(usePreferencesStore.getState().seededAgents).toEqual(["opencode"]);
+  });
+
+  it("offers an agent that was never seen when a later scan finds it, and never one the user deleted", async () => {
+    h.scan.mockResolvedValue([agent("opencode")]);
+    await runEditorScan();
+    usePreferencesStore.setState({ actions: [] });
+    h.scan.mockResolvedValue([agent("opencode"), agent("pi")]);
+    await runEditorScan();
+    expect(seededCommands()).toEqual(["pi"]);
+    expect(usePreferencesStore.getState().seededAgents.sort()).toEqual(["opencode", "pi"]);
   });
 
   it("waits for hydration when the scan resolves first, and keeps the saved global Actions", async () => {
@@ -155,13 +165,13 @@ describe("agent seeding on scan", () => {
     const run = runEditorScan();
     await new Promise<void>((r) => setTimeout(r, 0));
     expect(h.writes).toEqual([]);
-    usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: false });
+    usePreferencesStore.setState({ actions: [saved], seededAgents: [] });
     hydrate();
     await run;
     expect(seededCommands()).toEqual(["pnpm build", "opencode"]);
   });
 
-  it("does not reseed when the hydrated flag says the agents were already seeded", async () => {
+  it("does not reseed when the hydrated list says the agents were already seen", async () => {
     const saved: Action = { id: "act-1", name: "Build", kind: "script", command: "pnpm build", ownButton: false };
     let hydrate!: () => void;
     h.hydration = new Promise<void>((r) => {
@@ -170,7 +180,7 @@ describe("agent seeding on scan", () => {
     h.scan.mockResolvedValue([agent("opencode")]);
     const run = runEditorScan();
     await new Promise<void>((r) => setTimeout(r, 0));
-    usePreferencesStore.setState({ actions: [saved], agentActionsSeeded: true });
+    usePreferencesStore.setState({ actions: [saved], seededAgents: ["opencode"] });
     hydrate();
     await run;
     expect(h.writes).toEqual([]);
@@ -195,7 +205,7 @@ describe("app seeding on scan", () => {
     expect(prefs().actions).toHaveLength(1);
     expect(prefs().actions[0]).toMatchObject({ kind: "app", ownButton: false });
     expect(prefs().appActionsSeeded).toBe(true);
-    expect(prefs().agentActionsSeeded).toBe(false);
+    expect(prefs().seededAgents).toEqual([]);
   });
 
   it("does not seed again after the app Actions are deleted", async () => {
@@ -209,52 +219,52 @@ describe("app seeding on scan", () => {
   it("seeds agents and leaves the app flag unset when there are no editors", async () => {
     h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
-    expect(prefs().agentActionsSeeded).toBe(true);
+    expect(prefs().seededAgents).toEqual(["opencode"]);
     expect(prefs().appActionsSeeded).toBe(false);
   });
 
-  it("seeds apps and leaves the agent flag unset when there are no agents", async () => {
+  it("seeds an agent that shows up in a later scan", async () => {
     h.scan.mockResolvedValue([editor("zed")]);
     await runEditorScan();
     h.scan.mockResolvedValue([editor("zed"), agent("opencode")]);
     await runEditorScan();
     expect(seededCommands()).toContain("opencode");
-    expect(prefs().agentActionsSeeded).toBe(true);
+    expect(prefs().seededAgents).toEqual(["opencode"]);
   });
 
-  it("seeds only the apps when the agents flag was already true, without touching the agents", async () => {
-    usePreferencesStore.setState({ agentActionsSeeded: true });
+  it("seeds only the apps when the agents were already seen, without touching the agents", async () => {
+    usePreferencesStore.setState({ seededAgents: ["opencode"] });
     h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     await runEditorScan();
     expect(prefs().actions.map((a) => a.kind)).toEqual(["app"]);
     expect(prefs().appActionsSeeded).toBe(true);
   });
 
-  it("seeds agents and apps together, each flag set", async () => {
+  it("seeds agents and apps together, each marked", async () => {
     h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     await runEditorScan();
     expect(prefs().actions.map((a) => [a.kind, a.ownButton]).sort()).toEqual([
       ["agent", true],
       ["app", false],
     ]);
-    expect(prefs().agentActionsSeeded && prefs().appActionsSeeded).toBe(true);
+    expect(prefs().seededAgents.length > 0 && prefs().appActionsSeeded).toBe(true);
   });
 
-  it("keeps the app flag false when the apps write fails, and keeps the agent flag", async () => {
+  it("keeps the app flag false when the apps write fails, and keeps the agents recorded", async () => {
     h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     h.failAppActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
-    expect(prefs().agentActionsSeeded).toBe(true);
+    expect(prefs().seededAgents).toEqual(["opencode"]);
     expect(prefs().appActionsSeeded).toBe(false);
   });
 
-  it("does not attempt the apps nor set any flag when the agents write fails", async () => {
+  it("does not attempt the apps nor record anything when the agents write fails", async () => {
     h.scan.mockResolvedValue([agent("opencode"), editor("zed")]);
     h.failActions = true;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await runEditorScan();
-    expect(prefs().agentActionsSeeded).toBe(false);
+    expect(prefs().seededAgents).toEqual([]);
     expect(prefs().appActionsSeeded).toBe(false);
     expect(prefs().actions).toEqual([]);
   });
@@ -288,7 +298,7 @@ describe("startup scan", () => {
     await runStartupEditorScan();
     expect(h.scan).not.toHaveBeenCalled();
     expect(seededCommands()).toEqual([]);
-    expect(usePreferencesStore.getState().agentActionsSeeded).toBe(false);
+    expect(usePreferencesStore.getState().seededAgents).toEqual([]);
   });
 
   it("does not scan when the claim itself fails", async () => {

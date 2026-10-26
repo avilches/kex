@@ -22,51 +22,66 @@ const agentAction = (command: string, cwdMode: Action["cwdMode"]): Action => ({
 });
 
 describe("planAgentSeed", () => {
-  it("seeds one current-directory Action per enabled agent", () => {
-    const plan = planAgentSeed({ seeded: false, agents: [ag("opencode"), ag("pi")], existing: [] });
-    expect(plan?.map((a) => a.command).sort()).toEqual(["opencode", "pi"]);
-    for (const a of plan ?? []) {
+  it("seeds one current-directory Action per new enabled agent", () => {
+    const plan = planAgentSeed({ seen: [], agents: [ag("opencode"), ag("pi")], existing: [] });
+    expect(plan?.add.map((a) => a.command).sort()).toEqual(["opencode", "pi"]);
+    for (const a of plan?.add ?? []) {
       expect(a).toMatchObject({ kind: "agent", cwdMode: "context", ownButton: true });
       expect(a.appId).toBe(a.command);
       expect(a.iconId).toBe(a.command);
     }
-    expect(plan?.find((a) => a.command === "opencode")?.name).toBe("OPENCODE");
-    expect(new Set(plan?.map((a) => a.id)).size).toBe(2);
+    expect(plan?.add.find((a) => a.command === "opencode")?.name).toBe("OPENCODE");
+    expect(new Set(plan?.add.map((a) => a.id)).size).toBe(2);
+    expect(plan?.seen.sort()).toEqual(["opencode", "pi"]);
   });
 
-  it("has nothing to seed once seeded", () => {
-    expect(planAgentSeed({ seeded: true, agents: [ag("opencode")], existing: [] })).toBeNull();
+  it("has nothing to seed when every agent was seen", () => {
+    expect(planAgentSeed({ seen: ["opencode"], agents: [ag("opencode")], existing: [] })).toBeNull();
+  });
+
+  it("seeds only the agents never seen", () => {
+    const plan = planAgentSeed({ seen: ["opencode"], agents: [ag("opencode"), ag("pi")], existing: [] });
+    expect(plan?.add.map((a) => a.command)).toEqual(["pi"]);
+    expect(plan?.seen).toEqual(["pi"]);
   });
 
   it("has nothing to seed without agents", () => {
-    expect(planAgentSeed({ seeded: false, agents: [], existing: [] })).toBeNull();
+    expect(planAgentSeed({ seen: [], agents: [], existing: [] })).toBeNull();
   });
 
-  it("plans an empty list when every enabled agent is already there", () => {
-    expect(planAgentSeed({ seeded: false, agents: [ag("opencode")], existing: [agentAction("opencode", "context")] })).toEqual([]);
+  it("adds nothing but still marks the agent seen when its Action is already there", () => {
+    const plan = planAgentSeed({ seen: [], agents: [ag("opencode")], existing: [agentAction("opencode", "context")] });
+    expect(plan).toEqual({ add: [], seen: ["opencode"] });
   });
 
-  it("skips an agent Action already present with the same identity", () => {
+  it("skips an agent Action already present, whatever flags it carries", () => {
     const plan = planAgentSeed({
-      seeded: false,
-      agents: [ag("opencode"), ag("pi")],
-      existing: [agentAction("opencode", "context")],
+      seen: [],
+      agents: [ag("opencode"), ag("pi"), ag("claude")],
+      existing: [agentAction("opencode --model x", "context"), agentAction("claude --dangerously-skip-permissions", "context")],
     });
-    expect(plan?.map((a) => a.command)).toEqual(["pi"]);
+    expect(plan?.add.map((a) => a.command)).toEqual(["pi"]);
   });
 
   it("still seeds when the existing one starts elsewhere", () => {
     const plan = planAgentSeed({
-      seeded: false,
+      seen: [],
       agents: [ag("opencode")],
       existing: [agentAction("opencode", "workspace")],
     });
-    expect(plan?.map((a) => a.command)).toEqual(["opencode"]);
+    expect(plan?.add.map((a) => a.command)).toEqual(["opencode"]);
   });
 
-  it("has nothing to seed when every agent is disabled", () => {
-    expect(planAgentSeed({ seeded: false, agents: [ag("opencode", false)], existing: [] })).toBeNull();
-    expect(planAgentSeed({ seeded: false, agents: [ag("opencode", false), ag("pi")], existing: [] })?.map((a) => a.command)).toEqual(["pi"]);
+  it("has nothing to seed when every agent is disabled, and does not mark a disabled one", () => {
+    expect(planAgentSeed({ seen: [], agents: [ag("opencode", false)], existing: [] })).toBeNull();
+    const plan = planAgentSeed({ seen: [], agents: [ag("opencode", false), ag("pi")], existing: [] });
+    expect(plan?.add.map((a) => a.command)).toEqual(["pi"]);
+    expect(plan?.seen).toEqual(["pi"]);
+  });
+
+  it("seeds the agents without a bypass switch bare and the others with it", () => {
+    const plan = planAgentSeed({ seen: [], agents: [ag("pi"), ag("claude")], existing: [] });
+    expect(plan?.add.map((a) => a.command).sort()).toEqual(["claude --dangerously-skip-permissions", "pi"]);
   });
 });
 

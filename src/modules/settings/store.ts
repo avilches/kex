@@ -218,7 +218,8 @@ export type Preferences = {
   detectedEditors: DetectedEditor[];
   // Global Actions, available in every workspace. Each workspace has its own on top.
   actions: Action[];
-  agentActionsSeeded: boolean;
+  // Ids of the agents already offered as an Action, so a scan seeds only the ones never seen.
+  seededAgents: string[];
   appActionsSeeded: boolean;
   randomWorkspaceColor: boolean;
   workspaceDetailTerminalsEnabled: boolean;
@@ -331,7 +332,7 @@ const KEY_SHORTCUTS = "shortcuts";
 // Tools store keys
 const KEY_DETECTED_EDITORS = "tools";
 const KEY_ACTIONS = "actions";
-const KEY_AGENT_ACTIONS_SEEDED = "agentActionsSeeded";
+const KEY_SEEDED_AGENTS = "seededAgents";
 const KEY_APP_ACTIONS_SEEDED = "appActionsSeeded";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
@@ -494,7 +495,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scratchpadEnterSends: true,
   detectedEditors: [],
   actions: [],
-  agentActionsSeeded: false,
+  seededAgents: [],
   appActionsSeeded: false,
   randomWorkspaceColor: true,
   workspaceDetailTerminalsEnabled: true,
@@ -798,8 +799,10 @@ export async function loadPreferences(): Promise<Preferences> {
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
     })(),
     actions: normalizeActions(getTools<unknown>(KEY_ACTIONS)),
-    agentActionsSeeded:
-      getTools<boolean>(KEY_AGENT_ACTIONS_SEEDED) ?? DEFAULT_PREFERENCES.agentActionsSeeded,
+    seededAgents: (() => {
+      const v = getTools<unknown>(KEY_SEEDED_AGENTS);
+      return Array.isArray(v) ? v.filter((id): id is string => typeof id === "string") : [];
+    })(),
     appActionsSeeded:
       getTools<boolean>(KEY_APP_ACTIONS_SEEDED) ?? DEFAULT_PREFERENCES.appActionsSeeded,
     randomWorkspaceColor:
@@ -1156,8 +1159,8 @@ export async function setGlobalActions(value: Action[]): Promise<void> {
   await writeToolsPref(KEY_ACTIONS, normalizeActions(value));
 }
 
-export async function setAgentActionsSeeded(value: boolean): Promise<void> {
-  await writeToolsPref(KEY_AGENT_ACTIONS_SEEDED, value);
+export async function setSeededAgents(value: string[]): Promise<void> {
+  await writeToolsPref(KEY_SEEDED_AGENTS, [...new Set(value)]);
 }
 
 export async function setAppActionsSeeded(value: boolean): Promise<void> {
@@ -1456,7 +1459,7 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_ACTIONS]: "actions",
-  [KEY_AGENT_ACTIONS_SEEDED]: "agentActionsSeeded",
+  [KEY_SEEDED_AGENTS]: "seededAgents",
   [KEY_APP_ACTIONS_SEEDED]: "appActionsSeeded",
 };
 

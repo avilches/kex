@@ -3,7 +3,7 @@ import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
 import { planAgentSeed, planAppSeed } from "@/modules/actions/lib/agentSeed";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
-import { setAgentActionsSeeded, setAppActionsSeeded, setDetectedEditors } from "@/modules/settings/store";
+import { setAppActionsSeeded, setDetectedEditors, setSeededAgents } from "@/modules/settings/store";
 import type { DetectedEditor } from "./types";
 
 // Module-level scanning state - not persisted; each webview tracks its own spinner.
@@ -43,20 +43,21 @@ export function mergeEnabled(
   });
 }
 
-// The plan is computed from the live flag and the live Actions right before the writes, which go
-// through the serialized queue. A partial failure leaves the flag false and the next scan only
-// adds what is still missing. Only one window scans at startup (`runStartupEditorScan`), so the
+// The plan is computed from the live seen list and the live Actions right before the writes, which
+// go through the serialized queue. A partial failure leaves the list as it was and the next scan
+// only adds what is still missing. Agents are seeded one by one as they first appear, so a scan
+// that finds a new agent offers it like the first launch did; apps are seeded once, behind a flag. Only one window scans at startup (`runStartupEditorScan`), so the
 // others never seed in parallel; they get the Actions and the flag through the preferences echo.
-// Agents first, then apps, each with its own flag set only after its own writes. If the agents
-// write throws, the apps are not attempted and no flag moves; the next scan retries both.
+// Agents first, then apps, each marked only after its own writes. If the agents write throws,
+// the apps are not attempted and nothing is marked; the next scan retries both.
 async function seedActions(merged: DetectedEditor[]): Promise<void> {
   const agents = merged.filter((e) => e.kind === "agent");
   const editors = merged.filter((e) => e.kind === "editor");
   const prefs = () => usePreferencesStore.getState();
-  const agentPlan = planAgentSeed({ seeded: prefs().agentActionsSeeded, agents, existing: globalActions.get() });
+  const agentPlan = planAgentSeed({ seen: prefs().seededAgents, agents, existing: globalActions.get() });
   if (agentPlan) {
-    await Promise.all(agentPlan.map((a) => globalActions.add(a)));
-    await setAgentActionsSeeded(true);
+    await Promise.all(agentPlan.add.map((a) => globalActions.add(a)));
+    await setSeededAgents([...prefs().seededAgents, ...agentPlan.seen]);
   }
   const appPlan = planAppSeed({ seeded: prefs().appActionsSeeded, editors, existing: globalActions.get() });
   if (appPlan) {
