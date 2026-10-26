@@ -22,6 +22,7 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   disabledReason: null,
   subtitle: null,
   subtitleTrim: false,
+  subtitleRoot: false,
   title: null,
   iconOnly: false,
   ...over,

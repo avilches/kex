@@ -144,11 +144,11 @@ export function agentCommandProblem(command: string): string | null {
 // says what the variable stands for in words. The bar never uses this: it shows real values.
 export const SETTINGS_LABELS: BarContext = {
   vars: {
-    cwd: "Current Directory",
-    dir: "Current Directory",
-    filepath: "Current File",
-    filename: "Current File",
-    workspace: "Workspace",
+    cwd: "Current folder",
+    dir: "Current folder",
+    filepath: "Current file",
+    filename: "Current file",
+    workspace: "Workspace root",
   },
   shell: "posix",
   labels: true,
@@ -159,11 +159,13 @@ export type ActionSubtitle = {
   text: string | null;
   /** True when the value is a path rendered with its start cut instead of its tail. */
   startTrim: boolean;
+  /** The line names the workspace root, the path or the words for it: it carries the pin. */
+  root?: boolean;
 };
 
 // The line under the name says what the Action points at in words, not the raw template:
 // a workspace Action shows its root like a folder one (Settings, with no real values, says
-// "Workspace"), a file Action the file name alone, a folder path its value with the start cut. A variable with
+// "Workspace root"), a file Action the file name alone, a folder path its value with the start cut. A variable with
 // no readable part keeps the template; a workspace one without a root says so.
 export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubtitle {
   const { variable } = splitActionName(name);
@@ -172,7 +174,7 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
   const value = ctx?.vars[varName];
   if (varName === "workspace") {
     if (!value) return { text: WORKSPACE_UNSET, startTrim: false };
-    return ctx?.labels ? { text: value, startTrim: false } : { text: value, startTrim: true };
+    return { text: value, startTrim: !ctx?.labels, root: true };
   }
   if (value && (varName === "filepath" || varName === "filename")) {
     return { text: value.split(/[\\/]/).filter(Boolean).pop() ?? value, startTrim: false };
@@ -197,7 +199,15 @@ export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" 
     const cwd = ctx && !ctx.labels ? ctx.vars.cwd : "";
     return cwd ? { text: cwd, startTrim: true } : { text: "Current folder", startTrim: false };
   }
-  return { text: ctx && !ctx.vars.workspace ? WORKSPACE_UNSET : "Workspace", startTrim: false };
+  return workspaceLine(ctx);
+}
+
+// Where a workspace-rooted Action starts: the root itself, or the words for it in Settings.
+function workspaceLine(ctx: BarContext | null): ActionSubtitle {
+  const root = ctx?.vars.workspace;
+  if (ctx && !root) return { text: WORKSPACE_UNSET, startTrim: false };
+  if (!ctx || ctx.labels) return { text: "Workspace root", startTrim: false, root: true };
+  return { text: root!, startTrim: true, root: true };
 }
 
 // An agent has no template, so its name has no variable: the line always says the folder it
@@ -210,13 +220,13 @@ function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext 
   if (mode === "fixed" && fixed) return { text: fixed, startTrim: true };
   if (mode === "workspace" && ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
   // A fixed mode with no folder runs in the workspace folder, as resolveScriptCwd does.
-  if (!real) return { text: mode === "context" ? "Current directory" : "Workspace", startTrim: false };
+  if (!real) return mode === "context" ? { text: "Current folder", startTrim: false } : workspaceLine(ctx);
   const start = real.folders
     ? resolveScriptCwd({ mode, fixedFolder: fixed, ...real.folders })
     : mode === "context"
       ? real.vars.cwd
       : real.vars.workspace;
-  return start ? { text: start, startTrim: true } : { text: null, startTrim: false };
+  return start ? { text: start, startTrim: true, ...(mode === "context" ? {} : { root: true }) } : { text: null, startTrim: false };
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.
@@ -369,6 +379,8 @@ export type BarItem = {
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
   subtitleTrim: boolean;
+  /** The subtitle names the workspace root and draws its pin. */
+  subtitleRoot: boolean;
   /** The hover words of the row, or null to say nothing. */
   title: string | null;
   /** An own button drawn as its app icon alone. */
@@ -547,6 +559,8 @@ type BuildInput = {
   place?: FocusPlace;
   /** Twin Actions to leave out (`twinIds`); absent: worked out from the other inputs. */
   hidden?: ReadonlySet<string>;
+  /** The bar is being rearranged: lines name what a variable stands for, not today's values. */
+  arranging?: boolean;
 };
 
 // Own buttons first (workspace Actions, then global, each by kind in the user's order),
@@ -554,12 +568,13 @@ type BuildInput = {
 // user's order. A running script is never disabled whatever its variables are now: it has
 // to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
 // place to live.
-export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, hidden }: BuildInput): BarModel {
+export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, hidden, arranging }: BuildInput): BarModel {
   const toItem = (action: Action, isGlobal: boolean): BarItem => {
     const state = stateOf(action, states);
     const running = state === "running";
     const label = action.name.trim() || "Action";
-    const subtitle = scriptSubtitle({ ...action, name: label }, context);
+    const words = arranging ? SETTINGS_LABELS : context;
+    const subtitle = scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, context);
     return {
       id: action.id,
@@ -572,7 +587,8 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       disabledReason,
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
-      title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, context),
+      subtitleRoot: !!subtitle.root,
+      title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, words),
       iconOnly: false,
     };
   };

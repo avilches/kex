@@ -153,6 +153,7 @@ describe("menuEntries", () => {
     disabledReason: null,
     subtitle: null,
     subtitleTrim: false,
+    subtitleRoot: false,
     title: null,
     iconOnly: false,
     ...over,
@@ -387,8 +388,8 @@ describe("actionShownAt", () => {
 
 describe("actionSubtitle", () => {
   it("shows the root for the workspace variable, Workspace in Settings, and the file name alone for the file", () => {
-    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: vars.workspace, startTrim: true });
-    expect(actionSubtitle("PyCharm {workspace}", SETTINGS_LABELS)).toEqual({ text: "Workspace", startTrim: false });
+    expect(actionSubtitle("PyCharm {workspace}", ctx)).toEqual({ text: vars.workspace, startTrim: true, root: true });
+    expect(actionSubtitle("PyCharm {workspace}", SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
     expect(actionSubtitle("Code {filepath}", { ...ctx, vars: { ...vars, filepath: "/p/a.ts" } })).toEqual({
       text: "a.ts",
       startTrim: false,
@@ -418,14 +419,14 @@ describe("scriptSubtitle", () => {
 
   it("says where a script runs when its name has no variable", () => {
     expect(scriptSubtitle(script(), ctx)).toEqual({ text: "Home", startTrim: false });
-    expect(scriptSubtitle(script({ cwdMode: "workspace" }), ctx)).toEqual({ text: "Workspace", startTrim: false });
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), ctx)).toEqual({ text: vars.workspace, startTrim: true, root: true });
     expect(scriptSubtitle(script({ cwdMode: "context" }), ctx)).toEqual({ text: "/p", startTrim: true });
     expect(scriptSubtitle(script({ cwdMode: "fixed", cwd: "/srv/app" }), ctx)).toEqual({ text: "/srv/app", startTrim: true });
   });
 
   it("uses the generic words in Settings, which has no folder to show", () => {
     expect(scriptSubtitle(script({ cwdMode: "context" }), SETTINGS_LABELS).text).toBe("Current folder");
-    expect(scriptSubtitle(script({ cwdMode: "workspace" }), SETTINGS_LABELS).text).toBe("Workspace");
+    expect(scriptSubtitle(script({ cwdMode: "workspace" }), SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
   });
 
   it("falls back to the generic words with no folder, and says when the root is missing", () => {
@@ -520,10 +521,10 @@ describe("byKind", () => {
 
 describe("Settings labels", () => {
   it("say what the variable stands for in the subtitle and the hover, never the raw template", () => {
-    expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current Directory", startTrim: true });
-    expect(actionSubtitle("Code {filepath}", SETTINGS_LABELS).text).toBe("Current File");
-    expect(actionRowTitle("Rust {cwd}", false, null, SETTINGS_LABELS)).toBe("Open Rust in Current Directory");
-    expect(actionRowTitle("Code {filepath}", false, null, SETTINGS_LABELS)).toBe("Open Current File with Code");
+    expect(actionSubtitle("Rust {cwd}", SETTINGS_LABELS)).toEqual({ text: "Current folder", startTrim: true });
+    expect(actionSubtitle("Code {filepath}", SETTINGS_LABELS).text).toBe("Current file");
+    expect(actionRowTitle("Rust {cwd}", false, null, SETTINGS_LABELS)).toBe("Open Rust in Current folder");
+    expect(actionRowTitle("Code {filepath}", false, null, SETTINGS_LABELS)).toBe("Open Current file with Code");
   });
 
   it("a blocked row names the app without its variable", () => {
@@ -702,12 +703,12 @@ describe("agents", () => {
 
   it("shows the folder it starts in on its second line", () => {
     const sub = (o: Partial<Action>, c: Parameters<typeof scriptSubtitle>[1] = ctx) => scriptSubtitle(agent(o), c);
-    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true });
+    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true, root: true });
     expect(sub({ cwdMode: "context" })).toEqual({ text: "/p", startTrim: true });
     expect(sub({ cwdMode: "home" }).text).toBe("Home");
     expect(sub({ cwdMode: "fixed", cwd: "/srv" })).toEqual({ text: "/srv", startTrim: true });
-    expect(sub({ cwdMode: "context" }, SETTINGS_LABELS).text).toBe("Current directory");
-    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS).text).toBe("Workspace");
+    expect(sub({ cwdMode: "context" }, SETTINGS_LABELS).text).toBe("Current folder");
+    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, root: true });
   });
 
   it("names the folder the runner falls back to when the focused tab has none", () => {
@@ -718,17 +719,18 @@ describe("agents", () => {
     expect(sub({ cwdMode: "context" }, { ...noFocus, workspaceRoot: null })).toEqual({ text: "/cwd", startTrim: true });
     expect(sub({ cwdMode: "context" }, { ...noFocus, focusFolder: "/root/src" })).toEqual({ text: "/root/src", startTrim: true });
     expect(sub({ cwdMode: "context" }, { focusFolder: null, workspaceRoot: null, workspaceCwd: null }).text).toBeNull();
-    expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current directory");
+    expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current folder");
   });
 
   it("names the workspace folder the run falls back to for a fixed mode with no folder", () => {
     const folders = { focusFolder: "/root/src", workspaceRoot: "/root", workspaceCwd: "/cwd" };
-    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true });
+    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true, root: true });
     expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "  " }), { ...ctx, folders: { ...folders, workspaceRoot: null } })).toEqual({
       text: "/cwd",
       startTrim: true,
+      root: true,
     });
-    expect(scriptSubtitle(agent({ cwdMode: "fixed" }), SETTINGS_LABELS).text).toBe("Workspace");
+    expect(scriptSubtitle(agent({ cwdMode: "fixed" }), SETTINGS_LABELS).text).toBe("Workspace root");
   });
 
   it("is grey with the root message when it starts in a rootless workspace", () => {
@@ -1008,5 +1010,39 @@ describe("twinIds", () => {
     expect(ownButtonsThatFit(trio, room)).toBe(3);
     expect(ownButtonsThatFit(trio, room, undefined, none, hidden)).toBe(2);
     expect(ownButtonsThatFit(trio, ownButtonWidth(later) * 2 + BAR_GAP * 2 + MENUS_RESERVE, undefined, none, hidden)).toBe(2);
+  });
+});
+
+describe("buildActionsBarModel arranging", () => {
+  const rows = [
+    app({ id: "w1", name: "PyCharm {workspace}", command: "pycharm {workspace}", ownButton: true }),
+    app({ id: "c1", name: "Zed {cwd}", command: "zed {cwd}", ownButton: true }),
+    app({ id: "f1", name: "Code {filepath}", command: "code {filepath}", ownButton: true }),
+  ];
+  const build = (arranging: boolean, context = ctx) =>
+    buildActionsBarModel({ local: rows, context, states: new Map(), activeId: undefined, arranging });
+
+  it("names what each variable stands for instead of today's value", () => {
+    const m = build(true);
+    expect(m.buttons.map((b) => [b.subtitle, b.subtitleRoot])).toEqual([
+      ["Workspace root", true],
+      ["Current folder", false],
+      ["Current file", false],
+    ]);
+    expect(m.buttons[0]?.title).toBe("Open PyCharm in Workspace root");
+  });
+
+  it("shows the real values otherwise, the pin only on the workspace root", () => {
+    const m = build(false);
+    expect(m.buttons.map((b) => [b.subtitle, b.subtitleRoot])).toEqual([
+      [vars.workspace, true],
+      ["/p", false],
+      ["{filepath}", false],
+    ]);
+  });
+
+  it("keeps the real availability while arranging", () => {
+    const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
+    expect(build(true, rootless).buttons[0]?.disabledReason).toBe(WORKSPACE_UNSET);
   });
 });

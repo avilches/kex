@@ -42,23 +42,23 @@ describe("useActionsBarModel twins", () => {
     usePreferencesStore.setState({ actions: [] });
   });
 
-  it("hides the twin, and shows everything while showTwins is set", () => {
-    const { result, rerender } = renderHook((p: { showTwins?: boolean }) => useActionsBarModel({ workspace: ws, ...p }), {
+  it("hides the twin, and shows everything while arranging is set", () => {
+    const { result, rerender } = renderHook((p: { arranging?: boolean }) => useActionsBarModel({ workspace: ws, ...p }), {
       initialProps: {},
     });
     expect(result.current.buttons.map((b) => b.id)).toEqual(["w"]);
-    rerender({ showTwins: true });
+    rerender({ arranging: true });
     expect(result.current.buttons.map((b) => b.id)).toEqual(["w", "c"]);
-    rerender({ showTwins: false });
+    rerender({ arranging: false });
     expect(result.current.buttons.map((b) => b.id)).toEqual(["w"]);
   });
 
-  it("keeps the same model while showTwins stays as it was", () => {
-    const { result, rerender } = renderHook((p: { showTwins?: boolean }) => useActionsBarModel({ workspace: ws, ...p }), {
-      initialProps: { showTwins: true },
+  it("keeps the same model while arranging stays as it was", () => {
+    const { result, rerender } = renderHook((p: { arranging?: boolean }) => useActionsBarModel({ workspace: ws, ...p }), {
+      initialProps: { arranging: true },
     });
     const first = result.current;
-    rerender({ showTwins: true });
+    rerender({ arranging: true });
     expect(result.current).toBe(first);
   });
 });

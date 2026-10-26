@@ -49,9 +49,9 @@ describe("AddActionMenu", () => {
     expect(view.options().map((o) => o.textContent)).toEqual([
       "Add scriptruns in a terminal",
       "Custom",
-      "BBEditCurrent File",
-      "ZedCurrent File",
-      "ZedWorkspace",
+      "BBEditCurrent file",
+      "ZedCurrent file",
+      "ZedWorkspace root",
     ]);
     view.unmount();
   });
@@ -59,10 +59,10 @@ describe("AddActionMenu", () => {
   it("tells the place of each preset on its hover title", () => {
     const view = mount();
     click(view.trigger);
-    const row = view.options().find((o) => o.textContent?.includes("ZedWorkspace")) as HTMLElement;
-    expect(row.getAttribute("title")).toBe("Open Zed in Workspace");
-    const fileRow = view.options().find((o) => o.textContent?.includes("ZedCurrent File")) as HTMLElement;
-    expect(fileRow.getAttribute("title")).toBe("Open Current File with Zed");
+    const row = view.options().find((o) => o.textContent?.includes("ZedWorkspace root")) as HTMLElement;
+    expect(row.getAttribute("title")).toBe("Open Zed in Workspace root");
+    const fileRow = view.options().find((o) => o.textContent?.includes("ZedCurrent file")) as HTMLElement;
+    expect(fileRow.getAttribute("title")).toBe("Open Current file with Zed");
     view.unmount();
   });
 
@@ -70,7 +70,7 @@ describe("AddActionMenu", () => {
     const view = mount();
     click(view.trigger);
     search("workspace");
-    expect(view.options().map((o) => o.textContent)).toEqual(["ZedWorkspace"]);
+    expect(view.options().map((o) => o.textContent)).toEqual(["ZedWorkspace root"]);
     search("script");
     expect(view.options().map((o) => o.textContent)).toEqual(["Add scriptruns in a terminal"]);
     view.unmount();
@@ -88,7 +88,7 @@ describe("AddActionMenu", () => {
   it("picking a preset hands it over and stays open for the next one", () => {
     const view = mount();
     click(view.trigger);
-    click(view.options().find((o) => o.textContent?.includes("ZedWorkspace"))!);
+    click(view.options().find((o) => o.textContent?.includes("ZedWorkspace root"))!);
     expect(view.onPickApp).toHaveBeenCalledTimes(1);
     expect(view.onPickApp).toHaveBeenCalledWith(suggestions[1]);
     expect(view.options()).toHaveLength(5);
@@ -103,8 +103,8 @@ describe("AddActionMenu", () => {
     const groups = [...document.querySelectorAll("[cmdk-group]")];
     const agents = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Agents")!;
     expect([...agents.querySelectorAll("[cmdk-item]")].map((o) => o.textContent)).toEqual([
-      "Claude CodeWorkspace",
-      "Claude CodeCurrent directory",
+      "Claude CodeWorkspace root",
+      "Claude CodeCurrent folder",
     ]);
     const apps = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Applications")!;
     expect(apps.textContent).not.toContain("Claude");
@@ -118,12 +118,12 @@ describe("AddActionMenu", () => {
     const view = mount([...suggestions, claude]);
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
-      "Claude CodeWorkspace",
+      "Claude CodeWorkspace root",
       "Add scriptruns in a terminal",
       "Custom",
-      "BBEditCurrent File",
-      "ZedCurrent File",
-      "ZedWorkspace",
+      "BBEditCurrent file",
+      "ZedCurrent file",
+      "ZedWorkspace root",
     ]);
     view.unmount();
   });
