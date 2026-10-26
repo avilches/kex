@@ -31,6 +31,8 @@ export type RowMenuItem = {
   actionId?: string;
   // First item of the Actions block: a rule above it.
   separatorBefore?: boolean;
+  // First Action of a scope: a title above it, like the Header combo.
+  heading?: string;
 };
 
 export function highlightedTabOf(value: string, rows: readonly MergedRow[]): TabEntry | null {
@@ -106,7 +108,12 @@ export type FolderMenuTarget = {
   // The worktrees action of the row's repository, null when the row has none.
   worktrees: { kind: "show"; count: number } | { kind: "hide" } | null;
   // The Actions that run in the row's folder, in the order the menu lists them.
-  actions?: readonly { id: string; label: string; title: string | null }[];
+  actions?: readonly {
+    id: string;
+    label: string;
+    title: string | null;
+    scope: "workspace" | "global";
+  }[];
 };
 
 export function worktreesLabel(hint: NonNullable<FolderMenuTarget["worktrees"]>): string {
@@ -131,15 +138,21 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
     });
   }
   items.push({ id: "copy", label: "Copy Absolute Path", shortcutId: "path.copy" });
-  target.actions?.forEach((action, i) =>
+  const actions = target.actions ?? [];
+  const titled = actions.some((a) => a.scope === "workspace") && actions.some((a) => a.scope === "global");
+  actions.forEach((action, i) => {
+    const firstOfScope = i === 0 || actions[i - 1].scope !== action.scope;
     items.push({
       id: "action",
       actionId: action.id,
       label: action.label,
       ...(action.title ? { title: action.title } : {}),
-      ...(i === 0 ? { separatorBefore: true } : {}),
-    }),
-  );
+      ...(i === 0 || (titled && firstOfScope) ? { separatorBefore: true } : {}),
+      ...(titled && firstOfScope
+        ? { heading: action.scope === "global" ? "Global actions" : "Workspace actions" }
+        : {}),
+    });
+  });
   return items;
 }
 

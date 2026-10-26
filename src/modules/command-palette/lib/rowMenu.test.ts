@@ -79,14 +79,30 @@ describe("folderMenuItems", () => {
       path: "/a/b",
       worktrees: null,
       actions: [
-        { id: "g1", label: "Claude Code", title: "Claude Code in /a/b" },
-        { id: "s1", label: "Dev server", title: null },
+        { id: "g1", label: "Claude Code", title: "Claude Code in /a/b", scope: "global" },
+        { id: "s1", label: "Dev server", title: null, scope: "global" },
       ],
     });
     expect(items.map((i) => i.id)).toEqual(["pick", "copy", "action", "action"]);
     expect(items[2]).toMatchObject({ actionId: "g1", label: "Claude Code", separatorBefore: true });
     expect(items[3]).toMatchObject({ actionId: "s1" });
     expect(items[3].separatorBefore).toBeUndefined();
+    expect(items[2].heading).toBeUndefined();
+  });
+
+  it("titles each scope, like the Header combo, only when both are present", () => {
+    const items = folderMenuItems({
+      path: "/a/b",
+      worktrees: null,
+      actions: [
+        { id: "w1", label: "Dev", title: null, scope: "workspace" },
+        { id: "w2", label: "Test", title: null, scope: "workspace" },
+        { id: "g1", label: "Claude", title: null, scope: "global" },
+      ],
+    });
+    expect(items[2]).toMatchObject({ actionId: "w1", heading: "Workspace actions", separatorBefore: true });
+    expect(items[3].heading).toBeUndefined();
+    expect(items[4]).toMatchObject({ actionId: "g1", heading: "Global actions", separatorBefore: true });
   });
 });
 

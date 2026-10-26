@@ -171,17 +171,22 @@ export function FolderPalette({
     const box = boxRef.current;
     if (!row || !box || !el) return;
     const { groups: found, overlay } = rowActions(workspaceOf(row.workspaceId), row.path, row.branch);
-    const entries = [...found.workspace, ...found.global];
+    const scoped = [
+      ...found.workspace.map((entry) => ({ entry, scope: "workspace" as const })),
+      ...found.global.map((entry) => ({ entry, scope: "global" as const })),
+    ];
+    const entries = scoped.map((s) => s.entry);
     menuActions.current = { byId: new Map(entries.map((e) => [e.action.id, e.action])), overlay };
     openRowMenu(
       row.key,
       folderMenuItems({
         path: row.path,
         worktrees: row.repoKey && row.repoHint ? row.repoHint : null,
-        actions: entries.map((e) => ({
+        actions: scoped.map(({ entry: e, scope }) => ({
           id: e.action.id,
           label: splitActionName(e.action.name).main,
           title: e.title,
+          scope,
         })),
       }),
       anchorOf(box, el, pointer),
