@@ -4,7 +4,7 @@ import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
-import type { TabEntry } from "./tabEntries";
+import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 export type RowMenuItemId =
   | "go"
@@ -42,6 +42,24 @@ export function highlightedTabOf(value: string, rows: readonly MergedRow[]): Tab
     if (row.kind === "tab" && value === `tab:${row.entry.tabId}`) return row.entry;
   }
   return null;
+}
+
+export function highlightedWorkspaceOf(
+  value: string,
+  rows: readonly MergedRow[],
+): WorkspaceEntry | null {
+  for (const row of rows) {
+    if (row.kind === "workspace" && value === `ws:${row.entry.workspaceId}`) return row.entry;
+  }
+  return null;
+}
+
+export function workspaceMenuItems(entry: WorkspaceEntry): RowMenuItem[] {
+  const items: RowMenuItem[] = [{ id: "go", label: "Go to Workspace", enter: true }];
+  if (entry.root) {
+    items.push({ id: "terminal", label: "New Terminal", title: entry.root, shortcutId: "tab.new" });
+  }
+  return items;
 }
 
 export function highlightedActionOf(value: string, rows: readonly MergedRow[]): BarItem | null {

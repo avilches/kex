@@ -18,6 +18,10 @@ export function terminalTargetOf(
       const { cwd, workspaceId, tabId } = row.entry;
       return cwd ? { cwd, workspaceId, besideTabId: tabId } : null;
     }
+    if (row.kind === "workspace" && value === `ws:${row.entry.workspaceId}`) {
+      const { root, workspaceId } = row.entry;
+      return root ? { cwd: root, workspaceId, besideTabId: null } : null;
+    }
     if (row.kind === "closed" && value === row.entry.key) {
       const { kind, path, workspaceId } = row.entry;
       const cwd = kind === "terminal" ? path : pathDirname(path);

@@ -43,6 +43,7 @@ const ws = (workspaceId: string, title: string): WorkspaceEntry => ({
   color: null,
   icon: null,
   tabCount: 1,
+  root: null,
   lastUsedAt: 0,
 });
 const closed = (
@@ -558,5 +559,29 @@ describe("mergeRows with Actions", () => {
   it("does not match the raw template suffix of the name", () => {
     const rows = mergeRows(input({ term: "workspace", actions: [expanded("a", "PyCharm {workspace}", "/work/x")] }));
     expect(keys(rows)).toEqual([]);
+  });
+});
+
+describe("idle list workspaces", () => {
+  const base = {
+    commands: [],
+    tabs: [],
+    term: "",
+    activeTabId: null,
+    learned: {},
+    mru: {},
+  };
+
+  it("offers every workspace but the active one, empty ones included, most recent first", () => {
+    const rows = mergeRows({
+      ...base,
+      activeWorkspaceId: "a",
+      workspaces: [
+        ws("a", "A"),
+        { ...ws("b", "B"), tabCount: 0, lastUsedAt: 1 },
+        { ...ws("c", "C"), lastUsedAt: 5 },
+      ],
+    });
+    expect(rows.map((r) => r.key)).toEqual(["ws:c", "ws:b"]);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
-import type { TabEntry } from "./tabEntries";
+import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import { terminalTargetOf } from "./terminalTarget";
 
 const tab = (tabId: string, cwd: string): MergedRow => ({
@@ -21,9 +21,23 @@ describe("terminalTargetOf", () => {
     const others = [
       { kind: "command", key: "cmd:x" },
       { kind: "action", key: "act:x" },
-      { kind: "workspace", key: "ws:x" },
     ] as MergedRow[];
     for (const row of others) expect(terminalTargetOf(row.key, others)).toBeNull();
+  });
+
+  it("opens a workspace row in its root, and nowhere without one", () => {
+    const wsRow = (id: string, root: string | null): MergedRow => ({
+      kind: "workspace",
+      key: `ws:${id}`,
+      entry: { workspaceId: id, root } as WorkspaceEntry,
+    });
+    const list = [wsRow("a", "/root/a"), wsRow("b", null)];
+    expect(terminalTargetOf("ws:a", list)).toEqual({
+      cwd: "/root/a",
+      workspaceId: "a",
+      besideTabId: null,
+    });
+    expect(terminalTargetOf("ws:b", list)).toBeNull();
   });
 
   const rows = [

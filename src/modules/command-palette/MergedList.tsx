@@ -27,6 +27,7 @@ type Props = {
   onRunClosed: (entry: ClosedTabEntry) => void;
   onRunAction: (item: BarItem) => void;
   onContextMenuAction?: (item: BarItem, e: React.MouseEvent<HTMLElement>) => void;
+  onContextMenuWorkspace?: (entry: WorkspaceEntry, e: React.MouseEvent<HTMLElement>) => void;
   onContextMenuTab?: (entry: TabEntry, e: React.MouseEvent<HTMLElement>) => void;
   onContextMenuClosed?: (entry: ClosedTabEntry, e: React.MouseEvent<HTMLElement>) => void;
 };
@@ -70,6 +71,11 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
         entry={row.entry}
         highlight={row.highlight}
         onRun={() => p.onRunWorkspace(row.entry)}
+        onContextMenu={
+          p.onContextMenuWorkspace
+            ? (e) => p.onContextMenuWorkspace?.(row.entry, e)
+            : undefined
+        }
       />
     );
   }
