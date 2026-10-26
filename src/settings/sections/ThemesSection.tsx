@@ -85,6 +85,21 @@ export function ThemesSection() {
           void handleThemeFiles(e.dataTransfer.files);
         }}
       >
+        {importError ? (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11.5px] text-destructive">
+            {importError}
+          </div>
+        ) : null}
+        <ThemeTable
+          themes={themes}
+          themeId={themeId}
+          customIds={customIds}
+          mode={resolvedMode}
+          activeTheme={resolvedTheme}
+          onSelectTheme={setThemeId}
+          onEditTheme={onEditTheme}
+          onRemoveTheme={(id) => void onRemoveCustomTheme(id)}
+        />
         <div className="flex items-center justify-end">
           <div className="flex items-center gap-1.5">
             <Button
@@ -116,21 +131,6 @@ export function ThemesSection() {
             }}
           />
         </div>
-        {importError ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11.5px] text-destructive">
-            {importError}
-          </div>
-        ) : null}
-        <ThemeTable
-          themes={themes}
-          themeId={themeId}
-          customIds={customIds}
-          mode={resolvedMode}
-          activeTheme={resolvedTheme}
-          onSelectTheme={setThemeId}
-          onEditTheme={onEditTheme}
-          onRemoveTheme={(id) => void onRemoveCustomTheme(id)}
-        />
       </div>
     </div>
   );

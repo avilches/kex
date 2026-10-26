@@ -367,7 +367,7 @@ export function ThemeTable({
   return (
     <div className="flex flex-col gap-2.5">
       <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
-        <span />
+        <span className="px-2">Theme</span>
         <span className="px-2">Editor</span>
         <span className="px-2">Terminal</span>
       </div>
