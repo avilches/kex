@@ -381,9 +381,11 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
   for (const ws of input.workspaces) {
     if (ws.id === input.activeWorkspaceId) continue;
     const rootPath = rootOf(ws);
+    // A workspace always lists its own root, even when another group already shows that folder.
     const rootRows: FolderRow[] = [];
     if (rootPath) {
-      pushUnique(b, rootRows, rowOf(b, rootPath, ws.id, "Workspace Root"));
+      rootRows.push(rowOf(b, rootPath, ws.id, "Workspace Root"));
+      b.seen.add(rootPath);
     }
     const loose = looseOf(ws);
     if (rootRows.length + loose.length === 0) continue;
