@@ -240,6 +240,57 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
+  describe("the Yolo checkbox of an agent", () => {
+    const agentOf = (command: string, over: Partial<Action> = {}): Action => ({
+      id: "ac-y",
+      name: "Agent",
+      kind: "agent",
+      command,
+      cwdMode: "workspace",
+      ownButton: true,
+      ...over,
+    });
+    const yoloBox = () => document.querySelector("button[role='checkbox']#action-yolo") as HTMLElement | null;
+
+    it("is unchecked on a bare known agent and appends the switch when checked", () => {
+      const { container, g, unmount } = mount([agentOf("claude -c")]);
+      click(pencil(container));
+      expect(yoloBox()?.getAttribute("aria-checked")).toBe("false");
+      click(yoloBox());
+      const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
+      expect(id).toBe("ac-y");
+      expect(next.command).toBe("claude -c --dangerously-skip-permissions");
+      unmount();
+    });
+
+    it("is checked when the switch is anywhere in the command and removes it when unchecked", () => {
+      const { container, g, unmount } = mount([agentOf("claude --dangerously-skip-permissions -c")]);
+      click(pencil(container));
+      expect(yoloBox()?.getAttribute("aria-checked")).toBe("true");
+      click(yoloBox());
+      const [, next] = g.onUpdate.mock.calls[0]! as [string, Action];
+      expect(next.command).toBe("claude -c");
+      unmount();
+    });
+
+    it("names the switch it manages", () => {
+      const { container, unmount } = mount([agentOf("grok")]);
+      click(pencil(container));
+      expect(document.querySelector("[role='dialog']")?.textContent).toContain("--permission-mode bypassPermissions");
+      unmount();
+    });
+
+    it("is absent for an agent without a switch and for scripts and apps", () => {
+      for (const action of [agentOf("pi"), saved, savedApp]) {
+        const { container, unmount } = mount([action]);
+        click(pencil(container));
+        expect(yoloBox()).toBeNull();
+        click(dialogButton("Done"));
+        unmount();
+      }
+    });
+  });
+
   it("the combo never offers a preset that is already installed", () => {
     const { container, unmount } = mount([preset], [], { suggestions: [zed] });
     click(addTrigger(container, "global"));
