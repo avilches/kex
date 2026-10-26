@@ -135,6 +135,8 @@ export type ClosedTabEntry = {
   prevTabId: string | null;
   // Closing it left the workspace without tabs.
   lastOfWorkspace?: boolean;
+  // Tabs closed by one bulk action share it, and one undo brings them all back.
+  batchId?: string;
 };
 
 // A closed workspace with everything it held. `index` is where it sat in the bar.
@@ -142,6 +144,7 @@ export type ClosedWorkspaceEntry = {
   kind: "workspace";
   workspace: Workspace;
   index: number;
+  batchId?: string;
 };
 
 export type ClosedEntry = ClosedTabEntry | ClosedWorkspaceEntry;

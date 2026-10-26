@@ -495,8 +495,20 @@ A workspace that folds away because its last tab closed (`emptyWorkspaceToClose`
 accident. `closeTab` flags the entry `lastOfWorkspace` when it empties the workspace, and `captureClosedWorkspace`
 folds that tab back into the snapshot, so one undo returns the workspace with its tab instead of an empty shell.
 `clearStaleFolds` drops the flag as soon as the workspace holds a tab again, so a later close never folds an older
-tab by mistake. An empty workspace with no actions is not recorded. Tabs closed before the workspace stay as tab
-entries below it and reopen into the restored workspace on the following undos.
+tab by mistake. A blank workspace that folds away on its own is not recorded, but one the user closes (`closeWorkspace(id, true)`,
+from `handleCloseWorkspace`) always is, even with no tabs or actions. Tabs closed before the workspace stay as tab
+entries below it and reopen into the restored workspace on the following undos, unless they came from the same bulk
+close.
+
+Tabs closed by one bulk action (`closeTabs` with more than one tab) share a `batchId` (`newCloseBatchId`), and a
+workspace entry that absorbed the last tab of such a batch inherits it. `reopenClosed` keeps reopening entries while
+they carry the batch of the first one, so a single undo returns the whole batch. The ref `workspacesRef` is updated
+after each step so the next entry finds the workspace and the tabs just restored.
+
+Every close that lands in the stack shows a toast (`closedNotice.ts`): "Tab closed", "N tabs closed" or "Workspace
+closed", with "Press <shortcut> to undo this action" read from the current binding of `tab.reopenClosed`. The toast has
+a fixed id, so a bulk close or a tab that takes its workspace with it shows one toast, and the undo dismisses it. There
+is no setting to turn it off.
 
 A restored workspace gets fresh tab ids (`reviveWorkspace`): the old ones carry marks that outlive the close
 (abandoned editor buffers, agent records). Editors come back clean,

@@ -162,6 +162,56 @@ describe("undo close workspace", () => {
     expect(tabIds(view.h.workspaces[1])).toHaveLength(2);
   });
 
+  it("returns every tab of one bulk close with a single undo, in their old order", async () => {
+    view = mount([makeWs("a", [term("a1"), term("a2"), term("a3"), term("a4")])]);
+
+    act(() => {
+      view!.h.closeTab("a", "a2", "cb-1");
+      view!.h.closeTab("a", "a3", "cb-1");
+    });
+    act(() => view!.h.closeTab("a", "a4"));
+    expect(tabIds(view.h.workspaces[0])).toEqual(["a1"]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(tabIds(view.h.workspaces[0])).toHaveLength(2);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(tabIds(view.h.workspaces[0])).toHaveLength(4);
+    expect(tabIds(view.h.workspaces[0])[0]).toBe("a1");
+  });
+
+  it("returns a workspace and the tabs of the bulk close that emptied it with one undo", async () => {
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1"), term("b2")])]);
+
+    act(() => {
+      view!.h.closeTab("b", "b1", "cb-1");
+      view!.h.closeTab("b", "b2", "cb-1");
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a"]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a", "b"]);
+    expect(tabIds(view.h.workspaces[1])).toHaveLength(2);
+  });
+
+  it("can undo closing a workspace without tabs or actions that the user closed", async () => {
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [], { title: "Notes" })]);
+
+    act(() => view!.h.closeWorkspace("b", true));
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a"]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a", "b"]);
+  });
+
   it("does not offer a workspace that is already open again", async () => {
     view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1")])]);
     act(() => view!.h.closeWorkspace("b"));

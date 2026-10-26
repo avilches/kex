@@ -53,25 +53,31 @@ function withTab(ws: Workspace, entry: ClosedTabEntry): Workspace {
 // entry is flagged `lastOfWorkspace`) takes that tab back from the stack, so a
 // single undo returns the workspace with the tab. The tabs closed earlier stay
 // as entries and reopen into the restored workspace one by one. An empty
-// workspace with nothing to bring back is not recorded.
+// workspace with nothing to bring back is not recorded, unless the user closed
+// it on purpose (`explicit`).
 export function captureClosedWorkspace(
   entries: ClosedEntry[],
   ws: Workspace,
   index: number,
   cap = CLOSED_STACK_CAP,
+  explicit = false,
 ): ClosedEntry[] {
   const top = entries[0];
   let snapshot = ws;
   let below = entries;
+  let batchId: string | undefined;
   if (!hasTabs(ws)) {
     if (top?.kind === "tab" && top.workspaceId === ws.id && top.lastOfWorkspace) {
       snapshot = withTab(ws, top);
       below = entries.slice(1);
-    } else if (actionsToDelete(ws) === 0) {
+      batchId = top.batchId;
+    } else if (!explicit && actionsToDelete(ws) === 0) {
       return entries;
     }
   }
-  return captureClosedEntry(below, { kind: "workspace", workspace: snapshot, index }, cap);
+  const entry: ClosedWorkspaceEntry = { kind: "workspace", workspace: snapshot, index };
+  if (batchId) entry.batchId = batchId;
+  return captureClosedEntry(below, entry, cap);
 }
 
 export type ReopenPick =

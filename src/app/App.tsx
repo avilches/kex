@@ -877,7 +877,7 @@ export default function App() {
         abandonUnflushedBuffers(editorTabIds(ws));
         unmarkHibernating(terminalTabs(ws).map((t) => t.id));
       }
-      closeWorkspace(wsId);
+      closeWorkspace(wsId, true);
     },
     [closeWorkspace, destroyWorkspaceFloats],
   );
@@ -2184,12 +2184,12 @@ export default function App() {
     resolveEditor,
     resolveTerminal,
   } = useTabCloseGuards({
-    disposeTab: (workspaceId, tabId) => {
+    disposeTab: (workspaceId, tabId, batchId) => {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind === "browser" && found.tab.floating) {
         void closeFloatWindow(tabId);
       }
-      closeTab(workspaceId, tabId);
+      closeTab(workspaceId, tabId, batchId);
     },
     findTab: findTabGlobal,
     saveTab,
