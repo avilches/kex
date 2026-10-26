@@ -10,6 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +20,7 @@ import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor"
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { ActionIcon } from "./ActionIcon";
 import { OwnButtonChoice } from "./OwnButtonChoice";
+import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { ActionContext } from "./lib/useActionContext";
@@ -78,6 +80,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
   const terminal = usesTerminal(action);
   const agent = isAgent(action);
+  const yolo = agent ? yoloSwitch(command.shown) : null;
 
   // The latest values for the unmount flush, which closes over nothing else.
   const pending = useRef({ action, draft, name, nameFocused, onChange });
@@ -266,6 +269,23 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
             />
           </label>
           {command.required && <div className="text-[11px] text-destructive">{fieldLabel} is required</div>}
+          {agent && yolo && (
+            <div className="flex items-center gap-2 px-0.5 pt-1">
+              <Checkbox
+                id="action-yolo"
+                checked={isYolo(command.shown)}
+                onCheckedChange={(v) => {
+                  const next = setYolo(command.shown, v === true);
+                  setDraft(next);
+                  saveCommand(next);
+                }}
+              />
+              <label htmlFor="action-yolo" className="cursor-pointer text-[12px]">
+                Yolo{" "}
+                <span className="font-mono text-[10.5px] text-muted-foreground">{yolo}</span>
+              </label>
+            </div>
+          )}
           {!agent && (
             <button
               type="button"

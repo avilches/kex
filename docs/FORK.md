@@ -249,6 +249,16 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   logged-in Codex when this was written, so the open checks (OSC 133 marks of its own, `codex resume` of a session
   with no rollout, the value-taking options of the `codex exec` gate, a `null` `transcript_path`) are listed in
   `docs/RESTORE_SESSION_TESTS.md`, Bloque K, K15.
+- **Detect-only agents and bypass-permissions commands** (not present upstream): `editor_scan` also finds `agy`,
+  `openclaude`, `grok`, `aider`, `goose` and `cursor-agent` (`DETECT_ONLY_AGENTS` in `editors/agents.rs`), which have no
+  session integration and stay out of `DEFAULT_AGENTS`. Lookup falls back to the usual install directories (version-manager
+  shims, `~/.local/bin`, `~/.bun/bin`, pnpm, Homebrew, nix, snap) when the login-shell PATH misses, as Orca does. Every agent
+  preset starts with its bypass switch (`agentCommand` in `appSuggestions.ts`): `--dangerously-skip-permissions` for
+  claude, agy and openclaude, `--dangerously-bypass-approvals-and-sandbox` for codex, `--permission-mode bypassPermissions`
+  for grok, `--yes-always` for aider, `--yolo` for cursor-agent and a `GOOSE_MODE=auto` prefix for goose; opencode, omp and pi
+  have none. The goose prefix needs a POSIX-style or fish shell. The Action modal of an agent shows a Yolo checkbox when its
+  binary is one of these (`lib/agentYolo.ts`, read from the command, not from `appId`): checking it appends the switch (the
+  goose assignment goes before the binary), unchecking removes it wherever it is.
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping
   whitelists). Because OpenCode has no hook commands, Kex ships a plugin script to

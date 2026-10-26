@@ -2,6 +2,7 @@ import { newActionId } from "@/lib/ids";
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
+import { yoloCommand } from "./agentYolo";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import type { Action, ActionKind } from "./types";
 
@@ -135,8 +136,9 @@ export function suggestionsFromDetected(detected: readonly DetectedEditor[]): Ap
 const AGENT_VARIANTS = ["workspace", "context"] as const satisfies readonly ScriptCwdMode[];
 
 /** Two presets per enabled agent, starting in the workspace root or in the current directory.
- * The command is the agent id, which is the bare binary name the scan looked up, so the Action
- * stays portable across machines and never carries a resolved path or a Windows `.exe`. */
+ * The command is the bare binary name the scan looked up plus its bypass-permissions switch, so
+ * the Action stays portable across machines and never carries a resolved path or a Windows
+ * `.exe`. */
 export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]): AppSuggestion[] {
   return agents
     .filter((a) => a.enabled !== false)
@@ -146,7 +148,7 @@ export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]):
         appId: agent.id,
         name: agent.name,
         iconId: agent.id,
-        defaultCommand: agent.id,
+        defaultCommand: yoloCommand(agent.id),
         kind: "agent" as const,
         cwdMode,
       })),
