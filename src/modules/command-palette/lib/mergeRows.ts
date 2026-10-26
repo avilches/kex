@@ -59,6 +59,8 @@ export type MergeInput = {
   closed?: ClosedTabEntry[];
   term: string;
   activeTabId: string | null;
+  /** Workspace the user is in; the idle list offers every other one so the palette can jump to it. */
+  activeWorkspaceId?: string | null;
   learned: LearnedMap;
   mru: Record<string, number>;
 };
@@ -222,7 +224,17 @@ export function mergeRows(input: MergeInput): MergedRow[] {
           item,
         }),
       );
-    return [...recents, ...recentlyClosed, ...userRows, ...actions];
+    const otherWorkspaces = workspaces
+      .filter((w) => w.workspaceId !== input.activeWorkspaceId)
+      .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+      .map(
+        (entry): MergedRow => ({
+          kind: "workspace",
+          key: workspaceRowKey(entry.workspaceId),
+          entry,
+        }),
+      );
+    return [...recents, ...otherWorkspaces, ...recentlyClosed, ...userRows, ...actions];
   }
 
   const scored: { row: MergedRow; points: number; recency: TabEntry | null }[] =

@@ -54,6 +54,8 @@ export type WorkspaceEntry = {
   color: string | null;
   icon: string | null;
   tabCount: number;
+  // Folder a new terminal opens in; null when the workspace has no root.
+  root: string | null;
   lastUsedAt: number;
 };
 
@@ -121,6 +123,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
       color: resolveWorkspaceColor(ws.color, ws.id),
       icon: ws.icon ?? null,
       tabCount: tabs.length,
+      root: ws.workspaceRoot ?? ws.fsRoot ?? null,
       lastUsedAt: newestTab,
     };
   });

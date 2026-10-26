@@ -159,17 +159,20 @@ describe("buildFolderGroups", () => {
       "/repo",
       "/dotfiles",
     ]);
+    // A workspace always lists its own root, even when another group already shows that folder.
     expect(groups.find((g) => g.workspaceId === "ws-2")?.rows.map((r) => r.path)).toEqual([
+      "/dotfiles",
       "/dotfiles/home",
     ]);
   });
 
-  it("skips a workspace whose rows were all listed before", () => {
+  it("lists the root of a workspace with no tabs even when another group shows that folder", () => {
     const groups = build({
       workspaces: [active, other],
       entries: [entry({ workspaceId: "ws-1", cwd: "/dotfiles" })],
     });
-    expect(groups.map((g) => g.workspaceId)).toEqual(["ws-1"]);
+    expect(groups.map((g) => g.workspaceId)).toEqual(["ws-1", "ws-2"]);
+    expect(groups[1].rows.map((r) => r.labels)).toEqual([["Workspace Root"]]);
   });
 
   it("drops browser tabs, which carry no folder", () => {
@@ -654,8 +657,8 @@ describe("filterFolderGroups", () => {
     const shown = build({
       workspaces: [active, other],
       workspaceEntries: [
-        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, tabCount: 1, lastUsedAt: 0 },
-        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, tabCount: 1, lastUsedAt: 0 },
+        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, tabCount: 1, root: null, lastUsedAt: 0 },
+        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, tabCount: 1, root: null, lastUsedAt: 0 },
       ],
       home: "/Users/a",
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
@@ -734,6 +737,7 @@ describe("resolved workspace identity", () => {
     color: null,
     icon: null,
     tabCount: 1,
+    root: null,
     lastUsedAt: 0,
     ...over,
   });

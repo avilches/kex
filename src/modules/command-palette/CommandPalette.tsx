@@ -51,9 +51,11 @@ import {
   highlightedActionOf,
   highlightedClosedOf,
   highlightedTabOf,
+  highlightedWorkspaceOf,
   type RowMenuItemId,
   tabEntryCopyPath,
   tabMenuItems,
+  workspaceMenuItems,
 } from "./lib/rowMenu";
 import { anchorOf, keepInputFocus, RowMenu, useRowMenu } from "./RowMenu";
 import { MergedList } from "./MergedList";
@@ -174,6 +176,7 @@ export function CommandPalette({
             closed: actionsOnly ? [] : closedEntries,
             term: parsed.term,
             activeTabId,
+            activeWorkspaceId,
             learned,
             mru,
           })
@@ -188,6 +191,7 @@ export function CommandPalette({
       closedEntries,
       parsed.term,
       activeTabId,
+      activeWorkspaceId,
       learned,
       mru,
     ],
@@ -203,6 +207,10 @@ export function CommandPalette({
   );
   const highlightedAction = useMemo(
     () => (open && inCommands ? highlightedActionOf(value, merged) : null),
+    [open, inCommands, value, merged],
+  );
+  const highlightedWorkspace = useMemo(
+    () => (open && inCommands ? highlightedWorkspaceOf(value, merged) : null),
     [open, inCommands, value, merged],
   );
   const highlightedTab = useMemo(
@@ -428,6 +436,19 @@ export function CommandPalette({
     [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, onCloseTab],
   );
 
+  const runWorkspaceAction = useCallback(
+    (id: RowMenuItemId, entry: WorkspaceEntry) => {
+      closeRowMenu();
+      if (id === "go") {
+        runAfterClose(() => onSelectWorkspace(entry));
+      } else if (id === "terminal") {
+        const target = terminalTargetOf(`ws:${entry.workspaceId}`, merged);
+        if (target) onOpenTerminalAt(target);
+      }
+    },
+    [closeRowMenu, runAfterClose, onSelectWorkspace, merged, onOpenTerminalAt],
+  );
+
   const runClosedAction = useCallback(
     (id: RowMenuItemId, entry: ClosedTabEntry) => {
       closeRowMenu();
@@ -484,6 +505,23 @@ export function CommandPalette({
       openRowMenu(
         actionRowKey(item.id),
         actionMenuItems(item),
+        anchorOf(box, row as HTMLElement, pointer),
+      );
+    },
+    [openRowMenu],
+  );
+
+  const openWorkspaceMenu = useCallback(
+    (
+      entry: WorkspaceEntry,
+      row: Element | null | undefined,
+      pointer?: { clientX: number; clientY: number },
+    ) => {
+      const box = boxRef.current;
+      if (!box || !row) return;
+      openRowMenu(
+        `ws:${entry.workspaceId}`,
+        workspaceMenuItems(entry),
         anchorOf(box, row as HTMLElement, pointer),
       );
     },
@@ -558,8 +596,10 @@ export function CommandPalette({
         const entry = highlightedTabOf(key, merged);
         const closed = highlightedClosedOf(key, merged);
         const action = highlightedActionOf(key, merged);
+        const workspace = highlightedWorkspaceOf(key, merged);
         const run = (item: { id: RowMenuItemId }) => {
-          if (entry) runTabAction(item.id, entry);
+          if (workspace) runWorkspaceAction(item.id, workspace);
+          else if (entry) runTabAction(item.id, entry);
           else if (closed) runClosedAction(item.id, closed);
           else if (action) runActionRow(item.id, action);
         };
@@ -572,6 +612,7 @@ export function CommandPalette({
         if (highlightedTab) openTabMenu(highlightedTab, row);
         else if (highlightedClosed) openClosedMenu(highlightedClosed, row);
         else if (highlightedAction) openActionMenu(highlightedAction, row);
+        else if (highlightedWorkspace) openWorkspaceMenu(highlightedWorkspace, row);
         return;
       }
       if (!inSubpage) return;
@@ -593,6 +634,9 @@ export function CommandPalette({
       merged,
       runTabAction,
       runClosedAction,
+      runWorkspaceAction,
+      highlightedWorkspace,
+      openWorkspaceMenu,
       highlightedTab,
       highlightedClosed,
       highlightedAction,
@@ -777,6 +821,11 @@ export function CommandPalette({
                     setValue(entry.key);
                     openClosedMenu(entry, e.currentTarget, e);
                   }}
+                  onContextMenuWorkspace={(entry, e) => {
+                    e.preventDefault();
+                    setValue(`ws:${entry.workspaceId}`);
+                    openWorkspaceMenu(entry, e.currentTarget, e);
+                  }}
                   onContextMenuTab={(entry, e) => {
                     e.preventDefault();
                     setValue(`tab:${entry.tabId}`);
@@ -881,7 +930,9 @@ export function CommandPalette({
               const entry = highlightedTabOf(key, merged);
               const closed = highlightedClosedOf(key, merged);
               const action = highlightedActionOf(key, merged);
-              if (entry) runTabAction(id, entry);
+              const workspace = highlightedWorkspaceOf(key, merged);
+              if (workspace) runWorkspaceAction(id, workspace);
+              else if (entry) runTabAction(id, entry);
               else if (closed) runClosedAction(id, closed);
               else if (action) runActionRow(id, action);
             }}
@@ -909,7 +960,7 @@ export function CommandPalette({
           ) : (
             <span className="flex-1" />
           )}
-          {highlightedTab || highlightedClosed || highlightedAction ? (
+          {highlightedTab || highlightedClosed || highlightedAction || highlightedWorkspace ? (
             <span className="flex shrink-0 items-center gap-1.5">
               <kbd className="rounded bg-foreground/15 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground">
                 Tab

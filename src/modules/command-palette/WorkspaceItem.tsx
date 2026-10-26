@@ -9,15 +9,18 @@ export function WorkspaceItem({
   entry,
   highlight,
   onRun,
+  onContextMenu,
 }: {
   entry: WorkspaceEntry;
   highlight?: RowHighlight;
   onRun: () => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   return (
     <CommandItem
       value={`ws:${entry.workspaceId}`}
       onSelect={onRun}
+      onContextMenu={onContextMenu}
       className="text-[12.5px]"
     >
       <RowTag kind="Workspace" />
@@ -34,7 +37,9 @@ export function WorkspaceItem({
         />
       </span>
       <span className="ml-auto shrink-0 text-[11px] font-normal text-muted-foreground">
-        {entry.tabCount} {entry.tabCount === 1 ? "tab" : "tabs"}
+        {entry.tabCount === 0
+          ? "empty"
+          : `${entry.tabCount} ${entry.tabCount === 1 ? "tab" : "tabs"}`}
       </span>
     </CommandItem>
   );
