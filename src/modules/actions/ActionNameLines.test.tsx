@@ -16,7 +16,7 @@ function render(props: Parameters<typeof ActionNameLines>[0]) {
 
 describe("ActionNameLines", () => {
   it("draws the workspace-root pin before the line only for a root", () => {
-    const withPin = render({ name: "Zed {workspace}", value: "/p", root: true });
+    const withPin = render({ name: "Zed {workspace}", value: "/p", lead: "root" });
     expect(withPin.container.querySelector("svg")).not.toBeNull();
     withPin.unmount();
     const without = render({ name: "Zed {workspace}", value: "/p" });
@@ -25,7 +25,7 @@ describe("ActionNameLines", () => {
   });
 
   it("keeps the pin on a path cut at its start", () => {
-    const { container, unmount } = render({ name: "Zed {workspace}", value: "/very/long/root", startTrim: true, root: true });
+    const { container, unmount } = render({ name: "Zed {workspace}", value: "/very/long/root", startTrim: true, lead: "root" });
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.textContent).toContain("/very/long/root");
     unmount();
