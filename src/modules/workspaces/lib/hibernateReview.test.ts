@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { enableRunOnStart } from "./hibernate";
 import { busyTabIds, hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, tabsReview, type HibernateLive } from "./hibernateReview";
 import type { Tab, Workspace } from "./types";
 
@@ -21,6 +22,25 @@ const live = (
   runningCommand: (id) => commands[id],
   scriptState: (id) => scripts[id],
   actionOf: (id) => actions[id],
+});
+
+describe("an agent that has not reported its session", () => {
+  const agents = { t1: { agent: "opencode", status: "idle" as const, resumable: false } };
+
+  it("is listed until Run on start stores the command it was launched with, and then it is not", () => {
+    const tab = term("t1", { restoreOnRestart: true });
+    const before = hibernateReview(ws([tab]), live(agents, { t1: "opencode" }));
+    expect(before.commands).toEqual([{ tabId: "t1", title: undefined, command: "opencode" }]);
+
+    const after = enableRunOnStart(tab, "opencode");
+    expect(after).toMatchObject({ restoreOnRestart: true, persistentCommand: "opencode" });
+    expect(isReviewEmpty(hibernateReview(ws([after]), live(agents, { t1: "opencode" })))).toBe(true);
+  });
+
+  it("keeps a command the user already set", () => {
+    const tab = term("t1", { restoreOnRestart: true, persistentCommand: "opencode -c" });
+    expect(enableRunOnStart(tab, "opencode")).toMatchObject({ persistentCommand: "opencode -c" });
+  });
 });
 
 describe("hibernateReview agents", () => {
