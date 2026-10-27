@@ -40,6 +40,7 @@ import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
 import { initialKey } from "./lib/initialKey";
+import { listViewportOf, scrollListToTop } from "./lib/listScroll";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
@@ -249,11 +250,20 @@ export function CommandPalette({
       mru,
     ],
   );
-  // Until a row is picked the previous tab is the highlighted one. Passing it as the controlled
-  // value from the first render keeps cmdk from selecting the first row (the current tab) first.
+  // Until cmdk reports a pick, the highlighted row is the first one drawn (Current tab, or the first
+  // row there is). Passed from the first render, it does not wait for cmdk to find the first item,
+  // which it does not do again when a page is left with an empty value.
   const value =
     pickedValue ||
-    (open && inCommands && !inSubpage ? initialKey(merged, parsed.term.length > 0) : "");
+    (open && inCommands && !inSubpage
+      ? initialKey(merged, parsed.term.length > 0, COMMAND_GROUPS)
+      : "");
+  // The parent closes the palette without going through handleOpenChange (a tab clicked behind it,
+  // a terminal opened from it), so the highlighted row of that session would survive into the next
+  // one. Empty, cmdk highlights the first row as soon as the items register.
+  useEffect(() => {
+    if (!open) setValue("");
+  }, [open]);
   const terminalTarget = useMemo(
     () => (open && inCommands ? terminalTargetOf(value, merged) : null),
     [open, inCommands, value, merged],
@@ -285,11 +295,13 @@ export function CommandPalette({
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
   const listRef = useRef<HTMLDivElement>(null);
+  const mountList = useCallback((el: HTMLDivElement | null) => {
+    listRef.current = el;
+    scrollListToTop(el);
+  }, []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the top whenever the typed text changes
   useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
-      ?.scrollTo({ top: 0 });
+    scrollListToTop(listRef.current);
   }, [query]);
 
   const themes = useMemo(() => {
@@ -333,10 +345,7 @@ export function CommandPalette({
     if (parsed.mode === "content") {
       lastContentQuery = query;
       lastContentValue = value;
-      lastContentScrollTop =
-        listRef.current?.querySelector<HTMLElement>(
-          '[data-slot="scroll-area-viewport"]',
-        )?.scrollTop ?? 0;
+      lastContentScrollTop = listViewportOf(listRef.current)?.scrollTop ?? 0;
     }
     setQuery("");
     setValue("");
@@ -390,10 +399,7 @@ export function CommandPalette({
   useEffect(() => {
     if (!open || !contentRestoredRef.current) return;
     if (content.loading || content.results.length === 0) return;
-    const viewport = listRef.current?.querySelector<HTMLElement>(
-      '[data-slot="scroll-area-viewport"]',
-    );
-    viewport?.scrollTo({ top: lastContentScrollTop });
+    listViewportOf(listRef.current)?.scrollTo({ top: lastContentScrollTop });
   }, [open, content.loading, content.results.length]);
 
   useEffect(() => {
@@ -502,13 +508,7 @@ export function CommandPalette({
     next: string | null;
     scrollTop: number;
   } | null>(null);
-  const listViewport = useCallback(
-    () =>
-      listRef.current?.querySelector<HTMLElement>(
-        '[data-slot="scroll-area-viewport"]',
-      ) ?? null,
-    [],
-  );
+  const listViewport = useCallback(() => listViewportOf(listRef.current), []);
   const mergedRef = useRef(merged);
   mergedRef.current = merged;
   const valueRef = useRef(value);
@@ -993,7 +993,7 @@ export function CommandPalette({
           }}
         >
         <ScrollArea
-          ref={listRef}
+          ref={mountList}
           className="[&_[data-slot=scroll-area-viewport]]:max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
         >
           <CommandList className="max-h-none overflow-visible pr-3">

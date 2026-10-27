@@ -242,6 +242,9 @@ describe("Cmd+Shift+W in the palette", () => {
     withCommand = false;
     render(<Harness />);
     await wait(50);
+    expect(selected()).toBe("tab:cur");
+    await key("ArrowDown");
+    await wait(10);
     expect(selected()).toBe("tab:a1");
     await closeWorkspaceShortcut();
     await wait(50);

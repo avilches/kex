@@ -441,7 +441,7 @@ describe("Move to Workspace from the palette", () => {
 });
 
 describe("Back from the Move tab to workspace command", () => {
-  it("returns to the first row like before, not to the active tab", async () => {
+  it("returns to the first row, which is the active tab", async () => {
     commands = [{ id: "tab.moveToWorkspace", title: "Move tab to workspace...", group: "Tabs", run: () => {} }];
     render(<Harness />);
     await wait(50);
@@ -453,8 +453,8 @@ describe("Back from the Move tab to workspace command", () => {
     expect(document.body.textContent).toContain("Move tab to workspace");
     fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
     await wait(50);
+    expect(opened).toBe("tab:cur");
     expect(selected()).toBe(opened);
-    expect(selected()).not.toBe("tab:cur");
   });
 });
 

@@ -1,10 +1,12 @@
+import { displayOrder } from "./closeSuccessor";
 import type { MergedRow } from "./mergeRows";
 
-// The row highlighted when the palette opens with an empty box: the previous tab, so Cmd+P then
-// Enter jumps back, and the current one only when there is no other. Typing keeps cmdk's own
-// choice of the best result.
-export function initialKey(rows: readonly MergedRow[], typing: boolean): string {
-  if (typing) return "";
-  const previous = rows.find((r) => r.kind === "tab" && !r.current);
-  return (previous ?? rows[0])?.key ?? "";
+// The row highlighted when the list is drawn: the first one on screen, which is Current tab when
+// there is one. Rows that are not drawn (the other workspaces of the idle list) never count.
+export function initialKey(
+  rows: readonly MergedRow[],
+  typing: boolean,
+  commandGroups: readonly string[],
+): string {
+  return displayOrder(rows, typing, commandGroups)[0]?.key ?? "";
 }
