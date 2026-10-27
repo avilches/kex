@@ -360,25 +360,4 @@ describe("useActionRunner", () => {
     expect(write).not.toHaveBeenCalled();
     expect(ptyStop).not.toHaveBeenCalled();
   });
-
-  it("F12 runs the active Action, and stops it when it is running", () => {
-    const found: Record<string, Tab> = {};
-    const { deps, result, write } = setup(ws(), found);
-    act(() => result.current.toggleActiveAction());
-    expect(deps.splitPaneAndOpenTab).toHaveBeenCalledTimes(1);
-    const tabId = getActionTab(script.id) as string;
-    found[tabId] = termTab(tabId);
-    deps.terminalHandles.current.set(tabId, { write });
-    act(() => result.current.toggleActiveAction());
-    expect(write).toHaveBeenCalledWith("\x03");
-    clearScriptRunningEntry(tabId);
-  });
-
-  it("F12 skips an active Action with no command", () => {
-    const empty: Action = { ...script, id: "ac-e", command: "" };
-    const { deps, result } = setup(ws({ actions: [empty, script], activeAction: "ac-e" }));
-    act(() => result.current.toggleActiveAction());
-    expect(deps.splitPaneAndOpenTab).toHaveBeenCalledTimes(1);
-    clearScriptRunningEntry(getActionTab(script.id) as string);
-  });
 });

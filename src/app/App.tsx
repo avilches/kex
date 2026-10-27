@@ -863,7 +863,7 @@ export default function App() {
     [],
   );
 
-  const { toggleActiveAction, runAction, stopAction, focusActionTab } = useActionRunner({
+  const { runAction, stopAction, focusActionTab } = useActionRunner({
     activeWorkspace,
     activeWorkspaceId,
     findWorkspace: findWorkspaceById,
@@ -3004,9 +3004,6 @@ export default function App() {
       "tab.hibernate": () => {
         if (activeTabId) toggleTabHibernate(activeTabId);
       },
-      "workspace.run": () => {
-        if (activeWorkspace) toggleActiveAction();
-      },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActiveTab,
@@ -3272,7 +3269,6 @@ export default function App() {
       rotateExplorerRoot,
       toggleOverlayPreview,
       toggleSplitPreview,
-      toggleActiveAction,
       activeTabId,
       toggleTabHibernate,
     ],
@@ -3282,7 +3278,6 @@ export default function App() {
     () => ({
       activeTab,
       hasWorkspaceRoot: !!activeWorkspace?.workspaceRoot,
-      scriptCount: activeWorkspace?.actions?.length ?? 0,
     }),
     [activeWorkspace?.workspaceRoot, activeWorkspace?.actions, activeTab],
   );

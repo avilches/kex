@@ -225,6 +225,11 @@ function ShortcutRow({
             >
               {hasBindings ? (
                 <KbdGroup>
+                  {isModified && (
+                    <span className="mr-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                      Custom
+                    </span>
+                  )}
                   {getBindingTokens(bindings[0]).map((t, i) => (
                     <Kbd
                       key={i}

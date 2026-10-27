@@ -55,7 +55,6 @@ export type ShortcutId =
   | "workspace.close"
   | "workspace.rename"
   | "workspace.settings"
-  | "workspace.run"
   | "nav.prev"
   | "nav.next"
   | "workspace.selectByIndex"
@@ -130,12 +129,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Workspace Settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "," }],
-  },
-  {
-    id: "workspace.run",
-    label: "Run / Stop Active Script",
-    group: "General",
-    defaultBindings: [{ key: "F12" }],
   },
   {
     id: "tab.hibernate",

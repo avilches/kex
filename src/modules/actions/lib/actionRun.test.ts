@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  pickRunnableAction,
   planActionRun,
   planActionStop,
   planTabReveal,
@@ -304,44 +303,6 @@ describe("planTabReveal", () => {
 
   it("switches to the workspace that holds the tab", () => {
     expect(planTabReveal({ ...at, tabWorkspaceId: "w2" })).toEqual({ switchWorkspace: true, mode: "activate" });
-  });
-});
-
-describe("pickRunnableAction", () => {
-  const a = script({ id: "a" });
-  const b = script({ id: "b" });
-  const empty = script({ id: "e", command: " " });
-
-  it("picks the active one", () => {
-    expect(pickRunnableAction([a, b], "b")).toBe(b);
-  });
-
-  it("falls back to the first with a command when the active one is empty", () => {
-    expect(pickRunnableAction([empty, a, b], "e")).toBe(a);
-  });
-
-  it("falls back to the first with a command when none is active or the id is stale", () => {
-    expect(pickRunnableAction([empty, a], undefined)).toBe(a);
-    expect(pickRunnableAction([a, b], "gone")).toBe(a);
-  });
-
-  it("prefers a visible Action over a hidden one when the active one is not runnable", () => {
-    expect(pickRunnableAction([a, b], undefined, new Set(["a"]))).toBe(b);
-    expect(pickRunnableAction([empty, a, b], "e", new Set(["a"]))).toBe(b);
-  });
-
-  it("still picks the active Action when it is hidden, its twin does the same", () => {
-    expect(pickRunnableAction([a, b], "a", new Set(["a"]))).toBe(a);
-  });
-
-  it("falls back to the hidden ones when nothing visible can run", () => {
-    expect(pickRunnableAction([a], undefined, new Set(["a"]))).toBe(a);
-    expect(pickRunnableAction([a, empty], "gone", new Set(["a"]))).toBe(a);
-  });
-
-  it("returns nothing when no Action has a command", () => {
-    expect(pickRunnableAction([empty], "e")).toBeUndefined();
-    expect(pickRunnableAction([], undefined)).toBeUndefined();
   });
 });
 
