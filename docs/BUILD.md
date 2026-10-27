@@ -5,7 +5,7 @@
 ```bash
 pnpm install
 pnpm tauri dev         # frontend (Vite) + Rust (cargo run); the port is picked per checkout
-pnpm dev               # frontend only (no Rust), port 1420
+pnpm dev               # frontend only (no Rust), the next free port if `tauri dev` holds this checkout's one
 ```
 
 `pnpm tauri dev` goes through `scripts/tauri.mjs`, which picks the Vite port so several checkouts
@@ -14,7 +14,10 @@ under `.claude/worktrees/` gets a port in 1421-1920 derived from its path (stabl
 next free one if taken). The script prints it (`[kex] dev server on port N`) and passes it as
 `KEX_DEV_PORT` to Vite (`vite.config.ts`), to the Tauri CLI as `--config` (`devUrl`) and to
 `src-tauri/build.rs`, which bakes the same URL into the dev build. Exporting `KEX_DEV_PORT` yourself
-overrides the choice, and a bare `pnpm dev` honors it too, defaulting to 1420.
+overrides the choice, and a bare `pnpm dev` honors it too. Without it, a bare `pnpm dev` runs the same
+pick (`vite.config.ts`), so it never collides with a `tauri dev` of the same checkout: it takes the next
+free port, and the Vite servers of one checkout watch the same files, so saving a theme from the preview
+of either reloads both.
 
 When `pnpm tauri dev` runs inside a Claude Code session (`CLAUDECODE` is set), the script also drops every
 `CLAUDE*` variable from the environment before starting the app (`scripts/devEnv.mjs`). Kex Dev would otherwise
@@ -28,7 +31,7 @@ saves the pending edits to `SETTINGS_TEXTS.md` (git-ignored) through a dev-only 
 
 ### Theme preview page
 
-`pnpm dev` also serves `http://localhost:1420/theme-preview.html` (on the port Vite prints if `KEX_DEV_PORT` is set; `theme-preview.html` +
+`pnpm dev` also serves `http://localhost:<port>/theme-preview.html` (the port Vite prints; `theme-preview.html` +
 `src/theme-preview/main.ts`), a vanilla-DOM page (no React tree, no Tauri `invoke`) that applies a
 theme through the real `applyTheme` and shows WorkspaceBar, Header, Sidebar (Explorer, Source
 Control, History, Notes), tab bar with agent chips, terminal (background, selection, cursor, 16

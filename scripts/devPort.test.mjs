@@ -1,5 +1,6 @@
+import net from "node:net";
 import { describe, expect, it } from "vitest";
-import { BASE_PORT, buildTauriArgs, pickPort, preferredPort } from "./devPort.mjs";
+import { BASE_PORT, buildTauriArgs, isPortFree, pickPort, preferredPort } from "./devPort.mjs";
 
 const wt = (name) => `/Users/x/Kex/.claude/worktrees/${name}`;
 
@@ -32,6 +33,17 @@ describe("pickPort", () => {
 
   it("gives up when nothing is free", async () => {
     await expect(pickPort(wt("a"), async () => false, 5)).rejects.toThrow(/No free dev port/);
+  });
+});
+
+describe("isPortFree", () => {
+  it("sees a port taken by a localhost-only listener", async () => {
+    const server = net.createServer();
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address();
+    expect(await isPortFree(port)).toBe(false);
+    await new Promise((resolve) => server.close(resolve));
+    expect(await isPortFree(port)).toBe(true);
   });
 });
 

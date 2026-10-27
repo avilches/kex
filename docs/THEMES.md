@@ -8,7 +8,7 @@ Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un 
 `inactivePaneDim`, los colores de git o del terminal) se hace y se comprueba en la pagina
 `theme-preview.html`, no arrancando la app ni con capturas de pantalla:
 
-1. Arrancar `pnpm dev` (en un worktree, con `--port <libre>` si el 1420 esta ocupado) y abrir
+1. Arrancar `pnpm dev` (elige solo un puerto libre; Vite imprime cual) y abrir
    `http://localhost:<puerto>/theme-preview.html?theme=<id>&mode=light|dark&view=swatches|app`.
    `view=swatches` lista cada superficie y cada token con su hex; `view=app` monta una
    aproximacion de la aplicacion (WorkspaceBar con tabs de ejemplo, Sidebar de Explorer y de
