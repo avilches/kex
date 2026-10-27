@@ -92,6 +92,20 @@ describe("TabItem", () => {
     expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
   });
 
+  it("dims the content of a hibernated row but not the row, so its selection highlight stays at full strength", () => {
+    render(
+      <Command value="tab:tab-1">
+        <CommandList>
+          <TabItem entry={entry({ hibernated: true })} onRun={vi.fn()} />
+        </CommandList>
+      </Command>,
+    );
+    const item = document.querySelector("[cmdk-item]") as HTMLElement;
+    expect(item.getAttribute("aria-selected")).toBe("true");
+    expect(item.className).not.toMatch(/(^|\s)opacity-/);
+    expect(item.className).toContain("[&>*]:opacity-40");
+  });
+
   it("shows the absolute path on the second line", () => {
     row(entry({ detail: "/p/Kex/src" }));
     expect(screen.getByText("/p/Kex/src")).toBeTruthy();

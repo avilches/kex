@@ -48,7 +48,7 @@ export function TabItem({
       value={`tab:${entry.tabId}`}
       onSelect={onRun}
       onContextMenu={onContextMenu}
-      className={cn("text-[12.5px]", entry.hibernated && "opacity-40")}
+      className={cn("text-[12.5px]", entry.hibernated && "[&>*]:opacity-40")}
     >
       <RowTag kind={tabTagKind(entry)} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
