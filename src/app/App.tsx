@@ -276,6 +276,11 @@ import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath, tabFolder } from "@/modules/workspaces/lib/tabPath";
 import { runPaletteShortcut, runPaletteTabItem } from "@/modules/command-palette/lib/paletteControl";
 import {
+  menuItemBlockedByPalette,
+  openPaletteOf,
+  shortcutBlockedByPalette,
+} from "@/modules/command-palette/lib/paletteGate";
+import {
   isPaletteTabShortcut,
   withPaletteTabShortcuts,
 } from "@/modules/command-palette/lib/paletteShortcuts";
@@ -3294,7 +3299,14 @@ export default function App() {
       ) {
         return true;
       }
-      if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
+      if (
+        shortcutBlockedByPalette(
+          id,
+          openPaletteOf(commandPaletteOpenRef.current, folderPaletteOpenRef.current),
+        )
+      ) {
+        return true;
+      }
       if (
         id === "workspace.settings" &&
         !useWorkspaceSettingsStore.getState().open &&
@@ -3383,6 +3395,14 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
+    if (
+      menuItemBlockedByPalette(
+        id,
+        openPaletteOf(commandPaletteOpenRef.current, folderPaletteOpenRef.current),
+      )
+    ) {
+      return;
+    }
     switch (id) {
       case "settings":
         void openSettingsWindow();
@@ -3391,7 +3411,7 @@ export default function App() {
         addWorkspace(home ?? undefined);
         break;
       case "new_terminal":
-        openNewTerminal();
+        shortcutHandlers["tab.new"]?.(new KeyboardEvent("keydown"));
         break;
       case "new_browser":
         openBrowserInTab("");
