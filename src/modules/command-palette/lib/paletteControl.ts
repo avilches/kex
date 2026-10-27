@@ -38,7 +38,3 @@ export function runPaletteShortcut(action: PaletteShortcut, digit?: number): boo
 export function runPaletteTabItem(item: RowMenuItemId): boolean {
   return current ? current("tabItem", undefined, item) : false;
 }
-
-export function paletteIsOpen(): boolean {
-  return current !== null;
-}

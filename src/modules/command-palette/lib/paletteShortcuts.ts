@@ -34,10 +34,6 @@ export function isPaletteTabShortcut(id: ShortcutId): boolean {
   return id in PALETTE_TAB_SHORTCUTS;
 }
 
-export function paletteTabItemFor(id: ShortcutId): RowMenuItemId | null {
-  return (PALETTE_TAB_SHORTCUTS as Partial<Record<ShortcutId, RowMenuItemId>>)[id] ?? null;
-}
-
 // The handlers with each tab shortcut offered first to the open palette; with none open, or when it
 // declines, the original handler runs.
 export function withPaletteTabShortcuts(

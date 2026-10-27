@@ -4,7 +4,6 @@ import {
   isPaletteShortcut,
   isPaletteTabShortcut,
   PALETTE_TAB_SHORTCUTS,
-  paletteTabItemFor,
   withPaletteTabShortcuts,
 } from "./paletteShortcuts";
 import { tabMenuItems } from "./rowMenu";
@@ -50,12 +49,10 @@ describe("PALETTE_TAB_SHORTCUTS", () => {
     for (const id of Object.keys(PALETTE_TAB_SHORTCUTS) as ShortcutId[]) {
       expect(isPaletteShortcut(id)).toBe(true);
       expect(isPaletteTabShortcut(id)).toBe(true);
-      expect(paletteTabItemFor(id)).not.toBeNull();
     }
     for (const id of ["tab.new", "workspace.close", "palette.folderRoot", "palette.menuAction"] as const) {
       expect(isPaletteShortcut(id)).toBe(true);
       expect(isPaletteTabShortcut(id)).toBe(false);
-      expect(paletteTabItemFor(id)).toBeNull();
     }
     for (const id of ["tab.rename", "tab.next", "workspace.new", "editor.undo"] as const) {
       expect(isPaletteShortcut(id)).toBe(false);
