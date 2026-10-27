@@ -282,7 +282,8 @@ export function useActionRunner(deps: ActionRunnerDeps) {
         case "new-agent-tab": {
           const tabId = newTabId();
           warnMissingFolder(plan.cwd, plan.title);
-          openAgentTab(ws, { id: tabId, kind: "terminal", cwd: plan.cwd, title: plan.title });
+          // No title: tab.title is the user's own name and would shadow the one the agent sends by OSC.
+          openAgentTab(ws, { id: tabId, kind: "terminal", cwd: plan.cwd });
           scheduleAgentWrite(tabId, plan.input, WRITE_DELAY_NEW_MS);
           return;
         }

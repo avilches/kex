@@ -223,7 +223,8 @@ describe("useActionRunner", () => {
     expect(deps.openTab).toHaveBeenCalledTimes(2);
     const tabs = deps.openTab.mock.calls.map((c) => (c as unknown[])[2] as Tab);
     expect(tabs[0].id).not.toBe(tabs[1].id);
-    expect(tabs[0]).toMatchObject({ kind: "terminal", title: "Claude", cwd: "/w" });
+    expect(tabs[0]).toMatchObject({ kind: "terminal", cwd: "/w" });
+    expect(tabs[0].title).toBeUndefined();
     expect(deps.openTab).toHaveBeenCalledWith("w1", "p1", tabs[0]);
     expect(deps.activateTab).toHaveBeenCalledWith("w1", tabs[1].id);
     expect(deps.setScriptPaneId).not.toHaveBeenCalled();
