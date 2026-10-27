@@ -195,7 +195,7 @@ export function RowMenu({
         const own = iconFor?.(item);
         return (
           <Fragment key={item.actionId ?? item.id}>
-            {item.separatorBefore ? <div role="separator" className="-mx-1 my-1 h-px bg-border/60" /> : null}
+            {item.separatorBefore ? <div aria-hidden className="-mx-1 my-1 h-px bg-border/60" /> : null}
             {item.heading ? (
               <div className="px-2.5 py-1 text-[10px] font-medium text-muted-foreground select-none">{item.heading}</div>
             ) : null}
