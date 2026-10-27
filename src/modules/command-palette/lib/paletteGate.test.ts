@@ -33,6 +33,7 @@ const EXPECTED_COMMANDS: ShortcutId[] = [
 ];
 const EXPECTED_FOLDER: ShortcutId[] = [
   ...TABS,
+  "palette.folderCurrent",
   "palette.folderRoot",
   "palette.folderMain",
   "palette.folderHome",

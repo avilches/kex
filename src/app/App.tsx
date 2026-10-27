@@ -2969,6 +2969,7 @@ export default function App() {
           if (foreground === null) openCommandPalette("history");
         });
       },
+      "palette.folderCurrent": () => void runPaletteShortcut("folderCurrent"),
       "palette.folderRoot": () => void runPaletteShortcut("folderRoot", 1),
       "palette.folderMain": () => void runPaletteShortcut("folderMain", 2),
       "palette.folderHome": () => void runPaletteShortcut("folderHome", 3),

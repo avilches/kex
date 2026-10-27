@@ -19,6 +19,7 @@ export const PALETTE_TAB_SHORTCUTS = {
 const PALETTE_OWN_SHORTCUTS: readonly ShortcutId[] = [
   "tab.new",
   "workspace.close",
+  "palette.folderCurrent",
   "palette.folderRoot",
   "palette.folderMain",
   "palette.folderHome",

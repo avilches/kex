@@ -23,6 +23,7 @@ export const PALETTE_ALLOWED_SHORTCUTS: Record<Exclude<OpenPalette, "none">, rea
   commands: [...TAB_AND_WORKSPACE, "commandPalette.open", "commandPalette.content", "commandPalette.history"],
   folder: [
     ...TAB_AND_WORKSPACE,
+    "palette.folderCurrent",
     "palette.folderRoot",
     "palette.folderMain",
     "palette.folderHome",

@@ -8,6 +8,7 @@ export type PaletteShortcut =
   // A shortcut that has a twin item in the tab menu; the item id says which.
   | "tabItem"
   | "closeWorkspace"
+  | "folderCurrent"
   | "folderRoot"
   | "folderMain"
   | "folderHome"

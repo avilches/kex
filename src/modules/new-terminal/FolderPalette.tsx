@@ -222,7 +222,7 @@ export function FolderPalette({
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action, digit, item) => {
-      if (action === "closeWorkspace") return true;
+      if (action === "closeWorkspace" || action === "newTab") return true;
       // Over a folder row only copying the path means something; the other tab shortcuts are taken without effect.
       if (action === "tabItem" && item !== "copy") return true;
       const byDigit = action === "menuAction" || (latest.current.menuOpen && action in SLOT_ACTION);
@@ -237,7 +237,7 @@ export function FolderPalette({
         if (fixed) latest.current.onPick(fixed);
         return true;
       }
-      if (action === "newTab") {
+      if (action === "folderCurrent") {
         const current = latest.current.groups.flatMap((g) => g.rows).find((r) => r.labels.includes("Current tab"));
         if (current) latest.current.onPick(current);
         return true;
@@ -488,7 +488,7 @@ const SLOT_OF_LABEL: Partial<Record<FolderRowLabel, FolderSlot>> = {
 
 // The current tab's folder is picked with the new-tab shortcut, which the palette takes over while open.
 function CurrentKey({ userShortcuts }: { userShortcuts: Parameters<typeof getShortcutLabel>[1] }) {
-  const label = getShortcutLabel("tab.new", userShortcuts);
+  const label = getShortcutLabel("palette.folderCurrent", userShortcuts);
   if (!label) return null;
   return (
     <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
@@ -592,7 +592,7 @@ function FolderFooter({
       ) : null}
       {agentCount === 0 && all.some((r) => r.labels.includes("Current tab")) ? (
         <span className="flex shrink-0 items-center gap-1.5">
-          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts)}</kbd>
+          <kbd className={kbd}>{getShortcutLabel("palette.folderCurrent", userShortcuts)}</kbd>
           Current tab
         </span>
       ) : null}

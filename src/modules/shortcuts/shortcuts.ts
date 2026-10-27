@@ -8,6 +8,7 @@ export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
   | "commandPalette.history"
+  | "palette.folderCurrent"
   | "palette.folderRoot"
   | "palette.folderMain"
   | "palette.folderHome"
@@ -83,7 +84,7 @@ export type ShortcutGroup =
   | "Terminal"
   | "View"
   | "Editor"
-  | "Palette";
+  | "Palette: New Terminal";
 
 export type KeyBinding = {
   key: string;
@@ -159,34 +160,41 @@ export const SHORTCUTS: Shortcut[] = [
   // Only live while the new-terminal palette is open (shortcutsDisabled), so Cmd+1..9 keep
   // jumping to a workspace everywhere else; they sit before workspace.selectByIndex to win there.
   {
+    id: "palette.folderCurrent",
+    label: "Current Tab Folder",
+    group: "Palette: New Terminal",
+    // Shares Cmd+T with tab.new on purpose: it comes first and is dead unless the palette is open.
+    defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
+  },
+  {
     id: "palette.folderRoot",
-    label: "New Terminal: Workspace Root",
-    group: "Palette",
+    label: "Workspace Root",
+    group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "palette.folderMain",
-    label: "New Terminal: Main Checkout",
-    group: "Palette",
+    label: "Main Checkout",
+    group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "2" }],
   },
   {
     id: "palette.folderHome",
-    label: "New Terminal: Home",
-    group: "Palette",
+    label: "Home",
+    group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "3" }],
   },
   {
     id: "palette.menuAction",
-    label: "New Terminal: Run Menu Action 1–9",
-    group: "Palette",
+    label: "Run Menu Action 1–9",
+    group: "Palette: New Terminal",
     // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "palette.worktrees",
-    label: "New Terminal: Show or Hide Worktrees",
-    group: "Palette",
+    label: "Show or Hide Worktrees",
+    group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "k" }],
   },
   {
@@ -553,7 +561,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Terminal",
   "View",
   "Editor",
-  "Palette",
+  "Palette: New Terminal",
 ];
 
 export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {
@@ -774,10 +782,11 @@ export function findShortcutConflict(
     if (s.id === currentId) continue;
     // A palette shortcut is only live while its palette is open, so it never competes with the index jumps
     // or with Clear Terminal.
-    const outsidePalette = (id: string) => id.endsWith("selectByIndex") || id === "terminal.clear";
+    const outsidePalette = (id: string) =>
+      id.endsWith("selectByIndex") || id === "terminal.clear" || id === "tab.new";
     if (
-      (s.group === "Palette" && current && outsidePalette(current.id)) ||
-      (current?.group === "Palette" && outsidePalette(s.id))
+      (s.group === "Palette: New Terminal" && current && outsidePalette(current.id)) ||
+      (current?.group === "Palette: New Terminal" && outsidePalette(s.id))
     )
       continue;
     if (PALETTE_DIGIT_SLOTS.includes(s.id) && PALETTE_DIGIT_SLOTS.includes(currentId)) continue;

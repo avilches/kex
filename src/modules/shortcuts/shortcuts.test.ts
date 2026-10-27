@@ -262,7 +262,7 @@ describe("index shortcut digit families", () => {
 
   test("the palette shortcuts are matched before the index jumps they share keys with", () => {
     const at = (id: ShortcutId) => SHORTCUTS.findIndex((s) => s.id === id);
-    for (const s of SHORTCUTS.filter((c) => c.group === "Palette")) {
+    for (const s of SHORTCUTS.filter((c) => c.group === "Palette: New Terminal")) {
       expect(at(s.id)).toBeLessThan(at("workspace.selectByIndex"));
       expect(at(s.id)).toBeLessThan(at("tab.selectByIndex"));
     }
@@ -277,7 +277,7 @@ describe("index shortcut digit families", () => {
       if (
         s.id === "workspace.selectByIndex" ||
         s.id === "tab.selectByIndex" ||
-        s.group === "Palette" ||
+        s.group === "Palette: New Terminal" ||
         KNOWN_DIGIT_OVERLAP.has(s.id)
       )
         continue;

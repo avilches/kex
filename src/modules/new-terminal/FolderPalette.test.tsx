@@ -599,7 +599,7 @@ describe("FolderPalette", () => {
       expect(onPick.mock.calls[0][0].slots).toContain(slot);
     });
 
-    it("newTab picks the current tab row wherever the focus is", async () => {
+    it("folderCurrent picks the current tab row wherever the focus is", async () => {
       const onPick = vi.fn();
       mountFixed(fixed, onPick);
       await settle();
@@ -608,7 +608,7 @@ describe("FolderPalette", () => {
       });
       let taken = false;
       await act(async () => {
-        taken = runPaletteShortcut("newTab");
+        taken = runPaletteShortcut("folderCurrent");
       });
       expect(taken).toBe(true);
       expect(onPick).toHaveBeenCalledTimes(1);
