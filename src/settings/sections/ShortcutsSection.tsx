@@ -222,10 +222,13 @@ export function ShortcutsSection() {
               >
                 {group}
               </h3>
-              {cards.map((card) => (
+              {cards.map((card, i) => (
                 <div
                   key={card[0].id}
-                  className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden"
+                  className={cn(
+                    "flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden",
+                    i > 0 && "ml-6",
+                  )}
                 >
                   {card.map((s) => (
                     <ShortcutRow
