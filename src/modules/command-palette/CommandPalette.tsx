@@ -33,6 +33,8 @@ import {
   useContentSearch,
 } from "./hooks/useContentSearch";
 import type { ClosedTabEntry } from "./lib/closedEntries";
+import { COMMAND_GROUPS } from "./commands";
+import { displayOrder, successorKey } from "./lib/closeSuccessor";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
@@ -106,6 +108,8 @@ function paletteInputElement(): HTMLInputElement | null {
 let lastContentQuery = "";
 let lastContentValue = "";
 let lastContentScrollTop = 0;
+
+const SELECTION_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 export function CommandPalette({
   open,
@@ -260,7 +264,18 @@ export function CommandPalette({
       .map((x) => x.e);
   }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
 
+  // The frame that puts the selection back after a close; anything that moves the selection
+  // or resets the palette in the meantime cancels it so it never steals the selection.
+  const settleFrame = useRef<number | null>(null);
+  const cancelSettle = useCallback(() => {
+    if (settleFrame.current === null) return;
+    window.cancelAnimationFrame(settleFrame.current);
+    settleFrame.current = null;
+  }, []);
+  useEffect(() => cancelSettle, [cancelSettle]);
+
   const resetPalette = useCallback(() => {
+    cancelSettle();
     if (parsed.mode === "content") {
       lastContentQuery = query;
       lastContentValue = value;
@@ -273,7 +288,7 @@ export function CommandPalette({
     setValue("");
     setPage("root");
     previewThemeId(null);
-  }, [previewThemeId, parsed.mode, query, value]);
+  }, [previewThemeId, parsed.mode, query, value, cancelSettle]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -417,6 +432,70 @@ export function CommandPalette({
       }, delay);
     }
   }, []);
+  // The row to select once the tab being closed is gone. Set before closing, applied only when the
+  // tab really disappears from the list, dropped when the close was cancelled or refused.
+  const pendingClose = useRef<{
+    key: string;
+    next: string | null;
+    scrollTop: number;
+  } | null>(null);
+  const listViewport = useCallback(
+    () =>
+      listRef.current?.querySelector<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]',
+      ) ?? null,
+    [],
+  );
+  const mergedRef = useRef(merged);
+  mergedRef.current = merged;
+  const typingRef = useRef(false);
+  typingRef.current = parsed.term.length > 0;
+  const closeTabFromRow = useCallback(
+    (entry: TabEntry) => {
+      if (pendingClose.current) return;
+      const key = tabRowKey(entry.tabId);
+      const pending = {
+        key,
+        next: successorKey(
+          displayOrder(mergedRef.current, typingRef.current, COMMAND_GROUPS),
+          key,
+        ),
+        scrollTop: listViewport()?.scrollTop ?? 0,
+      };
+      pendingClose.current = pending;
+      void Promise.resolve()
+        .then(() => onCloseTab(entry))
+        .catch((e) => console.error("Closing the tab failed", e))
+        .finally(() => {
+          refocusInput();
+          window.setTimeout(() => {
+            if (pendingClose.current === pending) pendingClose.current = null;
+          }, 300);
+        });
+    },
+    [onCloseTab, refocusInput, listViewport],
+  );
+  useEffect(() => {
+    const pending = pendingClose.current;
+    if (!pending || merged.some((r) => r.key === pending.key)) return;
+    pendingClose.current = null;
+    const next = pending.next;
+    const target =
+      next && merged.some((r) => r.key === next) ? next : (merged[0]?.key ?? "");
+    // cmdk reselects the first row when the selected item unmounts, after this effect, and scrolls
+    // to it: the frame after, put the successor back and the scroll where it was.
+    const restore = () => {
+      const viewport = listViewport();
+      if (viewport) viewport.scrollTop = pending.scrollTop;
+    };
+    setValue(target);
+    cancelSettle();
+    settleFrame.current = window.requestAnimationFrame(() => {
+      settleFrame.current = null;
+      setValue(target);
+      restore();
+    });
+  }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
       closeRowMenu();
@@ -430,10 +509,10 @@ export function CommandPalette({
         const path = tabEntryCopyPath(entry);
         if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
       } else if (id === "close") {
-        void Promise.resolve(onCloseTab(entry)).then(refocusInput);
+        closeTabFromRow(entry);
       }
     },
-    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, onCloseTab],
+    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, closeTabFromRow],
   );
 
   const runWorkspaceAction = useCallback(
@@ -552,6 +631,9 @@ export function CommandPalette({
     if (!open) return;
     return registerPaletteControl((action) => {
       if (action === "newTab") return false;
+      // Between a close and the frame that restores the selection the highlighted row is cmdk's
+      // own pick, not the user's: acting on it would hit the wrong tab.
+      if (settleFrame.current !== null) return true;
       const { highlightedTab: entry, runTabAction: run } = latestShortcut.current;
       if (entry) run(action === "closeTab" ? "close" : "copy", entry);
       return true;
@@ -559,12 +641,16 @@ export function CommandPalette({
   }, [open]);
 
   useEffect(() => {
-    if (!open) closeRowMenu();
-  }, [open, closeRowMenu]);
+    if (!open) {
+      closeRowMenu();
+      cancelSettle();
+    }
+  }, [open, closeRowMenu, cancelSettle]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: typing closes the menu
   useEffect(() => {
     closeRowMenu();
-  }, [query, closeRowMenu]);
+    cancelSettle();
+  }, [query, closeRowMenu, cancelSettle]);
 
   const commitTheme = useCallback(
     (id: string) => {
@@ -591,6 +677,7 @@ export function CommandPalette({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (SELECTION_KEYS.has(e.key)) cancelSettle();
       if (rowMenu.menu) {
         const key = rowMenu.menu.rowKey;
         const entry = highlightedTabOf(key, merged);
@@ -624,6 +711,7 @@ export function CommandPalette({
       }
     },
     [
+      cancelSettle,
       inSubpage,
       inThemes,
       inCommands,

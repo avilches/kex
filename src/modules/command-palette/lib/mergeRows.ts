@@ -28,7 +28,14 @@ export type MergedRow =
       highlight?: RowHighlight;
     }
   | { kind: "action"; key: string; item: BarItem; highlight?: RowHighlight }
-  | { kind: "tab"; key: string; entry: TabEntry; highlight?: RowHighlight }
+  | {
+      kind: "tab";
+      key: string;
+      entry: TabEntry;
+      highlight?: RowHighlight;
+      // The tab the user is in right now: always the first row, under its own heading.
+      current?: boolean;
+    }
   | {
       kind: "workspace";
       key: string;
@@ -198,6 +205,17 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   const q = foldText(input.term.trim());
 
   if (!q) {
+    const currentEntry = tabs.find((t) => t.tabId === activeTabId);
+    const current: MergedRow[] = currentEntry
+      ? [
+          {
+            kind: "tab",
+            key: tabRowKey(currentEntry.tabId),
+            entry: currentEntry,
+            current: true,
+          },
+        ]
+      : [];
     const recents = tabs
       .filter((t) => t.tabId !== activeTabId)
       .sort(byRecentList)
@@ -234,7 +252,10 @@ export function mergeRows(input: MergeInput): MergedRow[] {
           entry,
         }),
       );
-    return [...recents, ...otherWorkspaces, ...recentlyClosed, ...userRows, ...actions];
+    return [
+      ...current,
+      ...recents,
+      ...otherWorkspaces, ...recentlyClosed, ...userRows, ...actions];
   }
 
   const scored: { row: MergedRow; points: number; recency: TabEntry | null }[] =
@@ -273,7 +294,13 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     if (r === null) continue;
     const key = tabRowKey(entry.tabId);
     scored.push({
-      row: { kind: "tab", key, entry, highlight: r.highlight },
+      row: {
+        kind: "tab",
+        key,
+        entry,
+        highlight: r.highlight,
+        current: entry.tabId === activeTabId ? true : undefined,
+      },
       points: r.points + learnedBoost(learned, q, key),
       recency: entry,
     });
@@ -313,7 +340,8 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   let closedCount = 0;
   const rows: MergedRow[] = [];
   for (const s of scored) {
-    if (s.row.kind === "tab" && ++tabCount > SEARCH_LIMIT) continue;
+    if (s.row.kind === "tab" && !s.row.current && ++tabCount > SEARCH_LIMIT)
+      continue;
     if (s.row.kind === "closed" && ++closedCount > CLOSED_SEARCH_LIMIT)
       continue;
     rows.push(s.row);
@@ -321,7 +349,10 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   const shownWorkspaces = new Set(
     rows.flatMap((r) => (r.kind === "tab" ? [r.entry.workspaceId] : [])),
   );
-  return rows.filter(
+  const visible = rows.filter(
     (r) => r.kind !== "workspace" || !shownWorkspaces.has(r.entry.workspaceId),
   );
+  const at = visible.findIndex((r) => r.kind === "tab" && r.current);
+  if (at > 0) visible.unshift(...visible.splice(at, 1));
+  return visible;
 }

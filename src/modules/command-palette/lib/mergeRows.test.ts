@@ -257,14 +257,14 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:new", "tab:old", "cmd:a", "cmd:b"]);
   });
 
-  it("with an empty term leaves out the active tab", () => {
+  it("with an empty term puts the active tab first, apart from the recents", () => {
     const rows = mergeRows(
       input({
         tabs: [tab("here", { lastUsedAt: 9 }), tab("other", { lastUsedAt: 1 })],
         activeTabId: "here",
       }),
     );
-    expect(keys(rows)).toEqual(["tab:other"]);
+    expect(keys(rows)).toEqual(["tab:here", "tab:other"]);
   });
 
   it("with an empty term orders actions by recent use", () => {
@@ -583,5 +583,56 @@ describe("idle list workspaces", () => {
       ],
     });
     expect(rows.map((r) => r.key)).toEqual(["ws:c", "ws:b"]);
+  });
+
+  describe("current tab", () => {
+    const tabs = [
+      tab("a", { title: "alpha", lastUsedAt: 3 }),
+      tab("b", { title: "beta", lastUsedAt: 2 }),
+      tab("c", { title: "alpha two", lastUsedAt: 1 }),
+    ];
+
+    it("is the first row when the box is empty, flagged, and not repeated in the recents", () => {
+      const rows = mergeRows(input({ tabs, activeTabId: "c" }));
+      expect(keys(rows).slice(0, 3)).toEqual(["tab:c", "tab:a", "tab:b"]);
+      expect(rows.filter((r) => r.kind === "tab" && r.current)).toHaveLength(1);
+    });
+
+    it("has no section when the active tab is not among the entries", () => {
+      const rows = mergeRows(input({ tabs, activeTabId: "zz" }));
+      expect(rows.some((r) => r.kind === "tab" && r.current)).toBe(false);
+    });
+
+    it("stays on top while typing when it matches, even below a better match", () => {
+      const rows = mergeRows(input({ tabs, term: "alpha", activeTabId: "c" }));
+      expect(keys(rows)).toEqual(["tab:c", "tab:a"]);
+      expect(rows[0].kind === "tab" && rows[0].current).toBe(true);
+    });
+
+    it("does not take a tab that is active in another pane", () => {
+      const rows = mergeRows(input({ tabs, activeTabId: "a" }));
+      expect(rows.filter((r) => r.kind === "tab" && r.current)).toHaveLength(1);
+      expect(keys(rows)).toEqual(["tab:a", "tab:b", "tab:c"]);
+    });
+
+    it("is the only row when it is the only tab", () => {
+      const rows = mergeRows(input({ tabs: [tab("solo")], activeTabId: "solo" }));
+      expect(keys(rows)).toEqual(["tab:solo"]);
+    });
+
+    it("keeps a hibernated current tab first", () => {
+      const rows = mergeRows(
+        input({
+          tabs: [tab("z", { hibernated: true }), tab("y")],
+          activeTabId: "z",
+        }),
+      );
+      expect(keys(rows)).toEqual(["tab:z", "tab:y"]);
+    });
+
+    it("is left out while typing when it does not match", () => {
+      const rows = mergeRows(input({ tabs, term: "beta", activeTabId: "a" }));
+      expect(keys(rows)).toEqual(["tab:b"]);
+    });
   });
 });

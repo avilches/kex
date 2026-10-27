@@ -3,7 +3,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { SleepingIcon } from "@hugeicons/core-free-icons";
+import { LockKeyIcon, SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlightText } from "./HighlightText";
 import { foldText, highlightIndices, substringIndices } from "./lib/fuzzy";
@@ -109,6 +109,16 @@ export function TabItem({
             size={12}
             strokeWidth={1.75}
             className="text-muted-foreground"
+          />
+        </span>
+      ) : null}
+      {entry.tab.locked ? (
+        <span role="img" aria-label="Tab is locked" className="shrink-0">
+          <HugeiconsIcon
+            icon={LockKeyIcon}
+            size={12}
+            strokeWidth={2}
+            className="text-foreground"
           />
         </span>
       ) : null}
