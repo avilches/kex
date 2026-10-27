@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
-import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Action } from "@/modules/actions/lib/types";
@@ -53,19 +52,17 @@ const groups = (path: string): FolderGroup[] => [
 
 function mount(path: string, ws: Workspace | undefined, run = vi.fn()) {
   render(
-    createElement(
-      ActionMenuProvider,
-      { run, ws: null, children: undefined },
-      createElement(FolderPalette, {
-        open: true,
-        onOpenChange: vi.fn(),
-        restoreFocus: vi.fn(),
-        groups: groups(path),
-        onPick: vi.fn(),
-        onToggleWorktrees: vi.fn(),
-        workspaceOf: () => ws,
-      }),
-    ),
+    <ActionMenuProvider run={run} ws={null}>
+      <FolderPalette
+        open
+        onOpenChange={vi.fn()}
+        restoreFocus={vi.fn()}
+        groups={groups(path)}
+        onPick={vi.fn()}
+        onToggleWorktrees={vi.fn()}
+        workspaceOf={() => ws}
+      />
+    </ActionMenuProvider>,
   );
   return run;
 }
