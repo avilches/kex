@@ -108,6 +108,11 @@ function Harness({
         closeCalls++;
         return closeImpl(e, setTabs);
       }}
+      onCloseWorkspace={() => Promise.resolve(false)}
+      onRenameWorkspace={() => {}}
+      onHibernateWorkspace={() => {}}
+      onCloseAllTabs={() => {}}
+      onOpenWorkspaceSettings={() => {}}
     />
   );
 }

@@ -23,13 +23,28 @@ export function displayOrder(
   ];
 }
 
-// The row to select once `key` disappears: the one below it so the list does not seem to move,
-// the one above when it was the last, null when nothing is left.
+// The row to select once every key in `gone` has disappeared, starting from the highlighted one:
+// the first row that stays below it so the list does not seem to move, the nearest one above when
+// none stays below, null when nothing is left.
+export function successorOf(
+  ordered: readonly MergedRow[],
+  gone: ReadonlySet<string>,
+  from: string,
+): string | null {
+  const i = ordered.findIndex((r) => r.key === from);
+  if (i < 0) return null;
+  for (let k = i + 1; k < ordered.length; k++) {
+    if (!gone.has(ordered[k].key)) return ordered[k].key;
+  }
+  for (let k = i - 1; k >= 0; k--) {
+    if (!gone.has(ordered[k].key)) return ordered[k].key;
+  }
+  return null;
+}
+
 export function successorKey(
   ordered: readonly MergedRow[],
   key: string,
 ): string | null {
-  const i = ordered.findIndex((r) => r.key === key);
-  if (i < 0) return null;
-  return (ordered[i + 1] ?? ordered[i - 1])?.key ?? null;
+  return successorOf(ordered, new Set([key]), key);
 }

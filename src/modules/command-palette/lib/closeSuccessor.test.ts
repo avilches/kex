@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayOrder, successorKey } from "./closeSuccessor";
+import { displayOrder, successorKey, successorOf } from "./closeSuccessor";
 import type { MergedRow } from "./mergeRows";
 
 const tabRow = (id: string, current = false) =>
@@ -61,5 +61,26 @@ describe("displayOrder", () => {
   it("falls back to the commands when the last tab is the only row before them", () => {
     const ordered = displayOrder([cmdRow("y", "A"), tabRow("a")], false, ["A"]);
     expect(successorKey(ordered, "tab:a")).toBe("cmd:y");
+  });
+});
+
+describe("successorOf", () => {
+  const rows = [tabRow("a"), tabRow("b"), tabRow("c"), tabRow("d"), tabRow("e")];
+
+  it("skips the whole block that disappears and picks the first row after it", () => {
+    expect(successorOf(rows, new Set(["tab:b", "tab:c"]), "tab:b")).toBe("tab:d");
+  });
+
+  it("skips a block that is not contiguous", () => {
+    expect(successorOf(rows, new Set(["tab:b", "tab:d"]), "tab:b")).toBe("tab:c");
+  });
+
+  it("picks the row above the block when nothing stays below it", () => {
+    expect(successorOf(rows, new Set(["tab:d", "tab:e"]), "tab:e")).toBe("tab:c");
+  });
+
+  it("is null when every row goes or the start is unknown", () => {
+    expect(successorOf(rows, new Set(rows.map((r) => r.key)), "tab:a")).toBeNull();
+    expect(successorOf(rows, new Set(["tab:a"]), "tab:zz")).toBeNull();
   });
 });
