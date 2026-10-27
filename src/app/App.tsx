@@ -3680,15 +3680,13 @@ export default function App() {
     }
     return closeTabsRef.current([entry.tabId]);
   }, []);
-  // Unlike the shortcut, waking leaves the focus where it is: the palette keeps it.
-  const onPaletteToggleHibernate = useCallback(
+  const onPaletteHibernateTab = useCallback(
     async (tabId: string) => {
       const found = findTabGlobal(tabId);
-      if (found?.tab.kind !== "terminal") return;
-      if (found.tab.hibernation) await wakeTabs(found.workspace.id, [tabId]);
-      else await requestHibernate(found.workspace.id, [tabId]);
+      if (found?.tab.kind !== "terminal" || found.tab.hibernation) return;
+      await requestHibernate(found.workspace.id, [tabId]);
     },
-    [findTabGlobal, wakeTabs, requestHibernate],
+    [findTabGlobal, requestHibernate],
   );
   const onPaletteRenameWorkspace = useCallback((workspaceId: string) => {
     useContextMenuCloseStore.getState().closeAll();
@@ -4216,7 +4214,7 @@ export default function App() {
             onMoveTabToWorkspace={moveTabFromPalette}
             onUpdateTab={sidebarTabMenu.onUpdateTab}
             onSaveTab={sidebarTabMenu.onSaveTab}
-            onToggleTabHibernate={onPaletteToggleHibernate}
+            onHibernateTab={onPaletteHibernateTab}
             onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}

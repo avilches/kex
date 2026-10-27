@@ -43,7 +43,7 @@ export type RowMenuItem = {
   shortcutId?: ShortcutId;
   enter?: boolean;
   disabled?: boolean;
-  // A toggle that is on: Unlock and Restore draw their alternate icon, Autofocus tints its own.
+  // A toggle that is on: Unlock draws its alternate icon, Autofocus tints its own.
   active?: boolean;
   // Full text for the tooltip when the label shortens something, such as a folder path.
   title?: string;
@@ -209,12 +209,11 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
     });
   }
   items.push({ id: "moveWorkspace", label: "Move to Workspace" });
-  if (tab.kind === "terminal") {
+  if (tab.kind === "terminal" && !entry.hibernated) {
     items.push({
       id: "hibernateTab",
-      label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
+      label: "Hibernate Tab",
       shortcutId: "tab.hibernate",
-      active: entry.hibernated,
       separatorBefore: true,
     });
   }
@@ -223,7 +222,7 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
     label: locked ? "Unlock Tab" : "Lock Tab",
     shortcutId: "tab.lock",
     active: locked,
-    separatorBefore: tab.kind !== "terminal",
+    separatorBefore: tab.kind !== "terminal" || entry.hibernated,
   });
   items.push(
     { id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: locked },

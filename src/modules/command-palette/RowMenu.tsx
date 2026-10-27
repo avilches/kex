@@ -15,7 +15,6 @@ import {
   LockKeyIcon,
   SquareUnlock02Icon,
   StickyNote03Icon,
-  UploadCircle01Icon,
   GitBranchIcon,
   PencilEdit02Icon,
   PlayIcon,
@@ -67,7 +66,6 @@ const ICONS = {
 // The icon of a toggle that is on, for the ones that change it.
 const ACTIVE_ICONS: Partial<Record<RowMenuItemId, typeof LockKeyIcon>> = {
   lock: SquareUnlock02Icon,
-  hibernateTab: UploadCircle01Icon,
 };
 
 function iconOf(item: RowMenuItem) {

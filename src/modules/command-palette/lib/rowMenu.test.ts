@@ -87,10 +87,15 @@ describe("tabMenuItems", () => {
   it("flips lock and hibernate labels with the state of the tab", () => {
     expect(item(entry(), "lock")).toMatchObject({ label: "Lock Tab", active: false });
     expect(item(entry({ locked: true }), "lock")).toMatchObject({ label: "Unlock Tab", active: true });
-    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab", active: false });
+    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab" });
+  });
+
+  it("offers a sleeping tab only Restore and go to Tab, with no Hibernate and no Restore item", () => {
     const asleep = entry({ hibernation: { at: 1 } });
-    expect(item(asleep, "hibernateTab")).toMatchObject({ label: "Restore Tab", active: true });
     expect(item(asleep, "go")?.label).toBe("Restore and go to Tab");
+    expect(ids(asleep)).not.toContain("hibernateTab");
+    expect(ids(asleep).filter((id) => id === "go")).toHaveLength(1);
+    expect(runnableTabItem(asleep, ctx, "hibernateTab")).toBeNull();
   });
 
   it("only offers hibernation on terminals", () => {

@@ -108,7 +108,7 @@ type Props = {
   onUpdateTab: (tabId: string, updater: (tab: Tab) => Tab) => void;
   onSaveTab: (tabId: string) => void;
   /** Unlike the shortcut, it must not focus the tab: the palette keeps the focus. */
-  onToggleTabHibernate: (tabId: string) => unknown;
+  onHibernateTab: (tabId: string) => unknown;
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -165,7 +165,7 @@ export function CommandPalette({
   onMoveTabToWorkspace,
   onUpdateTab,
   onSaveTab,
-  onToggleTabHibernate,
+  onHibernateTab,
   onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
@@ -596,7 +596,7 @@ export function CommandPalette({
       } else if (id === "save") {
         onSaveTab(tabId);
       } else if (id === "hibernateTab") {
-        void Promise.resolve(onToggleTabHibernate(tabId))
+        void Promise.resolve(onHibernateTab(tabId))
           .catch((e) => console.error("Hibernating the tab failed", e))
           .finally(refocusInput);
       } else if (id === "removeNote") {
@@ -627,7 +627,7 @@ export function CommandPalette({
       closeWorkspaceFromRow,
       onUpdateTab,
       onSaveTab,
-      onToggleTabHibernate,
+      onHibernateTab,
       refocusInput,
       onGoToTab,
       enterWorkspaces,

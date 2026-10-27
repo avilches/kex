@@ -127,7 +127,7 @@ function Harness() {
         );
       }}
       onSaveTab={(id) => calls.save.push(id)}
-      onToggleTabHibernate={(id) => {
+      onHibernateTab={(id) => {
         calls.hibernate.push(id);
         return hibernateImpl(id);
       }}
@@ -342,7 +342,7 @@ describe("hibernating from the palette", () => {
     expect(selected()).toBe("tab:c");
   });
 
-  it("takes the focus back when waking the tab makes its terminal grab it, keeping the row", async () => {
+  it("takes the focus back when the hibernate review grabs it, keeping the row", async () => {
     const thief = document.createElement("textarea");
     document.body.appendChild(thief);
     hibernateImpl = () =>
