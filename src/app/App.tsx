@@ -171,7 +171,6 @@ import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import {
   bulkClosableIds,
-  closeIdsForTab,
   otherBulkClosableIds,
 } from "@/modules/workspaces/lib/tabClose";
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
@@ -3728,10 +3727,6 @@ export default function App() {
     }
     return closeTabsRef.current([entry.tabId]);
   }, []);
-  const onPaletteCloseOtherTabs = useCallback(
-    (tabId: string) => closeTabsRef.current(closeIdsForTab(workspacesRef.current, tabId)),
-    [],
-  );
   // Unlike the shortcut, waking leaves the focus where it is: the palette keeps it.
   const onPaletteToggleHibernate = useCallback(
     async (tabId: string) => {
@@ -4269,9 +4264,6 @@ export default function App() {
             onUpdateTab={sidebarTabMenu.onUpdateTab}
             onSaveTab={sidebarTabMenu.onSaveTab}
             onToggleTabHibernate={onPaletteToggleHibernate}
-            hibernateDialogOpen={hibernateFlow.pending !== null}
-            onRevealInExplorer={sidebarTabMenu.onRevealInExplorer}
-            onCloseOtherTabs={onPaletteCloseOtherTabs}
             onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}

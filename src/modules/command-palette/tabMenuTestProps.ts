@@ -4,8 +4,5 @@ export const TAB_MENU_NOOPS = {
   onUpdateTab: () => {},
   onSaveTab: () => {},
   onToggleTabHibernate: () => {},
-  hibernateDialogOpen: false,
-  onRevealInExplorer: () => {},
-  onCloseOtherTabs: () => {},
   onGoToTab: () => {},
 };

@@ -11,7 +11,6 @@ export const PALETTE_TAB_SHORTCUTS = {
   "tab.hibernate": "hibernateTab",
   "tab.note": "note",
   "editor.save": "save",
-  "tab.focusOnExplorer": "focusSidebar",
   "tab.toggleAutofocus": "autofocus",
 } as const satisfies Partial<Record<ShortcutId, RowMenuItemId>>;
 

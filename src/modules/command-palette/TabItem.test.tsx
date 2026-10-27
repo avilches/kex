@@ -12,7 +12,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: "ws-1",
   workspaceTitle: "Work",
   workspaceColor: null,
-  workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+  workspaceIcon: null, workspaceRoot: null,
   hibernated: false,
   kind: "terminal",
   title: "zsh",

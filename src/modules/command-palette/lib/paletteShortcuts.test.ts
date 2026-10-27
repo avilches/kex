@@ -18,7 +18,6 @@ describe("PALETTE_TAB_SHORTCUTS", () => {
       kind: "editor",
       cwd: "/p",
       detail: "/p/a.ts",
-      paneTabCount: 2,
       workspaceRoot: "/p",
       hibernated: false,
       agentSession: undefined,

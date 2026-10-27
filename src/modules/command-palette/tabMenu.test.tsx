@@ -32,6 +32,8 @@ vi.mock("@/modules/explorer/lib/iconResolver", () => ({
 vi.mock("@/modules/workspaces/WorkspaceMark", () => ({
   WorkspaceMark: () => null,
 }));
+const writeClipboardText = vi.fn().mockResolvedValue(true);
+vi.mock("@/lib/clipboard", () => ({ writeClipboardText: (t: string) => writeClipboardText(t) }));
 vi.mock("./hooks/useCommandHistory", () => ({
   useCommandHistory: () => ({ loading: false, error: null, results: [], retry() {} }),
 }));
@@ -47,8 +49,6 @@ const mk = (id: string, i: number, tab: Record<string, unknown> = {}, over: Part
     workspaceColor: null,
     workspaceIcon: null,
     workspaceRoot: null,
-    paneId: "pane-1",
-    paneTabCount: 4,
     hibernated: full.kind === "terminal" && !!full.hibernation,
     kind: full.kind,
     title: id,
@@ -85,9 +85,7 @@ type Calls = {
   update: [string, (t: Tab) => Tab][];
   save: string[];
   hibernate: string[];
-  reveal: string[];
   goTo: string[];
-  closeOthers: string[];
   move: unknown[][];
   openChange: boolean[];
 };
@@ -95,9 +93,8 @@ let calls: Calls;
 let initial: TabEntry[];
 let commands: PaletteItem[] = [];
 let hibernateImpl: (id: string) => unknown;
-let closeOthersImpl: (id: string, set: (f: (t: TabEntry[]) => TabEntry[]) => void) => unknown;
 
-function Harness({ dialog = false }: { dialog?: boolean }) {
+function Harness() {
   const [tabs, setTabs] = useState(initial);
   return (
     <CommandPalette
@@ -133,12 +130,6 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
       onToggleTabHibernate={(id) => {
         calls.hibernate.push(id);
         return hibernateImpl(id);
-      }}
-      hibernateDialogOpen={dialog}
-      onRevealInExplorer={(p) => calls.reveal.push(p)}
-      onCloseOtherTabs={(id) => {
-        calls.closeOthers.push(id);
-        return closeOthersImpl(id, setTabs);
       }}
       onGoToTab={(id) => calls.goTo.push(id)}
       onTerminalTargetChange={() => {}}
@@ -193,13 +184,10 @@ async function openOn(target: string) {
 }
 
 beforeEach(() => {
-  calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], closeOthers: [], move: [], openChange: [] };
+  calls = { update: [], save: [], hibernate: [], goTo: [], move: [], openChange: [] };
   commands = [];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
   hibernateImpl = () => Promise.resolve();
-  closeOthersImpl = (id, set) => {
-    set((t) => t.filter((x) => x.tabId === id || x.tab.locked));
-  };
   useTabNoteStore.setState({ focusTabId: null });
 });
 
@@ -242,12 +230,11 @@ describe("tab shortcuts over the highlighted row", () => {
     });
     await wait(30);
     expect(selected()).toBe("ws:other");
-    for (const item of ["lock", "hibernateTab", "note", "save", "focusSidebar", "autofocus", "copy", "close"] as const) {
+    for (const item of ["lock", "hibernateTab", "note", "save", "autofocus", "copy", "close"] as const) {
       expect(await shortcut(item)).toBe(true);
     }
     expect(calls.update).toEqual([]);
     expect(calls.hibernate).toEqual([]);
-    expect(calls.reveal).toEqual([]);
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("ws:other");
   });
@@ -278,62 +265,62 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.openChange).toEqual([]);
   });
 
-  it("focus on sidebar closes the palette and reveals the folder of the highlighted tab", async () => {
-    initial = [mk("cur", 0), mk("b", 1, { cwd: "/work/b" })];
-    await openOn("tab:b");
-    await shortcut("focusSidebar");
-    await wait(120);
-    expect(calls.openChange).toContain(false);
-    expect(calls.reveal).toEqual(["/work/b"]);
-    expect(calls.goTo).toEqual([]);
-  });
-
-  it("add note on another tab leaves the palette open on the same row, without activating the tab or asking the note for the focus", async () => {
+  it("add note on another tab activates it, asks the note for the focus and closes the palette", async () => {
     await openOn("tab:c");
-    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
-    input?.focus();
     await shortcut("note");
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(selected()).toBe("tab:c");
-    expect(calls.goTo).toEqual([]);
-    expect(useTabNoteStore.getState().focusTabId).toBeNull();
-    expect(document.activeElement).toBe(input);
+    expect(calls.openChange).toContain(false);
+    expect(calls.goTo).toEqual(["c"]);
+    expect(useTabNoteStore.getState().focusTabId).toBe("c");
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
     expect(updater({ id: "c", kind: "terminal" } as Tab)).toMatchObject({ note: "", noteOpen: true });
   });
 
-  it("add note on the current tab does not need to activate anything", async () => {
+  it("add note on the current tab closes the palette and focuses the note too", async () => {
     await openOn("tab:cur");
     await shortcut("note");
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(calls.goTo).toEqual([]);
+    expect(calls.openChange).toContain(false);
+    expect(calls.goTo).toEqual(["cur"]);
+    expect(useTabNoteStore.getState().focusTabId).toBe("cur");
     expect(calls.update.map(([id]) => id)).toEqual(["cur"]);
   });
 
-  it("show note from the row menu keeps the palette and the row too", async () => {
+  it("show note from the row menu closes the menu and the palette and focuses the note", async () => {
     initial = [mk("cur", 0), mk("b", 1, { note: "hi" })];
     await openOn("tab:b");
     await key("Tab");
     await wait(20);
     fireEvent.click(menuItem("Show Note") as HTMLElement);
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(selected()).toBe("tab:b");
-    expect(calls.goTo).toEqual([]);
+    expect(calls.openChange).toContain(false);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(calls.goTo).toEqual(["b"]);
     expect(calls.update.map(([id]) => id)).toEqual(["b"]);
-    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(useTabNoteStore.getState().focusTabId).toBe("b");
   });
 
-  it("hide note toggles in place and leaves the palette open", async () => {
+  it("hide note toggles in place, leaves the palette open and does not activate the tab", async () => {
     initial = [mk("cur", 0), mk("b", 1, { note: "hi", noteOpen: true })];
     await openOn("tab:b");
     await shortcut("note");
     await wait(30);
     expect(calls.openChange).toEqual([]);
     expect(calls.goTo).toEqual([]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(selected()).toBe("tab:b");
+    expect(calls.update.map(([id]) => id)).toEqual(["b"]);
+  });
+
+  it("remove note leaves the palette open and does not activate the tab", async () => {
+    initial = [mk("cur", 0), mk("b", 1, { note: "hi" })];
+    await openOn("tab:b");
+    await shortcut("removeNote");
+    await wait(30);
+    expect(calls.openChange).toEqual([]);
+    expect(calls.goTo).toEqual([]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
     expect(calls.update.map(([id]) => id)).toEqual(["b"]);
   });
 
@@ -355,63 +342,40 @@ describe("hibernating from the palette", () => {
     expect(selected()).toBe("tab:c");
   });
 
-  it("keeps the palette open on the same row, with the focus in the input, once the review dialog is cancelled", async () => {
-    const { rerender } = render(<Harness />);
-    await wait(50);
-    await key("ArrowDown");
-    await key("ArrowDown");
-    await wait(10);
-    const before = selected();
-    rerender(<Harness dialog />);
-    await wait(10);
-    rerender(<Harness />);
+  it("takes the focus back when waking the tab makes its terminal grab it, keeping the row", async () => {
+    const thief = document.createElement("textarea");
+    document.body.appendChild(thief);
+    hibernateImpl = () =>
+      new Promise((r) =>
+        setTimeout(() => {
+          thief.focus();
+          r(undefined);
+        }, 20),
+      );
+    await openOn("tab:c");
+    const input = document.querySelector<HTMLInputElement>('[cmdk-input=""]');
+    input?.focus();
+    await shortcut("hibernateTab");
     await wait(400);
-    expect(document.activeElement).toBe(document.querySelector('[cmdk-input=""]'));
-    expect(selected()).toBe(before);
+    thief.remove();
+    expect(document.activeElement).toBe(input);
+    expect(selected()).toBe("tab:c");
     expect(calls.openChange).toEqual([]);
   });
 });
 
-describe("Close Other Tabs from the palette", () => {
-  it("removes the other tabs of the pane and keeps the highlighted one selected", async () => {
+describe("Copy Tab ID from the palette", () => {
+  it("shows the id inline and copies the same value as the tab context menu, through the same function", async () => {
     await openOn("tab:c");
     await key("Tab");
     await wait(20);
-    fireEvent.click(menuItem("Close Other Tabs") as HTMLElement);
-    await wait(80);
-    expect(calls.closeOthers).toEqual(["c"]);
-    expect(rowIds().filter((r) => r.startsWith("tab:"))).toEqual(["tab:c"]);
-    expect(selected()).toBe("tab:c");
-  });
-
-  it("keeps the locked tabs and the selection when only some close", async () => {
-    initial = [mk("cur", 0), mk("b", 1, { locked: true }), mk("c", 2), mk("d", 3)];
-    await openOn("tab:c");
-    await key("Tab");
-    await wait(20);
-    fireEvent.click(menuItem("Close Other Tabs") as HTMLElement);
-    await wait(80);
-    expect(rowIds().filter((r) => r.startsWith("tab:")).sort()).toEqual(["tab:b", "tab:c"]);
-    expect(selected()).toBe("tab:c");
-  });
-
-  it("keeps everything when the close is cancelled", async () => {
-    closeOthersImpl = () => new Promise((r) => setTimeout(() => r(false), 40));
-    await openOn("tab:c");
-    await key("Tab");
-    await wait(20);
-    fireEvent.click(menuItem("Close Other Tabs") as HTMLElement);
-    await wait(500);
-    expect(rowIds().filter((r) => r.startsWith("tab:"))).toHaveLength(4);
-    expect(selected()).toBe("tab:c");
-  });
-
-  it("is disabled in a pane with a single tab", async () => {
-    initial = [mk("cur", 0), mk("b", 1, {}, { paneTabCount: 1 })];
-    await openOn("tab:b");
-    await key("Tab");
-    await wait(20);
-    expect(menuItem("Close Other Tabs")?.getAttribute("aria-disabled")).toBe("true");
+    const item = menuItem("Copy Tab ID") as HTMLElement;
+    expect(item.textContent).toContain("c");
+    expect(item.querySelector(".font-mono")?.textContent).toBe("c");
+    fireEvent.click(item);
+    await wait(30);
+    expect(writeClipboardText).toHaveBeenCalledWith("c");
+    expect(calls.openChange).toContain(false);
   });
 });
 
@@ -462,16 +426,7 @@ describe("Back from the Move tab to workspace command", () => {
   });
 });
 
-describe("note and sidebar details", () => {
-  it("focus on sidebar for a tab of another workspace switches to it first", async () => {
-    initial = [mk("cur", 0), mk("o", 1, { cwd: "/work/o" }, { workspaceId: "other" })];
-    await openOn("tab:o");
-    await shortcut("focusSidebar");
-    await wait(120);
-    expect(calls.goTo).toEqual(["o"]);
-    expect(calls.reveal).toEqual(["/work/o"]);
-  });
-
+describe("note details", () => {
   it.each([
     ["adding a note", {}, "note"],
     ["hiding a note", { note: "hi", noteOpen: true }, "note"],

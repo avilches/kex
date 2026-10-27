@@ -92,8 +92,8 @@ describe("historyPaletteShortcutUnavailable", () => {
 describe("shortcutUnavailableBehindPalette", () => {
   const ids = Object.keys(PALETTE_TAB_SHORTCUTS) as ShortcutId[];
 
-  it("lets the eight tab shortcuts through with a palette open, whatever the tab behind is", () => {
-    expect(ids).toHaveLength(8);
+  it("lets the seven tab shortcuts through with a palette open, whatever the tab behind is", () => {
+    expect(ids).toHaveLength(7);
     for (const id of ids) {
       expect(shortcutUnavailableBehindPalette(id, base, { open: true, ownsTabShortcut: true })).toBe(false);
     }

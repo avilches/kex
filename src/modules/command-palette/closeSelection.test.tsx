@@ -45,7 +45,7 @@ const mk = (id: string, i: number, over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: "ws",
   workspaceTitle: "W",
   workspaceColor: null,
-  workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+  workspaceIcon: null, workspaceRoot: null,
   hibernated: false,
   kind: "terminal",
   title: id,

@@ -8,6 +8,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { keepPaletteFocus } from "@/modules/command-palette";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -143,7 +144,7 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
 
   return (
     <AlertDialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
+      <AlertDialogContent onCloseAutoFocus={keepPaletteFocus} className="grid-cols-[minmax(0,1fr)] data-[size=default]:sm:max-w-2xl">
         <AlertDialogHeader className="grid-cols-[minmax(0,1fr)]">
           <AlertDialogTitle className="flex items-center gap-2">
             {closing ? "Close workspace?" : tabIds && tabIds.length === 1 ? "Hibernate tab?" : "Hibernate tabs?"}

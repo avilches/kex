@@ -7,6 +7,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { writeClipboardText } from "@/lib/clipboard";
 import { pathBasename } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import { type BarItem, paletteActions } from "@/modules/actions/lib/actionsBar";
@@ -18,7 +19,7 @@ import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { flushTabNote } from "@/modules/workspaces/lib/tabNoteStore";
+import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
 import {
@@ -40,6 +41,7 @@ import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
 import { initialKey } from "./lib/initialKey";
+import { PALETTE_INPUT_SELECTOR } from "./lib/keepPaletteFocus";
 import { listViewportOf, scrollListToTop } from "./lib/listScroll";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
@@ -60,12 +62,10 @@ import {
   highlightedClosedOf,
   highlightedTabOf,
   highlightedWorkspaceOf,
-  otherTabRowKeys,
   runnableTabItem,
   type RowMenuItemId,
   tabEntryCopyPath,
   tabEntryRelativePath,
-  tabFocusTarget,
   tabItemKeepsPalette,
   tabMenuItems,
   workspaceIdOfRow,
@@ -109,10 +109,6 @@ type Props = {
   onSaveTab: (tabId: string) => void;
   /** Unlike the shortcut, it must not focus the tab: the palette keeps the focus. */
   onToggleTabHibernate: (tabId: string) => unknown;
-  /** The review dialog takes the focus, and the palette claims it back when it goes. */
-  hibernateDialogOpen: boolean;
-  onRevealInExplorer: (path: string) => void;
-  onCloseOtherTabs: (tabId: string) => unknown;
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -134,7 +130,6 @@ const THEME_PREVIEW_DELAY_MS = 140;
 // cmdk overrides the rendered input's id attribute, so helpers that focus or select the palette
 // input query it by its cmdk marker instead of by id. The folder palette's input carries the same
 // marker and is still in the page while it closes, so this palette's own attribute is part of the query.
-const PALETTE_INPUT_SELECTOR = '[cmdk-input=""][data-palette="command"]';
 
 function paletteInputElement(): HTMLInputElement | null {
   return document.querySelector<HTMLInputElement>(PALETTE_INPUT_SELECTOR);
@@ -171,9 +166,6 @@ export function CommandPalette({
   onUpdateTab,
   onSaveTab,
   onToggleTabHibernate,
-  hibernateDialogOpen,
-  onRevealInExplorer,
-  onCloseOtherTabs,
   onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
@@ -578,7 +570,7 @@ export function CommandPalette({
   }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
-      if (!tabItemKeepsPalette(id)) closeRowMenu();
+      if (!tabItemKeepsPalette(id, entry)) closeRowMenu();
       const tabId = entry.tabId;
       if (id === "go") {
         runAfterClose(() => onSelectTab(entry));
@@ -596,14 +588,7 @@ export function CommandPalette({
         const rel = tabEntryRelativePath(entry);
         if (rel?.ok) runAfterClose(() => void copyToClipboard(rel.text, "Copied relative path"));
       } else if (id === "tabId") {
-        runAfterClose(() => void copyToClipboard(tabId, "Copied tab ID"));
-      } else if (id === "closeOthers") {
-        closeRows(
-          otherTabRowKeys(tabEntries, entry),
-          tabRowKey(tabId),
-          () => onCloseOtherTabs(tabId),
-          "Closing the other tabs failed",
-        );
+        runAfterClose(() => void writeClipboardText(tabId));
       } else if (id === "lock") {
         onUpdateTab(tabId, toggleTabLock);
       } else if (id === "autofocus") {
@@ -619,14 +604,13 @@ export function CommandPalette({
         onUpdateTab(tabId, removeTabNote);
       } else if (id === "note") {
         flushTabNote(tabId);
-        onUpdateTab(tabId, toggleTabNote);
-      } else if (id === "focusSidebar") {
-        const target = tabFocusTarget(entry);
-        if (target) {
+        if (tabItemKeepsPalette(id, entry)) {
+          onUpdateTab(tabId, toggleTabNote);
+        } else {
           runAfterClose(() => {
-            // The sidebar is the active workspace's.
-            if (entry.workspaceId !== activeWorkspaceId) onGoToTab(tabId);
-            window.setTimeout(() => onRevealInExplorer(target), 50);
+            onGoToTab(tabId);
+            useTabNoteStore.getState().requestFocus(tabId);
+            onUpdateTab(tabId, toggleTabNote);
           });
         }
       } else if (id === "moveWorkspace") {
@@ -641,16 +625,11 @@ export function CommandPalette({
       onOpenTerminalAt,
       closeTabFromRow,
       closeWorkspaceFromRow,
-      closeRows,
-      tabEntries,
-      onCloseOtherTabs,
       onUpdateTab,
       onSaveTab,
       onToggleTabHibernate,
       refocusInput,
       onGoToTab,
-      onRevealInExplorer,
-      activeWorkspaceId,
       enterWorkspaces,
     ],
   );
@@ -791,13 +770,6 @@ export function CommandPalette({
   useEffect(() => {
     if (menuTab) setMenuItems(tabMenuItems(menuTab, { autofocusMode }));
   }, [menuTab, autofocusMode, setMenuItems]);
-
-  // Takes the focus back from the hibernate review dialog once it is gone.
-  const hibernateDialogWasOpen = useRef(false);
-  useEffect(() => {
-    if (hibernateDialogWasOpen.current && !hibernateDialogOpen && open) refocusInput();
-    hibernateDialogWasOpen.current = hibernateDialogOpen;
-  }, [hibernateDialogOpen, open, refocusInput]);
 
   const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode });
   latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode };
