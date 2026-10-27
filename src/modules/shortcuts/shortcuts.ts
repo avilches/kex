@@ -85,7 +85,7 @@ export type ShortcutGroup =
   | "View"
   | "Editor"
   | "Palette: New Terminal"
-  | "Global Palette";
+  | "Command Palette";
 
 export type KeyBinding = {
   key: string;
@@ -199,14 +199,14 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "commandPalette.open",
-    label: "Open Global Palette",
-    group: "Global Palette",
+    label: "Open Command Palette",
+    group: "Command Palette",
     defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
   },
   {
     id: "palette.menuAction",
     label: "Run Menu Action 1–9",
-    group: "Global Palette",
+    group: "Command Palette",
     // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
@@ -558,7 +558,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Sidebar",
   "Explorer",
   "Palette: New Terminal",
-  "Global Palette",
+  "Command Palette",
   "Tabs",
   "Panes",
   "Terminal",
@@ -571,7 +571,7 @@ export const PALETTE_OPENERS: readonly ShortcutId[] = ["tab.new", "commandPalett
 
 /** Both palette groups: their shortcuts are only live while a palette is open. */
 export function isPaletteGroup(group: ShortcutGroup): boolean {
-  return group === "Palette: New Terminal" || group === "Global Palette";
+  return group === "Palette: New Terminal" || group === "Command Palette";
 }
 
 export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {
