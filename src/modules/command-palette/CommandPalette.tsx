@@ -18,7 +18,7 @@ import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { flushTabNote } from "@/modules/workspaces/lib/tabNoteStore";
+import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
 import {
@@ -578,7 +578,7 @@ export function CommandPalette({
   }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
-      if (!tabItemKeepsPalette(id)) closeRowMenu();
+      if (!tabItemKeepsPalette(id, entry)) closeRowMenu();
       const tabId = entry.tabId;
       if (id === "go") {
         runAfterClose(() => onSelectTab(entry));
@@ -619,7 +619,15 @@ export function CommandPalette({
         onUpdateTab(tabId, removeTabNote);
       } else if (id === "note") {
         flushTabNote(tabId);
-        onUpdateTab(tabId, toggleTabNote);
+        if (tabItemKeepsPalette(id, entry)) {
+          onUpdateTab(tabId, toggleTabNote);
+        } else {
+          runAfterClose(() => {
+            onGoToTab(tabId);
+            useTabNoteStore.getState().requestFocus(tabId);
+            onUpdateTab(tabId, toggleTabNote);
+          });
+        }
       } else if (id === "focusSidebar") {
         const target = tabFocusTarget(entry);
         if (target) {

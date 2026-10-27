@@ -191,15 +191,24 @@ describe("tabMenuItems", () => {
 });
 
 describe("tabItemKeepsPalette", () => {
-  it("keeps the palette for the toggles that change the row in place, a note included", () => {
-    for (const id of ["lock", "hibernateTab", "save", "note", "removeNote", "autofocus"] as const) {
-      expect(tabItemKeepsPalette(id)).toBe(true);
+  it("keeps the palette for the toggles that change the row in place", () => {
+    for (const id of ["lock", "hibernateTab", "save", "removeNote", "autofocus"] as const) {
+      expect(tabItemKeepsPalette(id, entry())).toBe(true);
     }
+  });
+
+  it("keeps it when the note item hides an open note", () => {
+    expect(tabItemKeepsPalette("note", entry({ note: "hi", noteOpen: true }))).toBe(true);
+  });
+
+  it("closes it when the note item adds or shows a note, because the note takes the focus", () => {
+    expect(tabItemKeepsPalette("note", entry())).toBe(false);
+    expect(tabItemKeepsPalette("note", entry({ note: "hi" }))).toBe(false);
   });
 
   it("closes it for the rest", () => {
     for (const id of ["go", "copy", "copyRelative", "tabId", "focusSidebar", "close", "closeOthers"] as const) {
-      expect(tabItemKeepsPalette(id)).toBe(false);
+      expect(tabItemKeepsPalette(id, entry())).toBe(false);
     }
   });
 });

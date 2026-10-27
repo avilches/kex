@@ -288,52 +288,62 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.goTo).toEqual([]);
   });
 
-  it("add note on another tab leaves the palette open on the same row, without activating the tab or asking the note for the focus", async () => {
+  it("add note on another tab activates it, asks the note for the focus and closes the palette", async () => {
     await openOn("tab:c");
-    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
-    input?.focus();
     await shortcut("note");
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(selected()).toBe("tab:c");
-    expect(calls.goTo).toEqual([]);
-    expect(useTabNoteStore.getState().focusTabId).toBeNull();
-    expect(document.activeElement).toBe(input);
+    expect(calls.openChange).toContain(false);
+    expect(calls.goTo).toEqual(["c"]);
+    expect(useTabNoteStore.getState().focusTabId).toBe("c");
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
     expect(updater({ id: "c", kind: "terminal" } as Tab)).toMatchObject({ note: "", noteOpen: true });
   });
 
-  it("add note on the current tab does not need to activate anything", async () => {
+  it("add note on the current tab closes the palette and focuses the note too", async () => {
     await openOn("tab:cur");
     await shortcut("note");
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(calls.goTo).toEqual([]);
+    expect(calls.openChange).toContain(false);
+    expect(calls.goTo).toEqual(["cur"]);
+    expect(useTabNoteStore.getState().focusTabId).toBe("cur");
     expect(calls.update.map(([id]) => id)).toEqual(["cur"]);
   });
 
-  it("show note from the row menu keeps the palette and the row too", async () => {
+  it("show note from the row menu closes the menu and the palette and focuses the note", async () => {
     initial = [mk("cur", 0), mk("b", 1, { note: "hi" })];
     await openOn("tab:b");
     await key("Tab");
     await wait(20);
     fireEvent.click(menuItem("Show Note") as HTMLElement);
     await wait(30);
-    expect(calls.openChange).toEqual([]);
-    expect(selected()).toBe("tab:b");
-    expect(calls.goTo).toEqual([]);
+    expect(calls.openChange).toContain(false);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(calls.goTo).toEqual(["b"]);
     expect(calls.update.map(([id]) => id)).toEqual(["b"]);
-    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(useTabNoteStore.getState().focusTabId).toBe("b");
   });
 
-  it("hide note toggles in place and leaves the palette open", async () => {
+  it("hide note toggles in place, leaves the palette open and does not activate the tab", async () => {
     initial = [mk("cur", 0), mk("b", 1, { note: "hi", noteOpen: true })];
     await openOn("tab:b");
     await shortcut("note");
     await wait(30);
     expect(calls.openChange).toEqual([]);
     expect(calls.goTo).toEqual([]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(selected()).toBe("tab:b");
+    expect(calls.update.map(([id]) => id)).toEqual(["b"]);
+  });
+
+  it("remove note leaves the palette open and does not activate the tab", async () => {
+    initial = [mk("cur", 0), mk("b", 1, { note: "hi" })];
+    await openOn("tab:b");
+    await shortcut("removeNote");
+    await wait(30);
+    expect(calls.openChange).toEqual([]);
+    expect(calls.goTo).toEqual([]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
     expect(calls.update.map(([id]) => id)).toEqual(["b"]);
   });
 
