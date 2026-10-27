@@ -270,7 +270,7 @@ export function RowMenu({
                   className={cn("shrink-0", item.id === "autofocus" && item.active && "text-primary")}
                 />
               )}
-              {item.detail !== undefined && !item.disabled ? (
+              {item.detail !== undefined ? (
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate">{item.label}</span>
                   <StartTrimmed
