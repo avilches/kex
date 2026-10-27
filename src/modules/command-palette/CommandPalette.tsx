@@ -33,6 +33,8 @@ import {
   useContentSearch,
 } from "./hooks/useContentSearch";
 import type { ClosedTabEntry } from "./lib/closedEntries";
+import { COMMAND_GROUPS } from "./commands";
+import { displayOrder, successorKey } from "./lib/closeSuccessor";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
@@ -417,6 +419,41 @@ export function CommandPalette({
       }, delay);
     }
   }, []);
+  // The row to select once the tab being closed is gone. Set before closing, applied only when the
+  // tab really disappears from the list, dropped when the close was cancelled or refused.
+  const pendingClose = useRef<{ key: string; next: string | null } | null>(null);
+  const mergedRef = useRef(merged);
+  mergedRef.current = merged;
+  const typingRef = useRef(false);
+  typingRef.current = parsed.term.length > 0;
+  const closeTabFromRow = useCallback(
+    (entry: TabEntry) => {
+      if (pendingClose.current) return;
+      const key = tabRowKey(entry.tabId);
+      const pending = {
+        key,
+        next: successorKey(
+          displayOrder(mergedRef.current, typingRef.current, COMMAND_GROUPS),
+          key,
+        ),
+      };
+      pendingClose.current = pending;
+      void Promise.resolve(onCloseTab(entry)).then(() => {
+        refocusInput();
+        window.setTimeout(() => {
+          if (pendingClose.current === pending) pendingClose.current = null;
+        }, 300);
+      });
+    },
+    [onCloseTab, refocusInput],
+  );
+  useEffect(() => {
+    const pending = pendingClose.current;
+    if (!pending || merged.some((r) => r.key === pending.key)) return;
+    pendingClose.current = null;
+    const next = pending.next;
+    setValue(next && merged.some((r) => r.key === next) ? next : (merged[0]?.key ?? ""));
+  }, [merged]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
       closeRowMenu();
@@ -430,10 +467,10 @@ export function CommandPalette({
         const path = tabEntryCopyPath(entry);
         if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
       } else if (id === "close") {
-        void Promise.resolve(onCloseTab(entry)).then(refocusInput);
+        closeTabFromRow(entry);
       }
     },
-    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, onCloseTab],
+    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, closeTabFromRow],
   );
 
   const runWorkspaceAction = useCallback(
