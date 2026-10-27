@@ -401,11 +401,16 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     unmount();
   });
 
-  it("an unlocked sleeping row shows the sleeping icon in the close slot, only on hover", () => {
-    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
-    const icon = container.querySelector('[title="Hibernated"]')!;
-    expect(icon.className).toContain("opacity-0");
-    expect(icon.className).toContain("group-hover/tab:opacity-40");
+  it("a sleeping row has a restore button that wakes it without activating the row", () => {
+    const onWake = vi.fn();
+    const onActivate = vi.fn();
+    const { container, unmount } = mountAsleep(onWake, onActivate, vi.fn(), false);
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Restore tab"]')!;
+    expect(button.className).toContain("opacity-0");
+    expect(button.className).toContain("group-hover/tab:opacity-100");
+    act(() => button.click());
+    expect(onWake).toHaveBeenCalledTimes(1);
+    expect(onActivate).not.toHaveBeenCalled();
     unmount();
   });
 

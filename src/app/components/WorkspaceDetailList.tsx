@@ -332,6 +332,7 @@ function DetailTabRow({
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
               {showAutofocus && <span aria-hidden className="size-[16px] shrink-0" />}
+              {hibernated && onWake && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
@@ -362,6 +363,18 @@ function DetailTabRow({
           onClick={() => onNoteToggle(tab.id)}
         >
           <HugeiconsIcon icon={StickyNote03Icon} size={13} strokeWidth={2} />
+        </button>
+      )}
+      {hibernated && onWake && (
+        <button
+          type="button"
+          title="Hibernated: click to restore"
+          aria-label="Restore tab"
+          style={{ right: 26 + (hasNote ? 20 : 0) + (showAutofocus ? 20 : 0) }}
+          className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/tab:opacity-100 group-focus-within/tab:opacity-100", hoverBg)}
+          onClick={onWake}
+        >
+          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
         </button>
       )}
       {showAutofocus && (
@@ -396,19 +409,11 @@ function DetailTabRow({
             type="button"
             title="Close tab"
             aria-label="Close tab"
-            className={cn("peer absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hibernated ? "" : "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
+            className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
             onClick={() => onClose(tab.id)}
           >
             <span className="text-[14px] leading-none">×</span>
           </button>
-          {hibernated && (
-            <span
-              title="Hibernated"
-              className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center text-muted-foreground opacity-0 transition-opacity group-hover/tab:opacity-40 peer-hover:!opacity-0"
-            >
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-            </span>
-          )}
         </>
       )}
     </div>
