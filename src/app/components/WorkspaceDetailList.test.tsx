@@ -352,10 +352,9 @@ describe("WorkspaceDetailList context menu", () => {
 });
 
 describe("WorkspaceDetailList with a hibernated tab", () => {
-  const sleeping = (t: Tab): Tab =>
-    t.id === "t-plain" ? ({ ...t, locked: true, note: "n", hibernation: { at: 1 } } as Tab) : t;
-
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn()) {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true) {
+    const sleeping = (t: Tab): Tab =>
+      t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1 } } as Tab) : t;
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -396,10 +395,17 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
-    expect(sleepingRow.querySelector("svg.opacity-0")).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
+    unmount();
+  });
+
+  it("an unlocked sleeping row shows the sleeping icon in the close slot, only on hover", () => {
+    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const icon = container.querySelector('[title="Hibernated"]')!;
+    expect(icon.className).toContain("opacity-0");
+    expect(icon.className).toContain("group-hover/tab:opacity-40");
     unmount();
   });
 

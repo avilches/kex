@@ -325,9 +325,6 @@ function DetailTabRow({
               >
                 {title}
               </span>
-              {hibernated && (
-                <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} className="shrink-0 opacity-0 transition-opacity group-hover/tab:opacity-100" />
-              )}
               {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
                 <span className="shrink-0 text-[9px] text-primary">●</span>
               )}
@@ -399,11 +396,19 @@ function DetailTabRow({
             type="button"
             title="Close tab"
             aria-label="Close tab"
-            className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
+            className={cn("peer absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hibernated ? "" : "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
             onClick={() => onClose(tab.id)}
           >
             <span className="text-[14px] leading-none">×</span>
           </button>
+          {hibernated && (
+            <span
+              title="Hibernated"
+              className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center text-muted-foreground opacity-0 transition-opacity group-hover/tab:opacity-40 peer-hover:!opacity-0"
+            >
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            </span>
+          )}
         </>
       )}
     </div>
