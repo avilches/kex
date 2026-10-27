@@ -2,6 +2,8 @@ import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import {
   clampPaletteWidth,
   DEFAULT_PALETTE_WIDTH,
+  MAX_PALETTE_WIDTH,
+  MIN_PALETTE_WIDTH,
   paletteBox,
   widthAfterDrag,
 } from "@/lib/paletteWidth";
@@ -90,6 +92,9 @@ export function usePaletteWidth() {
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize palette"
+        aria-valuenow={width}
+        aria-valuemin={MIN_PALETTE_WIDTH}
+        aria-valuemax={MAX_PALETTE_WIDTH}
         title="Drag to resize, double-click to reset"
         className={`${handleClass} left-0.5`}
         {...handlers("left")}
@@ -98,6 +103,9 @@ export function usePaletteWidth() {
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize palette"
+        aria-valuenow={width}
+        aria-valuemin={MIN_PALETTE_WIDTH}
+        aria-valuemax={MAX_PALETTE_WIDTH}
         title="Drag to resize, double-click to reset"
         className={`${handleClass} right-0.5`}
         {...handlers("right")}
