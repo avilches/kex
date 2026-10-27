@@ -99,7 +99,11 @@ resolverse la accion.
 
 `keepPaletteFocus` (`lib/keepPaletteFocus.ts`) es el `onCloseAutoFocus` de `HibernateDialog`: si hay un
 input de paleta en el DOM, evita el comportamiento por defecto y le da el foco. Sin paleta no hace nada.
-`hibernateFocus.test.tsx` usa un AlertDialog real en portal y falla sin la llamada a `focus()`.
+`hibernateFocus.test.tsx` comprueba el handler con un AlertDialog generico en portal, y `HibernateDialogFocus.test.tsx` monta el `HibernateDialog` real junto a un input de paleta simulado y comprueba que el foco acaba en el input al confirmar, cancelar y con Escape; falla si se quita el `onCloseAutoFocus` del componente.
+
+### Riesgo abierto
+
+El boton "Go to tab" del dialogo hace `onClose()` y luego `onGoToTab()`, que pide el foco del tab destino en un `requestAnimationFrame`. La paleta no se cierra con ese camino, asi que `keepPaletteFocus` sigue dando el foco al input cuando el dialogo termina de desmontarse (tras su animacion de salida), y podria pisar el foco que acaba de pedir el tab. Sin la app arrancada no se puede saber el orden real, asi que no se ha puesto ningun parche: si se confirma, la salida coherente es cerrar la paleta en ese camino, no discriminar el foco dentro del handler.
 
 ### Leccion
 
