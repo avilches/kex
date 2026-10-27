@@ -228,7 +228,11 @@ fn get_build_info() -> BuildInfo {
 }
 
 fn parse_launch_dir() -> Option<String> {
-    for arg in std::env::args().skip(1) {
+    launch_dir_from_args(std::env::args().skip(1))
+}
+
+fn launch_dir_from_args(args: impl IntoIterator<Item = String>) -> Option<String> {
+    for arg in args {
         if arg.starts_with('-') {
             continue;
         }
@@ -581,12 +585,62 @@ async fn check_launch_dir(path: String) -> Option<String> {
         .flatten()
 }
 
+/// A second `kex` process was started (Windows "Open in" verb, CLI): it exits right after
+/// calling this in the live instance, which opens the folder as a workspace in the focused
+/// window or, when no window exists, in a new one.
+#[cfg(desktop)]
+fn handle_second_launch(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) {
+    let dir = launch_dir_from_args(
+        argv.into_iter()
+            .skip(1)
+            .map(|a| resolve_against(&a, &cwd)),
+    );
+    if let Some(dir) = &dir {
+        let _ = app
+            .state::<workspace::WorkspaceRegistry>()
+            .authorize(dir);
+    }
+    let live = app
+        .state::<window_state::WindowStateManager>()
+        .get_focused_window()
+        .filter(|l| app.get_webview_window(l).is_some())
+        .or_else(|| main_window_labels(app).into_iter().min());
+    match (live, dir) {
+        (Some(label), dir) => {
+            if let Some(w) = app.get_webview_window(&label) {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            if let Some(dir) = dir {
+                let _ = app.emit_to(label.as_str(), "kex:open-folder", dir);
+            }
+        }
+        (None, dir) => {
+            *app.state::<LaunchDir>().0.lock().unwrap() = dir;
+            let _ = create_new_window(app);
+        }
+    }
+}
+
+/// The second process may have been started from another working directory.
+fn resolve_against(arg: &str, cwd: &str) -> String {
+    if arg.starts_with('-') || std::path::Path::new(arg).is_absolute() {
+        return arg.to_string();
+    }
+    std::path::Path::new(cwd).join(arg).to_string_lossy().into_owned()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli_dir = parse_launch_dir();
     workspace::init_launch_cwd(cli_dir.as_deref());
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        handle_second_launch(app, argv, cwd);
+    }));
+    builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
@@ -1102,6 +1156,34 @@ pub fn run() {
                 signal_quit_request(app_handle);
             }
         });
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use super::{launch_dir_from_args, resolve_against};
+
+    #[test]
+    fn picks_first_existing_directory_and_skips_flags() {
+        let tmp = std::env::temp_dir();
+        let args = vec![
+            "--flag".to_string(),
+            "/definitely/not/here".to_string(),
+            tmp.to_string_lossy().into_owned(),
+        ];
+        assert!(launch_dir_from_args(args).is_some());
+    }
+
+    #[test]
+    fn no_directory_gives_none() {
+        assert!(launch_dir_from_args(vec!["--x".to_string()]).is_none());
+    }
+
+    #[test]
+    fn relative_arg_resolves_against_caller_cwd() {
+        let out = resolve_against("proj", "/home/u");
+        assert!(out.ends_with("proj") && out.starts_with("/home/u"));
+        assert_eq!(resolve_against("--flag", "/home/u"), "--flag");
+    }
 }
 
 #[cfg(test)]

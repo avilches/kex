@@ -3429,6 +3429,26 @@ export default function App() {
     }
   };
 
+  const openFolderRef = useRef(newWorkspaceFromFolder);
+  openFolderRef.current = newWorkspaceFromFolder;
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen<string>("kex:open-folder", (e) =>
+        openFolderRef.current(e.payload.replace(/\\/g, "/")),
+      )
+      .then((u) => {
+        if (disposed) u();
+        else unlisten = u;
+      })
+      .catch((e) => console.error("[kex] kex:open-folder listen failed:", e));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   useEffect(() => {
     if (!IS_MAC) return;
     let disposed = false;
