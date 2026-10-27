@@ -1,9 +1,10 @@
 // The global shortcut listener runs before any keydown handler of a palette, so the shortcuts a
-// palette reacts to (Cmd+T, Cmd+W, Cmd+Shift+C, Cmd+1..9) reach it through this registry instead.
+// palette reacts to (Cmd+T, Cmd+W, Cmd+Shift+W, Cmd+Shift+C, Cmd+1..9) reach it through this registry instead.
 export type PaletteShortcut =
   | "newTab"
   | "copyPath"
   | "closeTab"
+  | "closeWorkspace"
   | "folderRoot"
   | "folderMain"
   | "folderHome"
