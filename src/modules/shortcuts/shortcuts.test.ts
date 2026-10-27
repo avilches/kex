@@ -5,6 +5,7 @@ import {
   matchesShortcut,
   SHORTCUTS,
   matchBinding,
+  shortcutsForEvent,
   type KeyBinding,
   type ShortcutId,
 } from "./shortcuts";
@@ -389,5 +390,38 @@ describe("tab.hibernate", () => {
 
   it("stays usable on a hibernated tab, so it can be toggled", () => {
     expect(blockedWhileHibernated("tab.hibernate")).toBe(false);
+  });
+});
+
+describe("shortcutsForEvent", () => {
+  it("finds the shortcut that owns the pressed keys", () => {
+    const target = SHORTCUTS.find((s) => s.defaultBindings.length > 0)!;
+    const b = target.defaultBindings[0];
+    const e = {
+      key: b.key,
+      code: `Key${b.key.toUpperCase()}`,
+      ctrlKey: !!b.ctrl,
+      shiftKey: !!b.shift,
+      altKey: !!b.alt,
+      metaKey: !!b.meta,
+    } as unknown as KeyboardEvent;
+    expect(shortcutsForEvent(e).map((s) => s.id)).toContain(target.id);
+  });
+
+  it("honours user overrides over defaults", () => {
+    const target = SHORTCUTS.find((s) => s.defaultBindings.length > 0)!;
+    const b = target.defaultBindings[0];
+    const e = {
+      key: b.key,
+      code: `Key${b.key.toUpperCase()}`,
+      ctrlKey: !!b.ctrl,
+      shiftKey: !!b.shift,
+      altKey: !!b.alt,
+      metaKey: !!b.meta,
+    } as unknown as KeyboardEvent;
+    const found = shortcutsForEvent(e, {
+      [target.id]: [],
+    } as unknown as Record<ShortcutId, KeyBinding[]>);
+    expect(found.map((s) => s.id)).not.toContain(target.id);
   });
 });

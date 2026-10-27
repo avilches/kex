@@ -612,6 +612,39 @@ export function matchesShortcut(
 }
 
 /**
+ * Builds a KeyBinding from a keydown. On macOS, Option transforms alpha keys
+ * (Option+B gives "∫"), so e.code recovers the real key when alt is held.
+ */
+export function bindingFromEvent(e: KeyboardEvent): KeyBinding {
+  const key =
+    e.altKey && /^Key[A-Z]$/.test(e.code)
+      ? e.code.slice(3).toLowerCase()
+      : e.key;
+  return {
+    key,
+    ctrl: e.ctrlKey,
+    shift: e.shiftKey,
+    alt: e.altKey,
+    meta: e.metaKey,
+  };
+}
+
+/**
+ * Every shortcut whose effective bindings (user overrides win over defaults)
+ * match the event, so the Settings finder reports exactly what the app would run.
+ */
+export function shortcutsForEvent(
+  e: KeyboardEvent,
+  userShortcuts?: Record<ShortcutId, KeyBinding[]>,
+): Shortcut[] {
+  return SHORTCUTS.filter((s) =>
+    (userShortcuts?.[s.id] ?? s.defaultBindings).some((b) =>
+      matchBinding(e, b, s.id),
+    ),
+  );
+}
+
+/**
  * Display helpers
  */
 export function getBindingTokens(binding?: KeyBinding): string[] {
