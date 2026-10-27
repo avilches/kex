@@ -17,8 +17,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { flushTabNote } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
 import {
@@ -582,7 +582,7 @@ export function CommandPalette({
   }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
-      if (!tabItemKeepsPalette(id, entry)) closeRowMenu();
+      if (!tabItemKeepsPalette(id)) closeRowMenu();
       const tabId = entry.tabId;
       if (id === "go") {
         recordChoice(parsed.term, tabRowKey(entry.tabId));
@@ -624,15 +624,12 @@ export function CommandPalette({
         onUpdateTab(tabId, removeTabNote);
       } else if (id === "note") {
         flushTabNote(tabId);
-        if (tabItemKeepsPalette("note", entry)) {
-          onUpdateTab(tabId, toggleTabNote);
-        } else {
-          // A note shows on the current tab only, and takes the focus when it opens.
-          runAfterClose(() => {
-            onGoToTab(tabId);
-            useTabNoteStore.getState().requestFocus(tabId);
-            onUpdateTab(tabId, toggleTabNote);
-          });
+        onUpdateTab(tabId, toggleTabNote);
+        // A note shows on the current tab only. The tab is activated so the note can be seen, but
+        // the note is not asked to take the focus: the cursor is still the palette's.
+        if (!isTabNoteOpen(entry.tab) && tabId !== activeTabId) {
+          onGoToTab(tabId);
+          refocusInput();
         }
       } else if (id === "focusSidebar") {
         const target = tabFocusTarget(entry);
