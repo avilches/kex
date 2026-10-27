@@ -79,6 +79,10 @@ describe("successorOf", () => {
     expect(successorOf(rows, new Set(["tab:d", "tab:e"]), "tab:e")).toBe("tab:c");
   });
 
+  it("keeps the highlighted row when it is not among the ones that go", () => {
+    expect(successorOf(rows, new Set(["tab:a", "tab:c"]), "tab:b")).toBe("tab:b");
+  });
+
   it("is null when every row goes or the start is unknown", () => {
     expect(successorOf(rows, new Set(rows.map((r) => r.key)), "tab:a")).toBeNull();
     expect(successorOf(rows, new Set(["tab:a"]), "tab:zz")).toBeNull();
