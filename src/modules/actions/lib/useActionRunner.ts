@@ -19,14 +19,11 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
-import { buildCommandVars, focusPlace, inWorktree } from "./commandVars";
+import { buildCommandVars, inWorktree } from "./commandVars";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
-import { twinIds } from "./actionsBar";
-import { getActionStatesSnapshot } from "./useActionStates";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
-  pickRunnableAction,
   planActionRun,
   planActionStop,
   planTabReveal,
@@ -118,19 +115,6 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
 function focusedOf(ws: Workspace): Tab | null {
   const tab = focusedTab(ws.paneTree, ws.activePaneId);
   return inWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null);
-}
-
-// The twins the bar hides right now, worked out from the same values the bar reads.
-function hiddenTwins(ws: Workspace, deps: ActionRunnerDeps): ReadonlySet<string> {
-  const focused = focusedOf(ws);
-  const ctx = contextFor(null, ws, deps);
-  const { home: _home, ...folders } = ctx.folders;
-  return twinIds(
-    [...(ws.actions ?? []), ...(usePreferencesStore.getState().actions ?? [])],
-    { vars: ctx.vars, shell: ctx.shell, hibernated: ctx.hibernated, folders },
-    getActionStatesSnapshot(),
-    focusPlace(focused),
-  );
 }
 
 function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
@@ -358,16 +342,5 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     [revealActionTab],
   );
 
-  /** F12: run the active Action, or stop it when it is already running. */
-  const toggleActiveAction = useCallback(() => {
-    const ws = activeWorkspace;
-    if (!ws) return;
-    const action = pickRunnableAction(ws.actions ?? [], ws.activeAction, hiddenTwins(ws, deps));
-    if (!action) return;
-    const tabId = isScript(action) ? getActionTab(action.id) : undefined;
-    if (tabId && getScriptRunningSnapshot().get(tabId)) stopAction(action);
-    else runAction(action);
-  }, [activeWorkspace, runAction, stopAction]);
-
-  return { runAction, stopAction, focusActionTab, toggleActiveAction };
+  return { runAction, stopAction, focusActionTab };
 }

@@ -149,7 +149,7 @@ describe("blockedWhileHibernated", () => {
   });
 
   it("lets tab, pane, sidebar, explorer and editor shortcuts through: a sleeping tab is still a tab", () => {
-    for (const id of ["tab.new", "tab.close", "tab.rename", "tab.next", "pane.splitRight", "sidebar.toggle", "sidebar.showGit", "explorer.search", "view.zenMode", "workspace.run"] as const) {
+    for (const id of ["tab.new", "tab.close", "tab.rename", "tab.next", "pane.splitRight", "sidebar.toggle", "sidebar.showGit", "explorer.search", "view.zenMode"] as const) {
       expect(blockedWhileHibernated(id), id).toBe(false);
     }
   });

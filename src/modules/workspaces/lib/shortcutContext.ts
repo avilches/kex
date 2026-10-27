@@ -6,7 +6,6 @@ import type { Tab } from "./types";
 export type ShortcutContext = {
   activeTab: Tab | null;
   hasWorkspaceRoot: boolean;
-  scriptCount: number;
 };
 
 // Shortcuts that must not fire for the current tab. Used by the global listener.
@@ -45,7 +44,6 @@ export function shortcutUnavailableBehindPalette(
 export function paletteShortcutUnavailable(id: ShortcutId, c: ShortcutContext): boolean {
   if (shortcutUnavailable(id, c)) return true;
   if (id === "sidebar.showNotes") return !c.hasWorkspaceRoot;
-  if (id === "workspace.run") return c.scriptCount === 0;
   return false;
 }
 

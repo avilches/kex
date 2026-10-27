@@ -211,17 +211,3 @@ export function planTabReveal(at: {
   if (at.tabWorkspaceId !== at.activeWorkspaceId) return { switchWorkspace: true, mode: "activate" };
   return { switchWorkspace: false, mode: at.tabPaneId === at.userPaneId ? "activate" : "reveal" };
 }
-
-/**
- * The Action F12 acts on: the active one when it has a command (hidden or not, its visible
- * twin does the same), else the first visible one with a command, else the first with one.
- * Hiding only decides between Actions that differ, it never makes F12 do nothing.
- */
-export function pickRunnableAction(
-  actions: readonly Action[],
-  activeId: string | undefined,
-  hidden?: ReadonlySet<string>,
-): Action | undefined {
-  const runnable = actions.filter((a) => a.command.trim() !== "");
-  return runnable.find((a) => a.id === activeId) ?? runnable.find((a) => !hidden?.has(a.id)) ?? runnable[0];
-}

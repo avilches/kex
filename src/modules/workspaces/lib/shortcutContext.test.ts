@@ -27,7 +27,7 @@ describe("shortcutUnavailable", () => {
 
   it("leaves tab, pane, sidebar, explorer and hibernate usable on a sleeping tab", () => {
     const asleep = { ...base, activeTab: sleeping };
-    for (const id of ["tab.hibernate", "tab.rename", "tab.close", "tab.next", "pane.splitRight", "sidebar.toggle", "explorer.search", "workspace.run"] as const) {
+    for (const id of ["tab.hibernate", "tab.rename", "tab.close", "tab.next", "pane.splitRight", "sidebar.toggle", "explorer.search"] as const) {
       expect(shortcutUnavailable(id, asleep), id).toBe(false);
     }
   });
@@ -54,7 +54,6 @@ describe("shortcutUnavailable", () => {
 
   it("does not look at the workspace root or the scripts", () => {
     expect(shortcutUnavailable("sidebar.showNotes", { ...base, hasWorkspaceRoot: false })).toBe(false);
-    expect(shortcutUnavailable("workspace.run", { ...base, scriptCount: 0 })).toBe(false);
   });
 });
 
@@ -62,8 +61,6 @@ describe("paletteShortcutUnavailable", () => {
   it("adds the two handlers that return silently without their prerequisite", () => {
     expect(paletteShortcutUnavailable("sidebar.showNotes", { ...base, hasWorkspaceRoot: false })).toBe(true);
     expect(paletteShortcutUnavailable("sidebar.showNotes", base)).toBe(false);
-    expect(paletteShortcutUnavailable("workspace.run", { ...base, scriptCount: 0 })).toBe(true);
-    expect(paletteShortcutUnavailable("workspace.run", base)).toBe(false);
   });
 
   it("keeps every rule of shortcutUnavailable", () => {
