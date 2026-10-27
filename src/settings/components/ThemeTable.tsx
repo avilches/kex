@@ -64,14 +64,15 @@ function columnWidth(from: number, to: number) {
 
 /**
  * One outline per run of adjacent selected cells, so joined cells share a
- * single border. The border sits above the cells so a hover shade never hides it.
+ * single border; with `separate` every selected cell gets its own box. The
+ * border sits above the cells so a hover shade never hides it.
  */
-function SelectionOutline({ selected }: { selected: boolean[] }) {
+function SelectionOutline({ selected, separate }: { selected: boolean[]; separate: boolean }) {
   const runs: [number, number][] = [];
   selected.forEach((on, i) => {
     if (!on) return;
     const last = runs[runs.length - 1];
-    if (last && last[1] === i) last[1] = i + 1;
+    if (!separate && last && last[1] === i) last[1] = i + 1;
     else runs.push([i, i + 1]);
   });
   return (
@@ -443,7 +444,7 @@ export function ThemeTable({
           const terminalSel = r.terminalSel && r.terminalInfo !== undefined;
           return (
             <div key={t.id} className={cn(COLUMNS, "group relative items-stretch")}>
-              <SelectionOutline selected={[themeSel, editorSel, terminalSel]} />
+              <SelectionOutline selected={[themeSel, editorSel, terminalSel]} separate={!themeAuto} />
               <div
                 className={cn(CELL, "flex min-w-0 items-center gap-1")}
                 onMouseEnter={() => setHoverTheme(t)}
@@ -548,7 +549,7 @@ export function ThemeTable({
           const sel = !editorAuto && id === editorPref;
           return (
             <div key={id} className={cn(COLUMNS, "relative items-stretch")}>
-              <SelectionOutline selected={[false, sel, false]} />
+              <SelectionOutline selected={[false, sel, false]} separate={!themeAuto} />
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <Cell
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
@@ -572,7 +573,7 @@ export function ThemeTable({
           const shown = sel ? (pinnedTerminal.mode ?? mode) : mode;
           return (
             <div key={t.id} className={cn(COLUMNS, "relative items-stretch")}>
-              <SelectionOutline selected={[false, false, sel]} />
+              <SelectionOutline selected={[false, false, sel]} separate={!themeAuto} />
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <span />
               <Cell
