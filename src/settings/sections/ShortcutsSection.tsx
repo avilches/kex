@@ -537,7 +537,15 @@ function KeyFinder({
       onClick={() => onActiveChange(true)}
     >
       <HugeiconsIcon icon={KeyboardIcon} size={13} strokeWidth={2} />
-      Find by keys
+      {found ? (
+        <KbdGroup>
+          {getBindingTokens(found.binding).map((t, i) => (
+            <Kbd key={i}>{t}</Kbd>
+          ))}
+        </KbdGroup>
+      ) : (
+        "Find by keys"
+      )}
     </Button>
   );
 }
