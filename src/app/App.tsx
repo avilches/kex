@@ -52,6 +52,7 @@ import {
   buildTabEntries,
   buildWorkspaceEntries,
   CommandPalette,
+  type MoveSubject,
   createCommandItems,
   liveTabSources,
   usePaletteGit,
@@ -167,6 +168,7 @@ import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import {
   bulkClosableIds,
+  closeIdsForTab,
   otherBulkClosableIds,
 } from "@/modules/workspaces/lib/tabClose";
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
@@ -240,9 +242,10 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailableBehindPalette } from "@/modules/workspaces/lib/shortcutContext";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
+import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -271,7 +274,11 @@ import {
 import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath, tabFolder } from "@/modules/workspaces/lib/tabPath";
-import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
+import { runPaletteShortcut, runPaletteTabItem } from "@/modules/command-palette/lib/paletteControl";
+import {
+  isPaletteTabShortcut,
+  withPaletteTabShortcuts,
+} from "@/modules/command-palette/lib/paletteShortcuts";
 import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
@@ -2159,16 +2166,15 @@ export default function App() {
     [handleMoveTabFollowingFocus],
   );
 
-  const moveActiveTabToWorkspace = useCallback(
-    (target: string | "new") => {
-      if (!activeWorkspace || !activeTabId) return;
+  const moveTabFromPalette = useCallback(
+    (subject: MoveSubject, target: string | "new") => {
       void handleMoveTabFollowingFocus(
-        activeWorkspace.id,
-        activeTabId,
+        subject.workspaceId,
+        subject.tabId,
         target === "new" ? { kind: "new" } : { kind: "auto", workspaceId: target },
       );
     },
-    [activeWorkspace, activeTabId, handleMoveTabFollowingFocus],
+    [handleMoveTabFollowingFocus],
   );
 
   const handleDropTabOnWorkspace = useCallback(
@@ -2998,10 +3004,7 @@ export default function App() {
       },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
-      "tab.close": () => {
-        if (runPaletteShortcut("closeTab")) return;
-        handleCloseActiveTab();
-      },
+      "tab.close": handleCloseActiveTab,
       "tab.reopenClosed": () => {
         if (activeWorkspace) reopenClosed();
       },
@@ -3190,18 +3193,7 @@ export default function App() {
       "tab.lock": () => {
         if (!activeTabId || !activeTab) return;
         const found = findTabGlobal(activeTabId);
-        if (found)
-          updateTabData(found.workspace.id, activeTabId, (p) => {
-            const newLocked = !p.locked;
-            if (p.kind === "editor" || p.kind === "markdown") {
-              return {
-                ...p,
-                locked: newLocked,
-                ...(newLocked ? { preview: false } : {}),
-              };
-            }
-            return { ...p, locked: newLocked };
-          });
+        if (found) updateTabData(found.workspace.id, activeTabId, toggleTabLock);
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
@@ -3214,7 +3206,6 @@ export default function App() {
           );
       },
       "path.copy": () => {
-        if (runPaletteShortcut("copyPath")) return;
         if (!activeTab) return;
         let value: string | undefined;
         let label: string;
@@ -3295,7 +3286,14 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
-      if (shortcutUnavailable(id, shortcutContext)) return true;
+      if (
+        shortcutUnavailableBehindPalette(id, shortcutContext, {
+          open: commandPaletteOpenRef.current || folderPaletteOpenRef.current,
+          ownsTabShortcut: isPaletteTabShortcut(id),
+        })
+      ) {
+        return true;
+      }
       if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
       if (
         id === "workspace.settings" &&
@@ -3332,7 +3330,11 @@ export default function App() {
     [shortcutContext, hibernateFlow.pending, closeFlow.pending?.id],
   );
 
-  useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
+  const globalShortcutHandlers = useMemo(
+    () => withPaletteTabShortcuts(shortcutHandlers, runPaletteTabItem),
+    [shortcutHandlers],
+  );
+  useGlobalShortcuts(globalShortcutHandlers, { isDisabled: shortcutsDisabled });
 
   // ── Agent activation ──────────────────────────────────────────────────────
 
@@ -3398,7 +3400,7 @@ export default function App() {
         void setEditorAutoSave(!usePreferencesStore.getState().editorAutoSave);
         break;
       case "close_tab":
-        if (runPaletteShortcut("closeTab")) break;
+        if (runPaletteTabItem("close")) break;
         handleCloseActiveTab();
         break;
       case "close_others":
@@ -3695,6 +3697,20 @@ export default function App() {
     }
     return closeTabsRef.current([entry.tabId]);
   }, []);
+  const onPaletteCloseOtherTabs = useCallback(
+    (tabId: string) => closeTabsRef.current(closeIdsForTab(workspacesRef.current, tabId)),
+    [],
+  );
+  // Unlike the shortcut, waking leaves the focus where it is: the palette keeps it.
+  const onPaletteToggleHibernate = useCallback(
+    async (tabId: string) => {
+      const found = findTabGlobal(tabId);
+      if (!found || found.tab.kind !== "terminal") return;
+      if (found.tab.hibernation) await wakeTabs(found.workspace.id, [tabId]);
+      else await requestHibernate(found.workspace.id, [tabId]);
+    },
+    [findTabGlobal, wakeTabs, requestHibernate],
+  );
   const onPaletteRenameWorkspace = useCallback((workspaceId: string) => {
     useContextMenuCloseStore.getState().closeAll();
     useWorkspaceRenameStore.getState().startRename(workspaceId);
@@ -4218,7 +4234,14 @@ export default function App() {
             onSelectTab={onPaletteSelectTab}
             onSelectWorkspace={onPaletteSelectWorkspace}
             onRunClosed={onPaletteRunClosed}
-            onMoveActiveTabToWorkspace={moveActiveTabToWorkspace}
+            onMoveTabToWorkspace={moveTabFromPalette}
+            onUpdateTab={sidebarTabMenu.onUpdateTab}
+            onSaveTab={sidebarTabMenu.onSaveTab}
+            onToggleTabHibernate={onPaletteToggleHibernate}
+            hibernateDialogOpen={hibernateFlow.pending !== null}
+            onRevealInExplorer={sidebarTabMenu.onRevealInExplorer}
+            onCloseOtherTabs={onPaletteCloseOtherTabs}
+            onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}
             onCloseTab={onPaletteCloseTab}

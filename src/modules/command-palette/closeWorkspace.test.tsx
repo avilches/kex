@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./CommandPalette";
+import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
 import { runPaletteShortcut } from "./lib/paletteControl";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import type { PaletteItem } from "./types";
@@ -46,7 +47,7 @@ const mk = (id: string, workspaceId: string, i: number): TabEntry =>
     workspaceId,
     workspaceTitle: workspaceId,
     workspaceColor: null,
-    workspaceIcon: null,
+    workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
     hibernated: false,
     kind: "terminal",
     title: id,
@@ -113,7 +114,7 @@ function Harness() {
       onSelectTab={() => {}}
       onSelectWorkspace={() => {}}
       onRunClosed={() => {}}
-      onMoveActiveTabToWorkspace={() => {}}
+      {...TAB_MENU_NOOPS}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
       onCloseTab={() => {}}

@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { createElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runPaletteShortcut } from "@/modules/command-palette/lib/paletteControl";
+import { runPaletteShortcut, runPaletteTabItem } from "@/modules/command-palette/lib/paletteControl";
+import { PALETTE_TAB_SHORTCUTS } from "@/modules/command-palette/lib/paletteShortcuts";
 import { FolderPalette } from "./FolderPalette";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 
@@ -777,15 +778,27 @@ describe("FolderPalette", () => {
   });
 
   describe("close shortcuts", () => {
-    it.each(["closeTab", "closeWorkspace"] as const)(
-      "%s is taken without effect, so the tab or workspace behind the palette is not closed",
-      async (action) => {
+    it("Close Workspace is taken without effect, so the workspace behind the palette is not closed", async () => {
+      const onPick = vi.fn();
+      mount(onPick);
+      await settle();
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut("closeWorkspace");
+      });
+      expect(taken).toBe(true);
+      expect(onPick).not.toHaveBeenCalled();
+    });
+
+    it.each(Object.values(PALETTE_TAB_SHORTCUTS).filter((item) => item !== "copy"))(
+      "the %s tab shortcut is taken without effect, so the tab behind the palette is not touched",
+      async (item) => {
         const onPick = vi.fn();
         mount(onPick);
         await settle();
         let taken = false;
         await act(async () => {
-          taken = runPaletteShortcut(action);
+          taken = runPaletteTabItem(item);
         });
         expect(taken).toBe(true);
         expect(onPick).not.toHaveBeenCalled();

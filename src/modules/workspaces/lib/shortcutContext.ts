@@ -30,6 +30,17 @@ export function shortcutUnavailable(id: ShortcutId, c: ShortcutContext): boolean
   }
 }
 
+// With a palette open, the tab shortcuts it owns act on its highlighted row, so the tab behind
+// it cannot make them unavailable.
+export function shortcutUnavailableBehindPalette(
+  id: ShortcutId,
+  c: ShortcutContext,
+  palette: { open: boolean; ownsTabShortcut: boolean },
+): boolean {
+  if (palette.open && palette.ownsTabShortcut) return false;
+  return shortcutUnavailable(id, c);
+}
+
 // A palette row must look disabled whenever its handler would return without doing anything.
 export function paletteShortcutUnavailable(id: ShortcutId, c: ShortcutContext): boolean {
   if (shortcutUnavailable(id, c)) return true;

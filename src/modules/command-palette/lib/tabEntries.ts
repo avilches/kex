@@ -24,6 +24,11 @@ export type TabEntry = {
   workspaceTitle: string;
   workspaceColor: string | null;
   workspaceIcon: string | null;
+  // Where "Copy Relative Path" is relative to.
+  workspaceRoot: string | null;
+  // The pane holding the tab and how many tabs it has: what "Close Other Tabs" closes.
+  paneId: string;
+  paneTabCount: number;
   // The terminal behind the tab is asleep.
   hibernated: boolean;
   kind: Tab["kind"];
@@ -91,6 +96,9 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           workspaceTitle,
           workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
           workspaceIcon: ws.icon ?? null,
+          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          paneId: pane.id,
+          paneTabCount: pane.tabs.length,
           hibernated: isHibernatedTab(tab),
           kind: tab.kind,
           title: src.displayTitle(tab),

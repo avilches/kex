@@ -23,8 +23,9 @@ export function displayOrder(
   ];
 }
 
-// The row to select once every key in `gone` has disappeared, starting from the highlighted one:
-// the first row that stays below it so the list does not seem to move, the nearest one above when
+// The row to select once every key in `gone` has disappeared, starting from the highlighted one.
+// A highlighted row that stays (Close Other Tabs) is kept; otherwise it is the first row that
+// stays below it so the list does not seem to move, the nearest one above when
 // none stays below, null when nothing is left.
 export function successorOf(
   ordered: readonly MergedRow[],
@@ -33,6 +34,7 @@ export function successorOf(
 ): string | null {
   const i = ordered.findIndex((r) => r.key === from);
   if (i < 0) return null;
+  if (!gone.has(from)) return from;
   for (let k = i + 1; k < ordered.length; k++) {
     if (!gone.has(ordered[k].key)) return ordered[k].key;
   }
