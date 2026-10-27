@@ -295,10 +295,6 @@ export function CommandPalette({
   // The new first row is selected on every keystroke, but a list scrolled down for the
   // previous query stays where it was and hides it.
   const listRef = useRef<HTMLDivElement>(null);
-  const mountList = useCallback((el: HTMLDivElement | null) => {
-    listRef.current = el;
-    scrollListToTop(el);
-  }, []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the top whenever the typed text changes
   useEffect(() => {
     scrollListToTop(listRef.current);
@@ -991,7 +987,7 @@ export function CommandPalette({
           }}
         >
         <ScrollArea
-          ref={mountList}
+          ref={listRef}
           className="[&_[data-slot=scroll-area-viewport]]:max-h-[420px] [&_[data-slot=scroll-area-viewport]>div]:block!"
         >
           <CommandList className="max-h-none overflow-visible pr-3">

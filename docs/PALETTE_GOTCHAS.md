@@ -41,7 +41,7 @@ veian el camino.
 - La fila inicial es la primera dibujada (`initialKey`, que usa `displayOrder`), pasada como valor
   controlado desde el primer render; ya no se apoya en que cmdk vuelva a elegir la primera al salir
   de una subpagina con el valor vacio.
-- El viewport vuelve a `scrollTop` 0 al montarse la lista y en cada consulta (`scrollListToTop`).
+- El viewport vuelve a `scrollTop` 0 en cada consulta (`scrollListToTop`); al abrir ya empieza arriba porque Radix desmonta el contenido al cerrar.
 - `openCursor.test.tsx` cierra desde fuera (`open=false` del padre) con una lista tan larga como la
   real; sin el efecto, el test recibe `act:g1`.
 
