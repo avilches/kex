@@ -346,16 +346,23 @@ export function leafCwd(leafId: string): string | null {
   return sessions.get(leafId)?.lastCwd ?? null;
 }
 
-// The screen of the leaf with its colours, for the placeholder of a hibernating tab. Null when
-// there is nothing worth keeping: no session, or an app such as vim on the alternate screen.
-export function leafAnsiTail(leafId: string, scrollback: number): string | null {
+// The screen of the leaf with its colours, for the placeholder of a hibernating tab. `alt` says an
+// app owns the alternate screen (the text then holds the normal buffer too, see `altScreenOf`).
+// Null when there is no session or nothing was serialized.
+export function leafAnsiTail(
+  leafId: string,
+  scrollback: number,
+): { text: string; alt: boolean; rows: number } | null {
   const s = sessions.get(leafId);
   if (!s) return null;
   const slot = getSlotForLeaf(leafId);
-  if (!slot) return s.altScreenAtRelease ? null : s.snapshot;
-  if (slot.term.buffer.active.type === "alternate") return null;
+  if (!slot) return s.snapshot ? { text: s.snapshot, alt: s.altScreenAtRelease, rows: s.rows } : null;
   try {
-    return slot.serializeAddon.serialize({ scrollback });
+    return {
+      text: slot.serializeAddon.serialize({ scrollback }),
+      alt: slot.term.buffer.active.type === "alternate",
+      rows: slot.term.rows,
+    };
   } catch {
     return null;
   }

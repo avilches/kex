@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  altScreenOf,
   clipToBytes,
   parseAnsi,
+  prepareAltScreenLines,
   prepareHibernateLines,
+  prepareHibernateScreen,
   redactLine,
   REDACTED,
   secretRanges,
@@ -99,6 +102,37 @@ describe("secrets", () => {
     const line = parseAnsi("ls -la /usr/local/bin")[0];
     expect(redactLine(line)).toBe(line);
     expect(secretRanges("nothing to see")).toEqual([]);
+  });
+});
+
+describe("alternate screen", () => {
+  const withAlt = (alt: string) => `normal line\r\nsecond${E}[1B${E}[6D${E}[?1049h${E}[H${alt}`;
+
+  it("takes only what follows the switch to the alternate screen", () => {
+    expect(altScreenOf(withAlt("TOP\r\nrow2"))).toBe("TOP\r\nrow2");
+    expect(altScreenOf("no alternate screen here")).toBeNull();
+  });
+
+  it("keeps the grid: its blank rows are padded up to the rows of the terminal, and its colours stay", () => {
+    const out = prepareAltScreenLines(withAlt(`${E}[44mTOP${E}[0m\r\n\r\nrow3`), 6);
+    const lines = parseAnsi(out);
+    expect(plain(lines)).toEqual(["TOP", "", "row3", "", "", ""]);
+    expect(lines[0][0].style.bg).toBe(4);
+  });
+
+  it("cuts a grid taller than the terminal from the top and crosses out secrets", () => {
+    const out = prepareAltScreenLines(withAlt("a\r\nb\r\nc\r\nTOKEN=abcd1234"), 2);
+    expect(plain(parseAnsi(out))).toEqual(["c", `TOKEN=${REDACTED}`]);
+  });
+
+  it("stores nothing for an alternate screen with nothing drawn, or one that cannot be found", () => {
+    expect(prepareAltScreenLines(withAlt("\r\n  \r\n"), 4)).toBe("");
+    expect(prepareAltScreenLines("plain", 4)).toBe("");
+  });
+
+  it("chooses by the kind of screen", () => {
+    expect(plain(parseAnsi(prepareHibernateScreen({ text: withAlt("TOP"), alt: true, rows: 2 })))).toEqual(["TOP", ""]);
+    expect(plain(parseAnsi(prepareHibernateScreen({ text: "a\nb\n\n", alt: false, rows: 2 })))).toEqual(["a", "b"]);
   });
 });
 

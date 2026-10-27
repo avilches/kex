@@ -21,6 +21,7 @@ import { keepLastLines } from "./useHibernateFlow";
 import { useHibernateLinesCleanup } from "./useHibernateLinesCleanup";
 
 const E = "\u001b";
+const screen = (text: string) => ({ text, alt: false, rows: 24 });
 const term = (id: string): Extract<Tab, { kind: "terminal" }> => ({ id, kind: "terminal" });
 const workspace = (...ids: string[]): Workspace => ({
   id: "w1",
@@ -41,7 +42,7 @@ describe("keepLastLines", () => {
       t1: `${E}[32mdone${E}[0m\nexport API_TOKEN=abcd1234efgh\n\n`,
       t2: "plain",
     };
-    await keepLastLines([term("t1"), term("t2")], (id) => screens[id] ?? null);
+    await keepLastLines([term("t1"), term("t2")], (id) => (screens[id] ? screen(screens[id]) : null));
     expect(io.save).toHaveBeenCalledTimes(2);
     const t1 = io.save.mock.calls.find(([id]) => id === "t1")![1];
     expect(t1).toContain("38;5;2");
@@ -51,19 +52,29 @@ describe("keepLastLines", () => {
 
   it("stores nothing when the setting is off", async () => {
     usePreferencesStore.setState({ hibernateSaveLines: false });
-    await keepLastLines([term("t1")], () => "text");
+    await keepLastLines([term("t1")], () => screen("text"));
     expect(io.save).not.toHaveBeenCalled();
   });
 
+  it("keeps the grid of an app on the alternate screen, such as top", async () => {
+    const serialized = `old shell line${E}[?1049h${E}[H${E}[7mPID  COMMAND${E}[0m\r\n123  node`;
+    await keepLastLines([term("t1")], () => ({ text: serialized, alt: true, rows: 4 }));
+    expect(io.save).toHaveBeenCalledTimes(1);
+    const stored = io.save.mock.calls[0]![1];
+    expect(stored).not.toContain("old shell line");
+    expect(stored).toContain("PID  COMMAND");
+    expect(stored.split("\n")).toHaveLength(4);
+  });
+
   it("stores nothing for a tab with no screen worth keeping", async () => {
-    await keepLastLines([term("t1"), term("t2")], (id) => (id === "t1" ? null : "\n\n  \n"));
+    await keepLastLines([term("t1"), term("t2")], (id) => (id === "t1" ? null : screen("\n\n  \n")));
     expect(io.save).not.toHaveBeenCalled();
   });
 
   it("does not fail the hibernation when the backend refuses", async () => {
     io.save.mockRejectedValue(new Error("disk full"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await expect(keepLastLines([term("t1")], () => "text")).resolves.toBeUndefined();
+    await expect(keepLastLines([term("t1")], () => screen("text"))).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

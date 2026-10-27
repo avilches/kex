@@ -220,3 +220,34 @@ export function prepareHibernateLines(
   const tail = tailLines(parseAnsi(snapshot), max).map(redactLine);
   return serializeLines(clipToBytes(tail, maxBytes));
 }
+
+// xterm serializes the normal buffer first and, when an app is on the alternate screen, switches to
+// it with this sequence and writes that screen after it.
+const ALT_SCREEN_START = `${ESC}[?1049h${ESC}[H`;
+
+export function altScreenOf(serialized: string): string | null {
+  const at = serialized.lastIndexOf(ALT_SCREEN_START);
+  return at < 0 ? null : serialized.slice(at + ALT_SCREEN_START.length);
+}
+
+// A full-screen app (top, vim, an agent) is kept as the grid it was: exactly `rows` lines, the blank
+// ones included, so the placeholder shows it where the app had drawn it.
+export function prepareAltScreenLines(
+  serialized: string,
+  rows: number,
+  maxBytes = HIBERNATE_LINES_MAX_BYTES,
+): string {
+  const screen = altScreenOf(serialized);
+  if (screen === null) return "";
+  const lines = parseAnsi(screen);
+  if (lines.every((l) => l.every((r) => r.text.trim() === "" && r.style.bg === undefined))) return "";
+  const grid = lines.slice(-Math.max(1, rows));
+  while (grid.length < rows) grid.push([]);
+  return serializeLines(clipToBytes(grid.map(redactLine), maxBytes));
+}
+
+export type LeafScreen = { text: string; alt: boolean; rows: number };
+
+export function prepareHibernateScreen(screen: LeafScreen): string {
+  return screen.alt ? prepareAltScreenLines(screen.text, screen.rows) : prepareHibernateLines(screen.text);
+}

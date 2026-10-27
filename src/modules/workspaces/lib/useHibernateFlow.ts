@@ -4,7 +4,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { awakeTerminalTabs, restoreCommandFor } from "./hibernate";
-import { HIBERNATE_LINES_MAX, prepareHibernateLines } from "./hibernateLines";
+import { HIBERNATE_LINES_MAX, prepareHibernateScreen, type LeafScreen } from "./hibernateLines";
 import { saveHibernateLines } from "./hibernateLinesIo";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
@@ -111,7 +111,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   return { request, requestAuto, perform };
 }
 
-export type ReadLeafAnsi = (tabId: string, scrollback: number) => string | null;
+export type ReadLeafAnsi = (tabId: string, scrollback: number) => LeafScreen | null;
 
 // A failure here must not stop the tab from sleeping: the placeholder just shows no lines.
 export async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<void> {
@@ -120,7 +120,7 @@ export async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
     tabs.map(async (tab) => {
       try {
         const raw = readAnsi(tab.id, HIBERNATE_LINES_MAX);
-        const text = raw ? prepareHibernateLines(raw) : "";
+        const text = raw ? prepareHibernateScreen(raw) : "";
         if (text) await saveHibernateLines(tab.id, text);
       } catch (e) {
         console.warn("[kex] could not keep the last lines of", tab.id, e);
