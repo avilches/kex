@@ -43,6 +43,7 @@ import {
   CrosshairIcon,
   FolderTreeIcon,
   GitBranchIcon,
+  Home03Icon,
   Moon02Icon,
   PinIcon,
   PlayIcon,
@@ -617,17 +618,21 @@ function sidebarFrame(
   active: "Explorer" | "Git",
   body: HTMLElement,
 ): HTMLElement {
-  const tab = (label: string) =>
-    h(
+  const tab = (label: string) => {
+    const on = label === active;
+    return h(
       "span",
       {
-        class:
-          label === active
-            ? "rounded bg-sidebar-primary px-2 py-0.5 text-sidebar-primary-foreground"
-            : "rounded px-2 py-0.5 opacity-70",
+        class: `relative flex h-full items-center px-3 text-[11px] font-medium ${on ? "bg-card text-foreground" : "bg-muted/35 text-muted-foreground"}`,
       },
+      on
+        ? h("span", {
+            class: "absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator",
+          })
+        : "",
       label,
     );
+  };
   return h(
     "div",
     {
@@ -636,7 +641,7 @@ function sidebarFrame(
     },
     h(
       "div",
-      { class: "flex shrink-0 gap-1 px-1.5 py-1.5 text-[11px]" },
+      { class: "flex h-8 shrink-0 items-center border-b border-border/60" },
       tab("Explorer"),
       tab("Git"),
       tab("History"),
@@ -802,48 +807,141 @@ function header(): HTMLElement {
   );
 }
 
-function tabBar(): HTMLElement {
-  const tab = (label: string, cls: string, dot = "") =>
-    h(
-      "div",
-      {
-        class: `flex items-center gap-1.5 rounded px-2 py-1 text-[12px] ${cls}`,
-      },
-      h("span", {}, label),
-      dot ? h("span", { class: dot }) : "",
-    );
-  const active = tab(
-    "active",
-    "bg-background text-foreground ring-1 ring-tab-focus-indicator",
-  );
-  const gitTab = tab("modified.ts", "bg-muted/40");
-  const gitHex = gitStatusHexColor("M", state.scheme, state.mode);
-  if (gitHex) (gitTab.firstElementChild as HTMLElement).style.color = gitHex;
+type StripTab = {
+  label: string;
+  active?: boolean;
+  focused?: boolean;
+  indicator?: "working" | "attention" | "error";
+  error?: boolean;
+  color?: string;
+  icon?: Element;
+};
+
+// Same classes as DraggableTab in PaneTabBar.tsx, "connected" style (the default).
+function stripTab(t: StripTab): HTMLElement {
+  const indicator =
+    t.indicator === "working"
+      ? h("span", {
+          class:
+            "size-[11px] animate-spin rounded-full border-2 border-transparent border-t-primary",
+        })
+      : t.indicator === "attention"
+        ? h("span", { class: "inline-block size-[6px] rounded-full bg-amber-400" })
+        : t.indicator === "error"
+          ? h("span", { class: "inline-block size-[6px] rounded-full bg-destructive" })
+          : "";
   return h(
     "div",
     {
-      class:
-        "flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-1 py-1 text-muted-foreground",
+      class: `group relative flex max-w-[320px] shrink-0 select-none items-center gap-1 self-stretch border-r border-border/30 px-1.5 text-[12px] ${t.active ? "bg-background text-foreground" : "border-b border-border/40 bg-muted/35 text-muted-foreground"}`,
+      "data-tab": t.label,
     },
-    active,
-    tab("idle", "bg-muted/40"),
-    tab(
-      "working",
-      "bg-muted/40",
-      "ml-0.5 size-[11px] animate-spin rounded-full border-2 border-transparent border-t-primary",
+    t.active && t.focused
+      ? h("div", {
+          class: "absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator",
+        })
+      : "",
+    t.icon ? h("span", { class: "shrink-0 opacity-70" }, t.icon) : "",
+    h(
+      "span",
+      {
+        class: `min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${t.error ? "text-destructive/70" : ""}`,
+        style: t.color ? `color:${t.color}` : "",
+      },
+      t.label,
     ),
-    tab(
-      "attention",
-      "bg-muted/40",
-      "ml-0.5 inline-block size-[6px] rounded-full bg-amber-400",
+    h(
+      "span",
+      { class: "relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center" },
+      indicator,
     ),
-    tab(
-      "restore error",
-      "bg-muted/40 text-destructive/70",
-      "ml-0.5 inline-block size-[6px] rounded-full bg-destructive",
-    ),
-    gitTab,
   );
+}
+
+// Same shell as PaneTabBar: h-8, bg-card/60, border-t in connected style.
+function stripBar(tabs: StripTab[]): HTMLElement {
+  return h(
+    "div",
+    { class: "flex h-8 shrink-0 items-center border-t border-border/60 bg-card/60" },
+    h(
+      "div",
+      { class: "flex min-w-0 flex-1 items-center gap-0 self-stretch overflow-hidden" },
+      ...tabs.map(stripTab),
+      h("div", { class: "flex-1 self-stretch border-b border-border/40" }),
+    ),
+    h(
+      "div",
+      { class: "flex shrink-0 items-center self-stretch border-b border-border/40 px-1.5" },
+      icon(Add01Icon, 14, 2),
+    ),
+  );
+}
+
+// Mirrors PathBreadcrumb.tsx inside TerminalPathBar / EditorPathBar.
+function pathBar(
+  kind: "terminal" | "editor",
+  segments: { label: string; home?: boolean; root?: boolean; above?: boolean }[],
+  process?: string,
+): HTMLElement {
+  const items: (Node | string)[] = [];
+  for (const seg of segments) {
+    const tone = seg.root
+      ? "text-foreground"
+      : seg.above
+        ? "text-muted-foreground/60"
+        : "text-muted-foreground";
+    items.push(
+      h(
+        "span",
+        {
+          class: `inline-flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 ${tone}`,
+          "data-segment": seg.label,
+        },
+        seg.home
+          ? icon(Home03Icon, 12, 1.75)
+          : seg.root
+            ? h("span", { class: "text-primary" }, icon(PinIcon, 12, 2))
+            : "",
+        seg.home ? "Home" : seg.label,
+      ),
+      h("span", { class: "text-muted-foreground" }, icon(ArrowRight01Icon, 12, 2)),
+    );
+  }
+  items.pop();
+  return h(
+    "div",
+    {
+      class: "flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 px-2 text-[11px]",
+      style: `background:var(--${kind}-background)`,
+      "data-path-bar": kind,
+    },
+    h(
+      "div",
+      { class: "flex min-w-0 flex-1 items-center gap-2" },
+      h("div", { class: "flex items-center gap-0.5 text-muted-foreground" }, ...items),
+      process
+        ? h(
+            "span",
+            { class: "flex min-w-0 shrink items-center gap-1 font-mono text-muted-foreground" },
+            icon(ComputerTerminal01Icon, 12, 1.75),
+            h("span", { class: "truncate" }, process),
+          )
+        : "",
+    ),
+  );
+}
+
+function tabBar(): HTMLElement {
+  const gitHex = gitStatusHexColor("M", state.scheme, state.mode);
+  const term = () => icon(CommandLineIcon, 13, 1.75);
+  return stripBar([
+    { label: "active", active: true, focused: true, icon: term() },
+    { label: "idle", icon: term() },
+    { label: "working", indicator: "working", icon: term() },
+    { label: "attention", indicator: "attention", icon: term() },
+    { label: "restore error", indicator: "error", error: true, icon: term() },
+    { label: "modified.ts", color: gitHex ?? undefined, icon: fileIcon("modified.ts") },
+  ]);
 }
 
 type PaneKind = "terminal" | "editor";
@@ -1002,25 +1100,36 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
       : "";
   const strip = h(
     "div",
-    {
-      class:
-        "relative flex items-center gap-1 border-b border-border bg-card px-1 py-1 text-[12px]",
-    },
-    h(
-      "div",
-      { class: "relative rounded bg-background px-2 py-1 text-foreground" },
-      focused
-        ? h("span", {
-            class:
-              "absolute inset-x-0 top-0 h-0.5 rounded-t bg-tab-focus-indicator",
-          })
-        : "",
-      kind === "terminal" ? "zsh" : "main.ts",
+    { class: "relative" },
+    stripBar(
+      kind === "terminal"
+        ? [
+            { label: "zsh", active: true, focused, icon: icon(CommandLineIcon, 13, 1.75) },
+            { label: "server", icon: icon(CommandLineIcon, 13, 1.75) },
+          ]
+        : [
+            { label: "main.ts", active: true, focused, icon: fileIcon("main.ts") },
+            { label: "greet.ts", icon: fileIcon("greet.ts") },
+          ],
     ),
-    h(
-      "div",
-      { class: "px-2 py-1 text-muted-foreground" },
-      kind === "terminal" ? "server" : "greet.ts",
+    pathBar(
+      kind,
+      kind === "terminal"
+        ? [
+            { label: "Home", home: true, above: true },
+            { label: "Hub", above: true },
+            { label: "Projects", above: true },
+            { label: "kex", root: true },
+            { label: "src" },
+          ]
+        : [
+            { label: "Home", home: true, above: true },
+            { label: "Hub", above: true },
+            { label: "kex", root: true },
+            { label: "src" },
+            { label: "main.ts" },
+          ],
+      kind === "terminal" ? "pnpm test --watch" : undefined,
     ),
     overlay(),
   );
