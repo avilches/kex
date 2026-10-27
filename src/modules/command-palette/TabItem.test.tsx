@@ -113,4 +113,12 @@ describe("TabItem", () => {
     row(entry({ note: "## Todo\n\nbuy milk" }));
     expect(screen.getByText("## Todo buy milk")).toBeTruthy();
   });
+
+  it("shows a lock only for a locked tab", () => {
+    row(entry());
+    expect(screen.queryByLabelText("Tab is locked")).toBeNull();
+    cleanup();
+    row(entry({ tab: { id: "tab-1", kind: "terminal", locked: true } }));
+    expect(screen.getByLabelText("Tab is locked")).toBeTruthy();
+  });
 });
