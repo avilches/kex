@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { hibernateReview, liveAgent, type HibernateLive } from "./hibernateReview";
@@ -47,6 +47,16 @@ export type CloseFlowDeps = {
 
 export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
   const inFlight = new Set<string>();
+  // The caller waiting for the confirmation dialog: true once the workspace is closed, false when
+  // the dialog is cancelled or replaced.
+  let waiter: { id: string; settle: (closed: boolean) => void } | null = null;
+
+  function settleWaiter(closed: boolean, id?: string) {
+    if (!waiter || (id !== undefined && waiter.id !== id)) return;
+    const w = waiter;
+    waiter = null;
+    w.settle(closed);
+  }
 
   async function perform(workspaceId: string): Promise<void> {
     if (inFlight.has(workspaceId)) return;
@@ -54,29 +64,57 @@ export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
     try {
       d.setPending(null);
       await d.close(workspaceId);
+      settleWaiter(true, workspaceId);
+    } catch (e) {
+      settleWaiter(false, workspaceId);
+      throw e;
     } finally {
       inFlight.delete(workspaceId);
     }
   }
 
-  async function request(workspaceId: string): Promise<void> {
-    if (!d.getWorkspace(workspaceId)) return;
+  function cancel() {
+    d.setPending(null);
+    settleWaiter(false);
+  }
+
+  type Outcome = { status: "closed" | "none" } | { status: "asking"; decision: Promise<boolean> };
+
+  async function run(workspaceId: string): Promise<Outcome> {
+    if (!d.getWorkspace(workspaceId)) return { status: "none" };
     if (d.autosaveEnabled()) {
       await d.flushDirtyEditors();
       await d.settle();
     }
     const ws = d.getWorkspace(workspaceId);
-    if (!ws) return;
+    if (!ws) return { status: "none" };
     const live = d.live(ws);
     const processes = closeProcesses(ws, live, await d.collectProcesses(ws));
     if (!needsCloseConfirmation(ws, live, processes)) {
       await perform(workspaceId);
-      return;
+      return { status: "closed" };
     }
+    settleWaiter(false);
+    const decision = new Promise<boolean>((settle) => {
+      waiter = { id: workspaceId, settle };
+    });
     d.setPending({ id: workspaceId, processes });
+    return { status: "asking", decision };
   }
 
-  return { request, perform };
+  async function request(workspaceId: string): Promise<void> {
+    await run(workspaceId);
+  }
+
+  // Resolves once the outcome is known, including the confirmation dialog: true when the
+  // workspace was closed, false when nothing was closed.
+  async function requestAndWait(workspaceId: string): Promise<boolean> {
+    const outcome = await run(workspaceId);
+    if (outcome.status === "asking") return outcome.decision;
+    return outcome.status === "closed";
+  }
+
+  return { request, requestAndWait, perform, cancel };
 }
 
 const nextFrames = () =>
@@ -117,7 +155,11 @@ export function useCloseWorkspaceFlow(deps: HookDeps) {
     [],
   );
 
-  const cancel = useCallback(() => setPending(null), []);
-
-  return { pending, requestClose: flow.request, performClose: flow.perform, cancel };
+  return {
+    pending,
+    requestClose: flow.request,
+    requestCloseAndWait: flow.requestAndWait,
+    performClose: flow.perform,
+    cancel: flow.cancel,
+  };
 }

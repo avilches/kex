@@ -106,4 +106,59 @@ describe("createCloseWorkspaceFlow", () => {
     await flow.request("w1");
     expect(calls).toEqual([]);
   });
+
+  describe("requestAndWait", () => {
+    const risky = () => ws([doc("d1", true)]);
+
+    it("resolves true when it closes without asking", async () => {
+      const { flow, calls } = setup(ws([term("t1")]));
+      expect(await flow.requestAndWait("w1")).toBe(true);
+      expect(calls).toContain("close:w1");
+    });
+
+    it("resolves false for an unknown workspace", async () => {
+      const { flow } = setup(undefined);
+      expect(await flow.requestAndWait("w1")).toBe(false);
+    });
+
+    it("waits for the dialog and resolves true when the close is confirmed", async () => {
+      const { flow } = setup(risky());
+      let result: boolean | null = null;
+      void flow.requestAndWait("w1").then((r) => (result = r));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(result).toBeNull();
+      await flow.perform("w1");
+      await new Promise((r) => setTimeout(r, 0));
+      expect(result).toBe(true);
+    });
+
+    it("resolves false when the dialog is cancelled", async () => {
+      const { flow, calls } = setup(risky());
+      const done = flow.requestAndWait("w1");
+      await new Promise((r) => setTimeout(r, 0));
+      flow.cancel();
+      expect(await done).toBe(false);
+      expect(calls).not.toContain("close:w1");
+    });
+
+    it("resolves false when the confirmed close rejects, and rethrows to its caller", async () => {
+      const { flow } = setup(risky(), [], {
+        close: async () => {
+          throw new Error("boom");
+        },
+      });
+      const done = flow.requestAndWait("w1");
+      await new Promise((r) => setTimeout(r, 0));
+      await expect(flow.perform("w1")).rejects.toThrow("boom");
+      expect(await done).toBe(false);
+    });
+
+    it("resolves false for the dialog another request replaces", async () => {
+      const { flow } = setup(risky());
+      const first = flow.requestAndWait("w1");
+      await new Promise((r) => setTimeout(r, 0));
+      void flow.requestAndWait("w1");
+      expect(await first).toBe(false);
+    });
+  });
 });
