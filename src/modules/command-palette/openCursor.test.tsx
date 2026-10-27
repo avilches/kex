@@ -72,8 +72,6 @@ const tab = (id: string, i: number): TabEntry => ({
   workspaceColor: null,
   workspaceIcon: null,
   workspaceRoot: null,
-  paneId: "pane-1",
-  paneTabCount: 12,
   hibernated: false,
   kind: "terminal",
   title: id,

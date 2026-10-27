@@ -61,12 +61,10 @@ import {
   highlightedClosedOf,
   highlightedTabOf,
   highlightedWorkspaceOf,
-  otherTabRowKeys,
   runnableTabItem,
   type RowMenuItemId,
   tabEntryCopyPath,
   tabEntryRelativePath,
-  tabFocusTarget,
   tabItemKeepsPalette,
   tabMenuItems,
   workspaceIdOfRow,
@@ -112,8 +110,6 @@ type Props = {
   onToggleTabHibernate: (tabId: string) => unknown;
   /** The review dialog takes the focus, and the palette claims it back when it goes. */
   hibernateDialogOpen: boolean;
-  onRevealInExplorer: (path: string) => void;
-  onCloseOtherTabs: (tabId: string) => unknown;
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -173,8 +169,6 @@ export function CommandPalette({
   onSaveTab,
   onToggleTabHibernate,
   hibernateDialogOpen,
-  onRevealInExplorer,
-  onCloseOtherTabs,
   onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
@@ -598,13 +592,6 @@ export function CommandPalette({
         if (rel?.ok) runAfterClose(() => void copyToClipboard(rel.text, "Copied relative path"));
       } else if (id === "tabId") {
         runAfterClose(() => void writeClipboardText(tabId));
-      } else if (id === "closeOthers") {
-        closeRows(
-          otherTabRowKeys(tabEntries, entry),
-          tabRowKey(tabId),
-          () => onCloseOtherTabs(tabId),
-          "Closing the other tabs failed",
-        );
       } else if (id === "lock") {
         onUpdateTab(tabId, toggleTabLock);
       } else if (id === "autofocus") {
@@ -629,15 +616,6 @@ export function CommandPalette({
             onUpdateTab(tabId, toggleTabNote);
           });
         }
-      } else if (id === "focusSidebar") {
-        const target = tabFocusTarget(entry);
-        if (target) {
-          runAfterClose(() => {
-            // The sidebar is the active workspace's.
-            if (entry.workspaceId !== activeWorkspaceId) onGoToTab(tabId);
-            window.setTimeout(() => onRevealInExplorer(target), 50);
-          });
-        }
       } else if (id === "moveWorkspace") {
         enterWorkspaces({ tabId, workspaceId: entry.workspaceId }, true);
       }
@@ -650,16 +628,11 @@ export function CommandPalette({
       onOpenTerminalAt,
       closeTabFromRow,
       closeWorkspaceFromRow,
-      closeRows,
-      tabEntries,
-      onCloseOtherTabs,
       onUpdateTab,
       onSaveTab,
       onToggleTabHibernate,
       refocusInput,
       onGoToTab,
-      onRevealInExplorer,
-      activeWorkspaceId,
       enterWorkspaces,
     ],
   );

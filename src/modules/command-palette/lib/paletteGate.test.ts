@@ -20,7 +20,6 @@ const TABS: ShortcutId[] = [
   "tab.hibernate",
   "tab.note",
   "editor.save",
-  "tab.focusOnExplorer",
   "tab.toggleAutofocus",
   "tab.new",
   "workspace.close",
@@ -68,6 +67,11 @@ describe("shortcutBlockedByPalette", () => {
       const folderRow = id.startsWith("palette.");
       expect(shortcutBlockedByPalette(id, folderRow ? "folder" : "commands")).toBe(false);
     }
+  });
+
+  it("blocks Focus on Sidebar, which the tab menu of a palette no longer offers", () => {
+    expect(shortcutBlockedByPalette("tab.focusOnExplorer", "commands")).toBe(true);
+    expect(shortcutBlockedByPalette("tab.focusOnExplorer", "folder")).toBe(true);
   });
 
   it("blocks the text editing shortcuts so the input keeps its keys", () => {
