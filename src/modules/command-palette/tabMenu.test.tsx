@@ -3,7 +3,6 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerTabNoteFlush, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
-import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteTabItem } from "./lib/paletteControl";
@@ -88,7 +87,6 @@ type Calls = {
   hibernate: string[];
   reveal: string[];
   goTo: string[];
-  goToOpts: { focus?: boolean }[];
   closeOthers: string[];
   move: unknown[][];
   openChange: boolean[];
@@ -142,10 +140,7 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
         calls.closeOthers.push(id);
         return closeOthersImpl(id, setTabs);
       }}
-      onGoToTab={(id, opts) => {
-        calls.goTo.push(id);
-        if (opts) calls.goToOpts.push(opts);
-      }}
+      onGoToTab={(id) => calls.goTo.push(id)}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
       onCloseTab={() => {}}
@@ -198,7 +193,7 @@ async function openOn(target: string) {
 }
 
 beforeEach(() => {
-  calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], goToOpts: [], closeOthers: [], move: [], openChange: [] };
+  calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], closeOthers: [], move: [], openChange: [] };
   commands = [];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
   hibernateImpl = () => Promise.resolve();
@@ -293,36 +288,20 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.goTo).toEqual([]);
   });
 
-  it("add note on another tab leaves the palette open on the same row, activates the tab and does not ask the note for the focus", async () => {
+  it("add note on another tab leaves the palette open on the same row, without activating the tab or asking the note for the focus", async () => {
     await openOn("tab:c");
+    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
+    input?.focus();
     await shortcut("note");
     await wait(30);
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("tab:c");
-    expect(calls.goTo).toEqual(["c"]);
-    expect(calls.goToOpts).toEqual([{ focus: false }]);
+    expect(calls.goTo).toEqual([]);
     expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(document.activeElement).toBe(input);
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
     expect(updater({ id: "c", kind: "terminal" } as Tab)).toMatchObject({ note: "", noteOpen: true });
-  });
-
-  it("takes the focus back to the input when something moves it out while a tab was activated without the keyboard", async () => {
-    await openOn("tab:c");
-    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
-    const outside = document.createElement("textarea");
-    document.body.append(outside);
-    paletteFocusGate.hold();
-    try {
-      outside.focus();
-      expect(document.activeElement).toBe(input);
-      paletteFocusGate.release();
-      outside.focus();
-      expect(document.activeElement).toBe(outside);
-    } finally {
-      paletteFocusGate.release();
-      outside.remove();
-    }
   });
 
   it("add note on the current tab does not need to activate anything", async () => {
@@ -343,8 +322,8 @@ describe("tab shortcuts over the highlighted row", () => {
     await wait(30);
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("tab:b");
-    expect(calls.goTo).toEqual(["b"]);
-    expect(calls.goToOpts).toEqual([{ focus: false }]);
+    expect(calls.goTo).toEqual([]);
+    expect(calls.update.map(([id]) => id)).toEqual(["b"]);
     expect(useTabNoteStore.getState().focusTabId).toBeNull();
   });
 

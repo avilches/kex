@@ -53,34 +53,18 @@ desde el padre, no solo con Escape.
 
 ---
 
-## Bug 2: Add/Show Note en una tab de terminal devuelve el teclado al terminal (RESUELTO)
+## Decision 2: Add/Show Note no activa la tab con la paleta abierta
 
-### Sintoma
+Los items de nota (Add, Show, Hide, Remove) actuan por id de tab sobre el estado de la nota y dejan
+la paleta abierta con la misma fila y el foco en su input. No activan la tab: activarla con la
+paleta abierta hace que el terminal (efecto de visible y enfocado, desocultado diferido) o un
+editor recupere el teclado, y ese foco no se puede controlar sin tocar el subsistema central de
+terminales y workspaces. Se probo una puerta de foco consultada por todos esos caminos y un
+listener de `focusin` que devolvia el foco al input, y se descarto: demasiados puntos de control en
+el foco del terminal y, sobre todo, el listener peleaba con un AlertDialog en portal (Hibernate,
+Close Other Tabs) y con la trampa de foco de Radix.
 
-Con la paleta abierta, Add/Show Note sobre otra tab activaba la tab y el terminal se quedaba con el
-teclado: lo que se tecleaba iba al terminal, no al input de la paleta.
+Consecuencia aceptada: si la tab no es visible, la nota no se ve hasta ir a ella. La fila ya pinta
+el texto de la nota; no hay indicador de "nota abierta" sin texto.
 
-### Pistas falsas descartadas
-
-- Reclamar el input con reintentos a 0 y 250 ms (`refocusInput`): deja una ventana, y un enfoque
-  mas tardio lo vuelve a perder.
-- Cubrir solo `focusTab` y el efecto de cambio de workspace de `App.tsx`: un terminal que pasa a
-  visible y enfocado se enfoca solo (`useTerminalSession`, `scheduleUnhide` de `rendererPool.ts`).
-
-### Causa raiz
-
-Hay muchos caminos de foco independientes, sincronos y diferidos, y ninguno sabia que la paleta
-tenia el teclado. La paleta es `modal={false}` con `onFocusOutside` prevenido, asi que nadie lo
-devuelve.
-
-### Fix
-
-`paletteFocusGate`: `goToTab(..., { focus: false })` la cierra, y `focusTab`, `focusSlot`,
-`requestLeafFocus` y el foco del scratchpad pasan por ella. Se abre al cerrar la paleta o con
-cualquier activacion normal. Red de seguridad: un `focusin` de la paleta devuelve el foco al input
-mientras la puerta esta cerrada.
-
-### Leccion
-
-Para impedir un robo de foco, cierra el punto mas bajo por el que pasan todos los caminos, no los
-llamadores uno a uno, y no uses temporizadores.
+Leccion: ningun listener global de foco debe pelearse con un dialogo en portal.

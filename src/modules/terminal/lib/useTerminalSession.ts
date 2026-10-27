@@ -59,7 +59,6 @@ import {
   BlockDecorations,
   type VisibleBlocks,
 } from "../block/lib/blockDecorations";
-import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import "../block/block.css";
 import {
   acquireSlot,
@@ -463,10 +462,8 @@ function fireScratchpadFocus(s: Session): void {
 }
 
 function requestScratchpadFocus(s: Session): void {
-  paletteFocusGate.run(() => {
-    if (s.scratchpadFocus) fireScratchpadFocus(s);
-    else s.scratchpadFocusPending = true;
-  });
+  if (s.scratchpadFocus) fireScratchpadFocus(s);
+  else s.scratchpadFocusPending = true;
 }
 
 // State-only close: clears scratchpadOpen without touching where focus goes
@@ -658,15 +655,13 @@ export function ptyIdForTab(tabId: string): number | null {
 // now" -- there's no separate "which side" to remember, since anything that
 // took focus away from the scratchpad already closed it.
 export function requestLeafFocus(leafId: string): void {
-  paletteFocusGate.run(() => {
-    const s = sessions.get(leafId);
-    if (!s) return;
-    if (s.scratchpadOpen) {
-      requestScratchpadFocus(s);
-    } else {
-      focusSlot(leafId);
-    }
-  });
+  const s = sessions.get(leafId);
+  if (!s) return;
+  if (s.scratchpadOpen) {
+    requestScratchpadFocus(s);
+  } else {
+    focusSlot(leafId);
+  }
 }
 
 configureRendererPool({

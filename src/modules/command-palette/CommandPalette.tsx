@@ -17,7 +17,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
@@ -39,7 +39,6 @@ import {
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
-import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import { initialKey } from "./lib/initialKey";
 import { listViewportOf, scrollListToTop } from "./lib/listScroll";
 import { commandChoice } from "./lib/commandChoice";
@@ -114,7 +113,7 @@ type Props = {
   hibernateDialogOpen: boolean;
   onRevealInExplorer: (path: string) => void;
   onCloseOtherTabs: (tabId: string) => unknown;
-  onGoToTab: (tabId: string, opts?: { focus?: boolean }) => void;
+  onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
   // biome-ignore lint/suspicious/noConfusingVoidType: callers may return nothing or a promise
@@ -251,20 +250,6 @@ export function CommandPalette({
       mru,
     ],
   );
-  // Safety net for the gate: whatever still moves the focus out of the dialog while a tab was
-  // activated without the keyboard goes back to the input at once, no timer involved.
-  useEffect(() => {
-    if (!open) return;
-    const onFocusIn = (e: FocusEvent) => {
-      if (!paletteFocusGate.isHeld()) return;
-      const input = paletteInputElement();
-      const dialog = input?.closest('[role="dialog"]');
-      if (!input || !dialog || dialog.contains(e.target as Node)) return;
-      input.focus();
-    };
-    document.addEventListener("focusin", onFocusIn);
-    return () => document.removeEventListener("focusin", onFocusIn);
-  }, [open]);
   // Until cmdk reports a pick, the highlighted row is the first one drawn (Current tab, or the first
   // row there is). Passed from the first render, it does not wait for cmdk to find the first item,
   // which it does not do again when a page is left with an empty value.
@@ -635,11 +620,6 @@ export function CommandPalette({
       } else if (id === "note") {
         flushTabNote(tabId);
         onUpdateTab(tabId, toggleTabNote);
-        // A note shows on the current tab only. The tab is activated so the note can be seen, but
-        // the note is not asked to take the focus: the cursor is still the palette's.
-        if (!isTabNoteOpen(entry.tab) && tabId !== activeTabId) {
-          onGoToTab(tabId, { focus: false });
-        }
       } else if (id === "focusSidebar") {
         const target = tabFocusTarget(entry);
         if (target) {
@@ -671,7 +651,6 @@ export function CommandPalette({
       onGoToTab,
       onRevealInExplorer,
       activeWorkspaceId,
-      activeTabId,
       enterWorkspaces,
     ],
   );
