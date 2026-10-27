@@ -38,6 +38,7 @@ import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
+import { takeWakeBackdrop } from "./wakeBackdrop";
 import { openPty, type PtySession } from "./pty-bridge";
 import { spawnCwdUpdate } from "./spawnCwd";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
@@ -744,7 +745,7 @@ function ensureSession(
     cols: 0,
     rows: 0,
     container: null,
-    snapshot: null,
+    snapshot: takeWakeBackdrop(leafId),
     searchQuery: null,
     dormantRing: new DormantRing(),
     pendingInput: "",

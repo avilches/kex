@@ -11,6 +11,7 @@ import {
   secretRanges,
   serializeLines,
   tailLines,
+  wakeBackdrop,
 } from "./hibernateLines";
 
 const E = "\u001b";
@@ -102,6 +103,24 @@ describe("secrets", () => {
     const line = parseAnsi("ls -la /usr/local/bin")[0];
     expect(redactLine(line)).toBe(line);
     expect(secretRanges("nothing to see")).toEqual([]);
+  });
+});
+
+describe("wakeBackdrop", () => {
+  it("makes every run faint, keeps the colours and ends with a line break", () => {
+    const out = wakeBackdrop(serializeLines(parseAnsi(`${E}[31mred${E}[0m plain\nsecond`)));
+    expect(out.endsWith("\r\n")).toBe(true);
+    const lines = parseAnsi(out);
+    expect(lines[0].map((r) => [r.text, r.style])).toEqual([
+      ["red", { fg: 1, dim: true }],
+      [" plain", { dim: true }],
+    ]);
+    expect(plain(lines.slice(0, 2))).toEqual(["red plain", "second"]);
+  });
+
+  it("drops the blank rows at the bottom of a grid and gives nothing for an empty one", () => {
+    expect(plain(parseAnsi(wakeBackdrop("TOP\n\n\n"))).filter(Boolean)).toEqual(["TOP"]);
+    expect(wakeBackdrop("\n  \n")).toBe("");
   });
 });
 

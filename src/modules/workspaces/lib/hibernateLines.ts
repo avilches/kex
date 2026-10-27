@@ -246,7 +246,17 @@ export function prepareAltScreenLines(
   return serializeLines(clipToBytes(grid.map(redactLine), maxBytes));
 }
 
-export type LeafScreen = { text: string; alt: boolean; rows: number };
+// The stored lines as a terminal replays them when the tab wakes: faint, so they read as history
+// above the new prompt, with the blank rows of a full-screen grid gone and a break at the end.
+export function wakeBackdrop(stored: string): string {
+  const lines = tailLines(parseAnsi(stored), Number.MAX_SAFE_INTEGER).map((line) =>
+    line.map((run) => ({ text: run.text, style: { ...run.style, dim: true as const } })),
+  );
+  if (lines.length === 0) return "";
+  return `${serializeLines(lines).replace(/\n/g, "\r\n")}\r\n`;
+}
+
+export type LeafScreen ={ text: string; alt: boolean; rows: number };
 
 export function prepareHibernateScreen(screen: LeafScreen): string {
   return screen.alt ? prepareAltScreenLines(screen.text, screen.rows) : prepareHibernateLines(screen.text);

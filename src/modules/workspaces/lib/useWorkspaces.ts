@@ -23,7 +23,10 @@ import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
+import { setWakeBackdrop } from "@/modules/terminal/lib/wakeBackdrop";
 import { applyHibernate, applyWake, terminalTabs } from "./hibernate";
+import { wakeBackdrop } from "./hibernateLines";
+import { readHibernateLines } from "./hibernateLinesIo";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import {
   allPaneIds,
@@ -79,6 +82,25 @@ export async function seedWakePlans(
     planWake(tabs).map(async (tabId) => {
       const plan = await lookup(tabId);
       if (plan) seed(tabId, plan);
+    }),
+  );
+}
+
+// The terminal that mounts after the wake starts with the lines the tab showed when it went to
+// sleep. They are read here, before the wake drops the stored file, and a read that fails only
+// means the terminal starts empty.
+export async function handOverLastLines(
+  tabIds: readonly string[],
+  read: (tabId: string) => Promise<string | null> = readHibernateLines,
+  give: (tabId: string, backdrop: string) => void = setWakeBackdrop,
+): Promise<void> {
+  await Promise.all(
+    tabIds.map(async (tabId) => {
+      try {
+        const stored = await read(tabId);
+        const backdrop = stored ? wakeBackdrop(stored) : "";
+        if (backdrop) give(tabId, backdrop);
+      } catch {}
     }),
   );
 }
@@ -1145,6 +1167,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (tabs.length === 0) return;
     await runOnce(wakesInFlight, tabs.map((t) => t.id).sort().join(","), async () => {
       await seedWakePlans(tabs, previewResumeCmd, seedRestorePlan);
+      await handOverLastLines(tabs.map((t) => t.id));
       unmarkHibernating(tabs.map((t) => t.id));
       setWorkspaces((prev) => applyWake(prev, workspaceId, new Set(tabs.map((t) => t.id))));
     });

@@ -942,19 +942,25 @@ session record in `agent-sessions.json` must survive that exit, because waking t
 flow), clears `hibernatingTabs` and drops `hibernation`; the terminal that mounts consumes the plan when it spawns. A normal exit detaches the record (`agent_detach_session`).
 
 **Last lines of the terminal.** While the PTY is still alive, `snapshotTerminalTabs` (`useHibernateFlow.ts`) reads the
-screen of each tab with `leafAnsiTail` (the `SerializeAddon` output of its slot, or the snapshot kept for a released leaf;
-nothing for a tab on the alternate screen, such as `vim`) and, when `hibernateSaveLines` is on (Settings > Terminal, on by
+screen of each tab with `leafAnsiTail` (the `SerializeAddon` output of its slot, or the snapshot kept for a released leaf) and, when `hibernateSaveLines` is on (Settings > Terminal, on by
 default), stores it through `hibernate_lines_save` in `hibernate-lines/<tab_id>.ans` of the app data dir, never in the
 workspace JSON. `lib/hibernateLines.ts` prepares the text: it parses the colour sequences (SGR only, everything else is
 dropped), keeps the last 500 lines once the empty rows at the bottom are gone, crosses out obvious secrets and clips whole
-lines from the top to 256 KiB. The secret filter runs on the plain text of each line (so a colour change cannot split a token
+lines from the top to 256 KiB. A tab whose app owns the alternate screen (`top`, `vim`, an agent) is kept as the grid it
+was: xterm serializes the normal buffer first and then switches with `ESC[?1049h ESC[H` and writes the alternate screen, so
+only what follows that switch is kept (`altScreenOf`), padded to the rows of the terminal with its blank rows
+(`prepareAltScreenLines`). The secret filter runs on the plain text of each line (so a colour change cannot split a token
 into two) and replaces GitHub tokens, `sk-` keys, AWS access keys, Slack tokens, JWTs, `Bearer` values and the value of any
 `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*API_KEY*` or `*PRIVATE_KEY*` assignment with `[redacted]`. It is a best effort and
 does not catch everything (a password typed at a prompt that does not echo is not on screen, but one echoed anywhere is), so
 the file is private (folder 0700, file 0600), unencrypted like `agent-sessions.json`, read only by the placeholder of the same
 tab id, and the setting turns the whole thing off. Failing to save never stops the tab from sleeping.
 `HibernatedLines.tsx` reads the file each time the placeholder is shown and draws it behind the placeholder, faded, with
-the palette of the active terminal theme (`lib/hibernateLinesStyle.ts`) and the terminal font. Nothing outlives the sleep:
+the palette of the active terminal theme (`lib/hibernateLinesStyle.ts`) and the terminal font. On the wake, `wakeTabs`
+reads the file before dropping `hibernation` (`handOverLastLines`) and leaves the faint version of the lines
+(`wakeBackdrop`: every run with the faint attribute, blank rows at the bottom gone) in `terminal/lib/wakeBackdrop.ts`;
+`ensureSession` takes it as the initial `snapshot` of the new terminal, so the usual snapshot replay writes it before the
+shell prints its prompt and the terminal does not start empty. Nothing outlives the sleep:
 `useHibernateLinesCleanup` deletes the file of any tab that is no longer hibernated (wake, close tab, close workspace), a
 reopened closed tab gets a new id and no `hibernation`, and at startup `hibernate_lines::sweep` removes the files of tabs
 that are in no window.
