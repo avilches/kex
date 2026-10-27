@@ -34,7 +34,14 @@ describe("focusWhenReady", () => {
   it("gives up after maxFrames", () => {
     const { frames, tick } = manualFrames();
     let calls = 0;
-    focusWhenReady(() => (calls++, false), 4, frames);
+    focusWhenReady(
+      () => {
+        calls++;
+        return false;
+      },
+      4,
+      frames,
+    );
     while (tick());
     expect(calls).toBe(4);
   });
@@ -42,7 +49,14 @@ describe("focusWhenReady", () => {
   it("stops when cancelled", () => {
     const { frames, tick } = manualFrames();
     let calls = 0;
-    const cancel = focusWhenReady(() => (calls++, false), 10, frames);
+    const cancel = focusWhenReady(
+      () => {
+        calls++;
+        return false;
+      },
+      10,
+      frames,
+    );
     tick();
     cancel();
     tick();

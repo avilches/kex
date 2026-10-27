@@ -67,6 +67,7 @@ const mk = (id: string, i: number, over: Partial<TabEntry> = {}): TabEntry => ({
 });
 
 type SetTabs = (f: (t: TabEntry[]) => TabEntry[]) => void;
+// biome-ignore lint/suspicious/noConfusingVoidType: callers may return nothing or a promise
 let closeImpl: (e: TabEntry, setTabs: SetTabs) => void | Promise<unknown>;
 let initial: TabEntry[];
 

@@ -66,7 +66,9 @@ describe("createHibernateFlow", () => {
     let received: unknown;
     const { flow } = setup(ws([term("t1")]), {
       snapshotTabs: async () => ({ t1: snap }),
-      hibernate: (_id, snapshots) => void (received = snapshots),
+      hibernate: (_id, snapshots) => {
+        received = snapshots;
+      },
     });
     await flow.request("w1", ["t1"]);
     expect(received).toEqual({ t1: snap });
@@ -150,7 +152,10 @@ describe("createHibernateFlow", () => {
       let active: string | null = null;
       const { flow, calls } = setup(ws([term("t1")]), {
         activeWorkspaceId: () => active,
-        snapshotTabs: async () => ((active = "w1"), { t1: { at: 1 } }),
+        snapshotTabs: async () => {
+          active = "w1";
+          return { t1: { at: 1 } };
+        },
       });
       expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
       expect(isHibernating("t1")).toBe(false);

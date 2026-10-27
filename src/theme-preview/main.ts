@@ -1069,6 +1069,7 @@ function editorBody(focused: boolean): HTMLElement {
   const view = new EditorView({
     parent: host,
     state: EditorState.create({
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: sample source shown in the editor
       doc: 'import { greet } from "./greet";\n\nexport function main(name: string) {\n  // active line + selection\n  const msg = greet(name);\n  return `hello ${msg}` + 42;\n}\n',
       extensions: [
         lineNumbers(),
@@ -1761,7 +1762,10 @@ function controls(): HTMLElement {
   load.onclick = () => {
     try {
       const r = validateTheme(JSON.parse(area.value));
-      if (!r.ok) return void (err.textContent = r.error);
+      if (!r.ok) {
+        err.textContent = r.error;
+        return;
+      }
       set({ themeId: r.theme.id, custom: r.theme });
     } catch (e) {
       err.textContent = String(e);
@@ -1894,8 +1898,8 @@ function tunerPanel(): HTMLElement {
     );
 
   const syncAll = () => {
-    sliders.forEach((s) => s.sync());
-    tokenRows.forEach((t) => t.sync());
+    for (const s of sliders) s.sync();
+    for (const t of tokenRows) t.sync();
   };
   const refresh = () => {
     paint();

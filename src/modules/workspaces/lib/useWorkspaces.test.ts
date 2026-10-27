@@ -319,7 +319,10 @@ describe("collectRunningTerminals", () => {
     const asked: string[] = [];
     const out = await collectRunningTerminals(
       wsWith([term("t1"), asleep]),
-      async (id) => (asked.push(id), "node"),
+      async (id) => {
+        asked.push(id);
+        return "node";
+      },
       () => undefined,
     );
     expect(asked).toEqual(["t1"]);
@@ -592,7 +595,14 @@ describe("seedWakePlans", () => {
   it("does not look up terminals that opted out", async () => {
     const asked: string[] = [];
     const tabs: Tab[] = [{ id: "a", kind: "terminal", restoreOnRestart: false }];
-    await seedWakePlans(tabs, async (id) => (asked.push(id), null), () => {});
+    await seedWakePlans(
+      tabs,
+      async (id) => {
+        asked.push(id);
+        return null;
+      },
+      () => {},
+    );
     expect(asked).toEqual([]);
   });
 });

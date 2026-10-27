@@ -90,7 +90,7 @@ describe("followableCommand", () => {
   });
 
   it("keeps a long script command whole", () => {
-    const long = "echo " + "y".repeat(400);
+    const long = `echo ${"y".repeat(400)}`;
     expect(followableCommand("cd '/a' && { echo yyyy", long)).toBe(long);
   });
 });

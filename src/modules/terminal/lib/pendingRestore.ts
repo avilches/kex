@@ -22,7 +22,10 @@ export function setPendingRestore(leafId: string, block: RestoreBlock | null): v
 
 export function subscribePendingRestore(leafId: string, cb: () => void): () => void {
   let set = listeners.get(leafId);
-  if (!set) listeners.set(leafId, (set = new Set()));
+  if (!set) {
+    set = new Set();
+    listeners.set(leafId, set);
+  }
   set.add(cb);
   return () => {
     set.delete(cb);

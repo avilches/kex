@@ -60,8 +60,12 @@ function loadExtension(agent: "omp" | "pi", argv: string[] = []) {
     },
   });
   return {
-    fire: (name: string, event: unknown, c: unknown) => handlers.get(name)?.forEach((h) => h(event, c)),
-    channel: (ch: string, data: unknown) => channels.get(ch)?.forEach((h) => h(data)),
+    fire: (name: string, event: unknown, c: unknown) => handlers.get(name)?.forEach((h) => {
+      h(event, c);
+    }),
+    channel: (ch: string, data: unknown) => channels.get(ch)?.forEach((h) => {
+      h(data);
+    }),
     ctx,
     handlers,
   };

@@ -933,7 +933,10 @@ function setRestoreBlock(leafId: string, s: Session, block: RestoreBlock | null)
 
 function subscribeRestoreBlock(leafId: string, cb: () => void): () => void {
   let set = restoreBlockListeners.get(leafId);
-  if (!set) restoreBlockListeners.set(leafId, (set = new Set()));
+  if (!set) {
+    set = new Set();
+    restoreBlockListeners.set(leafId, set);
+  }
   set.add(cb);
   return () => {
     set.delete(cb);
@@ -1023,10 +1026,10 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
   if (decision.inject === "resume" && plan) {
     stageRestoredSnapshot(leafId, plan);
-    void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
+    void writeWhenShellReady(s, leafId, pty, ` ${plan.resumeCmd}\r`);
     watchResume(leafId, plan);
   } else if (decision.inject === "command" && s.persistentCommand) {
-    void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
+    void writeWhenShellReady(s, leafId, pty, `${s.persistentCommand}\r`);
   }
 }
 

@@ -28,7 +28,7 @@ function parseColor(value: string): Rgb | null {
 }
 
 function toHex(c: Rgb): string {
-  return "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  return `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 }
 
 function mix(a: Rgb, b: Rgb, t: number): Rgb {

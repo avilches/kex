@@ -13,7 +13,6 @@ export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null 
   switch (r.mode) {
     case "workspace":
       return r.workspaceRoot;
-    case "filesystem":
     default:
       return r.fsRoot ?? r.home;
   }

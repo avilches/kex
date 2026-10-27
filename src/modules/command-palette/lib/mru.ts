@@ -46,5 +46,6 @@ export function mruSnapshot(): MruMap {
 }
 
 export function mruRank(snapshot: MruMap, id: string): number {
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: Object.hasOwn is ES2022 and the lib is ES2020
   return Object.prototype.hasOwnProperty.call(snapshot, id) ? snapshot[id] : 0;
 }

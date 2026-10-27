@@ -1608,7 +1608,7 @@ export default function App() {
   const onFloatBrowserTab = useCallback(
     (tabId: string) => {
       const found = findTabGlobal(tabId);
-      if (!found || found.tab.kind !== "browser") return;
+      if (found?.tab.kind !== "browser") return;
       void floatTab(found.tab, found.workspace.id);
     },
     [findTabGlobal, floatTab],
@@ -2089,7 +2089,7 @@ export default function App() {
   const toggleTabHibernate = useCallback(
     (tabId: string) => {
       const found = findTabGlobal(tabId);
-      if (!found || found.tab.kind !== "terminal") return;
+      if (found?.tab.kind !== "terminal") return;
       if (found.tab.hibernation) void wakeAndFocusTab(tabId);
       else void requestHibernate(found.workspace.id, [tabId]);
     },
@@ -2614,7 +2614,7 @@ export default function App() {
       },
       onNavigateGitDiffTab: (tabId, direction) => {
         const found = findTabGlobal(tabId);
-        if (!found || found.tab.kind !== "git-diff") return;
+        if (found?.tab.kind !== "git-diff") return;
         const next = sidebarRef.current?.navigateGitDiffEntry(
           {
             repoRoot: found.tab.repoRoot,
@@ -3630,7 +3630,7 @@ export default function App() {
         }
         return;
       }
-      let target = workspacesRef.current.find((w) => w.id === row.workspaceId);
+      const target = workspacesRef.current.find((w) => w.id === row.workspaceId);
       if (!target) return;
       setActiveWorkspaceId(target.id);
       // openTab inserts right after the pane's focused tab and makes the new tab active.
@@ -3720,7 +3720,7 @@ export default function App() {
   const onPaletteToggleHibernate = useCallback(
     async (tabId: string) => {
       const found = findTabGlobal(tabId);
-      if (!found || found.tab.kind !== "terminal") return;
+      if (found?.tab.kind !== "terminal") return;
       if (found.tab.hibernation) await wakeTabs(found.workspace.id, [tabId]);
       else await requestHibernate(found.workspace.id, [tabId]);
     },

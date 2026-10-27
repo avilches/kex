@@ -115,6 +115,7 @@ type Props = {
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
+  // biome-ignore lint/suspicious/noConfusingVoidType: callers may return nothing or a promise
   onCloseTab: (entry: TabEntry) => void | Promise<unknown>;
   /** Resolves once the workspace is closed (true) or the close was cancelled or refused (false). */
   onCloseWorkspace: (workspaceId: string) => Promise<boolean>;

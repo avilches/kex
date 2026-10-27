@@ -28,13 +28,13 @@ const normalize = (s: string): string => slashes(s).trim().replace(/\.md$/i, "")
 export function resolveWikiTarget(target: string, root: string, files: readonly string[]): string | null {
   const want = normalize(target);
   if (want === "") return null;
-  const base = slashes(root).replace(/\/+$/, "") + "/";
+  const base = `${slashes(root).replace(/\/+$/, "")}/`;
   let best: string | null = null;
   let bestDepth = Infinity;
   for (const file of files) {
     const f = slashes(file);
     const rel = normalize(f.startsWith(base) ? f.slice(base.length) : f);
-    if (rel !== want && !rel.endsWith("/" + want)) continue;
+    if (rel !== want && !rel.endsWith(`/${want}`)) continue;
     const depth = rel.split("/").length;
     if (depth < bestDepth || (depth === bestDepth && best !== null && file < best)) {
       best = file;
@@ -66,7 +66,7 @@ export function newWikiNotePath(target: string, currentPath: string, root: strin
   }
   const base = slashes(root).replace(/\/+$/, "");
   const full = out.join("/");
-  if (!full.startsWith(base + "/")) return { error: "outside" };
+  if (!full.startsWith(`${base}/`)) return { error: "outside" };
   return { path: /\.md$/i.test(full) ? full : `${full}.md` };
 }
 
@@ -76,5 +76,5 @@ export function wikiBoundary(workspaceRoot: string | null, currentPath: string):
   const dir = slashes(currentPath).replace(/\/[^/]*$/, "");
   if (!workspaceRoot) return dir;
   const base = slashes(workspaceRoot).replace(/\/+$/, "");
-  return dir === base || dir.startsWith(base + "/") ? workspaceRoot : dir;
+  return dir === base || dir.startsWith(`${base}/`) ? workspaceRoot : dir;
 }

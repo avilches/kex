@@ -42,6 +42,7 @@ export type ScopeEditor = {
    * May return a promise: when it rejects, a command the user was typing keeps its draft and can
    * be saved again. A picked app preset has no draft and shows the host's toast instead.
    */
+  // biome-ignore lint/suspicious/noConfusingVoidType: callers may return nothing or a promise
   onAdd: (action: Action) => void | Promise<unknown>;
   onUpdate: (id: string, next: Action) => void;
   onRemove: (id: string) => void;

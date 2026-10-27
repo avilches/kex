@@ -1146,8 +1146,7 @@ export function WorkspaceBar({
   // biome-ignore lint/correctness/useExhaustiveDependencies: the overlay only depends on the dragged workspace and the bar width
   useEffect(() => {
     barBinding.setOverlay(
-      <>
-          {dragActiveWs
+      dragActiveWs
             ? (() => {
                 const displayColor = resolveWorkspaceColor(
                   dragActiveWs.color,
@@ -1181,8 +1180,7 @@ export function WorkspaceBar({
                   </div>
                 );
               })()
-            : null}
-        </>,
+            : null,
       dropAnimation,
     );
   }, [barBinding, dragActiveWs, compact]);
@@ -1196,8 +1194,7 @@ export function WorkspaceBar({
       )}
       style={{ width }}
     >
-      <>
-        <SortableContext
+      <SortableContext
  disabled={nonBarDrag}
           items={sortableGroupIds}
           strategy={verticalListSortingStrategy}
@@ -1318,9 +1315,6 @@ export function WorkspaceBar({
             )}
           </div>
         </SortableContext>
-
-
-      </>
 
       <button
         type="button"

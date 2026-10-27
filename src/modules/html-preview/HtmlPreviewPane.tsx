@@ -25,7 +25,7 @@ export function injectBase(html: string, baseUrl: string): string {
 
 export function HtmlPreviewPane({ content, path }: Props) {
   const dirPath = pathDirname(path);
-  const baseUrl = convertFileSrc(dirPath) + "/";
+  const baseUrl = `${convertFileSrc(dirPath)}/`;
   const contentWithBase = injectBase(content, baseUrl);
 
   return (

@@ -576,7 +576,7 @@ const writeToolsPref = makeWriter(toolsStore, "tools");
 const writeShortcutsStorePref = makeWriter(shortcutsStore, "shortcuts");
 
 async function writeShortcutsPref(
-  value: Record<ShortcutId, KeyBinding[]> | {},
+  value: Partial<Record<ShortcutId, KeyBinding[]>>,
 ): Promise<void> {
   await writeShortcutsStorePref(KEY_SHORTCUTS, value);
 }
@@ -1360,7 +1360,7 @@ export async function readIntegrationSuggestions(): Promise<SuggestionMap> {
 
 
 export async function setShortcuts(
-  value: Record<ShortcutId, KeyBinding[]> | {},
+  value: Partial<Record<ShortcutId, KeyBinding[]>>,
 ): Promise<void> {
   await writeShortcutsPref(value);
 }

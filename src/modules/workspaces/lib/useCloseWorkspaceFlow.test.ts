@@ -67,7 +67,9 @@ describe("createCloseWorkspaceFlow", () => {
   it("asks when a terminal has a running process and passes it on", async () => {
     let pending: PendingClose | null = null;
     const { flow } = setup(ws([term("t1")]), [{ tabId: "t1", label: "vim" }], {
-      setPending: (p) => void (pending = p),
+      setPending: (p) => {
+        pending = p;
+      },
     });
     await flow.request("w1");
     expect(pending).toEqual({ id: "w1", processes: [{ tabId: "t1", label: "vim" }] });
@@ -82,7 +84,9 @@ describe("createCloseWorkspaceFlow", () => {
         scriptState: () => "running",
         actionOf: () => ({ name: "dev", command: "pnpm dev" }),
       }),
-      setPending: (p) => void (pending = p),
+      setPending: (p) => {
+        pending = p;
+      },
     });
     await flow.request("w1");
     expect((pending as PendingClose | null)?.processes).toEqual([]);

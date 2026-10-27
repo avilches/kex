@@ -204,7 +204,7 @@ function DraggableTab({
   const displayTitle = isDescription
     ? agentTitle
     : agentTitle.length > 28
-      ? "..." + agentTitle.slice(-27)
+      ? `...${agentTitle.slice(-27)}`
       : agentTitle;
 
   const anyRenaming = useTabRenameStore((s) => s.renamingTabId !== null);

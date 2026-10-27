@@ -13,7 +13,7 @@ describe("boundedPendingInput", () => {
 
   it("appends right up to the cap", () => {
     const current = "a".repeat(PENDING_INPUT_MAX - 1);
-    expect(boundedPendingInput(current, "b")).toBe(current + "b");
+    expect(boundedPendingInput(current, "b")).toBe(`${current}b`);
   });
 
   it("drops the whole append when it would overflow the cap", () => {

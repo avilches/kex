@@ -166,7 +166,7 @@ export function pasteIntoLeaf(leafId: string, text: string): boolean {
 }
 
 function getRecycler(): HTMLDivElement {
-  if (recyclerEl && recyclerEl.isConnected) return recyclerEl;
+  if (recyclerEl?.isConnected) return recyclerEl;
   const el = document.createElement("div");
   el.setAttribute("data-kex-recycler", "");
   el.style.cssText =

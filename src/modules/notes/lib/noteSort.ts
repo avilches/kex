@@ -21,7 +21,9 @@ export function sortNotes(
       break;
     case "custom": {
       const rank = new Map<string, number>();
-      (order ?? []).forEach((name, i) => rank.set(name, i));
+      (order ?? []).forEach((name, i) => {
+        rank.set(name, i);
+      });
       copy.sort((a, b) => {
         const ia = rank.get(pathBasename(a.relPath));
         const ib = rank.get(pathBasename(b.relPath));

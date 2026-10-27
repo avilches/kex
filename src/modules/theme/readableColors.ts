@@ -14,7 +14,7 @@ function toRgb(hex: string): Rgb {
 }
 
 function toHex(c: Rgb): string {
-  return "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  return `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 }
 
 function luminance(c: Rgb): number {
@@ -54,7 +54,7 @@ export function flattenColor(value: string, over: string): string | null {
   if (!HEX.test(over)) return null;
   if (HEX.test(value)) return value.toLowerCase();
   const hex8 = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(value);
-  if (hex8) return blend(toRgb("#" + hex8[1]), parseInt(hex8[2]!, 16) / 255, over);
+  if (hex8) return blend(toRgb(`#${hex8[1]}`), parseInt(hex8[2]!, 16) / 255, over);
   const fn = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(value);
   if (!fn) return null;
   const rgb: Rgb = [Number(fn[1]), Number(fn[2]), Number(fn[3])];
