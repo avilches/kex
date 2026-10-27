@@ -669,4 +669,15 @@ describe("idle list workspaces", () => {
       expect(keys(rows)).toEqual(["tab:b"]);
     });
   });
+
+  it("keeps a hibernated current tab as Current tab, first, idle and typing", () => {
+    const tabs = [
+      tab("awake", { lastUsedAt: 50, title: "build" }),
+      tab("sleepy", { hibernated: true, lastUsedAt: 1, title: "build" }),
+    ];
+    const idle = mergeRows(input({ tabs, activeTabId: "sleepy" }));
+    expect(idle[0]).toMatchObject({ key: "tab:sleepy", current: true });
+    const typed = mergeRows(input({ tabs, activeTabId: "sleepy", term: "build" }));
+    expect(typed[0]).toMatchObject({ key: "tab:sleepy", current: true });
+  });
 });

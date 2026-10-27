@@ -127,7 +127,7 @@ function Harness() {
         );
       }}
       onSaveTab={(id) => calls.save.push(id)}
-      onToggleTabHibernate={(id) => {
+      onHibernateTab={(id) => {
         calls.hibernate.push(id);
         return hibernateImpl(id);
       }}
@@ -342,7 +342,7 @@ describe("hibernating from the palette", () => {
     expect(selected()).toBe("tab:c");
   });
 
-  it("takes the focus back when waking the tab makes its terminal grab it, keeping the row", async () => {
+  it("takes the focus back when the hibernate review grabs it, keeping the row", async () => {
     const thief = document.createElement("textarea");
     document.body.appendChild(thief);
     hibernateImpl = () =>
@@ -376,6 +376,20 @@ describe("Copy Tab ID from the palette", () => {
     await wait(30);
     expect(writeClipboardText).toHaveBeenCalledWith("c");
     expect(calls.openChange).toContain(false);
+  });
+});
+
+describe("Copy Absolute Path from the palette", () => {
+  it("shows the path under the label, in full as the tooltip", async () => {
+    await openOn("tab:c");
+    await key("Tab");
+    await wait(20);
+    const item = menuItem("Copy Absolute Path") as HTMLElement;
+    const sub = item.querySelector(".font-mono") as HTMLElement;
+    expect(sub.textContent).toContain("/p");
+    expect(sub.title).toBe("/p");
+    const relative = menuItem("Copy Relative Path") as HTMLElement;
+    expect(relative.querySelector(".font-mono")).toBeNull();
   });
 });
 

@@ -109,3 +109,25 @@ El boton "Go to tab" del dialogo hace `onClose()` y luego `onGoToTab()`, que pid
 
 Un dialogo sin trigger no devuelve el foco a nadie: quien lo abre desde otra superficie debe decirle
 adonde. Se resuelve en el `onCloseAutoFocus` del propio dialogo, no con timeouts ni listeners globales.
+
+## Bug 4: la tab actual hibernada no se ve resaltada como Current tab (RESUELTO)
+
+### Sintoma
+
+Con la tab actual hibernada, al abrir la paleta no se distinguia como "Current tab" ni como la fila del cursor.
+
+### Pistas falsas descartadas
+
+`byRecency` (las hibernadas van al final), el filtro `t.tabId !== activeTabId` de `mergeRows`, la marca `current`, `initialKey` y `displayOrder`: los tests de `mergeRows.test.ts` y `openCursor.test.tsx` con cmdk real pasan sin tocar nada. La fila SI es la primera, esta bajo "Current tab" y SI tiene `aria-selected`.
+
+### Causa raiz
+
+`TabItem` aplicaba `opacity-40` a la propia fila del `CommandItem` cuando `entry.hibernated`. Esa misma fila lleva `data-selected:bg-accent`, asi que la opacidad atenuaba tambien el fondo de seleccion: la fila elegida quedaba casi invisible.
+
+### Fix
+
+La opacidad va en un contenedor interior que envuelve el contenido (no en la fila ni en un selector `[&>*]`, que tambien atenuaria el tick de seleccion de `CommandItem`, hijo directo con `opacity-0`). `ClosedItem` igual. `TabItem.test.tsx` comprueba que la fila no lleva opacidad y que el tick queda fuera del contenedor atenuado.
+
+### Leccion
+
+Atenuar una fila de cmdk nunca con opacidad en la raiz: arrastra el resaltado de seleccion y el foco visual.

@@ -92,6 +92,21 @@ describe("TabItem", () => {
     expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
   });
 
+  it("dims the content in an inner wrapper, never the row nor the selection tick", () => {
+    row(entry({ hibernated: true }));
+    const item = document.querySelector("[cmdk-item]") as HTMLElement;
+    expect(item.className).not.toMatch(/(^|\s)(\[[^\s]*\]:)?opacity-/);
+    const dimmed = item.querySelector(":scope > .opacity-40") as HTMLElement;
+    expect(dimmed).not.toBeNull();
+    expect(dimmed.textContent).toContain("zsh");
+    const tick = [...item.children].find((c) => c.classList.contains("opacity-0")) as Element;
+    expect(tick).toBeDefined();
+    expect(dimmed.contains(tick)).toBe(false);
+    cleanup();
+    row(entry());
+    expect(document.querySelector(".opacity-40")).toBeNull();
+  });
+
   it("shows the absolute path on the second line", () => {
     row(entry({ detail: "/p/Kex/src" }));
     expect(screen.getByText("/p/Kex/src")).toBeTruthy();

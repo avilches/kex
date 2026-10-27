@@ -3,6 +3,6 @@ export const TAB_MENU_NOOPS = {
   onMoveTabToWorkspace: () => {},
   onUpdateTab: () => {},
   onSaveTab: () => {},
-  onToggleTabHibernate: () => {},
+  onHibernateTab: () => {},
   onGoToTab: () => {},
 };

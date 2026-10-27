@@ -1,4 +1,5 @@
 import { ContextMenuShortcut } from "@/components/ui/context-menu";
+import { StartTrimmed } from "@/components/StartTrimmed";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
@@ -15,7 +16,6 @@ import {
   LockKeyIcon,
   SquareUnlock02Icon,
   StickyNote03Icon,
-  UploadCircle01Icon,
   GitBranchIcon,
   PencilEdit02Icon,
   PlayIcon,
@@ -67,7 +67,6 @@ const ICONS = {
 // The icon of a toggle that is on, for the ones that change it.
 const ACTIVE_ICONS: Partial<Record<RowMenuItemId, typeof LockKeyIcon>> = {
   lock: SquareUnlock02Icon,
-  hibernateTab: UploadCircle01Icon,
 };
 
 function iconOf(item: RowMenuItem) {
@@ -271,7 +270,17 @@ export function RowMenu({
                   className={cn("shrink-0", item.id === "autofocus" && item.active && "text-primary")}
                 />
               )}
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.detail !== undefined ? (
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{item.label}</span>
+                  <StartTrimmed
+                    text={item.detail}
+                    className="flex max-w-[260px] font-mono text-[10px] font-normal text-muted-foreground"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              )}
               {item.value !== undefined ? (
                 <span className="max-w-[140px] shrink-0 truncate pl-3 font-mono text-[10px] font-normal text-muted-foreground">
                   {item.value}

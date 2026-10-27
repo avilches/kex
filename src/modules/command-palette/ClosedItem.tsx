@@ -28,8 +28,9 @@ export function ClosedItem({
       value={entry.key}
       onSelect={onRun}
       onContextMenu={onContextMenu}
-      className="text-[12.5px] opacity-60"
+      className="text-[12.5px]"
     >
+      <span className="flex min-w-0 flex-1 items-center gap-2 opacity-60">
       <RowTag kind={folder ? "Terminal" : "File"} closed />
       <span className="shrink-0 text-muted-foreground">
         <HugeiconsIcon
@@ -59,6 +60,7 @@ export function ClosedItem({
           </span>
         </span>
       ) : null}
+      </span>
     </CommandItem>
   );
 }

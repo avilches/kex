@@ -87,10 +87,15 @@ describe("tabMenuItems", () => {
   it("flips lock and hibernate labels with the state of the tab", () => {
     expect(item(entry(), "lock")).toMatchObject({ label: "Lock Tab", active: false });
     expect(item(entry({ locked: true }), "lock")).toMatchObject({ label: "Unlock Tab", active: true });
-    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab", active: false });
+    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab" });
+  });
+
+  it("offers a sleeping tab only Restore and go to Tab, with no Hibernate and no Restore item", () => {
     const asleep = entry({ hibernation: { at: 1 } });
-    expect(item(asleep, "hibernateTab")).toMatchObject({ label: "Restore Tab", active: true });
     expect(item(asleep, "go")?.label).toBe("Restore and go to Tab");
+    expect(ids(asleep)).not.toContain("hibernateTab");
+    expect(ids(asleep).filter((id) => id === "go")).toHaveLength(1);
+    expect(runnableTabItem(asleep, ctx, "hibernateTab")).toBeNull();
   });
 
   it("only offers hibernation on terminals", () => {
@@ -138,6 +143,17 @@ describe("tabMenuItems", () => {
     expect(ids(entry({ kind: "browser", url: "https://a.b" }, { detail: "https://a.b" }))).not.toContain(
       "copyRelative",
     );
+  });
+
+  it("shows the paths to copy as a second line, and nothing when the item is disabled", () => {
+    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false });
+    expect(item(inside, "copy")?.detail).toBe("/repo/src/a.ts");
+    expect(item(inside, "copyRelative")?.detail).toBe("src/a.ts");
+    const outside = entry({ kind: "editor", path: "/other/a.ts", dirty: false });
+    expect(item(outside, "copyRelative")?.detail).toBeUndefined();
+    const none = entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" });
+    expect(item(none, "copy")?.detail).toBeUndefined();
+    expect(item(entry(), "tabId")?.detail).toBeUndefined();
   });
 
   it("copies the tab id and shows it as the tooltip", () => {
