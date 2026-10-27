@@ -50,3 +50,37 @@ veian el camino.
 Un estado que se resetea en el handler de cierre del componente no se resetea si el padre cierra
 por la prop. Resetea en funcion de `open`, no del camino por el que se cierra, y prueba cerrando
 desde el padre, no solo con Escape.
+
+---
+
+## Bug 2: Add/Show Note en una tab de terminal devuelve el teclado al terminal (RESUELTO)
+
+### Sintoma
+
+Con la paleta abierta, Add/Show Note sobre otra tab activaba la tab y el terminal se quedaba con el
+teclado: lo que se tecleaba iba al terminal, no al input de la paleta.
+
+### Pistas falsas descartadas
+
+- Reclamar el input con reintentos a 0 y 250 ms (`refocusInput`): deja una ventana, y un enfoque
+  mas tardio lo vuelve a perder.
+- Cubrir solo `focusTab` y el efecto de cambio de workspace de `App.tsx`: un terminal que pasa a
+  visible y enfocado se enfoca solo (`useTerminalSession`, `scheduleUnhide` de `rendererPool.ts`).
+
+### Causa raiz
+
+Hay muchos caminos de foco independientes, sincronos y diferidos, y ninguno sabia que la paleta
+tenia el teclado. La paleta es `modal={false}` con `onFocusOutside` prevenido, asi que nadie lo
+devuelve.
+
+### Fix
+
+`paletteFocusGate`: `goToTab(..., { focus: false })` la cierra, y `focusTab`, `focusSlot`,
+`requestLeafFocus` y el foco del scratchpad pasan por ella. Se abre al cerrar la paleta o con
+cualquier activacion normal. Red de seguridad: un `focusin` de la paleta devuelve el foco al input
+mientras la puerta esta cerrada.
+
+### Leccion
+
+Para impedir un robo de foco, cierra el punto mas bajo por el que pasan todos los caminos, no los
+llamadores uno a uno, y no uses temporizadores.

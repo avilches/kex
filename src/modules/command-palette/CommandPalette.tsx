@@ -39,6 +39,7 @@ import {
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
+import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import { initialKey } from "./lib/initialKey";
 import { listViewportOf, scrollListToTop } from "./lib/listScroll";
 import { commandChoice } from "./lib/commandChoice";
@@ -250,6 +251,20 @@ export function CommandPalette({
       mru,
     ],
   );
+  // Safety net for the gate: whatever still moves the focus out of the dialog while a tab was
+  // activated without the keyboard goes back to the input at once, no timer involved.
+  useEffect(() => {
+    if (!open) return;
+    const onFocusIn = (e: FocusEvent) => {
+      if (!paletteFocusGate.isHeld()) return;
+      const input = paletteInputElement();
+      const dialog = input?.closest('[role="dialog"]');
+      if (!input || !dialog || dialog.contains(e.target as Node)) return;
+      input.focus();
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [open]);
   // Until cmdk reports a pick, the highlighted row is the first one drawn (Current tab, or the first
   // row there is). Passed from the first render, it does not wait for cmdk to find the first item,
   // which it does not do again when a page is left with an empty value.

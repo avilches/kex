@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerTabNoteFlush, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteTabItem } from "./lib/paletteControl";
@@ -304,6 +305,24 @@ describe("tab shortcuts over the highlighted row", () => {
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
     expect(updater({ id: "c", kind: "terminal" } as Tab)).toMatchObject({ note: "", noteOpen: true });
+  });
+
+  it("takes the focus back to the input when something moves it out while a tab was activated without the keyboard", async () => {
+    await openOn("tab:c");
+    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
+    const outside = document.createElement("textarea");
+    document.body.append(outside);
+    paletteFocusGate.hold();
+    try {
+      outside.focus();
+      expect(document.activeElement).toBe(input);
+      paletteFocusGate.release();
+      outside.focus();
+      expect(document.activeElement).toBe(outside);
+    } finally {
+      paletteFocusGate.release();
+      outside.remove();
+    }
   });
 
   it("add note on the current tab does not need to activate anything", async () => {
