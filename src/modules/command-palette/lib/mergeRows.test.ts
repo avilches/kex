@@ -609,6 +609,27 @@ describe("idle list workspaces", () => {
       expect(rows[0].kind === "tab" && rows[0].current).toBe(true);
     });
 
+    it("does not take a tab that is active in another pane", () => {
+      const rows = mergeRows(input({ tabs, activeTabId: "a" }));
+      expect(rows.filter((r) => r.kind === "tab" && r.current)).toHaveLength(1);
+      expect(keys(rows)).toEqual(["tab:a", "tab:b", "tab:c"]);
+    });
+
+    it("is the only row when it is the only tab", () => {
+      const rows = mergeRows(input({ tabs: [tab("solo")], activeTabId: "solo" }));
+      expect(keys(rows)).toEqual(["tab:solo"]);
+    });
+
+    it("keeps a hibernated current tab first", () => {
+      const rows = mergeRows(
+        input({
+          tabs: [tab("z", { hibernated: true }), tab("y")],
+          activeTabId: "z",
+        }),
+      );
+      expect(keys(rows)).toEqual(["tab:z", "tab:y"]);
+    });
+
     it("is left out while typing when it does not match", () => {
       const rows = mergeRows(input({ tabs, term: "beta", activeTabId: "a" }));
       expect(keys(rows)).toEqual(["tab:b"]);

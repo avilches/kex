@@ -115,16 +115,17 @@ export function MergedList(p: Props) {
       </CommandGroup>
     ) : null;
   if (p.typing) {
+    const ranked = p.rows.filter((r) => !isCurrent(r));
     return (
       <>
         {current}
-        <CommandGroup>
-          {p.rows
-            .filter((r) => !isCurrent(r))
-            .map((row) => (
+        {ranked.length > 0 ? (
+          <CommandGroup>
+            {ranked.map((row) => (
               <Row key={row.key} row={row} p={p} />
             ))}
-        </CommandGroup>
+          </CommandGroup>
+        ) : null}
       </>
     );
   }

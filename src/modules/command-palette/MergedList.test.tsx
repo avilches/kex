@@ -3,7 +3,9 @@
 import { Command, CommandList } from "@/components/ui/command";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { displayOrder } from "./lib/closeSuccessor";
 import type { MergedRow } from "./lib/mergeRows";
+import { COMMAND_GROUPS } from "./commands";
 import type { TabEntry } from "./lib/tabEntries";
 import { MergedList } from "./MergedList";
 import type { PaletteItem } from "./types";
@@ -125,5 +127,30 @@ describe("MergedList", () => {
     mount(withCurrent, true);
     expect(screen.getByText("Current tab")).toBeTruthy();
     expect(screen.queryByText("Recent tabs")).toBeNull();
+  });
+
+  it("leaves no empty group while typing when the current tab is the only result", () => {
+    mount([{ kind: "tab", key: "tab:t1", entry: tab, current: true }], true);
+    expect(document.querySelectorAll("[cmdk-group]")).toHaveLength(1);
+  });
+
+  it("draws the idle rows in the order displayOrder predicts", () => {
+    const hibernated = {
+      ...tab,
+      tabId: "t3",
+      hibernated: true,
+      tab: { id: "t3", kind: "terminal" as const },
+    };
+    const mixed: MergedRow[] = [
+      { kind: "command", key: "cmd:s", item: item("s", "Appearance", "Settings") },
+      { kind: "tab", key: "tab:t3", entry: hibernated },
+      { kind: "command", key: "cmd:g", item: item("g", "Open", "General") },
+      { kind: "tab", key: "tab:t1", entry: tab, current: true },
+    ];
+    mount(mixed, false);
+    const drawn = [...document.querySelectorAll("[cmdk-item]")].map((x) =>
+      x.getAttribute("data-value"),
+    );
+    expect(drawn).toEqual(displayOrder(mixed, false, COMMAND_GROUPS).map((r) => r.key));
   });
 });
