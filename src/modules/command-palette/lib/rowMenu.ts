@@ -50,6 +50,8 @@ export type RowMenuItem = {
   active?: boolean;
   // Full text for the tooltip when the label shortens something, such as a folder path.
   title?: string;
+  // A value the item acts on, drawn dimmed in monospace after the label.
+  value?: string;
   // The Action an "action" item runs.
   actionId?: string;
   // The 1-9 key that runs it while the menu is open (Cmd+digit).
@@ -208,7 +210,7 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
       disabled: !rel.ok,
     });
   }
-  items.push({ id: "tabId", label: "Copy Tab ID", title: entry.tabId });
+  items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
   const focusTarget = tabFocusTarget(entry);
   if (focusTarget) {
     items.push({

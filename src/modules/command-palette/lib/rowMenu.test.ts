@@ -146,7 +146,7 @@ describe("tabMenuItems", () => {
   });
 
   it("copies the tab id and shows it as the tooltip", () => {
-    expect(item(entry(), "tabId")).toMatchObject({ label: "Copy Tab ID", title: "tab-1" });
+    expect(item(entry(), "tabId")).toMatchObject({ label: "Copy Tab ID", value: "tab-1", title: "tab-1" });
   });
 
   it("disables the terminal without a folder and the copy without a path", () => {

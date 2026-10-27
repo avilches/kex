@@ -32,6 +32,8 @@ vi.mock("@/modules/explorer/lib/iconResolver", () => ({
 vi.mock("@/modules/workspaces/WorkspaceMark", () => ({
   WorkspaceMark: () => null,
 }));
+const writeClipboardText = vi.fn().mockResolvedValue(true);
+vi.mock("@/lib/clipboard", () => ({ writeClipboardText: (t: string) => writeClipboardText(t) }));
 vi.mock("./hooks/useCommandHistory", () => ({
   useCommandHistory: () => ({ loading: false, error: null, results: [], retry() {} }),
 }));
@@ -379,6 +381,21 @@ describe("hibernating from the palette", () => {
     expect(document.activeElement).toBe(document.querySelector('[cmdk-input=""]'));
     expect(selected()).toBe(before);
     expect(calls.openChange).toEqual([]);
+  });
+});
+
+describe("Copy Tab ID from the palette", () => {
+  it("shows the id inline and copies the same value as the tab context menu, through the same function", async () => {
+    await openOn("tab:c");
+    await key("Tab");
+    await wait(20);
+    const item = menuItem("Copy Tab ID") as HTMLElement;
+    expect(item.textContent).toContain("c");
+    expect(item.querySelector(".font-mono")?.textContent).toBe("c");
+    fireEvent.click(item);
+    await wait(30);
+    expect(writeClipboardText).toHaveBeenCalledWith("c");
+    expect(calls.openChange).toContain(false);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { writeClipboardText } from "@/lib/clipboard";
 import { pathBasename } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import { type BarItem, paletteActions } from "@/modules/actions/lib/actionsBar";
@@ -596,7 +597,7 @@ export function CommandPalette({
         const rel = tabEntryRelativePath(entry);
         if (rel?.ok) runAfterClose(() => void copyToClipboard(rel.text, "Copied relative path"));
       } else if (id === "tabId") {
-        runAfterClose(() => void copyToClipboard(tabId, "Copied tab ID"));
+        runAfterClose(() => void writeClipboardText(tabId));
       } else if (id === "closeOthers") {
         closeRows(
           otherTabRowKeys(tabEntries, entry),

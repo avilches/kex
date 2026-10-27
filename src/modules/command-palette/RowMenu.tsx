@@ -275,6 +275,11 @@ export function RowMenu({
                 />
               )}
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.value !== undefined ? (
+                <span className="max-w-[140px] shrink-0 truncate pl-3 font-mono text-[10px] font-normal text-muted-foreground">
+                  {item.value}
+                </span>
+              ) : null}
               {item.enter ? (
                 <ContextMenuShortcut>{"↵"}</ContextMenuShortcut>
               ) : label ? (
