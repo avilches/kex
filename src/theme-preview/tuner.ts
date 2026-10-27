@@ -3,26 +3,88 @@ import { compose, hexToRgb, rgbToHex, shiftHsl, toHex, tokenValue, type Rgb } fr
 export type Tune = {
   bgLightness: number;
   bgHue: number;
+  bgSaturation: number;
+  borderLightness: number;
+  textLightness: number;
+  accentLightness: number;
+  accentHue: number;
+  codeLightness: number;
+  ansiLightness: number;
+  ansiSaturation: number;
   normalAlpha: number;
   ignoredAlpha: number;
 };
 
-export const DEFAULT_TUNE: Tune = { bgLightness: 0, bgHue: 0, normalAlpha: 0.85, ignoredAlpha: 0.85 };
+export const DEFAULT_TUNE: Tune = {
+  bgLightness: 0,
+  bgHue: 0,
+  bgSaturation: 0,
+  borderLightness: 0,
+  textLightness: 0,
+  accentLightness: 0,
+  accentHue: 0,
+  codeLightness: 0,
+  ansiLightness: 0,
+  ansiSaturation: 0,
+  normalAlpha: 0.85,
+  ignoredAlpha: 0.85,
+};
 
-// UI surfaces the tone sliders move together, so the whole window shifts and
-// the explorer/source-control sidebar follows. Text tokens are left alone, and
-// so are the editor and terminal backgrounds: those have their own palettes,
-// and shifting them would write extra fields on save. Override those by hand
-// with the token picker if you want them moved.
-const SURFACES = [
-  "background",
-  "card",
-  "popover",
-  "sidebar",
-  "muted",
-  "secondary",
-  "accent",
+const ANSI_TOKENS = [
+  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "bright-black", "bright-red", "bright-green", "bright-yellow",
+  "bright-blue", "bright-magenta", "bright-cyan", "bright-white",
+].map((n) => `terminal-ansi-${n}`);
+
+type Field = Exclude<keyof Tune, "normalAlpha" | "ignoredAlpha">;
+
+// Each slider moves a whole family of tokens at once, so a theme can be tuned
+// with a dozen controls instead of the full token list. Anything finer is still
+// reachable with the token picker. UI surfaces move together so the whole window
+// shifts and the explorer/source-control sidebar follows.
+const GROUPS: { tokens: string[]; l?: Field; h?: Field; s?: Field }[] = [
+  {
+    tokens: ["background", "card", "popover", "sidebar", "muted", "secondary", "accent"],
+    l: "bgLightness",
+    h: "bgHue",
+    s: "bgSaturation",
+  },
+  { tokens: ["border", "input", "sidebar-border"], l: "borderLightness" },
+  {
+    tokens: [
+      "foreground",
+      "card-foreground",
+      "popover-foreground",
+      "muted-foreground",
+      "sidebar-foreground",
+    ],
+    l: "textLightness",
+  },
+  {
+    tokens: ["primary", "sidebar-primary", "ring", "sidebar-ring", "tab-focus-indicator", "link"],
+    l: "accentLightness",
+    h: "accentHue",
+  },
+  { tokens: ["editor-background", "terminal-background"], l: "codeLightness" },
+  { tokens: ANSI_TOKENS, l: "ansiLightness", s: "ansiSaturation" },
 ];
+
+const deltas = (g: (typeof GROUPS)[number], tune: Tune) => ({
+  dl: g.l ? tune[g.l] : 0,
+  dh: g.h ? tune[g.h] : 0,
+  ds: g.s ? tune[g.s] : 0,
+});
+
+// Tokens a non-default slider is moving right now, so save and export can tell
+// them apart from the ones the theme declares itself.
+export function tunedTokens(tune: Tune): Set<string> {
+  const out = new Set<string>();
+  for (const g of GROUPS) {
+    const { dl, dh, ds } = deltas(g, tune);
+    if (dl || dh || ds) for (const t of g.tokens) out.add(t);
+  }
+  return out;
+}
 
 const TUNE_KEY = "kex-theme-preview-tune";
 const TOKENS_KEY = "kex-theme-preview-tokens";
@@ -45,14 +107,6 @@ export function saveTune(key: string, tune: Tune): void {
   localStorage.setItem(TUNE_KEY, JSON.stringify(store));
 }
 
-export function changedTune(tune: Tune): Partial<Tune> {
-  const out: Partial<Tune> = {};
-  for (const key of Object.keys(DEFAULT_TUNE) as (keyof Tune)[]) {
-    if (tune[key] !== DEFAULT_TUNE[key]) out[key] = tune[key];
-  }
-  return out;
-}
-
 export function loadTokens(key: string): Record<string, string> {
   return (readStore(TOKENS_KEY)[key] as Record<string, string> | undefined) ?? {};
 }
@@ -72,11 +126,18 @@ export function applyTune(tune: Tune): void {
   root.setProperty("--px-ignored-alpha", `${Math.round(tune.ignoredAlpha * 100)}%`);
   root.setProperty("--px-normal-text", "color-mix(in oklab, var(--foreground) var(--px-normal-alpha), transparent)");
   root.setProperty("--px-ignored-text", "color-mix(in oklab, var(--muted-foreground) var(--px-ignored-alpha), transparent)");
-  for (const name of SURFACES) {
-    const hex = toHex(tokenValue(name));
-    if (!hex.startsWith("#")) continue;
-    root.setProperty(`--${name}`, shiftHsl(hex, tune.bgLightness, tune.bgHue));
+  // Read every value before writing any: a token can alias another one
+  // (`var(--primary)`), and reading it after the original moved would shift it twice.
+  const writes: [string, string][] = [];
+  for (const g of GROUPS) {
+    const { dl, dh, ds } = deltas(g, tune);
+    if (!dl && !dh && !ds) continue;
+    for (const name of g.tokens) {
+      const hex = toHex(tokenValue(name));
+      if (hex.startsWith("#")) writes.push([name, shiftHsl(hex, dl, dh, ds)]);
+    }
   }
+  for (const [name, value] of writes) root.setProperty(`--${name}`, value);
 }
 
 export function clearOverrides(key: string): void {
@@ -127,31 +188,4 @@ export function readTune(tune: Tune): TuneReadout {
     ignored: resolve("muted-foreground", tune.ignoredAlpha),
     surface: surfaceHex,
   };
-}
-
-export function tuneSnapshot(
-  themeId: string,
-  themeName: string,
-  mode: string,
-  tune: Tune,
-  read: TuneReadout,
-  tokens: Record<string, string>,
-): string {
-  return JSON.stringify(
-    {
-      kind: "kex-theme-tune",
-      theme: themeId,
-      themeName,
-      mode,
-      tune: changedTune(tune),
-      tokens,
-      resolved: {
-        surface: read.surface,
-        normal: read.normal,
-        ignored: read.ignored,
-      },
-    },
-    null,
-    2,
-  );
 }

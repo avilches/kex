@@ -74,7 +74,7 @@ import {
   saveTokens,
   saveTune,
   type Tune,
-  tuneSnapshot,
+  tunedTokens,
 } from "./tuner";
 
 type Scheme = "vscode" | "jetbrains";
@@ -1809,7 +1809,7 @@ function controls(): HTMLElement {
   );
 }
 
-type SliderField = "bgLightness" | "bgHue" | "normalAlpha" | "ignoredAlpha";
+type SliderField = keyof Tune;
 
 function smallButton(label: string): HTMLButtonElement {
   return h(
@@ -1833,15 +1833,22 @@ function slider(opts: {
 }): { node: HTMLElement; sync: () => void } {
   const input = h("input", {
     type: "range",
-    class: "w-52 grow",
+    class: "h-3 w-20 shrink-0",
     min: String(opts.min),
     max: String(opts.max),
     step: String(opts.step),
   }) as HTMLInputElement;
   const out = h("span", {
-    class: "w-14 shrink-0 text-right font-mono text-[11px]",
+    class: "w-9 shrink-0 text-right font-mono text-[10px]",
   });
-  const reset = smallButton("reset");
+  const reset = h(
+    "button",
+    {
+      class:
+        "shrink-0 rounded px-1 text-[10px] leading-none text-muted-foreground hover:text-foreground",
+    },
+    "x",
+  ) as HTMLButtonElement;
   reset.title = "Back to the theme default for this one";
   const sync = () => {
     input.value = String(state.tune[opts.field]);
@@ -1857,8 +1864,8 @@ function slider(opts: {
   return {
     node: h(
       "div",
-      { class: "flex items-center gap-2 text-[11px]" },
-      h("span", { class: "w-40 shrink-0 text-muted-foreground" }, opts.label),
+      { class: "flex items-center gap-1.5 text-[10px]" },
+      h("span", { class: "w-[88px] shrink-0 truncate text-muted-foreground", title: opts.label }, opts.label),
       input,
       out,
       reset,
@@ -1890,23 +1897,6 @@ function tunerPanel(): HTMLElement {
 
   const sliders: { sync: () => void }[] = [];
   const tokenRows: { sync: () => void }[] = [];
-  const exportArea = h("textarea", {
-    class:
-      "h-40 w-full rounded border border-border bg-transparent p-1 font-mono text-[11px]",
-    readonly: "true",
-  }) as HTMLTextAreaElement;
-  let exportIsChanges = true;
-
-  const snapshot = () =>
-    tuneSnapshot(
-      state.themeId,
-      currentTheme().name,
-      state.mode,
-      state.tune,
-      readTune(state.tune),
-      changedTokens(),
-    );
-
   const syncAll = () => {
     for (const s of sliders) s.sync();
     for (const t of tokenRows) t.sync();
@@ -1915,7 +1905,6 @@ function tunerPanel(): HTMLElement {
     paint();
     paintReadout();
     syncAll();
-    exportArea.value = exportIsChanges ? snapshot() : fullThemeJson();
   };
   const patch = (p: Partial<Tune>) => {
     state.tune = { ...state.tune, ...p };
@@ -2020,25 +2009,15 @@ function tunerPanel(): HTMLElement {
   };
 
   const copyStatus = h("span", { class: "text-[11px] text-muted-foreground" });
-  const copy = async (getText: () => string, isChanges: boolean) => {
-    exportIsChanges = isChanges;
-    const text = getText();
-    exportArea.value = text;
+  const copyFull = smallButton("Export full theme (copy)");
+  copyFull.onclick = async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      copyStatus.textContent = isChanges
-        ? "Copied the changes. Paste it back to me and I bake it in."
-        : "Copied the full theme. You can also paste it in the box above as a custom theme.";
+      await navigator.clipboard.writeText(fullThemeJson());
+      copyStatus.textContent = "Copied the full theme.";
     } catch {
-      exportArea.select();
-      copyStatus.textContent =
-        "Clipboard blocked. The JSON is in the box, copy it by hand.";
+      copyStatus.textContent = "Clipboard blocked by the browser.";
     }
   };
-  const copyChanges = smallButton("Export changes (copy)");
-  copyChanges.onclick = () => void copy(snapshot, true);
-  const copyFull = smallButton("Export full theme (copy)");
-  copyFull.onclick = () => void copy(fullThemeJson, false);
 
   const saveStatus = h("span", { class: "text-[11px] text-muted-foreground" });
   const saveBtn = smallButton("Save to disk");
@@ -2089,49 +2068,31 @@ function tunerPanel(): HTMLElement {
 
   paintReadout();
   syncAll();
-  exportArea.value = snapshot();
 
   return section(
     "Tuner (changes are saved per theme and mode, and survive a reload)",
     h(
       "div",
       { class: "flex flex-col gap-1.5" },
-      addSlider(
-        "Background lightness",
-        "bgLightness",
-        -15,
-        15,
-        0.5,
-        (v) => `${v > 0 ? "+" : ""}${v}%`,
-      ),
-      addSlider(
-        "Background tone (warm/cool)",
-        "bgHue",
-        -40,
-        40,
-        1,
-        (v) => `${v > 0 ? "+" : ""}${v}deg`,
-      ),
-      addSlider(
-        "Normal text alpha",
-        "normalAlpha",
-        0.5,
-        1,
-        0.01,
-        (v) => `${Math.round(v * 100)}%`,
-      ),
-      addSlider(
-        "Ignored text alpha",
-        "ignoredAlpha",
-        0.4,
-        1,
-        0.01,
-        (v) => `${Math.round(v * 100)}%`,
+      h(
+        "div",
+        { class: "grid grid-cols-2 gap-x-5 gap-y-1 md:grid-cols-3 xl:grid-cols-4" },
+        addSlider("Surfaces light", "bgLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Surfaces tint", "bgHue", -60, 60, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`),
+        addSlider("Surfaces color", "bgSaturation", -20, 20, 1, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Borders light", "borderLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Text light", "textLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Accent light", "accentLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Accent hue", "accentHue", -60, 60, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`),
+        addSlider("Editor+term light", "codeLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("ANSI light", "ansiLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("ANSI color", "ansiSaturation", -30, 30, 1, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Explorer text a.", "normalAlpha", 0.5, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
+        addSlider("Ignored text a.", "ignoredAlpha", 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       ),
       readout,
-      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, saveBtn, copyStatus),
+      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyFull, saveBtn, copyStatus),
       saveStatus,
-      exportArea,
       tokenDetails,
     ),
   );
@@ -2173,27 +2134,14 @@ function paint(): void {
   document.documentElement.dataset.previewMode = state.mode;
 }
 
-function changedTokens(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(state.tokens)) {
-    if (baseline[name]?.toLowerCase() !== value.toLowerCase())
-      out[name] = value;
-  }
-  return out;
-}
-
-// Tokens whose on-screen value differs from what the theme declares, which is
-// what "Save to disk" writes: every UI color the tone sliders moved or that was
-// overridden by hand, plus the terminal and editor tokens only when they were
-// overridden by hand (they alias the UI colors in CSS, so they would otherwise
-// look changed on their own).
 function effectiveChanges(): Record<string, string> {
   const out: Record<string, string> = {};
+  const tuned = tunedTokens(state.tune);
   for (const token of TOKENS) {
     const current = toHex(tokenValue(token));
     if (!baseline[token] || current.toLowerCase() === baseline[token].toLowerCase()) continue;
     const explicit = token in state.tokens;
-    if (token in COLOR_TOKEN || explicit) out[token] = current;
+    if (token in COLOR_TOKEN || explicit || tuned.has(token)) out[token] = current;
   }
   return out;
 }
