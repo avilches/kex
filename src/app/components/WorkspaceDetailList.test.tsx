@@ -396,7 +396,7 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
-    expect(sleepingRow.querySelector("svg.opacity-60")).not.toBeNull();
+    expect(sleepingRow.querySelector("svg.opacity-0")).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
