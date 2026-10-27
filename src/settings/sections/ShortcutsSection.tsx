@@ -21,7 +21,7 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 export function ShortcutsSection() {
@@ -42,6 +42,25 @@ export function ShortcutsSection() {
     setFinding(v);
     if (!v) setFound(null);
   };
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    ro.observe(el);
+    setHeaderHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  // Starting a recording drops the finder filter, so the row moves: follow it.
+  useEffect(() => {
+    if (!recordingId) return;
+    document
+      .querySelector(`[data-shortcut-id="${recordingId}"]`)
+      ?.scrollIntoView({ block: "center" });
+  }, [recordingId]);
 
   const startRecording = (id: ShortcutId) => {
     setFindingActive(false);
@@ -89,7 +108,10 @@ export function ShortcutsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="sticky top-0 z-10 -mt-2 -mx-1 flex flex-col gap-4 bg-background px-1 pt-2 pb-3">
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-10 -mt-2 -mx-1 flex flex-col gap-4 bg-background px-1 pt-2 pb-3"
+      >
         <div className="flex items-center justify-between">
           <SectionHeader title="Shortcuts" />
         </div>
@@ -133,7 +155,10 @@ export function ShortcutsSection() {
 
           return (
             <div key={group} className="flex flex-col gap-3">
-              <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              <h3
+                style={{ top: headerHeight }}
+                className="sticky z-[5] -mt-1 bg-background py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+              >
                 {group}
               </h3>
               <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
@@ -200,7 +225,10 @@ function ShortcutRow({
   const hasBindings = bindings && bindings.length > 0;
 
   return (
-    <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
+    <div
+      data-shortcut-id={shortcut.id}
+      className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30"
+    >
       <div className="flex flex-col gap-0.5">
         <span className="text-[12.5px] font-medium">{shortcut.label}</span>
       </div>
