@@ -1,7 +1,7 @@
 import type { MergedRow } from "./mergeRows";
 
-// The order MergedList draws the rows in. Typing is the rank order with the current tab first;
-// the idle list regroups them under fixed headings, so it is not the order of `rows`.
+// The order MergedList draws the rows in. Typing is the order of `rows`; the idle list regroups
+// them under fixed headings, so it is not the order of `rows`.
 export function displayOrder(
   rows: readonly MergedRow[],
   typing: boolean,

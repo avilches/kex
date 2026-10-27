@@ -78,7 +78,7 @@ const input = (over: Partial<MergeInput>): MergeInput => ({
 const keys = (rows: ReturnType<typeof mergeRows>) => rows.map((r) => r.key);
 
 describe("mergeRows", () => {
-  it("puts a command that matches better than a tab before it", () => {
+  it("puts every matching tab before a command, whatever the scores", () => {
     const rows = mergeRows(
       input({
         term: "hibernate",
@@ -86,7 +86,7 @@ describe("mergeRows", () => {
         tabs: [tab("t1", { title: "my hibernate notes" })],
       }),
     );
-    expect(keys(rows)[0]).toBe("cmd:tab.hibernate");
+    expect(keys(rows)).toEqual(["tab:t1", "cmd:tab.hibernate"]);
   });
 
   it("puts a tab that matches better than a command before it", () => {
@@ -100,7 +100,7 @@ describe("mergeRows", () => {
     expect(keys(rows)[0]).toBe("tab:t1");
   });
 
-  it("keeps the tab tiers: a location match never beats a title or command match", () => {
+  it("orders the matching tabs like the empty list, not by where the text matched", () => {
     const rows = mergeRows(
       input({
         term: "deploy",
@@ -111,9 +111,7 @@ describe("mergeRows", () => {
         ],
       }),
     );
-    const k = keys(rows);
-    expect(k.indexOf("tab:title")).toBeLessThan(k.indexOf("tab:cwd"));
-    expect(k.indexOf("cmd:c")).toBeLessThan(k.indexOf("tab:cwd"));
+    expect(keys(rows)).toEqual(["tab:cwd", "tab:title", "cmd:c"]);
   });
 
   it("lets a row the user keeps choosing for this text become the first one", () => {
@@ -129,19 +127,26 @@ describe("mergeRows", () => {
     expect(keys(mergeRows({ ...base, learned }))[0]).toBe("cmd:b");
   });
 
-  it("never lets learning lift a location match above a title match", () => {
-    const learned: LearnedMap = { deploy: { "tab:cwd": 500 } };
+  it("never lets learning reorder the matching tabs", () => {
+    const learned: LearnedMap = { deploy: { "tab:title": 500 } };
     const rows = mergeRows(
       input({
         term: "deploy",
         tabs: [
-          tab("cwd", { cwd: "/work/deploy" }),
-          tab("title", { title: "deploy" }),
+          tab("cwd", { cwd: "/work/deploy", lastUsedAt: 9 }),
+          tab("title", { title: "deploy", lastUsedAt: 1 }),
         ],
         learned,
       }),
     );
-    expect(keys(rows)).toEqual(["tab:title", "tab:cwd"]);
+    expect(keys(rows)).toEqual(["tab:cwd", "tab:title"]);
+  });
+
+  it("does not let learning pick which tabs fit under the cap", () => {
+    const tabs = Array.from({ length: 60 }, (_, i) => tab(`t${i}`, { title: `term ${i}`, lastUsedAt: 100 - i }));
+    const learned: LearnedMap = { term: { "tab:t59": 500 } };
+    const rows = mergeRows(input({ term: "term", tabs, learned }));
+    expect(keys(rows)).toEqual(keys(mergeRows(input({ term: "term", tabs }))));
   });
 
   it("includes workspaces", () => {
@@ -203,7 +208,7 @@ describe("mergeRows", () => {
     ).toEqual(["closed:terminal:/work/api"]);
   });
 
-  it("lets a heavily reused closed entry beat a live tab, but not one with no use behind it", () => {
+  it("keeps a live tab before a closed entry, however much the entry was reused", () => {
     const live = tab("t1", { title: "api" });
     const fresh = closed("/work/api", { uses: 0 });
     const used = closed("/work/api", { uses: 20 });
@@ -212,7 +217,7 @@ describe("mergeRows", () => {
     ).toEqual(["tab:t1", "closed:terminal:/work/api"]);
     expect(
       keys(mergeRows(input({ term: "api", tabs: [live], closed: [used] }))),
-    ).toEqual(["closed:terminal:/work/api", "tab:t1"]);
+    ).toEqual(["tab:t1", "closed:terminal:/work/api"]);
   });
 
   it("caps the closed rows rendered while typing", () => {
@@ -296,17 +301,21 @@ describe("mergeRows", () => {
     ).toEqual(["tab:a"]);
   });
 
-  it("matches worktree, branch and process as the lowest tab tiers, in that order", () => {
+  it("matches worktree, branch and process, and lists those tabs in the order of the empty list", () => {
     const tabs = [
-      tab("process", { process: "kex-server" }),
-      tab("branch", { branch: "kex-fix" }),
-      tab("workspace", { workspaceTitle: "kex" }),
-      tab("title", { title: "kex" }),
+      tab("process", { process: "kex-server", lastUsedAt: 1 }),
+      tab("branch", { branch: "kex-fix", lastUsedAt: 4 }),
+      tab("workspace", { workspaceTitle: "kex", lastUsedAt: 3 }),
+      tab("title", { title: "kex", lastUsedAt: 2 }),
+      tab("busy", { process: "kex", running: true, lastUsedAt: 0 }),
+      tab("alert", { branch: "kex", indicator: "attention", lastUsedAt: 0 }),
     ];
     expect(keys(mergeRows(input({ term: "kex", tabs })))).toEqual([
-      "tab:title",
-      "tab:workspace",
+      "tab:alert",
+      "tab:busy",
       "tab:branch",
+      "tab:workspace",
+      "tab:title",
       "tab:process",
     ]);
   });
@@ -329,7 +338,7 @@ describe("mergeRows", () => {
     }
   });
 
-  it("still ranks an action that contains the typed text above a tab found by process", () => {
+  it("lists a tab found by process before an action that contains the typed text", () => {
     const rows = mergeRows(
       input({
         term: "top",
@@ -337,7 +346,7 @@ describe("mergeRows", () => {
         tabs: [tab("t", { process: "top" })],
       }),
     );
-    expect(keys(rows)).toEqual(["cmd:bar", "tab:t"]);
+    expect(keys(rows)).toEqual(["tab:t", "cmd:bar"]);
   });
 
   it("breaks ties by recency with awake workspaces first", () => {
@@ -629,6 +638,30 @@ describe("idle list workspaces", () => {
         }),
       );
       expect(keys(rows)).toEqual(["tab:z", "tab:y"]);
+    });
+
+    it("keeps the current tab first and the other matches in the order of the empty list while typing", () => {
+      const tabs = [
+        tab("old", { title: "term old", lastUsedAt: 1 }),
+        tab("exact", { title: "term", lastUsedAt: 2 }),
+        tab("busy", { title: "terminal busy", running: true, lastUsedAt: 0 }),
+        tab("cur", { title: "terminal now", lastUsedAt: 9 }),
+      ];
+      const rows = mergeRows(
+        input({
+          tabs,
+          term: "term",
+          activeTabId: "cur",
+          commands: [cmd("c", "Term")],
+        }),
+      );
+      expect(keys(rows)).toEqual([
+        "tab:cur",
+        "tab:busy",
+        "tab:exact",
+        "tab:old",
+        "cmd:c",
+      ]);
     });
 
     it("is left out while typing when it does not match", () => {

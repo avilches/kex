@@ -196,6 +196,8 @@ function closedPoints(entry: ClosedTabEntry, q: string): FieldScored | null {
   };
 }
 
+type TabRow = Extract<MergedRow, { kind: "tab" }>;
+
 export const actionRowKey = (id: string): string => `act:${id}`;
 
 export function mergeRows(input: MergeInput): MergedRow[] {
@@ -301,7 +303,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         highlight: r.highlight,
         current: entry.tabId === activeTabId ? true : undefined,
       },
-      points: r.points + learnedBoost(learned, q, key),
+      points: r.points,
       recency: entry,
     });
   }
@@ -338,21 +340,32 @@ export function mergeRows(input: MergeInput): MergedRow[] {
 
   let tabCount = 0;
   let closedCount = 0;
-  const rows: MergedRow[] = [];
+  const currentRows: MergedRow[] = [];
+  const tabRows: TabRow[] = [];
+  const others: MergedRow[] = [];
   for (const s of scored) {
-    if (s.row.kind === "tab" && !s.row.current && ++tabCount > SEARCH_LIMIT)
+    const row = s.row;
+    if (row.kind === "tab") {
+      if (row.current) currentRows.push(row);
+      else if (++tabCount <= SEARCH_LIMIT) tabRows.push(row);
       continue;
-    if (s.row.kind === "closed" && ++closedCount > CLOSED_SEARCH_LIMIT)
-      continue;
-    rows.push(s.row);
+    }
+    if (row.kind === "closed" && ++closedCount > CLOSED_SEARCH_LIMIT) continue;
+    others.push(row);
   }
+  // The tabs that fit keep the order of the empty list, so typing narrows it instead of reshuffling it.
+  tabRows.sort((a, b) => byRecentList(a.entry, b.entry));
   const shownWorkspaces = new Set(
-    rows.flatMap((r) => (r.kind === "tab" ? [r.entry.workspaceId] : [])),
+    [...currentRows, ...tabRows].flatMap((r) =>
+      r.kind === "tab" ? [r.entry.workspaceId] : [],
+    ),
   );
-  const visible = rows.filter(
-    (r) => r.kind !== "workspace" || !shownWorkspaces.has(r.entry.workspaceId),
-  );
-  const at = visible.findIndex((r) => r.kind === "tab" && r.current);
-  if (at > 0) visible.unshift(...visible.splice(at, 1));
-  return visible;
+  return [
+    ...currentRows,
+    ...tabRows,
+    ...others.filter(
+      (r) =>
+        r.kind !== "workspace" || !shownWorkspaces.has(r.entry.workspaceId),
+    ),
+  ];
 }

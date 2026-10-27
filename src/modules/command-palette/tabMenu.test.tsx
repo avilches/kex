@@ -288,16 +288,43 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.goTo).toEqual([]);
   });
 
-  it("add note closes the palette, makes the tab current, asks for the note focus and toggles it", async () => {
+  it("add note on another tab leaves the palette open on the same row, without activating the tab or asking the note for the focus", async () => {
     await openOn("tab:c");
+    const input = document.querySelector<HTMLInputElement>("[cmdk-input]");
+    input?.focus();
     await shortcut("note");
     await wait(30);
-    expect(calls.openChange).toContain(false);
-    expect(calls.goTo).toEqual(["c"]);
-    expect(useTabNoteStore.getState().focusTabId).toBe("c");
+    expect(calls.openChange).toEqual([]);
+    expect(selected()).toBe("tab:c");
+    expect(calls.goTo).toEqual([]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+    expect(document.activeElement).toBe(input);
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
     expect(updater({ id: "c", kind: "terminal" } as Tab)).toMatchObject({ note: "", noteOpen: true });
+  });
+
+  it("add note on the current tab does not need to activate anything", async () => {
+    await openOn("tab:cur");
+    await shortcut("note");
+    await wait(30);
+    expect(calls.openChange).toEqual([]);
+    expect(calls.goTo).toEqual([]);
+    expect(calls.update.map(([id]) => id)).toEqual(["cur"]);
+  });
+
+  it("show note from the row menu keeps the palette and the row too", async () => {
+    initial = [mk("cur", 0), mk("b", 1, { note: "hi" })];
+    await openOn("tab:b");
+    await key("Tab");
+    await wait(20);
+    fireEvent.click(menuItem("Show Note") as HTMLElement);
+    await wait(30);
+    expect(calls.openChange).toEqual([]);
+    expect(selected()).toBe("tab:b");
+    expect(calls.goTo).toEqual([]);
+    expect(calls.update.map(([id]) => id)).toEqual(["b"]);
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
   });
 
   it("hide note toggles in place and leaves the palette open", async () => {
@@ -418,7 +445,7 @@ describe("Move to Workspace from the palette", () => {
 });
 
 describe("Back from the Move tab to workspace command", () => {
-  it("returns to the first row like before, not to the active tab", async () => {
+  it("returns to the first row, which is the active tab", async () => {
     commands = [{ id: "tab.moveToWorkspace", title: "Move tab to workspace...", group: "Tabs", run: () => {} }];
     render(<Harness />);
     await wait(50);
@@ -430,8 +457,8 @@ describe("Back from the Move tab to workspace command", () => {
     expect(document.body.textContent).toContain("Move tab to workspace");
     fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
     await wait(50);
+    expect(opened).toBe("tab:cur");
     expect(selected()).toBe(opened);
-    expect(selected()).not.toBe("tab:cur");
   });
 });
 

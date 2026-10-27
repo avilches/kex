@@ -254,10 +254,10 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
 
 // Whether the item leaves the palette open: it toggles or saves in place, so the row stays and
 // shows the new state. Every other item closes the palette or removes rows through the close flow.
-export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean {
-  if (id === "note") return isTabNoteOpen(entry.tab);
+export function tabItemKeepsPalette(id: RowMenuItemId): boolean {
   return (
     id === "lock" ||
+    id === "note" ||
     id === "hibernateTab" ||
     id === "save" ||
     id === "removeNote" ||

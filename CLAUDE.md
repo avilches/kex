@@ -92,7 +92,7 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 
 Antes de empezar la Fase 1 (root cause investigation) de `systematic-debugging` en cualquier bug o
 comportamiento inesperado, `grep -il` por palabras clave del sintoma en `docs/*_GOTCHAS.md` (hoy:
-`docs/WORKSPACES_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
+`docs/WORKSPACES_GOTCHAS.md` y `docs/PALETTE_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
 nada mas: puede ahorrar horas de re-descubrir una causa raiz ya documentada, o evitar repetir un
 intento que ya fallo alli. No basta con saber que el fichero existe: hay que grepearlo activamente
 como primer paso, no confiar en recordarlo.
@@ -213,7 +213,7 @@ Se actualiza en el mismo commit que el cambio de codigo, nunca despues.
 - `docs/BUILD.md`: setup, checks, build de produccion, bundle, plataformas y updater, y la pagina de preview de temas.
 - `docs/PLATFORM.md`: integracion del PTY con las shells, ConPTY y Job Objects, ventanas, capabilities y estructura del frontend.
 - `docs/THEMES.md`, `docs/SETTINGS_UI.md`, `docs/USER_DATA.md`: reglas de temas, de ajustes y mapa de las carpetas de la maquina.
-- `docs/WORKSPACES.md`: render del workspace y pool de slots del terminal (constantes, visibilidad, drag-and-drop). `docs/WORKSPACES_GOTCHAS.md`: bugs dificiles de diagnosticar; anadir una entrada cuando uno cueste mas de un intento. `docs/WORKSPACES_GPU.md`: el fix de WebGL al arrancar (`retryMissingWebgl` desde `main.tsx` a 350 ms); no anadir mas retries en `rendererPool.ts` sin pasar por ahi.
+- `docs/WORKSPACES.md`: render del workspace y pool de slots del terminal (constantes, visibilidad, drag-and-drop). `docs/WORKSPACES_GOTCHAS.md`: bugs dificiles de diagnosticar; anadir una entrada cuando uno cueste mas de un intento. `docs/PALETTE_GOTCHAS.md`: lo mismo para la paleta de comandos. `docs/WORKSPACES_GPU.md`: el fix de WebGL al arrancar (`retryMissingWebgl` desde `main.tsx` a 350 ms); no anadir mas retries en `rendererPool.ts` sin pasar por ahi.
 - `docs/SCRATCHPAD.md`: modelo binario del scratchpad y todos los caminos de foco y cierre (`requestLeafFocus`).
 - `docs/AGENT_SESSION_RESTORE.md`, `docs/RESTORE_SESSION_TESTS.md`, `docs/NOTIFICATIONS.md`: hooks, restore de sesiones y notificaciones de agentes, y su plan de pruebas manuales.
 - `docs/FORK.md`: divergencias y roadmap respecto al upstream (funcionalidades quitadas, anadidas, decisiones de arquitectura). Actualizar cuando cambie cualquiera de ellas.
