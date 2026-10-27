@@ -2,11 +2,12 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { registerTabNoteFlush, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteTabItem } from "./lib/paletteControl";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
+import type { PaletteItem } from "./types";
 import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -92,6 +93,7 @@ type Calls = {
 };
 let calls: Calls;
 let initial: TabEntry[];
+let commands: PaletteItem[] = [];
 let hibernateImpl: (id: string) => unknown;
 let closeOthersImpl: (id: string, set: (f: (t: TabEntry[]) => TabEntry[]) => void) => unknown;
 
@@ -103,7 +105,7 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
       onOpenChange={(o) => calls.openChange.push(o)}
       restoreFocus={() => {}}
       initialMode="commands"
-      commandItems={[]}
+      commandItems={commands}
       actionsWorkspace={null}
       onRunAction={() => {}}
       onStopAction={() => {}}
@@ -192,6 +194,7 @@ async function openOn(target: string) {
 
 beforeEach(() => {
   calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], closeOthers: [], move: [], openChange: [] };
+  commands = [];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
   hibernateImpl = () => Promise.resolve();
   closeOthersImpl = (id, set) => {
@@ -411,5 +414,49 @@ describe("Move to Workspace from the palette", () => {
     fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
     await wait(50);
     expect(selected()).toBe("tab:c");
+  });
+});
+
+describe("Back from the Move tab to workspace command", () => {
+  it("returns to the first row like before, not to the active tab", async () => {
+    commands = [{ id: "tab.moveToWorkspace", title: "Move tab to workspace...", group: "Tabs", run: () => {} }];
+    render(<Harness />);
+    await wait(50);
+    const opened = selected();
+    const row = document.querySelector('[cmdk-item][data-value^="cmd:"]');
+    expect(row).not.toBeNull();
+    fireEvent.click(row as Element);
+    await wait(30);
+    expect(document.body.textContent).toContain("Move tab to workspace");
+    fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
+    await wait(50);
+    expect(selected()).toBe(opened);
+    expect(selected()).not.toBe("tab:cur");
+  });
+});
+
+describe("note and sidebar details", () => {
+  it("focus on sidebar for a tab of another workspace switches to it first", async () => {
+    initial = [mk("cur", 0), mk("o", 1, { cwd: "/work/o" }, { workspaceId: "other" })];
+    await openOn("tab:o");
+    await shortcut("focusSidebar");
+    await wait(120);
+    expect(calls.goTo).toEqual(["o"]);
+    expect(calls.reveal).toEqual(["/work/o"]);
+  });
+
+  it.each([
+    ["adding a note", {}, "note"],
+    ["hiding a note", { note: "hi", noteOpen: true }, "note"],
+    ["removing a note", { note: "hi" }, "removeNote"],
+  ] as const)("flushes the pending note text before %s", async (_n, tab, item) => {
+    initial = [mk("cur", 0), mk("b", 1, tab)];
+    const flush = vi.fn();
+    const off = registerTabNoteFlush("b", flush);
+    await openOn("tab:b");
+    await shortcut(item);
+    await wait(30);
+    off();
+    expect(flush).toHaveBeenCalledTimes(1);
   });
 });

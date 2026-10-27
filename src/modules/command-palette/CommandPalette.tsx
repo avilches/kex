@@ -104,16 +104,14 @@ type Props = {
     subject: MoveSubject,
     target: string | "new",
   ) => void;
-  /** The tab data and actions the tab row menu runs by tab id, without changing the active tab. */
   onUpdateTab: (tabId: string, updater: (tab: Tab) => Tab) => void;
   onSaveTab: (tabId: string) => void;
-  /** Hibernates or wakes the terminal without moving the focus off the palette. */
+  /** Unlike the shortcut, it must not focus the tab: the palette keeps the focus. */
   onToggleTabHibernate: (tabId: string) => unknown;
-  /** True while the hibernate review dialog is up, so the palette takes the focus back when it goes. */
+  /** The review dialog takes the focus, and the palette claims it back when it goes. */
   hibernateDialogOpen: boolean;
   onRevealInExplorer: (path: string) => void;
   onCloseOtherTabs: (tabId: string) => unknown;
-  /** Makes the tab current, switching workspace if it lives in another one. */
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -194,6 +192,7 @@ export function CommandPalette({
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const [moveSubject, setMoveSubject] = useState<MoveSubject | null>(null);
+  const [moveFromRow, setMoveFromRow] = useState(false);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
@@ -431,20 +430,21 @@ export function CommandPalette({
     setValue("");
   }, [previewThemeId]);
 
-  const enterWorkspaces = useCallback((subject: MoveSubject | null) => {
+  const enterWorkspaces = useCallback((subject: MoveSubject | null, fromRow = false) => {
     setMoveSubject(subject);
+    setMoveFromRow(fromRow);
     setPage("workspaces");
     setQuery("");
     setValue("");
   }, []);
 
-  // Back to the row the move started from, so the highlight does not jump to the first row.
+  // Back to the row whose menu started the move; the command has no row to go back to.
   const exitWorkspaces = useCallback(() => {
     setPage("root");
     setQuery("");
-    setValue(moveSubject ? tabRowKey(moveSubject.tabId) : "");
+    setValue(moveSubject && moveFromRow ? tabRowKey(moveSubject.tabId) : "");
     setMoveSubject(null);
-  }, [moveSubject]);
+  }, [moveSubject, moveFromRow]);
 
   const runCommand = useCallback(
     (item: PaletteItem) => {
@@ -643,7 +643,7 @@ export function CommandPalette({
           });
         }
       } else if (id === "moveWorkspace") {
-        enterWorkspaces({ tabId, workspaceId: entry.workspaceId });
+        enterWorkspaces({ tabId, workspaceId: entry.workspaceId }, true);
       }
     },
     [
