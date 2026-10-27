@@ -12,7 +12,8 @@ const ws = (tabs: Tab[], activeTabId: string | null = tabs[0]?.id ?? null): Work
     activePaneId: "p1",
   }) as Workspace;
 
-const idle = { agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined, actionOf: () => undefined };
+const idle = { agentOf: () => undefined, scriptState: () => undefined, actionOf: () => undefined };
+const running = (o: Record<string, string>) => async () => new Map(Object.entries(o));
 
 function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
   const calls: string[] = [];
@@ -20,6 +21,10 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     getWorkspace: () => workspace,
     activeWorkspaceId: () => null,
     live: () => idle,
+    collectProcesses: async () => new Map(),
+    warnProcesses: () => true,
+    withRunOnStart: (t) => t,
+    updateTab: (_id, t) => void calls.push(`update:${t.id}`),
     finishAgent: (id) => void calls.push(`finish:${id}`),
     snapshotTabs: async (tabs) => Object.fromEntries(tabs.map((t) => [t.id, { at: 1 }])),
     hibernate: (_id, snapshots) => void calls.push(`hibernate:${Object.keys(snapshots).join(",")}`),
@@ -74,37 +79,82 @@ describe("createHibernateFlow", () => {
     expect(received).toEqual({ t1: snap });
   });
 
-  it("opens the dialog with just the tabs that were asked for when a command would be lost", async () => {
-    const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
-      live: () => ({ ...idle, runningCommand: (id: string) => (id === "t1" ? "npm run dev" : undefined) }),
+  describe("when it asks", () => {
+    it("opens the dialog with the tabs asked for and their processes when a process is running", async () => {
+      let pending: unknown;
+      const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
+        collectProcesses: running({ t1: "npm run dev" }),
+        setPending: (p) => {
+          pending = p;
+        },
+      });
+      await flow.request("w1", ["t1", "t2"]);
+      expect(pending).toEqual({ workspaceId: "w1", tabIds: ["t1", "t2"], processes: [["t1", "npm run dev"]] });
+      expect(calls.some((c) => c.startsWith("hibernate"))).toBe(false);
     });
-    await flow.request("w1", ["t1", "t2"]);
-    expect(calls).toContain("pending:w1:t1,t2");
-    expect(calls.some((c) => c.startsWith("hibernate"))).toBe(false);
+
+    it("hibernates without asking when the process warning is off", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), {
+        collectProcesses: running({ t1: "npm run dev" }),
+        warnProcesses: () => false,
+      });
+      await flow.request("w1", ["t1"]);
+      expect(calls).toContain("hibernate:t1");
+      expect(calls.some((c) => c.startsWith("pending:w1"))).toBe(false);
+    });
+
+    it("asks about a working agent even when the process warning is off", async () => {
+      const working = { agent: "claude", status: "working" as const, resumable: true };
+      const { flow, calls } = setup(ws([term("t1")]), {
+        warnProcesses: () => false,
+        live: () => ({ ...idle, agentOf: () => working }),
+      });
+      await flow.request("w1", ["t1"]);
+      expect(calls).toContain("pending:w1:t1");
+    });
+
+    it("asks about a running script, but only while the process warning is on", async () => {
+      const script = { ...idle, scriptState: () => "running" as const, actionOf: () => ({ name: "dev", command: "pnpm dev" }) };
+      const on = setup(ws([term("t1")]), { live: () => script });
+      await on.flow.request("w1", ["t1"]);
+      expect(on.calls).toContain("pending:w1:t1");
+      const off = setup(ws([term("t1")]), { live: () => script, warnProcesses: () => false });
+      await off.flow.request("w1", ["t1"]);
+      expect(off.calls).toContain("hibernate:t1");
+    });
   });
 
-  it("opens the dialog for a working agent and for a running script", async () => {
-    const working = { agent: "claude", status: "working" as const, resumable: true };
-    const a = setup(ws([term("t1", { restoreOnRestart: true })]), { live: () => ({ ...idle, agentOf: () => working }) });
-    await a.flow.request("w1", ["t1"]);
-    expect(a.calls).toContain("pending:w1:t1");
-
-    const b = setup(ws([term("t1")]), {
-      live: () => ({
-        ...idle,
-        scriptState: () => "running",
-        actionOf: () => ({ name: "dev", command: "pnpm dev" }),
-      }),
+  describe("Run on start", () => {
+    it("is stored on every tab that sleeps, before the agent session ends", async () => {
+      const { flow, calls } = setup(ws([term("t1"), term("t2")]));
+      await flow.perform("w1", ["t1", "t2"]);
+      expect(calls).toEqual(["pending:null", "update:t1", "update:t2", "finish:t1", "finish:t2", "hibernate:t1,t2"]);
     });
-    await b.flow.request("w1", ["t1"]);
-    expect(b.calls).toContain("pending:w1:t1");
+
+    it("snapshots the tab as it will be stored, so the restore command matches", async () => {
+      let seen: Tab[] = [];
+      const { flow } = setup(ws([term("t1")]), {
+        withRunOnStart: (t) => ({ ...t, restoreOnRestart: true, persistentCommand: "make" }) as Tab,
+        snapshotTabs: async (tabs) => {
+          seen = tabs;
+          return {};
+        },
+      });
+      await flow.perform("w1", ["t1"]);
+      expect(seen[0]).toMatchObject({ restoreOnRestart: true, persistentCommand: "make" });
+    });
+
+    it("is not stored for a tab that stopped being valid, so nothing changes if it did not sleep", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { activeWorkspaceId: () => "w1" });
+      await flow.requestAuto("w1", ["t1"]);
+      expect(calls.some((c) => c.startsWith("update"))).toBe(false);
+    });
   });
 
   it("marks the tabs and finishes each agent session right before flagging them", async () => {
-    const { flow, calls } = setup(ws([term("t1"), term("t2")]));
+    const { flow } = setup(ws([term("t1"), term("t2")]));
     await flow.perform("w1", ["t1", "t2"]);
     expect(isHibernating("t1") && isHibernating("t2")).toBe(true);
-    expect(calls).toEqual(["pending:null", "finish:t1", "finish:t2", "hibernate:t1,t2"]);
   });
 
   it("unmarks the tabs when hibernating throws", async () => {
@@ -181,16 +231,14 @@ describe("createHibernateFlow", () => {
       expect(await script.flow.requestAuto("w1", ["t1"])).toBe(false);
     });
 
-    it("does nothing, and never opens the dialog, when a command would be lost", async () => {
-      const { flow, calls } = setup(ws([term("t1")]), { live: () => ({ ...idle, runningCommand: () => "npm run dev" }) });
+    it("never opens the dialog, and leaves a tab with an unsaved process alone", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { collectProcesses: running({ t1: "npm run dev" }) });
       expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
       expect(calls).toEqual([]);
     });
 
     it("skips only the tabs that would lose something", async () => {
-      const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
-        live: () => ({ ...idle, runningCommand: (id: string) => (id === "t1" ? "npm run dev" : undefined) }),
-      });
+      const { flow, calls } = setup(ws([term("t1"), term("t2")]), { collectProcesses: running({ t1: "npm run dev" }) });
       expect(await flow.requestAuto("w1", ["t1", "t2"])).toBe(true);
       expect(calls).toContain("hibernate:t2");
       expect(isHibernating("t1")).toBe(false);

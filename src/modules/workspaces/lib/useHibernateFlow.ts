@@ -9,7 +9,16 @@ import { saveHibernateLines } from "./hibernateLinesIo";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
-import { busyTabIds, isReviewEmpty, liveAgent, tabsReview, type HibernateLive } from "./hibernateReview";
+import {
+  busyTabIds,
+  liveAgent,
+  needsConfirmation,
+  staysBehind,
+  tabsReview,
+  type ForegroundProcesses,
+  type HibernateLive,
+} from "./hibernateReview";
+import { withLiveRunOnStart } from "./runOnStartSave";
 import { visibleTabIds } from "./autoHibernate";
 import { liveScripts } from "./liveScripts";
 import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
@@ -17,12 +26,22 @@ import type { Tab, TabHibernation, Workspace } from "./types";
 
 type TerminalTab = Extract<Tab, { kind: "terminal" }>;
 
-export type PendingHibernate = { workspaceId: string; tabIds: string[] };
+export type PendingHibernate = {
+  workspaceId: string;
+  tabIds: string[];
+  processes: [tabId: string, label: string][];
+};
 
 export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
   activeWorkspaceId: () => string | null;
   live: (ws: Workspace) => HibernateLive;
+  // Foreground process the PTY reports for each of these tabs, labelled with the command.
+  collectProcesses: (tabs: readonly TerminalTab[]) => Promise<ForegroundProcesses>;
+  warnProcesses: () => boolean;
+  // The tab as it must be stored when it sleeps: Run on start on, with what it runs now.
+  withRunOnStart: (tab: TerminalTab) => Tab;
+  updateTab: (workspaceId: string, tab: Tab) => void;
   finishAgent: (tabId: string) => void;
   // Title, agent and restore command of the tabs, read while their PTYs are still alive.
   snapshotTabs: (tabs: TerminalTab[]) => Promise<Record<string, TabHibernation>>;
@@ -40,13 +59,16 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
 
   // Tabs an unattended hibernation may take: out of sight, not busy and with nothing that
   // would be lost.
-  const unattended = (ws: Workspace, tabIds: readonly string[]) => {
-    const tabs = awake(ws, tabIds);
+  const unattended = async (ws: Workspace, tabIds: readonly string[]) => {
     const live = d.live(ws);
     const visible = visibleTabIds([ws], ws.id === d.activeWorkspaceId() ? ws.id : null);
-    const busy = busyTabIds(tabs, live);
-    const lost = new Set(tabsReview(tabs, live).commands.map((c) => c.tabId));
-    return tabs.filter((t) => !visible.has(t.id) && !busy.has(t.id) && !lost.has(t.id));
+    const all = awake(ws, tabIds);
+    const busy = busyTabIds(all, live);
+    // The cheap checks first: the PTY is only asked about the tabs that could still sleep.
+    const candidates = all.filter((t) => !visible.has(t.id) && !busy.has(t.id));
+    if (candidates.length === 0) return [];
+    const processes = await d.collectProcesses(candidates);
+    return candidates.filter((t) => !staysBehind(t, live, processes));
   };
 
   // `stillValid` is checked after the only await, right before anything irreversible: marking
@@ -55,7 +77,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   async function perform(
     workspaceId: string,
     tabIds: readonly string[],
-    stillValid?: (ws: Workspace, tabIds: readonly string[]) => TerminalTab[],
+    stillValid?: (ws: Workspace, tabIds: readonly string[]) => Promise<TerminalTab[]>,
   ): Promise<boolean> {
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return false;
@@ -66,14 +88,16 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     try {
       // First, so the dialog stops watching the stores this call is about to change.
       d.setPending(null);
-      const snapshots = await d.snapshotTabs(tabs);
+      const kept = tabs.map((t) => d.withRunOnStart(t) as TerminalTab);
+      const snapshots = await d.snapshotTabs(kept);
       const current = d.getWorkspace(workspaceId);
       if (!current) return false;
-      const still = (stillValid ?? awake)(current, ids);
+      const still = stillValid ? await stillValid(current, ids) : awake(current, ids);
       if (still.length === 0) return false;
       const stillIds = still.map((t) => t.id);
       markHibernating(stillIds);
       try {
+        for (const tab of kept) if (stillIds.includes(tab.id)) d.updateTab(workspaceId, tab);
         for (const id of stillIds) d.finishAgent(id);
         d.hibernate(workspaceId, snapshots);
       } catch (e) {
@@ -91,11 +115,12 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     if (!ws) return;
     const tabs = awake(ws, tabIds);
     if (tabs.length === 0) return;
-    if (isReviewEmpty(tabsReview(tabs, d.live(ws)))) {
+    const processes = await d.collectProcesses(tabs);
+    if (!needsConfirmation(tabsReview(tabs, d.live(ws), processes), d.warnProcesses())) {
       await perform(workspaceId, tabIds);
       return;
     }
-    d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id) });
+    d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id), processes: [...processes] });
   }
 
   // Unattended variant: hibernates only the tabs nobody is looking at and nothing would be
@@ -103,7 +128,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   async function requestAuto(workspaceId: string, tabIds: readonly string[]): Promise<boolean> {
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return false;
-    const ids = unattended(ws, tabIds).filter((t) => !inFlight.has(t.id)).map((t) => t.id);
+    const ids = (await unattended(ws, tabIds)).filter((t) => !inFlight.has(t.id)).map((t) => t.id);
     if (ids.length === 0) return false;
     return perform(workspaceId, ids, unattended);
   }
@@ -149,6 +174,8 @@ type HookDeps = {
   workspacesRef: { current: Workspace[] };
   activeWorkspaceIdRef: { current: string | null };
   hibernateWorkspace: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
+  updateTabData: (workspaceId: string, tabId: string, updater: (tab: Tab) => Tab) => void;
+  foregroundProcess: (tabId: string) => Promise<string | null>;
   readLeafAnsi: ReadLeafAnsi;
 };
 
@@ -164,13 +191,33 @@ export function useHibernateFlow(deps: HookDeps) {
         activeWorkspaceId: () => depsRef.current.activeWorkspaceIdRef.current,
         live: (ws) => {
           const sessions = useAgentStore.getState().sessions;
-          const commands = getRunningCommandsSnapshot();
           return {
             agentOf: (id) => liveAgent(sessions[id]),
-            runningCommand: (id) => commands.get(id),
             ...liveScripts(ws),
           };
         },
+        collectProcesses: async (tabs) => {
+          const commands = getRunningCommandsSnapshot();
+          const found = await Promise.all(
+            tabs.map(async (t) => [t.id, await depsRef.current.foregroundProcess(t.id).catch(() => null)] as const),
+          );
+          return new Map(
+            found.flatMap(([id, name]) => (name === null ? [] : [[id, commands.get(id) ?? (name || "shell")] as const])),
+          );
+        },
+        warnProcesses: () => usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
+        withRunOnStart: withLiveRunOnStart,
+        updateTab: (workspaceId, saved) =>
+          depsRef.current.updateTabData(workspaceId, saved.id, (t) =>
+            t.kind === "terminal" && saved.kind === "terminal"
+              ? {
+                  ...t,
+                  restoreOnRestart: saved.restoreOnRestart,
+                  persistentCommand: saved.persistentCommand,
+                  persistentCommandManual: saved.persistentCommandManual,
+                }
+              : t,
+          ),
         finishAgent: (id) => useAgentStore.getState().finish(id),
         snapshotTabs: (tabs) => snapshotTerminalTabs(tabs, depsRef.current.readLeafAnsi),
         hibernate: (id, snapshots) => depsRef.current.hibernateWorkspace(id, snapshots),

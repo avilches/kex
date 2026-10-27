@@ -289,9 +289,10 @@ describe("buildReopenedTab", () => {
     expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
   });
 
-  it("reopens a hibernated terminal awake, with its new id", () => {
-    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", hibernation: { at: 1, agent: "claude", command: "claude --resume", title: "x" } };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false });
+  it("keeps a hibernated terminal asleep", () => {
+    const hibernation = { at: 1, agent: "claude", command: "claude --resume", title: "x" };
+    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", hibernation };
+    expect(buildReopenedTab(tab, "old")).toEqual({ id: "old", kind: "terminal", cwd: "/proj", hibernation, locked: false });
   });
 
   it("unlocks a reopened git-diff tab and drops its preview state", () => {

@@ -468,8 +468,8 @@ export function TerminalSection() {
           </Select>
         </SettingRow>
         <SettingRow
-          title="Warn when closing a tab with a running process"
-          description="Confirm before closing a terminal that still has a process running."
+          title="Warn when closing or hibernating a tab with a running process"
+          description="Confirm before a terminal that still has a process running is closed or hibernated. A working agent always asks."
         >
           <Switch
             checked={warnOnCloseRunning}

@@ -302,17 +302,23 @@ menu item "Hibernate" and the workspace context menu item "Hibernate all" call `
 from `useHibernateFlow` (`lib/useHibernateFlow.ts`; the framework-free `createHibernateFlow` holds the logic so it is
 testable without React):
 
-1. `tabsReview` (`lib/hibernateReview.ts`) lists what would be lost in those tabs: busy tabs (agents still working and
-   script Actions in `running` or `waiting`) and commands without "Run on start". There are no documents: editors do not
-   hibernate. (`hibernateReview`, the workspace-level version, is the one closing a workspace uses: it adds the unsaved
-   documents and ignores sleeping tabs.) An agent only counts as coming back when it has a stored session (`hasResumed`); a
-   busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a
-   command. An empty shell is not listed: it sleeps without asking. If the review is empty the tabs hibernate immediately;
-   otherwise `pending` (`{ workspaceId, tabIds }`) opens `HibernateDialog` with one row per tab to review.
-2. `performHibernate` clears the pending request and takes the snapshots (`snapshotTerminalTabs`: title, agent and restore
+1. `collectProcesses` asks the PTY of each tab for its foreground process (`leafHasForegroundProcess`, the same check
+   closing a tab uses), and `tabsReview` (`lib/hibernateReview.ts`) lists what hibernating would interrupt in those tabs:
+   busy tabs (agents still working and script Actions in `running` or `waiting`) and plain terminals with a foreground
+   process. There are no documents: editors do not hibernate. (`hibernateReview`, the workspace-level version, is the one
+   closing a workspace uses: it adds the unsaved documents and ignores sleeping tabs.) An empty shell, an idle agent and an
+   agent waiting for the user are not listed: they sleep without asking. `needsConfirmation` decides whether to ask: a
+   working agent and an unsaved document always ask; a running process or script asks only while the
+   `warnOnCloseTabWithRunningProcess` preference is on (default on). If it does not ask the tabs hibernate immediately;
+   otherwise `pending` (`{ workspaceId, tabIds, processes }`) opens `HibernateDialog` with one row per tab to review.
+   Run on start is never a question: `perform` stores it on every tab that sleeps (`saveRunOnStart`, applied through
+   `withLiveRunOnStart`), so the wake brings back what was running (see "Run on start is always saved" below).
+2. `performHibernate` clears the pending request, stores Run on start on each tab (`withRunOnStart`) and takes the
+   snapshots from those tabs (`snapshotTerminalTabs`: title, agent and restore
    command of each tab, read while the PTYs are alive, after flushing the agent titles and the Sidebar snapshots). Then,
    with no await left, it rechecks (for the automatic path: the tab is still hidden, not busy and has nothing to lose),
-   marks the tabs with `markHibernating` (so the exit of their PTYs is not reported as an agent failure), calls `finish` on
+   marks the tabs with `markHibernating` (so the exit of their PTYs is not reported as an agent failure), writes the stored
+   Run on start to the tabs (`updateTab`), calls `finish` on
    each agent session and calls `hibernateWorkspace` (`applyHibernate`); if the recheck fails or hibernating throws, nothing
    stays marked. A set of in-flight tab ids makes a double trigger hibernate once.
 
@@ -323,17 +329,24 @@ keeps the last shown workspace and group so it does not flip during the exit ani
 while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
 While the dialog is open `shortcutsDisabled` returns true for every shortcut (the global listener
 runs in capture phase, before the Radix modal); Escape is not a registered shortcut and still closes it.
-`HibernateDialog` is reactive: it recomputes the review from the agent store, the running
-commands store and the script state map, so a row disappears when its agent finishes or when "Run on start" is enabled
-(`enableRunOnStart`), and the dialog closes and hibernates on its own once the lists are
-empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it
-hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script
+`HibernateDialog` is the one dialog for everything that interrupts a terminal, in three modes: `hibernate`, `close-tab`
+(closing one tab, fed by `useTabCloseGuards`) and `close` (closing a workspace). It is reactive: it recomputes the review
+from the agent store and the script state map, so a row disappears when its agent finishes, and in `hibernate` mode the
+dialog hibernates on its own once the lists are empty. Busy rows are split in two sections: agents (spinner; in
+`hibernate` mode "Waiting for these agents to finish" and a line saying it hibernates on its own, shown only when nothing
+else is pending; when closing, "Agents that are working and will be killed" and a line suggesting to wait for them) and
+running scripts (no spinner, no waiting line: a script
 cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C
 plus status idle, the session survives) or "Stop"
 (script: the dialog only marks the tab and types Ctrl+C, no moving focus and no signal stage; the row unsticks when the
 shell reports the end of the command, and a Ctrl+C-immune program from here keeps the disabled "Stopping" row until its
-terminal tab is closed). In `mode="close"` the same dialog is fed by the workspace-level `hibernateReview` (it keeps the
-unsaved-document rows with Save and Save all). Closing a workspace abandons its carried buffers (`abandonUnflushedBuffers`:
+terminal tab is closed). Running processes are a third section ("Running processes that will be killed"). Under every
+terminal row goes the command that will run when the tab comes back (`useRestoreCommand`: the agent resume command or the
+command the shell reports; "Runs again on restore"), so the user sees what the undo or the wake will do. The "Don't ask me
+again" checkbox appears only when the review holds processes or scripts and nothing else (`canSilenceWarning`): with a
+working agent or an unsaved document in it there is no checkbox, because those always ask. Checking it switches the
+`warnOnCloseTabWithRunningProcess` preference off for hibernating and closing alike. In `mode="close"` the dialog is fed by
+the workspace-level `hibernateReview` (it keeps the unsaved-document rows with Save and Save all). Closing a workspace abandons its carried buffers (`abandonUnflushedBuffers`:
 the editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are
 refused) and clears its hibernating marks. Closing a workspace does not go through `closeTab`; `closeWorkspace` records the
 whole workspace as one entry of the closed stack instead, so `tab.reopenClosed` brings it back with everything it held (see
@@ -351,10 +364,36 @@ stamps a tab the first time it is seen hidden, deletes the stamp of a visible, s
 of a busy tab (a working agent, a running script, or an agent in `attention`, from `busyTabIds`), so its countdown only
 runs while nothing works in it. The stamps are never persisted: after a restart every hidden tab starts counting again.
 For each workspace with candidates `createHibernateFlow().requestAuto(workspaceId, tabIds)` keeps only the tabs that are
-still hidden, not busy and with nothing to lose (`tabsReview` has no busy tab and no command without "Run on start"), and
-hibernates them together; the rest stay awake until the next check. Empty shells do hibernate. It re-checks after taking the
+still hidden, not busy and with nothing to lose (not busy, and `staysBehind` is false: no process of a tab whose Run on
+start the user switched off, no agent without a stored session), and hibernates them together; the rest stay awake until
+the next check. Empty shells do hibernate. A tab that sleeps unattended also gets Run on start stored. It re-checks after taking the
 snapshots, so a tab that became visible meanwhile is left alone. Unsaved documents play no part: editors never hibernate.
 `requestAuto` never opens `HibernateDialog`.
+
+#### Run on start is always saved
+
+Closing and hibernating are two actions with the same warning and the same effect on Run on start: the command a terminal
+runs is stored on the tab (`restoreOnRestart` on, `persistentCommand` set) whenever the tab stops, and the user is never
+asked. `saveRunOnStart` (`lib/hibernate.ts`, pure) decides what to store: a tab whose Run on start the user switched off
+in its menu stays off; an agent that resumes its own session (`hasResumed`) turns the flag on without copying the running
+command; any other terminal keeps a command typed by hand (`persistentCommandManual`) or adopts the one the shell reports
+(`followableCommand`); and an empty shell is left untouched.
+`withLiveRunOnStart` (`lib/runOnStartSave.ts`) reads the live stores and applies it. Hibernating stores it through
+`updateTab`; closing a tab stores it on the tab `closeTab` puts on the closed stack, and closing a workspace stores it on
+every tab of the snapshot (`withLiveRunOnStartAll`), so undoing the close runs the command again.
+
+#### Close and hibernate are two steps
+
+Closing a tab that is awake interrupts it (the dialog above) and `tab.reopenClosed` brings it back awake, with a new id and
+its command running. Closing a tab that is hibernated never asks and `tab.reopenClosed` brings it back hibernated, with its
+own id (its stored lines and agent session are indexed by it), exactly as it was. For that, closing a sleeping tab does not
+delete its stored lines (`useHibernateLinesCleanup` only deletes on wake); the backend sweep at startup removes the ones
+nobody brought back. Hibernating first and closing after is
+therefore the two-step way to close something without ever running it again on undo. `closeQueue` asks only for an awake
+terminal: a working agent always (`terminalCloseWarning`, no checkbox), a foreground process while the preference is on.
+A tab with a live agent session that is not working (idle or waiting for the user) is never asked about, even though its
+process is in the foreground: `hasAgent` keeps the queue and the dialog's review in agreement. The "Don't ask me again"
+checkbox is not offered when closing a workspace that also deletes Actions, since the dialog would still open.
 
 #### Startup
 

@@ -126,6 +126,23 @@ export function enableRunOnStart(tab: Tab, runningCommand?: string): Tab {
   };
 }
 
+// Run on start is saved every time a terminal stops (hibernate or close), so waking it or undoing
+// the close brings back what it was running. A user who switched it off keeps it off. A shell with
+// nothing to run is left alone, an agent that resumes its own session never copies the running
+// command, and a command the user typed by hand is never replaced by the running one.
+export function saveRunOnStart(
+  tab: Tab,
+  live: { running: string | null; agentResumable: boolean | undefined },
+): Tab {
+  if (tab.kind !== "terminal" || tab.hibernation || tab.restoreOnRestart === false) return tab;
+  const resumes = live.agentResumable === true;
+  const running = resumes ? undefined : (live.running ?? undefined);
+  const command = tab.persistentCommandManual ? tab.persistentCommand : (running ?? tab.persistentCommand);
+  if (!resumes && !command) return tab;
+  if (tab.restoreOnRestart === true && tab.persistentCommand === command) return tab;
+  return { ...tab, restoreOnRestart: true, persistentCommand: command };
+}
+
 export function isPendingStale(pendingId: string | null, workspaces: readonly { id: string }[]): boolean {
   return pendingId !== null && !workspaces.some((w) => w.id === pendingId);
 }

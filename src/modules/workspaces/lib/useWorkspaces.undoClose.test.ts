@@ -353,8 +353,7 @@ describe("undo close of a hibernated tab", () => {
   });
   afterEach(() => view?.unmount());
 
-  it("closes it without a session to stash and reopens it awake with a new id and a seeded plan", async () => {
-    vi.mocked(previewResumeCmd).mockResolvedValue(planFor("b1"));
+  it("closes it without a session to stash and reopens it still asleep, with its own id and no plan seeded", async () => {
     view = mount([makeWs("b", [sleeping("b1"), term("b2")])]);
 
     act(() => view!.h.closeTab("b", "b1"));
@@ -363,12 +362,24 @@ describe("undo close of a hibernated tab", () => {
     await act(async () => {
       await view!.h.reopenClosed();
     });
-    const ids = tabIds(view.h.workspaces[0]);
-    expect(ids).toHaveLength(2);
+    expect(tabIds(view.h.workspaces[0]).sort()).toEqual(["b1", "b2"]);
+    const reopened = allPanes(view.h.workspaces[0]!.paneTree)[0]!.tabs.find((t) => t.id === "b1")!;
+    expect(reopened).toMatchObject({ hibernation: { at: 1, agent: "claude" } });
+    expect(previewResumeCmd).not.toHaveBeenCalled();
+    expect(seedRestorePlan).not.toHaveBeenCalled();
+  });
+
+  it("reopens a tab that was awake awake, with a new id and a seeded plan", async () => {
+    vi.mocked(previewResumeCmd).mockResolvedValue(planFor("b1"));
+    view = mount([makeWs("b", [term("b1"), term("b2")])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
     const reopened = allPanes(view.h.workspaces[0]!.paneTree)[0]!.tabs.find((t) => t.id !== "b2")!;
     expect(reopened.id).not.toBe("b1");
     expect((reopened as { hibernation?: unknown }).hibernation).toBeUndefined();
-    expect(previewResumeCmd).toHaveBeenCalledWith("b1");
     expect(seedRestorePlan).toHaveBeenCalledWith(reopened.id, expect.objectContaining({ tabId: "b1" }));
   });
 });

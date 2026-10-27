@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
-import { departedHibernatedIds, hibernatedTabIds } from "./hibernate";
+import { departedHibernatedIds, hibernatedTabIds, terminalTabs } from "./hibernate";
 import { deleteHibernateLines } from "./hibernateLinesIo";
 import type { Workspace } from "./types";
 
-// One place for every way a tab stops sleeping (wake, close tab, close workspace, reopen), so none
-// of them can leave its stored lines behind. The first render only records the starting point:
-// files of tabs that vanished while Kex was closed are swept by the backend at startup.
+// Waking a tab deletes its stored lines. Closing one does not: undoing the close brings it back
+// asleep with the same id and it needs them. The ones nobody brings back are swept by the backend
+// at startup. The first render only records the starting point.
 export function useHibernateLinesCleanup(workspaces: readonly Workspace[]): void {
   const previous = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -13,7 +13,8 @@ export function useHibernateLinesCleanup(workspaces: readonly Workspace[]): void
     const before = previous.current;
     previous.current = now;
     if (!before) return;
-    const gone = departedHibernatedIds(before, now);
+    const present = new Set(workspaces.flatMap((ws) => terminalTabs(ws).map((t) => t.id)));
+    const gone = departedHibernatedIds(before, now).filter((id) => present.has(id));
     if (gone.length > 0) {
       deleteHibernateLines(gone).catch((e) => console.warn("[kex] could not delete hibernate lines:", e));
     }

@@ -1,42 +1,32 @@
 import { useMemo, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { hibernateReview, liveAgent, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, liveAgent, needsConfirmation, type ForegroundProcesses, type HibernateLive } from "./hibernateReview";
 import { liveScripts } from "./liveScripts";
-import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
 import { actionsToDelete, type Workspace } from "./types";
 
 export type RunningProcess = { tabId: string; label: string };
 export type PendingClose = { id: string; processes: RunningProcess[] };
 
-// Scripts and agents already show up as busy rows, so a process listed for the
-// same tab would be a duplicate.
-export function closeProcesses(
-  ws: Workspace,
-  live: HibernateLive,
-  processes: RunningProcess[],
-): RunningProcess[] {
-  const busy = new Set(hibernateReview(ws, live).busy.map((b) => b.tabId));
-  return processes.filter((p) => !busy.has(p.tabId));
+export function processMap(processes: readonly RunningProcess[]): ForegroundProcesses {
+  return new Map(processes.map((p) => [p.tabId, p.label]));
 }
 
 export function needsCloseConfirmation(
   ws: Workspace,
   live: HibernateLive,
   processes: RunningProcess[],
+  warnProcesses: boolean,
 ): boolean {
-  const review = hibernateReview(ws, live);
-  return (
-    actionsToDelete(ws) > 0 ||
-    review.busy.length > 0 ||
-    review.docs.length > 0 ||
-    closeProcesses(ws, live, processes).length > 0
-  );
+  const review = hibernateReview(ws, live, processMap(processes));
+  // Deleting actions is not a warning the user can silence: it is the one thing closing loses.
+  return actionsToDelete(ws) > 0 || needsConfirmation(review, warnProcesses);
 }
 
 export type CloseFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
   autosaveEnabled: () => boolean;
+  warnProcesses: () => boolean;
   flushDirtyEditors: () => Promise<void>;
   settle: () => Promise<void>;
   live: (ws: Workspace) => HibernateLive;
@@ -89,8 +79,8 @@ export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return { status: "none" };
     const live = d.live(ws);
-    const processes = closeProcesses(ws, live, await d.collectProcesses(ws));
-    if (!needsCloseConfirmation(ws, live, processes)) {
+    const processes = await d.collectProcesses(ws);
+    if (!needsCloseConfirmation(ws, live, processes, d.warnProcesses())) {
       await perform(workspaceId);
       return { status: "closed" };
     }
@@ -137,14 +127,13 @@ export function useCloseWorkspaceFlow(deps: HookDeps) {
       createCloseWorkspaceFlow({
         getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
         autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
+        warnProcesses: () => usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
         flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
         settle: nextFrames,
         live: (ws) => {
           const sessions = useAgentStore.getState().sessions;
-          const commands = getRunningCommandsSnapshot();
           return {
             agentOf: (id) => liveAgent(sessions[id]),
-            runningCommand: (id) => commands.get(id),
             ...liveScripts(ws),
           };
         },

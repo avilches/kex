@@ -1486,6 +1486,15 @@ function dialogFrame(opts: {
   );
 }
 
+function restoreLine(command: string): HTMLElement {
+  return h(
+    "span",
+    { class: "min-w-0 truncate pl-5 text-[11px] text-muted-foreground/80" },
+    "Runs again on restore: ",
+    h("span", { class: "font-mono" }, command),
+  );
+}
+
 function dialogsView(): HTMLElement {
   const term = (size = 16) => icon(ComputerTerminal01Icon, size, 2);
   const tinted = (color: string, node: Node) =>
@@ -1503,27 +1512,48 @@ function dialogsView(): HTMLElement {
     "div",
     { class: "grid grid-cols-1 gap-6 xl:grid-cols-2" },
     dialogFrame({
-      id: "close-terminal",
-      title: "Close terminal?",
-      name: dialogName(tinted("#e5a50a", term()), "claude: refactor close dialogs"),
-      description: "The running process will be killed",
+      id: "close-tab (process)",
+      title: "Close tab?",
+      name: dialogName(dot("#22c55e"), "Kex", "In progress"),
       body: [
-        h(
-          "p",
-          { class: "break-all font-mono text-[12px] text-muted-foreground" },
-          "claude --resume 7f3a9c",
+        dialogSection(
+          "Running processes that will be killed",
+          dialogRow(term(12), "logs", "tail -f ~/.cache/kex/kex.log"),
+          restoreLine("tail -f ~/.cache/kex/kex.log"),
         ),
         dialogCheckbox("Don't ask me again"),
       ],
       footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
-      notice: "Run on start enabled: you can undo close this tab",
     }),
     dialogFrame({
-      id: "close-terminal (long name)",
-      title: "Close terminal?",
+      id: "close-tab (working agent)",
+      title: "Close tab?",
+      name: dialogName(dot("#22c55e"), "Kex", "In progress"),
+      body: [
+        dialogSection(
+          "Agents that are working and will be killed",
+          dialogRow(term(12), "claude: refactor close dialogs", "", busy()),
+          restoreLine("claude --resume 7f3a9c"),
+        ),
+        h(
+          "p",
+          { class: "text-[12px] text-muted-foreground" },
+          "Consider waiting for the agent to finish before closing.",
+        ),
+      ],
+      footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
+    }),
+    dialogFrame({
+      id: "close-tab (long name)",
+      title: "Close tab?",
       name: dialogName(tinted("#3b82f6", term()), longName),
-      description: "The running process will be killed",
-      body: [dialogCheckbox("Don't ask me again", true)],
+      body: [
+        dialogSection(
+          "Running processes that will be killed",
+          dialogRow(term(12), longName, longName),
+        ),
+        dialogCheckbox("Don't ask me again", true),
+      ],
       footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
     }),
     dialogFrame({
@@ -1532,9 +1562,14 @@ function dialogsView(): HTMLElement {
       name: dialogName(dot("#22c55e"), "Kex", "In progress"),
       body: [
         dialogSection(
-          "Agents that will be killed",
+          "Agents that are working and will be killed",
           dialogRow(term(12), "claude", "claude --resume 7f3a9c", busy()),
           dialogRow(term(12), "codex", "codex", busy()),
+        ),
+        h(
+          "p",
+          { class: "text-[12px] text-muted-foreground" },
+          "Consider waiting for the agents to finish before closing.",
         ),
         dialogSection(
           "Running scripts that will be stopped",
@@ -1571,11 +1606,13 @@ function dialogsView(): HTMLElement {
           "The tab will hibernate as soon as the agents are done.",
         ),
         dialogSection(
-          "Commands that will not come back",
-          dialogRow(term(12), "server", "pnpm dev", dialogButton("Run on start", "outline", true)),
+          "Running processes that will be killed",
+          dialogRow(term(12), "server", "pnpm dev"),
+          restoreLine("pnpm dev"),
         ),
+        dialogCheckbox("Don't ask me again"),
       ],
-      footer: [dialogButton("Close"), dialogButton("Hibernate now", "default")],
+      footer: [dialogButton("Cancel"), dialogButton("Hibernate now", "default")],
     }),
     dialogFrame({
       id: "close-file",

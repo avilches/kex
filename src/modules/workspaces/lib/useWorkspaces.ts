@@ -24,7 +24,7 @@ import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
 import { setWakeBackdrop } from "@/modules/terminal/lib/wakeBackdrop";
-import { applyHibernate, applyWake, terminalTabs } from "./hibernate";
+import { applyHibernate, applyWake, isHibernatedTab, terminalTabs } from "./hibernate";
 import { wakeBackdrop } from "./hibernateLines";
 import { readHibernateLines } from "./hibernateLinesIo";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
@@ -60,6 +60,7 @@ import {
   reviveWorkspace,
 } from "./closedStack";
 import { dismissCloseNotice, showCloseNotice } from "./closedNotice";
+import { withLiveRunOnStart, withLiveRunOnStartAll } from "./runOnStartSave";
 
 // Whether a reopened closed tab is worth asking Rust for a live agent resume plan.
 // Mirrors the same "Run on start" gate the startup restore flow already applies
@@ -602,7 +603,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       const before = closedTabsRef.current;
       closedTabsRef.current = captureClosedWorkspace(
         before,
-        closing,
+        withLiveRunOnStartAll(closing),
         workspacesRef.current.findIndex((w) => w.id === id),
         undefined,
         explicit,
@@ -829,7 +830,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
           kind: "tab",
-          tab: found.tab,
+          tab: withLiveRunOnStart(found.tab),
           paneId: found.pane.id,
           workspaceId,
           prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,
@@ -882,8 +883,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     }
 
     const { entry } = picked;
-    const newId = newTabId();
-    await seedPlan(entry.tab, newId);
+    // A sleeping tab comes back asleep with its own id: its stored lines and agent session are
+    // indexed by it, and its plan is seeded when it wakes.
+    const asleep = isHibernatedTab(entry.tab);
+    const newId = asleep ? entry.tab.id : newTabId();
+    if (!asleep) await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
     closedTabsRef.current = remapPrevTabId(closedTabsRef.current, entry.tab.id, newId);
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);

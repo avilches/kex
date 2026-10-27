@@ -96,12 +96,11 @@ describe("useHibernateLinesCleanup", () => {
     expect(io.del).toHaveBeenCalledWith(["t1"]);
   });
 
-  it("deletes the lines of a sleeping tab that is closed, with its workspace or alone", () => {
+  it("keeps the lines of a sleeping tab that is closed, with its workspace or alone, so undoing the close finds them", () => {
     const { rerender } = renderHook(({ ws }) => useHibernateLinesCleanup(ws), { initialProps: { ws: sleeping("t1", "t2") } });
     rerender({ ws: [workspace("t2")].map((w) => applyHibernate([w], "w1", { t2: { at: 1 } })[0]!) });
-    expect(io.del).toHaveBeenLastCalledWith(["t1"]);
     rerender({ ws: [] });
-    expect(io.del).toHaveBeenLastCalledWith(["t2"]);
+    expect(io.del).not.toHaveBeenCalled();
   });
 
   it("does nothing when a tab starts to sleep", () => {

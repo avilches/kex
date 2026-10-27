@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   runCloseQueue,
+  terminalCloseWarning,
   type CloseQueueDeps,
   type CloseQueueTab,
 } from "./closeQueue";
@@ -17,6 +18,8 @@ function makeDeps(
   const deps: CloseQueueDeps = {
     getTab: (id) => tabs[id] ?? null,
     hasForegroundProcess: async () => null,
+    hasBusyAgent: () => false,
+    hasAgent: () => false,
     isWarnEnabled: () => true,
     setWarnEnabled: async (v) => {
       warnSet.push(v);
@@ -86,6 +89,90 @@ describe("runCloseQueue", () => {
     const { deps } = makeDeps({ a: { kind: "terminal" }, b: { kind: "editor", dirty: false } });
     const allClosed = await runCloseQueue(["a", "b"], deps);
     expect(allClosed).toBe(true);
+  });
+
+  it("never asks about a sleeping terminal, even if a process is reported", async () => {
+    const ask = vi.fn();
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal", hibernated: true } },
+      { hasForegroundProcess: async () => "npm", hasBusyAgent: () => true, askTerminalClose: ask as never },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(closed).toEqual(["a"]);
+  });
+
+  it("tells the dialog why it is asking: the process, or a working agent", async () => {
+    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
+    const proc = makeDeps({ a: { kind: "terminal" } }, { hasForegroundProcess: async () => "npm", askTerminalClose: ask });
+    await runCloseQueue(["a"], proc.deps);
+    expect(ask).toHaveBeenLastCalledWith("a", { reason: "process", processName: "npm" });
+    const agent = makeDeps({ a: { kind: "terminal" } }, { hasBusyAgent: () => true, askTerminalClose: ask });
+    await runCloseQueue(["a"], agent.deps);
+    expect(ask).toHaveBeenLastCalledWith("a", { reason: "agent" });
+  });
+
+  it("does not ask about an idle agent: its process is in the foreground but nothing is lost", async () => {
+    const ask = vi.fn();
+    const probe = vi.fn(async () => "claude");
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal" } },
+      { hasAgent: () => true, hasForegroundProcess: probe, askTerminalClose: ask as never },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(probe).not.toHaveBeenCalled();
+    expect(closed).toEqual(["a"]);
+  });
+
+  it("always asks about a working agent, even with the warning off", async () => {
+    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal" } },
+      { isWarnEnabled: () => false, hasBusyAgent: () => true, askTerminalClose: ask },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(closed).toEqual(["a"]);
+  });
+
+  it("does not look for a process when an agent is already the reason to ask", async () => {
+    const probe = vi.fn(async () => "npm");
+    const { deps } = makeDeps({ a: { kind: "terminal" } }, { hasBusyAgent: () => true, hasForegroundProcess: probe });
+    await runCloseQueue(["a"], deps);
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it("cancelling the question about a working agent stops the run", async () => {
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal" }, b: { kind: "terminal" } },
+      { hasBusyAgent: (id) => id === "a", askTerminalClose: async () => ({ type: "cancel" }) },
+    );
+    expect(await runCloseQueue(["a", "b"], deps)).toBe(false);
+    expect(closed).toEqual([]);
+  });
+
+  it("a working agent is asked about again on every tab, since the dialog offers no checkbox for it", async () => {
+    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
+    const { deps, closed, warnSet } = makeDeps(
+      { a: { kind: "terminal" }, b: { kind: "terminal" } },
+      { hasBusyAgent: () => true, askTerminalClose: ask },
+    );
+    await runCloseQueue(["a", "b"], deps);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(warnSet).toEqual([]);
+    expect(closed).toEqual(["a", "b"]);
+  });
+
+  it("after dont-ask-again on a process, a later working agent is still asked about", async () => {
+    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: true }) as const);
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal" }, b: { kind: "terminal" }, c: { kind: "terminal" } },
+      { hasForegroundProcess: async () => "npm", hasBusyAgent: (id) => id === "c", askTerminalClose: ask },
+    );
+    await runCloseQueue(["a", "b", "c"], deps);
+    expect(ask.mock.calls.map((c) => (c as unknown[])[0])).toEqual(["a", "c"]);
+    expect(closed).toEqual(["a", "b", "c"]);
   });
 
   it("dont-ask-again disables the setting and closes the rest silently", async () => {
@@ -215,5 +302,25 @@ describe("runCloseQueue", () => {
       expect(closed).toEqual([]);
     }
     expect(reported).toEqual([err, err]);
+  });
+});
+
+describe("terminalCloseWarning", () => {
+  it("asks about a busy agent whatever the warning says", () => {
+    expect(terminalCloseWarning({ busyAgent: true, processName: null, warnProcesses: false })).toEqual({ reason: "agent" });
+    expect(terminalCloseWarning({ busyAgent: true, processName: "npm", warnProcesses: true })).toEqual({ reason: "agent" });
+  });
+
+  it("asks about a process only while the warning is on", () => {
+    expect(terminalCloseWarning({ busyAgent: false, processName: "npm", warnProcesses: true })).toEqual({ reason: "process", processName: "npm" });
+    expect(terminalCloseWarning({ busyAgent: false, processName: "npm", warnProcesses: false })).toBeNull();
+  });
+
+  it("treats an empty process name as a process: a shell with something in the foreground", () => {
+    expect(terminalCloseWarning({ busyAgent: false, processName: "", warnProcesses: true })).toEqual({ reason: "process", processName: "" });
+  });
+
+  it("does not ask about a quiet terminal", () => {
+    expect(terminalCloseWarning({ busyAgent: false, processName: null, warnProcesses: true })).toBeNull();
   });
 });

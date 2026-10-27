@@ -15,6 +15,7 @@ import {
   enableRunOnStart,
   formatHibernatedFor,
   restoreCommandFor,
+  saveRunOnStart,
   terminalTabs,
 } from "./hibernate";
 import type { SplitNode, Tab, TabHibernation, Workspace } from "./types";
@@ -283,5 +284,71 @@ describe("workspaceDialogPending", () => {
     expect(workspaceDialogPending(null, undefined)).toBe(false);
     expect(workspaceDialogPending({ workspaceId: "w1", tabIds: ["t1"] }, undefined)).toBe(true);
     expect(workspaceDialogPending(null, "w2")).toBe(true);
+  });
+});
+
+describe("saveRunOnStart", () => {
+  const none = { running: null, agentResumable: undefined };
+
+  it("stores the running command and turns Run on start on", () => {
+    expect(saveRunOnStart(term("t1"), { ...none, running: "npm run dev" })).toMatchObject({
+      restoreOnRestart: true,
+      persistentCommand: "npm run dev",
+    });
+  });
+
+  it("keeps the stored command when nothing is running now", () => {
+    const tab = term("t1", { persistentCommand: "make" });
+    expect(saveRunOnStart(tab, none)).toMatchObject({ restoreOnRestart: true, persistentCommand: "make" });
+  });
+
+  it("leaves an empty shell untouched, as the same object", () => {
+    const tab = term("t1");
+    expect(saveRunOnStart(tab, none)).toBe(tab);
+  });
+
+  it("leaves a tab that already has everything stored as the same object", () => {
+    const tab = term("t1", { restoreOnRestart: true, persistentCommand: "make" });
+    expect(saveRunOnStart(tab, { ...none, running: "make" })).toBe(tab);
+  });
+
+  it("turns on an agent that resumes its session without copying the running command", () => {
+    const saved = saveRunOnStart(term("t1"), { running: "claude", agentResumable: true });
+    expect(saved).toMatchObject({ restoreOnRestart: true });
+    expect((saved as Terminal).persistentCommand).toBeUndefined();
+  });
+
+  it("stores the launch command of an agent that has not reported a session", () => {
+    expect(saveRunOnStart(term("t1"), { running: "opencode", agentResumable: false })).toMatchObject({
+      restoreOnRestart: true,
+      persistentCommand: "opencode",
+    });
+  });
+
+  it("respects a Run on start the user switched off, for a plain terminal and for an agent", () => {
+    const plain = term("t1", { restoreOnRestart: false, persistentCommand: "make" });
+    expect(saveRunOnStart(plain, { ...none, running: "make" })).toBe(plain);
+    const agent = term("t2", { restoreOnRestart: false });
+    expect(saveRunOnStart(agent, { running: "claude", agentResumable: true })).toBe(agent);
+  });
+
+  it("keeps a command typed by hand instead of the one running now", () => {
+    const tab = term("t1", { persistentCommand: "make", persistentCommandManual: true });
+    expect(saveRunOnStart(tab, { ...none, running: "other" })).toMatchObject({
+      restoreOnRestart: true,
+      persistentCommand: "make",
+    });
+  });
+
+  it("follows the running command when the stored one was not typed by hand", () => {
+    const tab = term("t1", { persistentCommand: "old", persistentCommandManual: false });
+    expect(saveRunOnStart(tab, { ...none, running: "new" })).toMatchObject({ persistentCommand: "new" });
+  });
+
+  it("never touches a sleeping tab or a tab that is not a terminal", () => {
+    const asleep = term("t1", { hibernation: { at: 1 } });
+    expect(saveRunOnStart(asleep, { ...none, running: "make" })).toBe(asleep);
+    const doc = editor("e1", true);
+    expect(saveRunOnStart(doc, { ...none, running: "make" })).toBe(doc);
   });
 });

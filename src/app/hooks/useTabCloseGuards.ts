@@ -1,16 +1,19 @@
 import { useCallback, useRef, useState } from "react";
 import { newCloseBatchId } from "@/lib/ids";
 import { leafHasForegroundProcess } from "@/modules/terminal";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { liveAgent } from "@/modules/workspaces/lib/hibernateReview";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import {
   runCloseQueue,
   type EditorCloseDecision,
   type TerminalCloseDecision,
+  type TerminalCloseWarning,
 } from "./closeQueue";
 
-type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string; tab?: Tab };
+export type TabInfo = { id: string; title: string; kind: string; path?: string; workspaceId?: string; warning?: TerminalCloseWarning; command?: string; tab?: Tab };
 
 type FoundTab = {
   workspace: { id: string };
@@ -67,14 +70,15 @@ export function useTabCloseGuards({
   );
 
   const askTerminalClose = useCallback(
-    (tabId: string, processName: string) =>
+    (tabId: string, warning: TerminalCloseWarning) =>
       new Promise<TerminalCloseDecision>((resolve) => {
         const found = findTab(tabId);
         setPendingTerminalCloseTab({
           id: tabId,
           title: found?.tab.title ?? "terminal",
           kind: "terminal",
-          processName,
+          workspaceId: found?.workspace.id,
+          warning,
           command: getRunningCommandsSnapshot().get(tabId),
           tab: found?.tab,
         });
@@ -109,10 +113,12 @@ export function useTabCloseGuards({
               kind: found.tab.kind,
               locked: found.tab.locked,
               dirty: found.tab.dirty,
+              hibernated: isHibernatedTab(found.tab),
             };
           },
-          // A sleeping tab has no process to warn about.
-          hasForegroundProcess: async (id) => (isHibernatedTab(findTab(id)?.tab) ? null : leafHasForegroundProcess(id)),
+          hasForegroundProcess: (id) => leafHasForegroundProcess(id),
+          hasBusyAgent: (id) => liveAgent(useAgentStore.getState().sessions[id])?.status === "working",
+          hasAgent: (id) => liveAgent(useAgentStore.getState().sessions[id]) !== undefined,
           isWarnEnabled,
           setWarnEnabled,
           isAutoSaveEnabled,
