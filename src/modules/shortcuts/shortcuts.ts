@@ -566,6 +566,9 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Editor",
 ];
 
+/** The shortcut that opens each palette: it leads its group, set apart from the ones that only work inside. */
+export const PALETTE_OPENERS: readonly ShortcutId[] = ["tab.new", "commandPalette.open"];
+
 /** Both palette groups: their shortcuts are only live while a palette is open. */
 export function isPaletteGroup(group: ShortcutGroup): boolean {
   return group === "Palette: New Terminal" || group === "Global Palette";
