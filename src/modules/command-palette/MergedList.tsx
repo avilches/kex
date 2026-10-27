@@ -104,16 +104,31 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
 // Typing: one flat list in rank order, so the best match is the first row whatever it is.
 // Empty box: recent tabs, then the actions under their fixed groups.
 export function MergedList(p: Props) {
-  if (p.typing) {
-    return (
-      <CommandGroup>
-        {p.rows.map((row) => (
+  const isCurrent = (r: MergedRow) => r.kind === "tab" && r.current === true;
+  const currentRows = p.rows.filter(isCurrent);
+  const current =
+    currentRows.length > 0 ? (
+      <CommandGroup heading="Current tab">
+        {currentRows.map((row) => (
           <Row key={row.key} row={row} p={p} />
         ))}
       </CommandGroup>
+    ) : null;
+  if (p.typing) {
+    return (
+      <>
+        {current}
+        <CommandGroup>
+          {p.rows
+            .filter((r) => !isCurrent(r))
+            .map((row) => (
+              <Row key={row.key} row={row} p={p} />
+            ))}
+        </CommandGroup>
+      </>
     );
   }
-  const tabs = p.rows.filter((r) => r.kind === "tab");
+  const tabs = p.rows.filter((r) => r.kind === "tab" && !r.current);
   const closed = p.rows.filter((r) => r.kind === "closed");
   const userActions = p.rows.filter(
     (r): r is Extract<MergedRow, { kind: "action" }> => r.kind === "action",
@@ -125,6 +140,7 @@ export function MergedList(p: Props) {
   );
   return (
     <>
+      {current}
       {tabs.length > 0 ? (
         <CommandGroup heading="Recent tabs">
           {tabs.map((row) => (

@@ -111,4 +111,19 @@ describe("MergedList", () => {
     expect(screen.getByText("Settings actions")).toBeTruthy();
     expect(screen.queryByText("General")).toBeNull();
   });
+
+  it("draws the current tab under its own heading, before the recent tabs", () => {
+    const other = { ...tab, tabId: "t2", tab: { id: "t2", kind: "terminal" as const } };
+    const withCurrent: MergedRow[] = [
+      { kind: "tab", key: "tab:t1", entry: tab, current: true },
+      { kind: "tab", key: "tab:t2", entry: other },
+    ];
+    mount(withCurrent, false);
+    expect(screen.getByText("Current tab")).toBeTruthy();
+    expect(screen.getByText("Recent tabs")).toBeTruthy();
+    cleanup();
+    mount(withCurrent, true);
+    expect(screen.getByText("Current tab")).toBeTruthy();
+    expect(screen.queryByText("Recent tabs")).toBeNull();
+  });
 });
