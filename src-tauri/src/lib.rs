@@ -1,8 +1,8 @@
 pub mod modules;
 
 use modules::{
-    actions, agent, editors, float_browser, fs, git, history, menu_route, pty, shell, tab_history,
-    window_state, workspace,
+    actions, agent, editors, float_browser, fs, git, hibernate_lines, history, menu_route, pty,
+    shell, tab_history, window_state, workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -810,9 +810,11 @@ pub fn run() {
                 .map_err(|e| std::io::Error::other(e.to_string()))?;
             agent::session_store::init(data_dir.clone());
             tab_history::init(data_dir.clone());
+            hibernate_lines::init(&data_dir);
             let state_path = data_dir.join("workspaces.json");
             let mgr = window_state::WindowStateManager::new(state_path);
             mgr.load();
+            hibernate_lines::sweep(&mgr.terminal_tab_ids());
             let order = mgr.window_order();
             app.manage(mgr);
 
@@ -989,6 +991,9 @@ pub fn run() {
             agent_session_restore_plan,
             agent_session_preview_cmd,
             agent_session_previews,
+            hibernate_lines::hibernate_lines_save,
+            hibernate_lines::hibernate_lines_read,
+            hibernate_lines::hibernate_lines_delete,
             tab_history::tab_history_list,
             tab_history::tab_history_record,
             tab_history::tab_history_touch,

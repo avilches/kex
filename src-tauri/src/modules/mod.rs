@@ -4,6 +4,7 @@ pub mod editors;
 pub mod float_browser;
 pub mod fs;
 pub mod git;
+pub mod hibernate_lines;
 pub mod history;
 pub mod menu_route;
 pub mod proc;

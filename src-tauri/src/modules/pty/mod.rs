@@ -1,7 +1,7 @@
 mod agent_detect;
 mod da_filter;
 #[cfg_attr(not(unix), allow(dead_code))]
-mod hook_router;
+pub(crate) mod hook_router;
 #[cfg(unix)]
 mod ipc;
 #[cfg(windows)]
