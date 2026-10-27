@@ -75,7 +75,6 @@ import {
   saveTune,
   type Tune,
   tunedTokens,
-  tuneSnapshot,
 } from "./tuner";
 
 type Scheme = "vscode" | "jetbrains";
@@ -1884,23 +1883,6 @@ function tunerPanel(): HTMLElement {
 
   const sliders: { sync: () => void }[] = [];
   const tokenRows: { sync: () => void }[] = [];
-  const exportArea = h("textarea", {
-    class:
-      "h-40 w-full rounded border border-border bg-transparent p-1 font-mono text-[11px]",
-    readonly: "true",
-  }) as HTMLTextAreaElement;
-  let exportIsChanges = true;
-
-  const snapshot = () =>
-    tuneSnapshot(
-      state.themeId,
-      currentTheme().name,
-      state.mode,
-      state.tune,
-      readTune(state.tune),
-      changedTokens(),
-    );
-
   const syncAll = () => {
     sliders.forEach((s) => s.sync());
     tokenRows.forEach((t) => t.sync());
@@ -1909,7 +1891,6 @@ function tunerPanel(): HTMLElement {
     paint();
     paintReadout();
     syncAll();
-    exportArea.value = exportIsChanges ? snapshot() : fullThemeJson();
   };
   const patch = (p: Partial<Tune>) => {
     state.tune = { ...state.tune, ...p };
@@ -2014,25 +1995,15 @@ function tunerPanel(): HTMLElement {
   };
 
   const copyStatus = h("span", { class: "text-[11px] text-muted-foreground" });
-  const copy = async (getText: () => string, isChanges: boolean) => {
-    exportIsChanges = isChanges;
-    const text = getText();
-    exportArea.value = text;
+  const copyFull = smallButton("Export full theme (copy)");
+  copyFull.onclick = async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      copyStatus.textContent = isChanges
-        ? "Copied the changes. Paste it back to me and I bake it in."
-        : "Copied the full theme. You can also paste it in the box above as a custom theme.";
+      await navigator.clipboard.writeText(fullThemeJson());
+      copyStatus.textContent = "Copied the full theme.";
     } catch {
-      exportArea.select();
-      copyStatus.textContent =
-        "Clipboard blocked. The JSON is in the box, copy it by hand.";
+      copyStatus.textContent = "Clipboard blocked by the browser.";
     }
   };
-  const copyChanges = smallButton("Export changes (copy)");
-  copyChanges.onclick = () => void copy(snapshot, true);
-  const copyFull = smallButton("Export full theme (copy)");
-  copyFull.onclick = () => void copy(fullThemeJson, false);
 
   const saveStatus = h("span", { class: "text-[11px] text-muted-foreground" });
   const saveBtn = smallButton("Save to disk");
@@ -2083,7 +2054,6 @@ function tunerPanel(): HTMLElement {
 
   paintReadout();
   syncAll();
-  exportArea.value = snapshot();
 
   return section(
     "Tuner (changes are saved per theme and mode, and survive a reload)",
@@ -2107,9 +2077,8 @@ function tunerPanel(): HTMLElement {
         addSlider("Ignored text a.", "ignoredAlpha", 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       ),
       readout,
-      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, saveBtn, copyStatus),
+      h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyFull, saveBtn, copyStatus),
       saveStatus,
-      exportArea,
       tokenDetails,
     ),
   );
@@ -2151,20 +2120,6 @@ function paint(): void {
   document.documentElement.dataset.previewMode = state.mode;
 }
 
-function changedTokens(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(state.tokens)) {
-    if (baseline[name]?.toLowerCase() !== value.toLowerCase())
-      out[name] = value;
-  }
-  return out;
-}
-
-// Tokens whose on-screen value differs from what the theme declares, which is
-// what "Save to disk" writes: every UI color the tone sliders moved or that was
-// overridden by hand, plus the terminal and editor tokens only when they were
-// overridden by hand (they alias the UI colors in CSS, so they would otherwise
-// look changed on their own).
 function effectiveChanges(): Record<string, string> {
   const out: Record<string, string> = {};
   const tuned = tunedTokens(state.tune);

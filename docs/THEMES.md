@@ -18,7 +18,7 @@ Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un 
    El tema se cambia con un boton por tema o con las flechas (izquierda/derecha recorren los temas,
    arriba/abajo cambian de modo). El tuner son doce sliders pequenos que mueven familias de tokens (superficies, bordes, texto,
    acento, fondos de editor y terminal, los 16 ANSI) y el alfa del texto normal y del ignorado, con el hex y el ratio ya compuestos: sirve para buscar un valor a
-   ojo y "Export changes (copy)" copia un JSON con ese valor para hornearlo en el tema.
+   ojo. "Export full theme (copy)" copia el tema entero con esos valores, por si hace falta fuera del repo.
    "Save to disk" escribe los valores cambiados en `src/modules/theme/themes/<id>.ts` (solo funciona con
    `pnpm dev`) editando solo las lineas que cambian, y recarga la pagina con el tema tal cual quedo en
    disco, listo para revisar el `git diff` y commitear.

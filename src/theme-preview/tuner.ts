@@ -81,7 +81,7 @@ export function tunedTokens(tune: Tune): Set<string> {
   const out = new Set<string>();
   for (const g of GROUPS) {
     const { dl, dh, ds } = deltas(g, tune);
-    if (dl || dh || ds) g.tokens.forEach((t) => out.add(t));
+    if (dl || dh || ds) for (const t of g.tokens) out.add(t);
   }
   return out;
 }
@@ -105,14 +105,6 @@ export function saveTune(key: string, tune: Tune): void {
   const store = readStore(TUNE_KEY);
   store[key] = tune;
   localStorage.setItem(TUNE_KEY, JSON.stringify(store));
-}
-
-export function changedTune(tune: Tune): Partial<Tune> {
-  const out: Partial<Tune> = {};
-  for (const key of Object.keys(DEFAULT_TUNE) as (keyof Tune)[]) {
-    if (tune[key] !== DEFAULT_TUNE[key]) out[key] = tune[key];
-  }
-  return out;
 }
 
 export function loadTokens(key: string): Record<string, string> {
@@ -196,31 +188,4 @@ export function readTune(tune: Tune): TuneReadout {
     ignored: resolve("muted-foreground", tune.ignoredAlpha),
     surface: surfaceHex,
   };
-}
-
-export function tuneSnapshot(
-  themeId: string,
-  themeName: string,
-  mode: string,
-  tune: Tune,
-  read: TuneReadout,
-  tokens: Record<string, string>,
-): string {
-  return JSON.stringify(
-    {
-      kind: "kex-theme-tune",
-      theme: themeId,
-      themeName,
-      mode,
-      tune: changedTune(tune),
-      tokens,
-      resolved: {
-        surface: read.surface,
-        normal: read.normal,
-        ignored: read.ignored,
-      },
-    },
-    null,
-    2,
-  );
 }
