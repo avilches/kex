@@ -39,7 +39,6 @@ export type ScmViewMode = "list" | "tree";
 export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
 export type SpinnerStyle = (typeof SPINNER_STYLES)[number];
 
-export type TerminalNewFolderMode = "home" | "workspace" | "context" | "ask";
 
 export type DiffViewMode = "unified" | "split";
 
@@ -194,7 +193,6 @@ export type Preferences = {
   terminalCursorInactiveStyle: CursorInactiveStyle;
   terminalCursorWidth: number;
   terminalScrollSensitivity: number;
-  terminalNewFolderMode: TerminalNewFolderMode;
   lastWslDistro: string | null;
   zoomLevel: number;
   paletteWidth: number;
@@ -306,7 +304,6 @@ const KEY_TERMINAL_CURSOR_STYLE = "cursorStyle";
 const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "cursorInactiveStyle";
 const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
 const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
-const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 
 // Editor store keys - no "editor" prefix since the file is already settings-editor.json
@@ -474,7 +471,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorInactiveStyle: CURSOR_INACTIVE_STYLE_DEFAULT,
   terminalCursorWidth: CURSOR_WIDTH_DEFAULT,
   terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
-  terminalNewFolderMode: "context",
   lastWslDistro: null,
   zoomLevel: DEFAULT_ZOOM,
   paletteWidth: DEFAULT_PALETTE_WIDTH,
@@ -551,13 +547,6 @@ export function parseScmViewMode(value: unknown): ScmViewMode {
 
 export function parseThemePref(value: unknown): ThemePref {
   return value === "light" || value === "dark" ? value : "system";
-}
-
-export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
-  if (value === "home") return "home";
-  if (value === "workspace") return "workspace";
-  if (value === "ask") return "ask";
-  return "context";
 }
 
 // Builds a per-store writer: persists the key, flushes it to disk, then
@@ -719,9 +708,6 @@ export async function loadPreferences(): Promise<Preferences> {
       SCROLL_SENSITIVITY_MAX,
       SCROLL_SENSITIVITY_STEP,
       SCROLL_SENSITIVITY_DEFAULT,
-    ),
-    terminalNewFolderMode: parseTerminalNewFolderMode(
-      getTerminal<string>(KEY_TERMINAL_NEW_FOLDER_MODE),
     ),
     lastWslDistro:
       getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
@@ -1015,12 +1001,6 @@ export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promi
 
 export async function setAutoHibernate(value: AutoHibernate): Promise<void> {
   await writePref(KEY_AUTO_HIBERNATE, value);
-}
-
-export async function setTerminalNewFolderMode(
-  value: TerminalNewFolderMode,
-): Promise<void> {
-  await writeTerminalPref(KEY_TERMINAL_NEW_FOLDER_MODE, value);
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
@@ -1443,7 +1423,6 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_CURSOR_INACTIVE_STYLE]: "terminalCursorInactiveStyle",
   [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",
   [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
-  [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
 };
 

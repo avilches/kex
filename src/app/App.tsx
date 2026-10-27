@@ -287,7 +287,6 @@ import {
   withPaletteTabShortcuts,
 } from "@/modules/command-palette/lib/paletteShortcuts";
 import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
-import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   planCommandEvent,
   planScriptStop,
@@ -1240,31 +1239,10 @@ export default function App() {
 
   const openNewTerminal = useCallback(
     (targetPaneId?: string, targetWsId?: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        setFolderAskTarget({ wsId: targetWsId, paneId: targetPaneId });
-        setFolderPaletteOpen(true);
-        return;
-      }
-      const ws = targetWsId
-        ? workspacesRef.current.find((w) => w.id === targetWsId)
-        : workspacesRef.current.find(
-            (w) => w.id === activeWorkspaceIdRef.current,
-          );
-      if (!ws) return;
-      openTab(ws.id, targetPaneId ?? ws.activePaneId, {
-        id: newTabId(),
-        kind: "terminal",
-        cwd: resolveNewTerminalCwd({
-          mode: terminalNewFolderMode,
-          home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
-          launchDir: getLaunchDir() ?? null,
-        }),
-      });
+      setFolderAskTarget({ wsId: targetWsId, paneId: targetPaneId });
+      setFolderPaletteOpen(true);
     },
-    [openTab],
+    [],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
@@ -1754,57 +1732,31 @@ export default function App() {
       wsId: string,
       paneId: string,
       orientation: "horizontal" | "vertical",
-      cwd?: string,
+      cwd: string,
     ) => {
       setZenPaneId(null);
       const newPaneId = splitPane(wsId, paneId, orientation);
-      const ws = workspacesRef.current.find((w) => w.id === wsId);
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openTab(wsId, newPaneId, {
-        id: newTabId(),
-        kind: "terminal",
-        cwd: cwd ?? resolveNewTerminalCwd({
-          mode: terminalNewFolderMode,
-          home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws?.cwd ?? null,
-          workspaceRoot: ws?.workspaceRoot ?? ws?.fsRoot ?? null,
-          launchDir: getLaunchDir() ?? null,
-        }),
-      });
+      openTab(wsId, newPaneId, { id: newTabId(), kind: "terminal", cwd });
     },
     [splitPane, openTab],
   );
 
   const onSplitTerminalRightStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        if (canSplitTerminal(wsId, paneId, "horizontal")) {
-          setFolderAskTarget({ wsId, paneId, split: "horizontal" });
-          setFolderPaletteOpen(true);
-        }
-        return;
-      }
       if (!canSplitTerminal(wsId, paneId, "horizontal")) return;
-      splitAndOpenTerminal(wsId, paneId, "horizontal");
+      setFolderAskTarget({ wsId, paneId, split: "horizontal" });
+      setFolderPaletteOpen(true);
     },
-    [canSplitTerminal, splitAndOpenTerminal],
+    [canSplitTerminal],
   );
 
   const onSplitTerminalDownStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        if (canSplitTerminal(wsId, paneId, "vertical")) {
-          setFolderAskTarget({ wsId, paneId, split: "vertical" });
-          setFolderPaletteOpen(true);
-        }
-        return;
-      }
       if (!canSplitTerminal(wsId, paneId, "vertical")) return;
-      splitAndOpenTerminal(wsId, paneId, "vertical");
+      setFolderAskTarget({ wsId, paneId, split: "vertical" });
+      setFolderPaletteOpen(true);
     },
-    [canSplitTerminal, splitAndOpenTerminal],
+    [canSplitTerminal],
   );
 
   const onNewBrowserStable = useCallback(
@@ -3421,6 +3373,7 @@ export default function App() {
         addWorkspace(home ?? undefined);
         break;
       case "new_terminal":
+        if (runPaletteShortcut("folderCurrent")) break;
         shortcutHandlers["tab.new"]?.(new KeyboardEvent("keydown"));
         break;
       case "new_browser":

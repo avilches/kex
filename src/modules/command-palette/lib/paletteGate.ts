@@ -21,8 +21,9 @@ const TAB_AND_WORKSPACE: readonly ShortcutId[] = [
 // its mode change without closing it first.
 export const PALETTE_ALLOWED_SHORTCUTS: Record<Exclude<OpenPalette, "none">, readonly ShortcutId[]> = {
   commands: [...TAB_AND_WORKSPACE, "commandPalette.open", "commandPalette.content", "commandPalette.history"],
+  // tab.new is left out on purpose: with the folder palette open its key belongs to palette.folderCurrent.
   folder: [
-    ...TAB_AND_WORKSPACE,
+    ...TAB_AND_WORKSPACE.filter((id) => id !== "tab.new"),
     "palette.folderCurrent",
     "palette.folderRoot",
     "palette.folderMain",
@@ -81,5 +82,7 @@ export function menuItemBlockedByPalette(id: string, palette: OpenPalette): bool
   if (palette === "none") return false;
   const shortcut = MENU_ITEM_SHORTCUT[id as MenuItemId];
   if (!shortcut) return true;
+  // The menu's Cmd+T is the key of the folder palette's current-tab folder while that palette is open.
+  if (shortcut === "tab.new" && palette === "folder") return false;
   return shortcutBlockedByPalette(shortcut, palette);
 }

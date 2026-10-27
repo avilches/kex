@@ -41,6 +41,10 @@ tienen modificadores, porque cualquier digito de su rango (1-9, o 0-9 en tabs) e
 `palette.menuAction` comparte a proposito el modificador de `palette.folderRoot/Main/Home`: con un menu de fila abierto estos
 delegan en el (`FolderPalette`), asi que no se marcan como conflicto.
 
+Los atajos de palette viven en dos grupos, justo antes de Tabs: "Palette: New Terminal" (`tab.new` que la abre, Open in: Current Tab
+Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Global Palette" (`commandPalette.open` que la abre y
+`palette.menuAction`, Run Menu Action 1-9). Solo estan vivos con su palette abierta (`isPaletteGroup`). El atajo que abre cada palette (`PALETTE_OPENERS`) va en una tarjeta propia, separado por un hueco del resto de su grupo.
+
 ## Patrones que se repiten
 
 - **Tarjetas plegables**: las filas de configuracion que abren un formulario van plegadas a

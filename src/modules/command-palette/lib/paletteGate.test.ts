@@ -31,7 +31,7 @@ const EXPECTED_COMMANDS: ShortcutId[] = [
   "commandPalette.history",
 ];
 const EXPECTED_FOLDER: ShortcutId[] = [
-  ...TABS,
+  ...TABS.filter((id) => id !== "tab.new"),
   "palette.folderCurrent",
   "palette.folderRoot",
   "palette.folderMain",
