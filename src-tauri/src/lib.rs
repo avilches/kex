@@ -1,7 +1,7 @@
 pub mod modules;
 
 use modules::{
-    actions, agent, editors, float_browser, fs, git, history, menu_route, pty, shell, tab_history,
+    actions, agent, custom_themes, editors, float_browser, fs, git, history, menu_route, pty, shell, tab_history,
     window_state, workspace,
 };
 use serde::Serialize;
@@ -1003,6 +1003,9 @@ pub fn run() {
             get_launch_dir,
             get_build_info,
             confirm_quit,
+            custom_themes::custom_theme_save,
+            custom_themes::custom_theme_delete,
+            custom_themes::request_theme_edit,
             cancel_quit,
             enter_windowless_mode,
             sync_menu,

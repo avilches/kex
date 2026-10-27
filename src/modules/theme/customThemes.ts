@@ -1,4 +1,5 @@
-import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { Theme } from "./types";
 
@@ -14,20 +15,11 @@ export async function listCustomThemes(): Promise<Theme[]> {
 }
 
 export async function saveCustomTheme(theme: Theme): Promise<void> {
-  const current = await listCustomThemes();
-  const next = current.filter((t) => t.id !== theme.id).concat(theme);
-  await store.set(KEY, next);
-  await store.save();
-  await emit(CHANGED_EVENT);
+  await invoke("custom_theme_save", { theme });
 }
 
 export async function deleteCustomTheme(id: string): Promise<void> {
-  const current = await listCustomThemes();
-  const next = current.filter((t) => t.id !== id);
-  if (next.length === current.length) return;
-  await store.set(KEY, next);
-  await store.save();
-  await emit(CHANGED_EVENT);
+  await invoke("custom_theme_delete", { id });
 }
 
 export async function onCustomThemesChange(cb: () => void): Promise<UnlistenFn> {
