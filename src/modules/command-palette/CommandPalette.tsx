@@ -113,7 +113,7 @@ type Props = {
   hibernateDialogOpen: boolean;
   onRevealInExplorer: (path: string) => void;
   onCloseOtherTabs: (tabId: string) => unknown;
-  onGoToTab: (tabId: string) => void;
+  onGoToTab: (tabId: string, opts?: { focus?: boolean }) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
   // biome-ignore lint/suspicious/noConfusingVoidType: callers may return nothing or a promise
@@ -628,8 +628,7 @@ export function CommandPalette({
         // A note shows on the current tab only. The tab is activated so the note can be seen, but
         // the note is not asked to take the focus: the cursor is still the palette's.
         if (!isTabNoteOpen(entry.tab) && tabId !== activeTabId) {
-          onGoToTab(tabId);
-          refocusInput();
+          onGoToTab(tabId, { focus: false });
         }
       } else if (id === "focusSidebar") {
         const target = tabFocusTarget(entry);

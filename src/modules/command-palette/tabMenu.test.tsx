@@ -87,6 +87,7 @@ type Calls = {
   hibernate: string[];
   reveal: string[];
   goTo: string[];
+  goToOpts: { focus?: boolean }[];
   closeOthers: string[];
   move: unknown[][];
   openChange: boolean[];
@@ -140,7 +141,10 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
         calls.closeOthers.push(id);
         return closeOthersImpl(id, setTabs);
       }}
-      onGoToTab={(id) => calls.goTo.push(id)}
+      onGoToTab={(id, opts) => {
+        calls.goTo.push(id);
+        if (opts) calls.goToOpts.push(opts);
+      }}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
       onCloseTab={() => {}}
@@ -193,7 +197,7 @@ async function openOn(target: string) {
 }
 
 beforeEach(() => {
-  calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], closeOthers: [], move: [], openChange: [] };
+  calls = { update: [], save: [], hibernate: [], reveal: [], goTo: [], goToOpts: [], closeOthers: [], move: [], openChange: [] };
   commands = [];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
   hibernateImpl = () => Promise.resolve();
@@ -295,6 +299,7 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("tab:c");
     expect(calls.goTo).toEqual(["c"]);
+    expect(calls.goToOpts).toEqual([{ focus: false }]);
     expect(useTabNoteStore.getState().focusTabId).toBeNull();
     const [id, updater] = calls.update[0];
     expect(id).toBe("c");
@@ -320,6 +325,7 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("tab:b");
     expect(calls.goTo).toEqual(["b"]);
+    expect(calls.goToOpts).toEqual([{ focus: false }]);
     expect(useTabNoteStore.getState().focusTabId).toBeNull();
   });
 

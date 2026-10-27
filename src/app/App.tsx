@@ -177,6 +177,7 @@ import {
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { workspaceDetailRows } from "@/modules/workspaces/lib/workspaceDetail";
+import { createFocusGate } from "@/modules/workspaces/lib/focusGate";
 import { focusTabContent } from "@/modules/workspaces/lib/focusTabContent";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
@@ -1295,6 +1296,12 @@ export default function App() {
   const folderPaletteOpenRef = useRef(false);
   folderPaletteOpenRef.current = folderPaletteOpen;
   const commandPaletteOpenRef = useRef(false);
+  // Held while the command palette activates a tab it must not hand the keyboard to; released
+  // when the palette closes or any other gesture activates a tab.
+  const paletteFocusGate = useRef(createFocusGate());
+  useEffect(() => {
+    if (!commandPaletteOpen) paletteFocusGate.current.release();
+  }, [commandPaletteOpen]);
   commandPaletteOpenRef.current = commandPaletteOpen;
   const [paletteInitialMode, setPaletteInitialMode] = useState<
     "commands" | "content" | "history"
@@ -1648,12 +1655,14 @@ export default function App() {
     (tabId: string) => {
       const kind = findTabGlobal(tabId)?.tab.kind;
       requestAnimationFrame(() =>
-        focusTabContent(kind, tabId, {
-          focusEditor: (id) => editorHandles.current.get(id)?.focus(),
-          focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
-          focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
-          focusLeaf: requestLeafFocus,
-        }),
+        paletteFocusGate.current.run(() =>
+          focusTabContent(kind, tabId, {
+            focusEditor: (id) => editorHandles.current.get(id)?.focus(),
+            focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
+            focusBrowser: (id) => browserHandles.current.get(id)?.focusAddressBar(),
+            focusLeaf: requestLeafFocus,
+          }),
+        ),
       );
     },
     [findTabGlobal],
@@ -1663,7 +1672,7 @@ export default function App() {
   // agent jumps) activates a tab: it also hands the tab its focus, so a new
   // caller cannot forget it. File-open flows activate with activateTab and
   // decide their own focus.
-  const onActivateTabStable = useCallback(
+  const activateKeepingScratchpads = useCallback(
     (wsId: string, tabId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (ws) {
@@ -1676,9 +1685,16 @@ export default function App() {
         }
       }
       activateTab(wsId, tabId);
+    },
+    [activateTab],
+  );
+  const onActivateTabStable = useCallback(
+    (wsId: string, tabId: string) => {
+      paletteFocusGate.current.release();
+      activateKeepingScratchpads(wsId, tabId);
       focusTab(tabId);
     },
-    [activateTab, focusTab],
+    [activateKeepingScratchpads, focusTab],
   );
 
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
@@ -2031,13 +2047,16 @@ export default function App() {
   flushDirtyEditorsRef.current = flushDirtyEditors;
 
   const goToTab = useCallback(
-    (tabId: string) => {
+    (tabId: string, opts?: { focus?: boolean }) => {
       const found = findTabGlobal(tabId);
       if (!found) return;
       setActiveWorkspaceId(found.workspace.id);
-      onActivateTabStable(found.workspace.id, tabId);
+      if (opts?.focus === false) {
+        paletteFocusGate.current.hold();
+        activateKeepingScratchpads(found.workspace.id, tabId);
+      } else onActivateTabStable(found.workspace.id, tabId);
     },
-    [onActivateTabStable, findTabGlobal, setActiveWorkspaceId],
+    [onActivateTabStable, activateKeepingScratchpads, findTabGlobal, setActiveWorkspaceId],
   );
 
   useEffect(() => startAgentTitleSync(setAgentTitles, clearAgentTitles), [setAgentTitles, clearAgentTitles]);
