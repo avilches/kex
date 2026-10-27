@@ -126,7 +126,7 @@ Con la tab actual hibernada, al abrir la paleta no se distinguia como "Current t
 
 ### Fix
 
-La opacidad baja a los hijos (`[&>*]:opacity-40`), no a la fila. `TabItem.test.tsx` comprueba que la clase de la fila no lleva `opacity-` y que sus hijos si.
+La opacidad va en un contenedor interior que envuelve el contenido (no en la fila ni en un selector `[&>*]`, que tambien atenuaria el tick de seleccion de `CommandItem`, hijo directo con `opacity-0`). `ClosedItem` igual. `TabItem.test.tsx` comprueba que la fila no lleva opacidad y que el tick queda fuera del contenedor atenuado.
 
 ### Leccion
 

@@ -48,8 +48,9 @@ export function TabItem({
       value={`tab:${entry.tabId}`}
       onSelect={onRun}
       onContextMenu={onContextMenu}
-      className={cn("text-[12.5px]", entry.hibernated && "[&>*]:opacity-40")}
+      className="text-[12.5px]"
     >
+      <span className={cn("flex min-w-0 flex-1 items-center gap-2", entry.hibernated && "opacity-40")}>
       <RowTag kind={tabTagKind(entry)} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
         <TabBarIcon
@@ -132,6 +133,7 @@ export function TabItem({
         <span className="truncate">
           <HighlightText text={entry.workspaceTitle} indices={wsIndices} />
         </span>
+      </span>
       </span>
     </CommandItem>
   );

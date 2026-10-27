@@ -92,18 +92,19 @@ describe("TabItem", () => {
     expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
   });
 
-  it("dims the content of a hibernated row but not the row, so its selection highlight stays at full strength", () => {
-    render(
-      <Command value="tab:tab-1">
-        <CommandList>
-          <TabItem entry={entry({ hibernated: true })} onRun={vi.fn()} />
-        </CommandList>
-      </Command>,
-    );
+  it("dims the content in an inner wrapper, never the row nor the selection tick", () => {
+    row(entry({ hibernated: true }));
     const item = document.querySelector("[cmdk-item]") as HTMLElement;
-    expect(item.getAttribute("aria-selected")).toBe("true");
-    expect(item.className).not.toMatch(/(^|\s)opacity-/);
-    expect(item.className).toContain("[&>*]:opacity-40");
+    expect(item.className).not.toMatch(/(^|\s)(\[[^\s]*\]:)?opacity-/);
+    const dimmed = item.querySelector(":scope > .opacity-40") as HTMLElement;
+    expect(dimmed).not.toBeNull();
+    expect(dimmed.textContent).toContain("zsh");
+    const tick = [...item.children].find((c) => c.classList.contains("opacity-0")) as Element;
+    expect(tick).toBeDefined();
+    expect(dimmed.contains(tick)).toBe(false);
+    cleanup();
+    row(entry());
+    expect(document.querySelector(".opacity-40")).toBeNull();
   });
 
   it("shows the absolute path on the second line", () => {
