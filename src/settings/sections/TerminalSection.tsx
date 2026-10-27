@@ -62,6 +62,7 @@ import {
   TERMINAL_LINE_HEIGHT_DEFAULT,
   TERMINAL_SCROLLBACK_PRESETS,
   setAutoHibernate,
+  setHibernateSaveLines,
   setTerminalBackgroundMemoryBudget,
   setTerminalCursorBlink,
   setTerminalCursorInactiveStyle,
@@ -105,6 +106,7 @@ const SHELL_AUTO = "auto";
 
 export function TerminalSection() {
   const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
+  const hibernateSaveLines = usePreferencesStore((s) => s.hibernateSaveLines);
   const hibernateModes = autoHibernateModes(import.meta.env.DEV);
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
@@ -592,6 +594,15 @@ export function TerminalSection() {
               </div>
             ))}
           </RadioGroup>
+        </SettingRow>
+        <SettingRow
+          title="Keep the last lines of a hibernated tab"
+          description="Store the last lines of the terminal, with their colors, when a tab hibernates and show them dimmed behind the Restore screen. Obvious tokens are crossed out, but the lines are kept unencrypted on this machine, so turn it off if your terminals show sensitive output."
+        >
+          <Switch
+            checked={hibernateSaveLines}
+            onCheckedChange={(v) => void setHibernateSaveLines(v)}
+          />
         </SettingRow>
       </div>
     </div>
