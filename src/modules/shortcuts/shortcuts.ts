@@ -552,6 +552,54 @@ export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {
   );
 }
 
+// The shortcuts that take a whole range of digits. Workspaces use 1-9 (0 stays Reset Zoom);
+// tabs use 0-9 (0 = last tab). Only the modifiers of their binding are configurable.
+const DIGIT_WILDCARDS: Partial<Record<ShortcutId, RegExp>> = {
+  "workspace.selectByIndex": /^[1-9]$/,
+  "palette.menuAction": /^[1-9]$/,
+  "tab.selectByIndex": /^[0-9]$/,
+};
+
+export function isDigitWildcard(id: ShortcutId): boolean {
+  return id in DIGIT_WILDCARDS;
+}
+
+export type Modifiers = Pick<KeyBinding, "ctrl" | "alt" | "shift" | "meta">;
+
+// What the Settings combo offers for a wildcard shortcut; Win+digit is taken by the OS elsewhere.
+export const WILDCARD_MODIFIER_PRESETS: readonly Modifiers[] = IS_MAC
+  ? [
+      { meta: true },
+      { ctrl: true },
+      { alt: true },
+      { meta: true, alt: true },
+      { ctrl: true, alt: true },
+      { meta: true, shift: true },
+    ]
+  : [{ ctrl: true }, { alt: true }, { ctrl: true, alt: true }, { ctrl: true, shift: true }];
+
+export function modifiersOf(b: Modifiers): Modifiers {
+  return { ctrl: !!b.ctrl, alt: !!b.alt, shift: !!b.shift, meta: !!b.meta };
+}
+
+export function sameModifiers(a: Modifiers, b: Modifiers): boolean {
+  return (
+    !!a.ctrl === !!b.ctrl &&
+    !!a.alt === !!b.alt &&
+    !!a.shift === !!b.shift &&
+    !!a.meta === !!b.meta
+  );
+}
+
+// The binding a wildcard shortcut stores for the chosen modifiers; the key "1" is only representative.
+export function wildcardBinding(mods: Modifiers): KeyBinding {
+  return { ...modifiersOf(mods), key: "1" };
+}
+
+function wildcardRangeLabel(id: ShortcutId): string {
+  return id === "tab.selectByIndex" ? "0–9" : "1–9";
+}
+
 /**
  * Matching logic: checks if a KeyboardEvent matches a KeyBinding.
  */
@@ -567,14 +615,11 @@ export function matchBinding(
     : e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
 
-  // Special case for the index shortcuts: the binding key is just a
-  // representative digit; ANY digit in range counts as a hit (the handler
-  // reads e.key for the actual index). Workspaces use 1-9 (0 stays Reset Zoom);
-  // tabs use 0-9 (0 = last tab).
-  if (id === "workspace.selectByIndex" || id === "palette.menuAction") {
-    if (!/^[1-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;
-  } else if (id === "tab.selectByIndex") {
-    if (!/^[0-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;
+  // The index shortcuts only own their modifiers: ANY digit of their range is a
+  // hit (the handler reads e.key for the actual index) and the binding key is ignored.
+  const range = id && DIGIT_WILDCARDS[id];
+  if (range) {
+    if (!range.test(e.key)) return false;
   } else if (eventKey !== bindingKey) {
     return false;
   }
@@ -640,7 +685,7 @@ export function shortcutsForEvent(
 /**
  * Display helpers
  */
-export function getBindingTokens(binding?: KeyBinding): string[] {
+export function getBindingTokens(binding?: KeyBinding, wildcardOf?: ShortcutId): string[] {
   if (!binding) return [];
   const tokens: string[] = [];
   if (IS_MAC) {
@@ -664,7 +709,7 @@ export function getBindingTokens(binding?: KeyBinding): string[] {
   else if (keyLabel === "Enter") keyLabel = ENTER_KEY;
   else if (keyLabel.length === 1) keyLabel = keyLabel.toUpperCase();
 
-  tokens.push(keyLabel);
+  tokens.push(wildcardOf && isDigitWildcard(wildcardOf) ? wildcardRangeLabel(wildcardOf) : keyLabel);
   return tokens;
 }
 
@@ -680,4 +725,48 @@ export function getShortcutLabel(
   const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
   const tokens = getBindingTokens(bindings?.[0]);
   return tokens.length ? tokens.join(separator) : null;
+}
+
+// Palette slots that share Cmd+digit with the menu-action wildcard on purpose: with a row menu
+// open the slot's key runs the menu action instead (FolderPalette), so they never compete.
+const PALETTE_DIGIT_SLOTS: readonly ShortcutId[] = [
+  "palette.folderRoot",
+  "palette.folderMain",
+  "palette.folderHome",
+  "palette.menuAction",
+];
+
+function bindingsCollide(a: KeyBinding, aId: ShortcutId, b: KeyBinding, bId: ShortcutId): boolean {
+  if (!sameModifiers(a, b)) return false;
+  const wa = DIGIT_WILDCARDS[aId];
+  const wb = DIGIT_WILDCARDS[bId];
+  if (wa && wb) return true;
+  if (wa) return wa.test(b.key);
+  if (wb) return wb.test(a.key);
+  return a.key.toLowerCase() === b.key.toLowerCase();
+}
+
+/**
+ * The shortcut that already uses `binding`, as `currentId` would bind it. A wildcard claims every
+ * digit of its range, so it collides with any literal digit under the same modifiers.
+ */
+export function findShortcutConflict(
+  binding: KeyBinding,
+  currentId: ShortcutId,
+  userShortcuts: Record<ShortcutId, KeyBinding[]>,
+): Shortcut | null {
+  const current = SHORTCUTS_BY_ID.get(currentId);
+  for (const s of SHORTCUTS) {
+    if (s.id === currentId) continue;
+    // A palette shortcut is only live while its palette is open, so it never competes with the index jumps.
+    if (
+      (s.group === "Palette" && current?.id.endsWith("selectByIndex")) ||
+      (current?.group === "Palette" && s.id.endsWith("selectByIndex"))
+    )
+      continue;
+    if (PALETTE_DIGIT_SLOTS.includes(s.id) && PALETTE_DIGIT_SLOTS.includes(currentId)) continue;
+    const bindings = s.id in userShortcuts ? userShortcuts[s.id] : s.defaultBindings;
+    if (bindings.some((b) => bindingsCollide(b, s.id, binding, currentId))) return s;
+  }
+  return null;
 }

@@ -30,6 +30,17 @@ Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos
 
 Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.tsx` en `src/modules/actions/` (Checkbox y Select en un formulario).
 
+## Settings > Shortcuts: atajos comodin
+
+Los atajos de rango de digitos (`workspace.selectByIndex`, `palette.menuAction`; `tab.selectByIndex` esta oculto) no se graban: solo
+tienen modificadores, porque cualquier digito de su rango (1-9, o 0-9 en tabs) es un acierto (`DIGIT_WILDCARDS` en
+`shortcuts.ts`, la tecla guardada es solo representativa y `matchBinding` la ignora). Su fila usa un `Select`
+(`WildcardPicker` en `ShortcutsSection.tsx`) con `WILDCARD_MODIFIER_PRESETS` (distintos en macOS y fuera) y muestra la tecla como
+`1–9` (`getBindingTokens(binding, id)`). Una opcion que ya usa otro atajo sale desactivada con el nombre de quien la tiene
+(`findShortcutConflict`, pura y testeada: un comodin choca con cualquier digito de su rango bajo los mismos modificadores).
+`palette.menuAction` comparte a proposito el modificador de `palette.folderRoot/Main/Home`: con un menu de fila abierto estos
+delegan en el (`FolderPalette`), asi que no se marcan como conflicto.
+
 ## Patrones que se repiten
 
 - **Tarjetas plegables**: las filas de configuracion que abren un formulario van plegadas a

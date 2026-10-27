@@ -1,6 +1,8 @@
 import { describe, expect, it, test } from "vitest";
 import { MOD_PROP } from "@/lib/platform";
 import {
+  findShortcutConflict,
+  getBindingTokens,
   getShortcutLabel,
   matchesShortcut,
   SHORTCUTS,
@@ -228,7 +230,7 @@ test("bare Delete keydown matches file.delete", () => {
 
 function digitEvent(
   key: string,
-  mods: { meta?: boolean; ctrl?: boolean },
+  mods: { meta?: boolean; ctrl?: boolean; alt?: boolean },
 ): KeyboardEvent {
   return {
     key,
@@ -236,7 +238,7 @@ function digitEvent(
     ctrlKey: !!mods.ctrl,
     metaKey: !!mods.meta,
     shiftKey: false,
-    altKey: false,
+    altKey: !!mods.alt,
     repeat: false,
   } as unknown as KeyboardEvent;
 }
@@ -423,5 +425,57 @@ describe("shortcutsForEvent", () => {
       [target.id]: [],
     } as unknown as Record<ShortcutId, KeyBinding[]>);
     expect(found.map((s) => s.id)).not.toContain(target.id);
+  });
+});
+
+describe("wildcard shortcuts take their modifiers only", () => {
+  const alt = { key: "1", alt: true } as KeyBinding;
+
+  test("a non-digit binding key does not kill the wildcard", () => {
+    const user = { "workspace.selectByIndex": [{ key: "h", alt: true }] } as unknown as Record<ShortcutId, KeyBinding[]>;
+    expect(matchesShortcut(digitEvent("7", { alt: true }), "workspace.selectByIndex", user)).toBe(true);
+    expect(matchesShortcut(digitEvent("7", { meta: true }), "workspace.selectByIndex", user)).toBe(false);
+  });
+
+  test("menuAction follows its own modifier for every digit", () => {
+    const user = { "palette.menuAction": [alt] } as unknown as Record<ShortcutId, KeyBinding[]>;
+    for (const d of ["1", "5", "9"])
+      expect(matchesShortcut(digitEvent(d, { alt: true }), "palette.menuAction", user)).toBe(true);
+    expect(matchesShortcut(digitEvent("0", { alt: true }), "palette.menuAction", user)).toBe(false);
+  });
+
+  test("tokens show the digit range instead of the representative key", () => {
+    const last = (t: string[]) => t[t.length - 1];
+    expect(last(getBindingTokens(alt, "palette.menuAction"))).toBe("1–9");
+    expect(last(getBindingTokens(alt, "tab.selectByIndex"))).toBe("0–9");
+    expect(last(getBindingTokens(alt))).toBe("1");
+  });
+});
+
+describe("findShortcutConflict with wildcards", () => {
+  const none = {} as Record<ShortcutId, KeyBinding[]>;
+
+  test("a wildcard collides with a literal digit under the same modifiers", () => {
+    const user = { "view.zoomReset": [{ key: "4", alt: true }] } as unknown as Record<ShortcutId, KeyBinding[]>;
+    expect(findShortcutConflict({ key: "1", alt: true }, "workspace.selectByIndex", user)?.id).toBe("view.zoomReset");
+  });
+
+  test("a literal digit collides with a wildcard that already owns its modifiers", () => {
+    const user = { "workspace.selectByIndex": [{ key: "1", alt: true }] } as unknown as Record<ShortcutId, KeyBinding[]>;
+    expect(findShortcutConflict({ key: "6", alt: true }, "view.zoomReset", user)?.id).toBe("workspace.selectByIndex");
+  });
+
+  test("a different modifier does not collide", () => {
+    const user = { "view.zoomReset": [{ key: "4", ctrl: true }] } as unknown as Record<ShortcutId, KeyBinding[]>;
+    expect(findShortcutConflict({ key: "1", alt: true }, "workspace.selectByIndex", user)).toBeNull();
+  });
+
+  test("menuAction may share the palette slots' modifier, they delegate to it", () => {
+    const cmd = { key: "1", [MOD_PROP]: true } as KeyBinding;
+    expect(findShortcutConflict(cmd, "palette.menuAction", none)).toBeNull();
+  });
+
+  test("workspace jumps and the palette group never compete", () => {
+    expect(findShortcutConflict({ key: "1", meta: true }, "workspace.selectByIndex", none)).toBeNull();
   });
 });

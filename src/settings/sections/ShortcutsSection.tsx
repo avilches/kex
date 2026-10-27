@@ -4,16 +4,30 @@ import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setShortcuts } from "@/modules/settings/store";
+import { fmtShortcut } from "@/lib/platform";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   bindingFromEvent,
   bindingsEqual,
+  findShortcutConflict,
   getBindingTokens,
+  isDigitWildcard,
   type KeyBinding,
+  type Modifiers,
+  modifiersOf,
   SHORTCUT_GROUPS,
   SHORTCUTS,
   type Shortcut,
   type ShortcutId,
   shortcutsForEvent,
+  WILDCARD_MODIFIER_PRESETS,
+  wildcardBinding,
 } from "@/modules/shortcuts/shortcuts";
 import {
   Cancel01Icon,
@@ -277,7 +291,27 @@ function ShortcutRow({
       </div>
 
       <div className="flex items-center gap-2">
-        {isRecording ? (
+        {isDigitWildcard(shortcut.id) ? (
+          <>
+            <WildcardPicker
+              shortcut={shortcut}
+              binding={hasBindings ? bindings[0] : undefined}
+              userShortcuts={userShortcuts}
+              onPick={onRecord}
+            />
+            <div className="flex items-center gap-1">
+              {isModified ? (
+                <ActionButton onClick={onReset} title="Reset to default">
+                  <HugeiconsIcon icon={Refresh01Icon} size={11} />
+                </ActionButton>
+              ) : hasBindings ? (
+                <ActionButton onClick={onClear} title="Clear shortcut">
+                  <HugeiconsIcon icon={CancelCircleIcon} size={12} />
+                </ActionButton>
+              ) : null}
+            </div>
+          </>
+        ) : isRecording ? (
           <Recorder
             currentId={shortcut.id}
             userShortcuts={userShortcuts}
@@ -335,25 +369,57 @@ function ShortcutRow({
   );
 }
 
-function findConflict(
-  binding: KeyBinding,
-  currentId: ShortcutId,
-  userShortcuts: Record<ShortcutId, KeyBinding[]>,
-): Shortcut | null {
-  const current = SHORTCUTS.find((c) => c.id === currentId);
-  for (const s of SHORTCUTS) {
-    if (s.id === currentId) continue;
-    // A palette shortcut is only live while its palette is open, so it never competes with the index jumps.
-    if (
-      (s.group === "Palette" && current?.id.endsWith("selectByIndex")) ||
-      (current?.group === "Palette" && s.id.endsWith("selectByIndex"))
-    )
-      continue;
-    const bindings =
-      s.id in userShortcuts ? userShortcuts[s.id] : s.defaultBindings;
-    if (bindings.some((b) => bindingsEqual(b, binding))) return s;
-  }
-  return null;
+const modifiersKey = (m: Modifiers) =>
+  ["ctrl", "alt", "shift", "meta"].filter((k) => m[k as keyof Modifiers]).join("+");
+
+function WildcardPicker({
+  shortcut,
+  binding,
+  userShortcuts,
+  onPick,
+}: {
+  shortcut: Shortcut;
+  binding?: KeyBinding;
+  userShortcuts: Record<ShortcutId, KeyBinding[]>;
+  onPick: (b: KeyBinding) => void;
+}) {
+  const label = (m: Modifiers) =>
+    fmtShortcut(...getBindingTokens(wildcardBinding(m), shortcut.id));
+  return (
+    <Select
+      value={binding ? modifiersKey(modifiersOf(binding)) : ""}
+      onValueChange={(v) => {
+        const mods = WILDCARD_MODIFIER_PRESETS.find((m) => modifiersKey(m) === v);
+        if (mods) onPick(wildcardBinding(mods));
+      }}
+    >
+      <SelectTrigger
+        size="sm"
+        title="Change modifier"
+        className="min-w-[100px] text-[11.5px]"
+      >
+        <SelectValue placeholder="Unassigned" />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {WILDCARD_MODIFIER_PRESETS.map((m) => {
+          const taken = findShortcutConflict(wildcardBinding(m), shortcut.id, userShortcuts);
+          return (
+            <SelectItem
+              key={modifiersKey(m)}
+              value={modifiersKey(m)}
+              disabled={!!taken}
+              className="text-[11.5px]"
+            >
+              {label(m)}
+              {taken && (
+                <span className="ml-2 text-muted-foreground">used by {taken.label}</span>
+              )}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
 }
 
 function ActionButton({
@@ -424,7 +490,7 @@ function Recorder({
 
       const binding = bindingFromEvent(e);
 
-      const conflicting = findConflict(binding, currentId, userShortcuts);
+      const conflicting = findShortcutConflict(binding, currentId, userShortcuts);
       if (conflicting) {
         onConflict({ binding, with: conflicting });
         return;
