@@ -177,7 +177,8 @@ import {
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { workspaceDetailRows } from "@/modules/workspaces/lib/workspaceDetail";
-import { createFocusGate } from "@/modules/workspaces/lib/focusGate";
+import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
+import { activateKeepingKeyboard, activateWithFocus } from "@/modules/workspaces/lib/tabActivation";
 import { focusTabContent } from "@/modules/workspaces/lib/focusTabContent";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
@@ -1296,13 +1297,11 @@ export default function App() {
   const folderPaletteOpenRef = useRef(false);
   folderPaletteOpenRef.current = folderPaletteOpen;
   const commandPaletteOpenRef = useRef(false);
-  // Held while the command palette activates a tab it must not hand the keyboard to; released
-  // when the palette closes or any other gesture activates a tab.
-  const paletteFocusGate = useRef(createFocusGate());
-  useEffect(() => {
-    if (!commandPaletteOpen) paletteFocusGate.current.release();
-  }, [commandPaletteOpen]);
   commandPaletteOpenRef.current = commandPaletteOpen;
+  // The gate is held while the command palette activates a tab it must not hand the keyboard to.
+  useEffect(() => {
+    if (!commandPaletteOpen) paletteFocusGate.release();
+  }, [commandPaletteOpen]);
   const [paletteInitialMode, setPaletteInitialMode] = useState<
     "commands" | "content" | "history"
   >("commands");
@@ -1655,7 +1654,7 @@ export default function App() {
     (tabId: string) => {
       const kind = findTabGlobal(tabId)?.tab.kind;
       requestAnimationFrame(() =>
-        paletteFocusGate.current.run(() =>
+        paletteFocusGate.run(() =>
           focusTabContent(kind, tabId, {
             focusEditor: (id) => editorHandles.current.get(id)?.focus(),
             focusMarkdown: (id) => markdownHandles.current.get(id)?.focus(),
@@ -1690,9 +1689,11 @@ export default function App() {
   );
   const onActivateTabStable = useCallback(
     (wsId: string, tabId: string) => {
-      paletteFocusGate.current.release();
-      activateKeepingScratchpads(wsId, tabId);
-      focusTab(tabId);
+      activateWithFocus(
+        paletteFocusGate,
+        () => activateKeepingScratchpads(wsId, tabId),
+        () => focusTab(tabId),
+      );
     },
     [activateKeepingScratchpads, focusTab],
   );
@@ -2052,8 +2053,9 @@ export default function App() {
       if (!found) return;
       setActiveWorkspaceId(found.workspace.id);
       if (opts?.focus === false) {
-        paletteFocusGate.current.hold();
-        activateKeepingScratchpads(found.workspace.id, tabId);
+        activateKeepingKeyboard(paletteFocusGate, () =>
+          activateKeepingScratchpads(found.workspace.id, tabId),
+        );
       } else onActivateTabStable(found.workspace.id, tabId);
     },
     [onActivateTabStable, activateKeepingScratchpads, findTabGlobal, setActiveWorkspaceId],

@@ -17,6 +17,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { type FontWeight, Terminal } from "@xterm/xterm";
 import { registerTerminalLinks, parseFileUri } from "@/modules/terminal/lib/terminalLinks";
 import { dispatchFileLink } from "@/modules/terminal/lib/terminalLinkBridge";
+import { paletteFocusGate } from "@/modules/workspaces/lib/focusGate";
 import { shouldCursorBlink } from "./cursorBlink";
 import {
   terminalDeleteSequence,
@@ -975,9 +976,17 @@ export function applyTheme(): void {
   }
 }
 
+export function focusSlotOf(
+  list: readonly Pick<Slot, "currentLeafId" | "term">[],
+  leafId: string,
+): void {
+  paletteFocusGate.run(() => {
+    list.find((s) => s.currentLeafId === leafId)?.term.focus();
+  });
+}
+
 export function focusSlot(leafId: string): void {
-  const slot = slots.find((s) => s.currentLeafId === leafId);
-  slot?.term.focus();
+  focusSlotOf(slots, leafId);
 }
 
 export function setSlotFocused(leafId: string, focused: boolean): void {
