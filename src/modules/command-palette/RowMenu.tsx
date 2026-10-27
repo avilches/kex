@@ -1,4 +1,5 @@
 import { ContextMenuShortcut } from "@/components/ui/context-menu";
+import { StartTrimmed } from "@/components/StartTrimmed";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
@@ -269,7 +270,17 @@ export function RowMenu({
                   className={cn("shrink-0", item.id === "autofocus" && item.active && "text-primary")}
                 />
               )}
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.detail !== undefined && !item.disabled ? (
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{item.label}</span>
+                  <StartTrimmed
+                    text={item.detail}
+                    className="flex max-w-[260px] font-mono text-[10px] font-normal text-muted-foreground"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              )}
               {item.value !== undefined ? (
                 <span className="max-w-[140px] shrink-0 truncate pl-3 font-mono text-[10px] font-normal text-muted-foreground">
                   {item.value}

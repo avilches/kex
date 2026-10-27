@@ -145,6 +145,17 @@ describe("tabMenuItems", () => {
     );
   });
 
+  it("shows the paths to copy as a second line, and nothing when the item is disabled", () => {
+    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false });
+    expect(item(inside, "copy")?.detail).toBe("/repo/src/a.ts");
+    expect(item(inside, "copyRelative")?.detail).toBe("src/a.ts");
+    const outside = entry({ kind: "editor", path: "/other/a.ts", dirty: false });
+    expect(item(outside, "copyRelative")?.detail).toBeUndefined();
+    const none = entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" });
+    expect(item(none, "copy")?.detail).toBeUndefined();
+    expect(item(entry(), "tabId")?.detail).toBeUndefined();
+  });
+
   it("copies the tab id and shows it as the tooltip", () => {
     expect(item(entry(), "tabId")).toMatchObject({ label: "Copy Tab ID", value: "tab-1", title: "tab-1" });
   });

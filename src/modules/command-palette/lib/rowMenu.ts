@@ -49,6 +49,8 @@ export type RowMenuItem = {
   title?: string;
   // A value the item acts on, drawn dimmed in monospace after the label.
   value?: string;
+  // A second line under the label, dimmed in monospace and trimmed at the start when it is long.
+  detail?: string;
   // The Action an "action" item runs.
   actionId?: string;
   // The 1-9 key that runs it while the menu is open (Cmd+digit).
@@ -183,12 +185,14 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
   }
   items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note", separatorBefore: true });
   if (hasTabNote(tab)) items.push({ id: "removeNote", label: "Remove Note" });
+  const absolute = tabEntryCopyPath(entry);
   items.push({
     id: "copy",
     label: "Copy Absolute Path",
     shortcutId: "path.copy",
-    disabled: !tabEntryCopyPath(entry),
+    disabled: !absolute,
     separatorBefore: true,
+    ...(absolute ? { detail: absolute } : {}),
   });
   const rel = tabEntryRelativePath(entry);
   if (rel && !(rel.ok && rel.text === ".")) {
@@ -197,6 +201,7 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
       label: "Copy Relative Path",
       title: rel.ok ? rel.text : rel.reason,
       disabled: !rel.ok,
+      ...(rel.ok ? { detail: rel.text } : {}),
     });
   }
   items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });

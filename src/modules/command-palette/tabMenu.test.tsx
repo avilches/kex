@@ -379,6 +379,20 @@ describe("Copy Tab ID from the palette", () => {
   });
 });
 
+describe("Copy Absolute Path from the palette", () => {
+  it("shows the path under the label, in full as the tooltip", async () => {
+    await openOn("tab:c");
+    await key("Tab");
+    await wait(20);
+    const item = menuItem("Copy Absolute Path") as HTMLElement;
+    const sub = item.querySelector(".font-mono") as HTMLElement;
+    expect(sub.textContent).toContain("/p");
+    expect(sub.title).toBe("/p");
+    const relative = menuItem("Copy Relative Path") as HTMLElement;
+    expect(relative.querySelector(".font-mono")).toBeNull();
+  });
+});
+
 describe("Move to Workspace from the palette", () => {
   it("moves the highlighted tab, not the active one, to the picked workspace", async () => {
     await openOn("tab:c");
