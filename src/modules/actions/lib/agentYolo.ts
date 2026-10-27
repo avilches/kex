@@ -14,8 +14,8 @@ const BYPASS: Readonly<Record<string, Bypass>> = {
 };
 
 const ASSIGNMENT = /^\s*(?:[A-Za-z_]\w*=\S*\s+)*/;
-const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const tokenRegex = (token: string): RegExp => new RegExp(`(^|\\s)${token.split(/\s+/).map(escape).join("\\s+")}(?=\\s|$)`, "g");
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const tokenRegex = (token: string): RegExp => new RegExp(`(^|\\s)${token.split(/\s+/).map(escapeRegex).join("\\s+")}(?=\\s|$)`, "g");
 
 /** The agent a command starts: its binary name, past any leading `VAR=value`, without directory
  * or Windows extension. Null when the command has no binary yet. */
