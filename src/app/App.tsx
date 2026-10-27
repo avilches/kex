@@ -243,6 +243,7 @@ import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modul
 import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
+import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -3190,18 +3191,7 @@ export default function App() {
       "tab.lock": () => {
         if (!activeTabId || !activeTab) return;
         const found = findTabGlobal(activeTabId);
-        if (found)
-          updateTabData(found.workspace.id, activeTabId, (p) => {
-            const newLocked = !p.locked;
-            if (p.kind === "editor" || p.kind === "markdown") {
-              return {
-                ...p,
-                locked: newLocked,
-                ...(newLocked ? { preview: false } : {}),
-              };
-            }
-            return { ...p, locked: newLocked };
-          });
+        if (found) updateTabData(found.workspace.id, activeTabId, toggleTabLock);
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {

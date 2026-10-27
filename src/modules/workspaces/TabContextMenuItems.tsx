@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/context-menu";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
+import { toggleTabLock } from "./lib/tabLock";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
@@ -253,16 +254,7 @@ export function TabContextMenuItems({
         // menu is toggling in place, so the item flips to Unlock Tab and stays.
         onSelect={(e) => {
           e.preventDefault();
-          onUpdateTab?.(tab.id, (p) => {
-            const newLocked = !isLocked;
-            return {
-              ...p,
-              locked: newLocked,
-              ...(newLocked && (p.kind === "editor" || p.kind === "markdown" || p.kind === "git-diff" || p.kind === "git-commit-file")
-                ? { preview: false }
-                : {}),
-            };
-          });
+          onUpdateTab?.(tab.id, toggleTabLock);
         }}
       >
         <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
