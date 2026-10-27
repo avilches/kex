@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -230,7 +231,14 @@ function ShortcutRow({
       className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30"
     >
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12.5px] font-medium">{shortcut.label}</span>
+        <span
+          className={cn(
+            "text-[12.5px] font-medium",
+            (isModified || isRecording) && "text-primary",
+          )}
+        >
+          {shortcut.label}
+        </span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -254,7 +262,7 @@ function ShortcutRow({
               {hasBindings ? (
                 <KbdGroup>
                   {isModified && (
-                    <span className="mr-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                    <span className="mr-1 text-[10px] font-medium text-muted-foreground">
                       Custom
                     </span>
                   )}
