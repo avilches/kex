@@ -36,7 +36,18 @@ async function pickWorktreePort(start, isFree, tries) {
   throw new Error(`No free dev port found in ${BASE_PORT + 1}-${BASE_PORT + WORKTREE_SPAN}`);
 }
 
-export function isPortFree(port) {
+// Vite listens on localhost only, and on macOS a wildcard listen succeeds next to
+// a listener bound to one address, so a bind probe alone calls a taken port free.
+function isListening(port, host) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ port, host });
+    socket.once("connect", () => socket.destroy(resolve(true)));
+    socket.once("error", () => resolve(false));
+  });
+}
+
+export async function isPortFree(port) {
+  if ((await isListening(port, "127.0.0.1")) || (await isListening(port, "::1"))) return false;
   return new Promise((resolve) => {
     const server = net.createServer();
     server.once("error", () => resolve(false));

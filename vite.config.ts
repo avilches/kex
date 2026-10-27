@@ -10,14 +10,16 @@ import {
   type UserConfig,
 } from "vite";
 import Inspect from "vite-plugin-inspect";
+import { isPortFree, pickPort } from "./scripts/devPort.mjs";
 import { settingsTextsPlugin } from "./scripts/settings-texts-plugin";
 import { themeWritePlugin } from "./scripts/theme-write-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
 
-// `pnpm tauri dev` picks a free port per checkout (scripts/tauri.mjs) so several
-// worktrees can run at once; a bare `pnpm dev` keeps the classic 1420.
-const port = Number(process.env.KEX_DEV_PORT) || 1420;
+// `pnpm tauri dev` picks a free port per checkout (scripts/tauri.mjs) and passes it in
+// KEX_DEV_PORT. A bare `pnpm dev` runs the same pick, so it takes the next free port
+// when a `tauri dev` already holds this checkout's one instead of failing on strictPort.
+const port = Number(process.env.KEX_DEV_PORT) || (await pickPort(process.cwd(), isPortFree));
 
 // Bundle/treemap analysis is opt-in: `ANALYZE=true pnpm build` emits stats.html.
 const analyze = process.env.ANALYZE === "true";
