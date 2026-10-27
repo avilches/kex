@@ -84,7 +84,8 @@ export type ShortcutGroup =
   | "Terminal"
   | "View"
   | "Editor"
-  | "Palette: New Terminal";
+  | "Palette: New Terminal"
+  | "Global Palette";
 
 export type KeyBinding = {
   key: string;
@@ -160,42 +161,54 @@ export const SHORTCUTS: Shortcut[] = [
   // Only live while the new-terminal palette is open (shortcutsDisabled), so Cmd+1..9 keep
   // jumping to a workspace everywhere else; they sit before workspace.selectByIndex to win there.
   {
+    id: "tab.new",
+    label: "Open New Terminal Palette",
+    group: "Palette: New Terminal",
+    defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
+  },
+  {
     id: "palette.folderCurrent",
-    label: "Current Tab Folder",
+    label: "Open in: Current Tab Folder",
     group: "Palette: New Terminal",
     // Shares Cmd+T with tab.new on purpose: it comes first and is dead unless the palette is open.
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
     id: "palette.folderRoot",
-    label: "Workspace Root",
+    label: "Open in: Workspace Root",
     group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "palette.folderMain",
-    label: "Main Checkout",
+    label: "Open in: Main Checkout",
     group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "2" }],
   },
   {
     id: "palette.folderHome",
-    label: "Home",
+    label: "Open in: Home",
     group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "3" }],
-  },
-  {
-    id: "palette.menuAction",
-    label: "Run Menu Action 1–9",
-    group: "Palette: New Terminal",
-    // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
-    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "palette.worktrees",
     label: "Show or Hide Worktrees",
     group: "Palette: New Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "k" }],
+  },
+  {
+    id: "commandPalette.open",
+    label: "Open Global Palette",
+    group: "Global Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
+  },
+  {
+    id: "palette.menuAction",
+    label: "Run Menu Action 1–9",
+    group: "Global Palette",
+    // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
+    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "workspace.selectByIndex",
@@ -205,12 +218,6 @@ export const SHORTCUTS: Shortcut[] = [
     // representative binding; matchBinding treats any 1-9 as a hit (see the
     // workspace.selectByIndex special case). Cmd+0 is left to Reset Zoom.
     defaultBindings: [{ meta: true, key: "1" }],
-  },
-  {
-    id: "commandPalette.open",
-    label: "Open Command Palette",
-    group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
   },
   {
     id: "commandPalette.content",
@@ -323,12 +330,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Rename File",
     group: "Explorer",
     defaultBindings: [{ key: "F2" }],
-  },
-  {
-    id: "tab.new",
-    label: "New Terminal Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
     id: "tab.newBrowser",
@@ -556,13 +557,19 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "General",
   "Sidebar",
   "Explorer",
+  "Palette: New Terminal",
+  "Global Palette",
   "Tabs",
   "Panes",
   "Terminal",
   "View",
   "Editor",
-  "Palette: New Terminal",
 ];
+
+/** Both palette groups: their shortcuts are only live while a palette is open. */
+export function isPaletteGroup(group: ShortcutGroup): boolean {
+  return group === "Palette: New Terminal" || group === "Global Palette";
+}
 
 export function bindingsEqual(a: KeyBinding, b: KeyBinding): boolean {
   return (
@@ -783,10 +790,16 @@ export function findShortcutConflict(
     // A palette shortcut is only live while its palette is open, so it never competes with the index jumps
     // or with Clear Terminal.
     const outsidePalette = (id: string) =>
-      id.endsWith("selectByIndex") || id === "terminal.clear" || id === "tab.new";
+      id.endsWith("selectByIndex") || id === "terminal.clear";
+    // Opening the palette and picking its current-tab folder share a key: one acts before the palette opens, the other after.
     if (
-      (s.group === "Palette: New Terminal" && current && outsidePalette(current.id)) ||
-      (current?.group === "Palette: New Terminal" && outsidePalette(s.id))
+      (s.id === "tab.new" && currentId === "palette.folderCurrent") ||
+      (s.id === "palette.folderCurrent" && currentId === "tab.new")
+    )
+      continue;
+    if (
+      (isPaletteGroup(s.group) && current && outsidePalette(current.id)) ||
+      (current && isPaletteGroup(current.group) && outsidePalette(s.id))
     )
       continue;
     if (PALETTE_DIGIT_SLOTS.includes(s.id) && PALETTE_DIGIT_SLOTS.includes(currentId)) continue;
