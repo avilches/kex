@@ -337,7 +337,8 @@ The fork builds its own macOS menu bar instead of the default Tauri menu (`#[cfg
   ([tauri#12978](https://github.com/tauri-apps/tauri/issues/12978)), so `prevent_exit` could not run the autosave
   flush. The custom Quit item is intercepted in `on_menu_event`, which emits `kex:before-quit`; the frontend flushes
   dirty editors and workspace state, then calls the `confirm_quit` command (guarded by `QuitGuard` so the second pass
-  exits). `ExitRequested` is still handled as a fallback for programmatic exits.
+  exits). With several windows, `QuitGuard.flushing` holds the labels still saving and the app exits only when the
+  last one confirms (or after a 3 s timeout), so the first window to finish cannot kill the others mid-save. `ExitRequested` is still handled as a fallback for programmatic exits.
 - **App actions in the menu.** Kex / File / Edit / View / Window submenus. Action items emit `kex:menu` with their id,
   routed via `emit_to` to the focused window only (plain `emit` broadcasts to every window), and dispatched in
   `App.tsx` to the same handlers the shortcuts use. Dynamic labels (Enable/Disable Autosave, Show/Hide

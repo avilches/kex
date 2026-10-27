@@ -6,7 +6,9 @@ use modules::{
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashSet;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const LOG_ARCHIVES_KEPT: usize = 20;
@@ -26,16 +28,61 @@ pub(crate) struct QuitGuard {
     /// Set by the frontend before it voluntarily destroys the last window (last workspace
     /// removed). Signals ExitRequested to stay alive without windows rather than quitting.
     pub(crate) windowless_mode: AtomicBool,
+    /// Main windows that were told to flush and have not yet acknowledged.
+    pub(crate) flushing: FlushTracker,
 }
 
-/// Called by the frontend once it has flushed editors and workspace state in
-/// response to `kex:before-quit`, to let the deferred quit proceed.
-#[tauri::command]
-fn confirm_quit(app: tauri::AppHandle) {
+/// Upper bound on how long a quit waits for windows that never acknowledge.
+const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Labels of the windows still flushing for a quit. The app may only exit once it is empty,
+/// otherwise the first window to finish would kill the others mid-save.
+#[derive(Default)]
+pub(crate) struct FlushTracker(Mutex<HashSet<String>>);
+
+impl FlushTracker {
+    /// Replaces the waiting set with `labels`.
+    pub(crate) fn begin(&self, labels: impl IntoIterator<Item = String>) {
+        *self.0.lock().unwrap() = labels.into_iter().collect();
+    }
+
+    /// Marks `label` as done. True when no window is left waiting.
+    pub(crate) fn ack(&self, label: &str) -> bool {
+        let mut waiting = self.0.lock().unwrap();
+        waiting.remove(label);
+        waiting.is_empty()
+    }
+}
+
+fn main_window_labels(app: &tauri::AppHandle) -> Vec<String> {
+    app.webview_windows()
+        .into_keys()
+        .filter(|l| l.starts_with("w-"))
+        .collect()
+}
+
+/// Asks every live main window to flush, and force-exits after `QUIT_FLUSH_TIMEOUT` if one hangs.
+pub(crate) fn emit_before_quit(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
-        .confirmed
-        .store(true, Ordering::SeqCst);
-    app.exit(0);
+        .flushing
+        .begin(main_window_labels(app));
+    let _ = app.emit("kex:before-quit", ());
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(QUIT_FLUSH_TIMEOUT);
+        handle.exit(0);
+    });
+}
+
+/// Called by each main window once it has flushed editors and workspace state in
+/// response to `kex:before-quit`; the quit proceeds when the last one reports.
+#[tauri::command]
+fn confirm_quit(app: tauri::AppHandle, window: tauri::WebviewWindow) {
+    let guard = app.state::<QuitGuard>();
+    guard.confirmed.store(true, Ordering::SeqCst);
+    if guard.flushing.ack(window.label()) {
+        app.exit(0);
+    }
 }
 
 /// Dismisses a quit that was deferred because a duplication was in progress
@@ -78,9 +125,8 @@ fn signal_quit_request(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
         .confirmed
         .store(true, Ordering::SeqCst);
-    let has_main = app.webview_windows().keys().any(|l| l.starts_with("w-"));
-    if has_main {
-        let _ = app.emit("kex:before-quit", ());
+    if !main_window_labels(app).is_empty() {
+        emit_before_quit(app);
     } else {
         // No windows to flush - exit immediately.
         app.exit(0);
@@ -1053,4 +1099,37 @@ pub fn run() {
                 signal_quit_request(app_handle);
             }
         });
+}
+
+#[cfg(test)]
+mod quit_tests {
+    use super::FlushTracker;
+
+    fn labels(l: &[&str]) -> Vec<String> {
+        l.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn quit_waits_for_every_window() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        assert!(!t.ack("w-a"));
+        assert!(t.ack("w-b"));
+    }
+
+    #[test]
+    fn repeated_ack_does_not_release_early() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        assert!(!t.ack("w-a"));
+        assert!(!t.ack("w-a"));
+    }
+
+    #[test]
+    fn begin_replaces_previous_set() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        t.begin(labels(&["w-c"]));
+        assert!(t.ack("w-c"));
+    }
 }

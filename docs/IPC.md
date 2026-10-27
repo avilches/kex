@@ -195,7 +195,7 @@ State: `tab-history.json` in the app data dir, next to `agent-sessions.json`. On
 | `window_save_collapsed_groups(label, ids)` | Persist which workspace groups are collapsed in a window |
 | `restore_window_geometry` | Restore the window size on startup (physical pixels; position is not restored) |
 | `sync_menu(state)` | Sync the native menu with the frontend (`autosave`, `sidebarOpen`, `activeView`, `sidebarSide`, `showHidden`) |
-| `confirm_quit` | Called once the frontend has flushed editors and workspace state after `kex:before-quit`, so the deferred quit proceeds |
+| `confirm_quit` | Called by each main window once it has flushed editors and workspace state after `kex:before-quit`. Rust tracks the `w-*` windows alive when the quit was signalled (`QuitGuard.flushing`) and exits only when the last one has reported, or after a 3 s safety timeout |
 | `enter_windowless_mode` | Called before destroying the last window so the app stays alive in the Dock without windows (macOS) |
 | `agent_os_notify` | Send an OS notification `{ window_label, workspace_id, tab_id, title, body }`. On macOS a click on the notification (and only that) focuses the window and emits `kex:activate-tab` to it. |
 | `float_browser_open(tabId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser tab. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
