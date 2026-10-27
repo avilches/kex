@@ -34,7 +34,8 @@ import {
 } from "./hooks/useContentSearch";
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
-import { displayOrder, successorKey } from "./lib/closeSuccessor";
+import { displayOrder, successorOf } from "./lib/closeSuccessor";
+import { initialKey } from "./lib/initialKey";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
@@ -57,7 +58,9 @@ import {
   type RowMenuItemId,
   tabEntryCopyPath,
   tabMenuItems,
+  workspaceIdOfRow,
   workspaceMenuItems,
+  workspaceRowKeys,
 } from "./lib/rowMenu";
 import { anchorOf, keepInputFocus, RowMenu, useRowMenu } from "./RowMenu";
 import { MergedList } from "./MergedList";
@@ -92,6 +95,12 @@ type Props = {
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
   onCloseTab: (entry: TabEntry) => void | Promise<unknown>;
+  /** Resolves once the workspace is closed (true) or the close was cancelled or refused (false). */
+  onCloseWorkspace: (workspaceId: string) => Promise<boolean>;
+  onRenameWorkspace: (workspaceId: string) => void;
+  onHibernateWorkspace: (workspaceId: string) => void;
+  onCloseAllTabs: (workspaceId: string) => void;
+  onOpenWorkspaceSettings: (workspaceId: string) => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -136,13 +145,18 @@ export function CommandPalette({
   onTerminalTargetChange,
   onOpenTerminalAt,
   onCloseTab,
+  onCloseWorkspace,
+  onRenameWorkspace,
+  onHibernateWorkspace,
+  onCloseAllTabs,
+  onOpenWorkspaceSettings,
 }: Props) {
   const [query, setQuery] = useState("");
   const barModel = useActionsBarModel({ workspace: open ? actionsWorkspace : null });
   const actionItems = useMemo(() => paletteActions(barModel), [barModel]);
   const { contentStyle, handles } = usePaletteWidth();
   const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
-  const [value, setValue] = useState("");
+  const [pickedValue, setValue] = useState("");
   const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
@@ -200,6 +214,11 @@ export function CommandPalette({
       mru,
     ],
   );
+  // Until a row is picked the previous tab is the highlighted one. Passing it as the controlled
+  // value from the first render keeps cmdk from selecting the first row (the current tab) first.
+  const value =
+    pickedValue ||
+    (open && inCommands && !inSubpage ? initialKey(merged, parsed.term.length > 0) : "");
   const terminalTarget = useMemo(
     () => (open && inCommands ? terminalTargetOf(value, merged) : null),
     [open, inCommands, value, merged],
@@ -432,10 +451,10 @@ export function CommandPalette({
       }, delay);
     }
   }, []);
-  // The row to select once the tab being closed is gone. Set before closing, applied only when the
-  // tab really disappears from the list, dropped when the close was cancelled or refused.
+  // The rows that will disappear and the one to select once they have. Set before closing, applied
+  // only when they really leave the list, dropped when the close was cancelled or refused.
   const pendingClose = useRef<{
-    key: string;
+    gone: ReadonlySet<string>;
     next: string | null;
     scrollTop: number;
   } | null>(null);
@@ -448,24 +467,26 @@ export function CommandPalette({
   );
   const mergedRef = useRef(merged);
   mergedRef.current = merged;
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const typingRef = useRef(false);
   typingRef.current = parsed.term.length > 0;
-  const closeTabFromRow = useCallback(
-    (entry: TabEntry) => {
-      if (pendingClose.current) return;
-      const key = tabRowKey(entry.tabId);
+  const closeRows = useCallback(
+    (gone: ReadonlySet<string>, from: string, run: () => unknown, failure: string) => {
+      if (pendingClose.current || gone.size === 0) return;
       const pending = {
-        key,
-        next: successorKey(
+        gone,
+        next: successorOf(
           displayOrder(mergedRef.current, typingRef.current, COMMAND_GROUPS),
-          key,
+          gone,
+          from,
         ),
         scrollTop: listViewport()?.scrollTop ?? 0,
       };
       pendingClose.current = pending;
       void Promise.resolve()
-        .then(() => onCloseTab(entry))
-        .catch((e) => console.error("Closing the tab failed", e))
+        .then(run)
+        .catch((e) => console.error(failure, e))
         .finally(() => {
           refocusInput();
           window.setTimeout(() => {
@@ -473,11 +494,30 @@ export function CommandPalette({
           }, 300);
         });
     },
-    [onCloseTab, refocusInput, listViewport],
+    [refocusInput, listViewport],
+  );
+  const closeTabFromRow = useCallback(
+    (entry: TabEntry) => {
+      const key = tabRowKey(entry.tabId);
+      closeRows(new Set([key]), key, () => onCloseTab(entry), "Closing the tab failed");
+    },
+    [onCloseTab, closeRows],
+  );
+  const closeWorkspaceFromRow = useCallback(
+    (workspaceId: string, from: string) => {
+      closeRowMenu();
+      closeRows(
+        workspaceRowKeys(mergedRef.current, workspaceId),
+        from,
+        () => onCloseWorkspace(workspaceId),
+        "Closing the workspace failed",
+      );
+    },
+    [onCloseWorkspace, closeRows, closeRowMenu],
   );
   useEffect(() => {
     const pending = pendingClose.current;
-    if (!pending || merged.some((r) => r.key === pending.key)) return;
+    if (!pending || merged.some((r) => pending.gone.has(r.key))) return;
     pendingClose.current = null;
     const next = pending.next;
     const target =
@@ -510,9 +550,20 @@ export function CommandPalette({
         if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
       } else if (id === "close") {
         closeTabFromRow(entry);
+      } else if (id === "closeWorkspace") {
+        closeWorkspaceFromRow(entry.workspaceId, tabRowKey(entry.tabId));
       }
     },
-    [closeRowMenu, parsed.term, runAfterClose, onSelectTab, merged, onOpenTerminalAt, closeTabFromRow],
+    [
+      closeRowMenu,
+      parsed.term,
+      runAfterClose,
+      onSelectTab,
+      merged,
+      onOpenTerminalAt,
+      closeTabFromRow,
+      closeWorkspaceFromRow,
+    ],
   );
 
   const runWorkspaceAction = useCallback(
@@ -523,9 +574,30 @@ export function CommandPalette({
       } else if (id === "terminal") {
         const target = terminalTargetOf(`ws:${entry.workspaceId}`, merged);
         if (target) onOpenTerminalAt(target);
+      } else if (id === "rename") {
+        runAfterClose(() => onRenameWorkspace(entry.workspaceId));
+      } else if (id === "hibernate") {
+        runAfterClose(() => onHibernateWorkspace(entry.workspaceId));
+      } else if (id === "closeTabs") {
+        runAfterClose(() => onCloseAllTabs(entry.workspaceId));
+      } else if (id === "settings") {
+        runAfterClose(() => onOpenWorkspaceSettings(entry.workspaceId));
+      } else if (id === "closeWorkspace") {
+        closeWorkspaceFromRow(entry.workspaceId, workspaceRowKey(entry.workspaceId));
       }
     },
-    [closeRowMenu, runAfterClose, onSelectWorkspace, merged, onOpenTerminalAt],
+    [
+      closeRowMenu,
+      runAfterClose,
+      onSelectWorkspace,
+      merged,
+      onOpenTerminalAt,
+      onRenameWorkspace,
+      onHibernateWorkspace,
+      onCloseAllTabs,
+      onOpenWorkspaceSettings,
+      closeWorkspaceFromRow,
+    ],
   );
 
   const runClosedAction = useCallback(
@@ -624,9 +696,10 @@ export function CommandPalette({
     [openRowMenu],
   );
 
-  const latestShortcut = useRef({ highlightedTab, runTabAction });
-  latestShortcut.current = { highlightedTab, runTabAction };
-  // Cmd+W and Cmd+Shift+C act on the highlighted tab; Cmd+T keeps opening the terminal beside it.
+  const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow });
+  latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow };
+  // Cmd+W and Cmd+Shift+C act on the highlighted tab, Cmd+Shift+W on its workspace; Cmd+T keeps
+  // opening the terminal beside it.
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action) => {
@@ -634,7 +707,13 @@ export function CommandPalette({
       // Between a close and the frame that restores the selection the highlighted row is cmdk's
       // own pick, not the user's: acting on it would hit the wrong tab.
       if (settleFrame.current !== null) return true;
-      const { highlightedTab: entry, runTabAction: run } = latestShortcut.current;
+      const { highlightedTab: entry, runTabAction: run, closeWorkspaceFromRow: closeWs } =
+        latestShortcut.current;
+      if (action === "closeWorkspace") {
+        const workspaceId = workspaceIdOfRow(valueRef.current, mergedRef.current);
+        if (workspaceId) closeWs(workspaceId, valueRef.current);
+        return true;
+      }
       if (entry) run(action === "closeTab" ? "close" : "copy", entry);
       return true;
     });

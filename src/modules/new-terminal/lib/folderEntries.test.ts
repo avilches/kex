@@ -657,8 +657,8 @@ describe("filterFolderGroups", () => {
     const shown = build({
       workspaces: [active, other],
       workspaceEntries: [
-        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, tabCount: 1, root: null, lastUsedAt: 0 },
-        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, tabCount: 1, root: null, lastUsedAt: 0 },
+        { workspaceId: "ws-1", title: "Kex | zsh", color: null, icon: null, tabCount: 1, root: null, canHibernate: false, lastUsedAt: 0 },
+        { workspaceId: "ws-2", title: "Dotfiles", color: null, icon: null, tabCount: 1, root: null, canHibernate: false, lastUsedAt: 0 },
       ],
       home: "/Users/a",
       activeTabEntry: entry({ workspaceId: "ws-1", cwd: "/repo/src" }),
@@ -738,6 +738,7 @@ describe("resolved workspace identity", () => {
     icon: null,
     tabCount: 1,
     root: null,
+    canHibernate: false,
     lastUsedAt: 0,
     ...over,
   });

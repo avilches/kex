@@ -42,6 +42,7 @@ const ws = (workspaceId: string, title: string): WorkspaceEntry => ({
   title,
   color: null,
   icon: null,
+  canHibernate: false,
   tabCount: 1,
   root: null,
   lastUsedAt: 0,

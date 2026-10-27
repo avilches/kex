@@ -108,6 +108,11 @@ function Harness({
         closeCalls++;
         return closeImpl(e, setTabs);
       }}
+      onCloseWorkspace={() => Promise.resolve(false)}
+      onRenameWorkspace={() => {}}
+      onHibernateWorkspace={() => {}}
+      onCloseAllTabs={() => {}}
+      onOpenWorkspaceSettings={() => {}}
     />
   );
 }
@@ -132,6 +137,14 @@ const arrowDown = () =>
         new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
       );
   });
+const arrowUp = () =>
+  act(async () => {
+    document
+      .querySelector("[cmdk-root]")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+      );
+  });
 const closeHighlighted = () =>
   act(async () => {
     runPaletteShortcut("closeTab");
@@ -143,11 +156,31 @@ async function openOn(n: number) {
   closeCalls = 0;
   render(<Harness />);
   await wait(50);
+  await arrowUp();
+  await wait(10);
   for (let i = 0; i < n; i++) {
     await arrowDown();
     await wait(10);
   }
 }
+
+describe("the row highlighted on open", () => {
+  it("is the previous tab, not the current one", async () => {
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2)];
+    closeImpl = removing;
+    render(<Harness />);
+    await wait(50);
+    expect(selected()).toBe("tab:b");
+  });
+
+  it("is the current tab when it is the only one", async () => {
+    initial = [mk("cur", 0)];
+    closeImpl = removing;
+    render(<Harness />);
+    await wait(50);
+    expect(selected()).toBe("tab:cur");
+  });
+});
 
 describe("closing a tab from the palette", () => {
   it("selects the row below the closed one", async () => {

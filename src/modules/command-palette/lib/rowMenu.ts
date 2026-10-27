@@ -11,6 +11,11 @@ export type RowMenuItemId =
   | "terminal"
   | "copy"
   | "close"
+  | "rename"
+  | "hibernate"
+  | "closeTabs"
+  | "closeWorkspace"
+  | "settings"
   | "pick"
   | "worktrees"
   | "run"
@@ -54,11 +59,39 @@ export function highlightedWorkspaceOf(
   return null;
 }
 
+// The workspace a highlighted row belongs to: its own for a workspace row, the one holding the
+// tab for a tab row, null for any other kind of row.
+export function workspaceIdOfRow(value: string, rows: readonly MergedRow[]): string | null {
+  const ws = highlightedWorkspaceOf(value, rows);
+  if (ws) return ws.workspaceId;
+  return highlightedTabOf(value, rows)?.workspaceId ?? null;
+}
+
+// Every row that belongs to the workspace: the workspace row itself and each of its tabs.
+export function workspaceRowKeys(rows: readonly MergedRow[], workspaceId: string): Set<string> {
+  const keys = new Set<string>();
+  for (const row of rows) {
+    if (row.kind === "workspace" && row.entry.workspaceId === workspaceId) keys.add(row.key);
+    else if (row.kind === "tab" && row.entry.workspaceId === workspaceId) keys.add(row.key);
+  }
+  return keys;
+}
+
 export function workspaceMenuItems(entry: WorkspaceEntry): RowMenuItem[] {
   const items: RowMenuItem[] = [{ id: "go", label: "Go to Workspace", enter: true }];
   if (entry.root) {
     items.push({ id: "terminal", label: "New Terminal", title: entry.root, shortcutId: "tab.new" });
   }
+  items.push({ id: "rename", label: "Rename Workspace", shortcutId: "workspace.rename" });
+  if (entry.canHibernate) items.push({ id: "hibernate", label: "Hibernate Workspace" });
+  if (entry.tabCount > 0) items.push({ id: "closeTabs", label: "Close All Tabs" });
+  items.push({ id: "closeWorkspace", label: "Close Workspace", shortcutId: "workspace.close" });
+  items.push({
+    id: "settings",
+    label: "Workspace Settings",
+    shortcutId: "workspace.settings",
+    separatorBefore: true,
+  });
   return items;
 }
 
@@ -120,6 +153,7 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
       disabled: !tabEntryCopyPath(entry),
     },
     { id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: !closable },
+    { id: "closeWorkspace", label: "Close Workspace", shortcutId: "workspace.close" },
   ];
 }
 

@@ -775,4 +775,21 @@ describe("FolderPalette", () => {
       expect(restore).not.toHaveBeenCalled();
     });
   });
+
+  describe("close shortcuts", () => {
+    it.each(["closeTab", "closeWorkspace"] as const)(
+      "%s is taken without effect, so the tab or workspace behind the palette is not closed",
+      async (action) => {
+        const onPick = vi.fn();
+        mount(onPick);
+        await settle();
+        let taken = false;
+        await act(async () => {
+          taken = runPaletteShortcut(action);
+        });
+        expect(taken).toBe(true);
+        expect(onPick).not.toHaveBeenCalled();
+      },
+    );
+  });
 });

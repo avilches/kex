@@ -10,8 +10,11 @@ import {
   placeMenuTop,
   stepEnabled,
   tabMenuItems,
+  workspaceIdOfRow,
+  workspaceMenuItems,
+  workspaceRowKeys,
 } from "./rowMenu";
-import type { TabEntry } from "./tabEntries";
+import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 const entry = (over: Partial<TabEntry> & { locked?: boolean } = {}): TabEntry =>
   ({
@@ -28,7 +31,14 @@ const entry = (over: Partial<TabEntry> & { locked?: boolean } = {}): TabEntry =>
 describe("tabMenuItems", () => {
   it("offers go, terminal, copy and close with their shortcuts", () => {
     const items = tabMenuItems(entry());
-    expect(items.map((i) => i.id)).toEqual(["go", "terminal", "copy", "close"]);
+    expect(items.map((i) => i.id)).toEqual([
+      "go",
+      "terminal",
+      "copy",
+      "close",
+      "closeWorkspace",
+    ]);
+    expect(items[4]).toMatchObject({ label: "Close Workspace", shortcutId: "workspace.close" });
     expect(items[0]).toMatchObject({ label: "Go to Tab", enter: true });
     expect(items[1].shortcutId).toBe("tab.new");
     expect(items[2].shortcutId).toBe("path.copy");
@@ -187,5 +197,68 @@ describe("actionMenuItems", () => {
     const items = actionMenuItems({ ...base, state: "running", stoppable: true } as never);
     expect(items.map((i) => i.id)).toEqual(["run", "stop", "edit"]);
     expect(items[0].label).toBe("Show script");
+  });
+});
+
+const wsEntry = (over: Partial<WorkspaceEntry> = {}): WorkspaceEntry => ({
+  workspaceId: "ws-1",
+  title: "Kex",
+  color: null,
+  icon: null,
+  tabCount: 2,
+  root: "/repo",
+  canHibernate: true,
+  lastUsedAt: 0,
+  ...over,
+});
+
+describe("workspaceMenuItems", () => {
+  it("offers the actions of the workspace bar menu that need no pointer, with their shortcuts", () => {
+    const items = workspaceMenuItems(wsEntry());
+    expect(items.map((i) => i.id)).toEqual([
+      "go",
+      "terminal",
+      "rename",
+      "hibernate",
+      "closeTabs",
+      "closeWorkspace",
+      "settings",
+    ]);
+    const shortcut = (id: string) => items.find((i) => i.id === id)?.shortcutId;
+    expect(shortcut("rename")).toBe("workspace.rename");
+    expect(shortcut("closeWorkspace")).toBe("workspace.close");
+    expect(shortcut("settings")).toBe("workspace.settings");
+    expect(items.find((i) => i.id === "settings")?.separatorBefore).toBe(true);
+  });
+
+  it("leaves out hibernate when nothing is awake, close all tabs when it has none and the terminal without a root", () => {
+    const ids = workspaceMenuItems(wsEntry({ canHibernate: false, tabCount: 0, root: null })).map(
+      (i) => i.id,
+    );
+    expect(ids).toEqual(["go", "rename", "closeWorkspace", "settings"]);
+  });
+});
+
+describe("workspaceIdOfRow and workspaceRowKeys", () => {
+  const tabRow = (id: string, workspaceId: string) =>
+    ({ kind: "tab", key: `tab:${id}`, entry: { tabId: id, workspaceId } }) as unknown as MergedRow;
+  const wsRow = (id: string) =>
+    ({ kind: "workspace", key: `ws:${id}`, entry: wsEntry({ workspaceId: id }) }) as MergedRow;
+  const cmdRow = { kind: "command", key: "cmd:x", item: {} } as unknown as MergedRow;
+  const rows = [tabRow("a", "w1"), tabRow("b", "w2"), wsRow("w2"), tabRow("c", "w2"), cmdRow];
+
+  it("resolves a workspace row to itself and a tab row to the workspace holding it", () => {
+    expect(workspaceIdOfRow("ws:w2", rows)).toBe("w2");
+    expect(workspaceIdOfRow("tab:a", rows)).toBe("w1");
+  });
+
+  it("resolves nothing for rows without a workspace or an unknown value", () => {
+    expect(workspaceIdOfRow("cmd:x", rows)).toBeNull();
+    expect(workspaceIdOfRow("", rows)).toBeNull();
+  });
+
+  it("collects the workspace row and every tab row of the workspace", () => {
+    expect([...workspaceRowKeys(rows, "w2")].sort()).toEqual(["tab:b", "tab:c", "ws:w2"]);
+    expect(workspaceRowKeys(rows, "w9").size).toBe(0);
   });
 });

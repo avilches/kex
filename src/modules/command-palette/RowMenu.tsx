@@ -12,6 +12,11 @@ import {
   PencilEdit02Icon,
   PlayIcon,
   StopIcon,
+  CancelSquareIcon,
+  Delete02Icon,
+  PencilEdit01Icon,
+  SleepingIcon,
+  Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -35,6 +40,11 @@ const ICONS = {
   stop: StopIcon,
   edit: PencilEdit02Icon,
   action: PlayIcon,
+  rename: PencilEdit01Icon,
+  hibernate: SleepingIcon,
+  closeTabs: CancelSquareIcon,
+  closeWorkspace: Delete02Icon,
+  settings: Settings01Icon,
 } as const;
 
 // The binding of the wildcard menu-action shortcut with its digit swapped for this item's.

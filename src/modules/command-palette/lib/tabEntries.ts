@@ -1,5 +1,5 @@
 import type { AgentSession } from "@/modules/agents/lib/types";
-import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { awakeTerminalTabs, isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
@@ -56,6 +56,8 @@ export type WorkspaceEntry = {
   tabCount: number;
   // Folder a new terminal opens in; null when the workspace has no root.
   root: string | null;
+  // Some terminal of the workspace is awake, so hibernating it does something.
+  canHibernate: boolean;
   lastUsedAt: number;
 };
 
@@ -124,6 +126,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
       icon: ws.icon ?? null,
       tabCount: tabs.length,
       root: ws.workspaceRoot ?? ws.fsRoot ?? null,
+      canHibernate: awakeTerminalTabs(ws).length > 0,
       lastUsedAt: newestTab,
     };
   });

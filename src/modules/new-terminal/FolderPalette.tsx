@@ -222,7 +222,7 @@ export function FolderPalette({
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action, digit) => {
-      if (action === "closeTab") return false;
+      if (action === "closeTab" || action === "closeWorkspace") return true;
       const byDigit = action === "menuAction" || (latest.current.menuOpen && action in SLOT_ACTION);
       if (byDigit) {
         if (digit) latest.current.runDigit(digit);

@@ -81,6 +81,11 @@ const PaletteHarness: FunctionComponent<{
       onTerminalTargetChange={noop}
       onOpenTerminalAt={noop}
       onCloseTab={noop}
+      onCloseWorkspace={() => Promise.resolve(false)}
+      onRenameWorkspace={noop}
+      onHibernateWorkspace={noop}
+      onCloseAllTabs={noop}
+      onOpenWorkspaceSettings={noop}
     />
   );
 }

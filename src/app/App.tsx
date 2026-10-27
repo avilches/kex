@@ -2968,6 +2968,7 @@ export default function App() {
       },
       "workspace.new": () => addWorkspace(home ?? undefined),
       "workspace.close": () => {
+        if (runPaletteShortcut("closeWorkspace")) return;
         if (activeWorkspace) void requestCloseWorkspace(activeWorkspace.id);
       },
       "workspace.rename": () => {
@@ -3694,6 +3695,18 @@ export default function App() {
     }
     return closeTabsRef.current([entry.tabId]);
   }, []);
+  const onPaletteRenameWorkspace = useCallback((workspaceId: string) => {
+    useContextMenuCloseStore.getState().closeAll();
+    useWorkspaceRenameStore.getState().startRename(workspaceId);
+  }, []);
+  const onPaletteCloseAllTabs = useCallback(
+    (workspaceId: string) => void closeAllTabsInWorkspace(workspaceId),
+    [closeAllTabsInWorkspace],
+  );
+  const onPaletteWorkspaceSettings = useCallback(
+    (workspaceId: string) => useWorkspaceSettingsStore.getState().openSettings(workspaceId),
+    [],
+  );
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {
       selectWorkspace(entry, { activate: setActiveWorkspaceId });
@@ -4209,6 +4222,11 @@ export default function App() {
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}
             onCloseTab={onPaletteCloseTab}
+            onCloseWorkspace={closeFlow.requestCloseAndWait}
+            onRenameWorkspace={onPaletteRenameWorkspace}
+            onHibernateWorkspace={hibernateAllInWorkspace}
+            onCloseAllTabs={onPaletteCloseAllTabs}
+            onOpenWorkspaceSettings={onPaletteWorkspaceSettings}
           />
 
           <FolderPalette
