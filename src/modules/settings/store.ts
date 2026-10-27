@@ -180,6 +180,7 @@ export type Preferences = {
   editorCursorBlinkRate: number;
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
+  hibernateSaveLines: boolean;
   autoHibernate: AutoHibernate;
   terminalFontFamily: string;
   terminalShell: string;
@@ -290,6 +291,7 @@ const KEY_WORKSPACE_DETAIL_GIT = "workspaceDetailGit";
 
 // Terminal store keys - no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
+const KEY_HIBERNATE_SAVE_LINES = "hibernateSaveLines";
 const KEY_TERMINAL_WEBGL_ENABLED = "webglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "cursorBlink";
 const KEY_TERMINAL_FONT_FAMILY = "fontFamily";
@@ -458,6 +460,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCursorBlinkRate: EDITOR_BLINK_RATE_DEFAULT,
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
+  hibernateSaveLines: true,
   autoHibernate: "4h",
   terminalFontFamily: "",
   terminalShell: "",
@@ -667,6 +670,9 @@ export async function loadPreferences(): Promise<Preferences> {
     warnOnCloseTabWithRunningProcess:
       getTerminal<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
+    hibernateSaveLines:
+      getTerminal<boolean>(KEY_HIBERNATE_SAVE_LINES) ??
+      DEFAULT_PREFERENCES.hibernateSaveLines,
     autoHibernate: parseAutoHibernate(getGeneral<string>(KEY_AUTO_HIBERNATE)),
     terminalFontFamily:
       getTerminal<string>(KEY_TERMINAL_FONT_FAMILY) ??
@@ -997,6 +1003,10 @@ export async function setEditorCursorBlinkRate(value: number): Promise<void> {
 
 export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
   await writeEditorPref(KEY_EDITOR_CURSOR_STYLE, value);
+}
+
+export async function setHibernateSaveLines(value: boolean): Promise<void> {
+  await writeTerminalPref(KEY_HIBERNATE_SAVE_LINES, value);
 }
 
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
@@ -1418,6 +1428,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
 
 export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
+  [KEY_HIBERNATE_SAVE_LINES]: "hibernateSaveLines",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",

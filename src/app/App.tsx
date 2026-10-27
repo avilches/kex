@@ -21,6 +21,8 @@ import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
+import { useHibernateLinesCleanup } from "@/modules/workspaces/lib/useHibernateLinesCleanup";
+import { enterBelongsToFocusedElement } from "@/modules/workspaces/lib/wakeShortcut";
 import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
@@ -127,6 +129,7 @@ import {
   writeToSession,
 } from "@/modules/terminal";
 import { configureTerminalLinkBridge } from "@/modules/terminal/lib/terminalLinkBridge";
+import { leafAnsiTail } from "@/modules/terminal/lib/useTerminalSession";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -2062,7 +2065,9 @@ export default function App() {
     workspacesRef,
     activeWorkspaceIdRef,
     hibernateWorkspace,
+    readLeafAnsi: leafAnsiTail,
   });
+  useHibernateLinesCleanup(workspaces);
   const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;
   useAutoHibernate({ workspacesRef, activeWorkspaceIdRef, requestAutoHibernate });
   const pendingHibernateRef = useRef(hibernateFlow.pending);
@@ -3004,6 +3009,9 @@ export default function App() {
       "tab.hibernate": () => {
         if (activeTabId) toggleTabHibernate(activeTabId);
       },
+      "tab.wake": () => {
+        if (activeTabId) void wakeAndFocusTab(activeTabId);
+      },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActiveTab,
@@ -3310,6 +3318,12 @@ export default function App() {
         )
       ) {
         return true;
+      }
+      if (id === "tab.wake") {
+        return (
+          enterBelongsToFocusedElement(e.target as Element | null) ||
+          !!sidebarRef.current?.isExplorerFocused()
+        );
       }
       if (id === "terminal.clear") {
         const target =
@@ -4326,14 +4340,11 @@ export default function App() {
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pending?.workspaceId;
               if (!id) return;
-              const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
               updateTabData(id, tabId, (t) =>
                 enableRunOnStart(
                   t,
-                  isAgent
-                    ? undefined
-                    : (followableCommand(running ?? null, getRunningScriptCommand(tabId)) ??
-                        undefined),
+                  followableCommand(running ?? null, getRunningScriptCommand(tabId)) ??
+                    undefined,
                 ),
               );
             }}

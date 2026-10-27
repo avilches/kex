@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Tab, SplitNode, PaneNode, Workspace } from "./types";
 import { addAction, removeAction, type Action } from "@/modules/actions";
-import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, handOverLastLines, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -572,6 +572,35 @@ describe("planWake", () => {
       { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
     ];
     expect(planWake(tabs)).toEqual(["a"]);
+  });
+});
+
+describe("handOverLastLines", () => {
+  it("hands each tab its lines, faint, and skips the ones with nothing stored", async () => {
+    const given: [string, string][] = [];
+    await handOverLastLines(
+      ["a", "b"],
+      async (id) => (id === "a" ? "hello" : null),
+      (id, text) => given.push([id, text]),
+    );
+    expect(given).toHaveLength(1);
+    expect(given[0]![0]).toBe("a");
+    expect(given[0]![1]).toContain("hello");
+    expect(given[0]![1]).toContain("2m");
+    expect(given[0]![1].endsWith("\r\n")).toBe(true);
+  });
+
+  it("lets a failing read leave only that terminal empty", async () => {
+    const given: string[] = [];
+    await handOverLastLines(
+      ["a", "b"],
+      async (id) => {
+        if (id === "a") throw new Error("gone");
+        return "ok";
+      },
+      (id) => given.push(id),
+    );
+    expect(given).toEqual(["b"]);
   });
 });
 

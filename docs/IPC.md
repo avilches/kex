@@ -156,6 +156,18 @@ State: `tab-history.json` in the app data dir, next to `agent-sessions.json`. On
 
 ---
 
+## `hibernate_lines::*` - Last lines of a hibernated terminal
+
+State: `hibernate-lines/<tab_id>.ans` in the app data dir, one file per hibernated tab, so the workspace JSON does not grow with them. Each file holds the last lines of the terminal with their colours (SGR sequences only), already trimmed and with obvious tokens crossed out by the frontend (`workspaces/lib/hibernateLines.ts`). Not encrypted, like `agent-sessions.json`. The folder is 0700 and the files 0600 on Unix, writes are atomic (temp file + rename), a text over 256 KiB is refused and the previous file is kept, and a `tab_id` outside `^[A-Za-z0-9_-]{1,64}$` is rejected, so an id cannot point outside the folder. At startup, right after the window state loads, every file whose tab is in no window (and any leftover temp file) is deleted.
+
+| Command | Description |
+|---|---|
+| `hibernate_lines_save(tabId, text)` | Replace the tab's file. Called when a tab goes to sleep |
+| `hibernate_lines_read(tabId)` | The stored text, or `null` when the tab has none |
+| `hibernate_lines_delete(tabIds)` | Delete the files of those tabs; a missing file is not an error. Called on wake and when a tab or workspace closes |
+
+---
+
 ## Misc
 
 | Command | Description |

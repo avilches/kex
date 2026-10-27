@@ -6,6 +6,7 @@ import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
+import { HibernatedLines } from "./HibernatedLines";
 import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
 import { describeSessionPreview } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
@@ -47,44 +48,45 @@ type Props = { tab: SleepingTab; visible: boolean; onWake: () => void };
 // behind it, only what was captured when it went to sleep.
 export function HibernatedTab({ tab, visible, onWake }: Props) {
   const info = useAgentTabTitle(tab);
-  const shortcutLabel = useShortcutLabel("tab.hibernate");
+  const shortcutLabel = useShortcutLabel("tab.wake");
   const now = useNow(visible);
   const preview = useSessionPreview(tab.id, visible);
   const { agent, command, title: frozen, at } = tab.hibernation;
   const title = frozen || info?.displayTitle || tab.title || tab.id;
   const line = preview ? describeSessionPreview(preview, now, cachedHomeDir()) : null;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-background text-muted-foreground">
-      <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
-      <div className="flex max-w-[80%] flex-col items-center gap-1.5">
-        <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
-          <span className="flex size-4 shrink-0 items-center justify-center">
-            {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
+    <div
+      data-hibernated-tab
+      className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
+    >
+      <HibernatedLines tabId={tab.id} visible={visible} />
+      <div className="relative flex max-w-[80%] flex-col items-center gap-5 rounded-xl border border-border bg-background px-10 py-8 shadow-sm">
+        <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
+        <div className="flex max-w-full flex-col items-center gap-1.5">
+          <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
+            <span className="flex size-4 shrink-0 items-center justify-center">
+              {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
+            </span>
+            <span className="truncate">{title}</span>
           </span>
-          <span className="truncate">{title}</span>
-        </span>
-        {command && (
-          <span title={command} className="max-w-full truncate font-mono text-[11.5px] opacity-70">
-            {command}
-          </span>
-        )}
-        <span className="text-[12px]">Hibernated for {formatHibernatedFor(now - at)}</span>
-        {line?.message && (
-          <span title={line.message} className="line-clamp-2 max-w-full text-center text-[11.5px] leading-snug text-foreground/80">
-            {line.message}
-          </span>
-        )}
-        {line?.meta && (
-          <span title={line.metaTitle} className="max-w-full truncate text-[11px] opacity-60">
-            {line.meta}
-          </span>
-        )}
+          {command && (
+            <span title={command} className="max-w-full truncate font-mono text-[11.5px] opacity-70">
+              {command}
+            </span>
+          )}
+          <span className="text-[12px]">Hibernated for {formatHibernatedFor(now - at)}</span>
+          {line?.meta && (
+            <span title={line.metaTitle} className="max-w-full truncate text-[11px] opacity-60">
+              {line.meta}
+            </span>
+          )}
+        </div>
+        <Button size="lg" onClick={onWake} className="gap-2">
+          <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
+          Restore
+          {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
+        </Button>
       </div>
-      <Button size="lg" onClick={onWake} className="gap-2">
-        <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
-        Restore
-        {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
-      </Button>
     </div>
   );
 }

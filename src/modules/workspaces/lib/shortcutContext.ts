@@ -13,6 +13,8 @@ export function shortcutUnavailable(id: ShortcutId, c: ShortcutContext): boolean
   if (isHibernatedTab(c.activeTab) && blockedWhileHibernated(id)) return true;
   const kind = c.activeTab?.kind;
   switch (id) {
+    case "tab.wake":
+      return !isHibernatedTab(c.activeTab);
     case "editor.undo":
     case "editor.redo":
       return kind !== "editor";

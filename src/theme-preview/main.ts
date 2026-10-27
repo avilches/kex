@@ -1285,32 +1285,42 @@ function hibernatedTab(): HTMLElement {
         "relative flex h-[300px] flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-md border border-border bg-background text-muted-foreground",
       "data-surface": "hibernated-tab",
     },
-    h("div", {
-      class: "size-16 rounded-full border border-current opacity-70",
-    }),
-    h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
-    h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
-    h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
     h(
       "div",
       {
-        class: "flex w-80 flex-col gap-0.5 border-l border-border/60 pl-2",
-        "data-surface": "hibernated-session-preview",
+        class:
+          "pointer-events-none absolute inset-0 flex select-none flex-col justify-end overflow-hidden px-3 pb-2 font-mono text-[12px] leading-snug opacity-25",
+        style: "mask-image:linear-gradient(to bottom, transparent, black 35%)",
+        "data-surface": "hibernated-lines",
       },
-      h(
-        "span",
-        { class: "line-clamp-2 text-[11.5px] leading-snug text-foreground/80" },
-        "The build is green again: the missing import is back and all tests pass.",
-      ),
-      h("span", { class: "truncate text-[11px] opacity-60" }, "~/code/kex · 2h ago"),
+      h("span", { style: "color:var(--terminal-ansi-green)" }, "ok  src/modules/workspaces 87 files"),
+      h("span", { style: "color:var(--terminal-ansi-yellow)" }, "warn  3 unused exports"),
+      h("span", { style: "color:var(--terminal-ansi-red)" }, "error  build failed: missing import"),
+      h("span", { style: "color:var(--terminal-foreground)" }, "$ pnpm test"),
     ),
     h(
-      "span",
+      "div",
       {
         class:
-          "rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
+          "relative flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-10 py-5 shadow-sm",
+        "data-surface": "hibernated-card",
       },
-      "Restore",
+      h("div", {
+        class: "size-12 rounded-full border border-current opacity-70",
+      }),
+      h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
+      h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
+      h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
+      h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
+      h(
+        "span",
+        {
+          class:
+            "flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
+        },
+        "Restore",
+        h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
+      ),
     ),
   );
 }

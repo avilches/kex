@@ -38,6 +38,7 @@ import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
+import { takeWakeBackdrop } from "./wakeBackdrop";
 import { openPty, type PtySession } from "./pty-bridge";
 import { spawnCwdUpdate } from "./spawnCwd";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
@@ -344,6 +345,28 @@ export function interruptLeaf(leafId: string): void {
 
 export function leafCwd(leafId: string): string | null {
   return sessions.get(leafId)?.lastCwd ?? null;
+}
+
+// The screen of the leaf with its colours, for the placeholder of a hibernating tab. `alt` says an
+// app owns the alternate screen (the text then holds the normal buffer too, see `altScreenOf`).
+// Null when there is no session or nothing was serialized.
+export function leafAnsiTail(
+  leafId: string,
+  scrollback: number,
+): { text: string; alt: boolean; rows: number } | null {
+  const s = sessions.get(leafId);
+  if (!s) return null;
+  const slot = getSlotForLeaf(leafId);
+  if (!slot) return s.snapshot ? { text: s.snapshot, alt: s.altScreenAtRelease, rows: s.rows } : null;
+  try {
+    return {
+      text: slot.serializeAddon.serialize({ scrollback }),
+      alt: slot.term.buffer.active.type === "alternate",
+      rows: slot.term.rows,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function getLeafBlockMode(leafId: string): BlockMode {
@@ -722,7 +745,7 @@ function ensureSession(
     cols: 0,
     rows: 0,
     container: null,
-    snapshot: null,
+    snapshot: takeWakeBackdrop(leafId),
     searchQuery: null,
     dormantRing: new DormantRing(),
     pendingInput: "",
