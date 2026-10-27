@@ -242,7 +242,7 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailableBehindPalette } from "@/modules/workspaces/lib/shortcutContext";
 import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
@@ -3286,9 +3286,14 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
-      // With a palette open these act on its highlighted row, which the tab behind does not limit.
-      if (isPaletteTabShortcut(id) && (commandPaletteOpenRef.current || folderPaletteOpenRef.current)) return false;
-      if (shortcutUnavailable(id, shortcutContext)) return true;
+      if (
+        shortcutUnavailableBehindPalette(id, shortcutContext, {
+          open: commandPaletteOpenRef.current || folderPaletteOpenRef.current,
+          ownsTabShortcut: isPaletteTabShortcut(id),
+        })
+      ) {
+        return true;
+      }
       if (id.startsWith("palette.")) return !folderPaletteOpenRef.current;
       if (
         id === "workspace.settings" &&

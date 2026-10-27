@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailable } from "./shortcutContext";
+import { PALETTE_TAB_SHORTCUTS } from "@/modules/command-palette/lib/paletteShortcuts";
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
+import {
+  historyPaletteShortcutUnavailable,
+  paletteShortcutUnavailable,
+  shortcutUnavailable,
+  shortcutUnavailableBehindPalette,
+} from "./shortcutContext";
 import type { Tab } from "./types";
 
 const terminal: Tab = { id: "t", kind: "terminal" };
@@ -82,5 +89,25 @@ describe("historyPaletteShortcutUnavailable", () => {
   it("stays out while any foreground process owns the terminal, even with no running command reported", () => {
     expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: "bun" })).toBe(true);
     expect(historyPaletteShortcutUnavailable({ activeTab: terminal, promptReady: true, runningCommand: null, foregroundProcess: null })).toBe(false);
+  });
+});
+
+describe("shortcutUnavailableBehindPalette", () => {
+  const ids = Object.keys(PALETTE_TAB_SHORTCUTS) as ShortcutId[];
+
+  it("lets the eight tab shortcuts through with a palette open, whatever the tab behind is", () => {
+    expect(ids).toHaveLength(8);
+    for (const id of ids) {
+      expect(shortcutUnavailableBehindPalette(id, base, { open: true, ownsTabShortcut: true })).toBe(false);
+    }
+  });
+
+  it("would block Save for a terminal behind the palette if it did not own it", () => {
+    expect(shortcutUnavailable("editor.save", base)).toBe(true);
+    expect(shortcutUnavailableBehindPalette("editor.save", base, { open: false, ownsTabShortcut: true })).toBe(true);
+  });
+
+  it("keeps blocking the shortcuts the palette does not own", () => {
+    expect(shortcutUnavailableBehindPalette("editor.undo", base, { open: true, ownsTabShortcut: false })).toBe(true);
   });
 });
