@@ -8,6 +8,15 @@ import {
   Cancel01Icon,
   ComputerTerminal01Icon,
   CopySlashIcon,
+  Copy01Icon,
+  CancelCircleIcon,
+  CrosshairIcon,
+  FloppyDiskIcon,
+  Link01Icon,
+  LockKeyIcon,
+  SquareUnlock02Icon,
+  StickyNote03Icon,
+  UploadCircle01Icon,
   GitBranchIcon,
   PencilEdit02Icon,
   PlayIcon,
@@ -45,7 +54,31 @@ const ICONS = {
   closeTabs: CancelSquareIcon,
   closeWorkspace: Delete02Icon,
   settings: Settings01Icon,
+  copyRelative: Link01Icon,
+  tabId: Copy01Icon,
+  closeOthers: CancelCircleIcon,
+  lock: LockKeyIcon,
+  hibernateTab: SleepingIcon,
+  save: FloppyDiskIcon,
+  note: StickyNote03Icon,
+  removeNote: Cancel01Icon,
+  focusSidebar: CrosshairIcon,
+  autofocus: CrosshairIcon,
+  moveWorkspace: ArrowRight01Icon,
 } as const;
+
+// The icon of a toggle that is on, for the ones that change it.
+const ACTIVE_ICONS: Partial<Record<RowMenuItemId, typeof LockKeyIcon>> = {
+  lock: SquareUnlock02Icon,
+  hibernateTab: UploadCircle01Icon,
+};
+
+function iconOf(item: RowMenuItem) {
+  if (item.id === "go" && (item.label.startsWith("Restore") || item.label.startsWith("Reopen"))) {
+    return ArrowReloadHorizontalIcon;
+  }
+  return (item.active && ACTIVE_ICONS[item.id]) || ICONS[item.id];
+}
 
 // The binding of the wildcard menu-action shortcut with its digit swapped for this item's.
 export function digitLabel(userShortcuts: Parameters<typeof getShortcutLabel>[1], digit: number): string | null {
@@ -142,7 +175,18 @@ export function useRowMenu() {
     [],
   );
 
-  return { menu, open, close, setActive, handleKey };
+  // Swaps the items of the open menu (a toggle flipped in place), keeping the same item active.
+  const setItems = useCallback((items: RowMenuItem[]) => {
+    setMenu((m) => {
+      if (!m) return m;
+      const prev = m.items[m.active];
+      let active = items.findIndex((i) => i.id === prev?.id && i.actionId === prev?.actionId);
+      if (active < 0 || items[active].disabled) active = Math.max(0, stepEnabled(items, -1, 1));
+      return { ...m, items, active };
+    });
+  }, []);
+
+  return { menu, open, close, setActive, setItems, handleKey };
 }
 
 export function RowMenu({
@@ -224,10 +268,10 @@ export function RowMenu({
             >
               {own ?? (
                 <HugeiconsIcon
-                  icon={item.id === "go" && (item.label.startsWith("Restore") || item.label.startsWith("Reopen")) ? ArrowReloadHorizontalIcon : ICONS[item.id]}
+                  icon={iconOf(item)}
                   size={14}
                   strokeWidth={2}
-                  className="shrink-0"
+                  className={cn("shrink-0", item.id === "autofocus" && item.active && "text-primary")}
                 />
               )}
               <span className="min-w-0 flex-1 truncate">{item.label}</span>

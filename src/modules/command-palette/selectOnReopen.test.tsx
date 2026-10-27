@@ -41,6 +41,7 @@ vi.mock("./hooks/useCommandHistory", () => ({
 }));
 
 import { CommandPalette } from "./CommandPalette";
+import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
 
 declare global {
   interface Window {
@@ -77,7 +78,7 @@ const PaletteHarness: FunctionComponent<{
       onSelectTab={noop}
       onSelectWorkspace={noop}
       onRunClosed={noop}
-      onMoveActiveTabToWorkspace={noop}
+      {...TAB_MENU_NOOPS}
       onTerminalTargetChange={noop}
       onOpenTerminalAt={noop}
       onCloseTab={noop}

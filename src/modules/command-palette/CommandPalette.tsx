@@ -17,6 +17,10 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
+import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
+import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
 import {
   Add01Icon,
   AlertCircleIcon,
@@ -55,8 +59,13 @@ import {
   highlightedClosedOf,
   highlightedTabOf,
   highlightedWorkspaceOf,
+  otherTabRowKeys,
+  runnableTabItem,
   type RowMenuItemId,
   tabEntryCopyPath,
+  tabEntryRelativePath,
+  tabFocusTarget,
+  tabItemKeepsPalette,
   tabMenuItems,
   workspaceIdOfRow,
   workspaceMenuItems,
@@ -91,7 +100,21 @@ type Props = {
   onSelectTab: (entry: TabEntry) => void;
   onSelectWorkspace: (entry: WorkspaceEntry) => void;
   onRunClosed: (entry: ClosedTabEntry) => void;
-  onMoveActiveTabToWorkspace: (target: string | "new") => void;
+  onMoveTabToWorkspace: (
+    subject: MoveSubject,
+    target: string | "new",
+  ) => void;
+  /** The tab data and actions the tab row menu runs by tab id, without changing the active tab. */
+  onUpdateTab: (tabId: string, updater: (tab: Tab) => Tab) => void;
+  onSaveTab: (tabId: string) => void;
+  /** Hibernates or wakes the terminal without moving the focus off the palette. */
+  onToggleTabHibernate: (tabId: string) => unknown;
+  /** True while the hibernate review dialog is up, so the palette takes the focus back when it goes. */
+  hibernateDialogOpen: boolean;
+  onRevealInExplorer: (path: string) => void;
+  onCloseOtherTabs: (tabId: string) => unknown;
+  /** Makes the tab current, switching workspace if it lives in another one. */
+  onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
   onCloseTab: (entry: TabEntry) => void | Promise<unknown>;
@@ -102,6 +125,9 @@ type Props = {
   onCloseAllTabs: (workspaceId: string) => void;
   onOpenWorkspaceSettings: (workspaceId: string) => void;
 };
+
+/** The tab "Move tab to workspace" moves: the highlighted row's, or the active one's for the command. */
+export type MoveSubject = { tabId: string; workspaceId: string };
 
 const THEME_PREVIEW_DELAY_MS = 140;
 
@@ -141,7 +167,14 @@ export function CommandPalette({
   onSelectTab,
   onSelectWorkspace,
   onRunClosed,
-  onMoveActiveTabToWorkspace,
+  onMoveTabToWorkspace,
+  onUpdateTab,
+  onSaveTab,
+  onToggleTabHibernate,
+  hibernateDialogOpen,
+  onRevealInExplorer,
+  onCloseOtherTabs,
+  onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
   onCloseTab,
@@ -159,6 +192,8 @@ export function CommandPalette({
   const [pickedValue, setValue] = useState("");
   const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
+  const [moveSubject, setMoveSubject] = useState<MoveSubject | null>(null);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
@@ -272,7 +307,7 @@ export function CommandPalette({
   const workspaceTargets = useMemo(() => {
     if (!inWorkspaces) return [];
     const others = workspaceEntries.filter(
-      (e) => e.workspaceId !== activeWorkspaceId,
+      (e) => e.workspaceId !== (moveSubject?.workspaceId ?? activeWorkspaceId),
     );
     const q = workspaceFilter.toLowerCase();
     if (!q) return others;
@@ -281,7 +316,7 @@ export function CommandPalette({
       .filter((x) => x.s !== null)
       .sort((a, b) => (b.s ?? 0) - (a.s ?? 0))
       .map((x) => x.e);
-  }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
+  }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId, moveSubject]);
 
   // The frame that puts the selection back after a close; anything that moves the selection
   // or resets the palette in the meantime cancels it so it never steals the selection.
@@ -306,6 +341,7 @@ export function CommandPalette({
     setQuery("");
     setValue("");
     setPage("root");
+    setMoveSubject(null);
     previewThemeId(null);
   }, [previewThemeId, parsed.mode, query, value, cancelSettle]);
 
@@ -395,17 +431,20 @@ export function CommandPalette({
     setValue("");
   }, [previewThemeId]);
 
-  const enterWorkspaces = useCallback(() => {
+  const enterWorkspaces = useCallback((subject: MoveSubject | null) => {
+    setMoveSubject(subject);
     setPage("workspaces");
     setQuery("");
     setValue("");
   }, []);
 
+  // Back to the row the move started from, so the highlight does not jump to the first row.
   const exitWorkspaces = useCallback(() => {
     setPage("root");
     setQuery("");
-    setValue("");
-  }, []);
+    setValue(moveSubject ? tabRowKey(moveSubject.tabId) : "");
+    setMoveSubject(null);
+  }, [moveSubject]);
 
   const runCommand = useCallback(
     (item: PaletteItem) => {
@@ -413,13 +452,17 @@ export function CommandPalette({
       if (choice.action === "none") return;
       if (choice.learn) recordChoice(parsed.term, commandRowKey(item.id));
       if (choice.action === "themes") return enterThemes();
-      if (choice.action === "workspaces") return enterWorkspaces();
+      if (choice.action === "workspaces") {
+        return enterWorkspaces(
+          activeTabId ? { tabId: activeTabId, workspaceId: activeWorkspaceId } : null,
+        );
+      }
       if (choice.action === "content") return setQuery("#");
       if (choice.action === "history") return setQuery(">");
       recordUse(item.id);
       runAfterClose(item.run);
     },
-    [enterThemes, enterWorkspaces, runAfterClose, parsed.term],
+    [enterThemes, enterWorkspaces, runAfterClose, parsed.term, activeTabId, activeWorkspaceId],
   );
 
   const openContent = useCallback(
@@ -538,7 +581,8 @@ export function CommandPalette({
   }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
-      closeRowMenu();
+      if (!tabItemKeepsPalette(id, entry)) closeRowMenu();
+      const tabId = entry.tabId;
       if (id === "go") {
         recordChoice(parsed.term, tabRowKey(entry.tabId));
         runAfterClose(() => onSelectTab(entry));
@@ -552,6 +596,54 @@ export function CommandPalette({
         closeTabFromRow(entry);
       } else if (id === "closeWorkspace") {
         closeWorkspaceFromRow(entry.workspaceId, tabRowKey(entry.tabId));
+      } else if (id === "copyRelative") {
+        const rel = tabEntryRelativePath(entry);
+        if (rel?.ok) runAfterClose(() => void copyToClipboard(rel.text, "Copied relative path"));
+      } else if (id === "tabId") {
+        runAfterClose(() => void copyToClipboard(tabId, "Copied tab ID"));
+      } else if (id === "closeOthers") {
+        closeRows(
+          otherTabRowKeys(tabEntries, entry),
+          tabRowKey(tabId),
+          () => onCloseOtherTabs(tabId),
+          "Closing the other tabs failed",
+        );
+      } else if (id === "lock") {
+        onUpdateTab(tabId, toggleTabLock);
+      } else if (id === "autofocus") {
+        onUpdateTab(tabId, (p) => (isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p));
+      } else if (id === "save") {
+        onSaveTab(tabId);
+      } else if (id === "hibernateTab") {
+        void Promise.resolve(onToggleTabHibernate(tabId))
+          .catch((e) => console.error("Hibernating the tab failed", e))
+          .finally(refocusInput);
+      } else if (id === "removeNote") {
+        flushTabNote(tabId);
+        onUpdateTab(tabId, removeTabNote);
+      } else if (id === "note") {
+        flushTabNote(tabId);
+        if (tabItemKeepsPalette("note", entry)) {
+          onUpdateTab(tabId, toggleTabNote);
+        } else {
+          // A note shows on the current tab only, and takes the focus when it opens.
+          runAfterClose(() => {
+            onGoToTab(tabId);
+            useTabNoteStore.getState().requestFocus(tabId);
+            onUpdateTab(tabId, toggleTabNote);
+          });
+        }
+      } else if (id === "focusSidebar") {
+        const target = tabFocusTarget(entry);
+        if (target) {
+          runAfterClose(() => {
+            // The sidebar is the active workspace's.
+            if (entry.workspaceId !== activeWorkspaceId) onGoToTab(tabId);
+            window.setTimeout(() => onRevealInExplorer(target), 50);
+          });
+        }
+      } else if (id === "moveWorkspace") {
+        enterWorkspaces({ tabId, workspaceId: entry.workspaceId });
       }
     },
     [
@@ -563,6 +655,17 @@ export function CommandPalette({
       onOpenTerminalAt,
       closeTabFromRow,
       closeWorkspaceFromRow,
+      closeRows,
+      tabEntries,
+      onCloseOtherTabs,
+      onUpdateTab,
+      onSaveTab,
+      onToggleTabHibernate,
+      refocusInput,
+      onGoToTab,
+      onRevealInExplorer,
+      activeWorkspaceId,
+      enterWorkspaces,
     ],
   );
 
@@ -689,32 +792,53 @@ export function CommandPalette({
       if (!box || !row) return;
       openRowMenu(
         `tab:${entry.tabId}`,
-        tabMenuItems(entry),
+        tabMenuItems(entry, { autofocusMode }),
         anchorOf(box, row as HTMLElement, pointer),
       );
     },
-    [openRowMenu],
+    [openRowMenu, autofocusMode],
   );
 
-  const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow });
-  latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow };
-  // Cmd+W and Cmd+Shift+C act on the highlighted tab, Cmd+Shift+W on its workspace; Cmd+T keeps
-  // opening the terminal beside it.
+  // A flipped toggle (lock, hibernate, note) changes the open menu in place.
+  const { setItems: setMenuItems } = rowMenu;
+  const menuTab = rowMenu.menu ? highlightedTabOf(rowMenu.menu.rowKey, merged) : null;
+  useEffect(() => {
+    if (menuTab) setMenuItems(tabMenuItems(menuTab, { autofocusMode }));
+  }, [menuTab, autofocusMode, setMenuItems]);
+
+  // Takes the focus back from the hibernate review dialog once it is gone.
+  const hibernateDialogWasOpen = useRef(false);
+  useEffect(() => {
+    if (hibernateDialogWasOpen.current && !hibernateDialogOpen && open) refocusInput();
+    hibernateDialogWasOpen.current = hibernateDialogOpen;
+  }, [hibernateDialogOpen, open, refocusInput]);
+
+  const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode });
+  latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode };
+  // The tab shortcuts (`paletteShortcuts.ts`) run their menu item on the highlighted tab, Cmd+Shift+W
+  // closes its workspace; Cmd+T keeps opening the terminal beside it. A highlighted row that is not
+  // a tab, or an item the menu does not offer there, takes the key without effect.
   useEffect(() => {
     if (!open) return;
-    return registerPaletteControl((action) => {
+    return registerPaletteControl((action, _digit, item) => {
       if (action === "newTab") return false;
       // Between a close and the frame that restores the selection the highlighted row is cmdk's
       // own pick, not the user's: acting on it would hit the wrong tab.
       if (settleFrame.current !== null) return true;
-      const { highlightedTab: entry, runTabAction: run, closeWorkspaceFromRow: closeWs } =
-        latestShortcut.current;
+      const {
+        highlightedTab: entry,
+        runTabAction: run,
+        closeWorkspaceFromRow: closeWs,
+        autofocusMode: mode,
+      } = latestShortcut.current;
       if (action === "closeWorkspace") {
         const workspaceId = workspaceIdOfRow(valueRef.current, mergedRef.current);
         if (workspaceId) closeWs(workspaceId, valueRef.current);
         return true;
       }
-      if (entry) run(action === "closeTab" ? "close" : "copy", entry);
+      if (action === "tabItem" && item && entry && runnableTabItem(entry, { autofocusMode: mode }, item)) {
+        run(item, entry);
+      }
       return true;
     });
   }, [open]);
@@ -730,6 +854,12 @@ export function CommandPalette({
     closeRowMenu();
     cancelSettle();
   }, [query, closeRowMenu, cancelSettle]);
+
+  const moveTo = useCallback(
+    (subject: MoveSubject, target: string | "new") =>
+      runAfterClose(() => onMoveTabToWorkspace(subject, target)),
+    [runAfterClose, onMoveTabToWorkspace],
+  );
 
   const commitTheme = useCallback(
     (id: string) => {
@@ -919,9 +1049,7 @@ export function CommandPalette({
                 </CommandItem>
                 <CommandItem
                   value="move-workspace:new"
-                  onSelect={() =>
-                    runAfterClose(() => onMoveActiveTabToWorkspace("new"))
-                  }
+                  onSelect={() => moveSubject && moveTo(moveSubject, "new")}
                   className="text-[12.5px]"
                 >
                   <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
@@ -932,9 +1060,7 @@ export function CommandPalette({
                     key={entry.workspaceId}
                     value={`move-workspace:${entry.workspaceId}`}
                     onSelect={() =>
-                      runAfterClose(() =>
-                        onMoveActiveTabToWorkspace(entry.workspaceId),
-                      )
+                      moveSubject && moveTo(moveSubject, entry.workspaceId)
                     }
                     className="text-[12.5px]"
                   >

@@ -3,7 +3,8 @@ import { act, cleanup, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./CommandPalette";
-import { runPaletteShortcut } from "./lib/paletteControl";
+import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
+import { runPaletteTabItem } from "./lib/paletteControl";
 import type { TabEntry } from "./lib/tabEntries";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -44,7 +45,7 @@ const mk = (id: string, i: number, over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: "ws",
   workspaceTitle: "W",
   workspaceColor: null,
-  workspaceIcon: null,
+  workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
   hibernated: false,
   kind: "terminal",
   title: id,
@@ -101,7 +102,7 @@ function Harness({
       onSelectTab={() => {}}
       onSelectWorkspace={() => {}}
       onRunClosed={() => {}}
-      onMoveActiveTabToWorkspace={() => {}}
+      {...TAB_MENU_NOOPS}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
       onCloseTab={(e) => {
@@ -147,7 +148,7 @@ const arrowUp = () =>
   });
 const closeHighlighted = () =>
   act(async () => {
-    runPaletteShortcut("closeTab");
+    runPaletteTabItem("close");
   });
 const removing: typeof closeImpl = (e, set) =>
   set((t) => t.filter((x) => x.tabId !== e.tabId));

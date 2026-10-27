@@ -221,8 +221,10 @@ export function FolderPalette({
   // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
-    return registerPaletteControl((action, digit) => {
-      if (action === "closeTab" || action === "closeWorkspace") return true;
+    return registerPaletteControl((action, digit, item) => {
+      if (action === "closeWorkspace") return true;
+      // Over a folder row only copying the path means something; the other tab shortcuts are taken without effect.
+      if (action === "tabItem" && item !== "copy") return true;
       const byDigit = action === "menuAction" || (latest.current.menuOpen && action in SLOT_ACTION);
       if (byDigit) {
         if (digit) latest.current.runDigit(digit);

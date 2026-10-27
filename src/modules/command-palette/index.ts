@@ -1,4 +1,4 @@
-export { CommandPalette } from "./CommandPalette";
+export { CommandPalette, type MoveSubject } from "./CommandPalette";
 export {
   createCommandItems,
   type CommandPaletteActionContext,
