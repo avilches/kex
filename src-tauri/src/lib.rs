@@ -1,7 +1,7 @@
 pub mod modules;
 
 use modules::{
-    actions, agent, editors, float_browser, fs, git, history, pty, shell, tab_history,
+    actions, agent, editors, float_browser, fs, git, history, menu_route, pty, shell, tab_history,
     window_state, workspace,
 };
 use serde::Serialize;
@@ -727,6 +727,19 @@ pub fn run() {
 
                 app.on_menu_event(|app, event| {
                     let id = event.id().as_ref();
+                    let settings_focused = app
+                        .get_webview_window("settings")
+                        .is_some_and(|w| w.is_focused().unwrap_or(false));
+                    match menu_route::route_menu_event(settings_focused, id) {
+                        menu_route::MenuRoute::Ignore => return,
+                        menu_route::MenuRoute::CloseSettings => {
+                            if let Some(w) = app.get_webview_window("settings") {
+                                let _ = w.close();
+                            }
+                            return;
+                        }
+                        menu_route::MenuRoute::Quit | menu_route::MenuRoute::Forward => {}
+                    }
                     if id == "quit" {
                         // macOS Cmd+Q lands here, not on ExitRequested, so it must
                         // run the same duplication check or it would close mid-copy.
