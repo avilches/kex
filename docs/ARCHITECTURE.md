@@ -473,6 +473,12 @@ carried, persisted in `agent-sessions.json` (`SessionRecord.last_message`). That
 encrypted, so the text is clipped to 280 characters: enough to recognise the session, little of
 what the assistant may have printed. The transcript `.jsonl` is not read for it.
 
+The placeholder also draws, faded behind it, the last lines the terminal showed, with their colours (`HibernatedLines`), and
+tells which keys restore the tab: Enter (`tab.wake`, a shortcut of the registry, only live when the active tab sleeps and the
+focus is not in a field, button, menu, editor or explorer: `enterBelongsToFocusedElement`) or the `tab.hibernate` binding,
+spelled out from the current bindings ("Press Enter or Cmd+Alt+Z to restore"). The lines live in their own file per tab, off
+the workspace JSON, and are described in `docs/AGENT_SESSION_RESTORE.md` ("Hibernating a tab").
+
 Startup: there is no startup preference. `initWorkspaceState()` restores every saved workspace as it was:
 the tabs that were hibernated (manually or by auto-hibernate) stay hibernated, the rest mount normally. The
 auto-hibernate clocks are not persisted (a tab's "hidden since" moment lives in memory), so after a restart every hidden

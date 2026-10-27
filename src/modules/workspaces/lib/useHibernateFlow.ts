@@ -114,7 +114,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
 export type ReadLeafAnsi = (tabId: string, scrollback: number) => string | null;
 
 // A failure here must not stop the tab from sleeping: the placeholder just shows no lines.
-async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<void> {
+export async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<void> {
   if (!usePreferencesStore.getState().hibernateSaveLines) return;
   await Promise.all(
     tabs.map(async (tab) => {
