@@ -14,6 +14,7 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setShortcuts } from "@/modules/settings/store";
 import {
+  bindingFromEvent,
   bindingsEqual,
   getBindingTokens,
   type KeyBinding,
@@ -21,10 +22,12 @@ import {
   SHORTCUTS,
   type Shortcut,
   type ShortcutId,
+  shortcutsForEvent,
 } from "@/modules/shortcuts/shortcuts";
 import {
   ArrowTurnBackwardIcon,
   CancelCircleIcon,
+  KeyboardIcon,
   Refresh01Icon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
@@ -41,8 +44,10 @@ export function ShortcutsSection() {
     with: Shortcut;
   } | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [finding, setFinding] = useState(false);
 
   const startRecording = (id: ShortcutId) => {
+    setFinding(false);
     setRecordingId(id);
     setRecordingConflict(null);
   };
@@ -89,36 +94,46 @@ export function ShortcutsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <SectionHeader title="Shortcuts" />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 px-2.5 text-[11px]"
-          onClick={() => setResetDialogOpen(true)}
-        >
-          <HugeiconsIcon
-            icon={ArrowTurnBackwardIcon}
-            size={12}
-            strokeWidth={2}
-          />
-          Reset All
-        </Button>
-      </div>
+      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-4 bg-background px-1 pt-2 pb-3">
+        <div className="flex items-center justify-between">
+          <SectionHeader title="Shortcuts" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-[11px]"
+            onClick={() => setResetDialogOpen(true)}
+          >
+            <HugeiconsIcon
+              icon={ArrowTurnBackwardIcon}
+              size={12}
+              strokeWidth={2}
+            />
+            Reset All
+          </Button>
+        </div>
 
-      <div className="relative">
-        <HugeiconsIcon
-          icon={Search01Icon}
-          size={14}
-          strokeWidth={2}
-          className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          placeholder="Search shortcuts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 pl-9 text-[12.5px]"
-        />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <HugeiconsIcon
+              icon={Search01Icon}
+              size={14}
+              strokeWidth={2}
+              className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              placeholder="Search shortcuts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 pl-9 text-[12.5px]"
+            />
+          </div>
+          <KeyFinder
+            active={finding}
+            disabled={recordingId !== null}
+            userShortcuts={userShortcuts}
+            onActiveChange={setFinding}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-8">
@@ -209,7 +224,10 @@ function ShortcutRow({
   const hasBindings = bindings && bindings.length > 0;
 
   return (
-    <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
+    <div
+      data-shortcut-id={shortcut.id}
+      className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30"
+    >
       <div className="flex flex-col gap-0.5">
         <span className="text-[12.5px] font-medium">{shortcut.label}</span>
       </div>
@@ -355,19 +373,7 @@ function Recorder({
       e.preventDefault();
       e.stopPropagation();
 
-      // On macOS, Option transforms alpha keys (e.g. Option+B → "∫"), so use
-      // e.code to recover the actual key name when alt is held.
-      const key =
-        e.altKey && /^Key[A-Z]$/.test(e.code)
-          ? e.code.slice(3).toLowerCase()
-          : e.key;
-      const binding: KeyBinding = {
-        key,
-        ctrl: e.ctrlKey,
-        shift: e.shiftKey,
-        alt: e.altKey,
-        meta: e.metaKey,
-      };
+      const binding = bindingFromEvent(e);
 
       const conflicting = findConflict(binding, currentId, userShortcuts);
       if (conflicting) {
@@ -416,6 +422,95 @@ function Recorder({
     >
       <span className="animate-pulse font-medium">Recording...</span>
       <span className="text-muted-foreground">(Esc to cancel)</span>
+    </div>
+  );
+}
+
+function KeyFinder({
+  active,
+  disabled,
+  userShortcuts,
+  onActiveChange,
+}: {
+  active: boolean;
+  disabled: boolean;
+  userShortcuts: Record<ShortcutId, KeyBinding[]>;
+  onActiveChange: (v: boolean) => void;
+}) {
+  const [hit, setHit] = useState<{
+    binding: KeyBinding;
+    matches: Shortcut[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const onDown = (e: KeyboardEvent) => {
+      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        onActiveChange(false);
+        return;
+      }
+      setHit({
+        binding: bindingFromEvent(e),
+        matches: shortcutsForEvent(e, userShortcuts),
+      });
+    };
+    window.addEventListener("keydown", onDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onDown, { capture: true });
+  }, [active, userShortcuts, onActiveChange]);
+
+  const reveal = (id: ShortcutId) =>
+    document
+      .querySelector(`[data-shortcut-id="${id}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+
+  return (
+    <div className="flex items-center gap-2">
+      {hit && (
+        <div className="flex max-w-[260px] flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[11px]">
+          <KbdGroup>
+            {getBindingTokens(hit.binding).map((t, i) => (
+              <Kbd key={i}>{t}</Kbd>
+            ))}
+          </KbdGroup>
+          {hit.matches.length === 0 ? (
+            <span className="text-muted-foreground italic">Unassigned</span>
+          ) : (
+            hit.matches.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                title="Show in list"
+                onClick={() => reveal(m.id)}
+                className="font-medium underline-offset-2 hover:underline"
+              >
+                {m.group}: {m.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+      <Button
+        variant={active ? "secondary" : "outline"}
+        size="sm"
+        disabled={disabled}
+        title="Press a key combination to see which shortcut it triggers"
+        className="h-9 shrink-0 gap-1.5 px-2.5 text-[11px]"
+        onClick={() => {
+          setHit(null);
+          onActiveChange(!active);
+        }}
+      >
+        <HugeiconsIcon icon={KeyboardIcon} size={13} strokeWidth={2} />
+        {active ? (
+          <span className="animate-pulse">Press keys... (Esc)</span>
+        ) : (
+          "Find by keys"
+        )}
+      </Button>
     </div>
   );
 }
