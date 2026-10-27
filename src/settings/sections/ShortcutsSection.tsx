@@ -16,12 +16,14 @@ import {
   shortcutsForEvent,
 } from "@/modules/shortcuts/shortcuts";
 import {
+  Cancel01Icon,
   CancelCircleIcon,
   KeyboardIcon,
   Refresh01Icon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
@@ -55,16 +57,39 @@ export function ShortcutsSection() {
     return () => ro.disconnect();
   }, []);
 
-  // Starting a recording drops the finder filter, so the row moves: follow it.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const hasFilter = search !== "" || found !== null || finding;
+
+  const resetFilter = () => {
+    setSearch("");
+    setFinding(false);
+    setFound(null);
+  };
+
   useEffect(() => {
-    if (!recordingId) return;
-    document
-      .querySelector(`[data-shortcut-id="${recordingId}"]`)
-      ?.scrollIntoView({ block: "center" });
-  }, [recordingId]);
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Recording and finding own Escape while they are live.
+      if (recordingId !== null || finding) return;
+      const inSearch = e.target === searchRef.current;
+      if (inSearch && search !== "") {
+        e.preventDefault();
+        setSearch("");
+      } else if (found) {
+        e.preventDefault();
+        setFound(null);
+      } else if (inSearch) {
+        e.preventDefault();
+        void getCurrentWebviewWindow().close();
+      }
+    };
+    window.addEventListener("keydown", onEsc, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onEsc, { capture: true });
+  }, [recordingId, finding, search, found]);
 
   const startRecording = (id: ShortcutId) => {
-    setFindingActive(false);
+    setFinding(false);
     setRecordingId(id);
     setRecordingConflict(null);
   };
@@ -126,8 +151,13 @@ export function ShortcutsSection() {
               className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
             />
             <Input
+              ref={searchRef}
               placeholder="Search shortcuts..."
               value={search}
+              onFocus={() => {
+                setFinding(false);
+                setFound(null);
+              }}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 pl-9 text-[12.5px]"
             />
@@ -138,8 +168,16 @@ export function ShortcutsSection() {
             disabled={recordingId !== null}
             userShortcuts={userShortcuts}
             onActiveChange={setFindingActive}
-            onFound={setFound}
+            onFound={(f) => {
+              setSearch("");
+              setFound(f);
+            }}
           />
+          {hasFilter && (
+            <ActionButton onClick={resetFilter} title="Clear search">
+              <HugeiconsIcon icon={Cancel01Icon} size={14} />
+            </ActionButton>
+          )}
         </div>
       </div>
 
@@ -226,10 +264,7 @@ function ShortcutRow({
   const hasBindings = bindings && bindings.length > 0;
 
   return (
-    <div
-      data-shortcut-id={shortcut.id}
-      className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30"
-    >
+    <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
       <div className="flex flex-col gap-0.5">
         <span
           className={cn(
