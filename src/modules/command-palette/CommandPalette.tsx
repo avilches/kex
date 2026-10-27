@@ -41,6 +41,7 @@ import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
 import { initialKey } from "./lib/initialKey";
+import { PALETTE_INPUT_SELECTOR } from "./lib/keepPaletteFocus";
 import { listViewportOf, scrollListToTop } from "./lib/listScroll";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
@@ -129,7 +130,6 @@ const THEME_PREVIEW_DELAY_MS = 140;
 // cmdk overrides the rendered input's id attribute, so helpers that focus or select the palette
 // input query it by its cmdk marker instead of by id. The folder palette's input carries the same
 // marker and is still in the page while it closes, so this palette's own attribute is part of the query.
-const PALETTE_INPUT_SELECTOR = '[cmdk-input=""][data-palette="command"]';
 
 function paletteInputElement(): HTMLInputElement | null {
   return document.querySelector<HTMLInputElement>(PALETTE_INPUT_SELECTOR);
