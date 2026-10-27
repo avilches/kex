@@ -190,9 +190,9 @@ function DetailTabRow({
 }) {
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
-  const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
   const hibernated = isHibernatedTab(tab);
+  const agent = hibernated ? tab.hibernation.agent : info?.hasAgent ? info.agentSession?.agent : undefined;
   const isLocked = tab.locked ?? false;
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
   const hasNote = tab.note !== undefined;
@@ -307,7 +307,7 @@ function DetailTabRow({
               )}
               <span className="flex size-3.5 shrink-0 items-center justify-center">
                 {agent && !tab.icon ? (
-                  <AgentIcon agent={agent} size={13} />
+                  <AgentIcon agent={agent} size={13} className={hibernated ? "grayscale" : undefined} />
                 ) : tab.kind === "browser" && tab.floating ? (
                   <HugeiconsIcon icon={LinkSquare02Icon} size={13} strokeWidth={1.75} className="opacity-60" />
                 ) : (

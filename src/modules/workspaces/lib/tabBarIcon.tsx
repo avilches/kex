@@ -3,6 +3,7 @@ import { AgentIcon, StruckAgentIcon } from "@/modules/agents/lib/agentIcon";
 import { Alert02Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { agentIconMark, type AgentIconMark } from "./agentRestore";
+import { isHibernatedTab } from "./hibernate";
 import { tabIcon } from "./tabTitle";
 import type { Tab } from "./types";
 
@@ -39,6 +40,9 @@ export function TabBarIcon({
     ) : (
       <AgentIcon agent={agentSession.agent} size={13} />
     );
+  }
+  if (isHibernatedTab(tab) && tab.hibernation.agent && !tab.icon) {
+    return <AgentIcon agent={tab.hibernation.agent} size={13} className="grayscale" />;
   }
   if (tab.kind === "browser" && tab.floating) {
     return <HugeiconsIcon icon={LinkSquare02Icon} size={13} strokeWidth={1.75} className="opacity-60" />;
