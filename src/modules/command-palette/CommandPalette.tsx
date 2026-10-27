@@ -109,6 +109,8 @@ let lastContentQuery = "";
 let lastContentValue = "";
 let lastContentScrollTop = 0;
 
+const SELECTION_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End"]);
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -262,7 +264,18 @@ export function CommandPalette({
       .map((x) => x.e);
   }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId]);
 
+  // The frame that puts the selection back after a close; anything that moves the selection
+  // or resets the palette in the meantime cancels it so it never steals the selection.
+  const settleFrame = useRef<number | null>(null);
+  const cancelSettle = useCallback(() => {
+    if (settleFrame.current === null) return;
+    window.cancelAnimationFrame(settleFrame.current);
+    settleFrame.current = null;
+  }, []);
+  useEffect(() => cancelSettle, [cancelSettle]);
+
   const resetPalette = useCallback(() => {
+    cancelSettle();
     if (parsed.mode === "content") {
       lastContentQuery = query;
       lastContentValue = value;
@@ -275,7 +288,7 @@ export function CommandPalette({
     setValue("");
     setPage("root");
     previewThemeId(null);
-  }, [previewThemeId, parsed.mode, query, value]);
+  }, [previewThemeId, parsed.mode, query, value, cancelSettle]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -476,11 +489,13 @@ export function CommandPalette({
       if (viewport) viewport.scrollTop = pending.scrollTop;
     };
     setValue(target);
-    window.requestAnimationFrame(() => {
+    cancelSettle();
+    settleFrame.current = window.requestAnimationFrame(() => {
+      settleFrame.current = null;
       setValue(target);
       restore();
     });
-  }, [merged, listViewport]);
+  }, [merged, listViewport, cancelSettle]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
       closeRowMenu();
@@ -616,6 +631,9 @@ export function CommandPalette({
     if (!open) return;
     return registerPaletteControl((action) => {
       if (action === "newTab") return false;
+      // Between a close and the frame that restores the selection the highlighted row is cmdk's
+      // own pick, not the user's: acting on it would hit the wrong tab.
+      if (settleFrame.current !== null) return true;
       const { highlightedTab: entry, runTabAction: run } = latestShortcut.current;
       if (entry) run(action === "closeTab" ? "close" : "copy", entry);
       return true;
@@ -623,12 +641,16 @@ export function CommandPalette({
   }, [open]);
 
   useEffect(() => {
-    if (!open) closeRowMenu();
-  }, [open, closeRowMenu]);
+    if (!open) {
+      closeRowMenu();
+      cancelSettle();
+    }
+  }, [open, closeRowMenu, cancelSettle]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: typing closes the menu
   useEffect(() => {
     closeRowMenu();
-  }, [query, closeRowMenu]);
+    cancelSettle();
+  }, [query, closeRowMenu, cancelSettle]);
 
   const commitTheme = useCallback(
     (id: string) => {
@@ -655,6 +677,7 @@ export function CommandPalette({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (SELECTION_KEYS.has(e.key)) cancelSettle();
       if (rowMenu.menu) {
         const key = rowMenu.menu.rowKey;
         const entry = highlightedTabOf(key, merged);
@@ -688,6 +711,7 @@ export function CommandPalette({
       }
     },
     [
+      cancelSettle,
       inSubpage,
       inThemes,
       inCommands,

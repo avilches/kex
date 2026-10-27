@@ -69,11 +69,19 @@ type SetTabs = (f: (t: TabEntry[]) => TabEntry[]) => void;
 let closeImpl: (e: TabEntry, setTabs: SetTabs) => void | Promise<unknown>;
 let initial: TabEntry[];
 
-function Harness({ activeTabId = "cur" }: { activeTabId?: string }) {
+let closeCalls = 0;
+
+function Harness({
+  activeTabId = "cur",
+  open = true,
+}: {
+  activeTabId?: string;
+  open?: boolean;
+}) {
   const [tabs, setTabs] = useState(initial);
   return (
     <CommandPalette
-      open
+      open={open}
       onOpenChange={() => {}}
       restoreFocus={() => {}}
       initialMode="commands"
@@ -96,7 +104,10 @@ function Harness({ activeTabId = "cur" }: { activeTabId?: string }) {
       onMoveActiveTabToWorkspace={() => {}}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
-      onCloseTab={(e) => closeImpl(e, setTabs)}
+      onCloseTab={(e) => {
+        closeCalls++;
+        return closeImpl(e, setTabs);
+      }}
     />
   );
 }
@@ -129,6 +140,7 @@ const removing: typeof closeImpl = (e, set) =>
   set((t) => t.filter((x) => x.tabId !== e.tabId));
 
 async function openOn(n: number) {
+  closeCalls = 0;
   render(<Harness />);
   await wait(50);
   for (let i = 0; i < n; i++) {
@@ -176,24 +188,34 @@ describe("closing a tab from the palette", () => {
     closeImpl = () => new Promise((r) => setTimeout(() => r(false), 50));
     await openOn(1);
     await closeHighlighted();
-    await closeHighlighted();
     await wait(500);
+    expect(rowIds()).toContain("tab:b");
     expect(selected()).toBe("tab:b");
   });
 
-  it("releases the guard when closing rejects, so a later close still works", async () => {
+  it("ignores a second close while the first is pending", async () => {
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2)];
+    closeImpl = () => new Promise((r) => setTimeout(() => r(false), 50));
+    await openOn(1);
+    await closeHighlighted();
+    await closeHighlighted();
+    await wait(500);
+    expect(closeCalls).toBe(1);
+  });
+
+  it("releases the guard when closing rejects, so a later close goes through", async () => {
     initial = [mk("cur", 0), mk("b", 1), mk("c", 2)];
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     closeImpl = () => Promise.reject(new Error("boom"));
     await openOn(1);
     await closeHighlighted();
     await wait(600);
-    expect(selected()).toBe("tab:b");
+    expect(closeCalls).toBe(1);
     closeImpl = removing;
     await closeHighlighted();
     await wait(50);
+    expect(closeCalls).toBe(2);
     expect(rowIds()).not.toContain("tab:b");
-    expect(selected()).toBe("tab:c");
     error.mockRestore();
   });
 
@@ -207,12 +229,107 @@ describe("closing a tab from the palette", () => {
     expect(selected()).toBe("tab:c");
   });
 
-  it("leaves the current tab selected when it is the only one left", async () => {
-    initial = [mk("cur", 0), mk("b", 1)];
+  it("empties the list without selecting anything when the only row is closed", async () => {
+    initial = [mk("cur", 0)];
     closeImpl = removing;
-    await openOn(1);
+    await openOn(0);
+    expect(selected()).toBe("tab:cur");
     await closeHighlighted();
     await wait(50);
-    expect(selected()).toBe("tab:cur");
+    expect(rowIds()).toEqual([]);
+    expect(selected()).toBe("");
+  });
+});
+
+describe("the frame that restores the selection", () => {
+  let queue: Map<number, FrameRequestCallback>;
+  let nextId: number;
+  const flush = () =>
+    act(async () => {
+      const callbacks = [...queue.values()];
+      queue.clear();
+      for (const cb of callbacks) cb(0);
+    });
+
+  const setup = async () => {
+    queue = new Map();
+    nextId = 1;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      queue.set(nextId, cb);
+      return nextId++;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+      queue.delete(id);
+    });
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
+    closeImpl = removing;
+    await openOn(1);
+    queue.clear();
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("restores the successor when nothing intervenes", async () => {
+    await setup();
+    await closeHighlighted();
+    await flush();
+    expect(selected()).toBe("tab:c");
+  });
+
+  it("does not steal the selection from an arrow pressed before it runs", async () => {
+    await setup();
+    await closeHighlighted();
+    await act(async () => {
+      document
+        .querySelector("[cmdk-root]")
+        ?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "End", bubbles: true }),
+        );
+    });
+    await flush();
+    expect(selected()).toBe("tab:d");
+  });
+
+  it("is cancelled when the palette closes", async () => {
+    await setup();
+    await closeHighlighted();
+    expect(queue.size).toBeGreaterThan(0);
+    cleanup();
+    expect(queue.size).toBe(0);
+  });
+
+  it("is cancelled when the palette is closed from outside", async () => {
+    queue = new Map();
+    nextId = 1;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      queue.set(nextId, cb);
+      return nextId++;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+      queue.delete(id);
+    });
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2)];
+    closeImpl = removing;
+    closeCalls = 0;
+    const view = render(<Harness />);
+    await wait(50);
+    await arrowDown();
+    await wait(10);
+    queue.clear();
+    await closeHighlighted();
+    expect(queue.size).toBeGreaterThan(0);
+    view.rerender(<Harness open={false} />);
+    expect(queue.size).toBe(0);
+  });
+
+  it("does not let Cmd+W close another tab before the selection is restored", async () => {
+    await setup();
+    await closeHighlighted();
+    await closeHighlighted();
+    await flush();
+    expect(closeCalls).toBe(1);
+    expect(rowIds()).toEqual(["tab:cur", "tab:c", "tab:d"]);
   });
 });
