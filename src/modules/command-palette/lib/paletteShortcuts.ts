@@ -23,6 +23,7 @@ const PALETTE_OWN_SHORTCUTS: readonly ShortcutId[] = [
   "palette.folderMain",
   "palette.folderHome",
   "palette.menuAction",
+  "palette.worktrees",
 ];
 
 // Every shortcut an open palette owns: the rest of the app's shortcuts are not its business.

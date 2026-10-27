@@ -320,7 +320,7 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
     items.push({
       id: "worktrees",
       label: worktreesLabel(target.worktrees),
-      shortcutId: "tab.new",
+      shortcutId: "palette.worktrees",
     });
   }
   items.push({ id: "copy", label: "Copy Absolute Path", shortcutId: "path.copy" });

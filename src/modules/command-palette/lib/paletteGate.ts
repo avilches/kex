@@ -27,6 +27,7 @@ export const PALETTE_ALLOWED_SHORTCUTS: Record<Exclude<OpenPalette, "none">, rea
     "palette.folderMain",
     "palette.folderHome",
     "palette.menuAction",
+    "palette.worktrees",
   ],
 };
 

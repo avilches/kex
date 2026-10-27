@@ -12,6 +12,7 @@ export type ShortcutId =
   | "palette.folderMain"
   | "palette.folderHome"
   | "palette.menuAction"
+  | "palette.worktrees"
   | "tab.new"
   | "tab.newBrowser"
   | "tab.newEditor"
@@ -181,6 +182,12 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Palette",
     // Wildcard digit like workspace.selectByIndex: with a row menu open, Cmd+1..9 run its Nth Action.
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
+  },
+  {
+    id: "palette.worktrees",
+    label: "New Terminal: Show or Hide Worktrees",
+    group: "Palette",
+    defaultBindings: [{ [MOD_PROP]: true, key: "k" }],
   },
   {
     id: "workspace.selectByIndex",
@@ -765,10 +772,12 @@ export function findShortcutConflict(
   const current = SHORTCUTS_BY_ID.get(currentId);
   for (const s of SHORTCUTS) {
     if (s.id === currentId) continue;
-    // A palette shortcut is only live while its palette is open, so it never competes with the index jumps.
+    // A palette shortcut is only live while its palette is open, so it never competes with the index jumps
+    // or with Clear Terminal.
+    const outsidePalette = (id: string) => id.endsWith("selectByIndex") || id === "terminal.clear";
     if (
-      (s.group === "Palette" && current?.id.endsWith("selectByIndex")) ||
-      (current?.group === "Palette" && s.id.endsWith("selectByIndex"))
+      (s.group === "Palette" && current && outsidePalette(current.id)) ||
+      (current?.group === "Palette" && outsidePalette(s.id))
     )
       continue;
     if (PALETTE_DIGIT_SLOTS.includes(s.id) && PALETTE_DIGIT_SLOTS.includes(currentId)) continue;

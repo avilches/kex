@@ -255,7 +255,7 @@ describe("folderMenuItems", () => {
     const items = folderMenuItems({ path: "/a/b", worktrees: { kind: "show", count: 2 } });
     expect(items.map((i) => i.id)).toEqual(["pick", "worktrees", "copy"]);
     expect(items[0].label).toBe("New Tab in b");
-    expect(items[1]).toMatchObject({ label: "Show 2 worktrees", shortcutId: "tab.new" });
+    expect(items[1]).toMatchObject({ label: "Show 2 worktrees", shortcutId: "palette.worktrees" });
     expect(folderMenuItems({ path: "/a/b", worktrees: { kind: "hide" } })[1].label).toBe(
       "Hide worktrees",
     );

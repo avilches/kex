@@ -89,7 +89,7 @@ type Props = {
   /** All groups for the open state; the component applies the search. */
   groups: readonly FolderGroup[];
   onPick: (row: FolderRow) => void;
-  /** Cmd+T on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
+  /** Cmd+K on a row of a repository: add its worktrees that are not listed, or take the added ones away. */
   onToggleWorktrees: (row: FolderRow) => void;
   /** The workspace a row belongs to: its Actions are the ones its menu offers, run there. */
   workspaceOf: (workspaceId: string) => Workspace | undefined;
@@ -129,7 +129,7 @@ export function FolderPalette({
       ?.scrollTo({ top: 0 });
   }, [query, open]);
 
-  // The menu and Cmd+T act on the row cmdk has selected, which this palette never controls (a
+  // The menu and Cmd+K act on the row cmdk has selected, which this palette never controls (a
   // controlled selection made the scroll lag a row); the hints below read it with useCommandState.
   const selectedRowEl = () =>
     listRef.current?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]') ?? null;
@@ -218,7 +218,7 @@ export function FolderPalette({
   const menuOpen = rowMenu.menu !== null;
   const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen });
   latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen };
-  // The global shortcut listener runs first: Cmd+T and Cmd+Shift+C reach the palette from there.
+  // The global shortcut listener runs first: Cmd+T, Cmd+K and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
     return registerPaletteControl((action, digit, item) => {
@@ -237,8 +237,13 @@ export function FolderPalette({
         if (fixed) latest.current.onPick(fixed);
         return true;
       }
+      if (action === "newTab") {
+        const current = latest.current.groups.flatMap((g) => g.rows).find((r) => r.labels.includes("Current tab"));
+        if (current) latest.current.onPick(current);
+        return true;
+      }
       const row = find(selectedRowEl()?.dataset.folderRow);
-      if (action === "newTab") toggle(row);
+      if (action === "worktrees") toggle(row);
       else copy(row);
       return true;
     });
@@ -440,6 +445,7 @@ function RowTail({ row }: { row: FolderRowMatched }) {
     return (
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <HintChip hint={row.repoHint} />
+        {row.labels.includes("Current tab") ? <CurrentKey userShortcuts={userShortcuts} /> : null}
         {row.slots.map((slot) => (
           <SlotKey key={slot} slot={slot} userShortcuts={userShortcuts} />
         ))}
@@ -466,6 +472,7 @@ function RowTail({ row }: { row: FolderRowMatched }) {
             {slot && row.slots.includes(slot) ? (
               <SlotKey slot={slot} userShortcuts={userShortcuts} />
             ) : null}
+            {label === "Current tab" ? <CurrentKey userShortcuts={userShortcuts} /> : null}
           </span>
         );
       })}
@@ -478,6 +485,17 @@ const SLOT_OF_LABEL: Partial<Record<FolderRowLabel, FolderSlot>> = {
   "Main checkout": "main",
   Home: "home",
 };
+
+// The current tab's folder is picked with the new-tab shortcut, which the palette takes over while open.
+function CurrentKey({ userShortcuts }: { userShortcuts: Parameters<typeof getShortcutLabel>[1] }) {
+  const label = getShortcutLabel("tab.new", userShortcuts);
+  if (!label) return null;
+  return (
+    <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
+      {label}
+    </kbd>
+  );
+}
 
 function SlotKey({
   slot,
@@ -527,7 +545,7 @@ function HintChip({ hint, className }: { hint: RepoHint; className?: string }) {
       className={`flex shrink-0 items-center gap-1.5 text-[11px] leading-none font-normal text-muted-foreground ${className ?? ""}`}
     >
       <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10.5px] leading-none text-foreground">
-        {getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}
+        {getShortcutLabel("palette.worktrees", userShortcuts) ?? "Worktrees"}
       </kbd>
       {worktreesLabel(hint).toLowerCase()}
     </span>
@@ -558,7 +576,7 @@ function FolderFooter({
       </span>
       {row.repoKey && row.repoHint ? (
         <span className="flex shrink-0 items-center gap-1.5">
-          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts) ?? "New tab"}</kbd>
+          <kbd className={kbd}>{getShortcutLabel("palette.worktrees", userShortcuts) ?? "Worktrees"}</kbd>
           {worktreesLabel(row.repoHint)}
         </span>
       ) : null}
@@ -570,6 +588,12 @@ function FolderFooter({
               : `${digitLabel(userShortcuts, 1)}\u2013${agentCount}`}
           </kbd>
           Run agent
+        </span>
+      ) : null}
+      {agentCount === 0 && all.some((r) => r.labels.includes("Current tab")) ? (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <kbd className={kbd}>{getShortcutLabel("tab.new", userShortcuts)}</kbd>
+          Current tab
         </span>
       ) : null}
       {(agentCount > 0 ? [] : (["root", "main", "home"] as const)).map((slot) => {

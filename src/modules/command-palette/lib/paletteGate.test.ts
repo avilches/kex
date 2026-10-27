@@ -37,6 +37,7 @@ const EXPECTED_FOLDER: ShortcutId[] = [
   "palette.folderMain",
   "palette.folderHome",
   "palette.menuAction",
+  "palette.worktrees",
 ];
 
 describe("shortcutBlockedByPalette", () => {

@@ -11,7 +11,8 @@ export type PaletteShortcut =
   | "folderRoot"
   | "folderMain"
   | "folderHome"
-  | "menuAction";
+  | "menuAction"
+  | "worktrees";
 
 // Returns true when the palette took the shortcut, even if it had nothing to do: a shortcut
 // pressed over an open palette must not act on the tab behind it.

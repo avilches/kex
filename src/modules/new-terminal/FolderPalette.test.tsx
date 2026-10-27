@@ -191,7 +191,7 @@ describe("FolderPalette", () => {
     );
     await settle();
     const [current, home, plain] = itemEls();
-    expect(current.textContent).toBe("/repo \u00b7 mainCurrent tab");
+    expect(current.textContent).toBe("/repo \u00b7 mainCurrent tabCtrl T");
     expect(home.textContent).toBe("~Home");
     expect(home.querySelector("svg")).not.toBeNull();
     expect(plain.textContent).toBe("/repo/src");
@@ -300,7 +300,7 @@ describe("FolderPalette", () => {
       await waitFor(() => expect(itemEls()[1].textContent).toContain("show 2 worktrees"));
       const [other, root, src] = itemEls();
       expect(root.textContent).not.toContain("Workspace Root");
-      expect(root.querySelector("kbd")?.textContent).toMatch(/T$/);
+      expect(root.querySelector("kbd")?.textContent).toMatch(/K$/);
       expect(other.textContent).not.toContain("show");
       expect(src.textContent).not.toContain("show");
       expect(repoHeadings()[0].querySelector("kbd")).toBeNull();
@@ -482,20 +482,20 @@ describe("FolderPalette", () => {
       expect(heading?.querySelector("svg")).not.toBeNull();
     });
 
-    it("Cmd+T on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {
+    it("Cmd+K on a row of the repository asks to toggle its worktrees, even without a hint of its own", async () => {
       const onToggle = vi.fn();
       mountGroups(clustered, onToggle);
       await settle();
       let taken = false;
       await act(async () => {
-        taken = runPaletteShortcut("newTab");
+        taken = runPaletteShortcut("worktrees");
       });
       expect(taken).toBe(true);
       expect(onToggle).toHaveBeenCalledTimes(1);
       expect(onToggle.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
     });
 
-    it("Cmd+T on a row outside any repository does nothing", async () => {
+    it("Cmd+K on a row outside any repository does nothing", async () => {
       const onToggle = vi.fn();
       mountGroups(clustered, onToggle);
       await settle();
@@ -506,7 +506,7 @@ describe("FolderPalette", () => {
         await settle();
       }
       await act(async () => {
-        runPaletteShortcut("newTab");
+        runPaletteShortcut("worktrees");
       });
       expect(onToggle).not.toHaveBeenCalled();
     });
@@ -599,6 +599,22 @@ describe("FolderPalette", () => {
       expect(onPick.mock.calls[0][0].slots).toContain(slot);
     });
 
+    it("newTab picks the current tab row wherever the focus is", async () => {
+      const onPick = vi.fn();
+      mountFixed(fixed, onPick);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "ArrowDown" });
+      });
+      let taken = false;
+      await act(async () => {
+        taken = runPaletteShortcut("newTab");
+      });
+      expect(taken).toBe(true);
+      expect(onPick).toHaveBeenCalledTimes(1);
+      expect(onPick.mock.calls[0][0].labels).toContain("Current tab");
+    });
+
     it("takes the key and does nothing when that fixed row does not exist", async () => {
       const onPick = vi.fn();
       mountFixed(
@@ -621,7 +637,7 @@ describe("FolderPalette", () => {
         itemEls().find((el) => el.textContent?.includes(label))?.querySelector("kbd")?.textContent;
       expect(keys("Workspace Root")).toMatch(/1$/);
       expect(keys("Home")).toMatch(/3$/);
-      expect(keys("Current tab")).toBeUndefined();
+      expect(keys("Current tab")).toMatch(/T$/);
     });
 
     it("lists the keys of the three fixed rows in the footer, whichever row has the focus", async () => {
