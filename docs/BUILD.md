@@ -72,8 +72,10 @@ token. It is dev only and not part of `pnpm build`.
   as the same monospace lines as Rich, not as a fence), so line n of one is line n of the other:
   `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
   computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
-- The tuner adjusts the background lightness and hue, and the alpha of the normal and the ignored explorer
-  rows (what `text-foreground/85` and `text-muted-foreground/85` resolve to). The two alphas feed CSS vars
+- The tuner is a compact grid of twelve small sliders, each moving a family of tokens at once (`GROUPS` in
+  `src/theme-preview/tuner.ts`): surfaces (lightness, tint, color), borders, text, accent (lightness, hue),
+  editor and terminal backgrounds, the 16 ANSI colors (lightness, color) and the alpha of the normal and the
+  ignored explorer rows (what `text-foreground/85` and `text-muted-foreground/85` resolve to). The two alphas feed CSS vars
   the rows read, so the explorer follows live; the readout prints the composited hex and the WCAG ratio
   against the sidebar. Each control has its own "reset", and "Reset all" clears the sliders and the token
   overrides. Values are saved per theme and mode in `localStorage` and survive a reload.

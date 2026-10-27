@@ -76,14 +76,22 @@ function hslToRgb(h: number, s: number, l: number): Rgb {
   return { r: f(h + 1 / 3) * 255, g: f(h) * 255, b: f(h - 1 / 3) * 255 };
 }
 
-// Lightness delta in percentage points (-15..15) and hue rotation in degrees.
-export function shiftHsl(hex: string, dl: number, dh: number): string {
+// Greys have no hue to rotate, so a tone shift starts from a cool blue and the
+// saturation delta is what makes it visible.
+const GREY_PIVOT_HUE = 215;
+const GREY_SATURATION = 0.02;
+
+// Lightness and saturation deltas in percentage points, hue rotation in degrees.
+// A trailing alpha byte on the input survives.
+export function shiftHsl(hex: string, dl: number, dh: number, ds = 0): string {
   const rgb = hexToRgb(hex);
   if (!rgb) return hex;
   let [h, s, l] = rgbToHsl(rgb);
+  if (s < GREY_SATURATION) h = GREY_PIVOT_HUE / 360;
   l = Math.max(0, Math.min(1, l + dl / 100));
+  s = Math.max(0, Math.min(1, s + ds / 100));
   h = (h + dh / 360 + 1) % 1;
-  return rgbToHex(hslToRgb(h, s, l));
+  return rgbToHex(hslToRgb(h, s, l)) + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(hex.trim())?.[1] ?? "");
 }
 
 export function withAlpha(hex: string, alpha: number): string {

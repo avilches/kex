@@ -74,6 +74,7 @@ import {
   saveTokens,
   saveTune,
   type Tune,
+  tunedTokens,
   tuneSnapshot,
 } from "./tuner";
 
@@ -1795,7 +1796,7 @@ function controls(): HTMLElement {
   );
 }
 
-type SliderField = "bgLightness" | "bgHue" | "normalAlpha" | "ignoredAlpha";
+type SliderField = keyof Tune;
 
 function smallButton(label: string): HTMLButtonElement {
   return h(
@@ -1819,15 +1820,22 @@ function slider(opts: {
 }): { node: HTMLElement; sync: () => void } {
   const input = h("input", {
     type: "range",
-    class: "w-52 grow",
+    class: "h-3 w-20 shrink-0",
     min: String(opts.min),
     max: String(opts.max),
     step: String(opts.step),
   }) as HTMLInputElement;
   const out = h("span", {
-    class: "w-14 shrink-0 text-right font-mono text-[11px]",
+    class: "w-9 shrink-0 text-right font-mono text-[10px]",
   });
-  const reset = smallButton("reset");
+  const reset = h(
+    "button",
+    {
+      class:
+        "shrink-0 rounded px-1 text-[10px] leading-none text-muted-foreground hover:text-foreground",
+    },
+    "x",
+  ) as HTMLButtonElement;
   reset.title = "Back to the theme default for this one";
   const sync = () => {
     input.value = String(state.tune[opts.field]);
@@ -1843,8 +1851,8 @@ function slider(opts: {
   return {
     node: h(
       "div",
-      { class: "flex items-center gap-2 text-[11px]" },
-      h("span", { class: "w-40 shrink-0 text-muted-foreground" }, opts.label),
+      { class: "flex items-center gap-1.5 text-[10px]" },
+      h("span", { class: "w-[88px] shrink-0 truncate text-muted-foreground", title: opts.label }, opts.label),
       input,
       out,
       reset,
@@ -2082,37 +2090,21 @@ function tunerPanel(): HTMLElement {
     h(
       "div",
       { class: "flex flex-col gap-1.5" },
-      addSlider(
-        "Background lightness",
-        "bgLightness",
-        -15,
-        15,
-        0.5,
-        (v) => `${v > 0 ? "+" : ""}${v}%`,
-      ),
-      addSlider(
-        "Background tone (warm/cool)",
-        "bgHue",
-        -40,
-        40,
-        1,
-        (v) => `${v > 0 ? "+" : ""}${v}deg`,
-      ),
-      addSlider(
-        "Normal text alpha",
-        "normalAlpha",
-        0.5,
-        1,
-        0.01,
-        (v) => `${Math.round(v * 100)}%`,
-      ),
-      addSlider(
-        "Ignored text alpha",
-        "ignoredAlpha",
-        0.4,
-        1,
-        0.01,
-        (v) => `${Math.round(v * 100)}%`,
+      h(
+        "div",
+        { class: "grid grid-cols-2 gap-x-5 gap-y-1 md:grid-cols-3 xl:grid-cols-4" },
+        addSlider("Surfaces light", "bgLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Surfaces tint", "bgHue", -60, 60, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`),
+        addSlider("Surfaces color", "bgSaturation", -20, 20, 1, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Borders light", "borderLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Text light", "textLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Accent light", "accentLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Accent hue", "accentHue", -60, 60, 1, (v) => `${v > 0 ? "+" : ""}${v}deg`),
+        addSlider("Editor+term light", "codeLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("ANSI light", "ansiLightness", -15, 15, 0.5, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("ANSI color", "ansiSaturation", -30, 30, 1, (v) => `${v > 0 ? "+" : ""}${v}%`),
+        addSlider("Explorer text a.", "normalAlpha", 0.5, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
+        addSlider("Ignored text a.", "ignoredAlpha", 0.4, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
       ),
       readout,
       h("div", { class: "flex flex-wrap items-center gap-2" }, resetAll, copyChanges, copyFull, saveBtn, copyStatus),
@@ -2175,11 +2167,12 @@ function changedTokens(): Record<string, string> {
 // look changed on their own).
 function effectiveChanges(): Record<string, string> {
   const out: Record<string, string> = {};
+  const tuned = tunedTokens(state.tune);
   for (const token of TOKENS) {
     const current = toHex(tokenValue(token));
     if (!baseline[token] || current.toLowerCase() === baseline[token].toLowerCase()) continue;
     const explicit = token in state.tokens;
-    if (token in COLOR_TOKEN || explicit) out[token] = current;
+    if (token in COLOR_TOKEN || explicit || tuned.has(token)) out[token] = current;
   }
   return out;
 }
