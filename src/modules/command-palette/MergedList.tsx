@@ -101,7 +101,8 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
   );
 }
 
-// Typing: one flat list in rank order, so the best match is the first row whatever it is.
+// Typing: the current tab, then the other matching tabs in the order of the empty list, then the rest
+// ranked by score, all in one flat list.
 // Empty box: recent tabs, then the actions under their fixed groups.
 export function MergedList(p: Props) {
   const isCurrent = (r: MergedRow) => r.kind === "tab" && r.current === true;
