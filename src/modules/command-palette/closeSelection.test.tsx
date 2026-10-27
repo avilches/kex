@@ -66,7 +66,7 @@ const mk = (id: string, i: number, over: Partial<TabEntry> = {}): TabEntry => ({
 });
 
 type SetTabs = (f: (t: TabEntry[]) => TabEntry[]) => void;
-let closeImpl: (e: TabEntry, setTabs: SetTabs) => unknown;
+let closeImpl: (e: TabEntry, setTabs: SetTabs) => void | Promise<unknown>;
 let initial: TabEntry[];
 
 function Harness({ activeTabId = "cur" }: { activeTabId?: string }) {
