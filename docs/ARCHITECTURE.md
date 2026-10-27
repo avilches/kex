@@ -468,16 +468,13 @@ terminal with one review). Limitations: scripts launched from an Action are not 
 sleeping empty shell wakes and reuses it), and an agent that cannot be resumed follows the existing restore error path.
 Rendering details are in `docs/WORKSPACES.md`.
 
-Each sleeping agent tab previews its conversation with the last assistant message the Stop hook
-carried, persisted in `agent-sessions.json` (`SessionRecord.last_message`). That file is not
-encrypted, so the text is clipped to 280 characters: enough to recognise the session, little of
-what the assistant may have printed. The transcript `.jsonl` is not read for it.
-
-The placeholder also draws, faded behind it, the last lines the terminal showed, with their colours (`HibernatedLines`), and
-tells which keys restore the tab: Enter (`tab.wake`, a shortcut of the registry, only live when the active tab sleeps and the
-focus is not in a field, button, menu, editor or explorer: `enterBelongsToFocusedElement`) or the `tab.hibernate` binding,
-spelled out from the current bindings ("Press Enter or Cmd+Alt+Z to restore"). The lines live in their own file per tab, off
-the workspace JSON, and are described in `docs/AGENT_SESSION_RESTORE.md` ("Hibernating a tab").
+The placeholder is a card with a solid background (title, command, how long, the folder of the agent session, and the Restore
+button with the Enter shortcut on it) over the last lines the terminal showed, faded and with their colours
+(`HibernatedLines`). Enter is `tab.wake`, a shortcut of the registry, only live when the active tab sleeps and the focus is
+not in a field, button, menu, editor or explorer (`enterBelongsToFocusedElement`); Cmd+Alt+Z toggles as before. The agent's
+last message (`SessionRecord.last_message` in `agent-sessions.json`) is still stored for the restore but no longer shown. The
+lines live in their own file per tab, off the workspace JSON, and are described in `docs/AGENT_SESSION_RESTORE.md`
+("Hibernating a tab").
 
 Startup: there is no startup preference. `initWorkspaceState()` restores every saved workspace as it was:
 the tabs that were hibernated (manually or by auto-hibernate) stay hibernated, the rest mount normally. The

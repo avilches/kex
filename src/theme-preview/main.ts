@@ -1298,37 +1298,29 @@ function hibernatedTab(): HTMLElement {
       h("span", { style: "color:var(--terminal-ansi-red)" }, "error  build failed: missing import"),
       h("span", { style: "color:var(--terminal-foreground)" }, "$ pnpm test"),
     ),
-    h("div", {
-      class: "relative size-16 rounded-full border border-current opacity-70",
-    }),
-    h("span", { class: "relative text-[15px] text-foreground" }, "build · idle"),
-    h("span", { class: "relative max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
-    h("span", { class: "relative text-[12px]" }, "Hibernated for 2h"),
     h(
       "div",
       {
-        class: "relative flex w-80 flex-col gap-0.5 border-l border-border/60 pl-2",
-        "data-surface": "hibernated-session-preview",
+        class:
+          "relative flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-10 py-5 shadow-sm",
+        "data-surface": "hibernated-card",
       },
-      h(
-        "span",
-        { class: "line-clamp-2 text-[11.5px] leading-snug text-foreground/80" },
-        "The build is green again: the missing import is back and all tests pass.",
-      ),
-      h("span", { class: "truncate text-[11px] opacity-60" }, "~/code/kex · 2h ago"),
-    ),
-    h(
-      "div",
-      { class: "relative flex flex-col items-center gap-2" },
+      h("div", {
+        class: "size-12 rounded-full border border-current opacity-70",
+      }),
+      h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
+      h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
+      h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
+      h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
       h(
         "span",
         {
           class:
-            "rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
+            "flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
         },
         "Restore",
+        h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
       ),
-      h("span", { class: "text-[11px] opacity-70" }, "Press Enter or Cmd+Alt+Z to restore"),
     ),
   );
 }

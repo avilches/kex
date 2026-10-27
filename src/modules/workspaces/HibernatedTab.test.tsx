@@ -59,13 +59,13 @@ describe("HibernatedTab", () => {
     expect(onWake).toHaveBeenCalledTimes(1);
   });
 
-  it("reads the last agent message and folder of the session while it is shown", async () => {
+  it("shows the folder of the session but not the last agent message", async () => {
     sessionRestore.sessionPreviews.mockResolvedValue([
       { tabId: "t1", cwd: "/Users/me/proj", lastMessage: "Tests are green", updatedAt: Math.floor(Date.now() / 1000) - 3600 },
     ]);
-    const { findByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible onWake={() => {}} />);
-    expect(await findByText("Tests are green")).toBeTruthy();
+    const { findByText, queryByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible onWake={() => {}} />);
     expect(await findByText(/~\/proj/)).toBeTruthy();
+    expect(queryByText("Tests are green")).toBeNull();
     expect(sessionRestore.sessionPreviews).toHaveBeenCalledWith(["t1"]);
   });
 
@@ -75,9 +75,10 @@ describe("HibernatedTab", () => {
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("says which keys restore it", () => {
-    const { getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
-    expect(getByText(/^Press Enter or .+ to restore$/)).toBeTruthy();
+  it("shows the Enter shortcut on the Restore button and no other hint", () => {
+    const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    expect(getByRole("button").textContent).toMatch(/^Restore.+$/);
+    expect(queryByText(/^Press /)).toBeNull();
   });
 
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {

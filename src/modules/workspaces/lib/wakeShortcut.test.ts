@@ -1,22 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { ENTER_KEY } from "@/lib/platform";
-import { enterBelongsToFocusedElement, restoreHint, spellBinding } from "./wakeShortcut";
-
-describe("restoreHint", () => {
-  it("spells the keys out", () => {
-    expect(spellBinding([ENTER_KEY])).toBe("Enter");
-    expect(spellBinding(["⌘", "⌥", "Z"])).toBe("Cmd+Alt+Z");
-    expect(spellBinding(["Ctrl", "Alt", "Z"])).toBe("Ctrl+Alt+Z");
-  });
-
-  it("lists the bindings that are assigned and skips a shortcut that has none", () => {
-    expect(restoreHint([[ENTER_KEY], ["⌘", "⌥", "Z"]])).toBe("Press Enter or Cmd+Alt+Z to restore");
-    expect(restoreHint([[], ["⌘", "⌥", "Z"]])).toBe("Press Cmd+Alt+Z to restore");
-    expect(restoreHint([[], []])).toBeNull();
-  });
-});
+import { enterBelongsToFocusedElement } from "./wakeShortcut";
 
 const mount = (html: string, selector: string): Element => {
   document.body.innerHTML = html;
