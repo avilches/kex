@@ -16,6 +16,9 @@ vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
 }));
 vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 
+const lines = vi.hoisted(() => ({ read: vi.fn(async (_tabId: string): Promise<string | null> => null) }));
+vi.mock("./lib/hibernateLinesIo", () => ({ readHibernateLines: lines.read }));
+
 import { HibernatedTab } from "./HibernatedTab";
 import type { SleepingTab } from "./lib/hibernate";
 
@@ -30,6 +33,8 @@ describe("HibernatedTab", () => {
   beforeEach(() => {
     sessionRestore.sessionPreviews.mockReset();
     sessionRestore.sessionPreviews.mockResolvedValue([]);
+    lines.read.mockReset();
+    lines.read.mockResolvedValue(null);
   });
   afterEach(cleanup);
 
@@ -67,5 +72,32 @@ describe("HibernatedTab", () => {
   it("does not read the session while the tab is out of sight", () => {
     render(<HibernatedTab tab={sleeping()} visible={false} onWake={() => {}} />);
     expect(sessionRestore.sessionPreviews).not.toHaveBeenCalled();
+    expect(lines.read).not.toHaveBeenCalled();
+  });
+
+  it("says which keys restore it", () => {
+    const { getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    expect(getByText(/^Press Enter or .+ to restore$/)).toBeTruthy();
+  });
+
+  it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {
+    lines.read.mockResolvedValueOnce("\u001b[38;2;255;0;0merror: boom\u001b[0m\nplain");
+    const { findByTestId, findByText, rerender } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    expect(lines.read).toHaveBeenCalledWith("t1");
+    const layer = await findByTestId("hibernated-lines");
+    expect(layer.getAttribute("aria-hidden")).toBe("true");
+    const red = await findByText("error: boom");
+    expect(red.getAttribute("style")).toContain("color");
+    expect(await findByText("plain")).toBeTruthy();
+    rerender(<HibernatedTab tab={{ ...sleeping(), id: "t2" }} visible onWake={() => {}} />);
+    expect(lines.read).toHaveBeenCalledWith("t2");
+  });
+
+  it("survives a failed read: the placeholder shows without lines", async () => {
+    lines.read.mockRejectedValueOnce(new Error("no store"));
+    const { queryByTestId, getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    await Promise.resolve();
+    expect(queryByTestId("hibernated-lines")).toBeNull();
+    expect(getByText("Restore")).toBeTruthy();
   });
 });

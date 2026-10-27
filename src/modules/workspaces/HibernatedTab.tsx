@@ -2,11 +2,14 @@ import { Button } from "@/components/ui/button";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { sessionPreviews, type SessionPreview } from "@/modules/agents/lib/agentSessionRestore";
-import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { getShortcutTokens } from "@/modules/shortcuts/shortcuts";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
+import { HibernatedLines } from "./HibernatedLines";
 import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
+import { restoreHint } from "./lib/wakeShortcut";
 import { describeSessionPreview } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
@@ -47,16 +50,21 @@ type Props = { tab: SleepingTab; visible: boolean; onWake: () => void };
 // behind it, only what was captured when it went to sleep.
 export function HibernatedTab({ tab, visible, onWake }: Props) {
   const info = useAgentTabTitle(tab);
-  const shortcutLabel = useShortcutLabel("tab.hibernate");
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const hint = restoreHint([getShortcutTokens("tab.wake", userShortcuts), getShortcutTokens("tab.hibernate", userShortcuts)]);
   const now = useNow(visible);
   const preview = useSessionPreview(tab.id, visible);
   const { agent, command, title: frozen, at } = tab.hibernation;
   const title = frozen || info?.displayTitle || tab.title || tab.id;
   const line = preview ? describeSessionPreview(preview, now, cachedHomeDir()) : null;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-background text-muted-foreground">
-      <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
-      <div className="flex max-w-[80%] flex-col items-center gap-1.5">
+    <div
+      data-hibernated-tab
+      className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
+    >
+      <HibernatedLines tabId={tab.id} visible={visible} />
+      <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="relative opacity-70" />
+      <div className="relative flex max-w-[80%] flex-col items-center gap-1.5">
         <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
           <span className="flex size-4 shrink-0 items-center justify-center">
             {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
@@ -80,11 +88,13 @@ export function HibernatedTab({ tab, visible, onWake }: Props) {
           </span>
         )}
       </div>
-      <Button size="lg" onClick={onWake} className="gap-2">
-        <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
-        Restore
-        {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
-      </Button>
+      <div className="relative flex flex-col items-center gap-2">
+        <Button size="lg" onClick={onWake} className="gap-2">
+          <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
+          Restore
+        </Button>
+        {hint && <span className="text-[11px] opacity-70">{hint}</span>}
+      </div>
     </div>
   );
 }

@@ -21,6 +21,7 @@ export type ShortcutId =
   | "tab.note"
   | "tab.lock"
   | "tab.hibernate"
+  | "tab.wake"
   | "tab.focusOnExplorer"
   | "tab.toggleAutofocus"
   | "file.rename"
@@ -135,6 +136,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Hibernate Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
+  },
+  {
+    id: "tab.wake",
+    label: "Restore Hibernated Tab",
+    group: "Tabs",
+    defaultBindings: [{ key: "Enter" }],
   },
   {
     id: "nav.prev",
@@ -715,15 +722,22 @@ export function getBindingTokens(binding?: KeyBinding, wildcardOf?: ShortcutId):
 
 export const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 
+export function getShortcutTokens(
+  id: ShortcutId,
+  userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
+): string[] {
+  const shortcut = SHORTCUTS_BY_ID.get(id);
+  if (!shortcut) return [];
+  const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
+  return getBindingTokens(bindings?.[0]);
+}
+
 export function getShortcutLabel(
   id: ShortcutId,
   userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
   separator = " ",
 ): string | null {
-  const shortcut = SHORTCUTS_BY_ID.get(id);
-  if (!shortcut) return null;
-  const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
-  const tokens = getBindingTokens(bindings?.[0]);
+  const tokens = getShortcutTokens(id, userShortcuts);
   return tokens.length ? tokens.join(separator) : null;
 }
 

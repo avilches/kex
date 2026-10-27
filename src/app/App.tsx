@@ -22,6 +22,7 @@ import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { useHibernateLinesCleanup } from "@/modules/workspaces/lib/useHibernateLinesCleanup";
+import { enterBelongsToFocusedElement } from "@/modules/workspaces/lib/wakeShortcut";
 import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
@@ -3008,6 +3009,9 @@ export default function App() {
       "tab.hibernate": () => {
         if (activeTabId) toggleTabHibernate(activeTabId);
       },
+      "tab.wake": () => {
+        if (activeTabId) void wakeAndFocusTab(activeTabId);
+      },
       "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActiveTab,
@@ -3314,6 +3318,12 @@ export default function App() {
         )
       ) {
         return true;
+      }
+      if (id === "tab.wake") {
+        return (
+          enterBelongsToFocusedElement(e.target as Element | null) ||
+          !!sidebarRef.current?.isExplorerFocused()
+        );
       }
       if (id === "terminal.clear") {
         const target =
