@@ -78,7 +78,11 @@ function SelectionOutline({ selected, separate }: { selected: boolean[]; separat
   return (
     <>
       {runs.map(([from, to]) => {
-        const style = { left: columnLeft(from), width: columnWidth(from, to) };
+        const left = columnLeft(from);
+        const width = columnWidth(from, to);
+        const style = separate
+          ? { left: `calc(${left} + 3px)`, width: `calc(${width} - 6px)` }
+          : { left, width };
         return (
           <Fragment key={from}>
             <div
