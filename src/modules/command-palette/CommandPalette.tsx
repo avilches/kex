@@ -108,8 +108,6 @@ type Props = {
   onSaveTab: (tabId: string) => void;
   /** Unlike the shortcut, it must not focus the tab: the palette keeps the focus. */
   onToggleTabHibernate: (tabId: string) => unknown;
-  /** The review dialog takes the focus, and the palette claims it back when it goes. */
-  hibernateDialogOpen: boolean;
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -168,7 +166,6 @@ export function CommandPalette({
   onUpdateTab,
   onSaveTab,
   onToggleTabHibernate,
-  hibernateDialogOpen,
   onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
@@ -773,13 +770,6 @@ export function CommandPalette({
   useEffect(() => {
     if (menuTab) setMenuItems(tabMenuItems(menuTab, { autofocusMode }));
   }, [menuTab, autofocusMode, setMenuItems]);
-
-  // Takes the focus back from the hibernate review dialog once it is gone.
-  const hibernateDialogWasOpen = useRef(false);
-  useEffect(() => {
-    if (hibernateDialogWasOpen.current && !hibernateDialogOpen && open) refocusInput();
-    hibernateDialogWasOpen.current = hibernateDialogOpen;
-  }, [hibernateDialogOpen, open, refocusInput]);
 
   const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode });
   latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode };

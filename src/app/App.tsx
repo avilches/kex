@@ -4264,7 +4264,6 @@ export default function App() {
             onUpdateTab={sidebarTabMenu.onUpdateTab}
             onSaveTab={sidebarTabMenu.onSaveTab}
             onToggleTabHibernate={onPaletteToggleHibernate}
-            hibernateDialogOpen={hibernateFlow.pending !== null}
             onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}

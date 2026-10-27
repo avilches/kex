@@ -94,7 +94,7 @@ let initial: TabEntry[];
 let commands: PaletteItem[] = [];
 let hibernateImpl: (id: string) => unknown;
 
-function Harness({ dialog = false }: { dialog?: boolean }) {
+function Harness() {
   const [tabs, setTabs] = useState(initial);
   return (
     <CommandPalette
@@ -131,7 +131,6 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
         calls.hibernate.push(id);
         return hibernateImpl(id);
       }}
-      hibernateDialogOpen={dialog}
       onGoToTab={(id) => calls.goTo.push(id)}
       onTerminalTargetChange={() => {}}
       onOpenTerminalAt={() => {}}
@@ -343,19 +342,24 @@ describe("hibernating from the palette", () => {
     expect(selected()).toBe("tab:c");
   });
 
-  it("keeps the palette open on the same row, with the focus in the input, once the review dialog is cancelled", async () => {
-    const { rerender } = render(<Harness />);
-    await wait(50);
-    await key("ArrowDown");
-    await key("ArrowDown");
-    await wait(10);
-    const before = selected();
-    rerender(<Harness dialog />);
-    await wait(10);
-    rerender(<Harness />);
+  it("takes the focus back when waking the tab makes its terminal grab it, keeping the row", async () => {
+    const thief = document.createElement("textarea");
+    document.body.appendChild(thief);
+    hibernateImpl = () =>
+      new Promise((r) =>
+        setTimeout(() => {
+          thief.focus();
+          r(undefined);
+        }, 20),
+      );
+    await openOn("tab:c");
+    const input = document.querySelector<HTMLInputElement>('[cmdk-input=""]');
+    input?.focus();
+    await shortcut("hibernateTab");
     await wait(400);
-    expect(document.activeElement).toBe(document.querySelector('[cmdk-input=""]'));
-    expect(selected()).toBe(before);
+    thief.remove();
+    expect(document.activeElement).toBe(input);
+    expect(selected()).toBe("tab:c");
     expect(calls.openChange).toEqual([]);
   });
 });

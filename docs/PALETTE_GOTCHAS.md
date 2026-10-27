@@ -71,3 +71,37 @@ un AlertDialog en portal (Hibernate) y con la trampa de foco de Radix.
 
 Leccion: ningun listener global de foco debe pelearse con un dialogo en portal; una accion que da el
 foco a otra cosa cierra la paleta en vez de intentar recuperarlo.
+
+---
+
+## Bug 3: Hibernate/Restore desde la paleta le quitan el foco (RESUELTO)
+
+### Sintoma
+
+Hibernar o restaurar una tab desde la paleta (item o atajo) dejaba la paleta abierta pero sin el
+foco en su input; con el modal de revision, al cerrarlo (confirmar, cancelar, Escape) pasaba lo mismo.
+
+### Pistas falsas descartadas
+
+- Un efecto que vigilaba la prop `hibernateDialogOpen` y refocalizaba con timeouts: el test que lo
+  cubria no usaba un AlertDialog real, y quitarlo no rompia ninguna prueba.
+- Tocar el foco del terminal o poner un listener global de `focusin`: descartado en la Decision 2.
+
+### Causa raiz
+
+Con un dialogo: Radix, al desmontar el contenido, llama a `onCloseAutoFocus`; el de `AlertDialogContent`
+hace `preventDefault()` y enfoca `triggerRef`, que aqui no existe (el dialogo se abre por estado, sin
+trigger), asi que el foco cae en el body. Sin dialogo: el terminal despertado enfoca su slot cuando
+monta (`requestLeafFocus` en el efecto de visible y enfocado); eso lo cubre `refocusInput` tras
+resolverse la accion.
+
+### Fix
+
+`keepPaletteFocus` (`lib/keepPaletteFocus.ts`) es el `onCloseAutoFocus` de `HibernateDialog`: si hay un
+input de paleta en el DOM, evita el comportamiento por defecto y le da el foco. Sin paleta no hace nada.
+`hibernateFocus.test.tsx` usa un AlertDialog real en portal y falla sin la llamada a `focus()`.
+
+### Leccion
+
+Un dialogo sin trigger no devuelve el foco a nadie: quien lo abre desde otra superficie debe decirle
+adonde. Se resuelve en el `onCloseAutoFocus` del propio dialogo, no con timeouts ni listeners globales.
