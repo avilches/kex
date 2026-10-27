@@ -35,6 +35,7 @@ import {
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorKey } from "./lib/closeSuccessor";
+import { initialKey } from "./lib/initialKey";
 import { commandChoice } from "./lib/commandChoice";
 import { fuzzyBest } from "./lib/fuzzy";
 import { learnedSnapshot, recordChoice } from "./lib/learned";
@@ -142,7 +143,7 @@ export function CommandPalette({
   const actionItems = useMemo(() => paletteActions(barModel), [barModel]);
   const { contentStyle, handles } = usePaletteWidth();
   const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
-  const [value, setValue] = useState("");
+  const [pickedValue, setValue] = useState("");
   const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
@@ -200,6 +201,11 @@ export function CommandPalette({
       mru,
     ],
   );
+  // Until a row is picked the previous tab is the highlighted one. Passing it as the controlled
+  // value from the first render keeps cmdk from selecting the first row (the current tab) first.
+  const value =
+    pickedValue ||
+    (open && inCommands && !inSubpage ? initialKey(merged, parsed.term.length > 0) : "");
   const terminalTarget = useMemo(
     () => (open && inCommands ? terminalTargetOf(value, merged) : null),
     [open, inCommands, value, merged],
