@@ -1,13 +1,3 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -25,7 +15,6 @@ import {
   shortcutsForEvent,
 } from "@/modules/shortcuts/shortcuts";
 import {
-  ArrowTurnBackwardIcon,
   CancelCircleIcon,
   KeyboardIcon,
   Refresh01Icon,
@@ -43,11 +32,19 @@ export function ShortcutsSection() {
     binding: KeyBinding;
     with: Shortcut;
   } | null>(null);
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [finding, setFinding] = useState(false);
+  const [found, setFound] = useState<{
+    binding: KeyBinding;
+    matches: Shortcut[];
+  } | null>(null);
+
+  const setFindingActive = (v: boolean) => {
+    setFinding(v);
+    if (!v) setFound(null);
+  };
 
   const startRecording = (id: ShortcutId) => {
-    setFinding(false);
+    setFindingActive(false);
     setRecordingId(id);
     setRecordingConflict(null);
   };
@@ -60,7 +57,10 @@ export function ShortcutsSection() {
   const filteredShortcuts = useMemo(() => {
     // Filter out internal/non-overridable shortcuts (JSON-only).
     const HIDDEN_IDS = new Set(["tab.selectByIndex"]);
-    const base = SHORTCUTS.filter((s) => !HIDDEN_IDS.has(s.id));
+    const hits = found && new Set(found.matches.map((m) => m.id));
+    const base = SHORTCUTS.filter(
+      (s) => !HIDDEN_IDS.has(s.id) && (!hits || hits.has(s.id)),
+    );
     if (!search) return base;
     const lower = search.toLowerCase();
     return base.filter(
@@ -68,7 +68,7 @@ export function ShortcutsSection() {
         s.label.toLowerCase().includes(lower) ||
         s.group.toLowerCase().includes(lower),
     );
-  }, [search]);
+  }, [search, found]);
 
   const onRecord = (id: ShortcutId, binding: KeyBinding) => {
     const next = { ...userShortcuts, [id]: [binding] };
@@ -87,29 +87,11 @@ export function ShortcutsSection() {
     void setShortcuts(next);
   };
 
-  const onResetAll = () => {
-    void setShortcuts({});
-    setResetDialogOpen(false);
-  };
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-4 bg-background px-1 pt-2 pb-3">
+      <div className="sticky top-0 z-10 -mt-2 -mx-1 flex flex-col gap-4 bg-background px-1 pt-2 pb-3">
         <div className="flex items-center justify-between">
           <SectionHeader title="Shortcuts" />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 px-2.5 text-[11px]"
-            onClick={() => setResetDialogOpen(true)}
-          >
-            <HugeiconsIcon
-              icon={ArrowTurnBackwardIcon}
-              size={12}
-              strokeWidth={2}
-            />
-            Reset All
-          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -129,12 +111,20 @@ export function ShortcutsSection() {
           </div>
           <KeyFinder
             active={finding}
+            found={found}
             disabled={recordingId !== null}
             userShortcuts={userShortcuts}
-            onActiveChange={setFinding}
+            onActiveChange={setFindingActive}
+            onFound={setFound}
           />
         </div>
       </div>
+
+      {found && filteredShortcuts.length === 0 && (
+        <p className="text-[12px] text-muted-foreground italic">
+          No shortcut uses these keys.
+        </p>
+      )}
 
       <div className="flex flex-col gap-8">
         {SHORTCUT_GROUPS.map((group) => {
@@ -168,27 +158,6 @@ export function ShortcutsSection() {
           );
         })}
       </div>
-
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset all shortcuts?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will revert all your custom keyboard shortcuts to their
-              factory defaults. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onResetAll}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Reset All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -220,14 +189,18 @@ function ShortcutRow({
 }) {
   const bindings =
     userBindings !== undefined ? userBindings : shortcut.defaultBindings;
-  const isModified = userBindings !== undefined;
+  const isModified =
+    userBindings !== undefined &&
+    !(
+      userBindings.length === shortcut.defaultBindings.length &&
+      userBindings.every((b, i) =>
+        bindingsEqual(b, shortcut.defaultBindings[i]),
+      )
+    );
   const hasBindings = bindings && bindings.length > 0;
 
   return (
-    <div
-      data-shortcut-id={shortcut.id}
-      className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30"
-    >
+    <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
       <div className="flex flex-col gap-0.5">
         <span className="text-[12.5px] font-medium">{shortcut.label}</span>
       </div>
@@ -269,7 +242,7 @@ function ShortcutRow({
             </button>
 
             <div className="flex items-center gap-1">
-              {!hasBindings && isModified ? (
+              {isModified ? (
                 <ActionButton onClick={onReset} title="Reset to default">
                   <HugeiconsIcon icon={Refresh01Icon} size={11} />
                 </ActionButton>
@@ -428,20 +401,19 @@ function Recorder({
 
 function KeyFinder({
   active,
+  found,
   disabled,
   userShortcuts,
   onActiveChange,
+  onFound,
 }: {
   active: boolean;
+  found: { binding: KeyBinding } | null;
   disabled: boolean;
   userShortcuts: Record<ShortcutId, KeyBinding[]>;
   onActiveChange: (v: boolean) => void;
+  onFound: (f: { binding: KeyBinding; matches: Shortcut[] }) => void;
 }) {
-  const [hit, setHit] = useState<{
-    binding: KeyBinding;
-    matches: Shortcut[];
-  } | null>(null);
-
   useEffect(() => {
     if (!active) return;
     const onDown = (e: KeyboardEvent) => {
@@ -452,7 +424,7 @@ function KeyFinder({
         onActiveChange(false);
         return;
       }
-      setHit({
+      onFound({
         binding: bindingFromEvent(e),
         matches: shortcutsForEvent(e, userShortcuts),
       });
@@ -460,57 +432,36 @@ function KeyFinder({
     window.addEventListener("keydown", onDown, { capture: true });
     return () =>
       window.removeEventListener("keydown", onDown, { capture: true });
-  }, [active, userShortcuts, onActiveChange]);
+  }, [active, userShortcuts, onActiveChange, onFound]);
 
-  const reveal = (id: ShortcutId) =>
-    document
-      .querySelector(`[data-shortcut-id="${id}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "smooth" });
-
-  return (
-    <div className="flex items-center gap-2">
-      {hit && (
-        <div className="flex max-w-[260px] flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[11px]">
+  if (active) {
+    return (
+      <div className="flex h-9 shrink-0 items-center gap-2 rounded bg-accent/50 px-2 py-1 text-[11px] ring-1 ring-accent">
+        {found ? (
           <KbdGroup>
-            {getBindingTokens(hit.binding).map((t, i) => (
+            {getBindingTokens(found.binding).map((t, i) => (
               <Kbd key={i}>{t}</Kbd>
             ))}
           </KbdGroup>
-          {hit.matches.length === 0 ? (
-            <span className="text-muted-foreground italic">Unassigned</span>
-          ) : (
-            hit.matches.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                title="Show in list"
-                onClick={() => reveal(m.id)}
-                className="font-medium underline-offset-2 hover:underline"
-              >
-                {m.group}: {m.label}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-      <Button
-        variant={active ? "secondary" : "outline"}
-        size="sm"
-        disabled={disabled}
-        title="Press a key combination to see which shortcut it triggers"
-        className="h-9 shrink-0 gap-1.5 px-2.5 text-[11px]"
-        onClick={() => {
-          setHit(null);
-          onActiveChange(!active);
-        }}
-      >
-        <HugeiconsIcon icon={KeyboardIcon} size={13} strokeWidth={2} />
-        {active ? (
-          <span className="animate-pulse">Press keys... (Esc)</span>
         ) : (
-          "Find by keys"
+          <span className="animate-pulse font-medium">Press keys...</span>
         )}
-      </Button>
-    </div>
+        <span className="text-muted-foreground">(Esc to cancel)</span>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      title="Press a key combination to see which shortcut it triggers"
+      className="h-9 shrink-0 gap-1.5 px-2.5 text-[11px]"
+      onClick={() => onActiveChange(true)}
+    >
+      <HugeiconsIcon icon={KeyboardIcon} size={13} strokeWidth={2} />
+      Find by keys
+    </Button>
   );
 }
