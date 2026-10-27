@@ -293,6 +293,11 @@ function ShortcutRow({
       <div className="flex items-center gap-2">
         {isDigitWildcard(shortcut.id) ? (
           <>
+            {isModified && (
+              <span className="text-[10px] font-medium text-muted-foreground">
+                Custom
+              </span>
+            )}
             <WildcardPicker
               shortcut={shortcut}
               binding={hasBindings ? bindings[0] : undefined}
