@@ -142,6 +142,13 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:cwd", "tab:title"]);
   });
 
+  it("does not let learning pick which tabs fit under the cap", () => {
+    const tabs = Array.from({ length: 60 }, (_, i) => tab(`t${i}`, { title: `term ${i}`, lastUsedAt: 100 - i }));
+    const learned: LearnedMap = { term: { "tab:t59": 500 } };
+    const rows = mergeRows(input({ term: "term", tabs, learned }));
+    expect(keys(rows)).toEqual(keys(mergeRows(input({ term: "term", tabs }))));
+  });
+
   it("includes workspaces", () => {
     const rows = mergeRows(
       input({ term: "back", workspaces: [ws("w1", "Backlog")] }),

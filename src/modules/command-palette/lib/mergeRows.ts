@@ -303,7 +303,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         highlight: r.highlight,
         current: entry.tabId === activeTabId ? true : undefined,
       },
-      points: r.points + learnedBoost(learned, q, key),
+      points: r.points,
       recency: entry,
     });
   }

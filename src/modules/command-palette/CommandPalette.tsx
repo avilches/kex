@@ -585,7 +585,6 @@ export function CommandPalette({
       if (!tabItemKeepsPalette(id)) closeRowMenu();
       const tabId = entry.tabId;
       if (id === "go") {
-        recordChoice(parsed.term, tabRowKey(entry.tabId));
         runAfterClose(() => onSelectTab(entry));
       } else if (id === "terminal") {
         const target = terminalTargetOf(`tab:${entry.tabId}`, merged);
@@ -645,7 +644,6 @@ export function CommandPalette({
     },
     [
       closeRowMenu,
-      parsed.term,
       runAfterClose,
       onSelectTab,
       merged,
@@ -662,6 +660,7 @@ export function CommandPalette({
       onGoToTab,
       onRevealInExplorer,
       activeWorkspaceId,
+      activeTabId,
       enterWorkspaces,
     ],
   );
@@ -1087,7 +1086,6 @@ export function CommandPalette({
                   userShortcuts={userShortcuts}
                   onRunCommand={runCommand}
                   onRunTab={(entry) => {
-                    recordChoice(parsed.term, tabRowKey(entry.tabId));
                     runAfterClose(() => onSelectTab(entry));
                   }}
                   onRunWorkspace={(entry) => {
