@@ -5,7 +5,9 @@ import {
   awakeTerminalTabs,
   blockedWhileHibernated,
   commandBlockedWhileHibernated,
+  departedHibernatedIds,
   editorTabIds,
+  hibernatedTabIds,
   isHibernatedTab,
   isPendingStale,
   liveTerminalIds,
@@ -58,6 +60,28 @@ const ws = (over: Partial<Workspace> = {}): Workspace => ({
 const snap = (over: Partial<TabHibernation> = {}): TabHibernation => ({ at: 1000, agent: "claude", command: "claude --resume abc", ...over });
 const paneTabs = (w: Workspace, which: "first" | "second" = "first") =>
   ((w.paneTree as Extract<SplitNode, { kind: "split" }>)[which] as Extract<SplitNode, { kind: "pane" }>).tabs;
+
+describe("hibernatedTabIds and departedHibernatedIds", () => {
+  const sleeping = (...ids: string[]) =>
+    applyHibernate([ws()], "w1", Object.fromEntries(ids.map((id) => [id, snap()])));
+
+  it("lists only the terminals that sleep, across workspaces", () => {
+    const other = applyHibernate([ws({ id: "w2" })], "w2", { t2: snap() })[0]!;
+    expect(hibernatedTabIds([...sleeping("t1"), other])).toEqual(new Set(["t1", "t2"]));
+    expect(hibernatedTabIds([ws()])).toEqual(new Set());
+  });
+
+  it("reports a tab that woke, and one that is gone with its workspace", () => {
+    const before = hibernatedTabIds(sleeping("t1", "t2"));
+    expect(departedHibernatedIds(before, hibernatedTabIds(applyWake(sleeping("t1", "t2"), "w1", new Set(["t1"]))))).toEqual(["t1"]);
+    expect(departedHibernatedIds(before, new Set())).toEqual(["t1", "t2"]);
+  });
+
+  it("reports nothing when a tab only starts to sleep or stays asleep", () => {
+    expect(departedHibernatedIds(new Set(), new Set(["t1"]))).toEqual([]);
+    expect(departedHibernatedIds(new Set(["t1"]), new Set(["t1"]))).toEqual([]);
+  });
+});
 
 describe("applyHibernate", () => {
   it("puts the snapshot on the terminal tabs it belongs to and on no other", () => {

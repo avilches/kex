@@ -346,6 +346,21 @@ export function leafCwd(leafId: string): string | null {
   return sessions.get(leafId)?.lastCwd ?? null;
 }
 
+// The screen of the leaf with its colours, for the placeholder of a hibernating tab. Null when
+// there is nothing worth keeping: no session, or an app such as vim on the alternate screen.
+export function leafAnsiTail(leafId: string, scrollback: number): string | null {
+  const s = sessions.get(leafId);
+  if (!s) return null;
+  const slot = getSlotForLeaf(leafId);
+  if (!slot) return s.altScreenAtRelease ? null : s.snapshot;
+  if (slot.term.buffer.active.type === "alternate") return null;
+  try {
+    return slot.serializeAddon.serialize({ scrollback });
+  } catch {
+    return null;
+  }
+}
+
 export function getLeafBlockMode(leafId: string): BlockMode {
   return sessions.get(leafId)?.blockMode ?? "prompt";
 }

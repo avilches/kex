@@ -2,7 +2,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { awakeTerminalTabs, restoreCommandFor } from "./hibernate";
+import { HIBERNATE_LINES_MAX, prepareHibernateLines } from "./hibernateLines";
+import { saveHibernateLines } from "./hibernateLinesIo";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
@@ -108,9 +111,28 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   return { request, requestAuto, perform };
 }
 
-async function snapshotTerminalTabs(tabs: TerminalTab[]): Promise<Record<string, TabHibernation>> {
+export type ReadLeafAnsi = (tabId: string, scrollback: number) => string | null;
+
+// A failure here must not stop the tab from sleeping: the placeholder just shows no lines.
+async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<void> {
+  if (!usePreferencesStore.getState().hibernateSaveLines) return;
+  await Promise.all(
+    tabs.map(async (tab) => {
+      try {
+        const raw = readAnsi(tab.id, HIBERNATE_LINES_MAX);
+        const text = raw ? prepareHibernateLines(raw) : "";
+        if (text) await saveHibernateLines(tab.id, text);
+      } catch (e) {
+        console.warn("[kex] could not keep the last lines of", tab.id, e);
+      }
+    }),
+  );
+}
+
+async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<Record<string, TabHibernation>> {
   await flushAgentTitles();
   await flushSidebarSnapshots();
+  await keepLastLines(tabs, readAnsi);
   const sessions = useAgentStore.getState().sessions;
   const at = Date.now();
   const entries = await Promise.all(
@@ -127,6 +149,7 @@ type HookDeps = {
   workspacesRef: { current: Workspace[] };
   activeWorkspaceIdRef: { current: string | null };
   hibernateWorkspace: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
+  readLeafAnsi: ReadLeafAnsi;
 };
 
 export function useHibernateFlow(deps: HookDeps) {
@@ -149,7 +172,7 @@ export function useHibernateFlow(deps: HookDeps) {
           };
         },
         finishAgent: (id) => useAgentStore.getState().finish(id),
-        snapshotTabs: snapshotTerminalTabs,
+        snapshotTabs: (tabs) => snapshotTerminalTabs(tabs, depsRef.current.readLeafAnsi),
         hibernate: (id, snapshots) => depsRef.current.hibernateWorkspace(id, snapshots),
         setPending,
       }),

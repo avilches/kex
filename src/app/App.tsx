@@ -21,6 +21,7 @@ import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
+import { useHibernateLinesCleanup } from "@/modules/workspaces/lib/useHibernateLinesCleanup";
 import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
@@ -127,6 +128,7 @@ import {
   writeToSession,
 } from "@/modules/terminal";
 import { configureTerminalLinkBridge } from "@/modules/terminal/lib/terminalLinkBridge";
+import { leafAnsiTail } from "@/modules/terminal/lib/useTerminalSession";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -2062,7 +2064,9 @@ export default function App() {
     workspacesRef,
     activeWorkspaceIdRef,
     hibernateWorkspace,
+    readLeafAnsi: leafAnsiTail,
   });
+  useHibernateLinesCleanup(workspaces);
   const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;
   useAutoHibernate({ workspacesRef, activeWorkspaceIdRef, requestAutoHibernate });
   const pendingHibernateRef = useRef(hibernateFlow.pending);

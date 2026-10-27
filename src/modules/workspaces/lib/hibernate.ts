@@ -74,6 +74,18 @@ export function formatHibernatedFor(ms: number): string {
   return unit(Math.floor(hours / 24), "d", hours % 24, "h");
 }
 
+export function hibernatedTabIds(workspaces: readonly Workspace[]): Set<string> {
+  const ids = new Set<string>();
+  for (const ws of workspaces) for (const t of terminalTabs(ws)) if (t.hibernation) ids.add(t.id);
+  return ids;
+}
+
+// Tabs that slept before and do not now: woken, closed, or gone with their workspace. Whatever was
+// stored for them has no use left.
+export function departedHibernatedIds(before: ReadonlySet<string>, after: ReadonlySet<string>): string[] {
+  return [...before].filter((id) => !after.has(id));
+}
+
 // The terminals that can still be put to sleep.
 export function awakeTerminalTabs(ws: Workspace): TerminalTab[] {
   return terminalTabs(ws).filter((t) => !t.hibernation);
