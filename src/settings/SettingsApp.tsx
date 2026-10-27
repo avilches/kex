@@ -3,6 +3,7 @@ import { WindowControls } from "@/components/WindowControls";
 import { cn } from "@/lib/utils";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -101,7 +102,18 @@ export function SettingsApp() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.defaultPrevented) return;
+      // macOS gets Cmd+W from the native menu (close_tab, routed in Rust); the
+      // other platforms have no menu, so the same registry shortcut closes here.
+      if (
+        !IS_MAC &&
+        matchesShortcut(e, "tab.close", usePreferencesStore.getState().shortcuts)
+      ) {
+        e.preventDefault();
+        void getCurrentWebviewWindow().close();
+        return;
+      }
+      if (e.key !== "Escape") return;
       // Let an open dialog/popover consume Escape first (Radix closes it), and
       // never close the window out from under a field being edited.
       if (

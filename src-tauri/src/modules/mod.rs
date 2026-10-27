@@ -5,6 +5,7 @@ pub mod float_browser;
 pub mod fs;
 pub mod git;
 pub mod history;
+pub mod menu_route;
 pub mod proc;
 pub mod pty;
 pub mod shell;
