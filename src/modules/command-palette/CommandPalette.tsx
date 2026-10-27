@@ -421,7 +421,18 @@ export function CommandPalette({
   }, []);
   // The row to select once the tab being closed is gone. Set before closing, applied only when the
   // tab really disappears from the list, dropped when the close was cancelled or refused.
-  const pendingClose = useRef<{ key: string; next: string | null } | null>(null);
+  const pendingClose = useRef<{
+    key: string;
+    next: string | null;
+    scrollTop: number;
+  } | null>(null);
+  const listViewport = useCallback(
+    () =>
+      listRef.current?.querySelector<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]',
+      ) ?? null,
+    [],
+  );
   const mergedRef = useRef(merged);
   mergedRef.current = merged;
   const typingRef = useRef(false);
@@ -436,24 +447,40 @@ export function CommandPalette({
           displayOrder(mergedRef.current, typingRef.current, COMMAND_GROUPS),
           key,
         ),
+        scrollTop: listViewport()?.scrollTop ?? 0,
       };
       pendingClose.current = pending;
-      void Promise.resolve(onCloseTab(entry)).then(() => {
-        refocusInput();
-        window.setTimeout(() => {
-          if (pendingClose.current === pending) pendingClose.current = null;
-        }, 300);
-      });
+      void Promise.resolve()
+        .then(() => onCloseTab(entry))
+        .catch((e) => console.error("Closing the tab failed", e))
+        .finally(() => {
+          refocusInput();
+          window.setTimeout(() => {
+            if (pendingClose.current === pending) pendingClose.current = null;
+          }, 300);
+        });
     },
-    [onCloseTab, refocusInput],
+    [onCloseTab, refocusInput, listViewport],
   );
   useEffect(() => {
     const pending = pendingClose.current;
     if (!pending || merged.some((r) => r.key === pending.key)) return;
     pendingClose.current = null;
     const next = pending.next;
-    setValue(next && merged.some((r) => r.key === next) ? next : (merged[0]?.key ?? ""));
-  }, [merged]);
+    const target =
+      next && merged.some((r) => r.key === next) ? next : (merged[0]?.key ?? "");
+    // cmdk reselects the first row when the selected item unmounts, after this effect, and scrolls
+    // to it: the frame after, put the successor back and the scroll where it was.
+    const restore = () => {
+      const viewport = listViewport();
+      if (viewport) viewport.scrollTop = pending.scrollTop;
+    };
+    setValue(target);
+    window.requestAnimationFrame(() => {
+      setValue(target);
+      restore();
+    });
+  }, [merged, listViewport]);
   const runTabAction = useCallback(
     (id: RowMenuItemId, entry: TabEntry) => {
       closeRowMenu();
