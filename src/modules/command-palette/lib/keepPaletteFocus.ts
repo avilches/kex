@@ -8,3 +8,8 @@ export function keepPaletteFocus(event: Event): void {
   event.preventDefault();
   input.focus();
 }
+
+// A confirmation dialog opened over the palette owns the keyboard and the focus until it closes.
+export function alertDialogOpen(): boolean {
+  return document.querySelector('[role="alertdialog"][data-state="open"]') !== null;
+}
