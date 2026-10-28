@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerTabNoteFlush, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
-import { runPaletteTabItem } from "./lib/paletteControl";
+import { runPaletteShortcut, runPaletteTabItem } from "./lib/paletteControl";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import type { PaletteItem } from "./types";
 import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
@@ -30,7 +30,7 @@ vi.mock("@/modules/explorer/lib/iconResolver", () => ({
   fileIconUrl: () => "",
 }));
 vi.mock("@/modules/workspaces/WorkspaceMark", () => ({
-  WorkspaceMark: () => null,
+  WorkspaceMark: ({ id }: { id: string }) => <i data-ws-mark={id} />,
 }));
 const writeClipboardText = vi.fn().mockResolvedValue(true);
 vi.mock("@/lib/clipboard", () => ({ writeClipboardText: (t: string) => writeClipboardText(t) }));
@@ -92,6 +92,7 @@ type Calls = {
 let calls: Calls;
 let initial: TabEntry[];
 let commands: PaletteItem[] = [];
+let workspaces: WorkspaceEntry[];
 let hibernateImpl: (id: string) => unknown;
 
 function Harness() {
@@ -113,7 +114,7 @@ function Harness() {
       activeTabId="cur"
       activeWorkspaceId="ws"
       tabEntries={tabs}
-      workspaceEntries={[wsEntry("ws", 0), wsEntry("other", 1)]}
+      workspaceEntries={workspaces}
       closedEntries={[]}
       onSelectTab={() => {}}
       onSelectWorkspace={() => {}}
@@ -186,6 +187,7 @@ async function openOn(target: string) {
 beforeEach(() => {
   calls = { update: [], save: [], hibernate: [], goTo: [], move: [], openChange: [] };
   commands = [];
+  workspaces = [wsEntry("ws", 0), wsEntry("other", 1), wsEntry("third", 2)];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
   hibernateImpl = () => Promise.resolve();
   useTabNoteStore.setState({ focusTabId: null });
@@ -393,50 +395,195 @@ describe("Copy Absolute Path from the palette", () => {
   });
 });
 
-describe("Move to Workspace from the palette", () => {
-  it("moves the highlighted tab, not the active one, to the picked workspace", async () => {
+const paletteRows = () => rowIds().join("|");
+const input = () => document.querySelector<HTMLInputElement>("[cmdk-input]") as HTMLInputElement;
+const shortcutDigit = (digit: number) =>
+  act(async () => {
+    runPaletteShortcut("menuAction", digit);
+  });
+const pressEscape = () =>
+  act(async () => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  });
+async function openMoveMenu() {
+  await openOn("tab:c");
+  await key("Tab");
+  await wait(20);
+  fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
+  await wait(30);
+}
+
+describe("Move to Workspace from the row menu", () => {
+  it("turns the menu into the destinations and leaves the palette list and input alone", async () => {
     await openOn("tab:c");
+    const rows = paletteRows();
     await key("Tab");
     await wait(20);
     fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
     await wait(30);
-    expect(document.body.textContent).toContain("Move tab to workspace");
-    const target = document.querySelector('[cmdk-item][data-value="move-workspace:other"]');
-    expect(target).not.toBeNull();
-    expect(document.querySelector('[cmdk-item][data-value="move-workspace:ws"]')).toBeNull();
-    fireEvent.click(target as Element);
+    expect(menuLabels().map((l) => l.replace(/Ctrl.*$/, ""))).toEqual(["Back", "New workspace", "other", "third"]);
+    expect(document.querySelector('[role="menuitem"] [data-ws-mark="other"]')).not.toBeNull();
+    expect(document.querySelector('[role="menuitem"] [data-ws-mark="ws"]')).toBeNull();
+    expect(paletteRows()).toBe(rows);
+    expect(selected()).toBe("tab:c");
+    expect(input().placeholder).not.toContain("workspaces");
+    expect(document.body.textContent).not.toContain("Move tab to workspace");
+  });
+
+  it("shows the digit on each destination and none on Back or New workspace", async () => {
+    await openMoveMenu();
+    expect(menuItem("other")?.textContent).toMatch(/1$/);
+    expect(menuItem("third")?.textContent).toMatch(/2$/);
+    expect(menuItem("New workspace")?.textContent).not.toMatch(/\d$/);
+  });
+
+  it("opens with Enter and moves the row's tab with Enter on the active destination", async () => {
+    await openOn("tab:c");
+    await key("Tab");
+    await wait(20);
+    for (let i = 0; i < 20 && !(document.querySelector("[data-active]")?.textContent ?? "").startsWith("Move to Workspace"); i++) {
+      await key("ArrowDown");
+      await wait(5);
+    }
+    await key("Enter");
+    await wait(20);
+    expect(menuLabels()[0]).toBe("Back");
+    await key("ArrowDown");
+    await key("ArrowDown");
+    await key("Enter");
     await wait(30);
     expect(calls.move).toEqual([[{ tabId: "c", workspaceId: "ws" }, "other"]]);
     expect(calls.openChange).toContain(false);
   });
 
-  it("goes back to the row it started from", async () => {
+  it("moves the clicked row's tab, not the active one, to the picked workspace", async () => {
+    await openMoveMenu();
+    fireEvent.click(menuItem("other") as HTMLElement);
+    await wait(30);
+    expect(calls.move).toEqual([[{ tabId: "c", workspaceId: "ws" }, "other"]]);
+    expect(calls.openChange).toContain(false);
+  });
+
+  it("New workspace moves the tab to a new one", async () => {
+    await openMoveMenu();
+    fireEvent.click(menuItem("New workspace") as HTMLElement);
+    await wait(30);
+    expect(calls.move).toEqual([[{ tabId: "c", workspaceId: "ws" }, "new"]]);
+  });
+
+  it("Cmd+2 moves the tab to the second destination", async () => {
+    await openMoveMenu();
+    await shortcutDigit(2);
+    await wait(30);
+    expect(calls.move).toEqual([[{ tabId: "c", workspaceId: "ws" }, "third"]]);
+  });
+
+  it("Cmd+digit does nothing with no menu open or for a digit with no destination", async () => {
     await openOn("tab:c");
+    await shortcutDigit(1);
+    await wait(20);
+    expect(calls.move).toEqual([]);
+    await key("Tab");
+    await wait(20);
+    await shortcutDigit(1);
+    await wait(20);
+    expect(calls.move).toEqual([]);
+    fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
+    await wait(20);
+    await shortcutDigit(9);
+    await wait(20);
+    expect(calls.move).toEqual([]);
+    expect(menuLabels()[0]).toBe("Back");
+  });
+
+  it("Back and Escape return to the row menu without closing the menu or the palette", async () => {
+    await openMoveMenu();
+    fireEvent.click(menuItem("Back") as HTMLElement);
+    await wait(20);
+    expect(menuLabels()).toContain("Move to Workspace");
+    expect(document.querySelector("[data-active]")?.textContent).toMatch(/^Move to Workspace/);
+    fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
+    await wait(20);
+    await pressEscape();
+    await wait(20);
+    expect(menuLabels()).toContain("Move to Workspace");
+    expect(selected()).toBe("tab:c");
+    expect(calls.openChange).toEqual([]);
+    await pressEscape();
+    await wait(20);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(calls.openChange).toEqual([]);
+  });
+
+  it("keeps the typed text in the input", async () => {
+    render(<Harness />);
+    await wait(50);
+    act(() => {
+      fireEvent.change(input(), { target: { value: "c" } });
+    });
+    await wait(50);
+    expect(rowIds()).toContain("tab:c");
     await key("Tab");
     await wait(20);
     fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
-    await wait(30);
-    fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
-    await wait(50);
-    expect(selected()).toBe("tab:c");
+    await wait(20);
+    expect(input().value).toBe("c");
+    expect(menuLabels()[0]).toBe("Back");
+  });
+
+  it("gives a digit to the first nine destinations only and scrolls the active one into view", async () => {
+    workspaces = [wsEntry("ws", 0), ...Array.from({ length: 11 }, (_, i) => wsEntry(`w-${String.fromCharCode(97 + i)}`, i + 1))];
+    await openMoveMenu();
+    expect(menuItem("w-i")?.textContent).toMatch(/9$/);
+    expect(menuItem("w-j")?.textContent).not.toMatch(/\d$/);
+    const scrolled = vi.fn();
+    for (const el of document.querySelectorAll<HTMLElement>('[role="menuitem"]')) {
+      el.scrollIntoView = scrolled;
+    }
+    for (let i = 0; i < 4; i++) await key("ArrowDown");
+    await wait(10);
+    expect(scrolled).toHaveBeenCalled();
   });
 });
 
-describe("Back from the Move tab to workspace command", () => {
-  it("returns to the first row, which is the active tab", async () => {
-    commands = [{ id: "tab.moveToWorkspace", title: "Move tab to workspace...", group: "Tabs", run: () => {} }];
+describe("the Move tab to workspace command", () => {
+  const cmd: PaletteItem = {
+    id: "tab.moveToWorkspace",
+    title: "Move tab to workspace...",
+    group: "Tabs",
+    run: () => {},
+  };
+
+  it("opens the same menu on the active tab's row without leaving the root page", async () => {
+    commands = [cmd];
     render(<Harness />);
     await wait(50);
-    const opened = selected();
-    const row = document.querySelector('[cmdk-item][data-value^="cmd:"]');
-    expect(row).not.toBeNull();
-    fireEvent.click(row as Element);
-    await wait(30);
-    expect(document.body.textContent).toContain("Move tab to workspace");
-    fireEvent.click(document.querySelector('[cmdk-item][data-value="move-workspace:back"]') as Element);
+    const rows = paletteRows();
+    fireEvent.click(document.querySelector('[cmdk-item][data-value^="cmd:"]') as Element);
     await wait(50);
-    expect(opened).toBe("tab:cur");
-    expect(selected()).toBe(opened);
+    expect(menuLabels()[0]).toBe("Back");
+    expect(selected()).toBe("tab:cur");
+    expect(paletteRows()).toBe(rows);
+    fireEvent.click(menuItem("other") as HTMLElement);
+    await wait(30);
+    expect(calls.move).toEqual([[{ tabId: "cur", workspaceId: "ws" }, "other"]]);
+  });
+
+  it("clears the typed text so the Current tab row is there to hang the menu from", async () => {
+    commands = [cmd];
+    render(<Harness />);
+    await wait(50);
+    act(() => {
+      fireEvent.change(input(), { target: { value: "move" } });
+    });
+    await wait(50);
+    fireEvent.click(document.querySelector('[cmdk-item][data-value^="cmd:"]') as Element);
+    await wait(80);
+    expect(input().value).toBe("");
+    expect(menuLabels()[0]).toBe("Back");
+    await shortcutDigit(2);
+    await wait(30);
+    expect(calls.move).toEqual([[{ tabId: "cur", workspaceId: "ws" }, "third"]]);
   });
 });
 

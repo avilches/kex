@@ -131,3 +131,13 @@ La opacidad va en un contenedor interior que envuelve el contenido (no en la fil
 ### Leccion
 
 Atenuar una fila de cmdk nunca con opacidad en la raiz: arrastra el resaltado de seleccion y el foco visual.
+
+---
+
+## Decision 5: Move to Workspace es un nivel del menu de fila, no una subpagina
+
+El menu de fila guarda el menu que sustituye (`RowMenuState.parent`) y `useRowMenu` expone `enter` / `back`; Escape (listener en captura, antes que Radix) vuelve un nivel y solo cierra el menu desde la raiz. Los digitos de los destinos usan `palette.menuAction`, que la paleta de comandos no dejaba pasar: `paletteGate` lo permite ahora y `registerPaletteControl` lo atiende (con menu abierto ejecuta el item cuyo `digit` coincide; sin menu o sin ese item consume la tecla sin efecto, asi `workspace.selectByIndex` nunca salta de workspace con la paleta abierta).
+
+El comando "Move tab to workspace..." mueve la tab activa: limpia la consulta (con texto la fila Current tab puede no estar en la lista) y abre el menu de esa fila ya en el nivel de destinos. Un `useEffect` sobre `pendingMove` espera a que la consulta este vacia y la fila exista en el DOM antes de anclar el menu; no se ancla en el mismo tick que `setQuery("")` porque la lista aun es la filtrada.
+
+Leccion: un atajo que el gate bloquea no llega nunca al `registerPaletteControl`; ampliar lo que un menu acepta empieza por `PALETTE_ALLOWED_SHORTCUTS` y su test que recorre el registry.

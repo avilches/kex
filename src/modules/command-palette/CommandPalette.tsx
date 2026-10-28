@@ -17,13 +17,11 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
-import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
 import {
-  Add01Icon,
   AlertCircleIcon,
   ArrowTurnBackwardIcon,
   CommandIcon,
@@ -62,6 +60,8 @@ import {
   highlightedClosedOf,
   highlightedTabOf,
   highlightedWorkspaceOf,
+  moveMenuItems,
+  type RowMenuItem,
   runnableTabItem,
   type RowMenuItemId,
   tabEntryCopyPath,
@@ -182,28 +182,24 @@ export function CommandPalette({
   const { contentStyle, handles } = usePaletteWidth();
   const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
   const [pickedValue, setValue] = useState("");
-  const [page, setPage] = useState<"root" | "themes" | "workspaces">("root");
+  const [pendingMove, setPendingMove] = useState<string | null>(null);
+  const [page, setPage] = useState<"root" | "themes">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
-  const [moveSubject, setMoveSubject] = useState<MoveSubject | null>(null);
-  const [moveFromRow, setMoveFromRow] = useState(false);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
   const inThemes = page === "themes";
-  const inWorkspaces = page === "workspaces";
-  const inSubpage = inThemes || inWorkspaces;
   const themeFilter = inThemes ? query.trim() : "";
-  const workspaceFilter = inWorkspaces ? query.trim() : "";
 
   const content = useContentSearch(
     workspaceRoot,
     parsed.term,
-    open && !inSubpage && parsed.mode === "content",
+    open && !inThemes && parsed.mode === "content",
   );
   const history = useCommandHistory(
     parsed.term,
-    open && !inSubpage && parsed.mode === "history",
+    open && !inThemes && parsed.mode === "history",
   );
 
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
@@ -247,7 +243,7 @@ export function CommandPalette({
   // which it does not do again when a page is left with an empty value.
   const value =
     pickedValue ||
-    (open && inCommands && !inSubpage
+    (open && inCommands && !inThemes
       ? initialKey(merged, parsed.term.length > 0, COMMAND_GROUPS)
       : "");
   // The parent closes the palette without going through handleOpenChange (a tab clicked behind it,
@@ -304,20 +300,6 @@ export function CommandPalette({
       .map((x) => x.t);
   }, [inThemes, themeFilter, customThemes]);
 
-  const workspaceTargets = useMemo(() => {
-    if (!inWorkspaces) return [];
-    const others = workspaceEntries.filter(
-      (e) => e.workspaceId !== (moveSubject?.workspaceId ?? activeWorkspaceId),
-    );
-    const q = workspaceFilter.toLowerCase();
-    if (!q) return others;
-    return others
-      .map((e) => ({ e, s: fuzzyBest(q, [e.title]) }))
-      .filter((x) => x.s !== null)
-      .sort((a, b) => (b.s ?? 0) - (a.s ?? 0))
-      .map((x) => x.e);
-  }, [inWorkspaces, workspaceFilter, workspaceEntries, activeWorkspaceId, moveSubject]);
-
   // The frame that puts the selection back after a close; anything that moves the selection
   // or resets the palette in the meantime cancels it so it never steals the selection.
   const settleFrame = useRef<number | null>(null);
@@ -338,7 +320,6 @@ export function CommandPalette({
     setQuery("");
     setValue("");
     setPage("root");
-    setMoveSubject(null);
     previewThemeId(null);
   }, [previewThemeId, parsed.mode, query, value, cancelSettle]);
 
@@ -425,39 +406,23 @@ export function CommandPalette({
     setValue("");
   }, [previewThemeId]);
 
-  const enterWorkspaces = useCallback((subject: MoveSubject | null, fromRow = false) => {
-    setMoveSubject(subject);
-    setMoveFromRow(fromRow);
-    setPage("workspaces");
-    setQuery("");
-    setValue("");
-  }, []);
-
-  // Back to the row whose menu started the move; the command has no row to go back to.
-  const exitWorkspaces = useCallback(() => {
-    setPage("root");
-    setQuery("");
-    setValue(moveSubject && moveFromRow ? tabRowKey(moveSubject.tabId) : "");
-    setMoveSubject(null);
-  }, [moveSubject, moveFromRow]);
-
   const runCommand = useCallback(
     (item: PaletteItem) => {
       const choice = commandChoice(item);
       if (choice.action === "none") return;
       if (choice.learn) recordChoice(parsed.term, commandRowKey(item.id));
       if (choice.action === "themes") return enterThemes();
-      if (choice.action === "workspaces") {
-        return enterWorkspaces(
-          activeTabId ? { tabId: activeTabId, workspaceId: activeWorkspaceId } : null,
-        );
+      if (choice.action === "moveMenu") {
+        if (!activeTabId) return;
+        setQuery("");
+        return setPendingMove(activeTabId);
       }
       if (choice.action === "content") return setQuery("#");
       if (choice.action === "history") return setQuery(">");
       recordUse(item.id);
       runAfterClose(item.run);
     },
-    [enterThemes, enterWorkspaces, runAfterClose, parsed.term, activeTabId, activeWorkspaceId],
+    [enterThemes, runAfterClose, parsed.term, activeTabId],
   );
 
   const openContent = useCallback(
@@ -478,7 +443,7 @@ export function CommandPalette({
     [insertCommand, runAfterClose],
   );
 
-  const { close: closeRowMenu, open: openRowMenu } = rowMenu;
+  const { close: closeRowMenu, open: openRowMenu, enter: enterMoveMenu, back: backMenu } = rowMenu;
   // The close-confirmation dialog returns the focus to the page when it unmounts, after the close
   // promise has settled, so the palette claims it again once that has happened.
   const refocusInput = useCallback(() => {
@@ -568,8 +533,13 @@ export function CommandPalette({
       restore();
     });
   }, [merged, listViewport, cancelSettle]);
+  const moveTo = useCallback(
+    (subject: MoveSubject, target: string | "new") =>
+      runAfterClose(() => onMoveTabToWorkspace(subject, target)),
+    [runAfterClose, onMoveTabToWorkspace],
+  );
   const runTabAction = useCallback(
-    (id: RowMenuItemId, entry: TabEntry) => {
+    (id: RowMenuItemId, entry: TabEntry, item?: RowMenuItem) => {
       if (!tabItemKeepsPalette(id, entry)) closeRowMenu();
       const tabId = entry.tabId;
       if (id === "go") {
@@ -614,7 +584,12 @@ export function CommandPalette({
           });
         }
       } else if (id === "moveWorkspace") {
-        enterWorkspaces({ tabId, workspaceId: entry.workspaceId }, true);
+        enterMoveMenu(moveMenuItems(workspaceEntries, entry.workspaceId), "moveWorkspace");
+      } else if (id === "back") {
+        backMenu();
+      } else if (id === "moveNew" || (id === "moveTarget" && item?.targetId)) {
+        const target = id === "moveNew" ? "new" : (item?.targetId as string);
+        moveTo({ tabId, workspaceId: entry.workspaceId }, target);
       }
     },
     [
@@ -630,7 +605,10 @@ export function CommandPalette({
       onHibernateTab,
       refocusInput,
       onGoToTab,
-      enterWorkspaces,
+      workspaceEntries,
+      enterMoveMenu,
+      backMenu,
+      moveTo,
     ],
   );
 
@@ -771,14 +749,26 @@ export function CommandPalette({
     if (menuTab) setMenuItems(tabMenuItems(menuTab, { autofocusMode }));
   }, [menuTab, autofocusMode, setMenuItems]);
 
-  const latestShortcut = useRef({ highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode });
-  latestShortcut.current = { highlightedTab, runTabAction, closeWorkspaceFromRow, autofocusMode };
+  const latestShortcut = useRef({
+    highlightedTab,
+    runTabAction,
+    closeWorkspaceFromRow,
+    autofocusMode,
+    menu: rowMenu.menu,
+  });
+  latestShortcut.current = {
+    highlightedTab,
+    runTabAction,
+    closeWorkspaceFromRow,
+    autofocusMode,
+    menu: rowMenu.menu,
+  };
   // The tab shortcuts (`paletteShortcuts.ts`) run their menu item on the highlighted tab, Cmd+Shift+W
   // closes its workspace; Cmd+T keeps opening the terminal beside it. A highlighted row that is not
   // a tab, or an item the menu does not offer there, takes the key without effect.
   useEffect(() => {
     if (!open) return;
-    return registerPaletteControl((action, _digit, item) => {
+    return registerPaletteControl((action, digit, item) => {
       if (action === "newTab") return false;
       // Between a close and the frame that restores the selection the highlighted row is cmdk's
       // own pick, not the user's: acting on it would hit the wrong tab.
@@ -788,7 +778,14 @@ export function CommandPalette({
         runTabAction: run,
         closeWorkspaceFromRow: closeWs,
         autofocusMode: mode,
+        menu,
       } = latestShortcut.current;
+      if (action === "menuAction") {
+        const target = menu?.items.find((i) => i.digit === digit);
+        const row = menu ? highlightedTabOf(menu.rowKey, mergedRef.current) : null;
+        if (target && row) run(target.id, row, target);
+        return true;
+      }
       if (action === "closeWorkspace") {
         const workspaceId = workspaceIdOfRow(valueRef.current, mergedRef.current);
         if (workspaceId) closeWs(workspaceId, valueRef.current);
@@ -813,11 +810,24 @@ export function CommandPalette({
     cancelSettle();
   }, [query, closeRowMenu, cancelSettle]);
 
-  const moveTo = useCallback(
-    (subject: MoveSubject, target: string | "new") =>
-      runAfterClose(() => onMoveTabToWorkspace(subject, target)),
-    [runAfterClose, onMoveTabToWorkspace],
-  );
+  // The "Move tab to workspace" command opens the menu of the active tab's row already turned into
+  // the destinations: it clears the query so that row (Current tab) is in the list.
+  useEffect(() => {
+    if (pendingMove === null || query !== "") return;
+    setPendingMove(null);
+    const entry = highlightedTabOf(`tab:${pendingMove}`, merged);
+    const box = boxRef.current;
+    if (!entry || !box) return;
+    const key = tabRowKey(entry.tabId);
+    const row = box.querySelector(`[cmdk-item][data-value="${CSS.escape(key)}"]`);
+    setValue(key);
+    openRowMenu(
+      key,
+      tabMenuItems(entry, { autofocusMode }),
+      row ? anchorOf(box, row as HTMLElement) : { rowTop: 0, rowBottom: 0 },
+    );
+    enterMoveMenu(moveMenuItems(workspaceEntries, entry.workspaceId));
+  }, [pendingMove, query, merged, openRowMenu, enterMoveMenu, workspaceEntries, autofocusMode]);
 
   const commitTheme = useCallback(
     (id: string) => {
@@ -830,17 +840,16 @@ export function CommandPalette({
   // Radix listens for Escape on document capture, before React handlers, so the
   // subpage has to intercept it earlier to go back instead of closing the palette.
   useEffect(() => {
-    if (!open || !inSubpage) return;
+    if (!open || !inThemes) return;
     const onEscape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      if (inThemes) exitThemes();
-      else exitWorkspaces();
+      exitThemes();
     };
     window.addEventListener("keydown", onEscape, true);
     return () => window.removeEventListener("keydown", onEscape, true);
-  }, [open, inSubpage, inThemes, exitThemes, exitWorkspaces]);
+  }, [open, inThemes, exitThemes]);
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -851,16 +860,16 @@ export function CommandPalette({
         const closed = highlightedClosedOf(key, merged);
         const action = highlightedActionOf(key, merged);
         const workspace = highlightedWorkspaceOf(key, merged);
-        const run = (item: { id: RowMenuItemId }) => {
+        const run = (item: RowMenuItem) => {
           if (workspace) runWorkspaceAction(item.id, workspace);
-          else if (entry) runTabAction(item.id, entry);
+          else if (entry) runTabAction(item.id, entry, item);
           else if (closed) runClosedAction(item.id, closed);
           else if (action) runActionRow(item.id, action);
         };
         if (rowMenu.handleKey(e, run)) return;
       }
       if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        if (inSubpage || !inCommands) return;
+        if (inThemes || !inCommands) return;
         e.preventDefault();
         const row = boxRef.current?.querySelector('[cmdk-item][aria-selected="true"]');
         if (highlightedTab) openTabMenu(highlightedTab, row);
@@ -869,22 +878,19 @@ export function CommandPalette({
         else if (highlightedWorkspace) openWorkspaceMenu(highlightedWorkspace, row);
         return;
       }
-      if (!inSubpage) return;
+      if (!inThemes) return;
       if (e.key === "Backspace" && query.length === 0) {
         e.preventDefault();
         e.stopPropagation();
-        if (inThemes) exitThemes();
-        else exitWorkspaces();
+        exitThemes();
       }
     },
     [
       cancelSettle,
-      inSubpage,
       inThemes,
       inCommands,
       query,
       exitThemes,
-      exitWorkspaces,
       rowMenu,
       merged,
       runTabAction,
@@ -904,15 +910,13 @@ export function CommandPalette({
 
   const placeholder = inThemes
     ? "Search themes..."
-    : inWorkspaces
-      ? "Search workspaces..."
-      : parsed.mode === "content"
-        ? "Find text in files..."
-        : parsed.mode === "history"
-          ? "Search command history..."
-          : actionsOnly
-            ? "Search actions..."
-            : "Type a command, tab or workspace, > history, # files, / actions";
+    : parsed.mode === "content"
+      ? "Find text in files..."
+      : parsed.mode === "history"
+        ? "Search command history..."
+        : actionsOnly
+          ? "Search actions..."
+          : "Type a command, tab or workspace, > history, # files, / actions";
 
   return (
     <CommandDialog
@@ -990,52 +994,6 @@ export function CommandPalette({
                   </CommandItem>
                 ))}
                 {themes.length === 0 ? <StatusItem label="No themes" /> : null}
-              </CommandGroup>
-            ) : inWorkspaces ? (
-              <CommandGroup heading="Move tab to workspace">
-                <CommandItem
-                  value="move-workspace:back"
-                  onSelect={exitWorkspaces}
-                  className="text-[12.5px]"
-                >
-                  <HugeiconsIcon
-                    icon={ArrowTurnBackwardIcon}
-                    size={14}
-                    strokeWidth={1.75}
-                  />
-                  <span>Back</span>
-                </CommandItem>
-                <CommandItem
-                  value="move-workspace:new"
-                  onSelect={() => moveSubject && moveTo(moveSubject, "new")}
-                  className="text-[12.5px]"
-                >
-                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                  <span>New workspace</span>
-                </CommandItem>
-                {workspaceTargets.map((entry) => (
-                  <CommandItem
-                    key={entry.workspaceId}
-                    value={`move-workspace:${entry.workspaceId}`}
-                    onSelect={() =>
-                      moveSubject && moveTo(moveSubject, entry.workspaceId)
-                    }
-                    className="text-[12.5px]"
-                  >
-                    <WorkspaceMark
-                      id={entry.workspaceId}
-                      color={entry.color}
-                      icon={entry.icon ?? undefined}
-                      size={14}
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      {entry.title}
-                    </span>
-                  </CommandItem>
-                ))}
-                {workspaceTargets.length === 0 ? (
-                  <StatusItem label="No other workspaces" />
-                ) : null}
               </CommandGroup>
             ) : parsed.mode === "commands" || actionsOnly ? (
               merged.length === 0 ? (
@@ -1175,14 +1133,14 @@ export function CommandPalette({
         {rowMenu.menu ? (
           <RowMenu
             menu={rowMenu.menu}
-            onRun={(id) => {
+            onRun={(id, item) => {
               const key = rowMenu.menu?.rowKey ?? "";
               const entry = highlightedTabOf(key, merged);
               const closed = highlightedClosedOf(key, merged);
               const action = highlightedActionOf(key, merged);
               const workspace = highlightedWorkspaceOf(key, merged);
               if (workspace) runWorkspaceAction(id, workspace);
-              else if (entry) runTabAction(id, entry);
+              else if (entry) runTabAction(id, entry, item);
               else if (closed) runClosedAction(id, closed);
               else if (action) runActionRow(id, action);
             }}
