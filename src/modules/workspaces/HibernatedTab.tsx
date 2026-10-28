@@ -8,7 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
 import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
-import { describeSessionPreview } from "./lib/sessionPreview";
+import { describeSessionPreview, tildePath } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
@@ -53,6 +53,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const preview = useSessionPreview(tab.id, visible);
   const { agent, command, title: frozen, at } = tab.hibernation;
   const title = frozen || info?.displayTitle || tab.title || tab.id;
+  const folder = tab.hibernation.worktreeCwd || tab.cwd;
   const line = preview ? describeSessionPreview(preview, now, cachedHomeDir()) : null;
   return (
     <div
@@ -62,13 +63,18 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       <HibernatedLines tabId={tab.id} visible={visible} />
       <div className="relative flex max-w-[80%] flex-col items-center gap-5 rounded-xl border border-border bg-background px-10 py-8 shadow-sm">
         <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
-        <div className="flex max-w-full flex-col items-center gap-1.5">
+        <div className="flex max-w-full flex-col items-start gap-1.5 self-stretch text-left">
           <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
             <span className="flex size-4 shrink-0 items-center justify-center">
               {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
             </span>
             <span className="truncate">{title}</span>
           </span>
+          {folder && (
+            <span title={folder} data-hibernated-folder className="max-w-full truncate font-mono text-[11.5px]">
+              {tildePath(folder, cachedHomeDir())}
+            </span>
+          )}
           {command && (
             <span title={command} className="max-w-full truncate font-mono text-[11.5px] opacity-70">
               {command}
