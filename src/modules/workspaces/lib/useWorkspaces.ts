@@ -24,7 +24,7 @@ import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
 import { setWakeBackdrop } from "@/modules/terminal/lib/wakeBackdrop";
-import { applyHibernate, applyWake, isHibernatedTab, terminalTabs } from "./hibernate";
+import { applyHibernate, applyWake, heldBlockStillValid, isHibernatedTab, manualCommandWins, terminalTabs } from "./hibernate";
 import { wakeBackdrop } from "./hibernateLines";
 import { deleteHibernateLines, readHibernateLines } from "./hibernateLinesIo";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
@@ -848,9 +848,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     // consumption pick it up with no other change to the spawn path.
     const seedPlan = async (tab: Tab, newId: string) => {
       if (!needsResumePlanLookup(tab)) return;
-      const plan = await previewResumeCmd(tab.id);
-      if (plan) seedRestorePlan(newId, plan);
-      if (tab.kind === "terminal" && tab.held) seedHeldBlock(newId, tab.held);
+      if (!manualCommandWins(tab)) {
+        const plan = await previewResumeCmd(tab.id);
+        if (plan) seedRestorePlan(newId, plan);
+      }
+      if (tab.kind === "terminal" && tab.held && (!manualCommandWins(tab) || tab.held.block.command === tab.persistentCommand)) {
+        seedHeldBlock(newId, tab.held);
+      }
     };
 
     if (picked.kind === "workspace") {
@@ -1145,8 +1149,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const tabs = terminalTabs(ws).filter((t) => t.hibernation && wanted.has(t.id));
     if (tabs.length === 0) return;
     await runOnce(wakesInFlight, tabs.map((t) => t.id).sort().join(","), async () => {
-      await seedWakePlans(tabs, previewResumeCmd, seedRestorePlan);
-      for (const t of tabs) if (t.hibernation?.held) seedHeldBlock(t.id, t.hibernation.held);
+      const planned = tabs.filter((t) => !manualCommandWins(t));
+      await seedWakePlans(planned, previewResumeCmd, seedRestorePlan);
+      for (const t of tabs) if (isHibernatedTab(t) && t.hibernation.held && heldBlockStillValid(t)) seedHeldBlock(t.id, t.hibernation.held);
       await handOverLastLines(tabs.map((t) => t.id));
       unmarkHibernating(tabs.map((t) => t.id));
       setWorkspaces((prev) => applyWake(prev, workspaceId, new Set(tabs.map((t) => t.id))));

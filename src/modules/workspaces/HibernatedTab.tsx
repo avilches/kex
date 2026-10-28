@@ -6,7 +6,7 @@ import { Folder01Icon, PlayIcon, SleepingIcon, UploadCircle01Icon } from "@hugei
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
-import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
+import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
 import { tildePath } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
@@ -32,7 +32,8 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
   const shortcutLabel = useShortcutLabel("tab.wake");
   const now = useNow(visible);
-  const { agent, command, title: frozen, at } = tab.hibernation;
+  const { agent, title: frozen, at } = tab.hibernation;
+  const command = hibernatedCommand(tab);
   const title = info?.displayTitle || frozen || tab.title || tab.id;
   const folder = tab.hibernation.worktreeCwd || tab.cwd;
   return (

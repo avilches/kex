@@ -14,6 +14,9 @@ import {
   workspaceDialogPending,
   formatHibernatedFor,
   restoreCommandFor,
+  hibernatedCommand,
+  heldBlockStillValid,
+  manualCommandWins,
   tabWorktree,
   worktreeToKeep,
   saveRestoreCommand,
@@ -271,6 +274,36 @@ describe("restoreCommandFor", () => {
     expect(restoreCommandFor(term("t") as Terminal, { resumeCmd: " claude --resume x " })).toBe("claude --resume x");
     expect(restoreCommandFor(term("t", { persistentCommand: "make" }) as Terminal, null)).toBe("make");
     expect(restoreCommandFor(term("t") as Terminal, null)).toBeUndefined();
+  });
+});
+
+describe("restoreCommandFor with a blocked plan", () => {
+  it("falls back to the command the plan tried, so the placeholder always shows one", () => {
+    expect(restoreCommandFor(term("t") as Terminal, { resumeCmd: "", attemptedCmd: "claude --resume x" })).toBe("claude --resume x");
+  });
+});
+
+describe("hibernatedCommand", () => {
+  const asleep = (extra: object, command?: string) =>
+    term("t", { hibernation: { at: 1, command }, ...extra }) as unknown as Parameters<typeof hibernatedCommand>[0];
+
+  it("shows what was captured when the tab went to sleep", () => {
+    expect(hibernatedCommand(asleep({}, "claude --resume x"))).toBe("claude --resume x");
+  });
+  it("shows a hand-typed command over the captured one", () => {
+    expect(hibernatedCommand(asleep({ persistentCommand: "claude --resume y", persistentCommandManual: true }, "claude --resume x"))).toBe("claude --resume y");
+  });
+  it("manualCommandWins needs a non-empty hand-typed command", () => {
+    expect(manualCommandWins(term("t", { persistentCommand: "a", persistentCommandManual: true }))).toBe(true);
+    expect(manualCommandWins(term("t", { persistentCommand: "", persistentCommandManual: true }))).toBe(false);
+    expect(manualCommandWins(term("t", { persistentCommand: "a" }))).toBe(false);
+  });
+  it("drops the held error once the command it describes was edited", () => {
+    const block = { reason: "r", dir: "/d", command: "claude --resume x", restorable: true };
+    const held = { block, modal: true };
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "other", persistentCommandManual: true }) as never)).toBe(false);
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "claude --resume x", persistentCommandManual: true }) as never)).toBe(true);
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held } }) as never)).toBe(true);
   });
 });
 
