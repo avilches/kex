@@ -66,6 +66,11 @@ describe("resolveAgentTabTitle - a sleeping tab keeps the name it had", () => {
     expect(info.isRunning).toBe(false);
   });
 
+  it("a rename of the sleeping tab shows at once, over the saved title", () => {
+    const info = resolveAgentTabTitle({ ...asleep("npm test · main"), title: "renamed" }, null, undefined, undefined);
+    expect(info.displayTitle).toBe("renamed");
+  });
+
   it("a snapshot without a title falls back to the usual resolution", () => {
     const info = resolveAgentTabTitle({ ...woken("older"), hibernation: { at: 1, agent: "claude" } }, null, undefined, undefined);
     expect(info.displayTitle).toBe("older · me");
