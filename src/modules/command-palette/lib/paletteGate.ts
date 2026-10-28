@@ -20,7 +20,15 @@ const TAB_AND_WORKSPACE: readonly ShortcutId[] = [
 // it has no use for, so it shares the tab list. The three that reopen the command palette let
 // its mode change without closing it first.
 export const PALETTE_ALLOWED_SHORTCUTS: Record<Exclude<OpenPalette, "none">, readonly ShortcutId[]> = {
-  commands: [...TAB_AND_WORKSPACE, "commandPalette.open", "commandPalette.content", "commandPalette.history"],
+  // palette.menuAction is listed so Cmd+1..9 reach the open row menu; the gate only knows which palette
+  // is open, so with no menu open the palette consumes the key without effect.
+  commands: [
+    ...TAB_AND_WORKSPACE,
+    "commandPalette.open",
+    "commandPalette.content",
+    "commandPalette.history",
+    "palette.menuAction",
+  ],
   // tab.new is left out on purpose: with the folder palette open its key belongs to palette.folderCurrent.
   folder: [
     ...TAB_AND_WORKSPACE.filter((id) => id !== "tab.new"),

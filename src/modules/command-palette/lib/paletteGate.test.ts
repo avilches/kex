@@ -29,6 +29,7 @@ const EXPECTED_COMMANDS: ShortcutId[] = [
   "commandPalette.open",
   "commandPalette.content",
   "commandPalette.history",
+  "palette.menuAction",
 ];
 const EXPECTED_FOLDER: ShortcutId[] = [
   ...TABS.filter((id) => id !== "tab.new"),
@@ -67,6 +68,16 @@ describe("shortcutBlockedByPalette", () => {
       const folderRow = id.startsWith("palette.");
       expect(shortcutBlockedByPalette(id, folderRow ? "folder" : "commands")).toBe(false);
     }
+  });
+
+  it("lets only palette.menuAction of the palette.* shortcuts through the command palette", () => {
+    const open = ALL.filter((id) => id.startsWith("palette.") && !shortcutBlockedByPalette(id, "commands"));
+    expect(open).toEqual(["palette.menuAction"]);
+  });
+
+  it("keeps Jump to Workspace and Select Tab by digit blocked behind the command palette", () => {
+    expect(shortcutBlockedByPalette("workspace.selectByIndex", "commands")).toBe(true);
+    expect(shortcutBlockedByPalette("tab.selectByIndex", "commands")).toBe(true);
   });
 
   it("blocks Focus on Sidebar, which the tab menu of a palette no longer offers", () => {
