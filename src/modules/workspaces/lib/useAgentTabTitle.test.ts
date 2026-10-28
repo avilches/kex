@@ -71,3 +71,21 @@ describe("resolveAgentTabTitle - a sleeping tab keeps the name it had", () => {
     expect(info.displayTitle).toBe("older · me");
   });
 });
+
+describe("resolveAgentTabTitle - running script name", () => {
+  it("shows the Action name instead of the default title while the script runs", () => {
+    const info = resolveAgentTabTitle(woken(), null, undefined, undefined, undefined, "Dev");
+    expect(info.displayTitle).toBe("Dev");
+    expect(info.isDescription).toBe(true);
+  });
+
+  it("goes back to the default title once there is no script name", () => {
+    const info = resolveAgentTabTitle(woken(), null, undefined, undefined, undefined, undefined);
+    expect(info.displayTitle).not.toBe("Dev");
+  });
+
+  it("never replaces the user's own title", () => {
+    const info = resolveAgentTabTitle({ ...woken(), title: "Mine" }, null, undefined, undefined, undefined, "Dev");
+    expect(info.displayTitle).toBe("Mine");
+  });
+});

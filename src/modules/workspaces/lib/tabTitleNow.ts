@@ -3,7 +3,7 @@ import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { getDirGit } from "./dirGitStore";
 import { getSystemInfo } from "./systemInfoStore";
 import { getTabWorkspaceRoot } from "./tabWorkspaceRootStore";
-import { getRunningCommand } from "./terminalEphemeralStore";
+import { getRunningCommand, getRunningScriptName } from "./terminalEphemeralStore";
 import { titleDefaultsNow } from "./titleDefaultsPrefs";
 import { expandTabTitle, tabDir } from "./titleVars";
 import { resolveAgentTabTitle } from "./useAgentTabTitle";
@@ -39,5 +39,6 @@ export function tabDisplayTitleNow(tab: Tab): string {
       defaults: titleDefaultsNow(),
       workspaceRoot: getTabWorkspaceRoot(tab.id),
     },
+    terminal ? getRunningScriptName(tab.id) : undefined,
   ).displayTitle;
 }

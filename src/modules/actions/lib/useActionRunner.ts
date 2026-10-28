@@ -15,6 +15,7 @@ import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
   getScriptRunningSnapshot,
   setScriptCommand,
+  setScriptName,
   setScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
@@ -24,6 +25,7 @@ import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
+  label,
   planActionRun,
   planActionStop,
   planTabReveal,
@@ -277,6 +279,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
           revealActionTab(plan.tabId);
           setScriptRunning(plan.tabId, "running");
           setScriptCommand(plan.tabId, action.command);
+          setScriptName(plan.tabId, label(action));
           scheduleWrite(plan.tabId, plan.input, plan.wake ? WRITE_DELAY_NEW_MS : WRITE_DELAY_REUSED_MS);
           return;
         case "new-agent-tab": {
@@ -289,12 +292,13 @@ export function useActionRunner(deps: ActionRunnerDeps) {
         }
         case "new-tab": {
           const tabId = newTabId();
-          const tab: Tab = { id: tabId, kind: "terminal", cwd: plan.cwd, title: plan.title };
+          const tab: Tab = { id: tabId, kind: "terminal", cwd: plan.cwd };
           warnMissingFolder(plan.cwd, plan.title);
           openScriptTab(ws, tab, plan.placement);
           linkActionTab(action.id, tabId);
           setScriptRunning(tabId, "running");
           setScriptCommand(tabId, action.command);
+          setScriptName(tabId, plan.title);
           scheduleWrite(tabId, plan.input, WRITE_DELAY_NEW_MS);
           return;
         }

@@ -100,6 +100,7 @@ export function setScriptRunning(tabId: string, state: ScriptState | false): voi
 
 export function clearScriptRunningEntry(tabId: string): void {
   scriptCommands.delete(tabId);
+  scriptNames.delete(tabId);
   if (!scriptRunning.has(tabId)) return;
   scriptRunning.delete(tabId);
   notifyScript();
@@ -111,6 +112,17 @@ const scriptCommands = new Map<string, string>();
 
 export function setScriptCommand(tabId: string, command: string): void {
   scriptCommands.set(tabId, command);
+}
+
+// The Action name a tab shows only while its script runs, so a recycled tab does not keep it.
+const scriptNames = new Map<string, string>();
+
+export function setScriptName(tabId: string, name: string): void {
+  scriptNames.set(tabId, name);
+}
+
+export function getRunningScriptName(tabId: string): string | undefined {
+  return scriptRunning.has(tabId) ? scriptNames.get(tabId) : undefined;
 }
 
 export function getRunningScriptCommand(tabId: string): string | null {

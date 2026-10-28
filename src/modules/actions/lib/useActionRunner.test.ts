@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
   clearScriptRunningEntry,
+  getRunningScriptName,
   getScriptRunningSnapshot,
   setScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
@@ -96,10 +97,14 @@ describe("useActionRunner", () => {
     act(() => result.current.runAction(script));
     expect(deps.splitPaneAndOpenTab).toHaveBeenCalledTimes(1);
     const tab = (deps.splitPaneAndOpenTab.mock.calls[0] as unknown[])[3] as Tab;
-    expect(tab).toMatchObject({ kind: "terminal", title: "Dev", cwd: "/w" });
+    expect(tab).toMatchObject({ kind: "terminal", cwd: "/w" });
+    expect(tab.title).toBeUndefined();
+    expect(getRunningScriptName(tab.id)).toBe("Dev");
     expect(deps.setScriptPaneId).toHaveBeenCalledWith("w1", "p-scripts");
     expect(getActionTab(script.id)).toBe(tab.id);
     expect(getScriptRunningSnapshot().get(tab.id)).toBe("running");
+    setScriptRunning(tab.id, false);
+    expect(getRunningScriptName(tab.id)).toBeUndefined();
     clearScriptRunningEntry(tab.id);
   });
 

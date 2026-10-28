@@ -16,7 +16,9 @@ import { useTitleDraft, withTitleDraft } from "./titleDraftStore";
 import { tabDir, type TitleSources } from "./titleVars";
 import {
   getRunningCommand,
+  getRunningScriptName,
   subscribeToRunningCommands,
+  subscribeToScriptRunning,
 } from "./terminalEphemeralStore";
 import type { Tab } from "./types";
 
@@ -38,6 +40,10 @@ export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null
     subscribeToRunningCommands,
     () => (tab?.kind === "terminal" ? getRunningCommand(tab.id) : null),
   );
+  const scriptName = useSyncExternalStore(
+    subscribeToScriptRunning,
+    () => (tab?.kind === "terminal" ? getRunningScriptName(tab.id) : undefined),
+  );
   const oscTitle = useSyncExternalStore(
     subscribeOscTitles,
     () => (tab?.kind === "terminal" ? getOscTitle(tab.id) : undefined),
@@ -46,7 +52,7 @@ export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null
   const sources = useTitleSources(tab, agentSession);
 
   if (!tab) return null;
-  return resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources);
+  return resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources, scriptName);
 }
 
 // The template that titles a tab right now: its own, else the default of its kind.
@@ -91,6 +97,7 @@ export function resolveAgentTabTitle(
   oscTitle: string | undefined,
   agentSession: AgentSession | undefined,
   sources?: TitleSources,
+  scriptName?: string,
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
   // A sleeping tab has no process left to feed its template, so it keeps the name it had.
@@ -110,8 +117,10 @@ export function resolveAgentTabTitle(
     model: hasAgent ? agentSession?.meta?.model : undefined,
     session: sessionTitle,
   };
-  const displayTitle = tabTitle(tab, runningCommand, osc, src);
-  const isDescription = !!(tab.title || osc || sessionTitle);
+  // The name of the running script Action stands in for the default title, never for the user's own.
+  const named = !tab.title && !!scriptName;
+  const displayTitle = named ? scriptName : tabTitle(tab, runningCommand, osc, src);
+  const isDescription = named || !!(tab.title || osc || sessionTitle);
 
   return { displayTitle, isDescription, hasAgent, isRunning: !!runningCommand, agentSession };
 }

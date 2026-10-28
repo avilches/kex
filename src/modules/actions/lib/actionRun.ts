@@ -61,7 +61,7 @@ export type RunPlan =
       title: string;
     };
 
-const label = (action: Action) => action.name.trim() || "Action";
+export const label = (action: Action) => action.name.trim() || "Action";
 
 const blocked = (action: Action, why: string): RunPlan => ({
   kind: "blocked",
