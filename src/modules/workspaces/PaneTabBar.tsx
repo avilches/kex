@@ -243,7 +243,13 @@ function DraggableTab({
       title={tooltip.title}
       onPointerEnter={tooltip.onPointerEnter}
       onClick={() => onActivate(tab.id)}
-      onDoubleClick={sleeping ? () => onWake?.(tab.id) : undefined}
+      onDoubleClick={
+        sleeping
+          ? () => onWake?.(tab.id)
+          : onRenameTab
+            ? () => useTabRenameStore.getState().startRename(tab.id, "pane")
+            : undefined
+      }
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault();
         // This div is draggable (dnd-kit's useDraggable sets tabIndex=0), so

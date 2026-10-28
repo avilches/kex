@@ -5,6 +5,7 @@ import { isImeComposing } from "@/lib/imeEnter";
 import { clearTitleDraft, setTitleDraft } from "./lib/titleDraftStore";
 import { titleSubjectForTab } from "./lib/titleVariablesFor";
 import type { Tab } from "./lib/types";
+import { RenameInput } from "./RenameInput";
 import { RenameTemplates } from "./RenameTemplates";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
 
@@ -107,8 +108,9 @@ export function TabRenamePopover({ tabId, tab, origin, title, placeholder, onRen
         onFocusOutside={(e) => e.preventDefault()}
       >
         <span className="text-[12px] text-muted-foreground">Rename tab</span>
-        <input
-          ref={inputRef}
+        <RenameInput
+          inputRef={inputRef}
+          onCleared={() => setTitleDraft(tabId, "")}
           autoFocus
           onFocus={(e) => {
             e.stopPropagation();

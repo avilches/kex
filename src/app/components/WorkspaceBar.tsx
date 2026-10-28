@@ -91,6 +91,7 @@ import {
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
+import { RenameInput } from "@/modules/workspaces/RenameInput";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
@@ -398,7 +399,7 @@ function SortableWorkspaceItem({
             if (active) onRestoreFocus();
             else onSelect(ws.id);
           }}
-          onDoubleClick={() => onOpenSettings(ws.id)}
+          onDoubleClick={() => startRename(ws.id)}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             compact
@@ -637,8 +638,9 @@ function SortableWorkspaceItem({
         onEscapeKeyDown={handleCancel}
       >
         <span className="px-0.5 text-[12px] text-muted-foreground">Rename workspace</span>
-        <input
-          ref={inputRef}
+        <RenameInput
+          inputRef={inputRef}
+          onCleared={() => setTitleDraft(ws.id, "")}
           type="text"
           defaultValue={ws.title}
           onChange={(e) => setTitleDraft(ws.id, e.target.value)}
