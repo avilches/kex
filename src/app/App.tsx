@@ -4166,6 +4166,7 @@ export default function App() {
             onUpdateTab={sidebarTabMenu.onUpdateTab}
             onSaveTab={sidebarTabMenu.onSaveTab}
             onHibernateTab={onPaletteHibernateTab}
+            onWakeTab={(workspaceId, tabId) => wakeTabs(workspaceId, [tabId])}
             onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}

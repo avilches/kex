@@ -26,6 +26,7 @@ import {
   Delete02Icon,
   PencilEdit01Icon,
   SleepingIcon,
+  CircleArrowUpIcon,
   Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -60,6 +61,7 @@ const ICONS = {
   tabId: Copy01Icon,
   lock: LockKeyIcon,
   hibernateTab: SleepingIcon,
+  restoreTab: CircleArrowUpIcon,
   save: FloppyDiskIcon,
   note: StickyNote03Icon,
   removeNote: Cancel01Icon,

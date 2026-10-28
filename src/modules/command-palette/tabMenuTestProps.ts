@@ -4,5 +4,6 @@ export const TAB_MENU_NOOPS = {
   onUpdateTab: () => {},
   onSaveTab: () => {},
   onHibernateTab: () => {},
+  onWakeTab: () => {},
   onGoToTab: () => {},
 };
