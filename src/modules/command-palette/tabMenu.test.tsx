@@ -87,6 +87,7 @@ type Calls = {
   hibernate: string[];
   goTo: string[];
   select: string[];
+  wake: string[][];
   move: unknown[][];
   openChange: boolean[];
 };
@@ -129,6 +130,7 @@ function Harness() {
         );
       }}
       onSaveTab={(id) => calls.save.push(id)}
+      onWakeTab={(ws, id) => calls.wake.push([ws, id])}
       onHibernateTab={(id) => {
         calls.hibernate.push(id);
         return hibernateImpl(id);
@@ -185,7 +187,7 @@ async function openOn(target: string) {
 }
 
 beforeEach(() => {
-  calls = { update: [], save: [], hibernate: [], goTo: [], select: [], move: [], openChange: [] };
+  calls = { update: [], save: [], hibernate: [], goTo: [], select: [], wake: [], move: [], openChange: [] };
   commands = [];
   workspaces = [wsEntry("ws", 0), wsEntry("other", 1), wsEntry("third", 2)];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
@@ -358,13 +360,28 @@ describe("hibernating from the palette", () => {
 });
 
 describe("the hibernate shortcut over a sleeping tab", () => {
-  it("restores it like Enter on its row, without hibernating anything", async () => {
+  it("restores it in place: no tab switch, no hibernating, the palette stays open", async () => {
     initial = [mk("cur", 0), mk("b", 1), mk("c", 2, { hibernation: { at: 1 } })];
     await openOn("tab:c");
     expect(await shortcut("hibernateTab")).toBe(true);
     await wait(30);
-    expect(calls.select).toEqual(["c"]);
+    expect(calls.wake).toEqual([["ws", "c"]]);
+    expect(calls.select).toEqual([]);
     expect(calls.hibernate).toEqual([]);
+    expect(calls.openChange).toEqual([]);
+  });
+
+  it("offers Restore Tab in the slot of Hibernate Tab, with the same shortcut", async () => {
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2, { hibernation: { at: 1 } })];
+    await openOn("tab:c");
+    await key("Tab");
+    await wait(20);
+    expect(menuLabels().some((l) => l.startsWith("Restore Tab"))).toBe(true);
+    expect(menuLabels().some((l) => l.startsWith("Hibernate Tab"))).toBe(false);
+    fireEvent.click(menuItem("Restore Tab") as HTMLElement);
+    await wait(30);
+    expect(calls.wake).toEqual([["ws", "c"]]);
+    expect(calls.select).toEqual([]);
   });
 });
 

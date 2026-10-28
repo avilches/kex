@@ -109,6 +109,8 @@ type Props = {
   onSaveTab: (tabId: string) => void;
   /** Unlike the shortcut, it must not focus the tab: the palette keeps the focus. */
   onHibernateTab: (tabId: string) => unknown;
+  /** Wakes a sleeping tab where it is: no tab switch, no focus. */
+  onWakeTab: (workspaceId: string, tabId: string) => unknown;
   onGoToTab: (tabId: string) => void;
   onTerminalTargetChange: (target: TerminalTarget | null) => void;
   onOpenTerminalAt: (target: TerminalTarget) => void;
@@ -165,6 +167,7 @@ export function CommandPalette({
   onUpdateTab,
   onSaveTab,
   onHibernateTab,
+  onWakeTab,
   onGoToTab,
   onTerminalTargetChange,
   onOpenTerminalAt,
@@ -562,6 +565,10 @@ export function CommandPalette({
         void Promise.resolve(onHibernateTab(tabId))
           .catch((e) => console.error("Hibernating the tab failed", e))
           .finally(refocusInput);
+      } else if (id === "restoreTab") {
+        void Promise.resolve(onWakeTab(entry.workspaceId, tabId))
+          .catch((e) => console.error("Restoring the tab failed", e))
+          .finally(refocusInput);
       } else if (id === "removeNote") {
         flushTabNote(tabId);
         onUpdateTab(tabId, removeTabNote);
@@ -596,6 +603,7 @@ export function CommandPalette({
       onUpdateTab,
       onSaveTab,
       onHibernateTab,
+      onWakeTab,
       refocusInput,
       onGoToTab,
       workspaceEntries,
@@ -779,9 +787,8 @@ export function CommandPalette({
         return true;
       }
       if (action === "tabItem" && item && entry) {
-        // A sleeping tab has no Hibernate item: the key restores it, like Enter on its row.
-        if (item === "hibernateTab" && entry.hibernated) run("go", entry);
-        else if (runnableTabItem(entry, item)) run(item, entry);
+        const runnable = runnableTabItem(entry, item);
+        if (runnable) run(runnable.id, entry);
       }
       return true;
     });

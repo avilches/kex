@@ -89,15 +89,21 @@ describe("tabMenuItems", () => {
     expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab" });
   });
 
-  it("offers a sleeping tab only Restore and go to Tab, with no Hibernate and no Restore item", () => {
+  it("offers a sleeping tab Restore Tab in the slot of Hibernate Tab, next to Restore and go to Tab", () => {
     const asleep = entry({ hibernation: { at: 1 } });
     expect(item(asleep, "go")?.label).toBe("Restore and go to Tab");
+    expect(item(asleep, "restoreTab")).toMatchObject({ label: "Restore Tab", shortcutId: "tab.hibernate" });
     expect(ids(asleep)).not.toContain("hibernateTab");
-    expect(ids(asleep).filter((id) => id === "go")).toHaveLength(1);
-    expect(runnableTabItem(asleep, "hibernateTab")).toBeNull();
+    expect(ids(asleep).indexOf("restoreTab")).toBe(ids(entry()).indexOf("hibernateTab"));
   });
 
-  it("only offers hibernation on terminals", () => {
+  it("runs Restore Tab for the hibernate key on a sleeping row, and Hibernate Tab on an awake one", () => {
+    const asleep = entry({ hibernation: { at: 1 } });
+    expect(runnableTabItem(asleep, "hibernateTab")?.id).toBe("restoreTab");
+    expect(runnableTabItem(entry(), "hibernateTab")?.id).toBe("hibernateTab");
+  });
+
+  it("only offers hibernation and restore on terminals", () => {
     expect(ids(entry({ kind: "editor", path: "/repo/a.ts", dirty: false }))).not.toContain("hibernateTab");
     expect(ids(entry({ kind: "browser", url: "https://a.b" }))).not.toContain("hibernateTab");
   });

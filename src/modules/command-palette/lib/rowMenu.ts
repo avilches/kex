@@ -17,6 +17,7 @@ export type RowMenuItemId =
   | "close"
   | "lock"
   | "hibernateTab"
+  | "restoreTab"
   | "save"
   | "note"
   | "removeNote"
@@ -202,10 +203,10 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   }
   items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
   items.push({ id: "moveWorkspace", label: "Move to Workspace" });
-  if (tab.kind === "terminal" && !entry.hibernated) {
+  if (tab.kind === "terminal") {
     items.push({
-      id: "hibernateTab",
-      label: "Hibernate Tab",
+      id: entry.hibernated ? "restoreTab" : "hibernateTab",
+      label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
       shortcutId: "tab.hibernate",
       separatorBefore: true,
     });
@@ -235,6 +236,7 @@ export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean
     id === "tabId" ||
     id === "lock" ||
     id === "hibernateTab" ||
+    id === "restoreTab" ||
     id === "save" ||
     id === "removeNote"
   );
@@ -246,7 +248,9 @@ export function runnableTabItem(
   entry: TabEntry,
   id: RowMenuItemId,
 ): RowMenuItem | null {
-  const item = tabMenuItems(entry).find((i) => i.id === id);
+  // The hibernate key is the restore key on a sleeping row: one slot, two items.
+  const wanted = id === "hibernateTab" && entry.hibernated ? "restoreTab" : id;
+  const item = tabMenuItems(entry).find((i) => i.id === wanted);
   if (!item || (item.disabled && id !== "close")) return null;
   return item;
 }
