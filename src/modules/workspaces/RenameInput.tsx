@@ -1,15 +1,15 @@
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ComponentProps, type RefObject, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = Omit<ComponentProps<"input">, "ref"> & {
   inputRef: RefObject<HTMLInputElement | null>;
-  // Called after the X emptied the field, so the live title draft follows.
+  // Called after the reset emptied the field, so the live title draft follows.
   onCleared: () => void;
 };
 
-// Uncontrolled text field of the rename popovers with an X at the end that
+// Uncontrolled text field of the rename popovers with a reset icon at the end that
 // appears while there is something typed and empties it.
 export function RenameInput({ inputRef, onCleared, onChange, defaultValue, className, ...rest }: Props) {
   const [hasText, setHasText] = useState(String(defaultValue ?? "") !== "");
@@ -29,8 +29,8 @@ export function RenameInput({ inputRef, onCleared, onChange, defaultValue, class
         <button
           type="button"
           tabIndex={-1}
-          aria-label="Clear name"
-          title="Clear name"
+          aria-label="Use default"
+          title="Use default"
           // Keeps the focus in the field so the popover does not read it as leaving.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
@@ -43,7 +43,7 @@ export function RenameInput({ inputRef, onCleared, onChange, defaultValue, class
           }}
           className="absolute right-1 top-1/2 flex size-[18px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          <HugeiconsIcon icon={Refresh01Icon} size={11} />
         </button>
       )}
     </div>
