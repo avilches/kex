@@ -1330,3 +1330,7 @@ su id, y de eso cuelgan varias cosas que no fallan con ruido si se tocan mal:
 - **Bloquear lo justo.** Con el tab enfocado dormido solo se bloquea lo que actua sobre una terminal viva
   (`terminal.*`, `search.focus`, `history.open`) y las Actions que dependen del tab enfocado. Bloquear tambien tab, pane,
   sidebar o el menu nativo (como hacia la version por workspace) deja inutil un workspace entero por un solo tab dormido.
+
+## Nota: hibernar o cerrar un tab con el restore bloqueado
+
+El bloqueo de un restore (el dialogo "could not be restored" y el plan pendiente) vive solo en memoria (`Session.restoreBlock`, `pendingRestore`). Al hibernar o cerrar ese tab se perdia, y al volver el arranque recalculaba el estado desde `tab.cwd` y `persistentCommand`, que ya no decian lo mismo (otra carpeta, el comando ejecutado en Home). Ahora el tab que se para lleva `HeldBlock` (`TabHibernation.held` al hibernar, `Tab.held` en la entrada del closed stack), `liveHeldBlock` lo lee de `pendingRestore.ts`, y al despertar o deshacer se siembra con `seedHeldBlock` bajo el id nuevo; `startLeaf` lo consume y rehace el mismo dialogo (o deja solo el plan pendiente si no era modal) sin recalcular. Limite conocido: un tab de agente cerrado y reabierto cambia de id, y "Try again" busca el plan por el id nuevo.

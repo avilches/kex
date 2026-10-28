@@ -24,7 +24,10 @@ export function buildReopenedTab(tab: Tab, newId: string): Tab {
   const base = { ...tab, id: newId };
   if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
   if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
-  if (base.kind === "terminal") return { ...base, locked: false };
+  if (base.kind === "terminal") {
+    const { held: _held, ...rest } = base;
+    return { ...rest, locked: false };
+  }
   return base;
 }
 

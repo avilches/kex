@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { liveHeldBlock } from "@/modules/terminal/lib/pendingRestore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { awakeTerminalTabs, restoreCommandFor, worktreeToKeep } from "./hibernate";
 import { HIBERNATE_LINES_MAX, prepareHibernateScreen, type LeafScreen } from "./hibernateLines";
@@ -159,7 +160,8 @@ async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
     tabs.map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd) }];
+      const held = liveHeldBlock(tab.id) ?? undefined;
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent ?? held?.block.agent, command: restoreCommandFor(tab, plan) ?? (held?.block.command || undefined), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd), ...(held ? { held } : {}) }];
     }),
   );
   return Object.fromEntries(entries);

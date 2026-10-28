@@ -1,5 +1,6 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
+import type { HeldBlock } from "@/modules/terminal/lib/restoreStart";
 import type { Action } from "@/modules/actions";
 import type { AutofocusMode } from "@/modules/settings/store";
 import type { WorkspaceSidebar } from "./sidebarSnapshot";
@@ -10,7 +11,7 @@ export type ScriptCwdMode = "home" | "workspace" | "context" | "fixed";
 // What the placeholder shows besides the title (the agent and the restore command) is gone with the
 // PTY, so it is captured when the tab goes to sleep. `title` is the name the tab showed then, kept
 // because the process that fed it is gone. `at` is the epoch ms it went to sleep.
-export type TabHibernation = { at: number; agent?: string; command?: string; title?: string; worktreeCwd?: string };
+export type TabHibernation = { at: number; agent?: string; command?: string; title?: string; worktreeCwd?: string; held?: HeldBlock };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no
 // exception.
@@ -32,7 +33,7 @@ type TabCommon = {
 };
 
 export type Tab =
-  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation; agentTitle?: string })
+  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation; agentTitle?: string; held?: HeldBlock })
   | (TabCommon & {
       kind: "editor";
       path: string;
