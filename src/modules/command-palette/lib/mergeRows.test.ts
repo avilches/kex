@@ -349,16 +349,16 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:t", "cmd:bar"]);
   });
 
-  it("breaks ties by recency with awake workspaces first", () => {
+  it("breaks ties by recency, asleep or not", () => {
     const tabs = [
       tab("sleepy", { title: "build", hibernated: true, lastUsedAt: 99 }),
       tab("old", { title: "build", lastUsedAt: 1 }),
       tab("new", { title: "build", lastUsedAt: 2 }),
     ];
     expect(keys(mergeRows(input({ term: "build", tabs })))).toEqual([
+      "tab:sleepy",
       "tab:new",
       "tab:old",
-      "tab:sleepy",
     ]);
   });
 
@@ -422,16 +422,16 @@ describe("mergeRows", () => {
     ).toEqual([]);
   });
 
-  it("puts the recents of hibernated tabs after the awake ones, even when newer", () => {
+  it("orders the recents of hibernated tabs by use like any other, so a tab keeps its place when it falls asleep", () => {
     const tabs = [
       tab("sleepy-new", { hibernated: true, lastUsedAt: 900 }),
       tab("awake-old", { lastUsedAt: 10 }),
       tab("awake-newer", { lastUsedAt: 20 }),
     ];
     expect(keys(mergeRows(input({ tabs })))).toEqual([
+      "tab:sleepy-new",
       "tab:awake-newer",
       "tab:awake-old",
-      "tab:sleepy-new",
     ]);
   });
 

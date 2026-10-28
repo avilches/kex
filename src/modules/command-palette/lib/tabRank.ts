@@ -7,13 +7,10 @@ export const SEARCH_LIMIT = 40;
 export const tabRowKey = (tabId: string) => `tab:${tabId}`;
 export const workspaceRowKey = (id: string) => `ws:${id}`;
 
-// Awake tabs first, then the most recently used; never-used tabs fall back to tree order.
+// The most recently used first, asleep or not (hibernating does not touch lastUsedAt, so a tab keeps
+// its place when it falls asleep); never-used tabs fall back to tree order.
 export function byRecency(a: TabEntry, b: TabEntry): number {
-  return (
-    Number(a.hibernated) - Number(b.hibernated) ||
-    b.lastUsedAt - a.lastUsedAt ||
-    a.order - b.order
-  );
+  return b.lastUsedAt - a.lastUsedAt || a.order - b.order;
 }
 
 // Empty-box order: tabs that need you first, then the ones still busy, then the rest.
