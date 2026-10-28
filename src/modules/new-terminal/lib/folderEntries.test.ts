@@ -25,7 +25,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: over.workspaceId ?? "ws-1",
   workspaceTitle: over.workspaceTitle ?? "Workspace",
   workspaceColor: over.workspaceColor ?? null,
-  workspaceIcon: over.workspaceIcon ?? null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+  workspaceIcon: over.workspaceIcon ?? null, workspaceRoot: null,
   hibernated: over.hibernated ?? false,
   kind: over.kind ?? "terminal",
   title: over.title ?? "",

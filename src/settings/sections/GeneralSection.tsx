@@ -1,11 +1,9 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type AutofocusMode,
   setAutofocusMode,
-  setAutofocusNewTabs,
   setAutostart,
   setPerformanceProfiler,
   setPreviewOnClick,
@@ -21,7 +19,6 @@ import { SettingRow } from "../components/SettingRow";
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
-  const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
   useEffect(() => {
@@ -91,22 +88,10 @@ export function GeneralSection() {
               <label htmlFor="autofocus-manual" className="cursor-pointer text-[12px]">
                 Manual{" "}
                 <span className="text-[10.5px] text-muted-foreground">
-                  or tabs where you turn it on from their context menu.
+                  Only the explorer crosshair button or F4 refresh it.
                 </span>
               </label>
             </div>
-            {autofocusMode === "manual" && (
-              <div className="ml-6 flex items-center gap-2">
-                <Checkbox
-                  id="autofocus-new-tabs"
-                  checked={autofocusNewTabs}
-                  onCheckedChange={(v) => void setAutofocusNewTabs(v === true)}
-                />
-                <label htmlFor="autofocus-new-tabs" className="cursor-pointer text-[12px]">
-                  Enable autofocus on new tabs
-                </label>
-              </div>
-            )}
           </RadioGroup>
         </div>
       </div>

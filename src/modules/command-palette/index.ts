@@ -9,6 +9,7 @@ export {
   buildClosedTabEntries,
   type ClosedTabEntry,
 } from "./lib/closedEntries";
+export { keepPaletteFocus } from "./lib/keepPaletteFocus";
 export { selectTab, selectWorkspace } from "./lib/selectEntry";
 export {
   buildTabEntries,

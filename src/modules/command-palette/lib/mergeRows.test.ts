@@ -17,7 +17,7 @@ const tab = (tabId: string, over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: "ws-1",
   workspaceTitle: "Work",
   workspaceColor: null,
-  workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+  workspaceIcon: null, workspaceRoot: null,
   hibernated: false,
   kind: "terminal",
   title: "zsh",
@@ -668,5 +668,16 @@ describe("idle list workspaces", () => {
       const rows = mergeRows(input({ tabs, term: "beta", activeTabId: "a" }));
       expect(keys(rows)).toEqual(["tab:b"]);
     });
+  });
+
+  it("keeps a hibernated current tab as Current tab, first, idle and typing", () => {
+    const tabs = [
+      tab("awake", { lastUsedAt: 50, title: "build" }),
+      tab("sleepy", { hibernated: true, lastUsedAt: 1, title: "build" }),
+    ];
+    const idle = mergeRows(input({ tabs, activeTabId: "sleepy" }));
+    expect(idle[0]).toMatchObject({ key: "tab:sleepy", current: true });
+    const typed = mergeRows(input({ tabs, activeTabId: "sleepy", term: "build" }));
+    expect(typed[0]).toMatchObject({ key: "tab:sleepy", current: true });
   });
 });

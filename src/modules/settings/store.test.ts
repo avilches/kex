@@ -13,7 +13,6 @@ import {
   parseCursorStyle,
   parseScmViewMode,
   parseSpinnerStyle,
-  parseTerminalNewFolderMode,
   parseThemePref,
   DEFAULT_PREFERENCES,
   PREF_KEY_MAP,
@@ -137,23 +136,6 @@ describe("parseThemePref", () => {
     // general and editor stores were ever merged again, that value must not
     // be accepted as a valid ThemePref.
     expect(parseThemePref("nord")).toBe("system");
-  });
-});
-
-describe("terminalNewFolderMode", () => {
-  it("defaults to context", () => {
-    expect(DEFAULT_PREFERENCES.terminalNewFolderMode).toBe("context");
-  });
-
-  it("parses all four valid modes and falls back to context", () => {
-    expect(parseTerminalNewFolderMode("home")).toBe("home");
-    expect(parseTerminalNewFolderMode("workspace")).toBe("workspace");
-    expect(parseTerminalNewFolderMode("context")).toBe("context");
-    expect(parseTerminalNewFolderMode("ask")).toBe("ask");
-    expect(parseTerminalNewFolderMode("WORKSPACE")).toBe("context");
-    expect(parseTerminalNewFolderMode(undefined)).toBe("context");
-    expect(parseTerminalNewFolderMode(null)).toBe("context");
-    expect(parseTerminalNewFolderMode(42)).toBe("context");
   });
 });
 

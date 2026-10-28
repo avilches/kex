@@ -6,10 +6,9 @@ import {
   closedMenuItems,
   folderMenuItems,
   highlightedClosedOf,
-  otherTabRowKeys,
+  moveMenuItems,
   type RowMenuItemId,
   runnableTabItem,
-  type TabMenuContext,
   tabItemKeepsPalette,
   placeMenuLeft,
   placeMenuTop,
@@ -22,7 +21,6 @@ import {
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 
-const ctx = { autofocusMode: "manual" } as const;
 
 // A tab entry whose live tab is built from `tab`; the entry mirrors what buildTabEntries derives from it.
 const entry = (tab: Record<string, unknown> = {}, over: Partial<TabEntry> = {}): TabEntry => {
@@ -30,8 +28,6 @@ const entry = (tab: Record<string, unknown> = {}, over: Partial<TabEntry> = {}):
   return {
     tabId: full.id,
     workspaceId: "ws-1",
-    paneId: "pane-1",
-    paneTabCount: 3,
     workspaceRoot: "/repo",
     kind: full.kind,
     cwd: "cwd" in full ? (full.cwd ?? "") : "",
@@ -43,10 +39,16 @@ const entry = (tab: Record<string, unknown> = {}, over: Partial<TabEntry> = {}):
   } as TabEntry;
 };
 
-const ids = (e: TabEntry, c: TabMenuContext = ctx) => tabMenuItems(e, c).map((i) => i.id);
-const item = (e: TabEntry, id: RowMenuItemId, c: TabMenuContext = ctx) => tabMenuItems(e, c).find((i) => i.id === id);
+const ids = (e: TabEntry) => tabMenuItems(e).map((i) => i.id);
+const item = (e: TabEntry, id: RowMenuItemId) => tabMenuItems(e).find((i) => i.id === id);
 
 describe("tabMenuItems", () => {
+  it("does not offer Focus on Sidebar nor Close Other Tabs", () => {
+    const all = ids(entry({ cwd: "/repo/sub" })) as string[];
+    expect(all).not.toContain("focusSidebar");
+    expect(all).not.toContain("closeOthers");
+  });
+
   it("offers the actions of the real tab menu on a terminal, in order", () => {
     expect(ids(entry({ cwd: "/repo/sub" }))).toEqual([
       "go",
@@ -55,13 +57,10 @@ describe("tabMenuItems", () => {
       "copy",
       "copyRelative",
       "tabId",
-      "focusSidebar",
-      "autofocus",
       "moveWorkspace",
       "hibernateTab",
       "lock",
       "close",
-      "closeOthers",
       "closeWorkspace",
     ]);
   });
@@ -72,8 +71,6 @@ describe("tabMenuItems", () => {
     expect(shortcutOf("terminal")).toBe("tab.new");
     expect(shortcutOf("note")).toBe("tab.note");
     expect(shortcutOf("copy")).toBe("path.copy");
-    expect(shortcutOf("focusSidebar")).toBe("tab.focusOnExplorer");
-    expect(shortcutOf("autofocus")).toBe("tab.toggleAutofocus");
     expect(shortcutOf("hibernateTab")).toBe("tab.hibernate");
     expect(shortcutOf("lock")).toBe("tab.lock");
     expect(shortcutOf("close")).toBe("tab.close");
@@ -87,10 +84,15 @@ describe("tabMenuItems", () => {
   it("flips lock and hibernate labels with the state of the tab", () => {
     expect(item(entry(), "lock")).toMatchObject({ label: "Lock Tab", active: false });
     expect(item(entry({ locked: true }), "lock")).toMatchObject({ label: "Unlock Tab", active: true });
-    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab", active: false });
+    expect(item(entry(), "hibernateTab")).toMatchObject({ label: "Hibernate Tab" });
+  });
+
+  it("offers a sleeping tab only Restore and go to Tab, with no Hibernate and no Restore item", () => {
     const asleep = entry({ hibernation: { at: 1 } });
-    expect(item(asleep, "hibernateTab")).toMatchObject({ label: "Restore Tab", active: true });
     expect(item(asleep, "go")?.label).toBe("Restore and go to Tab");
+    expect(ids(asleep)).not.toContain("hibernateTab");
+    expect(ids(asleep).filter((id) => id === "go")).toHaveLength(1);
+    expect(runnableTabItem(asleep, "hibernateTab")).toBeNull();
   });
 
   it("only offers hibernation on terminals", () => {
@@ -103,11 +105,6 @@ describe("tabMenuItems", () => {
     expect(item(locked, "close")?.disabled).toBe(true);
     expect(item(locked, "lock")?.disabled).toBeFalsy();
     expect(item(entry(), "close")?.disabled).toBeFalsy();
-  });
-
-  it("closes the others only when the pane has more than one tab", () => {
-    expect(item(entry({}, { paneTabCount: 1 }), "closeOthers")?.disabled).toBe(true);
-    expect(item(entry({}, { paneTabCount: 2 }), "closeOthers")?.disabled).toBeFalsy();
   });
 
   it("offers Save only on a dirty editor or markdown tab", () => {
@@ -145,8 +142,19 @@ describe("tabMenuItems", () => {
     );
   });
 
+  it("shows the paths to copy as a second line, and nothing when the item is disabled", () => {
+    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false });
+    expect(item(inside, "copy")?.detail).toBe("/repo/src/a.ts");
+    expect(item(inside, "copyRelative")?.detail).toBe("src/a.ts");
+    const outside = entry({ kind: "editor", path: "/other/a.ts", dirty: false });
+    expect(item(outside, "copyRelative")?.detail).toBeUndefined();
+    const none = entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" });
+    expect(item(none, "copy")?.detail).toBeUndefined();
+    expect(item(entry(), "tabId")?.detail).toBeUndefined();
+  });
+
   it("copies the tab id and shows it as the tooltip", () => {
-    expect(item(entry(), "tabId")).toMatchObject({ label: "Copy Tab ID", title: "tab-1" });
+    expect(item(entry(), "tabId")).toMatchObject({ label: "Copy Tab ID", value: "tab-1", title: "tab-1" });
   });
 
   it("disables the terminal without a folder and the copy without a path", () => {
@@ -154,33 +162,6 @@ describe("tabMenuItems", () => {
     expect(item(e, "terminal")?.disabled).toBe(true);
     expect(item(e, "copy")?.disabled).toBe(true);
     expect(ids(e)).not.toContain("copyRelative");
-  });
-
-  it("targets the worktree of an agent for the sidebar, like the shortcut", () => {
-    const e = entry(
-      {},
-      { agentSession: { meta: { worktreeCwd: "/repo/.claude/worktrees/x" } } as TabEntry["agentSession"] },
-    );
-    expect(item(e, "focusSidebar")?.title).toBe("/repo/.claude/worktrees/x");
-  });
-
-  it("offers Focus on Sidebar for a file tab and not for a tab with nothing to reveal", () => {
-    expect(ids(entry({ kind: "editor", path: "/repo/a.ts", dirty: false }))).toContain("focusSidebar");
-    expect(ids(entry({ kind: "browser", url: "https://a.b" }))).not.toContain("focusSidebar");
-    expect(ids(entry({ cwd: undefined }))).not.toContain("focusSidebar");
-  });
-
-  it("disables Focus on Sidebar while the tab already autofocuses it", () => {
-    expect(item(entry({ autofocus: true }), "focusSidebar")?.disabled).toBe(true);
-    expect(item(entry({ autofocus: false }), "focusSidebar")?.disabled).toBeFalsy();
-  });
-
-  it("offers Autofocus only in manual mode on a tab that can drive the sidebar", () => {
-    expect(item(entry({ autofocus: true }), "autofocus")).toMatchObject({ active: true });
-    expect(item(entry(), "autofocus")).toMatchObject({ active: false });
-    expect(ids(entry(), { autofocusMode: "always" })).not.toContain("autofocus");
-    expect(ids(entry(), { autofocusMode: "noRoot" })).not.toContain("autofocus");
-    expect(ids(entry({ kind: "browser", url: "https://a.b" }))).not.toContain("autofocus");
   });
 
   it("always offers moving the tab to another workspace", () => {
@@ -191,55 +172,41 @@ describe("tabMenuItems", () => {
 });
 
 describe("tabItemKeepsPalette", () => {
-  it("keeps the palette for the toggles that change the row in place, a note included", () => {
-    for (const id of ["lock", "hibernateTab", "save", "note", "removeNote", "autofocus"] as const) {
-      expect(tabItemKeepsPalette(id)).toBe(true);
+  it("keeps the palette for the toggles that change the row in place", () => {
+    for (const id of ["lock", "hibernateTab", "save", "removeNote"] as const) {
+      expect(tabItemKeepsPalette(id, entry())).toBe(true);
     }
   });
 
+  it("keeps it when the note item hides an open note", () => {
+    expect(tabItemKeepsPalette("note", entry({ note: "hi", noteOpen: true }))).toBe(true);
+  });
+
+  it("closes it when the note item adds or shows a note, because the note takes the focus", () => {
+    expect(tabItemKeepsPalette("note", entry())).toBe(false);
+    expect(tabItemKeepsPalette("note", entry({ note: "hi" }))).toBe(false);
+  });
+
   it("closes it for the rest", () => {
-    for (const id of ["go", "copy", "copyRelative", "tabId", "focusSidebar", "close", "closeOthers"] as const) {
-      expect(tabItemKeepsPalette(id)).toBe(false);
+    for (const id of ["go", "copy", "copyRelative", "tabId", "close"] as const) {
+      expect(tabItemKeepsPalette(id, entry())).toBe(false);
     }
   });
 });
 
 describe("runnableTabItem", () => {
   it("finds the item a shortcut would run", () => {
-    expect(runnableTabItem(entry(), ctx, "lock")?.id).toBe("lock");
+    expect(runnableTabItem(entry(), "lock")?.id).toBe("lock");
   });
 
   it("is null when the menu does not offer the item on that tab", () => {
-    expect(runnableTabItem(entry(), ctx, "save")).toBeNull();
-    expect(runnableTabItem(entry(), { autofocusMode: "always" }, "autofocus")).toBeNull();
-    expect(runnableTabItem(entry({ kind: "browser", url: "u" }), ctx, "hibernateTab")).toBeNull();
+    expect(runnableTabItem(entry(), "save")).toBeNull();
+    expect(runnableTabItem(entry({ kind: "browser", url: "u" }), "hibernateTab")).toBeNull();
   });
 
   it("is null for a disabled item, except Close so a locked tab still flashes", () => {
-    expect(runnableTabItem(entry({ autofocus: true }), ctx, "focusSidebar")).toBeNull();
-    expect(runnableTabItem(entry({ locked: true }), ctx, "close")?.id).toBe("close");
-  });
-});
-
-describe("otherTabRowKeys", () => {
-  const e = (tabId: string, paneId: string, over: Record<string, unknown> = {}, ws = "ws-1") =>
-    entry({ id: tabId, ...over }, { workspaceId: ws, paneId });
-
-  it("lists the unlocked tabs of the same pane except the highlighted one", () => {
-    const list = [
-      e("a", "p1"),
-      e("b", "p1"),
-      e("c", "p1", { locked: true }),
-      e("d", "p2"),
-      e("g", "p1", {}, "ws-2"),
-      e("f", "p1", {}, "ws-2"),
-    ];
-    expect([...otherTabRowKeys(list, list[0])]).toEqual(["tab:b"]);
-  });
-
-  it("is empty for a pane with a single tab", () => {
-    const list = [e("a", "p1"), e("b", "p2")];
-    expect(otherTabRowKeys(list, list[0]).size).toBe(0);
+    expect(runnableTabItem(entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" }), "terminal")).toBeNull();
+    expect(runnableTabItem(entry({ locked: true }), "close")?.id).toBe("close");
   });
 });
 
@@ -287,6 +254,41 @@ describe("folderMenuItems", () => {
     expect(items[2]).toMatchObject({ actionId: "w1", heading: "Workspace actions", separatorBefore: true });
     expect(items[3].heading).toBeUndefined();
     expect(items[4]).toMatchObject({ actionId: "g1", heading: "Global actions", separatorBefore: true });
+  });
+});
+
+describe("moveMenuItems", () => {
+  const ws = (id: string) => ({ workspaceId: id, title: id.toUpperCase(), color: "#fff", icon: "star" });
+
+  it("lists Back, New workspace and the other workspaces in order, the source left out", () => {
+    const items = moveMenuItems([ws("a"), ws("b"), ws("c")], "b");
+    expect(items.map((i) => [i.id, i.label])).toEqual([
+      ["back", "Back"],
+      ["moveNew", "New workspace"],
+      ["moveTarget", "A"],
+      ["moveTarget", "C"],
+    ]);
+    expect(items.filter((i) => i.targetId).map((i) => i.targetId)).toEqual(["a", "c"]);
+  });
+
+  it("numbers the destinations from 1 and leaves Back and New workspace without a digit", () => {
+    const items = moveMenuItems([ws("a"), ws("b")], "none");
+    expect(items.map((i) => i.digit)).toEqual([undefined, undefined, 1, 2]);
+  });
+
+  it("gives a digit to the first nine destinations only", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ws(`w${i}`));
+    const digits = moveMenuItems(many, "none").filter((i) => i.targetId).map((i) => i.digit);
+    expect(digits).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, undefined, undefined, undefined]);
+  });
+
+  it("carries the workspace identity for the mark", () => {
+    const [, , first] = moveMenuItems([ws("a")], "x");
+    expect(first.leading).toEqual({ workspaceId: "a", color: "#fff", icon: "star" });
+  });
+
+  it("offers only Back and New workspace when there is no other workspace", () => {
+    expect(moveMenuItems([ws("a")], "a").map((i) => i.id)).toEqual(["back", "moveNew"]);
   });
 });
 

@@ -71,7 +71,7 @@ export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
   "palette.folderRoot": "only meaningful inside the new-terminal palette",
   "palette.folderMain": "only meaningful inside the new-terminal palette",
   "palette.folderHome": "only meaningful inside the new-terminal palette",
-  "palette.menuAction": "only meaningful inside the new-terminal palette",
+  "palette.menuAction": "only meaningful with a row menu open inside a palette",
   "palette.worktrees": "only meaningful inside the new-terminal palette",
   "tab.selectByIndex": "handler is parametrised by the digit key",
   "workspace.selectByIndex": "handler is parametrised by the digit key",

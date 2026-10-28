@@ -9,26 +9,17 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 import {
   getSavedWorkspaceState,
   initWorkspaceState,
-  sanitizeTab,
   sanitizeWorkspace,
 } from "./workspaceState";
 import { isAutofocusActive, type Tab } from "./types";
 import type { Workspace } from "./types";
 
-describe("sanitizeTab", () => {
-  it("preserves the terminal autofocus flag", () => {
-    const p: Tab = { id: "t1", kind: "terminal", cwd: "/a", autofocus: true };
-    expect(sanitizeTab(p)).toMatchObject({ autofocus: true });
-  });
-});
-
 describe("isAutofocusActive", () => {
   const off: Tab = { id: "t1", kind: "terminal", cwd: "/a" };
-  const on: Tab = { ...off, autofocus: true };
   const web: Tab = { id: "b1", kind: "browser", url: "https://x" };
 
-  it("follows the per-tab flag in manual mode", () => {
-    expect(isAutofocusActive(on, "manual", true)).toBe(true);
+  it("is never true in manual mode", () => {
+    expect(isAutofocusActive(off, "manual", true)).toBe(false);
     expect(isAutofocusActive(off, "manual", false)).toBe(false);
   });
 
@@ -37,10 +28,9 @@ describe("isAutofocusActive", () => {
     expect(isAutofocusActive(web, "always", true)).toBe(false);
   });
 
-  it("in noRoot mode is true only without a workspace root, ignoring the per-tab flag", () => {
+  it("in noRoot mode is true only without a workspace root", () => {
     expect(isAutofocusActive(off, "noRoot", false)).toBe(true);
     expect(isAutofocusActive(off, "noRoot", true)).toBe(false);
-    expect(isAutofocusActive(on, "noRoot", true)).toBe(false);
     expect(isAutofocusActive(web, "noRoot", false)).toBe(false);
   });
 });

@@ -20,8 +20,6 @@ const TABS: ShortcutId[] = [
   "tab.hibernate",
   "tab.note",
   "editor.save",
-  "tab.focusOnExplorer",
-  "tab.toggleAutofocus",
   "tab.new",
   "workspace.close",
 ];
@@ -30,9 +28,10 @@ const EXPECTED_COMMANDS: ShortcutId[] = [
   "commandPalette.open",
   "commandPalette.content",
   "commandPalette.history",
+  "palette.menuAction",
 ];
 const EXPECTED_FOLDER: ShortcutId[] = [
-  ...TABS,
+  ...TABS.filter((id) => id !== "tab.new"),
   "palette.folderCurrent",
   "palette.folderRoot",
   "palette.folderMain",
@@ -68,6 +67,21 @@ describe("shortcutBlockedByPalette", () => {
       const folderRow = id.startsWith("palette.");
       expect(shortcutBlockedByPalette(id, folderRow ? "folder" : "commands")).toBe(false);
     }
+  });
+
+  it("lets only palette.menuAction of the palette.* shortcuts through the command palette", () => {
+    const open = ALL.filter((id) => id.startsWith("palette.") && !shortcutBlockedByPalette(id, "commands"));
+    expect(open).toEqual(["palette.menuAction"]);
+  });
+
+  it("keeps Jump to Workspace and Select Tab by digit blocked behind the command palette", () => {
+    expect(shortcutBlockedByPalette("workspace.selectByIndex", "commands")).toBe(true);
+    expect(shortcutBlockedByPalette("tab.selectByIndex", "commands")).toBe(true);
+  });
+
+  it("blocks Focus on Sidebar, which the tab menu of a palette no longer offers", () => {
+    expect(shortcutBlockedByPalette("tab.focusOnExplorer", "commands")).toBe(true);
+    expect(shortcutBlockedByPalette("tab.focusOnExplorer", "folder")).toBe(true);
   });
 
   it("blocks the text editing shortcuts so the input keeps its keys", () => {

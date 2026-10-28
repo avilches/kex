@@ -18,7 +18,6 @@ describe("PALETTE_TAB_SHORTCUTS", () => {
       kind: "editor",
       cwd: "/p",
       detail: "/p/a.ts",
-      paneTabCount: 2,
       workspaceRoot: "/p",
       hibernated: false,
       agentSession: undefined,
@@ -30,8 +29,8 @@ describe("PALETTE_TAB_SHORTCUTS", () => {
       tab: { id: "t", kind: "terminal", cwd: "/p" },
     } as unknown as TabEntry;
     const items = [
-      ...tabMenuItems(entry, { autofocusMode: "manual" }),
-      ...tabMenuItems(terminal, { autofocusMode: "manual" }),
+      ...tabMenuItems(entry),
+      ...tabMenuItems(terminal),
     ];
     for (const [shortcutId, itemId] of Object.entries(PALETTE_TAB_SHORTCUTS)) {
       const item = items.find((i) => i.id === itemId);

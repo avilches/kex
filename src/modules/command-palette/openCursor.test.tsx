@@ -72,8 +72,6 @@ const tab = (id: string, i: number): TabEntry => ({
   workspaceColor: null,
   workspaceIcon: null,
   workspaceRoot: null,
-  paneId: "pane-1",
-  paneTabCount: 12,
   hibernated: false,
   kind: "terminal",
   title: id,
@@ -269,5 +267,16 @@ describe("palette cursor when it opens", () => {
     );
     await openPalette();
     expect(selected()).toBe(tabRowKey("cur"));
+  });
+
+  it("lands on a hibernated Current tab, idle and typing", async () => {
+    const tabs = manyTabs().map((t) =>
+      t.tabId === "cur" ? { ...t, hibernated: true, lastUsedAt: 0 } : t,
+    );
+    render(<Harness tabs={tabs} />);
+    await openPalette();
+    expect(rowIds()[0]).toBe(tabRowKey("cur"));
+    expect(selected()).toBe(tabRowKey("cur"));
+    expect(document.body.textContent).toContain("Current tab");
   });
 });

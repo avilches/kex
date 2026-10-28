@@ -2,6 +2,7 @@ import { describe, expect, it, test } from "vitest";
 import { MOD_PROP } from "@/lib/platform";
 import {
   findShortcutConflict,
+  isPaletteGroup,
   getBindingTokens,
   getShortcutLabel,
   matchesShortcut,
@@ -262,7 +263,7 @@ describe("index shortcut digit families", () => {
 
   test("the palette shortcuts are matched before the index jumps they share keys with", () => {
     const at = (id: ShortcutId) => SHORTCUTS.findIndex((s) => s.id === id);
-    for (const s of SHORTCUTS.filter((c) => c.group === "Palette: New Terminal")) {
+    for (const s of SHORTCUTS.filter((c) => isPaletteGroup(c.group))) {
       expect(at(s.id)).toBeLessThan(at("workspace.selectByIndex"));
       expect(at(s.id)).toBeLessThan(at("tab.selectByIndex"));
     }
@@ -277,7 +278,7 @@ describe("index shortcut digit families", () => {
       if (
         s.id === "workspace.selectByIndex" ||
         s.id === "tab.selectByIndex" ||
-        s.group === "Palette: New Terminal" ||
+        isPaletteGroup(s.group) ||
         KNOWN_DIGIT_OVERLAP.has(s.id)
       )
         continue;

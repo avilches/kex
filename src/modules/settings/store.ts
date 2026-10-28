@@ -39,7 +39,6 @@ export type ScmViewMode = "list" | "tree";
 export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
 export type SpinnerStyle = (typeof SPINNER_STYLES)[number];
 
-export type TerminalNewFolderMode = "home" | "workspace" | "context" | "ask";
 
 export type DiffViewMode = "unified" | "split";
 
@@ -169,7 +168,6 @@ export type Preferences = {
   autostart: boolean;
   performanceProfiler: boolean;
   autofocusMode: AutofocusMode;
-  autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
   spinnerStyle: SpinnerStyle;
@@ -193,7 +191,6 @@ export type Preferences = {
   terminalCursorInactiveStyle: CursorInactiveStyle;
   terminalCursorWidth: number;
   terminalScrollSensitivity: number;
-  terminalNewFolderMode: TerminalNewFolderMode;
   lastWslDistro: string | null;
   zoomLevel: number;
   paletteWidth: number;
@@ -257,7 +254,6 @@ const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
 const KEY_PERFORMANCE_PROFILER = "performanceProfiler";
 const KEY_AUTOFOCUS_MODE = "autofocusMode";
-const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_SPINNER_STYLE = "spinnerStyle";
@@ -304,7 +300,6 @@ const KEY_TERMINAL_CURSOR_STYLE = "cursorStyle";
 const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "cursorInactiveStyle";
 const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
 const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
-const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 
 // Editor store keys - no "editor" prefix since the file is already settings-editor.json
@@ -447,7 +442,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autostart: false,
   performanceProfiler: false,
   autofocusMode: "noRoot",
-  autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
   spinnerStyle: "arc",
@@ -471,7 +465,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorInactiveStyle: CURSOR_INACTIVE_STYLE_DEFAULT,
   terminalCursorWidth: CURSOR_WIDTH_DEFAULT,
   terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
-  terminalNewFolderMode: "context",
   lastWslDistro: null,
   zoomLevel: DEFAULT_ZOOM,
   paletteWidth: DEFAULT_PALETTE_WIDTH,
@@ -548,13 +541,6 @@ export function parseScmViewMode(value: unknown): ScmViewMode {
 
 export function parseThemePref(value: unknown): ThemePref {
   return value === "light" || value === "dark" ? value : "system";
-}
-
-export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
-  if (value === "home") return "home";
-  if (value === "workspace") return "workspace";
-  if (value === "ask") return "ask";
-  return "context";
 }
 
 // Builds a per-store writer: persists the key, flushes it to disk, then
@@ -635,9 +621,6 @@ export async function loadPreferences(): Promise<Preferences> {
       if (v === "manual" || v === "noRoot" || v === "always") return v;
       return DEFAULT_PREFERENCES.autofocusMode;
     })(),
-    autofocusNewTabs:
-      getGeneral<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
-      DEFAULT_PREFERENCES.autofocusNewTabs,
     explorerGitColorScheme: (() => {
       const v = getGeneral<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
       if (v === "vscode" || v === "jetbrains") return v;
@@ -713,9 +696,6 @@ export async function loadPreferences(): Promise<Preferences> {
       SCROLL_SENSITIVITY_MAX,
       SCROLL_SENSITIVITY_STEP,
       SCROLL_SENSITIVITY_DEFAULT,
-    ),
-    terminalNewFolderMode: parseTerminalNewFolderMode(
-      getTerminal<string>(KEY_TERMINAL_NEW_FOLDER_MODE),
     ),
     lastWslDistro:
       getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
@@ -950,10 +930,6 @@ export async function setAutofocusMode(value: AutofocusMode): Promise<void> {
   await writePref(KEY_AUTOFOCUS_MODE, value);
 }
 
-export async function setAutofocusNewTabs(value: boolean): Promise<void> {
-  await writePref(KEY_AUTOFOCUS_NEW_TABS, value);
-}
-
 export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
   await writePref(KEY_EXPLORER_GIT_COLOR_SCHEME, value);
 }
@@ -1005,12 +981,6 @@ export async function setHibernateSaveLines(value: boolean): Promise<void> {
 
 export async function setAutoHibernate(value: AutoHibernate): Promise<void> {
   await writePref(KEY_AUTO_HIBERNATE, value);
-}
-
-export async function setTerminalNewFolderMode(
-  value: TerminalNewFolderMode,
-): Promise<void> {
-  await writeTerminalPref(KEY_TERMINAL_NEW_FOLDER_MODE, value);
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
@@ -1386,7 +1356,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOSTART]: "autostart",
   [KEY_PERFORMANCE_PROFILER]: "performanceProfiler",
   [KEY_AUTOFOCUS_MODE]: "autofocusMode",
-  [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_SPINNER_STYLE]: "spinnerStyle",
@@ -1432,7 +1401,6 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_CURSOR_INACTIVE_STYLE]: "terminalCursorInactiveStyle",
   [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",
   [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
-  [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
 };
 

@@ -21,6 +21,8 @@ import {
   type KeyBinding,
   type Modifiers,
   modifiersOf,
+  isPaletteGroup,
+  PALETTE_OPENERS,
   SHORTCUT_GROUPS,
   SHORTCUTS,
   type Shortcut,
@@ -205,6 +207,12 @@ export function ShortcutsSection() {
         {SHORTCUT_GROUPS.map((group) => {
           const items = filteredShortcuts.filter((s) => s.group === group);
           if (items.length === 0) return null;
+          const cards = isPaletteGroup(group)
+            ? [
+                items.filter((s) => PALETTE_OPENERS.includes(s.id)),
+                items.filter((s) => !PALETTE_OPENERS.includes(s.id)),
+              ].filter((c) => c.length > 0)
+            : [items];
 
           return (
             <div key={group} className="flex flex-col gap-3">
@@ -214,24 +222,32 @@ export function ShortcutsSection() {
               >
                 {group}
               </h3>
-              <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-                {items.map((s) => (
-                  <ShortcutRow
-                    key={s.id}
-                    shortcut={s}
-                    isRecording={recordingId === s.id}
-                    conflict={recordingId === s.id ? recordingConflict : null}
-                    onConflict={setRecordingConflict}
-                    onStartRecording={() => startRecording(s.id)}
-                    onStopRecording={stopRecording}
-                    onRecord={(b) => onRecord(s.id, b)}
-                    onClear={() => onClear(s.id)}
-                    onReset={() => onResetShortcut(s.id)}
-                    userBindings={userShortcuts[s.id]}
-                    userShortcuts={userShortcuts}
-                  />
-                ))}
-              </div>
+              {cards.map((card, i) => (
+                <div
+                  key={card[0].id}
+                  className={cn(
+                    "flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden",
+                    i > 0 && "ml-6",
+                  )}
+                >
+                  {card.map((s) => (
+                    <ShortcutRow
+                      key={s.id}
+                      shortcut={s}
+                      isRecording={recordingId === s.id}
+                      conflict={recordingId === s.id ? recordingConflict : null}
+                      onConflict={setRecordingConflict}
+                      onStartRecording={() => startRecording(s.id)}
+                      onStopRecording={stopRecording}
+                      onRecord={(b) => onRecord(s.id, b)}
+                      onClear={() => onClear(s.id)}
+                      onReset={() => onResetShortcut(s.id)}
+                      userBindings={userShortcuts[s.id]}
+                      userShortcuts={userShortcuts}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
           );
         })}

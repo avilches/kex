@@ -12,7 +12,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   workspaceId: "ws-1",
   workspaceTitle: "Work",
   workspaceColor: null,
-  workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+  workspaceIcon: null, workspaceRoot: null,
   hibernated: false,
   kind: "terminal",
   title: "zsh",
@@ -90,6 +90,21 @@ describe("TabItem", () => {
   it("marks a hibernated tab", () => {
     row(entry({ hibernated: true }));
     expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
+  });
+
+  it("dims the content in an inner wrapper, never the row nor the selection tick", () => {
+    row(entry({ hibernated: true }));
+    const item = document.querySelector("[cmdk-item]") as HTMLElement;
+    expect(item.className).not.toMatch(/(^|\s)(\[[^\s]*\]:)?opacity-/);
+    const dimmed = item.querySelector(":scope > .opacity-40") as HTMLElement;
+    expect(dimmed).not.toBeNull();
+    expect(dimmed.textContent).toContain("zsh");
+    const tick = [...item.children].find((c) => c.classList.contains("opacity-0")) as Element;
+    expect(tick).toBeDefined();
+    expect(dimmed.contains(tick)).toBe(false);
+    cleanup();
+    row(entry());
+    expect(document.querySelector(".opacity-40")).toBeNull();
   });
 
   it("shows the absolute path on the second line", () => {

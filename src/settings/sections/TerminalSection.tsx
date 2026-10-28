@@ -1,12 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { homeDir } from "@tauri-apps/api/path";
-import {
-  CommandIcon,
-  Folder01Icon,
-  Home01Icon,
-  PinIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Select,
   SelectContent,
@@ -38,7 +30,6 @@ import {
 import {
   type CursorInactiveStyle,
   type CursorStyle,
-  type TerminalNewFolderMode,
   CURSOR_INACTIVE_STYLES,
   CURSOR_STYLES,
   CURSOR_WIDTH_MAX,
@@ -73,7 +64,6 @@ import {
   setTerminalFontWeight,
   setTerminalLetterSpacing,
   setTerminalLineHeight,
-  setTerminalNewFolderMode,
   setTerminalScratchpadEnterSends,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
@@ -134,18 +124,11 @@ export function TerminalSection() {
     (s) => s.scratchpadEnterSends,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
-  const terminalNewFolderMode = usePreferencesStore(
-    (s) => s.terminalNewFolderMode,
-  );
   const [shells, setShells] = useState<ShellInfo[]>([]);
-  const [home, setHome] = useState<string>("");
 
   useEffect(() => {
     void invoke<ShellInfo[]>("pty_list_shells")
       .then(setShells)
-      .catch(() => {});
-    void homeDir()
-      .then((h) => setHome(h.replace(/\\/g, "/").replace(/\/$/, "")))
       .catch(() => {});
   }, []);
 
@@ -193,76 +176,6 @@ export function TerminalSection() {
                 {s.name}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
-
-      <SettingRow
-        title="Open new terminals in"
-        description={
-          terminalNewFolderMode === "ask"
-            ? "Every new terminal asks for its folder with a palette."
-            : terminalNewFolderMode === "home"
-              ? "Your home."
-              : terminalNewFolderMode === "workspace"
-                ? "The workspace root, or home if the workspace doesn't have a root defined."
-                : "Current folder from the terminal or editor."
-        }
-      >
-        <Select
-          value={terminalNewFolderMode}
-          onValueChange={(v) =>
-            void setTerminalNewFolderMode(v as TerminalNewFolderMode)
-          }
-        >
-          <SelectTrigger size="sm" className="h-8 w-60 text-[12px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="home" className="text-[12px]">
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={Home01Icon}
-                  size={13}
-                  strokeWidth={2}
-                  className="text-muted-foreground"
-                />
-                {home || "Home"}
-              </span>
-            </SelectItem>
-            <SelectItem value="workspace" className="text-[12px]">
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={PinIcon}
-                  size={13}
-                  strokeWidth={2}
-                  className="text-muted-foreground"
-                />
-                Workspace root folder
-              </span>
-            </SelectItem>
-            <SelectItem value="context" className="text-[12px]">
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={Folder01Icon}
-                  size={13}
-                  strokeWidth={2}
-                  className="text-muted-foreground"
-                />
-                Current folder
-              </span>
-            </SelectItem>
-            <SelectItem value="ask" className="text-[12px]">
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={CommandIcon}
-                  size={13}
-                  strokeWidth={2}
-                  className="text-muted-foreground"
-                />
-                Ask me
-              </span>
-            </SelectItem>
           </SelectContent>
         </Select>
       </SettingRow>

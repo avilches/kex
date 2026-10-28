@@ -53,18 +53,91 @@ desde el padre, no solo con Escape.
 
 ---
 
-## Decision 2: Add/Show Note no activa la tab con la paleta abierta
+## Decision 2: Add/Show Note cierran la paleta, Hide/Remove Note no
 
-Los items de nota (Add, Show, Hide, Remove) actuan por id de tab sobre el estado de la nota y dejan
-la paleta abierta con la misma fila y el foco en su input. No activan la tab: activarla con la
-paleta abierta hace que el terminal (efecto de visible y enfocado, desocultado diferido) o un
-editor recupere el teclado, y ese foco no se puede controlar sin tocar el subsistema central de
-terminales y workspaces. Se probo una puerta de foco consultada por todos esos caminos y un
-listener de `focusin` que devolvia el foco al input, y se descarto: demasiados puntos de control en
-el foco del terminal y, sobre todo, el listener peleaba con un AlertDialog en portal (Hibernate,
-Close Other Tabs) y con la trampa de foco de Radix.
+Add Note y Show Note entregan el teclado a la nota, asi que se comportan como cualquier item que
+mueve el foco: cierran el menu de fila y la paleta (`runAfterClose`), activan la tab con
+`onGoToTab` (que no despierta una tab hibernada), piden el foco para la nota
+(`useTabNoteStore.requestFocus`) y la abren. `tabItemKeepsPalette(id, entry)` decide segun el estado
+de la nota: el item `note` solo deja la paleta abierta cuando oculta una nota abierta.
 
-Consecuencia aceptada: si la tab no es visible, la nota no se ve hasta ir a ella. La fila ya pinta
-el texto de la nota; no hay indicador de "nota abierta" sin texto.
+Hide Note y Remove Note no dan el foco a nada, asi que actuan sobre la tab por id y dejan la paleta
+abierta en la misma fila con el foco en su input. No activan la tab: activarla con la paleta abierta
+hace que el terminal (efecto de visible y enfocado) o un editor recupere el teclado, y ese foco no se
+puede controlar sin tocar el subsistema central de terminales y workspaces. Se probo una puerta de
+foco consultada por todos esos caminos y un listener de `focusin` que devolvia el foco al input, y se
+descarto: demasiados puntos de control en el foco del terminal y, sobre todo, el listener peleaba con
+un AlertDialog en portal (Hibernate) y con la trampa de foco de Radix.
 
-Leccion: ningun listener global de foco debe pelearse con un dialogo en portal.
+Leccion: ningun listener global de foco debe pelearse con un dialogo en portal; una accion que da el
+foco a otra cosa cierra la paleta en vez de intentar recuperarlo.
+
+---
+
+## Bug 3: Hibernate/Restore desde la paleta le quitan el foco (RESUELTO)
+
+### Sintoma
+
+Hibernar o restaurar una tab desde la paleta (item o atajo) dejaba la paleta abierta pero sin el
+foco en su input; con el modal de revision, al cerrarlo (confirmar, cancelar, Escape) pasaba lo mismo.
+
+### Pistas falsas descartadas
+
+- Un efecto que vigilaba la prop `hibernateDialogOpen` y refocalizaba con timeouts: el test que lo
+  cubria no usaba un AlertDialog real, y quitarlo no rompia ninguna prueba.
+- Tocar el foco del terminal o poner un listener global de `focusin`: descartado en la Decision 2.
+
+### Causa raiz
+
+Con un dialogo: Radix, al desmontar el contenido, llama a `onCloseAutoFocus`; el de `AlertDialogContent`
+hace `preventDefault()` y enfoca `triggerRef`, que aqui no existe (el dialogo se abre por estado, sin
+trigger), asi que el foco cae en el body. Sin dialogo: el terminal despertado enfoca su slot cuando
+monta (`requestLeafFocus` en el efecto de visible y enfocado); eso lo cubre `refocusInput` tras
+resolverse la accion.
+
+### Fix
+
+`keepPaletteFocus` (`lib/keepPaletteFocus.ts`) es el `onCloseAutoFocus` de `HibernateDialog`: si hay un
+input de paleta en el DOM, evita el comportamiento por defecto y le da el foco. Sin paleta no hace nada.
+`hibernateFocus.test.tsx` comprueba el handler con un AlertDialog generico en portal, y `HibernateDialogFocus.test.tsx` monta el `HibernateDialog` real junto a un input de paleta simulado y comprueba que el foco acaba en el input al confirmar, cancelar y con Escape; falla si se quita el `onCloseAutoFocus` del componente.
+
+### Riesgo abierto
+
+El boton "Go to tab" del dialogo hace `onClose()` y luego `onGoToTab()`, que pide el foco del tab destino en un `requestAnimationFrame`. La paleta no se cierra con ese camino, asi que `keepPaletteFocus` sigue dando el foco al input cuando el dialogo termina de desmontarse (tras su animacion de salida), y podria pisar el foco que acaba de pedir el tab. Sin la app arrancada no se puede saber el orden real, asi que no se ha puesto ningun parche: si se confirma, la salida coherente es cerrar la paleta en ese camino, no discriminar el foco dentro del handler.
+
+### Leccion
+
+Un dialogo sin trigger no devuelve el foco a nadie: quien lo abre desde otra superficie debe decirle
+adonde. Se resuelve en el `onCloseAutoFocus` del propio dialogo, no con timeouts ni listeners globales.
+
+## Bug 4: la tab actual hibernada no se ve resaltada como Current tab (RESUELTO)
+
+### Sintoma
+
+Con la tab actual hibernada, al abrir la paleta no se distinguia como "Current tab" ni como la fila del cursor.
+
+### Pistas falsas descartadas
+
+`byRecency` (las hibernadas van al final), el filtro `t.tabId !== activeTabId` de `mergeRows`, la marca `current`, `initialKey` y `displayOrder`: los tests de `mergeRows.test.ts` y `openCursor.test.tsx` con cmdk real pasan sin tocar nada. La fila SI es la primera, esta bajo "Current tab" y SI tiene `aria-selected`.
+
+### Causa raiz
+
+`TabItem` aplicaba `opacity-40` a la propia fila del `CommandItem` cuando `entry.hibernated`. Esa misma fila lleva `data-selected:bg-accent`, asi que la opacidad atenuaba tambien el fondo de seleccion: la fila elegida quedaba casi invisible.
+
+### Fix
+
+La opacidad va en un contenedor interior que envuelve el contenido (no en la fila ni en un selector `[&>*]`, que tambien atenuaria el tick de seleccion de `CommandItem`, hijo directo con `opacity-0`). `ClosedItem` igual. `TabItem.test.tsx` comprueba que la fila no lleva opacidad y que el tick queda fuera del contenedor atenuado.
+
+### Leccion
+
+Atenuar una fila de cmdk nunca con opacidad en la raiz: arrastra el resaltado de seleccion y el foco visual.
+
+---
+
+## Decision 5: Move to Workspace es un nivel del menu de fila, no una subpagina
+
+El menu de fila guarda el menu que sustituye (`RowMenuState.parent`) y `useRowMenu` expone `enter` / `back`; Escape (listener en captura, antes que Radix) vuelve un nivel y solo cierra el menu desde la raiz. Los digitos de los destinos usan `palette.menuAction`, que la paleta de comandos no dejaba pasar: `paletteGate` lo permite ahora y `registerPaletteControl` lo atiende (con menu abierto ejecuta el item cuyo `digit` coincide; sin menu o sin ese item consume la tecla sin efecto, asi `workspace.selectByIndex` nunca salta de workspace con la paleta abierta).
+
+El comando "Move tab to workspace..." mueve la tab activa: limpia la consulta (con texto la fila Current tab puede no estar en la lista) y abre el menu de esa fila ya en el nivel de destinos. Un `useEffect` sobre `pendingMove` espera a que la consulta este vacia y la fila exista en el DOM antes de anclar el menu; no se ancla en el mismo tick que `setQuery("")` porque la lista aun es la filtrada.
+
+Leccion: un atajo que el gate bloquea no llega nunca al `registerPaletteControl`; ampliar lo que un menu acepta empieza por `PALETTE_ALLOWED_SHORTCUTS` y su test que recorre el registry.

@@ -168,7 +168,6 @@ import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import {
   bulkClosableIds,
-  closeIdsForTab,
   otherBulkClosableIds,
 } from "@/modules/workspaces/lib/tabClose";
 import { linearNavTarget } from "@/modules/workspaces/lib/linearNav";
@@ -284,12 +283,11 @@ import {
   withPaletteTabShortcuts,
 } from "@/modules/command-palette/lib/paletteShortcuts";
 import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarget";
-import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   planCommandEvent,
   displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
-import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
+import { isAutofocusActive } from "@/modules/workspaces/lib/types";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
@@ -1235,31 +1233,10 @@ export default function App() {
 
   const openNewTerminal = useCallback(
     (targetPaneId?: string, targetWsId?: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        setFolderAskTarget({ wsId: targetWsId, paneId: targetPaneId });
-        setFolderPaletteOpen(true);
-        return;
-      }
-      const ws = targetWsId
-        ? workspacesRef.current.find((w) => w.id === targetWsId)
-        : workspacesRef.current.find(
-            (w) => w.id === activeWorkspaceIdRef.current,
-          );
-      if (!ws) return;
-      openTab(ws.id, targetPaneId ?? ws.activePaneId, {
-        id: newTabId(),
-        kind: "terminal",
-        cwd: resolveNewTerminalCwd({
-          mode: terminalNewFolderMode,
-          home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
-          launchDir: getLaunchDir() ?? null,
-        }),
-      });
+      setFolderAskTarget({ wsId: targetWsId, paneId: targetPaneId });
+      setFolderPaletteOpen(true);
     },
-    [openTab],
+    [],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
@@ -1749,57 +1726,31 @@ export default function App() {
       wsId: string,
       paneId: string,
       orientation: "horizontal" | "vertical",
-      cwd?: string,
+      cwd: string,
     ) => {
       setZenPaneId(null);
       const newPaneId = splitPane(wsId, paneId, orientation);
-      const ws = workspacesRef.current.find((w) => w.id === wsId);
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openTab(wsId, newPaneId, {
-        id: newTabId(),
-        kind: "terminal",
-        cwd: cwd ?? resolveNewTerminalCwd({
-          mode: terminalNewFolderMode,
-          home: homeRef.current,
-          lastFolder: scriptFocusFolderRef.current ?? ws?.cwd ?? null,
-          workspaceRoot: ws?.workspaceRoot ?? ws?.fsRoot ?? null,
-          launchDir: getLaunchDir() ?? null,
-        }),
-      });
+      openTab(wsId, newPaneId, { id: newTabId(), kind: "terminal", cwd });
     },
     [splitPane, openTab],
   );
 
   const onSplitTerminalRightStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        if (canSplitTerminal(wsId, paneId, "horizontal")) {
-          setFolderAskTarget({ wsId, paneId, split: "horizontal" });
-          setFolderPaletteOpen(true);
-        }
-        return;
-      }
       if (!canSplitTerminal(wsId, paneId, "horizontal")) return;
-      splitAndOpenTerminal(wsId, paneId, "horizontal");
+      setFolderAskTarget({ wsId, paneId, split: "horizontal" });
+      setFolderPaletteOpen(true);
     },
-    [canSplitTerminal, splitAndOpenTerminal],
+    [canSplitTerminal],
   );
 
   const onSplitTerminalDownStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      if (terminalNewFolderMode === "ask") {
-        if (canSplitTerminal(wsId, paneId, "vertical")) {
-          setFolderAskTarget({ wsId, paneId, split: "vertical" });
-          setFolderPaletteOpen(true);
-        }
-        return;
-      }
       if (!canSplitTerminal(wsId, paneId, "vertical")) return;
-      splitAndOpenTerminal(wsId, paneId, "vertical");
+      setFolderAskTarget({ wsId, paneId, split: "vertical" });
+      setFolderPaletteOpen(true);
     },
-    [canSplitTerminal, splitAndOpenTerminal],
+    [canSplitTerminal],
   );
 
   const onNewBrowserStable = useCallback(
@@ -3203,15 +3154,6 @@ export default function App() {
         if (found) updateTabData(found.workspace.id, activeTabId, toggleTabLock);
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
-      "tab.toggleAutofocus": () => {
-        if (autofocusMode !== "manual") return;
-        if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
-        const found = findTabGlobal(activeTabId);
-        if (found)
-          updateTabData(found.workspace.id, activeTabId, (p) =>
-            isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p,
-          );
-      },
       "path.copy": () => {
         if (!activeTab) return;
         let value: string | undefined;
@@ -3417,6 +3359,7 @@ export default function App() {
         addWorkspace(home ?? undefined);
         break;
       case "new_terminal":
+        if (runPaletteShortcut("folderCurrent")) break;
         shortcutHandlers["tab.new"]?.(new KeyboardEvent("keydown"));
         break;
       case "new_browser":
@@ -3723,20 +3666,17 @@ export default function App() {
     }
     return closeTabsRef.current([entry.tabId]);
   }, []);
-  const onPaletteCloseOtherTabs = useCallback(
-    (tabId: string) => closeTabsRef.current(closeIdsForTab(workspacesRef.current, tabId)),
-    [],
-  );
-  // Unlike the shortcut, waking leaves the focus where it is: the palette keeps it.
-  const onPaletteToggleHibernate = useCallback(
+  const onPaletteHibernateTab = useCallback(
     async (tabId: string) => {
       const found = findTabGlobal(tabId);
-      if (found?.tab.kind !== "terminal") return;
-      if (found.tab.hibernation) await wakeTabs(found.workspace.id, [tabId]);
-      else if (found.tab.locked) flashLockIcon(tabId);
-      else await requestHibernate(found.workspace.id, [tabId]);
+      if (found?.tab.kind !== "terminal" || found.tab.hibernation) return;
+      if (found.tab.locked) {
+        flashLockIcon(tabId);
+        return;
+      }
+      await requestHibernate(found.workspace.id, [tabId]);
     },
-    [findTabGlobal, wakeTabs, requestHibernate],
+    [findTabGlobal, requestHibernate],
   );
   const onPaletteRenameWorkspace = useCallback((workspaceId: string) => {
     useContextMenuCloseStore.getState().closeAll();
@@ -4264,10 +4204,7 @@ export default function App() {
             onMoveTabToWorkspace={moveTabFromPalette}
             onUpdateTab={sidebarTabMenu.onUpdateTab}
             onSaveTab={sidebarTabMenu.onSaveTab}
-            onToggleTabHibernate={onPaletteToggleHibernate}
-            hibernateDialogOpen={hibernateFlow.pending !== null}
-            onRevealInExplorer={sidebarTabMenu.onRevealInExplorer}
-            onCloseOtherTabs={onPaletteCloseOtherTabs}
+            onHibernateTab={onPaletteHibernateTab}
             onGoToTab={goToTab}
             onTerminalTargetChange={onPaletteTerminalTargetChange}
             onOpenTerminalAt={openTerminalAtPaletteTarget}

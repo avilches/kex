@@ -2,14 +2,11 @@ import { pathBasename } from "@/lib/pathUtils";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { relativeCopyFor } from "@/modules/explorer/lib/relativeCopy";
-import type { AutofocusMode } from "@/modules/settings/store";
 import { hasTabNote, isTabNoteOpen } from "@/modules/workspaces/lib/tabNote";
-import { tabCopyPath, tabFilePath } from "@/modules/workspaces/lib/tabPath";
-import { isAutofocusTab } from "@/modules/workspaces/lib/types";
+import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
-import { tabRowKey } from "./tabRank";
 
 export type RowMenuItemId =
   | "go"
@@ -18,14 +15,11 @@ export type RowMenuItemId =
   | "copyRelative"
   | "tabId"
   | "close"
-  | "closeOthers"
   | "lock"
   | "hibernateTab"
   | "save"
   | "note"
   | "removeNote"
-  | "focusSidebar"
-  | "autofocus"
   | "moveWorkspace"
   | "rename"
   | "hibernate"
@@ -37,7 +31,10 @@ export type RowMenuItemId =
   | "run"
   | "stop"
   | "edit"
-  | "action";
+  | "action"
+  | "back"
+  | "moveNew"
+  | "moveTarget";
 
 export type RowMenuItem = {
   id: RowMenuItemId;
@@ -46,14 +43,22 @@ export type RowMenuItem = {
   shortcutId?: ShortcutId;
   enter?: boolean;
   disabled?: boolean;
-  // A toggle that is on: Unlock and Restore draw their alternate icon, Autofocus tints its own.
+  // A toggle that is on: Unlock draws its alternate icon, Autofocus tints its own.
   active?: boolean;
   // Full text for the tooltip when the label shortens something, such as a folder path.
   title?: string;
+  // A value the item acts on, drawn dimmed in monospace after the label.
+  value?: string;
+  // A second line under the label, dimmed in monospace and trimmed at the start when it is long.
+  detail?: string;
   // The Action an "action" item runs.
   actionId?: string;
   // The 1-9 key that runs it while the menu is open (Cmd+digit).
   digit?: number;
+  // The workspace a "moveTarget" item moves the tab to.
+  targetId?: string;
+  // The workspace identity drawn in place of the icon.
+  leading?: { workspaceId: string; color: string | null; icon: string | null };
   // First item of the Actions block: a rule above it.
   separatorBefore?: boolean;
   // First Action of a scope: a title above it, like the Header combo.
@@ -155,15 +160,6 @@ export function tabEntryCopyPath(entry: TabEntry): string | null {
   return tabCopyPath(entry.tab, entry.agentSession?.meta?.worktreeCwd ?? null);
 }
 
-export type TabMenuContext = { autofocusMode: AutofocusMode };
-
-// The folder or file "Focus on Sidebar" reveals; the worktree an agent entered wins over the cwd,
-// like the shortcut.
-export function tabFocusTarget(entry: TabEntry): string | null {
-  const { tab } = entry;
-  if (tab.kind === "terminal") return entry.agentSession?.meta?.worktreeCwd ?? tab.cwd ?? null;
-  return tabFilePath(tab);
-}
 
 export function tabEntryRelativePath(entry: TabEntry) {
   if (entry.kind === "browser") return null;
@@ -176,7 +172,7 @@ export function noteLabel(entry: TabEntry): string {
   return hasTabNote(entry.tab) ? "Show Note" : "Add Note";
 }
 
-export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[] {
+export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   const { tab } = entry;
   const locked = !!tab.locked;
   const items: RowMenuItem[] = [
@@ -192,12 +188,14 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
   }
   items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note", separatorBefore: true });
   if (hasTabNote(tab)) items.push({ id: "removeNote", label: "Remove Note" });
+  const absolute = tabEntryCopyPath(entry);
   items.push({
     id: "copy",
     label: "Copy Absolute Path",
     shortcutId: "path.copy",
-    disabled: !tabEntryCopyPath(entry),
+    disabled: !absolute,
     separatorBefore: true,
+    ...(absolute ? { detail: absolute } : {}),
   });
   const rel = tabEntryRelativePath(entry);
   if (rel && !(rel.ok && rel.text === ".")) {
@@ -206,34 +204,16 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
       label: "Copy Relative Path",
       title: rel.ok ? rel.text : rel.reason,
       disabled: !rel.ok,
+      ...(rel.ok ? { detail: rel.text } : {}),
     });
   }
-  items.push({ id: "tabId", label: "Copy Tab ID", title: entry.tabId });
-  const focusTarget = tabFocusTarget(entry);
-  if (focusTarget) {
-    items.push({
-      id: "focusSidebar",
-      label: "Focus on Sidebar",
-      shortcutId: "tab.focusOnExplorer",
-      title: focusTarget,
-      disabled: isAutofocusTab(tab) && !!tab.autofocus,
-    });
-  }
-  if (isAutofocusTab(tab) && ctx.autofocusMode === "manual") {
-    items.push({
-      id: "autofocus",
-      label: "Autofocus Sidebar",
-      shortcutId: "tab.toggleAutofocus",
-      active: !!tab.autofocus,
-    });
-  }
+  items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
   items.push({ id: "moveWorkspace", label: "Move to Workspace" });
-  if (tab.kind === "terminal") {
+  if (tab.kind === "terminal" && !entry.hibernated) {
     items.push({
       id: "hibernateTab",
-      label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
+      label: "Hibernate Tab",
       shortcutId: "tab.hibernate",
-      active: entry.hibernated,
       separatorBefore: true,
     });
   }
@@ -242,11 +222,10 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
     label: locked ? "Unlock Tab" : "Lock Tab",
     shortcutId: "tab.lock",
     active: locked,
-    separatorBefore: tab.kind !== "terminal",
+    separatorBefore: tab.kind !== "terminal" || entry.hibernated,
   });
   items.push(
     { id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: locked },
-    { id: "closeOthers", label: "Close Other Tabs", disabled: entry.paneTabCount <= 1 },
     { id: "closeWorkspace", label: "Close Workspace", shortcutId: "workspace.close" },
   );
   return items;
@@ -254,14 +233,16 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
 
 // Whether the item leaves the palette open: it toggles or saves in place, so the row stays and
 // shows the new state. Every other item closes the palette or removes rows through the close flow.
-export function tabItemKeepsPalette(id: RowMenuItemId): boolean {
+// Add and Show Note hand the keyboard to the note, so they close it; Hide Note does not.
+export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean {
+  if (id === "note") return isTabNoteOpen(entry.tab);
   return (
+    id === "moveWorkspace" ||
+    id === "back" ||
     id === "lock" ||
-    id === "note" ||
     id === "hibernateTab" ||
     id === "save" ||
-    id === "removeNote" ||
-    id === "autofocus"
+    id === "removeNote"
   );
 }
 
@@ -269,24 +250,11 @@ export function tabItemKeepsPalette(id: RowMenuItemId): boolean {
 // disabled. Close stays runnable on a locked tab: refusing it flashes the lock.
 export function runnableTabItem(
   entry: TabEntry,
-  ctx: TabMenuContext,
   id: RowMenuItemId,
 ): RowMenuItem | null {
-  const item = tabMenuItems(entry, ctx).find((i) => i.id === id);
+  const item = tabMenuItems(entry).find((i) => i.id === id);
   if (!item || (item.disabled && id !== "close")) return null;
   return item;
-}
-
-// Rows of the other tabs of the same pane that "Close Other Tabs" will close: locked ones stay.
-export function otherTabRowKeys(entries: readonly TabEntry[], entry: TabEntry): Set<string> {
-  const keys = new Set<string>();
-  for (const other of entries) {
-    if (other.tabId === entry.tabId || other.tab.locked) continue;
-    if (other.workspaceId === entry.workspaceId && other.paneId === entry.paneId) {
-      keys.add(tabRowKey(other.tabId));
-    }
-  }
-  return keys;
 }
 
 export type FolderMenuTarget = {
@@ -341,6 +309,29 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
     });
   });
   return items;
+}
+
+// What "Move to Workspace" turns the menu into: Back, New workspace and the destinations (the tab's
+// own workspace left out), the first nine reachable with Cmd+digit.
+export function moveMenuItems(
+  workspaces: readonly Pick<WorkspaceEntry, "workspaceId" | "title" | "color" | "icon">[],
+  sourceWorkspaceId: string,
+): RowMenuItem[] {
+  const targets = workspaces.filter((w) => w.workspaceId !== sourceWorkspaceId);
+  return [
+    { id: "back", label: "Back" },
+    { id: "moveNew", label: "New workspace" },
+    ...targets.map(
+      (t, i): RowMenuItem => ({
+        id: "moveTarget",
+        label: t.title,
+        title: t.title,
+        targetId: t.workspaceId,
+        leading: { workspaceId: t.workspaceId, color: t.color, icon: t.icon },
+        ...(i < 9 ? { digit: i + 1 } : {}),
+      }),
+    ),
+  ];
 }
 
 // The enabled item the arrow key reaches from `from`, wrapping around; -1 when none is enabled.

@@ -165,9 +165,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspaces/<id>.json` (`explorerRootMode`,
   `workspaceRoot`).
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
-  modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
-  context menu) drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd
-  changes while focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
+  modes. In the `noRoot` and `always` autofocus modes the active terminal drives both the Explorer root and the Source Control /
+  Git History repo when it gains focus or its cwd changes while focused (there is no per-tab flag, indicator or menu item).
+  F4 (`tab.focusOnExplorer`) and the explorer crosshair button do the same anchoring on demand, and
   additionally opens the sidebar if closed and switches away from Git History. Both F4 and autofocus use the same
   cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
@@ -644,6 +644,6 @@ These phases are designed but not fully implemented:
 - Changes applied (Bucket B): fix(breadcrumb) scroll horizontal (6963d82, cherry-pick limpio); fix(window) allow-destroy permission ya presente en el fork (414ee17, no action)
 - Changes applied (Bucket C): font weight terminal (9fc0425, merge manual); shell selector (a770307, merge manual); language override por panel con selector UI en EditorOverlayBar (d77476e, merge manual + reimplementacion UI)
 - Changes skipped (removed surface): Nix sources (564e145); version bump v0.8.2 (63099f5); npm dep bumps (db63229); AI autocomplete endpoints (a8b9481 -- superficie eliminada); quit-on-last-tab (7a812ca -- modelo de tabs eliminado en Phase 2)
-- Bonus (no upstream): HTML preview para archivos .html con injectBase para paths relativos; markdown live preview refactor (seeding de liveContent via onContentChange); undo-close-tab design spec (F5); editor.save shortcut global; toggle HTML preview shortcut; terminalNewFolderMode setting: "Open new terminals in" select in Terminal settings, with three modes: "Home" (the home directory), "Workspace root folder" (the static pinned/fs project root, falling back to last folder when the workspace has none) and "Last folder from terminal or editor" (active terminal cwd, or the worktree the agent entered in that tab, or editor file parent dir; the default). The workspace root reads the static pinnedRoot/fsRoot, never ws.cwd which tracks the focused terminal live via OSC 7.
+- Bonus (no upstream): HTML preview para archivos .html con injectBase para paths relativos; markdown live preview refactor (seeding de liveContent via onContentChange); undo-close-tab design spec (F5); editor.save shortcut global; toggle HTML preview shortcut; terminalNewFolderMode setting (removed later: a new terminal always asks for its folder with the FolderPalette): "Open new terminals in" select in Terminal settings, with three modes: "Home" (the home directory), "Workspace root folder" (the static pinned/fs project root, falling back to last folder when the workspace has none) and "Last folder from terminal or editor" (active terminal cwd, or the worktree the agent entered in that tab, or editor file parent dir; the default). The workspace root reads the static pinnedRoot/fsRoot, never ws.cwd which tracks the focused terminal live via OSC 7.
 - New features rejected: ninguna
 - Quality suite: biome lint sin issues, pnpm check-types OK, 517 tests JS (49 archivos; +6 resolveDisplayName, +1 git-bash OSC 7, +3 coerceFontWeight), cargo clippy limpio, 273 tests Rust (+6 shell_init unix/windows).

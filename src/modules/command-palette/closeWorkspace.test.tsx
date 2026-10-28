@@ -47,7 +47,7 @@ const mk = (id: string, workspaceId: string, i: number): TabEntry =>
     workspaceId,
     workspaceTitle: workspaceId,
     workspaceColor: null,
-    workspaceIcon: null, workspaceRoot: null, paneId: "pane-1", paneTabCount: 1,
+    workspaceIcon: null, workspaceRoot: null,
     hibernated: false,
     kind: "terminal",
     title: id,
