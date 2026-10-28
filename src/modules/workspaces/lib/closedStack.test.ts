@@ -386,3 +386,14 @@ describe("orphanedSleepers", () => {
     expect(orphanedSleepers([ws], [], new Set())).toEqual(["s1"]);
   });
 });
+
+describe("buildReopenedTab with a held restore block", () => {
+  it("drops the block from the live tab, it is seeded apart", () => {
+    const tab = {
+      id: "tab-a",
+      kind: "terminal",
+      held: { modal: true, block: { reason: "r", dir: "/d", command: "c", restorable: true } },
+    } as Tab;
+    expect(buildReopenedTab(tab, "tab-b")).not.toHaveProperty("held");
+  });
+});

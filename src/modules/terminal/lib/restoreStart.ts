@@ -11,6 +11,15 @@ export type RestoreBlock = {
   restorable: boolean;
 };
 
+// What a tab that stops (hibernate or close) keeps of a restore that did not run, so the way back
+// shows the same state: `modal` is the error dialog, otherwise the plan only waits in the menu.
+export type HeldBlock = { block: RestoreBlock; modal: boolean };
+
+export function heldBlockOf(modal: RestoreBlock | null, pending: RestoreBlock | null): HeldBlock | null {
+  if (modal) return { block: modal, modal: true };
+  return pending ? { block: pending, modal: false } : null;
+}
+
 export type StartDecision =
   | { kind: "spawn"; cwd: string | undefined; inject: "resume" | "command" | "none" }
   | { kind: "blocked"; block: RestoreBlock };

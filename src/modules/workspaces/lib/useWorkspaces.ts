@@ -61,6 +61,7 @@ import {
   reviveWorkspace,
 } from "./closedStack";
 import { dismissCloseNotice, showCloseNotice } from "./closedNotice";
+import { seedHeldBlock } from "@/modules/terminal/lib/pendingRestore";
 import { withLiveRestoreCommand, withLiveRestoreCommandAll } from "./restoreCommandSave";
 
 // Whether a reopened closed tab is worth asking Rust for a live agent resume plan: only a
@@ -849,6 +850,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       if (!needsResumePlanLookup(tab)) return;
       const plan = await previewResumeCmd(tab.id);
       if (plan) seedRestorePlan(newId, plan);
+      if (tab.kind === "terminal" && tab.held) seedHeldBlock(newId, tab.held);
     };
 
     if (picked.kind === "workspace") {
@@ -1144,6 +1146,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (tabs.length === 0) return;
     await runOnce(wakesInFlight, tabs.map((t) => t.id).sort().join(","), async () => {
       await seedWakePlans(tabs, previewResumeCmd, seedRestorePlan);
+      for (const t of tabs) if (t.hibernation?.held) seedHeldBlock(t.id, t.hibernation.held);
       await handOverLastLines(tabs.map((t) => t.id));
       unmarkHibernating(tabs.map((t) => t.id));
       setWorkspaces((prev) => applyWake(prev, workspaceId, new Set(tabs.map((t) => t.id))));
