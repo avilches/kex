@@ -924,7 +924,9 @@ export function CommandPalette({
         shouldFilter={false}
         loop
         value={value}
-        onValueChange={setValue}
+        onValueChange={(next) => {
+          if (open) setValue(next);
+        }}
         onKeyDown={onKeyDown}
       >
         <CommandInput
