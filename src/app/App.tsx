@@ -20,6 +20,7 @@ import { tabDisplayTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
+import { usePruneSleepingWorktree } from "@/modules/workspaces/lib/usePruneSleepingWorktree";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { useHibernateLinesCleanup } from "@/modules/workspaces/lib/useHibernateLinesCleanup";
 import { enterBelongsToFocusedElement } from "@/modules/workspaces/lib/wakeShortcut";
@@ -1077,6 +1078,7 @@ export default function App() {
     activeTabId ? (s.sessions[activeTabId]?.meta?.worktreeCwd ?? null) : null,
   );
   const agentWorktree = tabWorktree(activeTab, liveAgentWorktree);
+  usePruneSleepingWorktree(activeWorkspaceId, activeTab, updateTabData);
   scriptFocusFolderRef.current = agentWorktree ?? contextCwdRef.current;
 
   const focusSidebar = useCallback(
