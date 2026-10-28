@@ -1307,10 +1307,15 @@ function hibernatedTab(): HTMLElement {
       h("div", {
         class: "size-12 rounded-full border border-current opacity-70",
       }),
-      h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
-      h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
-      h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
-      h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
+      h(
+        "div",
+        { class: "flex max-w-full flex-col items-start gap-1.5 self-stretch text-left" },
+        h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
+        h("span", { class: "max-w-full truncate font-mono text-[11.5px]" }, "~/code/kex"),
+        h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
+        h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
+        h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
+      ),
       h(
         "div",
         { class: "flex items-center gap-2" },

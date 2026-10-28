@@ -108,4 +108,13 @@ describe("HibernatedTab", () => {
     rerender(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
     expect(getByRole("button", { name: /Restore/ }).getAttribute("data-variant")).toBe("secondary");
   });
+
+  it("shows the folder under the name, preferring the kept worktree", () => {
+    const tab = { ...sleeping(), cwd: "/Users/me/proj" };
+    const { container, rerender } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj");
+    const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
+    rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj/.claude/worktrees/x");
+  });
 });
