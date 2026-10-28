@@ -162,7 +162,7 @@ Con la tab actual hibernada, al abrir la paleta no se distinguia como "Current t
 
 ### Pistas falsas descartadas
 
-`byRecency` (las hibernadas van al final), el filtro `t.tabId !== activeTabId` de `mergeRows`, la marca `current`, `initialKey` y `displayOrder`: los tests de `mergeRows.test.ts` y `openCursor.test.tsx` con cmdk real pasan sin tocar nada. La fila SI es la primera, esta bajo "Current tab" y SI tiene `aria-selected`.
+`byRecency` (entonces las hibernadas iban al final; ya no), el filtro `t.tabId !== activeTabId` de `mergeRows`, la marca `current`, `initialKey` y `displayOrder`: los tests de `mergeRows.test.ts` y `openCursor.test.tsx` con cmdk real pasan sin tocar nada. La fila SI es la primera, esta bajo "Current tab" y SI tiene `aria-selected`.
 
 ### Causa raiz
 
