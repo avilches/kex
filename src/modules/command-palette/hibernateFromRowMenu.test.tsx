@@ -7,7 +7,7 @@ import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteTabItem } from "./lib/paletteControl";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
-import { setRunningCommand } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue({}) }));
@@ -95,10 +95,9 @@ function Harness() {
         workspace={pending}
         tabIds={["c"]}
         onClose={() => setPending(null)}
-        onHibernate={() => setPending(null)}
+        onConfirm={() => setPending(null)}
         onSaveTab={async () => null}
         onGoToTab={() => {}}
-        onEnableRunOnStart={() => {}}
         onStopBusy={() => {}}
       />
     </>
@@ -125,7 +124,16 @@ async function setup() {
 const trace = (label: string) =>
   log.push(`${label}: active=${document.activeElement?.tagName}${document.activeElement === input() ? "(input)" : ""} dialog=${!!document.querySelector('[role="alertdialog"]')} menu=${menuOpen()}`);
 
-beforeEach(() => { setRunningCommand("c", "sleep 100"); log.length = 0; onChange = vi.fn(); });
+beforeEach(() => {
+  // Only a working agent makes the dialog ask: a running command is hibernated without a question.
+  useAgentStore.setState({
+    sessions: { c: { tabId: "c", workspaceId: "ws", agent: "claude", status: "working", restoreError: false, meta: { sessionId: "s" } } },
+    notifications: [],
+    closedSessions: {},
+  } as never);
+  log.length = 0;
+  onChange = vi.fn();
+});
 
 async function openFromMenu(how: "enter" | "click") {
   await setup();
@@ -163,7 +171,7 @@ describe("Hibernate Tab chosen from the row menu over the palette", () => {
 
   it("Cancel returns the focus to the input", async () => {
     await openFromMenu("enter");
-    fireEvent.click(screen.getByText("Close"));
+    fireEvent.click(screen.getByText("Cancel"));
     await wait(400);
     expect(document.activeElement).toBe(input());
     expect(selected()).toBe("tab:c");
