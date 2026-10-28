@@ -746,13 +746,6 @@ pub fn run() {
                         signal_quit_request(app);
                         return;
                     }
-                    if id == "new_window" {
-                        let app2 = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let _ = create_new_window(&app2);
-                        });
-                        return;
-                    }
                     if id == "dock_browser" {
                         float_browser::dock_focused(app);
                         return;
@@ -775,7 +768,7 @@ pub fn run() {
                     } else {
                         // Windowless mode: no live window to route the event to.
                         match id {
-                            "new_workspace" | "new_terminal" | "new_browser" => {
+                            "new_window" | "new_workspace" | "new_terminal" | "new_browser" => {
                                 let app2 = app.clone();
                                 tauri::async_runtime::spawn(async move {
                                     let _ = create_new_window(&app2);

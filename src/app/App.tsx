@@ -3344,6 +3344,9 @@ export default function App() {
       case "settings":
         void openSettingsWindow();
         break;
+      case "new_window":
+        void native.openMainWindow();
+        break;
       case "new_workspace":
         addWorkspace(home ?? undefined);
         break;

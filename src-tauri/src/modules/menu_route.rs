@@ -18,7 +18,7 @@ pub fn route_menu_event(settings_focused: bool, id: &str) -> MenuRoute {
     }
     match id {
         "close_tab" => MenuRoute::CloseSettings,
-        "new_window" | "dock_browser" | "dock_all_browsers" => MenuRoute::Forward,
+        "dock_browser" | "dock_all_browsers" => MenuRoute::Forward,
         _ => MenuRoute::Ignore,
     }
 }
@@ -42,6 +42,7 @@ mod tests {
     fn settings_focused_ignores_items_that_target_the_main_window() {
         for id in [
             "settings",
+            "new_window",
             "new_workspace",
             "new_terminal",
             "new_browser",
@@ -62,7 +63,7 @@ mod tests {
 
     #[test]
     fn settings_focused_keeps_window_level_items() {
-        for id in ["new_window", "dock_browser", "dock_all_browsers"] {
+        for id in ["dock_browser", "dock_all_browsers"] {
             assert_eq!(route_menu_event(true, id), MenuRoute::Forward, "{id}");
         }
     }
