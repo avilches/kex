@@ -1,22 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { tabCloseControl } from "./tabCloseControl";
+import { tabEndButtons, tabMiddleClick } from "./tabCloseControl";
 import type { Tab } from "./types";
 
-describe("tabCloseControl", () => {
-  it("hibernates an awake terminal instead of closing it", () => {
-    expect(tabCloseControl({ id: "t1", kind: "terminal" } as Tab)).toBe("hibernate");
+const awake = { id: "t1", kind: "terminal" } as Tab;
+const asleep = { id: "t1", kind: "terminal", hibernation: { at: 1 } } as Tab;
+const others = [
+  { id: "e1", kind: "editor", path: "/a.ts", dirty: false, preview: false },
+  { id: "m1", kind: "markdown", path: "/a.md" },
+  { id: "b1", kind: "browser", url: "https://example.com" },
+] as Tab[];
+
+describe("tabEndButtons", () => {
+  it("gives an awake terminal both a hibernate and a close button", () => {
+    expect(tabEndButtons(awake)).toEqual(["hibernate", "close"]);
   });
 
-  it("closes a terminal that is already asleep", () => {
-    expect(tabCloseControl({ id: "t1", kind: "terminal", hibernation: { at: 1 } } as Tab)).toBe("close");
+  it("gives a sleeping terminal only the close button", () => {
+    expect(tabEndButtons(asleep)).toEqual(["close"]);
   });
 
-  it("closes any other kind of tab at once", () => {
-    const tabs = [
-      { id: "e1", kind: "editor", path: "/a.ts", dirty: false, preview: false },
-      { id: "m1", kind: "markdown", path: "/a.md" },
-      { id: "b1", kind: "browser", url: "https://example.com" },
-    ] as Tab[];
-    for (const tab of tabs) expect(tabCloseControl(tab)).toBe("close");
+  it("gives any other kind of tab only the close button", () => {
+    for (const tab of others) expect(tabEndButtons(tab)).toEqual(["close"]);
+  });
+});
+
+describe("tabMiddleClick", () => {
+  it("hibernates an awake terminal and closes everything else", () => {
+    expect(tabMiddleClick(awake)).toBe("hibernate");
+    expect(tabMiddleClick(asleep)).toBe("close");
+    for (const tab of others) expect(tabMiddleClick(tab)).toBe("close");
   });
 });

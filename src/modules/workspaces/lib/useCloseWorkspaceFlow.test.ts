@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCloseWorkspaceFlow, type CloseFlowDeps, type PendingClose, type RunningProcess } from "./useCloseWorkspaceFlow";
+import { createCloseWorkspaceFlow, type CloseFlowDeps, type PendingClose } from "./useCloseWorkspaceFlow";
 import type { Tab, Workspace } from "./types";
 
 const term = (id: string): Tab => ({ id, kind: "terminal" }) as Tab;
@@ -13,16 +13,14 @@ const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace =>
     ...over,
   }) as Workspace;
 
-function setup(workspace: Workspace | undefined, processes: RunningProcess[] = [], over: Partial<CloseFlowDeps> = {}) {
+function setup(workspace: Workspace | undefined, over: Partial<CloseFlowDeps> = {}) {
   const calls: string[] = [];
   const deps: CloseFlowDeps = {
     getWorkspace: () => workspace,
     autosaveEnabled: () => false,
-    warnProcesses: () => true,
     flushDirtyEditors: async () => void calls.push("flush"),
     settle: async () => void calls.push("settle"),
     live: () => ({ agentOf: () => undefined, scriptState: () => undefined, actionOf: () => undefined }),
-    collectProcesses: async () => processes,
     close: async (id) => void calls.push(`close:${id}`),
     setPending: (p) => void calls.push(`pending:${p ? p.id : "null"}`),
     ...over,
@@ -65,69 +63,57 @@ describe("createCloseWorkspaceFlow", () => {
     expect(calls).toContain("pending:w1");
   });
 
-  it("asks when a terminal has a running process and passes it on", async () => {
-    let pending: PendingClose | null = null;
-    const { flow } = setup(ws([term("t1")]), [{ tabId: "t1", label: "vim" }], {
-      setPending: (p) => {
-        pending = p;
-      },
-    });
-    await flow.request("w1");
-    expect(pending).toEqual({ id: "w1", processes: [{ tabId: "t1", label: "vim" }] });
-  });
-
-  it("closes without asking about a process when the warning is off", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), [{ tabId: "t1", label: "vim" }], { warnProcesses: () => false });
-    await flow.request("w1");
-    expect(calls).toContain("close:w1");
-    expect(calls).not.toContain("pending:w1");
-  });
-
-  it("asks about a working agent even with the warning off", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), [], {
-      warnProcesses: () => false,
-      live: () => ({
-        agentOf: () => ({ agent: "claude", status: "working" as const, resumable: true }),
-        scriptState: () => undefined,
-        actionOf: () => undefined,
-      }),
-    });
-    await flow.request("w1");
-    expect(calls).toContain("pending:w1");
-    expect(calls).not.toContain("close:w1");
-  });
-
-  it("asks about unsaved documents even with the warning off", async () => {
-    const { flow, calls } = setup(ws([doc("e1", true)]), [], { warnProcesses: () => false });
-    await flow.request("w1");
-    expect(calls).toContain("pending:w1");
-  });
-
-  it("asks about actions to delete even with the warning off", async () => {
-    const actions = [{ id: "ac-1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false }];
-    const { flow, calls } = setup(ws([], { actions }), [], { warnProcesses: () => false });
-    await flow.request("w1");
-    expect(calls).toContain("pending:w1");
-  });
-
-  it("does not list a process twice when the tab is a running script", async () => {
-    let pending: PendingClose | null = null;
-    const { flow } = setup(ws([term("t1")]), [{ tabId: "t1", label: "pnpm" }], {
+  it("closes without asking when a terminal has a process or a script running", async () => {
+    const { flow, calls } = setup(ws([term("t1")]), {
       live: () => ({
         agentOf: () => undefined,
         scriptState: () => "running",
         actionOf: () => ({ name: "dev", command: "pnpm dev" }),
       }),
+    });
+    await flow.request("w1");
+    expect(calls).toContain("close:w1");
+    expect(calls).not.toContain("pending:w1");
+  });
+
+  it("asks about a working agent", async () => {
+    let pending: PendingClose | null = null;
+    const { flow, calls } = setup(ws([term("t1")]), {
+      live: () => ({
+        agentOf: () => ({ agent: "claude", status: "working" as const, resumable: true }),
+        scriptState: () => undefined,
+        actionOf: () => undefined,
+      }),
       setPending: (p) => {
         pending = p;
       },
     });
     await flow.request("w1");
-    expect(pending).toEqual({ id: "w1", processes: [{ tabId: "t1", label: "pnpm" }] });
+    expect(pending).toEqual({ id: "w1" });
+    expect(calls).not.toContain("close:w1");
+  });
+
+  it("does not ask about an idle agent", async () => {
+    const { flow, calls } = setup(ws([term("t1")]), {
+      live: () => ({
+        agentOf: () => ({ agent: "claude", status: "idle" as const, resumable: true }),
+        scriptState: () => undefined,
+        actionOf: () => undefined,
+      }),
+    });
+    await flow.request("w1");
+    expect(calls).toContain("close:w1");
+  });
+
+  it("asks about actions to delete", async () => {
+    const actions = [{ id: "ac-1", name: "dev", kind: "script" as const, command: "pnpm dev", ownButton: false }];
+    const { flow, calls } = setup(ws([], { actions }));
+    await flow.request("w1");
+    expect(calls).toContain("pending:w1");
   });
 
   it("flushes autosave and lets the state settle before reviewing", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), [], { autosaveEnabled: () => true });
+    const { flow, calls } = setup(ws([term("t1")]), { autosaveEnabled: () => true });
     await flow.request("w1");
     expect(calls.indexOf("flush")).toBeLessThan(calls.indexOf("settle"));
     expect(calls.indexOf("settle")).toBeLessThan(calls.indexOf("close:w1"));
@@ -180,7 +166,7 @@ describe("createCloseWorkspaceFlow", () => {
     });
 
     it("resolves false when the confirmed close rejects, and rethrows to its caller", async () => {
-      const { flow } = setup(risky(), [], {
+      const { flow } = setup(risky(), {
         close: async () => {
           throw new Error("boom");
         },

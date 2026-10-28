@@ -98,7 +98,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
   setPerformanceProfiler,
-  setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
@@ -134,7 +133,6 @@ import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import {
   allPanes,
-  collectRunningTerminals,
   findOpenPathTab,
   findPane,
   findPaneInDirection,
@@ -258,7 +256,6 @@ import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
   getRunningCommand,
-  getRunningCommandsSnapshot,
   getRunningScriptCommand,
   setScriptRunning,
   getScriptRunningSnapshot,
@@ -290,7 +287,6 @@ import type { TerminalTarget } from "@/modules/command-palette/lib/terminalTarge
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   planCommandEvent,
-  planScriptStop,
   displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
@@ -2076,18 +2072,10 @@ export default function App() {
   useEffect(() => {
     if (isPendingStale(hibernateFlow.pending?.workspaceId ?? null, workspaces)) cancelHibernate();
   }, [hibernateFlow.pending, workspaces, cancelHibernate]);
-  const handleHibernateFromDialog = useCallback(
-    (dontAskAgain: boolean) => {
-      const pending = pendingHibernateRef.current;
-      if (dontAskAgain) void setWarnOnCloseTabWithRunningProcess(false);
-      if (pending) void performHibernate(pending.workspaceId, pending.tabIds);
-    },
-    [performHibernate],
-  );
-  const hibernateProcesses = useMemo(
-    () => hibernateFlow.pending?.processes.map(([tabId, label]) => ({ tabId, label })),
-    [hibernateFlow.pending],
-  );
+  const handleHibernateFromDialog = useCallback(() => {
+    const pending = pendingHibernateRef.current;
+    if (pending) void performHibernate(pending.workspaceId, pending.tabIds);
+  }, [performHibernate]);
 
   // Wakes a sleeping tab and gives it the focus once it is mounted again.
   const wakeAndFocusTab = useCallback(
@@ -2119,10 +2107,6 @@ export default function App() {
   const closeFlow = useCloseWorkspaceFlow({
     workspacesRef,
     flushDirtyEditors,
-    collectProcesses: (ws) =>
-      collectRunningTerminals(ws, leafHasForegroundProcess, (id) =>
-        getRunningCommandsSnapshot().get(id),
-      ),
     close: handleCloseWorkspace,
   });
   const requestCloseWorkspace = closeFlow.requestClose;
@@ -2219,9 +2203,6 @@ export default function App() {
     saveTab,
     reportSaveError,
     focusActiveTab,
-    isWarnEnabled: () =>
-      usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
-    setWarnEnabled: setWarnOnCloseTabWithRunningProcess,
     isAutoSaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
   });
 
@@ -2230,13 +2211,6 @@ export default function App() {
   const closeTabDialogWorkspace = useMemo(
     () => workspaces.find((w) => w.id === pendingTerminalCloseTab?.workspaceId) ?? null,
     [workspaces, pendingTerminalCloseTab],
-  );
-  const closeTabProcesses = useMemo(
-    () =>
-      pendingTerminalCloseTab?.warning?.reason === "process"
-        ? [{ tabId: pendingTerminalCloseTab.id, label: pendingTerminalCloseTab.command ?? pendingTerminalCloseTab.warning.processName }]
-        : [],
-    [pendingTerminalCloseTab],
   );
 
   // ── Path rename ───────────────────────────────────────────────────────────
@@ -4340,7 +4314,6 @@ export default function App() {
               null
             }
             tabIds={hibernateFlow.pending?.tabIds}
-            processes={hibernateProcesses}
             groupLabel={groupLabelOf(
               workspaces.find((w) => w.id === hibernateFlow.pending?.workspaceId)?.groupId,
               groups,
@@ -4349,17 +4322,7 @@ export default function App() {
             onConfirm={handleHibernateFromDialog}
             onSaveTab={saveTabReportingErrors}
             onGoToTab={goToTab}
-            onStopBusy={(row) => {
-              if (row.kind === "agent") {
-                interruptAgentLeaf(row.tabId);
-                return;
-              }
-              setScriptRunning(
-                row.tabId,
-                planScriptStop(scriptCommandSeen.current.has(row.tabId)),
-              );
-              terminalHandles.current.get(row.tabId)?.write("\x03");
-            }}
+            onStopBusy={(row) => interruptAgentLeaf(row.tabId)}
           />
 
           <HibernateDialog
@@ -4371,11 +4334,9 @@ export default function App() {
               workspaces.find((w) => w.id === closeFlow.pending?.id)?.groupId,
               groups,
             )}
-            processes={closeFlow.pending?.processes}
             onClose={closeFlow.cancel}
-            onConfirm={(dontAskAgain) => {
+            onConfirm={() => {
               const id = closeFlow.pending?.id;
-              if (dontAskAgain) void setWarnOnCloseTabWithRunningProcess(false);
               if (id) void closeFlow.performClose(id);
             }}
             onSaveTab={saveTabReportingErrors}
@@ -4387,10 +4348,9 @@ export default function App() {
             mode="close-tab"
             workspace={closeTabDialogWorkspace}
             tabIds={pendingTerminalCloseTab ? [pendingTerminalCloseTab.id] : undefined}
-            processes={closeTabProcesses}
             groupLabel={groupLabelOf(closeTabDialogWorkspace?.groupId, groups)}
             onClose={() => resolveTerminal({ type: "cancel" })}
-            onConfirm={(dontAskAgain) => resolveTerminal({ type: "close", dontAskAgain })}
+            onConfirm={() => resolveTerminal({ type: "close" })}
             onSaveTab={saveTabReportingErrors}
             onGoToTab={goToTab}
             onStopBusy={() => {}}

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   busyTabIds,
-  canSilenceWarning,
   hibernateReview,
   isBlockedByFailures,
   isReviewEmpty,
@@ -36,6 +35,7 @@ const live = (
 });
 const procs = (o: Record<string, string> = {}): ForegroundProcesses => new Map(Object.entries(o));
 const dev = { t1: { name: "dev", command: "npm run dev" } };
+const doc: Tab = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false };
 
 describe("hibernateReview agents", () => {
   it("lists an agent that is working", () => {
@@ -61,52 +61,17 @@ describe("hibernateReview agents", () => {
     expect(r.busy.map((b) => b.name)).toEqual(["fix layout", "codex"]);
   });
 
-  it("never lists the foreground process of an agent tab as a process", () => {
-    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "idle" } }), procs({ t1: "claude" }));
-    expect(r.processes).toEqual([]);
-  });
-});
-
-describe("hibernateReview processes", () => {
-  it("lists a plain terminal with a foreground process", () => {
-    const r = hibernateReview(ws([term("t1", { title: "api" })]), live(), procs({ t1: "npm run dev" }));
-    expect(r.processes).toEqual([{ tabId: "t1", title: "api", command: "npm run dev" }]);
-  });
-
-  it("lists a process whether or not the tab already has a saved Restore Command", () => {
-    for (const persistentCommand of [undefined, "make"]) {
-      const r = hibernateReview(ws([term("t1", { persistentCommand })]), live(), procs({ t1: "make" }));
-      expect(r.processes.map((p) => p.tabId)).toEqual(["t1"]);
-    }
-  });
-
-  it("does not list an empty shell", () => {
-    expect(isReviewEmpty(hibernateReview(ws([term("t1")]), live()))).toBe(true);
-  });
-
   it("does not list a sleeping tab", () => {
-    const r = hibernateReview(ws([term("t1", { hibernation: { at: 1 } })]), live(), procs({ t1: "make" }));
+    const r = hibernateReview(
+      ws([term("t1", { hibernation: { at: 1 } })]),
+      live({ t1: { agent: "claude", status: "working" } }),
+    );
     expect(isReviewEmpty(r)).toBe(true);
   });
 
-  it("lists a running script as busy, not as a process too", () => {
-    const r = hibernateReview(ws([term("t1")]), live({}, { t1: "running" }, dev), procs({ t1: "npm" }));
-    expect(r.busy).toEqual([expect.objectContaining({ tabId: "t1", kind: "script", name: "dev", command: "npm run dev" })]);
-    expect(r.processes).toEqual([]);
-  });
-
-  it("marks a script whose stop was requested as stopping", () => {
-    const r = hibernateReview(ws([term("t1")]), live({}, { t1: "waiting" }, dev));
-    expect(r.busy[0]).toMatchObject({ kind: "script", stopping: true });
-  });
-
-  it("ignores a script Action whose run has ended and nothing else is running", () => {
-    expect(isReviewEmpty(hibernateReview(ws([term("t1")]), live({}, {}, dev)))).toBe(true);
-  });
-
-  it("lists a process in a tab whose script already ended, since the question was asked about it", () => {
-    const r = hibernateReview(ws([term("t1")]), live({}, {}, dev), procs({ t1: "vim" }));
-    expect(r.processes).toEqual([{ tabId: "t1", title: undefined, command: "vim" }]);
+  it("ignores a script that is running: it is stopped without asking", () => {
+    const r = hibernateReview(ws([term("t1")]), live({}, { t1: "running" }, dev));
+    expect(isReviewEmpty(r)).toBe(true);
   });
 });
 
@@ -126,52 +91,29 @@ describe("hibernateReview docs", () => {
 
 describe("needsConfirmation", () => {
   const working = { t1: { agent: "claude", status: "working" as const } };
-  const doc: Tab = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false };
 
-  it("always asks about a working agent, even with the warning off", () => {
-    const r = tabsReview([term("t1")], live(working));
-    expect(needsConfirmation(r, true)).toBe(true);
-    expect(needsConfirmation(r, false)).toBe(true);
+  it("asks about a working agent", () => {
+    expect(needsConfirmation(tabsReview([term("t1")], live(working)))).toBe(true);
   });
 
-  it("always asks about an unsaved document, even with the warning off", () => {
-    const r = hibernateReview(ws([doc]), live());
-    expect(needsConfirmation(r, false)).toBe(true);
+  it("asks about an unsaved document", () => {
+    expect(needsConfirmation(hibernateReview(ws([doc]), live()))).toBe(true);
   });
 
-  it("asks about a process or a script only while the warning is on", () => {
-    const process = tabsReview([term("t1")], live(), procs({ t1: "vim" }));
-    const script = tabsReview([term("t1")], live({}, { t1: "running" }, dev));
-    for (const r of [process, script]) {
-      expect(needsConfirmation(r, true)).toBe(true);
-      expect(needsConfirmation(r, false)).toBe(false);
-    }
+  it("does not ask about a running script", () => {
+    expect(needsConfirmation(tabsReview([term("t1")], live({}, { t1: "running" }, dev)))).toBe(false);
   });
 
   it("does not ask about an empty shell, an idle agent or one waiting for the user", () => {
     const cases: Parameters<typeof live>[0][] = [{}, { t1: { agent: "claude", status: "idle" } }, { t1: { agent: "claude", status: "attention" } }];
     for (const agents of cases) {
-      expect(needsConfirmation(tabsReview([term("t1")], live(agents)), true)).toBe(false);
+      expect(needsConfirmation(tabsReview([term("t1")], live(agents)))).toBe(false);
     }
   });
 
-  it("asks when a busy agent comes with a process, whatever the warning", () => {
-    const r = tabsReview([term("t1"), term("t2")], live(working), procs({ t2: "vim" }));
-    expect(needsConfirmation(r, false)).toBe(true);
-  });
-});
-
-describe("canSilenceWarning", () => {
-  it("is offered for processes and scripts alone", () => {
-    expect(canSilenceWarning(tabsReview([term("t1")], live(), procs({ t1: "vim" })))).toBe(true);
-    expect(canSilenceWarning(tabsReview([term("t1")], live({}, { t1: "running" }, dev)))).toBe(true);
-  });
-
-  it("is not offered when a working agent or an unsaved document is in the review", () => {
-    const agent = tabsReview([term("t1"), term("t2")], live({ t1: { agent: "claude", status: "working" } }), procs({ t2: "vim" }));
-    expect(canSilenceWarning(agent)).toBe(false);
-    const doc: Tab = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false };
-    expect(canSilenceWarning(hibernateReview(ws([doc, term("t2")]), live(), procs({ t2: "vim" })))).toBe(false);
+  it("asks when a working agent comes with a script", () => {
+    const r = tabsReview([term("t1"), term("t2")], live(working, { t2: "running" }, { t2: { name: "dev", command: "x" } }));
+    expect(needsConfirmation(r)).toBe(true);
   });
 });
 
@@ -212,23 +154,15 @@ describe("liveAgent", () => {
 });
 
 describe("tabsReview", () => {
-  const editor = { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false } as Tab;
-
-  it("reviews only the tabs it is given, never documents", () => {
-    const tabs = [term("t1"), term("t2"), editor];
-    const r = tabsReview(tabs, live({ t1: { agent: "claude", status: "working" } }), procs({ t2: "npm run dev" }));
+  it("reviews only the terminals it is given, never documents", () => {
+    const tabs = [term("t1"), term("t2"), doc];
+    const r = tabsReview(tabs, live({ t1: { agent: "claude", status: "working" } }));
     expect(r.busy.map((b) => b.tabId)).toEqual(["t1"]);
-    expect(r.processes.map((c) => c.tabId)).toEqual(["t2"]);
     expect(r.docs).toEqual([]);
   });
 
   it("is empty for a shell with nothing running, which sleeps without asking", () => {
     expect(isReviewEmpty(tabsReview([term("t1")], live()))).toBe(true);
-  });
-
-  it("lists a running script as busy with the Action it belongs to", () => {
-    const r = tabsReview([term("t1")], live({}, { t1: "running" }, dev));
-    expect(r.busy).toEqual([expect.objectContaining({ tabId: "t1", kind: "script", name: "dev", stopping: false })]);
   });
 });
 
@@ -244,6 +178,12 @@ describe("busyTabIds", () => {
       ),
     );
     expect([...ids].sort()).toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("ignores a script Action whose run has ended and a sleeping tab", () => {
+    const tabs = [term("t1"), term("t2", { hibernation: { at: 1 } })];
+    const ids = busyTabIds(tabs, live({ t2: { agent: "claude", status: "working" } }, {}, dev));
+    expect([...ids]).toEqual([]);
   });
 });
 

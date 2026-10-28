@@ -133,11 +133,13 @@ describe("WorkspaceDetailList", () => {
 });
 
 describe("WorkspaceDetailList row controls", () => {
-  it("renders the hibernate control of an awake terminal as a real button beside the row, reachable by keyboard", () => {
+  it("renders a hibernate and a close control for every awake terminal, as real buttons beside the row, reachable by keyboard", () => {
     const { container, rows, unmount } = mount({ terminals: "all" });
     const close = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Hibernate tab"]');
     expect(close).toHaveLength(4);
-    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(0);
+    const closeButtons = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Close tab"]');
+    expect(closeButtons).toHaveLength(4);
+    for (const c of closeButtons) expect(c.tabIndex).toBe(0);
     for (const c of close) {
       expect(c.tabIndex).toBe(0);
       expect(rows().some((r) => r.contains(c))).toBe(false);
@@ -392,20 +394,20 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     return { container, rows, onWake, onActivate, unmount: track(root) };
   }
 
-  it("marks the sleeping row and keeps its lock and note; the awake rows hibernate", () => {
+  it("marks the sleeping row and keeps its lock and note; a locked row has neither hibernate nor close", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
     expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
     expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
-    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(0);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
     unmount();
   });
 
-  it("an unlocked sleeping row closes with the X, while the awake ones hibernate", () => {
+  it("an unlocked sleeping row only has the X, while the awake ones have both buttons", () => {
     const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
-    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(1);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(4);
     expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
     unmount();
   });

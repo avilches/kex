@@ -1,10 +1,15 @@
 import { isHibernatedTab } from "./hibernate";
 import type { Tab } from "./types";
 
-// What the button at the end of a tab and a middle click on it do. An awake terminal is closed in two steps, so its
-// button hibernates; the close button only shows once the tab sleeps. Other kinds close at once.
-export type TabCloseControl = "close" | "hibernate";
+export type TabEndButton = "hibernate" | "close";
 
-export function tabCloseControl(tab: Tab): TabCloseControl {
+// The buttons at the end of a tab. An awake terminal gets both, so it can be put to sleep or
+// closed; anything else only closes.
+export function tabEndButtons(tab: Tab): TabEndButton[] {
+  return tab.kind === "terminal" && !isHibernatedTab(tab) ? ["hibernate", "close"] : ["close"];
+}
+
+// What a middle click does: an awake terminal goes to sleep first, and a second click closes it.
+export function tabMiddleClick(tab: Tab): TabEndButton {
   return tab.kind === "terminal" && !isHibernatedTab(tab) ? "hibernate" : "close";
 }

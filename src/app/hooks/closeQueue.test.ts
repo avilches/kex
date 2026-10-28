@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   runCloseQueue,
-  terminalCloseWarning,
   type CloseQueueDeps,
   type CloseQueueTab,
 } from "./closeQueue";
@@ -11,21 +10,14 @@ type Tabs = Record<string, CloseQueueTab>;
 function makeDeps(
   tabs: Tabs,
   overrides: Partial<CloseQueueDeps> = {},
-): { deps: CloseQueueDeps; closed: string[]; saved: string[]; warnSet: boolean[] } {
+): { deps: CloseQueueDeps; closed: string[]; saved: string[] } {
   const closed: string[] = [];
   const saved: string[] = [];
-  const warnSet: boolean[] = [];
   const deps: CloseQueueDeps = {
     getTab: (id) => tabs[id] ?? null,
-    hasForegroundProcess: async () => null,
     hasBusyAgent: () => false,
-    hasAgent: () => false,
-    isWarnEnabled: () => true,
-    setWarnEnabled: async (v) => {
-      warnSet.push(v);
-    },
     isAutoSaveEnabled: () => false,
-    askTerminalClose: async () => ({ type: "close", dontAskAgain: false }),
+    askTerminalClose: async () => ({ type: "close" }),
     askEditorClose: async () => ({ type: "save" }),
     saveTab: async (id) => {
       saved.push(id);
@@ -36,13 +28,15 @@ function makeDeps(
     },
     ...overrides,
   };
-  return { deps, closed, saved, warnSet };
+  return { deps, closed, saved };
 }
 
-describe("runCloseQueue", () => {
+describe("runCloseQueue terminals", () => {
   it("closes a clean terminal without asking", async () => {
-    const { deps, closed } = makeDeps({ a: { kind: "terminal" } });
+    const ask = vi.fn();
+    const { deps, closed } = makeDeps({ a: { kind: "terminal" } }, { askTerminalClose: ask as never });
     await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
     expect(closed).toEqual(["a"]);
   });
 
@@ -52,141 +46,53 @@ describe("runCloseQueue", () => {
     expect(closed).toEqual([]);
   });
 
-  it("does not ask when the warning setting is off", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal" } },
-      { isWarnEnabled: () => false, hasForegroundProcess: async () => "npm", askTerminalClose: ask },
-    );
+  it("asks about a working agent and closes on confirm", async () => {
+    const ask = vi.fn(async () => ({ type: "close" }) as const);
+    const { deps, closed } = makeDeps({ a: { kind: "terminal" } }, { hasBusyAgent: () => true, askTerminalClose: ask });
     await runCloseQueue(["a"], deps);
-    expect(ask).not.toHaveBeenCalled();
+    expect(ask).toHaveBeenCalledWith("a");
     expect(closed).toEqual(["a"]);
   });
 
-  it("asks for a busy terminal and closes on confirm", async () => {
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal" } },
-      { hasForegroundProcess: async () => "npm" },
-    );
-    await runCloseQueue(["a"], deps);
-    expect(closed).toEqual(["a"]);
-  });
-
-  it("cancel on a busy terminal stops the whole queue and reports it", async () => {
+  it("cancel on a working agent stops the whole queue and reports it", async () => {
     const { deps, closed } = makeDeps(
       { a: { kind: "terminal" }, b: { kind: "terminal" } },
-      {
-        hasForegroundProcess: async () => "npm",
-        askTerminalClose: async () => ({ type: "cancel" }),
-      },
+      { hasBusyAgent: () => true, askTerminalClose: async () => ({ type: "cancel" }) },
     );
     const allClosed = await runCloseQueue(["a", "b"], deps);
     expect(closed).toEqual([]);
     expect(allClosed).toBe(false);
   });
 
-  it("reports true when every tab closes without cancelling", async () => {
-    const { deps } = makeDeps({ a: { kind: "terminal" }, b: { kind: "editor", dirty: false } });
-    const allClosed = await runCloseQueue(["a", "b"], deps);
-    expect(allClosed).toBe(true);
-  });
-
-  it("never asks about a sleeping terminal, even if a process is reported", async () => {
-    const ask = vi.fn();
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal", hibernated: true } },
-      { hasForegroundProcess: async () => "npm", hasBusyAgent: () => true, askTerminalClose: ask as never },
-    );
-    await runCloseQueue(["a"], deps);
-    expect(ask).not.toHaveBeenCalled();
-    expect(closed).toEqual(["a"]);
-  });
-
-  it("tells the dialog why it is asking: the process, or a working agent", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
-    const proc = makeDeps({ a: { kind: "terminal" } }, { hasForegroundProcess: async () => "npm", askTerminalClose: ask });
-    await runCloseQueue(["a"], proc.deps);
-    expect(ask).toHaveBeenLastCalledWith("a", { reason: "process", processName: "npm" });
-    const agent = makeDeps({ a: { kind: "terminal" } }, { hasBusyAgent: () => true, askTerminalClose: ask });
-    await runCloseQueue(["a"], agent.deps);
-    expect(ask).toHaveBeenLastCalledWith("a", { reason: "agent" });
-  });
-
-  it("does not ask about an idle agent: its process is in the foreground but nothing is lost", async () => {
-    const ask = vi.fn();
-    const probe = vi.fn(async () => "claude");
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal" } },
-      { hasAgent: () => true, hasForegroundProcess: probe, askTerminalClose: ask as never },
-    );
-    await runCloseQueue(["a"], deps);
-    expect(ask).not.toHaveBeenCalled();
-    expect(probe).not.toHaveBeenCalled();
-    expect(closed).toEqual(["a"]);
-  });
-
-  it("always asks about a working agent, even with the warning off", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal" } },
-      { isWarnEnabled: () => false, hasBusyAgent: () => true, askTerminalClose: ask },
-    );
-    await runCloseQueue(["a"], deps);
-    expect(ask).toHaveBeenCalledTimes(1);
-    expect(closed).toEqual(["a"]);
-  });
-
-  it("does not look for a process when an agent is already the reason to ask", async () => {
-    const probe = vi.fn(async () => "npm");
-    const { deps } = makeDeps({ a: { kind: "terminal" } }, { hasBusyAgent: () => true, hasForegroundProcess: probe });
-    await runCloseQueue(["a"], deps);
-    expect(probe).not.toHaveBeenCalled();
-  });
-
-  it("cancelling the question about a working agent stops the run", async () => {
-    const { deps, closed } = makeDeps(
-      { a: { kind: "terminal" }, b: { kind: "terminal" } },
-      { hasBusyAgent: (id) => id === "a", askTerminalClose: async () => ({ type: "cancel" }) },
-    );
-    expect(await runCloseQueue(["a", "b"], deps)).toBe(false);
-    expect(closed).toEqual([]);
-  });
-
-  it("a working agent is asked about again on every tab, since the dialog offers no checkbox for it", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: false }) as const);
-    const { deps, closed, warnSet } = makeDeps(
-      { a: { kind: "terminal" }, b: { kind: "terminal" } },
-      { hasBusyAgent: () => true, askTerminalClose: ask },
-    );
-    await runCloseQueue(["a", "b"], deps);
-    expect(ask).toHaveBeenCalledTimes(2);
-    expect(warnSet).toEqual([]);
-    expect(closed).toEqual(["a", "b"]);
-  });
-
-  it("after dont-ask-again on a process, a later working agent is still asked about", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: true }) as const);
+  it("asks about every working agent of a bulk close, one after the other", async () => {
+    const ask = vi.fn(async () => ({ type: "close" }) as const);
     const { deps, closed } = makeDeps(
       { a: { kind: "terminal" }, b: { kind: "terminal" }, c: { kind: "terminal" } },
-      { hasForegroundProcess: async () => "npm", hasBusyAgent: (id) => id === "c", askTerminalClose: ask },
+      { hasBusyAgent: (id) => id !== "b", askTerminalClose: ask },
     );
     await runCloseQueue(["a", "b", "c"], deps);
     expect(ask.mock.calls.map((c) => (c as unknown[])[0])).toEqual(["a", "c"]);
     expect(closed).toEqual(["a", "b", "c"]);
   });
 
-  it("dont-ask-again disables the setting and closes the rest silently", async () => {
-    const ask = vi.fn(async () => ({ type: "close", dontAskAgain: true }) as const);
-    const { deps, closed, warnSet } = makeDeps(
-      { a: { kind: "terminal" }, b: { kind: "terminal" } },
-      { hasForegroundProcess: async () => "npm", askTerminalClose: ask },
+  it("never asks about a sleeping terminal, even if an agent is reported busy", async () => {
+    const ask = vi.fn();
+    const { deps, closed } = makeDeps(
+      { a: { kind: "terminal", hibernated: true } },
+      { hasBusyAgent: () => true, askTerminalClose: ask as never },
     );
-    await runCloseQueue(["a", "b"], deps);
-    expect(ask).toHaveBeenCalledTimes(1);
-    expect(warnSet).toEqual([false]);
-    expect(closed).toEqual(["a", "b"]);
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(closed).toEqual(["a"]);
   });
 
+  it("reports true when every tab closes without cancelling", async () => {
+    const { deps } = makeDeps({ a: { kind: "terminal" }, b: { kind: "editor", dirty: false } });
+    expect(await runCloseQueue(["a", "b"], deps)).toBe(true);
+  });
+});
+
+describe("runCloseQueue editors", () => {
   it("skips locked editors without asking", async () => {
     const ask = vi.fn();
     const { deps, closed } = makeDeps(
@@ -241,10 +147,7 @@ describe("runCloseQueue", () => {
 
   it("closes a clean editor without asking", async () => {
     const ask = vi.fn();
-    const { deps, closed } = makeDeps(
-      { a: { kind: "editor", dirty: false } },
-      { askEditorClose: ask as never },
-    );
+    const { deps, closed } = makeDeps({ a: { kind: "editor", dirty: false } }, { askEditorClose: ask as never });
     await runCloseQueue(["a"], deps);
     expect(ask).not.toHaveBeenCalled();
     expect(closed).toEqual(["a"]);
@@ -275,10 +178,7 @@ describe("runCloseQueue", () => {
 
   it("closes a clean markdown tab without asking", async () => {
     const ask = vi.fn();
-    const { deps, closed } = makeDeps(
-      { a: { kind: "markdown", dirty: false } },
-      { askEditorClose: ask as never },
-    );
+    const { deps, closed } = makeDeps({ a: { kind: "markdown", dirty: false } }, { askEditorClose: ask as never });
     await runCloseQueue(["a"], deps);
     expect(ask).not.toHaveBeenCalled();
     expect(closed).toEqual(["a"]);
@@ -302,25 +202,5 @@ describe("runCloseQueue", () => {
       expect(closed).toEqual([]);
     }
     expect(reported).toEqual([err, err]);
-  });
-});
-
-describe("terminalCloseWarning", () => {
-  it("asks about a busy agent whatever the warning says", () => {
-    expect(terminalCloseWarning({ busyAgent: true, processName: null, warnProcesses: false })).toEqual({ reason: "agent" });
-    expect(terminalCloseWarning({ busyAgent: true, processName: "npm", warnProcesses: true })).toEqual({ reason: "agent" });
-  });
-
-  it("asks about a process only while the warning is on", () => {
-    expect(terminalCloseWarning({ busyAgent: false, processName: "npm", warnProcesses: true })).toEqual({ reason: "process", processName: "npm" });
-    expect(terminalCloseWarning({ busyAgent: false, processName: "npm", warnProcesses: false })).toBeNull();
-  });
-
-  it("treats an empty process name as a process: a shell with something in the foreground", () => {
-    expect(terminalCloseWarning({ busyAgent: false, processName: "", warnProcesses: true })).toEqual({ reason: "process", processName: "" });
-  });
-
-  it("does not ask about a quiet terminal", () => {
-    expect(terminalCloseWarning({ busyAgent: false, processName: null, warnProcesses: true })).toBeNull();
   });
 });

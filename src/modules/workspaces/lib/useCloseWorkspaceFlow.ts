@@ -1,36 +1,24 @@
 import { useMemo, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { hibernateReview, liveAgent, needsConfirmation, type ForegroundProcesses, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, liveAgent, needsConfirmation, type HibernateLive } from "./hibernateReview";
 import { liveScripts } from "./liveScripts";
 import { actionsToDelete, type Workspace } from "./types";
 
-export type RunningProcess = { tabId: string; label: string };
-export type PendingClose = { id: string; processes: RunningProcess[] };
+export type PendingClose = { id: string };
 
-export function processMap(processes: readonly RunningProcess[]): ForegroundProcesses {
-  return new Map(processes.map((p) => [p.tabId, p.label]));
-}
-
-export function needsCloseConfirmation(
-  ws: Workspace,
-  live: HibernateLive,
-  processes: RunningProcess[],
-  warnProcesses: boolean,
-): boolean {
-  const review = hibernateReview(ws, live, processMap(processes));
-  // Deleting actions is not a warning the user can silence: it is the one thing closing loses.
-  return actionsToDelete(ws) > 0 || needsConfirmation(review, warnProcesses);
+// Deleting Actions is one more thing closing a workspace loses, besides a working agent and an
+// unsaved document.
+export function needsCloseConfirmation(ws: Workspace, live: HibernateLive): boolean {
+  return actionsToDelete(ws) > 0 || needsConfirmation(hibernateReview(ws, live));
 }
 
 export type CloseFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
   autosaveEnabled: () => boolean;
-  warnProcesses: () => boolean;
   flushDirtyEditors: () => Promise<void>;
   settle: () => Promise<void>;
   live: (ws: Workspace) => HibernateLive;
-  collectProcesses: (ws: Workspace) => Promise<RunningProcess[]>;
   close: (workspaceId: string) => Promise<void>;
   setPending: (pending: PendingClose | null) => void;
 };
@@ -79,8 +67,7 @@ export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return { status: "none" };
     const live = d.live(ws);
-    const processes = await d.collectProcesses(ws);
-    if (!needsCloseConfirmation(ws, live, processes, d.warnProcesses())) {
+    if (!needsCloseConfirmation(ws, live)) {
       await perform(workspaceId);
       return { status: "closed" };
     }
@@ -88,7 +75,7 @@ export function createCloseWorkspaceFlow(d: CloseFlowDeps) {
     const decision = new Promise<boolean>((settle) => {
       waiter = { id: workspaceId, settle };
     });
-    d.setPending({ id: workspaceId, processes });
+    d.setPending({ id: workspaceId });
     return { status: "asking", decision };
   }
 
@@ -113,7 +100,6 @@ const nextFrames = () =>
 type HookDeps = {
   workspacesRef: { current: Workspace[] };
   flushDirtyEditors: () => Promise<void>;
-  collectProcesses: (ws: Workspace) => Promise<RunningProcess[]>;
   close: (workspaceId: string) => Promise<void>;
 };
 
@@ -127,7 +113,6 @@ export function useCloseWorkspaceFlow(deps: HookDeps) {
       createCloseWorkspaceFlow({
         getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
         autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
-        warnProcesses: () => usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
         flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
         settle: nextFrames,
         live: (ws) => {
@@ -137,7 +122,6 @@ export function useCloseWorkspaceFlow(deps: HookDeps) {
             ...liveScripts(ws),
           };
         },
-        collectProcesses: (ws) => depsRef.current.collectProcesses(ws),
         close: (id) => depsRef.current.close(id),
         setPending,
       }),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Tab, SplitNode, PaneNode, Workspace } from "./types";
 import { addAction, removeAction, type Action } from "@/modules/actions";
-import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, handOverLastLines, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyDropDeadScriptPanes, applyMoveTabToWorkspace, applyWorkspaceActions, applySetActiveAction, takeWorkspaceAction, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, handOverLastLines, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -292,72 +292,6 @@ describe("pushMru", () => {
     expect(out).toHaveLength(MRU_HISTORY_LIMIT);
     expect(out[0]).toBe("new");
     expect(out).not.toContain(`t${MRU_HISTORY_LIMIT - 1}`);
-  });
-});
-
-describe("collectRunningTerminals", () => {
-  const term = (id: string, title?: string): Tab => ({ id, kind: "terminal", title });
-  const wsWith = (tabs: Tab[]): Workspace =>
-    ws({
-      paneTree: { kind: "pane", id: "p1", tabs, activeTabId: tabs[0]?.id ?? null },
-      activePaneId: "p1",
-    });
-
-  it("returns only terminals with a foreground process, preserving pane order", async () => {
-    const w = wsWith([term("t1"), term("t2"), term("t3")]);
-    const running = new Set(["t1", "t3"]);
-    const out = await collectRunningTerminals(
-      w,
-      async (id) => (running.has(id) ? "node" : null),
-      () => undefined,
-    );
-    expect(out.map((r) => r.tabId)).toEqual(["t1", "t3"]);
-  });
-
-  it("does not ask about a sleeping terminal, which has no process", async () => {
-    const asleep: Tab = { id: "t2", kind: "terminal", hibernation: { at: 1 } };
-    const asked: string[] = [];
-    const out = await collectRunningTerminals(
-      wsWith([term("t1"), asleep]),
-      async (id) => {
-        asked.push(id);
-        return "node";
-      },
-      () => undefined,
-    );
-    expect(asked).toEqual(["t1"]);
-    expect(out.map((r) => r.tabId)).toEqual(["t1"]);
-  });
-
-  it("labels with command, then process name, then title, then 'shell'", async () => {
-    const w = wsWith([term("t1"), term("t2", "Build"), term("t3"), term("t4")]);
-    const commands = new Map([["t1", "pnpm dev"]]);
-    const procNames = new Map([
-      ["t1", "node"],
-      ["t2", ""],
-      ["t3", "vim"],
-      ["t4", ""],
-    ]);
-    const out = await collectRunningTerminals(
-      w,
-      async (id) => procNames.get(id) ?? null,
-      (id) => commands.get(id),
-    );
-    expect(out).toEqual([
-      { tabId: "t1", label: "pnpm dev" },
-      { tabId: "t2", label: "Build" },
-      { tabId: "t3", label: "vim" },
-      { tabId: "t4", label: "shell" },
-    ]);
-  });
-
-  it("ignores non-terminal tabs and returns empty when nothing runs", async () => {
-    const w = wsWith([
-      { id: "e1", kind: "editor", path: "/a", dirty: false, preview: false },
-      term("t1"),
-    ]);
-    const out = await collectRunningTerminals(w, async () => null, () => undefined);
-    expect(out).toEqual([]);
   });
 });
 

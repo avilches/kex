@@ -22,7 +22,7 @@ import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
-import { tabCloseControl } from "@/modules/workspaces/lib/tabCloseControl";
+import { tabEndButtons, tabMiddleClick } from "@/modules/workspaces/lib/tabCloseControl";
 import { type Tab, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -193,7 +193,7 @@ function DetailTabRow({
   const title = info?.displayTitle ?? tab.id;
   const { onRenameTab, onClose, onUpdateTab, onToggleHibernate } = useSidebarTabMenu();
   const hibernated = isHibernatedTab(tab);
-  const hibernates = tabCloseControl(tab) === "hibernate";
+  const canHibernate = tabEndButtons(tab).includes("hibernate");
   const agent = hibernated ? tab.hibernation.agent : info?.hasAgent ? info.agentSession?.agent : undefined;
   const isLocked = tab.locked ?? false;
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
@@ -278,7 +278,7 @@ function DetailTabRow({
               onAuxClick={(e) => {
                 if (e.button === 1) {
                   e.stopPropagation();
-                  if (hibernates) onToggleHibernate(tab.id);
+                  if (tabMiddleClick(tab) === "hibernate") onToggleHibernate(tab.id);
                   else onClose(tab.id);
                 }
               }}
@@ -408,18 +408,26 @@ function DetailTabRow({
               <StatusMark visual={visual} />
             </span>
           )}
+          {canHibernate && (
+            <button
+              type="button"
+              title="Hibernate tab"
+              aria-label="Hibernate tab"
+              style={{ right: 26 + (hasNote ? 20 : 0) + (showAutofocus ? 20 : 0) }}
+              className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
+              onClick={() => onToggleHibernate(tab.id)}
+            >
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            </button>
+          )}
           <button
             type="button"
-            title={hibernates ? "Hibernate tab" : "Close tab"}
-            aria-label={hibernates ? "Hibernate tab" : "Close tab"}
+            title="Close tab"
+            aria-label="Close tab"
             className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
-            onClick={() => (hibernates ? onToggleHibernate(tab.id) : onClose(tab.id))}
+            onClick={() => onClose(tab.id)}
           >
-            {hibernates ? (
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-            ) : (
-              <span className="text-[14px] leading-none">×</span>
-            )}
+            <span className="text-[14px] leading-none">×</span>
           </button>
         </>
       )}

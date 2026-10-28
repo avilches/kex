@@ -79,7 +79,6 @@ import {
   setTerminalScrollback,
   setTerminalShell,
   setTerminalWebglEnabled,
-  setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import { useEffect, useState } from "react";
 import { CursorGlyph } from "../components/CursorGlyph";
@@ -130,9 +129,6 @@ export function TerminalSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const terminalBackgroundMemoryBudgetMB = usePreferencesStore(
     (s) => s.terminalBackgroundMemoryBudgetMB,
-  );
-  const warnOnCloseRunning = usePreferencesStore(
-    (s) => s.warnOnCloseTabWithRunningProcess,
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
@@ -466,15 +462,6 @@ export function TerminalSection() {
               ))}
             </SelectContent>
           </Select>
-        </SettingRow>
-        <SettingRow
-          title="Warn when closing or hibernating a tab with a running process"
-          description="Confirm before a terminal that still has a process running is closed or hibernated. A working agent always asks."
-        >
-          <Switch
-            checked={warnOnCloseRunning}
-            onCheckedChange={(v) => void setWarnOnCloseTabWithRunningProcess(v)}
-          />
         </SettingRow>
       </div>
 

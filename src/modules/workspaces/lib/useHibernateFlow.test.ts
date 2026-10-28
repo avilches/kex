@@ -22,7 +22,6 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     activeWorkspaceId: () => null,
     live: () => idle,
     collectProcesses: async () => new Map(),
-    warnProcesses: () => true,
     withRestoreCommand: (t) => t,
     updateTab: (_id, t) => void calls.push(`update:${t.id}`),
     finishAgent: (id) => void calls.push(`finish:${id}`),
@@ -80,47 +79,41 @@ describe("createHibernateFlow", () => {
   });
 
   describe("when it asks", () => {
-    it("opens the dialog with the tabs asked for and their processes when a process is running", async () => {
+    it("opens the dialog with the tabs asked for when an agent is working", async () => {
       let pending: unknown;
+      const working = { agent: "claude", status: "working" as const, resumable: true };
       const { flow, calls } = setup(ws([term("t1"), term("t2")]), {
-        collectProcesses: running({ t1: "npm run dev" }),
+        live: () => ({ ...idle, agentOf: (id: string) => (id === "t1" ? working : undefined) }),
         setPending: (p) => {
           pending = p;
         },
       });
       await flow.request("w1", ["t1", "t2"]);
-      expect(pending).toEqual({ workspaceId: "w1", tabIds: ["t1", "t2"], processes: [["t1", "npm run dev"]] });
+      expect(pending).toEqual({ workspaceId: "w1", tabIds: ["t1", "t2"] });
       expect(calls.some((c) => c.startsWith("hibernate"))).toBe(false);
     });
 
-    it("hibernates without asking when the process warning is off", async () => {
+    it("hibernates without asking when a process or a script is running", async () => {
+      const script = { ...idle, scriptState: () => "running" as const, actionOf: () => ({ name: "dev", command: "pnpm dev" }) };
       const { flow, calls } = setup(ws([term("t1")]), {
         collectProcesses: running({ t1: "npm run dev" }),
-        warnProcesses: () => false,
+        live: () => script,
       });
       await flow.request("w1", ["t1"]);
       expect(calls).toContain("hibernate:t1");
       expect(calls.some((c) => c.startsWith("pending:w1"))).toBe(false);
     });
 
-    it("asks about a working agent even when the process warning is off", async () => {
-      const working = { agent: "claude", status: "working" as const, resumable: true };
-      const { flow, calls } = setup(ws([term("t1")]), {
-        warnProcesses: () => false,
-        live: () => ({ ...idle, agentOf: () => working }),
+    it("never asks the PTY about a process when the user hibernates by hand", async () => {
+      let asked = 0;
+      const { flow } = setup(ws([term("t1")]), {
+        collectProcesses: async () => {
+          asked += 1;
+          return new Map();
+        },
       });
       await flow.request("w1", ["t1"]);
-      expect(calls).toContain("pending:w1:t1");
-    });
-
-    it("asks about a running script, but only while the process warning is on", async () => {
-      const script = { ...idle, scriptState: () => "running" as const, actionOf: () => ({ name: "dev", command: "pnpm dev" }) };
-      const on = setup(ws([term("t1")]), { live: () => script });
-      await on.flow.request("w1", ["t1"]);
-      expect(on.calls).toContain("pending:w1:t1");
-      const off = setup(ws([term("t1")]), { live: () => script, warnProcesses: () => false });
-      await off.flow.request("w1", ["t1"]);
-      expect(off.calls).toContain("hibernate:t1");
+      expect(asked).toBe(0);
     });
   });
 

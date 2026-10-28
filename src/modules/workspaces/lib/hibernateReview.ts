@@ -20,30 +20,15 @@ export function liveAgent(
   return { agent: session.agent, status: session.status, resumable: hasResumed(session) };
 }
 
-export type BusyRow = {
-  tabId: string;
-  kind: "agent" | "script";
-  name: string;
-  command?: string;
-  agent?: string;
-  stopping: boolean;
-};
+// A working agent: the only busy terminal worth a question.
+export type BusyRow = { tabId: string; kind: "agent"; name: string; agent: string };
 export type DocRow = { tabId: string; title: string | undefined; path: string };
-// A plain terminal with a command running in the foreground. An agent is never one: it is either
-// busy or has nothing to lose.
-export type ProcessRow = { tabId: string; title: string | undefined; command: string };
-export type HibernateReview = { busy: BusyRow[]; docs: DocRow[]; processes: ProcessRow[] };
+export type HibernateReview = { busy: BusyRow[]; docs: DocRow[] };
 
-// A busy agent and unsaved documents are always asked about. A running process or script is only
-// asked about while the user keeps that warning on.
-export function needsConfirmation(r: HibernateReview, warnProcesses: boolean): boolean {
-  if (r.docs.length > 0 || r.busy.some((b) => b.kind === "agent")) return true;
-  return warnProcesses && (r.busy.length > 0 || r.processes.length > 0);
-}
-
-// The confirmation can be silenced with "Don't ask me again" only when no agent or document is in it.
-export function canSilenceWarning(r: HibernateReview): boolean {
-  return r.docs.length === 0 && !r.busy.some((b) => b.kind === "agent");
+// Only a working agent and an unsaved document are worth a question: a running process or script
+// is stopped without asking, since the Restore Command brings it back.
+export function needsConfirmation(r: HibernateReview): boolean {
+  return r.docs.length > 0 || r.busy.some((b) => b.kind === "agent");
 }
 
 // A document whose save failed must be fixed in its tab or, only when closing, explicitly discarded.
@@ -56,16 +41,16 @@ export function isBlockedByFailures(
 }
 
 export function isReviewEmpty(r: HibernateReview): boolean {
-  return r.busy.length === 0 && r.docs.length === 0 && r.processes.length === 0;
+  return r.busy.length === 0 && r.docs.length === 0;
 }
 
-// Tab id to the label of the foreground process the PTY reports for it.
+// Tab id to the label of the foreground process the PTY reports for it. Only the unattended
+// hibernation asks for it: it must not stop a process nobody chose to stop.
 export type ForegroundProcesses = ReadonlyMap<string, string>;
 
 function reviewTerminal(
   tab: Extract<Tab, { kind: "terminal" }>,
   live: HibernateLive,
-  processes: ForegroundProcesses,
   review: HibernateReview,
 ): void {
   if (tab.hibernation) return;
@@ -76,26 +61,8 @@ function reviewTerminal(
       kind: "agent",
       name: tab.title ?? agent.agent,
       agent: agent.agent,
-      stopping: false,
     });
-    return;
   }
-  const script = live.actionOf(tab.id);
-  const state = script ? live.scriptState(tab.id) : undefined;
-  if (script && state) {
-    review.busy.push({
-      tabId: tab.id,
-      kind: "script",
-      name: script.name.trim() || script.command.trim(),
-      command: script.command.trim() || undefined,
-      stopping: state === "waiting",
-    });
-    return;
-  }
-  // An idle agent keeps its process in the foreground but has nothing to lose.
-  if (agent) return;
-  const command = processes.get(tab.id);
-  if (command) review.processes.push({ tabId: tab.id, title: tab.title, command });
 }
 
 // An unattended hibernation must not take a terminal whose command would not come back on wake:
@@ -112,30 +79,35 @@ export function staysBehind(
   return !(agent?.resumable === true || tab.persistentCommand);
 }
 
-// What closing a workspace would destroy: busy terminals, unsaved documents and running processes.
-export function hibernateReview(ws: Workspace, live: HibernateLive, processes: ForegroundProcesses = new Map()): HibernateReview {
-  const review: HibernateReview = { busy: [], docs: [], processes: [] };
+// What closing a workspace would destroy: working agents and unsaved documents.
+export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateReview {
+  const review: HibernateReview = { busy: [], docs: [] };
   for (const tab of allPanes(ws.paneTree).flatMap((p) => p.tabs)) {
     if (tab.kind === "editor" || tab.kind === "markdown") {
       if (tab.dirty) review.docs.push({ tabId: tab.id, title: tab.title, path: tab.path });
     } else if (tab.kind === "terminal") {
-      reviewTerminal(tab, live, processes, review);
+      reviewTerminal(tab, live, review);
     }
   }
   return review;
 }
 
 // What putting these tabs to sleep would lose. Only terminals sleep, so there are no documents.
-export function tabsReview(tabs: readonly Tab[], live: HibernateLive, processes: ForegroundProcesses = new Map()): HibernateReview {
-  const review: HibernateReview = { busy: [], docs: [], processes: [] };
-  for (const tab of tabs) if (tab.kind === "terminal") reviewTerminal(tab, live, processes, review);
+export function tabsReview(tabs: readonly Tab[], live: HibernateLive): HibernateReview {
+  const review: HibernateReview = { busy: [], docs: [] };
+  for (const tab of tabs) if (tab.kind === "terminal") reviewTerminal(tab, live, review);
   return review;
 }
 
-// Terminals an unattended hibernation must leave alone: a working agent, a running script, or
-// an agent waiting for the user.
+// Terminals an unattended hibernation must leave alone: a working agent, an agent waiting for the
+// user, or a running script.
 export function busyTabIds(tabs: readonly Tab[], live: HibernateLive): Set<string> {
-  const ids = new Set(tabsReview(tabs, live).busy.map((b) => b.tabId));
-  for (const tab of tabs) if (tab.kind === "terminal" && live.agentOf(tab.id)?.status === "attention") ids.add(tab.id);
+  const ids = new Set<string>();
+  for (const tab of tabs) {
+    if (tab.kind !== "terminal" || tab.hibernation) continue;
+    const status = live.agentOf(tab.id)?.status;
+    const script = live.actionOf(tab.id) && live.scriptState(tab.id);
+    if (status === "working" || status === "attention" || script) ids.add(tab.id);
+  }
   return ids;
 }

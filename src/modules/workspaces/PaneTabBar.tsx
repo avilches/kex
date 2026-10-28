@@ -34,7 +34,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { isHibernatedTab } from "./lib/hibernate";
-import { tabCloseControl } from "./lib/tabCloseControl";
+import { tabEndButtons, tabMiddleClick } from "./lib/tabCloseControl";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
 import { tabFolder } from "./lib/tabPath";
@@ -177,7 +177,8 @@ function DraggableTab({
   });
   const active = tab.id === activeTabId;
   const sleeping = isHibernatedTab(tab);
-  const closeControl = tabCloseControl(tab);
+  const endButtons = tabEndButtons(tab);
+  const canHibernate = endButtons.includes("hibernate");
   const { onToggleHibernate } = useSidebarTabMenu();
   // Every tab can be locked, no exception.
   const isLocked = tab.locked ?? false;
@@ -262,7 +263,7 @@ function DraggableTab({
       onAuxClick={(e) => {
         if (e.button === 1) {
           e.stopPropagation();
-          if (closeControl === "hibernate") onToggleHibernate(tab.id);
+          if (tabMiddleClick(tab) === "hibernate") onToggleHibernate(tab.id);
           else onClose(tab.id);
         }
       }}
@@ -404,7 +405,7 @@ function DraggableTab({
         </button>
         </>
       ) : (
-        <span className="relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center">
+        <span className={cn("relative ml-0.5 flex h-[16px] shrink-0 items-center justify-center", canHibernate ? "w-[34px] gap-0.5" : "w-[16px]")}>
           {sleeping && (
             <span
               className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground transition-opacity group-hover:opacity-0"
@@ -418,7 +419,7 @@ function DraggableTab({
               {statusIndicator}
             </span>
           )}
-          {closeControl === "hibernate" ? (
+          {canHibernate && (
             <button
               type="button"
               className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
@@ -432,21 +433,20 @@ function DraggableTab({
             >
               <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
             </button>
-          ) : (
-            <button
-              type="button"
-              className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose(tab.id);
-              }}
-              title="Close tab"
-              aria-label="Close tab"
-            >
-              <span className="text-[14px] leading-none">×</span>
-            </button>
           )}
+          <button
+            type="button"
+            className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+            title="Close tab"
+            aria-label="Close tab"
+          >
+            <span className="text-[14px] leading-none">×</span>
+          </button>
         </span>
       )}
     </div>

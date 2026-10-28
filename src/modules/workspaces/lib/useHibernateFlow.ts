@@ -26,19 +26,15 @@ import type { Tab, TabHibernation, Workspace } from "./types";
 
 type TerminalTab = Extract<Tab, { kind: "terminal" }>;
 
-export type PendingHibernate = {
-  workspaceId: string;
-  tabIds: string[];
-  processes: [tabId: string, label: string][];
-};
+export type PendingHibernate = { workspaceId: string; tabIds: string[] };
 
 export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
   activeWorkspaceId: () => string | null;
   live: (ws: Workspace) => HibernateLive;
-  // Foreground process the PTY reports for each of these tabs, labelled with the command.
+  // Foreground process the PTY reports for each of these tabs. Only the unattended hibernation
+  // asks: it must not stop a process nobody chose to stop.
   collectProcesses: (tabs: readonly TerminalTab[]) => Promise<ForegroundProcesses>;
-  warnProcesses: () => boolean;
   // The tab as it must be stored when it sleeps, with the Restore Command it runs now.
   withRestoreCommand: (tab: TerminalTab) => Tab;
   updateTab: (workspaceId: string, tab: Tab) => void;
@@ -115,12 +111,11 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     if (!ws) return;
     const tabs = awake(ws, tabIds);
     if (tabs.length === 0) return;
-    const processes = await d.collectProcesses(tabs);
-    if (!needsConfirmation(tabsReview(tabs, d.live(ws), processes), d.warnProcesses())) {
+    if (!needsConfirmation(tabsReview(tabs, d.live(ws)))) {
       await perform(workspaceId, tabIds);
       return;
     }
-    d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id), processes: [...processes] });
+    d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id) });
   }
 
   // Unattended variant: hibernates only the tabs nobody is looking at and nothing would be
@@ -205,7 +200,6 @@ export function useHibernateFlow(deps: HookDeps) {
             found.flatMap(([id, name]) => (name === null ? [] : [[id, commands.get(id) ?? (name || "shell")] as const])),
           );
         },
-        warnProcesses: () => usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
         withRestoreCommand: withLiveRestoreCommand,
         updateTab: (workspaceId, saved) =>
           depsRef.current.updateTabData(workspaceId, saved.id, (t) =>

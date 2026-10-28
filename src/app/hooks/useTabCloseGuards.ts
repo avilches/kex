@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { newCloseBatchId } from "@/lib/ids";
-import { leafHasForegroundProcess } from "@/modules/terminal";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { liveAgent } from "@/modules/workspaces/lib/hibernateReview";
 import type { Tab } from "@/modules/workspaces/lib/types";
@@ -10,10 +8,9 @@ import {
   runCloseQueue,
   type EditorCloseDecision,
   type TerminalCloseDecision,
-  type TerminalCloseWarning,
 } from "./closeQueue";
 
-export type TabInfo = { id: string; title: string; kind: string; path?: string; workspaceId?: string; warning?: TerminalCloseWarning; command?: string; tab?: Tab };
+export type TabInfo = { id: string; title: string; kind: string; path?: string; workspaceId?: string; tab?: Tab };
 
 type FoundTab = {
   workspace: { id: string };
@@ -26,8 +23,6 @@ type Params = {
   saveTab: (tabId: string) => Promise<void>;
   reportSaveError: (tabId: string, error: unknown) => void;
   focusActiveTab: () => void;
-  isWarnEnabled: () => boolean;
-  setWarnEnabled: (value: boolean) => Promise<void>;
   isAutoSaveEnabled: () => boolean;
 };
 
@@ -43,8 +38,6 @@ export function useTabCloseGuards({
   saveTab,
   reportSaveError,
   focusActiveTab,
-  isWarnEnabled,
-  setWarnEnabled,
   isAutoSaveEnabled,
 }: Params) {
   const [pendingCloseTab, setPendingCloseTab] = useState<TabInfo | null>(null);
@@ -70,7 +63,7 @@ export function useTabCloseGuards({
   );
 
   const askTerminalClose = useCallback(
-    (tabId: string, warning: TerminalCloseWarning) =>
+    (tabId: string) =>
       new Promise<TerminalCloseDecision>((resolve) => {
         const found = findTab(tabId);
         setPendingTerminalCloseTab({
@@ -78,8 +71,6 @@ export function useTabCloseGuards({
           title: found?.tab.title ?? "terminal",
           kind: "terminal",
           workspaceId: found?.workspace.id,
-          warning,
-          command: getRunningCommandsSnapshot().get(tabId),
           tab: found?.tab,
         });
         terminalResolverRef.current = resolve;
@@ -116,11 +107,7 @@ export function useTabCloseGuards({
               hibernated: isHibernatedTab(found.tab),
             };
           },
-          hasForegroundProcess: (id) => leafHasForegroundProcess(id),
           hasBusyAgent: (id) => liveAgent(useAgentStore.getState().sessions[id])?.status === "working",
-          hasAgent: (id) => liveAgent(useAgentStore.getState().sessions[id]) !== undefined,
-          isWarnEnabled,
-          setWarnEnabled,
           isAutoSaveEnabled,
           askTerminalClose,
           askEditorClose,
@@ -144,8 +131,6 @@ export function useTabCloseGuards({
       saveTab,
       reportSaveError,
       focusActiveTab,
-      isWarnEnabled,
-      setWarnEnabled,
       isAutoSaveEnabled,
       askTerminalClose,
       askEditorClose,

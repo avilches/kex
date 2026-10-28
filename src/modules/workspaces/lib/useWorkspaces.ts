@@ -433,27 +433,6 @@ export function applyMoveTabToWorkspace(
   );
 }
 
-export async function collectRunningTerminals(
-  ws: Workspace,
-  getForegroundProcess: (tabId: string) => Promise<string | null>,
-  getCommand: (tabId: string) => string | undefined,
-): Promise<{ tabId: string; label: string }[]> {
-  const terminals = allPanes(ws.paneTree)
-    .flatMap((p) => p.tabs)
-    .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal" && !tab.hibernation);
-  const checked = await Promise.all(
-    terminals.map(async (tab) => {
-      const processName = await getForegroundProcess(tab.id);
-      if (processName === null) return null;
-      const label = getCommand(tab.id) ?? (processName || tab.title || "shell");
-      return { tabId: tab.id, label };
-    }),
-  );
-  return checked.filter(
-    (x): x is { tabId: string; label: string } => x !== null,
-  );
-}
-
 function newPaneNode(cwd?: string): PaneNode {
   const tabId = newTabId();
   return {

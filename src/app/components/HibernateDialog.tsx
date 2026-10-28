@@ -1,5 +1,5 @@
 import { Spinner } from "@/components/ui/spinner";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -8,44 +8,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import {
-  getRunningCommandsSnapshot,
-  getScriptRunningSnapshot,
-  subscribeToRunningCommands,
-  subscribeToScriptRunning,
-} from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { canSilenceWarning, hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, tabsReview, type BusyRow, type HibernateReview } from "@/modules/workspaces/lib/hibernateReview";
-import { processMap, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
+import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, tabsReview, type BusyRow, type HibernateReview } from "@/modules/workspaces/lib/hibernateReview";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { allPanes, focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { scriptActionOf } from "@/modules/actions/lib/actionStateStore";
 import { actionsToDelete, type Tab, type Workspace } from "@/modules/workspaces/lib/types";
 import { useRestoreCommand } from "./useRestoreCommand";
 
 // Same icon and title the tab bar shows: a custom tab icon wins over the agent's. Under the row
-// goes the command the tab runs when it comes back.
-function TabLabel({ tab, command }: { tab: Tab; command?: string }) {
+// goes the command that will run when the tab comes back.
+function TabLabel({ tab }: { tab: Tab }) {
   const info = useAgentTabTitle(tab);
   return (
-    <>
-      <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-        <span className="flex shrink-0 items-center">
-          {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
-        </span>
-        <span className="truncate">{info?.displayTitle}</span>
+    <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+      <span className="flex shrink-0 items-center">
+        {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
       </span>
-      <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={command}>{command}</span>
-    </>
+      <span className="truncate">{info?.displayTitle}</span>
+    </span>
   );
 }
 
@@ -60,17 +45,8 @@ function RestoreFor({ tab }: { tab: Tab }) {
   );
 }
 
-// Tab, process and actions line up as table columns across the rows of a section.
+// Tab and actions line up as table columns across the rows of a section.
 const ROW_GRID = "grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1";
-
-function CommandOnly({ command }: { command: string }) {
-  return (
-    <>
-      <span aria-hidden />
-      <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={command}>{command}</span>
-    </>
-  );
-}
 
 export type DialogMode = "hibernate" | "close" | "close-tab";
 
@@ -80,10 +56,8 @@ type Props = {
   tabIds?: string[];
   groupLabel?: string;
   mode?: DialogMode;
-  processes?: RunningProcess[];
   onClose: () => void;
-  // `dontAskAgain` is only true when the review allowed silencing the warning and it was checked.
-  onConfirm: (dontAskAgain: boolean) => void;
+  onConfirm: () => void;
   // Resolves to the failure reason, or null when the document was saved.
   onSaveTab: (tabId: string) => Promise<string | null>;
   onGoToTab: (tabId: string) => void;
@@ -102,39 +76,32 @@ function confirmLabel(mode: DialogMode, review: HibernateReview | null): string 
   return review && review.busy.length > 0 ? "Hibernate now" : "Hibernate";
 }
 
-export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hibernate", processes = [], onClose, onConfirm, onSaveTab, onGoToTab, onStopBusy }: Props) {
+export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hibernate", onClose, onConfirm, onSaveTab, onGoToTab, onStopBusy }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
-  const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
-  const scriptStates = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
-  const globalActionList = usePreferencesStore((s) => s.actions);
   const review = useMemo(() => {
     if (!workspace) return null;
     const live = {
       agentOf: (id: string) => liveAgent(sessions[id]),
-      scriptState: (id: string) => scriptStates.get(id),
-      actionOf: (id: string) => scriptActionOf(id, [workspace.actions ?? [], globalActionList]),
+      scriptState: () => undefined,
+      actionOf: () => undefined,
     };
-    const found = processMap(processes);
-    if (mode === "close") return hibernateReview(workspace, live, found);
+    if (mode === "close") return hibernateReview(workspace, live);
     const wanted = new Set(tabIds);
     return tabsReview(
       allPanes(workspace.paneTree).flatMap((p) => p.tabs).filter((t) => wanted.has(t.id)),
       live,
-      found,
     );
-  }, [workspace, tabIds, mode, processes, sessions, scriptStates, globalActionList]);
+  }, [workspace, tabIds, mode, sessions]);
 
   const closing = mode !== "hibernate";
   const [failures, setFailures] = useState<Record<string, string>>({});
   const [discarded, setDiscarded] = useState<ReadonlySet<string>>(new Set());
-  const [dontAskAgain, setDontAskAgain] = useState(false);
   const workspaceId = workspace?.id;
   // Joined, because the caller may hand a new array on every render.
   const tabsKey = tabIds?.join(",");
   useEffect(() => {
     setFailures({});
     setDiscarded(new Set());
-    setDontAskAgain(false);
   }, [workspaceId, tabsKey]);
   const saveDocs = async (tabIds: string[]) => {
     const results = await Promise.all(tabIds.map(async (id) => [id, await onSaveTab(id)] as const));
@@ -149,16 +116,8 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
   };
   const blockedByFailure = isBlockedByFailures(review?.docs ?? [], failures, discarded);
   const deletedScripts = workspace ? actionsToDelete(workspace) : 0;
-  const agents = review?.busy.filter((b) => b.kind === "agent") ?? [];
-  const scripts = review?.busy.filter((b) => b.kind === "script") ?? [];
-  const running = review?.processes ?? [];
-  const canSilence =
-    review !== null &&
-    canSilenceWarning(review) &&
-    (scripts.length > 0 || running.length > 0) &&
-    !(mode === "close" && deletedScripts > 0);
-  const onlyAgentsPending =
-    agents.length > 0 && scripts.length === 0 && review?.docs.length === 0 && running.length === 0;
+  const agents = review?.busy ?? [];
+  const onlyAgentsPending = agents.length > 0 && review?.docs.length === 0;
 
   // Radix keeps the content mounted during the exit animation, after `workspace` is already null.
   const shown = useRef<{ workspace: Workspace; groupLabel?: string } | null>(null);
@@ -176,7 +135,7 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
   // Once everything the dialog warned about is resolved (the agents finished) there is nothing
   // left to ask, so it hibernates.
   useEffect(() => {
-    if (mode === "hibernate" && workspace && review && isReviewEmpty(review)) onConfirm(false);
+    if (mode === "hibernate" && workspace && review && isReviewEmpty(review)) onConfirm();
   }, [mode, workspace, review, onConfirm]);
 
   return (
@@ -204,32 +163,30 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
               {closing ? "Agents that are working and will be killed" : "Waiting for these agents to finish"}
             </h3>
             <div className={ROW_GRID}>
-            {agents.map((b) => (
-              <div key={b.tabId} className="contents">
-                {tabs.get(b.tabId) ? (
-                  <TabLabel tab={tabs.get(b.tabId)!} command={commands.get(b.tabId)} />
-                ) : (
-                  <>
+              {agents.map((b) => (
+                <div key={b.tabId} className="contents">
+                  {tabs.get(b.tabId) ? (
+                    <TabLabel tab={tabs.get(b.tabId)!} />
+                  ) : (
                     <span className="min-w-0 truncate text-[12px] text-muted-foreground">{b.name}</span>
-                    <span aria-hidden />
-                  </>
-                )}
-                <span className="flex items-center justify-end gap-2">
-                  <Spinner size={11} />
-                  {!closing && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      title="Interrupt this agent so it can hibernate now"
-                      onClick={() => onStopBusy(b)}
-                    >
-                      Kill
-                    </Button>
                   )}
-                </span>
-                {tabs.get(b.tabId) && <RestoreFor tab={tabs.get(b.tabId)!} />}
-              </div>
-            ))}
+                  <span aria-hidden />
+                  <span className="flex items-center justify-end gap-2">
+                    <Spinner size={11} />
+                    {!closing && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        title="Interrupt this agent so it can hibernate now"
+                        onClick={() => onStopBusy(b)}
+                      >
+                        Kill
+                      </Button>
+                    )}
+                  </span>
+                  {tabs.get(b.tabId) && <RestoreFor tab={tabs.get(b.tabId)!} />}
+                </div>
+              ))}
             </div>
             {closing ? (
               <p className="text-[12px] text-muted-foreground">
@@ -242,57 +199,6 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
                 </p>
               )
             )}
-          </section>
-        )}
-        {scripts.length > 0 && (
-          <section className="flex flex-col gap-1">
-            <h3 className="text-[12px] font-medium">Running scripts that will be stopped</h3>
-            <div className={ROW_GRID}>
-            {scripts.map((b) => (
-              <div key={b.tabId} className="contents">
-                <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
-                  <span className="truncate">{b.name}</span>
-                </span>
-                <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={b.command}>
-                  {b.command && b.command !== b.name ? b.command : ""}
-                </span>
-                <span className="flex items-center justify-end">
-                  {!closing && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      disabled={b.stopping}
-                      title="Stop this script"
-                      onClick={() => onStopBusy(b)}
-                    >
-                      {b.stopping ? "Stopping" : "Stop"}
-                    </Button>
-                  )}
-                </span>
-                {tabs.get(b.tabId) && <RestoreFor tab={tabs.get(b.tabId)!} />}
-              </div>
-            ))}
-            </div>
-          </section>
-        )}
-        {running.length > 0 && (
-          <section className="flex flex-col gap-1">
-            <h3 className="text-[12px] font-medium">Running processes that will be killed</h3>
-            <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
-              {running.map((p) => {
-                const tab = tabs.get(p.tabId);
-                return tab ? (
-                  <div key={p.tabId} className="contents">
-                    <TabLabel tab={tab} command={p.command} />
-                    <RestoreFor tab={tab} />
-                  </div>
-                ) : (
-                  <CommandOnly key={p.tabId} command={p.command} />
-                );
-              })}
-            </div>
           </section>
         )}
         {review && review.docs.length > 0 && (
@@ -351,17 +257,11 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
             {deletedScripts === 1 ? "1 action" : `${deletedScripts} actions`} will be deleted.
           </p>
         )}
-        {canSilence && (
-          <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <Checkbox checked={dontAskAgain} onCheckedChange={(v) => setDontAskAgain(v === true)} />
-            Don't ask me again
-          </label>
-        )}
         <AlertDialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(canSilence && dontAskAgain)} autoFocus disabled={blockedByFailure}>
+          <Button onClick={() => onConfirm()} autoFocus disabled={blockedByFailure}>
             {confirmLabel(mode, review)}
           </Button>
         </AlertDialogFooter>

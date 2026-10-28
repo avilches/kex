@@ -51,7 +51,6 @@ import {
   RemoveSquareIcon,
   Search01Icon,
   SleepingIcon,
-  Tick02Icon,
   SquareArrowDown02Icon,
   SquareArrowDown03Icon,
   SquareArrowUp02Icon,
@@ -1343,26 +1342,6 @@ function dialogButton(
   );
 }
 
-function dialogCheckbox(label: string, checked = false): HTMLElement {
-  const box = h(
-    "span",
-    {
-      class: `flex size-4 shrink-0 items-center justify-center rounded-[5px] border ${
-        checked
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-transparent bg-input/90"
-      }`,
-    },
-    ...(checked ? [icon(Tick02Icon, 14, 2)] : []),
-  );
-  return h(
-    "label",
-    { class: "flex items-center gap-2 text-[13px] text-muted-foreground" },
-    box,
-    label,
-  );
-}
-
 function dialogName(mark: Node, name: string, trailing?: string): HTMLElement {
   return h(
     "div",
@@ -1512,20 +1491,6 @@ function dialogsView(): HTMLElement {
     "div",
     { class: "grid grid-cols-1 gap-6 xl:grid-cols-2" },
     dialogFrame({
-      id: "close-tab (process)",
-      title: "Close tab?",
-      name: dialogName(dot("#22c55e"), "Kex", "In progress"),
-      body: [
-        dialogSection(
-          "Running processes that will be killed",
-          dialogRow(term(12), "logs", "tail -f ~/.cache/kex/kex.log"),
-          restoreLine("tail -f ~/.cache/kex/kex.log"),
-        ),
-        dialogCheckbox("Don't ask me again"),
-      ],
-      footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
-    }),
-    dialogFrame({
       id: "close-tab (working agent)",
       title: "Close tab?",
       name: dialogName(dot("#22c55e"), "Kex", "In progress"),
@@ -1549,10 +1514,14 @@ function dialogsView(): HTMLElement {
       name: dialogName(tinted("#3b82f6", term()), longName),
       body: [
         dialogSection(
-          "Running processes that will be killed",
-          dialogRow(term(12), longName, longName),
+          "Agents that are working and will be killed",
+          dialogRow(term(12), longName, "", busy()),
         ),
-        dialogCheckbox("Don't ask me again", true),
+        h(
+          "p",
+          { class: "text-[12px] text-muted-foreground" },
+          "Consider waiting for the agent to finish before closing.",
+        ),
       ],
       footer: [dialogButton("Cancel"), dialogButton("Close", "default")],
     }),
@@ -1563,8 +1532,9 @@ function dialogsView(): HTMLElement {
       body: [
         dialogSection(
           "Agents that are working and will be killed",
-          dialogRow(term(12), "claude", "claude --resume 7f3a9c", busy()),
-          dialogRow(term(12), "codex", "codex", busy()),
+          dialogRow(term(12), "claude", "", busy()),
+          restoreLine("claude --resume 7f3a9c"),
+          dialogRow(term(12), "codex", "", busy()),
         ),
         h(
           "p",
@@ -1572,16 +1542,8 @@ function dialogsView(): HTMLElement {
           "Consider waiting for the agents to finish before closing.",
         ),
         dialogSection(
-          "Running scripts that will be stopped",
-          dialogRow(icon(PlayIcon, 12, 2), "dev", "pnpm tauri dev"),
-        ),
-        dialogSection(
           "Unsaved documents that will be discarded",
           dialogDocRow("CloseDialogs.tsx", "permission denied"),
-        ),
-        dialogSection(
-          "Running processes that will be killed",
-          dialogRow(term(12), "logs", "tail -f ~/.cache/kex/kex.log"),
         ),
         h(
           "p",
@@ -1598,19 +1560,14 @@ function dialogsView(): HTMLElement {
       body: [
         dialogSection(
           "Waiting for these agents to finish",
-          dialogRow(term(12), "claude", "claude", busy()),
+          dialogRow(term(12), "claude", "", busy()),
+          restoreLine("claude --resume 7f3a9c"),
         ),
         h(
           "p",
           { class: "text-[12px] text-muted-foreground" },
           "The tab will hibernate as soon as the agents are done.",
         ),
-        dialogSection(
-          "Running processes that will be killed",
-          dialogRow(term(12), "server", "pnpm dev"),
-          restoreLine("pnpm dev"),
-        ),
-        dialogCheckbox("Don't ask me again"),
       ],
       footer: [dialogButton("Cancel"), dialogButton("Hibernate now", "default")],
     }),
