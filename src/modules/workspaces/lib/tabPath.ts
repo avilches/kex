@@ -36,6 +36,11 @@ export function tabCopyPath(tab: Tab, agentWorktree: string | null): string | nu
 
 // The folder a tab works in: a terminal's cwd, or the folder holding a file tab's file ("/" for a
 // file directly in the root).
+export function tabFolderIn(tab: Tab | null, agentWorktree: string | null): string | null {
+  if (tab?.kind === "terminal") return tabWorktree(tab, agentWorktree) || tab.cwd || null;
+  return tabFolder(tab);
+}
+
 export function tabFolder(tab: Tab | null): string | null {
   if (!tab) return null;
   if (tab.kind === "terminal") return tab.cwd || null;

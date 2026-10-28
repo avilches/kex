@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tabTitle } from "./tabTitle";
-import { expandTabTitle, expandWorkspaceTitle, tabRawValues, tabTitleVars } from "./titleVars";
+import { expandTabTitle, expandWorkspaceTitle, tabDirIn, tabRawValues, tabTitleVars } from "./titleVars";
 import type { Tab } from "./types";
 
 const terminal = (o: Partial<{ cwd: string; title: string }> = {}): Tab => ({
@@ -17,6 +17,17 @@ const editor = (path: string, title?: string): Tab => ({
   title,
 });
 const git = { branch: "feat/x", repoRoot: "/Users/me/code/kex" };
+
+describe("tabDirIn", () => {
+  it("prefers the worktree an agent entered over a terminal's cwd", () => {
+    expect(tabDirIn(terminal({ cwd: "/code/kex" }), "/code/kex/.claude/worktrees/x")).toBe("/code/kex/.claude/worktrees/x");
+  });
+
+  it("falls back to the cwd without a worktree, and ignores it for file tabs", () => {
+    expect(tabDirIn(terminal({ cwd: "/code/kex" }), null)).toBe("/code/kex");
+    expect(tabDirIn(editor("/code/kex/a.ts"), "/code/kex/.claude/worktrees/x")).toBe("/code/kex");
+  });
+});
 
 describe("tabTitleVars", () => {
   it("derives location variables from a terminal cwd and abbreviates home", () => {

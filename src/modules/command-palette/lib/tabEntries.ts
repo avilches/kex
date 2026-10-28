@@ -4,7 +4,7 @@ import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
-import { tabDir } from "@/modules/workspaces/lib/titleVars";
+import { tabDirIn } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
 export type TabSources = {
@@ -84,7 +84,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
     const workspaceTitle = src.workspaceTitle(ws);
     for (const pane of allPanes(ws.paneTree)) {
       for (const tab of pane.tabs) {
-        const cwd = tabDir(tab) ?? "";
+        const cwd = tabDirIn(tab, src.agentSessionOf(tab.id)?.meta?.worktreeCwd) ?? "";
         const git = src.git(cwd || undefined);
         const { command, agent } = runningOf(tab, src);
         out.push({

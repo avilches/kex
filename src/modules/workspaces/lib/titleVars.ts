@@ -2,6 +2,7 @@ import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import type { DirGit } from "./dirGitStore";
 import { tabFilePath } from "./tabPath";
 import type { TitleDefaults } from "./defaultTitles";
+import { tabWorktree } from "./hibernate";
 import { expandTitle, type TitleVars } from "./titleTemplate";
 import type { Tab, Workspace } from "./types";
 
@@ -24,6 +25,12 @@ export type TitleSources = {
   // Root of the workspace the tab belongs to.
   workspaceRoot?: string;
 };
+
+// Like `tabDir`, with the worktree an agent entered standing in for a terminal's cwd.
+export function tabDirIn(tab: Tab, worktree: string | null | undefined): string | undefined {
+  if (tab.kind === "terminal") return tabWorktree(tab, worktree) || tab.cwd || undefined;
+  return tabDir(tab);
+}
 
 export function tabDir(tab: Tab): string | undefined {
   if (tab.kind === "terminal") return tab.cwd || undefined;

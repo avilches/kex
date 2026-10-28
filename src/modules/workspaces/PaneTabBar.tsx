@@ -36,7 +36,8 @@ import { isHibernatedTab } from "./lib/hibernate";
 import { tabMiddleClick } from "./lib/tabCloseControl";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
-import { tabFolder } from "./lib/tabPath";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { tabFolderIn } from "./lib/tabPath";
 import { TabBarIcon } from "./lib/tabBarIcon";
 import { tabTopLineColor } from "./lib/tabColor";
 import { tabGitColor } from "./lib/tabGitColor";
@@ -489,6 +490,9 @@ export function PaneTabBar({
     [gitStatus],
   );
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
+  const activeAgentWorktree = useAgentStore((s) =>
+    activeTabId ? (s.sessions[activeTabId]?.meta?.worktreeCwd ?? null) : null,
+  );
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -720,7 +724,7 @@ export function PaneTabBar({
         )}
       >
         <NewTabMenuButton
-          folder={tabFolder(tabs.find((t) => t.id === activeTabId) ?? null)}
+          folder={tabFolderIn(tabs.find((t) => t.id === activeTabId) ?? null, activeAgentWorktree)}
           onNewTerminal={onNewTerminal}
           onSplitTerminalRight={onSplitTerminalRight}
           onSplitTerminalDown={onSplitTerminalDown}

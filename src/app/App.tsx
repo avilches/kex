@@ -244,7 +244,7 @@ import {
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { historyPaletteShortcutUnavailable, paletteShortcutUnavailable, shortcutUnavailableBehindPalette } from "@/modules/workspaces/lib/shortcutContext";
-import { tabDir } from "@/modules/workspaces/lib/titleVars";
+import { tabDirIn } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -1256,9 +1256,10 @@ export default function App() {
     const project = explorerRoot
       ? pathBasename(explorerRoot, { tolerateTrailingSlash: true })
       : "";
+    const shownCwd = (isTerminalTab && agentWorktree) || activeCwd;
     const label = activeTab
-      ? activeCwd
-        ? pathBasename(activeCwd, { tolerateTrailingSlash: true })
+      ? shownCwd
+        ? pathBasename(shownCwd, { tolerateTrailingSlash: true })
         : tabDisplayTitleNow(activeTab)
       : "";
     let title: string;
@@ -1268,7 +1269,7 @@ export default function App() {
     void getCurrentWindow()
       .setTitle(title)
       .catch(() => {});
-  }, [explorerRoot, activeCwd, activeTab]);
+  }, [explorerRoot, activeCwd, activeTab, agentWorktree, isTerminalTab]);
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
@@ -1577,7 +1578,9 @@ export default function App() {
     const found = findTabGlobal(leafId);
     if (!found) return null;
     const p = found.tab;
-    return p.kind === "terminal" ? (p.cwd ?? null) : null;
+    return p.kind === "terminal"
+      ? tabDirIn(p, useAgentStore.getState().sessions[leafId]?.meta?.worktreeCwd) ?? null
+      : null;
   };
 
   useEffect(() => {
@@ -3439,7 +3442,9 @@ export default function App() {
     () =>
       commandPaletteOpen
         ? workspaces.flatMap((w) =>
-            allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
+            allPanes(w.paneTree).flatMap((p) =>
+              p.tabs.map((t) => tabDirIn(t, useAgentStore.getState().sessions[t.id]?.meta?.worktreeCwd) ?? ""),
+            ),
           )
         : [],
     [commandPaletteOpen, workspaces],
@@ -3468,7 +3473,9 @@ export default function App() {
             homeRef.current ?? "",
             ...workspaces.flatMap((w) => [
               w.workspaceRoot ?? w.fsRoot ?? "",
-              ...allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
+              ...allPanes(w.paneTree).flatMap((p) =>
+                p.tabs.map((t) => tabDirIn(t, useAgentStore.getState().sessions[t.id]?.meta?.worktreeCwd) ?? ""),
+              ),
             ]),
           ]
         : [],
