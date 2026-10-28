@@ -25,7 +25,7 @@ export function TabBarIcon({
 }) {
   const hasAgent = tab.kind === "terminal" && !!agentSession;
   const isRestoreError = agentSession?.restoreError ?? false;
-  const iconMark = agentIconMark(tab, agentSession);
+  const iconMark = agentIconMark(agentSession);
   if (hasAgent && (isRestoreError || !tab.icon)) {
     return isRestoreError ? (
       <span

@@ -268,8 +268,15 @@ describe("saveRestoreCommand", () => {
     });
   });
 
-  it("keeps the stored command when nothing is running now, as the same object", () => {
-    const tab = term("t1", { persistentCommand: "make" });
+  it("drops a followed command once nothing runs, so a finished command never runs again", () => {
+    const tab = term("t1", { persistentCommand: "make deploy" });
+    const saved = saveRestoreCommand(tab, none) as Terminal;
+    expect(saved.persistentCommand).toBeUndefined();
+    expect(saved.persistentCommandManual).toBe(false);
+  });
+
+  it("keeps a command typed by hand even when nothing runs", () => {
+    const tab = term("t1", { persistentCommand: "lazygit", persistentCommandManual: true });
     expect(saveRestoreCommand(tab, none)).toBe(tab);
   });
 

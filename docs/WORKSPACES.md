@@ -365,8 +365,10 @@ snapshots, so a tab that became visible meanwhile is left alone. Unsaved documen
 
 The command a terminal runs when it comes back (after a restart, a wake or an undo close) is its Restore Command. There is
 no switch for it: it is stored on the tab (`persistentCommand`) whenever the tab stops, whether it hibernates or closes, and
-the user is never asked. To stop a tab from running anything, empty the field in the tab's Restore Command menu. The
-`restoreOnRestart` flag and the struck-through agent icon that went with it no longer exist.
+the user is never asked. A command typed by hand in the tab's Restore Command menu is kept; one that was only followed from the shell is dropped
+when the tab stops with the shell idle, so a command that already finished (`make deploy`) never runs again. To make a tab
+run nothing, empty the field while the shell is idle. The `restoreOnRestart` flag and the struck-through agent icon that
+went with it no longer exist.
 `saveRestoreCommand` (`lib/hibernate.ts`, pure) decides what to store: an agent that resumes its own session
 (`hasResumed`) never copies the running command; any other terminal keeps a command typed by hand
 (`persistentCommandManual`) or adopts the one the shell reports (`followableCommand`); and an empty shell is left untouched.

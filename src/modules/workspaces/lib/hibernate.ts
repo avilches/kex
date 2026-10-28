@@ -118,17 +118,18 @@ export function restoreCommandFor(tab: TerminalTab, plan: { resumeCmd: string } 
 }
 
 // The Restore Command is saved every time a terminal stops (hibernate or close), so waking it or
-// undoing the close brings back what it was running. A shell with nothing to run is left alone, an
-// agent that resumes its own session never copies the running command, and a command the user
-// typed by hand is never replaced by the running one.
+// undoing the close brings back what it was running. An agent that resumes its own session never
+// copies the running command, and a command the user typed by hand is never replaced. A command
+// that was only followed from the shell lives as long as it runs: with the shell idle it is
+// dropped, or `make deploy` would run again every time the tab comes back.
 export function saveRestoreCommand(
   tab: Tab,
   live: { running: string | null; agentResumable: boolean | undefined },
 ): Tab {
   if (tab.kind !== "terminal" || tab.hibernation || live.agentResumable === true) return tab;
-  const running = live.running ?? undefined;
-  const command = tab.persistentCommandManual ? tab.persistentCommand : (running ?? tab.persistentCommand);
-  return command === tab.persistentCommand ? tab : { ...tab, persistentCommand: command };
+  if (tab.persistentCommandManual) return tab;
+  const command = live.running ?? undefined;
+  return command === tab.persistentCommand ? tab : { ...tab, persistentCommand: command, persistentCommandManual: false };
 }
 
 export function isPendingStale(pendingId: string | null, workspaces: readonly { id: string }[]): boolean {

@@ -214,8 +214,8 @@ and stores `launchKnown` in `session.meta`. Without this the icon of an agent la
 would only appear with the first prompt, because the hooks other than `SessionStart` are the only ones that emit
 `kex:agent-signal`. `PaneTabBar` draws the icon struck through with the tooltip "Launch command unknown: restore will
 use plain claude --resume" when `meta.launchKnown === false` (`agentIconMark` in `workspaces/lib/agentRestore.ts`).
-The strike of "Run on start is off" wins when both apply. The restore itself is unchanged: it still relaunches with
-`claude --resume '<id>'`. After that restore the line Kex types is recognised, so the strike goes away.
+The restore itself is unchanged: it still relaunches with `claude --resume '<id>'`. After that restore the line Kex types
+is recognised, so the strike goes away.
 
 Known limits of a launcher that was not recognised: the detector was never armed, so no `OSC 133;D` ends the session
 and the icon stays on the tab after the agent quits, until the tab closes (the same as it already did after the first
@@ -268,7 +268,7 @@ cap, silent failure. The plugin host is born in the launch directory and never m
 
 OpenCode keeps its history in a SQLite database (`~/.local/share/opencode/opencode.db`), not in a per-session file, so
 the frames carry no transcript path and the tab menu's OpenCode block has no transcript actions: it offers "Copy Session ID"
-and "Run on Start" only.
+and "Restore Command" only.
 A restored tab has the same record as any other: it is keyed by the tab's old session id, never pruned (the provider
 row's policy is `ResumeAnyway`) and `opencode --session '<id>'` runs in the same launch directory.
 
@@ -362,7 +362,7 @@ Codex, frames carry the same fields as Claude Code's (`session_id`, `transcript_
 `kex:agent-session-meta` with `agent: codex`; the other events become `kex:agent-signal` frames tagged `codex`, exactly
 as for Claude. `SubagentStart` / `SubagentStop` feed the same subagent gate; Codex's `Stop` carries no subagent list, so
 the ones it reported are kept until their own `SubagentStop`, as for OMP. The tab menu block offers Copy Session ID and
-Run on Start, and the transcript actions only when the frame named a rollout (`hasTranscriptActions`): with an empty
+Restore Command, and the transcript actions only when the frame named a rollout (`hasTranscriptActions`): with an empty
 path there is nothing to reveal, so it hides them, as for OpenCode, instead of "Transcript not created yet".
 
 The script now prints `{}` on stdout for Codex too (TASK-894). Not measured against a live Codex: the reasoning is that
@@ -708,7 +708,7 @@ result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` 
 given tab - consume-once semantics prevent double injection.
 
 `previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
-`RunOnStartMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
+`RestoreCommandMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
 `useWorkspaces.ts`'s `reopenClosed` (see "Reopening a closed terminal tab" below). It reads `agent-sessions.json`
 fresh each time and never mutates it, unlike `load_restore_plan`.
 
@@ -767,10 +767,10 @@ in `pendingRestore.ts` (`setPendingRestore`, read in React with `usePendingResto
 `Session.restoreBlock`, which is the modal and goes away when the user opens a plain shell. It is cleared when a start
 finally runs the plan, on Retry restore success, and on Discard restore plan.
 
-The `Run on Start` submenu (`RunOnStartMenu`) reacts to it:
+The `Restore Command` submenu (`RestoreCommandMenu`) reacts to it:
 
 - The submenu trigger turns red (`text-destructive`).
-- The Enable / Disable button is not rendered (`runOnStartSections`): it makes no sense while a plan waits.
+- The old error text is not rendered (`restoreCommandSections`): the block already carries the reason.
 - A "Restore pending" block (only its title is red) shows the reason and the command as it will be typed in the
   normal text colour, two selectable mono lines: `cd <dir>` and the command. It replaces the old red error text of
   the agent preview.
@@ -855,10 +855,10 @@ A tab running an agent is restored on relaunch even with no integration, but not
 
 | | Without the integration | With it |
 |---|---|---|
-| Restore on relaunch | "Run on Start" retypes the command seen in the shell (`claude`, `claude --model opus`) and opens a **new** session | A `SessionStart` record holds the `session_id`, and Kex types `claude --resume '<id>'`, which **continues the conversation** (`useTerminalSession.ts`: `plan?.resumeCmd || persistentCommand`) |
+| Restore on relaunch | "Restore Command" retypes the command seen in the shell (`claude`, `claude --model opus`) and opens a **new** session | A `SessionStart` record holds the `session_id`, and Kex types `claude --resume '<id>'`, which **continues the conversation** (`useTerminalSession.ts`: `plan?.resumeCmd || persistentCommand`) |
 | Spinner, attention dot, finish notification | No spinner and no end-of-turn signal: channel 1 only reports that the agent started and exited, plus a generic attention when the agent itself emits `OSC 9` (Claude Code does when it has no hooks) | All of them (channel 2, the hooks) |
 | Session id, model, transcript, agent cwd and worktree | Never filled: they only arrive over the hook socket (`pty/ipc.rs`) | Filled |
-| Tab menu | Agent name, Install, Run on Start | The full block above |
+| Tab menu | Agent name, Install, Restore Command | The full block above |
 
 ## Terminal path bar UI
 
@@ -867,28 +867,25 @@ surfaced in the tab context menu (`TabAgentMenuItems`, rendered by `TabContextMe
 for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
 with a `transcriptPath`). The two copy entries show the id they copy below their label. Those entries and the model line only exist because the integration reports them, so
 while an agent's integration is missing (`agentMenuIntegration`, pure, in `workspaces/lib/`; the status is read with `agentStatus` each time the menu opens) the block shows the agent name,
-"Install <Agent> integration" (the same `installWithToast` path as the install toast) and Run on Start, and hides the session id, the model and the transcript
+"Install <Agent> integration" (the same `installWithToast` path as the install toast) and Restore Command, and hides the session id, the model and the transcript
 entries, which can never be filled without it. With the status not yet known, or already installed, the block is the usual one and never offers Install; when Install
-cannot run (`malformed`, `uneditable`, `unavailable`) the dead entries are hidden and nothing is offered. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
-`Run on Start` submenu with an Enable / Disable button (its label follows the current state), the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. Its trigger keeps the play icon and ends with the state: a check when it is on and nothing when it is off, for terminals and agents alike. The path bar has no run-on-start icon; while
-an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
-dot either, only the model name, because the tab icon already carries the working and attention states.
+cannot run (`malformed`, `uneditable`, `unavailable`) the dead entries are hidden and nothing is offered. "Restore Command" lives in the tab context menu (`RestoreCommandMenu`, used by `TabContextMenuItems`), as a
+`Restore Command` submenu with the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. There is no switch to turn it on or off: the command is saved by itself every time the tab hibernates or closes (see `docs/WORKSPACES.md`, "The Restore Command is always saved"). The path bar has no restore icon; while
+an agent is alive the path bar shows no status dot, only the model name, because the tab icon already carries the working and attention states.
 
-- **Enable / Disable** button: toggles `restoreOnRestart` on the panel. For agent sessions it defaults to on
-  and enabling it captures the current running command as the `persistentCommand` if none is already set - this is only
-  a fallback default now (see below), not what normally gets shown or run.
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
   that will actually run on the next Kex launch, fetched from `agent_session_preview_cmd` (via `previewResumeCmd`) when
   the menu opens and whenever the session id changes (e.g. after `/clear`). It is computed the same way as the startup
   restore plan - `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that - so it
   always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
-  tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
-  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead (disabled while Run on Start is off). Without a manual edit it follows the
+  tab has no agent session (a plain "Restore Command" command like `lazygit`), or an agent session with no matching entry
+  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead. Without a manual edit it follows the
   command running in the terminal and writes it to `persistentCommand` while the menu is open; once the user types a
   value it is kept (`persistentCommandManual: true`), and clearing the field makes it follow the terminal again
-  (`modules/terminal/lib/runOnStartCommand.ts`). This replaces the previous behaviour where the input always showed
-  `persistentCommand`: a value captured once from the currently running command the first time the checkbox was
-  toggled on, then frozen forever, unrelated to the id/transcript-based command the app actually resumes with.
+  (`modules/terminal/lib/restoreCommand.ts`). This replaces the previous behaviour where the input always showed
+  `persistentCommand`: a value captured once from the currently running command, then frozen forever, unrelated to the
+  id/transcript-based command the app actually resumes with. A command followed from the shell is dropped when the tab
+  stops with the shell idle, so a command that already finished never runs again; a command typed by hand stays.
 
   **Exiting and restarting the agent in the same tab** also refreshes the preview, through the existing session
   lifecycle rather than anything preview-specific: when the agent process exits, `kex:agent-signal` fires `"exited"`
@@ -910,9 +907,6 @@ dot either, only the model name, because the tab icon already carries the workin
   the user launches an agent by hand in that tab, the `started` signal replaces it (`isRunningAgentSession`) and the
   error clears.
 
-The agent icon in the tab bar (`PaneTabBar.tsx`) gets a diagonal strike-through when the tab's "Run on start" is off
-(`agentRestoreDisabled`), meaning the live session will not come back on the next launch. It only shows while an
-agent is alive: a clean exit deletes the store entry, so there is no idle "saved session" state to represent.
 
 Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an agent is active) -- no HoverCard.
 
@@ -938,7 +932,7 @@ Actions:
 Hibernating a terminal tab (`Tab.hibernation`) kills its PTY, and each kill produces an `exited` signal. The stored
 session record in `agent-sessions.json` must survive that exit, because waking the tab restores the agent from it.
 "Hibernate all" in a workspace menu does the same for each awake terminal of the workspace. The wake
-(`wakeTabs`) seeds each tab's resume plan under the same tab id (`seedWakePlans`, same "Run on start" gate as the reopen
+(`wakeTabs`) seeds each tab's resume plan under the same tab id (`seedWakePlans`, same "Restore Command" gate as the reopen
 flow), clears `hibernatingTabs` and drops `hibernation`; the terminal that mounts consumes the plan when it spawns. A normal exit detaches the record (`agent_detach_session`).
 
 **Last lines of the terminal.** While the PTY is still alive, `snapshotTerminalTabs` (`useHibernateFlow.ts`) reads the
@@ -1023,7 +1017,7 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again / Open terminal without restoring modal and shows `⚠`; store entry kept |
 | saved command (no agent) whose directory is unusable | Same modal, built on the frontend from `check_launch_dir` |
 | `openPty` rejects at start | Modal with the reason `Could not start the terminal: ...` and only Try again; nothing is left pending |
-| Open terminal without restoring | Plain shell; plan kept in `agent-sessions.json` / `persistentCommand` and shown as pending in the Run on Start menu; the in-memory pending state is rebuilt by blocking again at the next launch |
+| Open terminal without restoring | Plain shell; plan kept in `agent-sessions.json` / `persistentCommand` and shown as pending in the Restore Command menu; the in-memory pending state is rebuilt by blocking again at the next launch |
 | Retry restore with the problem still there | Block stays pending with the new reason; nothing typed |
 | Discard restore plan on a saved command | Forgets this start only; `persistentCommand` kept |
 | session entered a worktree later deleted | restored in the worktree's `originalCwd` (from `worktree-state`), not in the worktree |

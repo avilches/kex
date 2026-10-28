@@ -855,7 +855,7 @@ Al reabrir Kex con varias pestanas de Claude, siempre la misma (la primera por o
 
 ### Pistas falsas descartadas
 
-- "Run on start" desactivado: `restoreOnRestart` era `true` en el JSON del workspace, y con el flag apagado el PTY no se habria abierto en el cwd del plan.
+- "Restore Command" desactivado: `restoreOnRestart` era `true` en el JSON del workspace, y con el flag apagado el PTY no se habria abierto en el cwd del plan.
 - Sobrescritura de la sesion: el `session_id` de `agent-sessions.json` era el mismo antes y despues; el usuario lanzo `claude -c` a mano y este continuo justo esa conversacion.
 - Carrera de plan no cargado: los planes se sirven todos en una sola llamada IPC y `attachSession` espera a `restorePlansReady()`.
 
@@ -1325,7 +1325,7 @@ su id, y de eso cuelgan varias cosas que no fallan con ruido si se tocan mal:
   conjunto, su xterm y su contexto WebGL se quedarian vivos dentro de un pane vivo. Lo cubre el test de `liveTerminalIds`.
 - **Correr un script sobre un tab dormido.** Si el tab enlazado se despertaria como una shell vacia (su `hibernation` no
   tiene ni `command` ni `agent`) se despierta y se reutiliza; si se despertaria ejecutando algo, se abre uno nuevo, o el
-  comando se teclearia encima del Run on start. La decision usa la instantanea (`LinkedTab.sleeping`), no el plan de resume, que es
+  comando se teclearia encima del Restore Command. La decision usa la instantanea (`LinkedTab.sleeping`), no el plan de resume, que es
   asincrono.
 - **Bloquear lo justo.** Con el tab enfocado dormido solo se bloquea lo que actua sobre una terminal viva
   (`terminal.*`, `search.focus`, `history.open`) y las Actions que dependen del tab enfocado. Bloquear tambien tab, pane,

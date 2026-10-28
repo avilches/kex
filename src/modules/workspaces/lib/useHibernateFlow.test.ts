@@ -49,6 +49,25 @@ describe("createHibernateFlow", () => {
     expect(calls).toContain("hibernate:t1");
   });
 
+  it("does not put a locked tab to sleep by hand, and still takes the others it was asked for", async () => {
+    const { flow, calls } = setup(ws([term("t1", { locked: true }), term("t2")]));
+    await flow.request("w1", ["t1", "t2"]);
+    expect(calls).toContain("hibernate:t2");
+    expect(isHibernating("t1")).toBe(false);
+  });
+
+  it("does nothing at all when the only tab asked for is locked", async () => {
+    const { flow, calls } = setup(ws([term("t1", { locked: true })]));
+    await flow.request("w1", ["t1"]);
+    expect(calls).toEqual([]);
+  });
+
+  it("keeps hibernating a locked tab on its own when the automatic hibernation takes it", async () => {
+    const { flow, calls } = setup(ws([term("t1", { locked: true })]));
+    expect(await flow.requestAuto("w1", ["t1"])).toBe(true);
+    expect(calls).toContain("hibernate:t1");
+  });
+
   it("only touches the tabs it was asked for, and only terminals", async () => {
     const editor = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
     const { flow, calls } = setup(ws([term("t1"), term("t2"), editor]));

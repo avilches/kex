@@ -66,12 +66,18 @@ export function useTabCloseGuards({
     (tabId: string) =>
       new Promise<TerminalCloseDecision>((resolve) => {
         const found = findTab(tabId);
+        // The dialog needs the workspace of the tab. Without it nothing would open and this
+        // promise, and the close queue behind it, would wait for ever.
+        if (!found) {
+          resolve({ type: "cancel" });
+          return;
+        }
         setPendingTerminalCloseTab({
           id: tabId,
-          title: found?.tab.title ?? "terminal",
+          title: found.tab.title ?? "terminal",
           kind: "terminal",
-          workspaceId: found?.workspace.id,
-          tab: found?.tab,
+          workspaceId: found.workspace.id,
+          tab: found.tab,
         });
         terminalResolverRef.current = resolve;
       }),

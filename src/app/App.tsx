@@ -2092,6 +2092,7 @@ export default function App() {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind !== "terminal") return;
       if (found.tab.hibernation) void wakeAndFocusTab(tabId);
+      else if (found.tab.locked) flashLockIcon(tabId);
       else void requestHibernate(found.workspace.id, [tabId]);
     },
     [findTabGlobal, wakeAndFocusTab, requestHibernate],
@@ -3732,6 +3733,7 @@ export default function App() {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind !== "terminal") return;
       if (found.tab.hibernation) await wakeTabs(found.workspace.id, [tabId]);
+      else if (found.tab.locked) flashLockIcon(tabId);
       else await requestHibernate(found.workspace.id, [tabId]);
     },
     [findTabGlobal, wakeTabs, requestHibernate],

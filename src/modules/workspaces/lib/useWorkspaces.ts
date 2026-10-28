@@ -501,15 +501,18 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedTabsRef = useRef<ClosedEntry[]>([]);
   // Every change of the closed stack goes through here: a sleeping tab that leaves it for good
-  // (pushed off by the cap, dropped, or the stack reset) has its stored lines deleted. A tab that
-  // is reopened keeps its id and is open again, so it is left alone.
-  const setClosedStack = useCallback((next: ClosedEntry[]) => {
+  // (pushed off by the cap, dropped, or the stack reset) has its stored lines deleted. A reopen
+  // passes `leaving: false`: the entry leaves the stack to come back with the same id, and the
+  // tab is not in the workspaces yet, so it must not be taken for an orphan.
+  const setClosedStack = useCallback((next: ClosedEntry[], leaving = true) => {
+    const before = closedTabsRef.current;
+    closedTabsRef.current = next;
+    if (!leaving || next === before) return;
     const orphans = orphanedSleepers(
-      closedTabsRef.current,
+      before,
       next,
       new Set(workspacesRef.current.flatMap((w) => terminalTabs(w).map((t) => t.id))),
     );
-    closedTabsRef.current = next;
     if (orphans.length > 0) {
       deleteHibernateLines(orphans).catch((e) => console.warn("[kex] could not delete hibernate lines:", e));
     }
@@ -849,7 +852,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       return null;
     }
     if (onlyBatch && picked.entry.batchId !== onlyBatch) return null;
-    setClosedStack(remaining);
+    setClosedStack(remaining, false);
 
     // A reopened terminal tab that used to run an agent gets the same live,
     // just-in-time resume plan the startup flow computes, keyed by the id the
@@ -883,7 +886,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const newId = asleep ? entry.tab.id : newTabId();
     if (!asleep) await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
-    setClosedStack(remapPrevTabId(closedTabsRef.current, entry.tab.id, newId));
+    setClosedStack(remapPrevTabId(closedTabsRef.current, entry.tab.id, newId), false);
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
     const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
     openTab(picked.workspaceId, slot.paneId, newTab, slot.index);

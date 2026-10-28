@@ -23,6 +23,7 @@ import {
   seedRestorePlan,
   type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
+import { invoke } from "@tauri-apps/api/core";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentNotification, AgentSession } from "@/modules/agents/lib/types";
 import { useWorkspaces } from "./useWorkspaces";
@@ -368,6 +369,48 @@ describe("undo close of a hibernated tab", () => {
     expect(reopened).toMatchObject({ hibernation: { at: 1, agent: "claude" } });
     expect(previewResumeCmd).not.toHaveBeenCalled();
     expect(seedRestorePlan).not.toHaveBeenCalled();
+  });
+
+  const deletedLines = () =>
+    vi
+      .mocked(invoke)
+      .mock.calls.filter(([cmd]) => cmd === "hibernate_lines_delete")
+      .flatMap(([, args]) => (args as { tabIds: string[] }).tabIds);
+
+  it("keeps the stored lines of a sleeping tab while it is closed and when the close is undone", async () => {
+    view = mount([makeWs("b", [sleeping("b1"), term("b2")])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    expect(deletedLines()).toEqual([]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(deletedLines()).toEqual([]);
+  });
+
+  it("keeps the stored lines of a sleeper when a closed workspace holding it is brought back", async () => {
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [sleeping("b1"), term("b2")])]);
+
+    act(() => view!.h.closeWorkspace("b"));
+    expect(deletedLines()).toEqual([]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a", "b"]);
+    expect(deletedLines()).toEqual([]);
+  });
+
+  it("deletes the stored lines of a sleeper that the cap pushes off the closed stack", async () => {
+    const many = Array.from({ length: 11 }, (_, i) => term(`x${i}`));
+    view = mount([makeWs("a", [term("a0")]), makeWs("b", [sleeping("b1"), ...many])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    expect(deletedLines()).toEqual([]);
+    for (const t of many) act(() => view!.h.closeTab("b", t.id));
+
+    expect(deletedLines()).toEqual(["b1"]);
   });
 
   it("reopens a tab that was awake awake, with a new id and a seeded plan", async () => {

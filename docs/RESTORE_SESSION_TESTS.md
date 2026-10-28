@@ -373,13 +373,13 @@ Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con e
 - [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "opencode"`, `session_id` tipo `ses_...`, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "opencode"` (grabada por OSC 133;C)
 - [ ] El icono del tab aparece sin la strike de "launch unknown"
 - [ ] Mientras OpenCode trabaja el tab muestra el spinner y al terminar el turno pasa a atencion una sola vez; una peticion de permiso (`bash` en modo `ask`) muestra la atencion
-- [ ] Menu contextual del tab: bloque OpenCode con "Copy Session ID" y "Run on Start", sin acciones de transcript (OpenCode guarda el historial en SQLite, no en un fichero por sesion)
+- [ ] Menu contextual del tab: bloque OpenCode con "Copy Session ID" y "Restore Command", sin acciones de transcript (OpenCode guarda el historial en SQLite, no en un fichero por sesion)
 
 ### F3 Restore del tab cerrado
 
 - [ ] Cerrar el tab de la sesion y reabrir Kex
 - [ ] Esperado: Kex escribe `opencode --session '<ses_id>'` (o `opencode ... --session '<ses_id>'` con los flags conservados si el lanzamiento lo tenia) en el directorio grabado
-- [ ] El preview "Run on start" del tab muestra el mismo comando antes de cerrar
+- [ ] El preview "Restore Command" del tab muestra el mismo comando antes de cerrar
 
 ### F4 Resume desde el picker del TUI
 
@@ -414,7 +414,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 
 - [ ] Cerrar el tab de la sesion y reabrir Kex
 - [ ] Esperado: Kex escribe `omp --resume '<uuid>'` (con los flags conservados si el lanzamiento lo tenia) en el directorio grabado
-- [ ] El preview "Run on start" del tab muestra el mismo comando antes de cerrar
+- [ ] El preview "Restore Command" del tab muestra el mismo comando antes de cerrar
 
 ### G4 Resume por prefijo del id
 
@@ -449,7 +449,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H3 Restore del tab cerrado
 
 - [ ] Cerrar el tab de la sesion y reabrir Kex
-- [ ] Esperado: Kex escribe `pi --session '<uuid>'` en el directorio grabado; el preview "Run on start" del tab muestra el mismo comando
+- [ ] Esperado: Kex escribe `pi --session '<uuid>'` en el directorio grabado; el preview "Restore Command" del tab muestra el mismo comando
 
 ### H4 Una sesion de Pi sin ningun turno
 
@@ -475,11 +475,11 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 
 ### I3 OMP no pierde el agente
 
-- [ ] Lanzar `omp`, escribir un mensaje y esperar la respuesta: el icono del tab sigue sin tachar y "Run on Start" muestra el comando
+- [ ] Lanzar `omp`, escribir un mensaje y esperar la respuesta: el icono del tab sigue sin tachar y "Restore Command" muestra el comando
 - [ ] `omp --resume '<id>'` desde un tab: lo mismo, y el tab no deja de ser un tab de agente al terminar el primer mensaje
 - [ ] Salir de `omp` con `/exit` o Ctrl+D: el icono desaparece (la salida real si se detecta)
 - [ ] Lo mismo con `pi`: escribir un mensaje, salir con Ctrl+D y comprobar que el icono desaparece (Pi dibuja `A B C` sin `D`, y sin esto se quedaba el tab marcado como agente)
-- [ ] `/new` dentro de `omp` y de `pi`: el tab sigue con su comando de arranque en "Run on Start" y sin tachar
+- [ ] `/new` dentro de `omp` y de `pi`: el tab sigue con su comando de arranque en "Restore Command" y sin tachar
 
 ### I4 Hibernacion
 
@@ -488,10 +488,10 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 
 ### I5 Menu del tab
 
-- [ ] Tab de OMP o Pi: el bloque del agente (icono, modelo, transcript) lleva "Run on Start" dentro
-- [ ] Tab de OpenCode: bloque de agente con "Copy Session ID" y "Run on Start" dentro, sin acciones de transcript
+- [ ] Tab de OMP o Pi: el bloque del agente (icono, modelo, transcript) lleva "Restore Command" dentro
+- [ ] Tab de OpenCode: bloque de agente con "Copy Session ID" y "Restore Command" dentro, sin acciones de transcript
 - [ ] Restaurar un tab de OpenCode sin escribir nada en el: en dev no sale el aviso "did not report a session"
-- [ ] Tab de terminal sin agente: "Run on Start" sigue ahi
+- [ ] Tab de terminal sin agente: "Restore Command" sigue ahi
 
 ## Bloque J - Subagentes
 
@@ -500,7 +500,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 - [ ] En un tab de `omp`, pedir: "usa la herramienta task para lanzar dos subagentes en paralelo con las descripciones Contar archivos y Saludar"
 - [ ] Esperado: en la lista anidada del WorkspaceBar aparecen dos filas hijas del tab, cada una con su nombre, mientras corren, y desaparecen al terminar
 - [ ] El tab sigue con spinner mientras haya subagentes corriendo y solo pasa a atencion cuando el ultimo termina
-- [ ] "Run on Start" y el icono del tab siguen mostrando la sesion principal, no la de un subagente
+- [ ] "Restore Command" y el icono del tab siguen mostrando la sesion principal, no la de un subagente
 
 ### J2 OpenCode
 
@@ -576,9 +576,9 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 
 ### K6 Menu del tab
 
-- [ ] Tab de Codex con rollout: el bloque del agente ofrece "Copy Session ID", "Run on Start" y las acciones de transcript ("Open Transcript Folder", "Reveal Transcript in Finder")
-- [ ] Tab de Codex cuyo frame llego con `transcript_path` vacio o `null`: "Copy Session ID" y "Run on Start" siguen, y las acciones de transcript no aparecen (ni "Transcript not created yet")
-- [ ] "Run on Start" muestra `codex resume '<uuid>'`, o `<launcher> resume '<uuid>'` si se lanzo con un wrapper reconocido
+- [ ] Tab de Codex con rollout: el bloque del agente ofrece "Copy Session ID", "Restore Command" y las acciones de transcript ("Open Transcript Folder", "Reveal Transcript in Finder")
+- [ ] Tab de Codex cuyo frame llego con `transcript_path` vacio o `null`: "Copy Session ID" y "Restore Command" siguen, y las acciones de transcript no aparecen (ni "Transcript not created yet")
+- [ ] "Restore Command" muestra `codex resume '<uuid>'`, o `<launcher> resume '<uuid>'` si se lanzo con un wrapper reconocido
 
 ### K7 Cerrar Kex con Codex abierto y reabrir
 
@@ -630,7 +630,7 @@ Para no tocar la configuracion real mientras se prueba, lanzar Kex y Codex con u
 
 Necesitan un Codex con sesion iniciada y no se pudieron medir. Cada una puede cambiar el codigo:
 
-- [ ] **Marcas OSC 133 propias (regla de TASK-851).** Lanzar `codex`, escribir un mensaje y esperar la respuesta: el icono del tab debe seguir ahi y "Run on Start" mantener su comando. Si el tab pierde el agente tras el primer mensaje, Codex dibuja sus propias marcas y `AgentDetector` necesita la regla que OMP ya tiene; salir con `/exit` o Ctrl+D debe apagar el icono. Hoy `AgentDetector` trata a Codex como a cualquier agente
+- [ ] **Marcas OSC 133 propias (regla de TASK-851).** Lanzar `codex`, escribir un mensaje y esperar la respuesta: el icono del tab debe seguir ahi y "Restore Command" mantener su comando. Si el tab pierde el agente tras el primer mensaje, Codex dibuja sus propias marcas y `AgentDetector` necesita la regla que OMP ya tiene; salir con `/exit` o Ctrl+D debe apagar el icono. Hoy `AgentDetector` trata a Codex como a cualquier agente
 - [ ] **`codex resume <id>` de una sesion sin rollout** (ver K10)
 - [ ] **Lista de flags de `codex exec`.** Las opciones de Codex que llevan valor (`-c`, `-m`, `-p`, `-s`, `-a`, `-C`, `-i`, `--add-dir`, `--enable`, `--disable`, `--local-provider`) salieron de la ayuda de la CLI, no de una medicion. Probar `codex <opcion> <valor> exec ...` con cada una y comprobar que se filtra
 - [ ] **Payload con `transcript_path` nulo.** Mirar el JSON real que Codex manda en `SessionStart`: si `transcript_path` viene `null` antes del primer mensaje, debe quedar vacio en el store y el menu ocultar las acciones de transcript (K6). Anotar tambien si manda `source` y con que valores
