@@ -53,6 +53,48 @@ desde el padre, no solo con Escape.
 
 ---
 
+## Bug 2: la paleta vuelve a abrir en la primera Action global tras cerrarla con Escape o clic fuera (RESUELTO)
+
+### Sintoma
+
+Solo en el build de produccion: la primera apertura caia en Current tab, pero tras cerrar con Escape o
+con un clic fuera, las siguientes abrian con el cursor en la primera Action global, siempre. Cerrar
+eligiendo una tab no lo provocaba. En `pnpm tauri dev` no se reproducia, ni tampoco en los tests.
+
+### Pistas falsas descartadas
+
+- El reseteo del Bug 1 (`if (!open) setValue("")`): estaba y se ejecutaba.
+- Un build antiguo: el de produccion era posterior al fix del Bug 1.
+- La animacion de salida en happy-dom: forzandola con `[data-state="closed"] { animation-name }` el
+  dialogo se queda montado, pero cmdk no avisa y el test pasa con y sin el fix.
+
+### Causa raiz
+
+`App.tsx` solo calcula las entradas de tabs con la paleta abierta, asi que al cerrar la lista pierde
+todas las tabs de golpe mientras el dialogo sigue montado ~100 ms por la animacion de salida. cmdk ve
+desaparecer la fila resaltada, elige la primera que queda (la primera Action global) y llama a
+`onValueChange` con la paleta ya cerrada. Ese aviso llegaba despues del reseteo y volvia a guardar la
+fila en `pickedValue`; la apertura siguiente la recibia como valor controlado.
+
+### Fix
+
+`onValueChange` ignora lo que cmdk diga mientras `open` es false.
+
+### Como se encontro
+
+Instrumentando `CommandPalette` con `fetch` a un receptor HTTP local (ver
+`.memory/reference_webview_debug_via_fetch.md`) y probando con el bundle de produccion
+(`pnpm tauri build -b app`): el registro mostraba `cmdk-onValueChange {v: "act:...", open: false}`
+justo despues del cierre.
+
+### Leccion
+
+Una libreria con estado interno (cmdk) sigue emitiendo cambios mientras el componente esta montado
+aunque `open` sea false. Resetear al cerrar no basta: hay que ignorar sus avisos mientras esta cerrada.
+Y un bug que solo sale en el build de produccion se mide con el build de produccion.
+
+---
+
 ## Decision 2: Add/Show Note cierran la paleta, Hide/Remove Note no
 
 Add Note y Show Note entregan el teclado a la nota, asi que se comportan como cualquier item que
