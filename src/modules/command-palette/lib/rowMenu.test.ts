@@ -61,8 +61,11 @@ describe("tabMenuItems", () => {
       "hibernateTab",
       "lock",
       "close",
-      "closeWorkspace",
     ]);
+  });
+
+  it("does not offer closing the workspace: the user could not tell which one it is", () => {
+    expect(ids(entry())).not.toContain("closeWorkspace");
   });
 
   it("carries the shortcut of every item that has a twin", () => {
@@ -74,7 +77,6 @@ describe("tabMenuItems", () => {
     expect(shortcutOf("hibernateTab")).toBe("tab.hibernate");
     expect(shortcutOf("lock")).toBe("tab.lock");
     expect(shortcutOf("close")).toBe("tab.close");
-    expect(shortcutOf("closeWorkspace")).toBe("workspace.close");
     expect(item(entry({ kind: "editor", path: "/repo/a.ts", dirty: true }), "save")?.shortcutId).toBe(
       "editor.save",
     );
@@ -173,7 +175,7 @@ describe("tabMenuItems", () => {
 
 describe("tabItemKeepsPalette", () => {
   it("keeps the palette for the toggles that change the row in place", () => {
-    for (const id of ["lock", "hibernateTab", "save", "removeNote"] as const) {
+    for (const id of ["lock", "hibernateTab", "save", "removeNote", "copy", "copyRelative", "tabId"] as const) {
       expect(tabItemKeepsPalette(id, entry())).toBe(true);
     }
   });
@@ -188,7 +190,7 @@ describe("tabItemKeepsPalette", () => {
   });
 
   it("closes it for the rest", () => {
-    for (const id of ["go", "copy", "copyRelative", "tabId", "close"] as const) {
+    for (const id of ["go", "close"] as const) {
       expect(tabItemKeepsPalette(id, entry())).toBe(false);
     }
   });

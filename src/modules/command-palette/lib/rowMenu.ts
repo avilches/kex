@@ -217,21 +217,22 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
     active: locked,
     separatorBefore: tab.kind !== "terminal" || entry.hibernated,
   });
-  items.push(
-    { id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: locked },
-    { id: "closeWorkspace", label: "Close Workspace", shortcutId: "workspace.close" },
-  );
+  items.push({ id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: locked });
   return items;
 }
 
 // Whether the item leaves the palette open: it toggles or saves in place, so the row stays and
 // shows the new state. Every other item closes the palette or removes rows through the close flow.
 // Add and Show Note hand the keyboard to the note, so they close it; Hide Note does not.
+// The copy items only write to the clipboard, so the palette stays where it was.
 export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean {
   if (id === "note") return isTabNoteOpen(entry.tab);
   return (
     id === "moveWorkspace" ||
     id === "back" ||
+    id === "copy" ||
+    id === "copyRelative" ||
+    id === "tabId" ||
     id === "lock" ||
     id === "hibernateTab" ||
     id === "save" ||

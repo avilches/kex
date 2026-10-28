@@ -169,6 +169,24 @@ describe("Hibernate Tab chosen from the row menu over the palette", () => {
     });
   }
 
+  for (const how of ["menu", "shortcut"] as const) {
+    it(`Enter confirms the dialog and leaves the palette open (${how})`, async () => {
+      if (how === "menu") await openFromMenu("enter");
+      else {
+        await setup();
+        await act(async () => { runPaletteTabItem("hibernateTab"); });
+        await wait(30);
+      }
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+      await press("Enter", input());
+      await wait(400);
+      expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+      expect(onChange).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(input());
+      expect(selected()).toBe("tab:c");
+    });
+  }
+
   it("Cancel returns the focus to the input", async () => {
     await openFromMenu("enter");
     fireEvent.click(screen.getByText("Cancel"));
