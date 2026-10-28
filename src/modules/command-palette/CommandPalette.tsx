@@ -20,7 +20,7 @@ import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
-import { isAutofocusTab, type Tab } from "@/modules/workspaces/lib/types";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import {
   AlertCircleIcon,
   ArrowTurnBackwardIcon,
@@ -185,7 +185,6 @@ export function CommandPalette({
   const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [page, setPage] = useState<"root" | "themes">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
@@ -561,8 +560,6 @@ export function CommandPalette({
         runAfterClose(() => void writeClipboardText(tabId));
       } else if (id === "lock") {
         onUpdateTab(tabId, toggleTabLock);
-      } else if (id === "autofocus") {
-        onUpdateTab(tabId, (p) => (isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p));
       } else if (id === "save") {
         onSaveTab(tabId);
       } else if (id === "hibernateTab") {
@@ -735,32 +732,30 @@ export function CommandPalette({
       if (!box || !row) return;
       openRowMenu(
         `tab:${entry.tabId}`,
-        tabMenuItems(entry, { autofocusMode }),
+        tabMenuItems(entry),
         anchorOf(box, row as HTMLElement, pointer),
       );
     },
-    [openRowMenu, autofocusMode],
+    [openRowMenu],
   );
 
   // A flipped toggle (lock, hibernate, note) changes the open menu in place.
   const { setItems: setMenuItems } = rowMenu;
   const menuTab = rowMenu.menu ? highlightedTabOf(rowMenu.menu.rowKey, merged) : null;
   useEffect(() => {
-    if (menuTab) setMenuItems(tabMenuItems(menuTab, { autofocusMode }));
-  }, [menuTab, autofocusMode, setMenuItems]);
+    if (menuTab) setMenuItems(tabMenuItems(menuTab));
+  }, [menuTab, setMenuItems]);
 
   const latestShortcut = useRef({
     highlightedTab,
     runTabAction,
     closeWorkspaceFromRow,
-    autofocusMode,
     menu: rowMenu.menu,
   });
   latestShortcut.current = {
     highlightedTab,
     runTabAction,
     closeWorkspaceFromRow,
-    autofocusMode,
     menu: rowMenu.menu,
   };
   // The tab shortcuts (`paletteShortcuts.ts`) run their menu item on the highlighted tab, Cmd+Shift+W
@@ -777,7 +772,6 @@ export function CommandPalette({
         highlightedTab: entry,
         runTabAction: run,
         closeWorkspaceFromRow: closeWs,
-        autofocusMode: mode,
         menu,
       } = latestShortcut.current;
       if (action === "menuAction") {
@@ -791,7 +785,7 @@ export function CommandPalette({
         if (workspaceId) closeWs(workspaceId, valueRef.current);
         return true;
       }
-      if (action === "tabItem" && item && entry && runnableTabItem(entry, { autofocusMode: mode }, item)) {
+      if (action === "tabItem" && item && entry && runnableTabItem(entry, item)) {
         run(item, entry);
       }
       return true;
@@ -823,11 +817,11 @@ export function CommandPalette({
     setValue(key);
     openRowMenu(
       key,
-      tabMenuItems(entry, { autofocusMode }),
+      tabMenuItems(entry),
       row ? anchorOf(box, row as HTMLElement) : { rowTop: 0, rowBottom: 0 },
     );
     enterMoveMenu(moveMenuItems(workspaceEntries, entry.workspaceId));
-  }, [pendingMove, merged, openRowMenu, enterMoveMenu, workspaceEntries, autofocusMode]);
+  }, [pendingMove, merged, openRowMenu, enterMoveMenu, workspaceEntries]);
 
   const commitTheme = useCallback(
     (id: string) => {

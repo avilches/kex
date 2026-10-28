@@ -12,7 +12,6 @@ import {
   ComputerTerminal01Icon,
   CopySlashIcon,
   Copy01Icon,
-  CrosshairIcon,
   FloppyDiskIcon,
   Link01Icon,
   LockKeyIcon,
@@ -63,7 +62,6 @@ const ICONS = {
   save: FloppyDiskIcon,
   note: StickyNote03Icon,
   removeNote: Cancel01Icon,
-  autofocus: CrosshairIcon,
   moveWorkspace: ArrowRight01Icon,
   back: ArrowTurnBackwardIcon,
   moveNew: Add01Icon,
@@ -310,7 +308,7 @@ export function RowMenu({
                   icon={iconOf(item)}
                   size={14}
                   strokeWidth={2}
-                  className={cn("shrink-0", item.id === "autofocus" && item.active && "text-primary")}
+                  className="shrink-0"
                 />
               )}
               {item.detail !== undefined ? (

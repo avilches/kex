@@ -168,7 +168,6 @@ export type Preferences = {
   autostart: boolean;
   performanceProfiler: boolean;
   autofocusMode: AutofocusMode;
-  autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
   spinnerStyle: SpinnerStyle;
@@ -256,7 +255,6 @@ const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
 const KEY_PERFORMANCE_PROFILER = "performanceProfiler";
 const KEY_AUTOFOCUS_MODE = "autofocusMode";
-const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_SPINNER_STYLE = "spinnerStyle";
@@ -446,7 +444,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autostart: false,
   performanceProfiler: false,
   autofocusMode: "noRoot",
-  autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
   spinnerStyle: "arc",
@@ -627,9 +624,6 @@ export async function loadPreferences(): Promise<Preferences> {
       if (v === "manual" || v === "noRoot" || v === "always") return v;
       return DEFAULT_PREFERENCES.autofocusMode;
     })(),
-    autofocusNewTabs:
-      getGeneral<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
-      DEFAULT_PREFERENCES.autofocusNewTabs,
     explorerGitColorScheme: (() => {
       const v = getGeneral<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
       if (v === "vscode" || v === "jetbrains") return v;
@@ -940,10 +934,6 @@ export async function setAutostart(value: boolean): Promise<void> {
 
 export async function setAutofocusMode(value: AutofocusMode): Promise<void> {
   await writePref(KEY_AUTOFOCUS_MODE, value);
-}
-
-export async function setAutofocusNewTabs(value: boolean): Promise<void> {
-  await writePref(KEY_AUTOFOCUS_NEW_TABS, value);
 }
 
 export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
@@ -1376,7 +1366,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOSTART]: "autostart",
   [KEY_PERFORMANCE_PROFILER]: "performanceProfiler",
   [KEY_AUTOFOCUS_MODE]: "autofocusMode",
-  [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_SPINNER_STYLE]: "spinnerStyle",

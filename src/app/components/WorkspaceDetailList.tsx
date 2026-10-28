@@ -4,7 +4,7 @@ import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -22,8 +22,7 @@ import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
-import { type Tab, isAutofocusTab } from "@/modules/workspaces/lib/types";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { noteSurfaceKind } from "@/modules/theme/noteSurface";
 import { tabGitColor } from "@/modules/workspaces/lib/tabGitColor";
@@ -197,7 +196,6 @@ function DetailTabRow({
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
   const hasNote = tab.note !== undefined;
   const tooltip = useTabTooltip(tab, info?.agentSession);
-  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const sidebarGit = useSidebarGit();
   const { resolvedMode } = useTheme();
   const gitColor = useMemo(
@@ -208,7 +206,6 @@ function DetailTabRow({
     [sidebarGit, workspaceId, tab, resolvedMode],
   );
   const solidChip = focused && color !== null;
-  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode === "manual";
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
@@ -331,7 +328,6 @@ function DetailTabRow({
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
-              {showAutofocus && <span aria-hidden className="size-[16px] shrink-0" />}
               {hibernated && onWake && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
           </PopoverAnchor>
@@ -370,23 +366,12 @@ function DetailTabRow({
           type="button"
           title="Hibernated: click to restore"
           aria-label="Restore tab"
-          style={{ right: 26 + (hasNote ? 20 : 0) + (showAutofocus ? 20 : 0) }}
+          style={{ right: 26 + (hasNote ? 20 : 0) }}
           className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/tab:opacity-100 group-focus-within/tab:opacity-100", hoverBg)}
           onClick={onWake}
         >
           <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
         </button>
-      )}
-      {showAutofocus && (
-        <span
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center",
-            hasNote ? "right-[46px]" : "right-[26px]",
-          )}
-        >
-          <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
-        </span>
       )}
       {isLocked ? (
         <button

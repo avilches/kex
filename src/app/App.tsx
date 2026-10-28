@@ -293,7 +293,7 @@ import {
   displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
 import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
-import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
+import { isAutofocusActive } from "@/modules/workspaces/lib/types";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
@@ -3159,15 +3159,6 @@ export default function App() {
         if (found) updateTabData(found.workspace.id, activeTabId, toggleTabLock);
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
-      "tab.toggleAutofocus": () => {
-        if (autofocusMode !== "manual") return;
-        if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
-        const found = findTabGlobal(activeTabId);
-        if (found)
-          updateTabData(found.workspace.id, activeTabId, (p) =>
-            isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p,
-          );
-      },
       "path.copy": () => {
         if (!activeTab) return;
         let value: string | undefined;

@@ -2,10 +2,8 @@ import { pathBasename } from "@/lib/pathUtils";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { relativeCopyFor } from "@/modules/explorer/lib/relativeCopy";
-import type { AutofocusMode } from "@/modules/settings/store";
 import { hasTabNote, isTabNoteOpen } from "@/modules/workspaces/lib/tabNote";
 import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
-import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
@@ -22,7 +20,6 @@ export type RowMenuItemId =
   | "save"
   | "note"
   | "removeNote"
-  | "autofocus"
   | "moveWorkspace"
   | "rename"
   | "hibernate"
@@ -163,7 +160,6 @@ export function tabEntryCopyPath(entry: TabEntry): string | null {
   return tabCopyPath(entry.tab, entry.agentSession?.meta?.worktreeCwd ?? null);
 }
 
-export type TabMenuContext = { autofocusMode: AutofocusMode };
 
 export function tabEntryRelativePath(entry: TabEntry) {
   if (entry.kind === "browser") return null;
@@ -176,7 +172,7 @@ export function noteLabel(entry: TabEntry): string {
   return hasTabNote(entry.tab) ? "Show Note" : "Add Note";
 }
 
-export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[] {
+export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   const { tab } = entry;
   const locked = !!tab.locked;
   const items: RowMenuItem[] = [
@@ -212,14 +208,6 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
     });
   }
   items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
-  if (isAutofocusTab(tab) && ctx.autofocusMode === "manual") {
-    items.push({
-      id: "autofocus",
-      label: "Autofocus Sidebar",
-      shortcutId: "tab.toggleAutofocus",
-      active: !!tab.autofocus,
-    });
-  }
   items.push({ id: "moveWorkspace", label: "Move to Workspace" });
   if (tab.kind === "terminal" && !entry.hibernated) {
     items.push({
@@ -254,8 +242,7 @@ export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean
     id === "lock" ||
     id === "hibernateTab" ||
     id === "save" ||
-    id === "removeNote" ||
-    id === "autofocus"
+    id === "removeNote"
   );
 }
 
@@ -263,10 +250,9 @@ export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean
 // disabled. Close stays runnable on a locked tab: refusing it flashes the lock.
 export function runnableTabItem(
   entry: TabEntry,
-  ctx: TabMenuContext,
   id: RowMenuItemId,
 ): RowMenuItem | null {
-  const item = tabMenuItems(entry, ctx).find((i) => i.id === id);
+  const item = tabMenuItems(entry).find((i) => i.id === id);
   if (!item || (item.disabled && id !== "close")) return null;
   return item;
 }

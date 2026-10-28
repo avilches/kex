@@ -232,7 +232,7 @@ describe("tab shortcuts over the highlighted row", () => {
     });
     await wait(30);
     expect(selected()).toBe("ws:other");
-    for (const item of ["lock", "hibernateTab", "note", "save", "autofocus", "copy", "close"] as const) {
+    for (const item of ["lock", "hibernateTab", "note", "save", "copy", "close"] as const) {
       expect(await shortcut(item)).toBe(true);
     }
     expect(calls.update).toEqual([]);
@@ -255,16 +255,6 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.save).toEqual(["e"]);
     expect(calls.openChange).toEqual([]);
     expect(selected()).toBe("tab:e");
-  });
-
-  it("toggles autofocus in manual mode and keeps the palette open", async () => {
-    await openOn("tab:b");
-    await shortcut("autofocus");
-    await wait(20);
-    expect(calls.update.map(([id]) => id)).toEqual(["b"]);
-    const flipped = calls.update[0][1]({ id: "b", kind: "terminal" } as Tab);
-    expect(flipped).toMatchObject({ autofocus: true });
-    expect(calls.openChange).toEqual([]);
   });
 
   it("add note on another tab activates it, asks the note for the focus and closes the palette", async () => {

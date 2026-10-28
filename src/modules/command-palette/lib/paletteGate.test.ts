@@ -20,7 +20,6 @@ const TABS: ShortcutId[] = [
   "tab.hibernate",
   "tab.note",
   "editor.save",
-  "tab.toggleAutofocus",
   "tab.new",
   "workspace.close",
 ];

@@ -13,8 +13,7 @@ export type ScriptCwdMode = "home" | "workspace" | "context" | "fixed";
 export type TabHibernation = { at: number; agent?: string; command?: string; title?: string };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no
-// exception. `autofocus` lives here too so any new path-bearing kind opts in
-// automatically; it is only *effective* where isAutofocusTab is true.
+// exception.
 type TabCommon = {
   id: string;
   title?: string;
@@ -26,7 +25,6 @@ type TabCommon = {
   // Set once the note is resized; absent means the default width and content-sized height.
   noteSize?: { width: number; height: number };
   locked?: boolean;
-  autofocus?: boolean;
   // Name from WORKSPACE_ICON_PALETTE that replaces the default icon of the kind.
   icon?: string;
   // Hex color of the tab: tints its icon and side stripe, and its top line when the workspace has none.
@@ -58,8 +56,7 @@ export function isAutofocusTab(p: Tab): boolean {
 }
 
 // In "always" mode every capable tab drives the sidebar, and in "noRoot" mode
-// every capable tab of a workspace without a root does; the per-tab flag is
-// kept untouched so it applies again when the mode is switched back.
+// every capable tab of a workspace without a root does. In "manual" none does.
 export function isAutofocusActive(
   p: Tab,
   mode: AutofocusMode,
@@ -68,7 +65,7 @@ export function isAutofocusActive(
   if (!isAutofocusTab(p)) return false;
   if (mode === "always") return true;
   if (mode === "noRoot") return !hasRoot;
-  return p.autofocus === true;
+  return false;
 }
 
 export type PaneNode = {

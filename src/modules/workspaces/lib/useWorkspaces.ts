@@ -43,7 +43,7 @@ import {
   updatePane,
 } from "./splitNode";
 import { attachTab, workspaceForTab, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
-import { type ClosedEntry, type Tab, type PaneNode, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
+import type { ClosedEntry, Tab, PaneNode, TabHibernation, Workspace, WorkspaceGitConfig } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
 import type { SidebarView } from "./sidebarState";
@@ -123,18 +123,6 @@ export function runOnce(inFlight: Map<string, Promise<void>>, key: string, task:
 }
 
 const wakesInFlight = new Map<string, Promise<void>>();
-
-// New autofocus-capable tabs get the flag when "autofocusNewTabs" is on (also in
-// "always", so they keep it if the mode is switched back),
-// unless they already carry an explicit flag. Restored tabs never pass through
-// here, so their persisted flag is preserved.
-function withNewTabAutofocus(tab: Tab): Tab {
-  if (!isAutofocusTab(tab) || tab.autofocus !== undefined) return tab;
-  const { autofocusMode, autofocusNewTabs } = usePreferencesStore.getState();
-  return autofocusMode === "always" || autofocusNewTabs
-    ? { ...tab, autofocus: true }
-    : tab;
-}
 
 export function applyExplorerRootMode(
   workspaces: Workspace[],
@@ -748,7 +736,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
-    const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -756,7 +743,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, sealedTab);
+        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, tab);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
@@ -767,9 +754,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
-    const newTab = withNewTabAutofocus(tab);
-    recordActivation(paneId, newTab.id);
-    setWorkspaces((prev) => applyOpenTab(prev, workspaceId, paneId, newTab, insertionIndex));
+    recordActivation(paneId, tab.id);
+    setWorkspaces((prev) => applyOpenTab(prev, workspaceId, paneId, tab, insertionIndex));
   }, [recordActivation]);
 
   const activateTab = useCallback((workspaceId: string, tabId: string) => {
@@ -889,7 +875,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
     const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
     openTab(picked.workspaceId, slot.paneId, newTab, slot.index);
-    workspacesRef.current = applyOpenTab(workspacesRef.current, picked.workspaceId, slot.paneId, withNewTabAutofocus(newTab), slot.index);
+    workspacesRef.current = applyOpenTab(workspacesRef.current, picked.workspaceId, slot.paneId, newTab, slot.index);
     selectWorkspace(picked.workspaceId);
     useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, picked.workspaceId);
     return entry;

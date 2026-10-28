@@ -9,7 +9,6 @@ import {
   moveMenuItems,
   type RowMenuItemId,
   runnableTabItem,
-  type TabMenuContext,
   tabItemKeepsPalette,
   placeMenuLeft,
   placeMenuTop,
@@ -22,7 +21,6 @@ import {
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 
-const ctx = { autofocusMode: "manual" } as const;
 
 // A tab entry whose live tab is built from `tab`; the entry mirrors what buildTabEntries derives from it.
 const entry = (tab: Record<string, unknown> = {}, over: Partial<TabEntry> = {}): TabEntry => {
@@ -41,8 +39,8 @@ const entry = (tab: Record<string, unknown> = {}, over: Partial<TabEntry> = {}):
   } as TabEntry;
 };
 
-const ids = (e: TabEntry, c: TabMenuContext = ctx) => tabMenuItems(e, c).map((i) => i.id);
-const item = (e: TabEntry, id: RowMenuItemId, c: TabMenuContext = ctx) => tabMenuItems(e, c).find((i) => i.id === id);
+const ids = (e: TabEntry) => tabMenuItems(e).map((i) => i.id);
+const item = (e: TabEntry, id: RowMenuItemId) => tabMenuItems(e).find((i) => i.id === id);
 
 describe("tabMenuItems", () => {
   it("does not offer Focus on Sidebar nor Close Other Tabs", () => {
@@ -59,7 +57,6 @@ describe("tabMenuItems", () => {
       "copy",
       "copyRelative",
       "tabId",
-      "autofocus",
       "moveWorkspace",
       "hibernateTab",
       "lock",
@@ -74,7 +71,6 @@ describe("tabMenuItems", () => {
     expect(shortcutOf("terminal")).toBe("tab.new");
     expect(shortcutOf("note")).toBe("tab.note");
     expect(shortcutOf("copy")).toBe("path.copy");
-    expect(shortcutOf("autofocus")).toBe("tab.toggleAutofocus");
     expect(shortcutOf("hibernateTab")).toBe("tab.hibernate");
     expect(shortcutOf("lock")).toBe("tab.lock");
     expect(shortcutOf("close")).toBe("tab.close");
@@ -96,7 +92,7 @@ describe("tabMenuItems", () => {
     expect(item(asleep, "go")?.label).toBe("Restore and go to Tab");
     expect(ids(asleep)).not.toContain("hibernateTab");
     expect(ids(asleep).filter((id) => id === "go")).toHaveLength(1);
-    expect(runnableTabItem(asleep, ctx, "hibernateTab")).toBeNull();
+    expect(runnableTabItem(asleep, "hibernateTab")).toBeNull();
   });
 
   it("only offers hibernation on terminals", () => {
@@ -168,14 +164,6 @@ describe("tabMenuItems", () => {
     expect(ids(e)).not.toContain("copyRelative");
   });
 
-  it("offers Autofocus only in manual mode on a tab that can drive the sidebar", () => {
-    expect(item(entry({ autofocus: true }), "autofocus")).toMatchObject({ active: true });
-    expect(item(entry(), "autofocus")).toMatchObject({ active: false });
-    expect(ids(entry(), { autofocusMode: "always" })).not.toContain("autofocus");
-    expect(ids(entry(), { autofocusMode: "noRoot" })).not.toContain("autofocus");
-    expect(ids(entry({ kind: "browser", url: "https://a.b" }))).not.toContain("autofocus");
-  });
-
   it("always offers moving the tab to another workspace", () => {
     for (const t of [{}, { kind: "browser", url: "u" }, { kind: "git-history", repoRoot: "/r" }]) {
       expect(ids(entry(t))).toContain("moveWorkspace");
@@ -185,7 +173,7 @@ describe("tabMenuItems", () => {
 
 describe("tabItemKeepsPalette", () => {
   it("keeps the palette for the toggles that change the row in place", () => {
-    for (const id of ["lock", "hibernateTab", "save", "removeNote", "autofocus"] as const) {
+    for (const id of ["lock", "hibernateTab", "save", "removeNote"] as const) {
       expect(tabItemKeepsPalette(id, entry())).toBe(true);
     }
   });
@@ -208,18 +196,17 @@ describe("tabItemKeepsPalette", () => {
 
 describe("runnableTabItem", () => {
   it("finds the item a shortcut would run", () => {
-    expect(runnableTabItem(entry(), ctx, "lock")?.id).toBe("lock");
+    expect(runnableTabItem(entry(), "lock")?.id).toBe("lock");
   });
 
   it("is null when the menu does not offer the item on that tab", () => {
-    expect(runnableTabItem(entry(), ctx, "save")).toBeNull();
-    expect(runnableTabItem(entry(), { autofocusMode: "always" }, "autofocus")).toBeNull();
-    expect(runnableTabItem(entry({ kind: "browser", url: "u" }), ctx, "hibernateTab")).toBeNull();
+    expect(runnableTabItem(entry(), "save")).toBeNull();
+    expect(runnableTabItem(entry({ kind: "browser", url: "u" }), "hibernateTab")).toBeNull();
   });
 
   it("is null for a disabled item, except Close so a locked tab still flashes", () => {
-    expect(runnableTabItem(entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" }), ctx, "terminal")).toBeNull();
-    expect(runnableTabItem(entry({ locked: true }), ctx, "close")?.id).toBe("close");
+    expect(runnableTabItem(entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" }), "terminal")).toBeNull();
+    expect(runnableTabItem(entry({ locked: true }), "close")?.id).toBe("close");
   });
 });
 

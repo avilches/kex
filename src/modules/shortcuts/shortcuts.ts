@@ -25,7 +25,6 @@ export type ShortcutId =
   | "tab.hibernate"
   | "tab.wake"
   | "tab.focusOnExplorer"
-  | "tab.toggleAutofocus"
   | "file.rename"
   | "file.copy"
   | "file.cut"
@@ -379,12 +378,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Focus Tab File or Folder in Explorer",
     group: "Tabs",
     defaultBindings: [{ key: "F4" }],
-  },
-  {
-    id: "tab.toggleAutofocus",
-    label: "Toggle Tab Autofocus",
-    group: "Tabs",
-    defaultBindings: [{ shift: true, key: "F4" }],
   },
   {
     id: "pane.splitRight",

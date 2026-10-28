@@ -165,9 +165,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspaces/<id>.json` (`explorerRootMode`,
   `workspaceRoot`).
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
-  modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
-  context menu) drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd
-  changes while focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
+  modes. In the `noRoot` and `always` autofocus modes the active terminal drives both the Explorer root and the Source Control /
+  Git History repo when it gains focus or its cwd changes while focused (there is no per-tab flag, indicator or menu item).
+  F4 (`tab.focusOnExplorer`) and the explorer crosshair button do the same anchoring on demand, and
   additionally opens the sidebar if closed and switches away from Git History. Both F4 and autofocus use the same
   cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved

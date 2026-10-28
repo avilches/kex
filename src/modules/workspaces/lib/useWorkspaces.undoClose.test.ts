@@ -14,7 +14,7 @@ vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
 }));
 vi.mock("@/modules/settings/preferences", () => ({
   usePreferencesStore: {
-    getState: () => ({ autofocusMode: "off", autofocusNewTabs: false, randomWorkspaceColor: false, workspacePaneLimit: 8 }),
+    getState: () => ({ autofocusMode: "off", randomWorkspaceColor: false, workspacePaneLimit: 8 }),
   },
 }));
 

@@ -19,7 +19,6 @@ import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
-  CrosshairIcon,
   LockKeyIcon,
   SleepingIcon,
   StickyNote03Icon,
@@ -46,7 +45,7 @@ import {
   getRunningCommand,
   subscribeToRunningCommands,
 } from "./lib/terminalEphemeralStore";
-import { isAutofocusTab, type Tab } from "./lib/types";
+import type { Tab } from "./lib/types";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { useTabTooltip } from "./lib/useTabTooltip";
 import { useWorkspaceColor } from "./lib/workspaceColorContext";
@@ -180,7 +179,6 @@ function DraggableTab({
   const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
     tab.kind === "terminal" ? getRunningCommand(tab.id) : null,
   );
-  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const agentTabTitle = useAgentTabTitle(tab);
@@ -366,14 +364,6 @@ function DraggableTab({
       {isLocked && statusIndicator && (
         <span className="ml-0.5 flex shrink-0 items-center">
           {statusIndicator}
-        </span>
-      )}
-      {isAutofocusTab(tab) && tab.autofocus && autofocusMode === "manual" && (
-        <span
-          className="ml-0.5 shrink-0 text-muted-foreground"
-          title="Autofocus: this tab drives the sidebar"
-        >
-          <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
         </span>
       )}
       {isLocked ? (

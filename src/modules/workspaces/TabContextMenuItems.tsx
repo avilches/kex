@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   CancelCircleIcon,
-  CrosshairIcon,
   Image01Icon,
   PaintBoardIcon,
   LockKeyIcon,
@@ -29,8 +28,7 @@ import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { toggleTabLock } from "./lib/tabLock";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
-import { type Tab, isAutofocusTab } from "./lib/types";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { Tab } from "./lib/types";
 import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
@@ -75,17 +73,14 @@ export function TabContextMenuItems({
   onRenameTab,
   onUpdateTab,
 }: Props) {
-  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const { targets, moveTab } = useWorkspaceMove();
   const startRename = useTabRenameStore((s) => s.startRename);
   const otherTargets = targets.filter((t) => t.id !== workspaceId);
-  const { onSaveTab, onToggleHibernate, onRevealInExplorer } = useSidebarTabMenu();
+  const { onSaveTab, onToggleHibernate } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
   const focusFilePath = tabFilePath(tab);
   const worktree = useAgentStore((s) => s.sessions[tab.id]?.meta?.worktreeCwd ?? null);
-  const focusTarget =
-    focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
   const runOnStart =
     tab.kind === "terminal" && onUpdateTab ? (
       <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
@@ -182,34 +177,6 @@ export function TabContextMenuItems({
             </ContextMenuSub>
           )}
           <TabCopyPathItems tab={tab} workspaceId={workspaceId} />
-          {focusTarget && (
-            <ContextMenuItem
-              disabled={isAutofocusTab(tab) && (tab.autofocus ?? false)}
-              onSelect={() => onRevealInExplorer(focusTarget)}
-            >
-              <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
-              Focus on Sidebar
-              <Shortcut id="tab.focusOnExplorer" />
-            </ContextMenuItem>
-          )}
-          {isAutofocusTab(tab) && autofocusMode === "manual" && (
-            <ContextMenuItem
-              onSelect={() =>
-                onUpdateTab?.(tab.id, (p) =>
-                  isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p,
-                )
-              }
-            >
-              <HugeiconsIcon
-                icon={CrosshairIcon}
-                size={14}
-                strokeWidth={2}
-                className={tab.autofocus ? "text-primary" : undefined}
-              />
-              Autofocus Sidebar
-              <Shortcut id="tab.toggleAutofocus" />
-            </ContextMenuItem>
-          )}
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
