@@ -209,7 +209,7 @@ describe("useActionRunner", () => {
     expect(toastError).toHaveBeenCalledWith("Code not run: {workspace} has no value here", { duration: 4000 });
   });
 
-  it("stays quiet while the focused tab sleeps and the Action reads its folder", () => {
+  it("runs an Action that reads the folder of a sleeping focused tab", () => {
     const here: Action = { ...script, id: "ac-here", command: "ls {cwd}" };
     const asleep: Tab = { id: "tab-user", kind: "terminal", hibernation: { at: 1 } };
     const { result } = setup(
@@ -217,7 +217,7 @@ describe("useActionRunner", () => {
     );
     act(() => result.current.runAction(here));
     expect(toastError).not.toHaveBeenCalled();
-    expect(getActionTab(here.id)).toBeUndefined();
+    expect(getActionTab(here.id)).toBeDefined();
   });
 
   it("opens a new tab per click of an agent, with no link and no running mark", () => {

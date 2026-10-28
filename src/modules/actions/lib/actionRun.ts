@@ -8,7 +8,7 @@ import {
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
-import { agentCommandProblem, dependsOnFocusedTab, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
+import { agentCommandProblem, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -29,8 +29,6 @@ export type LinkedTab = {
 };
 
 export type RunContext = {
-  /** The focused tab is asleep, so what depends on it has nothing to read. */
-  hibernated: boolean;
   shell: ScriptShell;
   /** Raw values for the command variables ({cwd}, {workspace}, {filepath}...); "" means no value. */
   vars: Readonly<Record<string, string>>;
@@ -157,7 +155,6 @@ function planAgent(action: Action, ctx: RunContext): RunPlan {
  * tab never keeps it from running. An app is spawned and needs no tab.
  */
 export function planActionRun(action: Action, ctx: RunContext): RunPlan {
-  if (ctx.hibernated && dependsOnFocusedTab(action)) return { kind: "blocked", reason: "", silent: true };
   if (action.command.trim() === "") return blocked(action, "it has no command");
   if (isAgent(action)) return planAgent(action, ctx);
   return isScript(action) ? planScript(action, ctx) : planApp(action, ctx);

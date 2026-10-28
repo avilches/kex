@@ -20,7 +20,6 @@ const script = (o: Partial<Action> = {}): Action => ({
 const app = (o: Partial<Action> = {}): Action => script({ kind: "app", command: "code {workspace}", name: "VS Code", ...o });
 
 const ctx = (o: Partial<RunContext> = {}): RunContext => ({
-  hibernated: false,
   shell: "posix",
   vars: { cwd: "/w/src", dir: "src", filename: "", filepath: "", workspace: "/w", branch: "main", repo: "w" },
   folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w" },
@@ -101,16 +100,6 @@ describe("planActionRun, scripts", () => {
 
   it("ignores a running mark on a tab that no longer exists", () => {
     expect(planActionRun(script(), ctx({ link: link({ markRunning: true, exists: false }) })).kind).toBe("new-tab");
-  });
-
-  it("is silent while the focused tab sleeps and the script depends on it", () => {
-    const silent = { kind: "blocked", reason: "", silent: true };
-    expect(planActionRun(script({ command: "ls {cwd}" }), ctx({ hibernated: true }))).toEqual(silent);
-    expect(planActionRun(script({ cwdMode: "context" }), ctx({ hibernated: true }))).toEqual(silent);
-  });
-
-  it("still runs a script that does not depend on the focused tab while it sleeps", () => {
-    expect(planActionRun(script(), ctx({ hibernated: true })).kind).toBe("new-tab");
   });
 
   it("wakes and reuses a sleeping linked shell that would come back empty", () => {
@@ -255,11 +244,6 @@ describe("planActionRun, apps", () => {
   it("is blocked by an unterminated quote", () => {
     const plan = planActionRun(app({ command: 'code "{workspace}' }), ctx());
     expect(plan.kind).toBe("blocked");
-  });
-
-  it("is silent while the focused tab sleeps and the app reads its folder", () => {
-    expect(planActionRun(app({ command: "code {cwd}" }), ctx({ hibernated: true }))).toMatchObject({ kind: "blocked", silent: true });
-    expect(planActionRun(app(), ctx({ hibernated: true })).kind).toBe("spawn-app");
   });
 });
 

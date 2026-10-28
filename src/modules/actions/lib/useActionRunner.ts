@@ -124,7 +124,6 @@ function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps
   const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
-    hibernated: isHibernatedTab(focused),
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
     vars: { ...buildCommandVars(focused, ws, info, getSystemInfo().host), ...overlay?.vars },
     folders: {

@@ -13,7 +13,6 @@ const git = { branch: "main", repoRoot: "/Users/me/code/kex" };
 const vars = buildCommandVars(editor, ws, git, "MacBook");
 
 const runCtx = (over: Partial<RunContext> = {}): RunContext => ({
-  hibernated: false,
   shell: "posix",
   vars,
   folders: { workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },

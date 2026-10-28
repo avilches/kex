@@ -72,8 +72,6 @@ export function ownButtonsThatFit(
 export type BarContext = {
   vars: Readonly<Record<string, string>>;
   shell: CommandShell;
-  /** The focused tab is asleep: what depends on it cannot run until it wakes. */
-  hibernated?: boolean;
   /** The vars are words for what a variable stands for, not values (Settings has no tab). */
   labels?: boolean;
   /** The folders the runner picks a start folder from, so the bar names the same one. */
@@ -270,7 +268,6 @@ export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): bo
 // so a missing root blocks it too, with the words the row shows for that case.
 export function actionAvailability(action: Action, ctx: BarContext | null): string | null {
   if (action.command.trim() === "") return "it has no command";
-  if (ctx?.hibernated && dependsOnFocusedTab(action)) return "tab is hibernated";
   if (isAgent(action)) {
     const problem = agentCommandProblem(action.command);
     if (problem) return problem;
@@ -331,7 +328,7 @@ function effectKey(action: Action, ctx: BarContext): string | null {
 // the user's own doing, so both stay. A
 // script that is not idle is never hidden, and a blocked Action (or one whose start folder the
 // runner would refuse) neither hides nor survives.
-// Nothing is hidden without a real context, or while the focused tab sleeps.
+// Nothing is hidden without a real context.
 export function twinIds(
   actions: readonly Action[],
   ctx: BarContext | null,
@@ -339,7 +336,7 @@ export function twinIds(
   place?: FocusPlace,
 ): Set<string> {
   const hidden = new Set<string>();
-  if (!ctx || ctx.labels || ctx.hibernated) return hidden;
+  if (!ctx || ctx.labels) return hidden;
   const groups = new Map<string, { action: Action; dynamic: boolean; idle: boolean }[]>();
   for (const action of actions) {
     const state = stateOf(action, states);
