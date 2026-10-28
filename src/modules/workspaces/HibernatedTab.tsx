@@ -60,13 +60,13 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
               {command}
             </span>
           )}
-          <span className="text-[12px]">Hibernated for {formatHibernatedFor(now - at)}</span>
         </div>
         <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
           Restore
           {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
         </Button>
+        <span className="absolute right-3 bottom-2 text-[10px] opacity-50">Hibernated for {formatHibernatedFor(now - at)}</span>
       </div>
     </div>
   );
