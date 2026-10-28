@@ -343,8 +343,9 @@ The fork builds its own macOS menu bar instead of the default Tauri menu (`#[cfg
   `App.tsx` to the same handlers the shortcuts use. Dynamic labels (Enable/Disable Autosave, Show/Hide
   Sidebar/Explorer/Git/History, Move Sidebar Left/Right) are refreshed by the `sync_menu` command whenever the backing
   preferences change. While the Settings window has focus (`modules/menu_route.rs`, `route_menu_event`), the menu
-  ignores everything except Quit, Close Tab (closes Settings instead) and the window-level New Window / Dock items, so
-  no action lands on the main window hidden behind it. Without a native menu (Windows/Linux) `SettingsApp.tsx` closes
+  ignores everything except Quit, Close Tab (closes Settings instead) and the window-level Dock items, so
+  no action lands on the main window hidden behind it. New Window is not one of them: it goes through the webview
+  like the other items (`window.new`), so an open palette blocks it and Settings ignores it. Without a native menu (Windows/Linux) `SettingsApp.tsx` closes
   Settings on the `tab.close` shortcut from the registry.
 
 ### Autosave on focus loss and before close

@@ -86,6 +86,7 @@ type Calls = {
   save: string[];
   hibernate: string[];
   goTo: string[];
+  select: string[];
   move: unknown[][];
   openChange: boolean[];
 };
@@ -116,7 +117,7 @@ function Harness() {
       tabEntries={tabs}
       workspaceEntries={workspaces}
       closedEntries={[]}
-      onSelectTab={() => {}}
+      onSelectTab={(entry) => calls.select.push(entry.tabId)}
       onSelectWorkspace={() => {}}
       onRunClosed={() => {}}
       {...TAB_MENU_NOOPS}
@@ -184,7 +185,7 @@ async function openOn(target: string) {
 }
 
 beforeEach(() => {
-  calls = { update: [], save: [], hibernate: [], goTo: [], move: [], openChange: [] };
+  calls = { update: [], save: [], hibernate: [], goTo: [], select: [], move: [], openChange: [] };
   commands = [];
   workspaces = [wsEntry("ws", 0), wsEntry("other", 1), wsEntry("third", 2)];
   initial = [mk("cur", 0), mk("b", 1), mk("c", 2), mk("d", 3)];
@@ -315,11 +316,12 @@ describe("tab shortcuts over the highlighted row", () => {
     expect(calls.update.map(([id]) => id)).toEqual(["b"]);
   });
 
-  it("copy closes the palette", async () => {
+  it("copy leaves the palette open", async () => {
     await openOn("tab:b");
     await shortcut("copy");
     await wait(30);
-    expect(calls.openChange).toContain(false);
+    expect(calls.openChange).toEqual([]);
+    expect(selected()).toBe("tab:b");
   });
 });
 
@@ -355,6 +357,17 @@ describe("hibernating from the palette", () => {
   });
 });
 
+describe("the hibernate shortcut over a sleeping tab", () => {
+  it("restores it like Enter on its row, without hibernating anything", async () => {
+    initial = [mk("cur", 0), mk("b", 1), mk("c", 2, { hibernation: { at: 1 } })];
+    await openOn("tab:c");
+    expect(await shortcut("hibernateTab")).toBe(true);
+    await wait(30);
+    expect(calls.select).toEqual(["c"]);
+    expect(calls.hibernate).toEqual([]);
+  });
+});
+
 describe("Copy Tab ID from the palette", () => {
   it("shows the id inline and copies the same value as the tab context menu, through the same function", async () => {
     await openOn("tab:c");
@@ -366,7 +379,7 @@ describe("Copy Tab ID from the palette", () => {
     fireEvent.click(item);
     await wait(30);
     expect(writeClipboardText).toHaveBeenCalledWith("c");
-    expect(calls.openChange).toContain(false);
+    expect(calls.openChange).toEqual([]);
   });
 });
 

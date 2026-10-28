@@ -201,23 +201,18 @@ const baseState = (): State => ({
 });
 
 describe("Cmd+Shift+W in the palette", () => {
-  it("closes the workspace of the highlighted tab and selects the first row after the block", async () => {
+  it("is taken without closing anything on a tab row, whose workspace the user cannot see", async () => {
     initial = baseState();
     impl = removing;
     await openAndGoTo("tab:a1");
-    expect(rowIds()).toEqual([
-      "tab:cur",
-      "tab:a1",
-      "tab:a2",
-      "tab:b1",
-      "tab:c1",
-      "cmd:do",
-    ]);
-    await closeWorkspaceShortcut();
+    let taken = false;
+    await act(async () => {
+      taken = runPaletteShortcut("closeWorkspace");
+    });
+    expect(taken).toBe(true);
     await wait(50);
-    expect(calls).toEqual(["w2"]);
-    expect(rowIds()).toEqual(["tab:cur", "tab:b1", "tab:c1", "cmd:do"]);
-    expect(selected()).toBe("tab:b1");
+    expect(calls).toEqual([]);
+    expect(rowIds()).toContain("tab:a2");
   });
 
   it("closes the workspace of a highlighted workspace row and selects the next one", async () => {
@@ -232,23 +227,13 @@ describe("Cmd+Shift+W in the palette", () => {
   });
 
   it("selects the row above the block when nothing stays below it", async () => {
-    initial = {
-      tabs: [mk("cur", "w1", 0), mk("a1", "w2", 1)],
-      workspaces: [wsEntry("w1", 0), wsEntry("w2", 1)],
-    };
+    initial = baseState();
     impl = removing;
-    calls = [];
-    withCommand = false;
-    render(<Harness />);
-    await wait(50);
-    expect(selected()).toBe("tab:cur");
-    await key("ArrowDown");
-    await wait(10);
-    expect(selected()).toBe("tab:a1");
+    await openAndGoTo("ws:w6", "w");
     await closeWorkspaceShortcut();
     await wait(50);
-    expect(rowIds()).toEqual(["tab:cur"]);
-    expect(selected()).toBe("tab:cur");
+    expect(rowIds()).not.toContain("ws:w6");
+    expect(selected()).toBe("ws:w5");
   });
 
   it("is taken without closing anything on a row with no workspace", async () => {
@@ -267,17 +252,17 @@ describe("Cmd+Shift+W in the palette", () => {
   it("keeps rows and selection when the confirmation is cancelled", async () => {
     initial = baseState();
     impl = () => new Promise((r) => setTimeout(() => r(false), 50));
-    await openAndGoTo("tab:a1");
+    await openAndGoTo("ws:w5", "w");
     await closeWorkspaceShortcut();
     await wait(500);
-    expect(rowIds()).toContain("tab:a2");
-    expect(selected()).toBe("tab:a1");
+    expect(rowIds()).toContain("ws:w5");
+    expect(selected()).toBe("ws:w5");
   });
 
   it("gives the focus back to the palette input when the confirmation is cancelled", async () => {
     initial = baseState();
     impl = () => new Promise((r) => setTimeout(() => r(false), 50));
-    await openAndGoTo("tab:a1");
+    await openAndGoTo("ws:w5", "w");
     const input = document.querySelector<HTMLInputElement>('[cmdk-input=""]');
     input?.blur();
     await closeWorkspaceShortcut();
@@ -288,37 +273,26 @@ describe("Cmd+Shift+W in the palette", () => {
   it("ignores a second Cmd+Shift+W while the first is pending", async () => {
     initial = baseState();
     impl = () => new Promise((r) => setTimeout(() => r(false), 50));
-    await openAndGoTo("tab:a1");
+    await openAndGoTo("ws:w5", "w");
     await closeWorkspaceShortcut();
     await closeWorkspaceShortcut();
     await wait(500);
-    expect(calls).toEqual(["w2"]);
+    expect(calls).toEqual(["w5"]);
   });
 
   it("releases the guard when closing rejects, so a later close goes through", async () => {
     initial = baseState();
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     impl = () => Promise.reject(new Error("boom"));
-    await openAndGoTo("tab:a1");
+    await openAndGoTo("ws:w5", "w");
     await closeWorkspaceShortcut();
     await wait(600);
-    expect(calls).toEqual(["w2"]);
+    expect(calls).toEqual(["w5"]);
     impl = removing;
     await closeWorkspaceShortcut();
     await wait(50);
-    expect(calls).toEqual(["w2", "w2"]);
-    expect(rowIds()).not.toContain("tab:a1");
+    expect(calls).toEqual(["w5", "w5"]);
+    expect(rowIds()).not.toContain("ws:w5");
     error.mockRestore();
-  });
-
-  it("recomputes the list when the workspace being left is the active one", async () => {
-    initial = baseState();
-    impl = removing;
-    await openAndGoTo("tab:cur");
-    await closeWorkspaceShortcut();
-    await wait(50);
-    expect(calls).toEqual(["w1"]);
-    expect(rowIds()).not.toContain("tab:cur");
-    expect(selected()).toBe("tab:a1");
   });
 });

@@ -215,3 +215,21 @@ No tienen el fallo: `runTabAction` y `runWorkspaceAction` llaman a `closeRowMenu
 ### Leccion
 
 Un listener global de Escape en captura se come la tecla de cualquier modal que se abra encima. Un menu que captura Escape debe cederlo cuando hay un dialogo modal abierto, y un test de foco debe montar el estado previo real (menu abierto) y mandar la tecla real.
+
+## Enter con un dialogo de confirmacion abierto sobre la paleta
+
+### Sintoma
+
+Con la paleta abierta y el dialogo de hibernar encima, Enter cerraba la paleta y dejaba el dialogo abierto, en vez de confirmarlo.
+
+### Causa raiz
+
+La paleta conserva el foco (el dialogo se monta en un portal sin robarlo), asi que Enter llegaba al `onKeyDown` de cmdk y elegia la fila resaltada. El foco no pasa al dialogo (la paleta es `modal={false}` y cancela `onFocusOutside`), asi que el `autoFocus` de su boton de confirmar no sirve de nada aqui.
+
+### Fix
+
+`onKeyDown` de `CommandPalette` comprueba `alertDialogOpen()` primero: con un dialogo abierto solo Enter hace algo, y es pulsar el ultimo boton del pie del dialogo (`confirmAlertDialog`, `lib/keepPaletteFocus.ts`) si no esta deshabilitado. Cubre el camino del atajo y el del menu de fila (`hibernateFromRowMenu.test.tsx`).
+
+### Leccion
+
+Un modal abierto sobre una paleta que no suelta el foco debe poder recibir Enter y Escape desde ella; Escape ya lo atiende Radix, Enter hay que reenviarlo.

@@ -38,6 +38,7 @@ import {
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import { COMMAND_GROUPS } from "./commands";
 import { displayOrder, successorOf } from "./lib/closeSuccessor";
+import { alertDialogOpen, confirmAlertDialog } from "./lib/keepPaletteFocus";
 import { initialKey } from "./lib/initialKey";
 import { PALETTE_INPUT_SELECTOR } from "./lib/keepPaletteFocus";
 import { listViewportOf, scrollListToTop } from "./lib/listScroll";
@@ -68,7 +69,6 @@ import {
   tabEntryRelativePath,
   tabItemKeepsPalette,
   tabMenuItems,
-  workspaceIdOfRow,
   workspaceMenuItems,
   workspaceRowKeys,
 } from "./lib/rowMenu";
@@ -546,16 +546,14 @@ export function CommandPalette({
         if (target) onOpenTerminalAt(target);
       } else if (id === "copy") {
         const path = tabEntryCopyPath(entry);
-        if (path) runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
+        if (path) void copyToClipboard(path, "Copied absolute path");
       } else if (id === "close") {
         closeTabFromRow(entry);
-      } else if (id === "closeWorkspace") {
-        closeWorkspaceFromRow(entry.workspaceId, tabRowKey(entry.tabId));
       } else if (id === "copyRelative") {
         const rel = tabEntryRelativePath(entry);
-        if (rel?.ok) runAfterClose(() => void copyToClipboard(rel.text, "Copied relative path"));
+        if (rel?.ok) void copyToClipboard(rel.text, "Copied relative path");
       } else if (id === "tabId") {
-        runAfterClose(() => void writeClipboardText(tabId));
+        void writeClipboardText(tabId);
       } else if (id === "lock") {
         onUpdateTab(tabId, toggleTabLock);
       } else if (id === "save") {
@@ -645,7 +643,7 @@ export function CommandPalette({
         runAfterClose(() => onRunClosed(entry));
       } else if (id === "copy" && entry.path) {
         const path = entry.path;
-        runAfterClose(() => void copyToClipboard(path, "Copied absolute path"));
+        void copyToClipboard(path, "Copied absolute path");
       }
     },
     [closeRowMenu, runAfterClose, onRunClosed],
@@ -776,12 +774,14 @@ export function CommandPalette({
         return true;
       }
       if (action === "closeWorkspace") {
-        const workspaceId = workspaceIdOfRow(valueRef.current, mergedRef.current);
-        if (workspaceId) closeWs(workspaceId, valueRef.current);
+        const workspace = highlightedWorkspaceOf(valueRef.current, mergedRef.current);
+        if (workspace) closeWs(workspace.workspaceId, valueRef.current);
         return true;
       }
-      if (action === "tabItem" && item && entry && runnableTabItem(entry, item)) {
-        run(item, entry);
+      if (action === "tabItem" && item && entry) {
+        // A sleeping tab has no Hibernate item: the key restores it, like Enter on its row.
+        if (item === "hibernateTab" && entry.hibernated) run("go", entry);
+        else if (runnableTabItem(entry, item)) run(item, entry);
       }
       return true;
     });
@@ -842,6 +842,15 @@ export function CommandPalette({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (alertDialogOpen()) {
+        // The dialog owns the keyboard but the palette keeps the focus, so Enter confirms it here.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          confirmAlertDialog();
+        }
+        return;
+      }
       if (SELECTION_KEYS.has(e.key)) cancelSettle();
       if (rowMenu.menu) {
         const key = rowMenu.menu.rowKey;

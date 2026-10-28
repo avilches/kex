@@ -13,3 +13,12 @@ export function keepPaletteFocus(event: Event): void {
 export function alertDialogOpen(): boolean {
   return document.querySelector('[role="alertdialog"][data-state="open"]') !== null;
 }
+
+// Presses the confirm button (the last of the footer) of the open confirmation dialog, if it is enabled.
+export function confirmAlertDialog(): void {
+  const buttons = document.querySelectorAll<HTMLButtonElement>(
+    '[role="alertdialog"][data-state="open"] [data-slot="alert-dialog-footer"] button',
+  );
+  const confirm = buttons[buttons.length - 1];
+  if (confirm && !confirm.disabled) confirm.click();
+}

@@ -126,7 +126,7 @@ describe("menuItemBlockedByPalette", () => {
   it("covers every item id the Rust menu builds, except the ones Rust handles itself", () => {
     const rust = readFileSync("src-tauri/src/lib.rs", "utf8");
     const built = [...rust.matchAll(/with_id\("([a-z_]+)"/g)].map((m) => m[1]);
-    const rustOnly = new Set(["quit", "new_window", "dock_browser", "dock_all_browsers"]);
+    const rustOnly = new Set(["quit", "dock_browser", "dock_all_browsers"]);
     const known = new Set<string>(MENU_ITEM_IDS);
     for (const id of built) {
       if (rustOnly.has(id)) continue;

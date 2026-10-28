@@ -50,6 +50,7 @@ export function shortcutBlockedByPalette(id: ShortcutId, palette: OpenPalette): 
 // Ids of the native menu items the frontend reacts to on the `kex:menu` event.
 export const MENU_ITEM_IDS = [
   "settings",
+  "new_window",
   "new_workspace",
   "new_terminal",
   "new_browser",
@@ -71,6 +72,7 @@ export type MenuItemId = (typeof MENU_ITEM_IDS)[number];
 // always blocks because they would act on the workspace behind it.
 export const MENU_ITEM_SHORTCUT: Record<MenuItemId, ShortcutId | null> = {
   settings: "settings.open",
+  new_window: "window.new",
   new_workspace: "workspace.new",
   new_terminal: "tab.new",
   new_browser: "tab.newBrowser",
