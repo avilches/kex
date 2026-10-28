@@ -143,6 +143,8 @@ resolverse la accion.
 input de paleta en el DOM, evita el comportamiento por defecto y le da el foco. Sin paleta no hace nada.
 `hibernateFocus.test.tsx` comprueba el handler con un AlertDialog generico en portal, y `HibernateDialogFocus.test.tsx` monta el `HibernateDialog` real junto a un input de paleta simulado y comprueba que el foco acaba en el input al confirmar, cancelar y con Escape; falla si se quita el `onCloseAutoFocus` del componente.
 
+Este fix cubre el atajo y los dialogos abiertos con el menu de fila cerrado; con el menu abierto ver el Bug 6.
+
 ### Riesgo abierto
 
 El boton "Go to tab" del dialogo hace `onClose()` y luego `onGoToTab()`, que pide el foco del tab destino en un `requestAnimationFrame`. La paleta no se cierra con ese camino, asi que `keepPaletteFocus` sigue dando el foco al input cuando el dialogo termina de desmontarse (tras su animacion de salida), y podria pisar el foco que acaba de pedir el tab. Sin la app arrancada no se puede saber el orden real, asi que no se ha puesto ningun parche: si se confirma, la salida coherente es cerrar la paleta en ese camino, no discriminar el foco dentro del handler.
@@ -178,8 +180,38 @@ Atenuar una fila de cmdk nunca con opacidad en la raiz: arrastra el resaltado de
 
 ## Decision 5: Move to Workspace es un nivel del menu de fila, no una subpagina
 
-El menu de fila guarda el menu que sustituye (`RowMenuState.parent`) y `useRowMenu` expone `enter` / `back`; Escape (listener en captura, antes que Radix) vuelve un nivel y solo cierra el menu desde la raiz. Los digitos de los destinos usan `palette.menuAction`, que la paleta de comandos no dejaba pasar: `paletteGate` lo permite ahora y `registerPaletteControl` lo atiende (con menu abierto ejecuta el item cuyo `digit` coincide; sin menu o sin ese item consume la tecla sin efecto, asi `workspace.selectByIndex` nunca salta de workspace con la paleta abierta).
+El menu de fila guarda el menu que sustituye (`RowMenuState.parent`) y `useRowMenu` expone `enter` / `back`; Escape (listener en captura, antes que Radix, salvo que haya un AlertDialog abierto, ver Bug 6) vuelve un nivel y solo cierra el menu desde la raiz. Los digitos de los destinos usan `palette.menuAction`, que la paleta de comandos no dejaba pasar: `paletteGate` lo permite ahora y `registerPaletteControl` lo atiende (con menu abierto ejecuta el item cuyo `digit` coincide; sin menu o sin ese item consume la tecla sin efecto, asi `workspace.selectByIndex` nunca salta de workspace con la paleta abierta).
 
 El comando "Move tab to workspace..." mueve la tab activa: limpia la consulta (con texto la fila Current tab puede no estar en la lista) y abre el menu de esa fila ya en el nivel de destinos. Un `useEffect` sobre `pendingMove` espera a que la consulta este vacia y la fila exista en el DOM antes de anclar el menu; no se ancla en el mismo tick que `setQuery("")` porque la lista aun es la filtrada.
 
 Leccion: un atajo que el gate bloquea no llega nunca al `registerPaletteControl`; ampliar lo que un menu acepta empieza por `PALETTE_ALLOWED_SHORTCUTS` y su test que recorre el registry.
+
+---
+
+## Bug 6: Hibernate Tab desde el menu de fila pierde el foco al pulsar Escape en el dialogo (RESUELTO)
+
+### Sintoma
+
+Con la paleta abierta y la tab activa ocupada, el atajo `tab.hibernate` abre el dialogo de revision y Escape devuelve el foco a la paleta. Eligiendo Hibernate Tab desde el menu de fila (Tab, Enter o clic) el dialogo sale igual, pero Escape no lo cierra y el foco acaba fuera de la paleta.
+
+### Pistas falsas descartadas
+
+- `keepPaletteFocus` / `onCloseAutoFocus` (Bug 3): sigue bien; en este camino ni llega a ejecutarse porque el dialogo no se cierra.
+- Los timeouts de `refocusInput` (0 y 250 ms), que corren con el dialogo todavia abierto porque la promesa de `onHibernateTab` resuelve al abrirlo: Radix mantiene el foco dentro de su trampa y no cambia el resultado.
+- El foco previo guardado por el dialogo (un item del menu desmontado): el dialogo no llega a cerrarse, asi que no se usa.
+
+### Causa raiz
+
+`tabItemKeepsPalette("hibernateTab")` es true, asi que `runTabAction` no llama a `closeRowMenu()` y el menu de fila sigue abierto cuando aparece el dialogo. Mientras esta abierto, `useRowMenu` escucha Escape en `window` en captura y hace `preventDefault` + `stopPropagation`: el evento no llega a Radix (que escucha en `document`), el dialogo no se cierra y el menu se cierra en su lugar. El atajo funciona porque no abre el menu. Evidencia (`hibernateFromRowMenu.test.tsx`): al abrirse el dialogo la traza es `menu=true dialog=true`, tras Escape `menu=false dialog=true`.
+
+### Fix
+
+El listener de Escape de `useRowMenu` ignora el evento mientras hay un `[role="alertdialog"][data-state="open"]` (`alertDialogOpen`, en `lib/keepPaletteFocus.ts`). Escape lo atiende Radix, el dialogo se cierra y `keepPaletteFocus` devuelve el foco al input. El menu de fila queda abierto debajo, como estaba. Escape sin dialogo sigue cerrando solo el menu.
+
+### Close Tab / Close Workspace
+
+No tienen el fallo: `runTabAction` y `runWorkspaceAction` llaman a `closeRowMenu()` antes de lanzar el cierre (`tabItemKeepsPalette` es false para ellos), asi que no hay listener de Escape del menu cuando sale el dialogo de confirmacion.
+
+### Leccion
+
+Un listener global de Escape en captura se come la tecla de cualquier modal que se abra encima. Un menu que captura Escape debe cederlo cuando hay un dialogo modal abierto, y un test de foco debe montar el estado previo real (menu abierto) y mandar la tecla real.
