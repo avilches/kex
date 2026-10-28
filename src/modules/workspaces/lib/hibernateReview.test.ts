@@ -43,11 +43,9 @@ describe("hibernateReview agents", () => {
     expect(r.busy).toEqual([expect.objectContaining({ tabId: "t1", kind: "agent", agent: "claude" })]);
   });
 
-  it("does not list an idle agent, whatever its Run on start", () => {
-    for (const restoreOnRestart of [undefined, true, false]) {
-      const r = hibernateReview(ws([term("t1", { restoreOnRestart })]), live({ t1: { agent: "claude", status: "idle" } }));
-      expect(isReviewEmpty(r)).toBe(true);
-    }
+  it("does not list an idle agent", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "idle" } }));
+    expect(isReviewEmpty(r)).toBe(true);
   });
 
   it("does not list an agent waiting for the user as busy", () => {
@@ -75,9 +73,9 @@ describe("hibernateReview processes", () => {
     expect(r.processes).toEqual([{ tabId: "t1", title: "api", command: "npm run dev" }]);
   });
 
-  it("does not care whether Run on start was on, since it is always saved", () => {
-    for (const restoreOnRestart of [undefined, true, false]) {
-      const r = hibernateReview(ws([term("t1", { restoreOnRestart })]), live(), procs({ t1: "make" }));
+  it("lists a process whether or not the tab already has a saved Restore Command", () => {
+    for (const persistentCommand of [undefined, "make"]) {
+      const r = hibernateReview(ws([term("t1", { persistentCommand })]), live(), procs({ t1: "make" }));
       expect(r.processes.map((p) => p.tabId)).toEqual(["t1"]);
     }
   });
@@ -254,17 +252,12 @@ describe("staysBehind", () => {
     expect(staysBehind(terminal("t1"), live(), procs())).toBe(false);
   });
 
-  it("leaves a terminal whose Run on start is explicitly off while it has something to run", () => {
-    expect(staysBehind(terminal("t1", { restoreOnRestart: false }), live(), procs({ t1: "make" }))).toBe(true);
-    expect(staysBehind(terminal("t1", { restoreOnRestart: false }), live(), procs())).toBe(false);
-  });
-
   it("leaves a plain process that was never saved, since an unattended hibernation does not decide for the user", () => {
     expect(staysBehind(terminal("t1"), live(), procs({ t1: "make" }))).toBe(true);
   });
 
   it("takes a terminal with a saved command", () => {
-    expect(staysBehind(terminal("t1", { restoreOnRestart: true, persistentCommand: "make" }), live(), procs({ t1: "make" }))).toBe(false);
+    expect(staysBehind(terminal("t1", { persistentCommand: "make" }), live(), procs({ t1: "make" }))).toBe(false);
   });
 
   it("takes an agent that resumes, and leaves one that has no stored session", () => {

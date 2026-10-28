@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, PlayIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ContextMenuItem,
@@ -19,14 +19,13 @@ import {
 import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
 import {
-  commandOnEnable,
-  commitRunOnStartEdit,
-  effectiveRunOnStartCommand,
+  commitRestoreCommandEdit,
+  effectiveRestoreCommand,
   followableCommand,
   syncFollowedCommand,
-} from "@/modules/terminal/lib/runOnStartCommand";
+} from "@/modules/terminal/lib/restoreCommand";
 import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
-import { pendingCdLine, runOnStartSections } from "@/modules/terminal/lib/runOnStartSections";
+import { pendingCdLine, restoreCommandSections } from "@/modules/terminal/lib/restoreCommandSections";
 import { discardPendingRestore, retryPendingRestore } from "@/modules/terminal/lib/useTerminalSession";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
@@ -40,14 +39,14 @@ const MENU_INPUT_CLASS = cn(
   "h-6 border-border/60 bg-background/50 px-1.5 text-[11px] focus:border-primary",
 );
 
-export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
+export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
   const agentSession = useAgentStore((s) => s.sessions[tab.id] ?? null);
   const reported =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tab.id) ??
     null;
   const running = followableCommand(reported, getRunningScriptCommand(tab.id));
   const pending = usePendingRestore(tab.id);
-  const sections = runOnStartSections(pending);
+  const sections = restoreCommandSections(pending);
   const cdLine = pending ? pendingCdLine(pending) : "";
   const [open, setOpen] = useState(false);
   const sessionId = agentSession?.meta?.sessionId;
@@ -70,22 +69,19 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     };
   }, [open, tab.id, agentSession, sessionId]);
 
-  // Agents default to restore=true; plain terminals default to false.
-  const enabled = agentSession ? tab.restoreOnRestart !== false : (tab.restoreOnRestart ?? false);
-
   const [draft, setDraft] = useState<string | null>(null);
   const plain = !agentSession || (previewPlan !== undefined && !previewPlan?.resumeCmd && !previewPlan?.errorReason);
 
   // A followed command has to reach the persisted tab, otherwise restart would replay a stale one.
   useEffect(() => {
-    if (!open || !enabled || !plain) return;
+    if (!open || !plain) return;
     const patch = syncFollowedCommand(tab, running);
     if (patch) onUpdateTab(tab.id, (p) => (p.kind === "terminal" ? { ...p, ...patch } : p));
-  }, [open, enabled, plain, tab, running, onUpdateTab]);
+  }, [open, plain, tab, running, onUpdateTab]);
 
   const commitDraft = () => {
     if (draft === null) return;
-    const patch = commitRunOnStartEdit(draft, running);
+    const patch = commitRestoreCommandEdit(draft, running);
     setDraft(null);
     onUpdateTab(tab.id, (p) => (p.kind === "terminal" ? { ...p, ...patch } : p));
   };
@@ -104,12 +100,11 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
       <input
         type="text"
         readOnly
-        disabled={!enabled}
         value={previewPlan.resumeCmd}
         title={previewPlan.resumeCmd}
         onFocus={(e) => e.currentTarget.select()}
         onKeyDown={(e) => e.stopPropagation()}
-        className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary"
       />
     ) : agentSession && previewPlan?.errorReason && sections.showOldError ? (
       <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
@@ -118,22 +113,21 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     ) : (
       <input
         type="text"
-        disabled={!enabled}
         placeholder="command to run (e.g. lazygit)"
-        value={draft ?? effectiveRunOnStartCommand(tab, running)}
+        value={draft ?? effectiveRestoreCommand(tab, running)}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           e.stopPropagation();
         }}
-        className={cn(MENU_INPUT_CLASS, "font-mono disabled:cursor-not-allowed disabled:opacity-50")}
+        className={cn(MENU_INPUT_CLASS, "font-mono")}
       />
     );
 
   const shownCommand = agentSession
     ? (previewPlan?.resumeCmd ?? "")
-    : (draft ?? effectiveRunOnStartCommand(tab, running));
+    : (draft ?? effectiveRestoreCommand(tab, running));
 
   return (
     <ContextMenuSub
@@ -144,27 +138,9 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
-        <span className="min-w-0 flex-1">Run on Start</span>
-        {enabled && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} />}
+        <span className="min-w-0 flex-1">Restore Command</span>
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
-        {sections.showEnabled && (
-          <ContextMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              const next = !enabled;
-              onUpdateTab(tab.id, (p) => ({
-                ...p,
-                restoreOnRestart: next,
-                persistentCommand: next
-                  ? commandOnEnable(tab, running, agentSession !== null)
-                  : tab.persistentCommand,
-              }));
-            }}
-          >
-            {enabled ? "Disable" : "Enable"}
-          </ContextMenuItem>
-        )}
         {pending ? (
           <>
             <div className="flex flex-col gap-1 px-2.5 py-1.5">
@@ -201,7 +177,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
             <div className="p-1.5">
               {commandField}
               <p className="mt-1.5 px-0.5 text-[10px] font-normal leading-snug text-muted-foreground">
-                Command runs when the tab is restored after a restart or an undo close
+                Runs when the tab is restored after a restart, a wake or an undo close. Saved on its own when the tab hibernates or closes
               </p>
             </div>
             {shownCommand.trim() !== "" && (

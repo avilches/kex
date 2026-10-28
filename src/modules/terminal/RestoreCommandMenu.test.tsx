@@ -16,7 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(nul
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { setPendingRestore } from "@/modules/terminal/lib/pendingRestore";
 import type { Tab } from "@/modules/workspaces/lib/types";
-import { RunOnStartMenu } from "./RunOnStartMenu";
+import { RestoreCommandMenu } from "./RestoreCommandMenu";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -46,7 +46,7 @@ function mount() {
       <ContextMenu>
         <ContextMenuTrigger>target</ContextMenuTrigger>
         <ContextMenuContent>
-          <RunOnStartMenu tab={tab} onUpdateTab={vi.fn()} />
+          <RestoreCommandMenu tab={tab} onUpdateTab={vi.fn()} />
         </ContextMenuContent>
       </ContextMenu>,
     ),
@@ -84,7 +84,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("RunOnStartMenu pending restore", () => {
+describe("RestoreCommandMenu pending restore", () => {
   it("shows the pending plan instead of the switch and wires Retry and Discard", async () => {
     setPendingRestore("tab-1", block);
     const unmount = mount();
@@ -123,12 +123,16 @@ describe("RunOnStartMenu pending restore", () => {
     unmount();
   });
 
-  it("shows the Enable button when nothing is pending", async () => {
+  it("shows the Restore Command field, with no Enable or Disable switch, when nothing is pending", async () => {
     const unmount = mount();
     await openMenu();
     await openSub();
-    expect(document.body.textContent).toContain("Enable");
-    expect(document.body.textContent).not.toContain("Restore pending");
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Restore Command");
+    expect(text).not.toContain("Enable");
+    expect(text).not.toContain("Disable");
+    expect(text).not.toContain("Run on Start");
+    expect(text).not.toContain("Restore pending");
     unmount();
   });
 });

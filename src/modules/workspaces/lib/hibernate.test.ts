@@ -12,10 +12,9 @@ import {
   isPendingStale,
   liveTerminalIds,
   workspaceDialogPending,
-  enableRunOnStart,
   formatHibernatedFor,
   restoreCommandFor,
-  saveRunOnStart,
+  saveRestoreCommand,
   terminalTabs,
 } from "./hibernate";
 import type { SplitNode, Tab, TabHibernation, Workspace } from "./types";
@@ -233,37 +232,10 @@ describe("liveTerminalIds", () => {
 });
 
 describe("restoreCommandFor", () => {
-  it("prefers the agent resume command, then the Run on start command, else nothing", () => {
+  it("prefers the agent resume command, then the Restore Command, else nothing", () => {
     expect(restoreCommandFor(term("t") as Terminal, { resumeCmd: " claude --resume x " })).toBe("claude --resume x");
-    expect(restoreCommandFor(term("t", { restoreOnRestart: true, persistentCommand: "make" }) as Terminal, null)).toBe("make");
-    expect(restoreCommandFor(term("t", { persistentCommand: "make" }) as Terminal, null)).toBeUndefined();
-  });
-});
-
-describe("enableRunOnStart", () => {
-  it("turns it on and adopts the running command when none is saved", () => {
-    expect(enableRunOnStart(term("t1"), "npm run dev")).toMatchObject({
-      restoreOnRestart: true,
-      persistentCommand: "npm run dev",
-    });
-  });
-
-  it("keeps an already saved persistent command", () => {
-    expect(enableRunOnStart(term("t1", { persistentCommand: "make" }), "other")).toMatchObject({
-      restoreOnRestart: true,
-      persistentCommand: "make",
-    });
-  });
-
-  it("turns it back on for an agent that had it explicitly off", () => {
-    expect(enableRunOnStart(term("t1", { restoreOnRestart: false }), undefined)).toMatchObject({
-      restoreOnRestart: true,
-    });
-  });
-
-  it("ignores non-terminal tabs", () => {
-    const e = editor("e1", false);
-    expect(enableRunOnStart(e, "x")).toBe(e);
+    expect(restoreCommandFor(term("t", { persistentCommand: "make" }) as Terminal, null)).toBe("make");
+    expect(restoreCommandFor(term("t") as Terminal, null)).toBeUndefined();
   });
 });
 
@@ -287,68 +259,55 @@ describe("workspaceDialogPending", () => {
   });
 });
 
-describe("saveRunOnStart", () => {
+describe("saveRestoreCommand", () => {
   const none = { running: null, agentResumable: undefined };
 
-  it("stores the running command and turns Run on start on", () => {
-    expect(saveRunOnStart(term("t1"), { ...none, running: "npm run dev" })).toMatchObject({
-      restoreOnRestart: true,
+  it("stores the running command", () => {
+    expect(saveRestoreCommand(term("t1"), { ...none, running: "npm run dev" })).toMatchObject({
       persistentCommand: "npm run dev",
     });
   });
 
-  it("keeps the stored command when nothing is running now", () => {
+  it("keeps the stored command when nothing is running now, as the same object", () => {
     const tab = term("t1", { persistentCommand: "make" });
-    expect(saveRunOnStart(tab, none)).toMatchObject({ restoreOnRestart: true, persistentCommand: "make" });
+    expect(saveRestoreCommand(tab, none)).toBe(tab);
   });
 
   it("leaves an empty shell untouched, as the same object", () => {
     const tab = term("t1");
-    expect(saveRunOnStart(tab, none)).toBe(tab);
+    expect(saveRestoreCommand(tab, none)).toBe(tab);
   });
 
   it("leaves a tab that already has everything stored as the same object", () => {
-    const tab = term("t1", { restoreOnRestart: true, persistentCommand: "make" });
-    expect(saveRunOnStart(tab, { ...none, running: "make" })).toBe(tab);
+    const tab = term("t1", { persistentCommand: "make" });
+    expect(saveRestoreCommand(tab, { ...none, running: "make" })).toBe(tab);
   });
 
-  it("turns on an agent that resumes its session without copying the running command", () => {
-    const saved = saveRunOnStart(term("t1"), { running: "claude", agentResumable: true });
-    expect(saved).toMatchObject({ restoreOnRestart: true });
-    expect((saved as Terminal).persistentCommand).toBeUndefined();
+  it("never copies the running command into an agent that resumes its own session", () => {
+    const tab = term("t1");
+    expect(saveRestoreCommand(tab, { running: "claude", agentResumable: true })).toBe(tab);
   });
 
   it("stores the launch command of an agent that has not reported a session", () => {
-    expect(saveRunOnStart(term("t1"), { running: "opencode", agentResumable: false })).toMatchObject({
-      restoreOnRestart: true,
+    expect(saveRestoreCommand(term("t1"), { running: "opencode", agentResumable: false })).toMatchObject({
       persistentCommand: "opencode",
     });
   });
 
-  it("respects a Run on start the user switched off, for a plain terminal and for an agent", () => {
-    const plain = term("t1", { restoreOnRestart: false, persistentCommand: "make" });
-    expect(saveRunOnStart(plain, { ...none, running: "make" })).toBe(plain);
-    const agent = term("t2", { restoreOnRestart: false });
-    expect(saveRunOnStart(agent, { running: "claude", agentResumable: true })).toBe(agent);
-  });
-
   it("keeps a command typed by hand instead of the one running now", () => {
     const tab = term("t1", { persistentCommand: "make", persistentCommandManual: true });
-    expect(saveRunOnStart(tab, { ...none, running: "other" })).toMatchObject({
-      restoreOnRestart: true,
-      persistentCommand: "make",
-    });
+    expect(saveRestoreCommand(tab, { ...none, running: "other" })).toBe(tab);
   });
 
   it("follows the running command when the stored one was not typed by hand", () => {
     const tab = term("t1", { persistentCommand: "old", persistentCommandManual: false });
-    expect(saveRunOnStart(tab, { ...none, running: "new" })).toMatchObject({ persistentCommand: "new" });
+    expect(saveRestoreCommand(tab, { ...none, running: "new" })).toMatchObject({ persistentCommand: "new" });
   });
 
   it("never touches a sleeping tab or a tab that is not a terminal", () => {
     const asleep = term("t1", { hibernation: { at: 1 } });
-    expect(saveRunOnStart(asleep, { ...none, running: "make" })).toBe(asleep);
+    expect(saveRestoreCommand(asleep, { ...none, running: "make" })).toBe(asleep);
     const doc = editor("e1", true);
-    expect(saveRunOnStart(doc, { ...none, running: "make" })).toBe(doc);
+    expect(saveRestoreCommand(doc, { ...none, running: "make" })).toBe(doc);
   });
 });

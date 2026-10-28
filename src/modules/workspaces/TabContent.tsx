@@ -260,7 +260,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
               focused={focused}
               initialCwd={tab.cwd}
               blocks={tab.blocks}
-              restoreOnRestart={tab.restoreOnRestart}
               persistentCommand={tab.persistentCommand}
               initialScratchpadEnabled={
                 tab.scratchpadEnabled ?? false

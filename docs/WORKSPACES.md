@@ -189,7 +189,7 @@ Key fields of a `Session`:
 
 A leaf whose start cannot happen (unusable restore directory, `openPty` failing) has no PTY and a non-null
 `Session.restoreBlock`; `attachSession` skips it. The modal that holds it covers that tab's content only. Flow, Try again,
-Open terminal without restoring and the pending restore (Retry restore / Discard restore plan in the Run on Start menu)
+Open terminal without restoring and the pending restore (Retry restore / Discard restore plan in the Restore Command menu)
 are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
 
 ### Visible vs. parked
@@ -286,7 +286,7 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   the others run.
 - **Run on a sleeping tab.** A script whose linked tab is asleep (`LinkedTab.sleeping`): if the tab would come back as a
   bare shell (no agent and no restore command in its `hibernation`) `planActionRun` plans a `reuse-tab` with `wake: true` and
-  the runner wakes it (`wakeTab`) before typing the command; if it would come back running something (Run on start command
+  the runner wakes it (`wakeTab`) before typing the command; if it would come back running something (Restore Command
   or agent) it opens a new tab instead.
 - **Workspace context menu.** The WorkspaceBar menu has "Hibernate all" (when the workspace has an awake terminal): it
   hibernates every awake terminal of the workspace with a single review. There is no workspace-level hibernate flag, overlay
@@ -311,14 +311,15 @@ testable without React):
    working agent and an unsaved document always ask; a running process or script asks only while the
    `warnOnCloseTabWithRunningProcess` preference is on (default on). If it does not ask the tabs hibernate immediately;
    otherwise `pending` (`{ workspaceId, tabIds, processes }`) opens `HibernateDialog` with one row per tab to review.
-   Run on start is never a question: `perform` stores it on every tab that sleeps (`saveRunOnStart`, applied through
-   `withLiveRunOnStart`), so the wake brings back what was running (see "Run on start is always saved" below).
-2. `performHibernate` clears the pending request, stores Run on start on each tab (`withRunOnStart`) and takes the
+   The Restore Command is never a question: `perform` stores it on every tab that sleeps (`saveRestoreCommand`, applied
+   through `withLiveRestoreCommand`), so the wake brings back what was running (see "The Restore Command is always saved"
+   below).
+2. `performHibernate` clears the pending request, stores the Restore Command on each tab (`withRestoreCommand`) and takes the
    snapshots from those tabs (`snapshotTerminalTabs`: title, agent and restore
    command of each tab, read while the PTYs are alive, after flushing the agent titles and the Sidebar snapshots). Then,
    with no await left, it rechecks (for the automatic path: the tab is still hidden, not busy and has nothing to lose),
    marks the tabs with `markHibernating` (so the exit of their PTYs is not reported as an agent failure), writes the stored
-   Run on start to the tabs (`updateTab`), calls `finish` on
+   Restore Command to the tabs (`updateTab`), calls `finish` on
    each agent session and calls `hibernateWorkspace` (`applyHibernate`); if the recheck fails or hibernating throws, nothing
    stays marked. A set of in-flight tab ids makes a double trigger hibernate once.
 
@@ -366,21 +367,22 @@ runs while nothing works in it. The stamps are never persisted: after a restart 
 For each workspace with candidates `createHibernateFlow().requestAuto(workspaceId, tabIds)` keeps only the tabs that are
 still hidden, not busy and with nothing to lose (not busy, and `staysBehind` is false: no process of a tab whose Run on
 start the user switched off, no agent without a stored session), and hibernates them together; the rest stay awake until
-the next check. Empty shells do hibernate. A tab that sleeps unattended also gets Run on start stored. It re-checks after taking the
+the next check. Empty shells do hibernate. A tab that sleeps unattended also gets its Restore Command stored. It re-checks after taking the
 snapshots, so a tab that became visible meanwhile is left alone. Unsaved documents play no part: editors never hibernate.
 `requestAuto` never opens `HibernateDialog`.
 
-#### Run on start is always saved
+#### The Restore Command is always saved
 
-Closing and hibernating are two actions with the same warning and the same effect on Run on start: the command a terminal
-runs is stored on the tab (`restoreOnRestart` on, `persistentCommand` set) whenever the tab stops, and the user is never
-asked. `saveRunOnStart` (`lib/hibernate.ts`, pure) decides what to store: a tab whose Run on start the user switched off
-in its menu stays off; an agent that resumes its own session (`hasResumed`) turns the flag on without copying the running
-command; any other terminal keeps a command typed by hand (`persistentCommandManual`) or adopts the one the shell reports
-(`followableCommand`); and an empty shell is left untouched.
-`withLiveRunOnStart` (`lib/runOnStartSave.ts`) reads the live stores and applies it. Hibernating stores it through
+The command a terminal runs when it comes back (after a restart, a wake or an undo close) is its Restore Command. There is
+no switch for it: it is stored on the tab (`persistentCommand`) whenever the tab stops, whether it hibernates or closes, and
+the user is never asked. To stop a tab from running anything, empty the field in the tab's Restore Command menu. The
+`restoreOnRestart` flag and the struck-through agent icon that went with it no longer exist.
+`saveRestoreCommand` (`lib/hibernate.ts`, pure) decides what to store: an agent that resumes its own session
+(`hasResumed`) never copies the running command; any other terminal keeps a command typed by hand
+(`persistentCommandManual`) or adopts the one the shell reports (`followableCommand`); and an empty shell is left untouched.
+`withLiveRestoreCommand` (`lib/restoreCommandSave.ts`) reads the live stores and applies it. Hibernating stores it through
 `updateTab`; closing a tab stores it on the tab `closeTab` puts on the closed stack, and closing a workspace stores it on
-every tab of the snapshot (`withLiveRunOnStartAll`), so undoing the close runs the command again.
+every tab of the snapshot (`withLiveRestoreCommandAll`), so undoing the close runs the command again.
 
 #### Close and hibernate are two steps
 
@@ -406,7 +408,7 @@ checkbox is not offered when closing a workspace that also deletes Actions, sinc
 
 There is no startup hibernation: `initWorkspaceState` restores the saved workspaces untouched. A tab that was hibernated
 stays so (its `hibernation` is in the persisted tab, and the stored agent session is kept because the tab is still known to
-`terminal_tab_ids`); every other terminal mounts, including its "Run on start" commands and agent sessions.
+`terminal_tab_ids`); every other terminal mounts, including its Restore Commands and agent sessions.
 
 ---
 

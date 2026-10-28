@@ -48,7 +48,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
         <Field label="Command" value={block.command} />
         {block.restorable && (
           <span className="text-[12px] text-muted-foreground">
-            The restore plan is kept. You can retry it later from Run on Start in this tab's menu.
+            The restore plan is kept. You can retry it later from Restore Command in this tab's menu.
           </span>
         )}
         <div className="flex justify-end gap-2">

@@ -8,7 +8,6 @@ import { tabIcon } from "./tabTitle";
 import type { Tab } from "./types";
 
 const ICON_MARK_TITLES: Record<NonNullable<AgentIconMark>, string> = {
-  "restore-off": "Won't be restored on restart (Run on start is off)",
   "launch-unknown": "Launch command unknown: restore will use plain claude --resume",
 };
 

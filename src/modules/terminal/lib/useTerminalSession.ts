@@ -102,10 +102,8 @@ type Session = {
   ptyOpening: boolean;
   ptyGen: number;
   initialCwd: string | undefined;
-  // "Run on start" config, captured at startup. On the first PTY spawn the
-  // session decides what to inject: the agent resume (if it had an agent) or
-  // this command (otherwise). `restoreOnRestart === false` disables both.
-  restoreOnRestart: boolean | undefined;
+  // Restore Command, captured at startup. On the first PTY spawn the session decides what to
+  // inject: the agent resume (if it had an agent) or this command (otherwise).
   persistentCommand: string | undefined;
   // Set while the start is held back (unusable directory, PTY refused to open): no PTY exists
   // and the tab shows a modal until the user retries or cancels.
@@ -181,7 +179,7 @@ async function writeWhenShellReady(
   await waitForShellReady(pty.id, SHELL_READY_FALLBACK_MS);
   const waited = Math.round(performance.now() - t0);
   if (s.disposed || s.pty !== pty) return;
-  console.debug(`[kex] run-on-start write tab=${leafId} pty=${pty.id} waited=${waited}ms`);
+  console.debug(`[kex] restore-command write tab=${leafId} pty=${pty.id} waited=${waited}ms`);
   void pty.write(data);
 }
 
@@ -731,7 +729,6 @@ function ensureSession(
     ptyOpening: false,
     ptyGen: 0,
     initialCwd,
-    restoreOnRestart: undefined,
     persistentCommand: undefined,
     restoreBlock: null,
     lastCwd: null,
@@ -977,7 +974,6 @@ function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
 
 // Starts the PTY of a leaf once restore plans are loaded. One place owns "what to inject on a
 // restored terminal":
-//   - "Run on start" off              -> nothing
 //   - had an agent (plan)             -> resume it, or hold the tab on its error
 //   - no agent, has a saved command   -> run that command, or hold the tab if its directory is unusable
 // `plain` skips all of that (the user cancelled the restore) and only opens a shell.
@@ -992,7 +988,6 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   // directly, without needing a `cd` shell command.
   const plan = plain ? null : consumeRestorePlan(leafId);
   const input = {
-    runOnStart: !plain && s.restoreOnRestart !== false,
     plan,
     persistentCommand: s.persistentCommand,
     initialCwd: s.initialCwd,
@@ -1024,7 +1019,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
       s.ptyOpening = false;
       return;
     }
-    const command = plan?.resumeCmd || (input.runOnStart ? s.persistentCommand ?? "" : "");
+    const command = plan?.resumeCmd || (plain ? "" : (s.persistentCommand ?? ""));
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
     const agent = decision.inject === "resume" ? plan?.agent : undefined;
@@ -1307,7 +1302,6 @@ type Options = {
   focused?: boolean;
   initialCwd?: string;
   blocks?: boolean;
-  restoreOnRestart?: boolean;
   persistentCommand?: string;
   initialScratchpadEnabled?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
@@ -1324,7 +1318,6 @@ export function useTerminalSession({
   focused = true,
   initialCwd,
   blocks = false,
-  restoreOnRestart,
   persistentCommand,
   initialScratchpadEnabled,
   onSearchReady,
@@ -1353,10 +1346,10 @@ export function useTerminalSession({
   // would detach/rebind the renderer slot (disposing block markers) on each cd.
   const initialCwdRef = useRef(initialCwd);
   initialCwdRef.current = initialCwd;
-  // Run-on-start config is read once at the first PTY spawn (startup), so keep
-  // it in refs and off the effect deps just like initialCwd.
-  const runOnStartRef = useRef({ restoreOnRestart, persistentCommand });
-  runOnStartRef.current = { restoreOnRestart, persistentCommand };
+  // The Restore Command is read once at the first PTY spawn (startup), so keep
+  // it in a ref and off the effect deps just like initialCwd.
+  const restoreCommandRef = useRef(persistentCommand);
+  restoreCommandRef.current = persistentCommand;
   // Seeds the initial scratchpad enabled flag on session creation only (restore).
   const initialScratchpadEnabledRef = useRef(initialScratchpadEnabled);
 
@@ -1368,8 +1361,7 @@ export function useTerminalSession({
       blocks,
       initialScratchpadEnabledRef.current,
     );
-    s.restoreOnRestart = runOnStartRef.current.restoreOnRestart;
-    s.persistentCommand = runOnStartRef.current.persistentCommand;
+    s.persistentCommand = restoreCommandRef.current;
     s.ready.then(() => {
       if (cancelled || s.disposed) return;
       const node = container.current;

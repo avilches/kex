@@ -129,26 +129,26 @@ describe("TabAgentMenuItems", () => {
 
   it("places the extra items inside the agent block, right after the process entry", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "omp");
-    open(noop, <div>Run on Start</div>);
+    open(noop, <div>Restore Command</div>);
     const html = document.body.innerHTML;
-    expect(html.indexOf("Run on Start")).toBeLessThan(html.indexOf("Transcript not created yet"));
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(html.indexOf("Restore Command")).toBeLessThan(html.indexOf("Transcript not created yet"));
+    expect(screen.getByText("Restore Command")).toBeTruthy();
   });
 
   it("still shows the extra items for a tab without an agent session", () => {
-    open(noop, <div>Run on Start</div>);
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    open(noop, <div>Restore Command</div>);
+    expect(screen.getByText("Restore Command")).toBeTruthy();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();
   });
 
   it("shows OpenCode's block with its session id and no transcript actions", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "opencode");
     useAgentStore.getState().setMeta("tab-1", { sessionId: "ses_abc" });
-    open(noop, <div>Run on Start</div>);
+    open(noop, <div>Restore Command</div>);
     expect(screen.getByText("OpenCode")).toBeTruthy();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();
     expect(screen.queryByText("Open Transcript Folder")).toBeNull();
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.getByText("Restore Command")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Copy Session ID"));
     expect(writeClipboardText).toHaveBeenCalledWith("ses_abc");
@@ -161,9 +161,9 @@ describe("TabAgentMenuItems", () => {
       transcriptPath: "/c/sessions/2026/10/23/rollout-x-019a-codex.jsonl",
     });
     const reveal = vi.fn();
-    open(reveal, <div>Run on Start</div>);
+    open(reveal, <div>Restore Command</div>);
     expect(screen.getByText("Codex")).toBeTruthy();
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.getByText("Restore Command")).toBeTruthy();
     fireEvent.click(screen.getByText("Open Transcript Folder"));
     expect(reveal).toHaveBeenCalledWith("/c/sessions/2026/10/23");
   });
@@ -171,11 +171,11 @@ describe("TabAgentMenuItems", () => {
   it("offers no transcript actions for a Codex session without a rollout path", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "codex");
     useAgentStore.getState().setMeta("tab-1", { sessionId: "019a-codex" });
-    open(noop, <div>Run on Start</div>);
+    open(noop, <div>Restore Command</div>);
     expect(screen.getByText("Codex")).toBeTruthy();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();
     expect(screen.queryByText("Open Transcript Folder")).toBeNull();
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.getByText("Restore Command")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Copy Session ID"));
     expect(writeClipboardText).toHaveBeenCalledWith("019a-codex");
@@ -199,14 +199,14 @@ describe("TabAgentMenuItems without the integration", () => {
       sessionId: "sess-1",
       transcriptPath: "/t/dir/s.jsonl",
     });
-    open(noop, <div>Run on Start</div>);
+    open(noop, <div>Restore Command</div>);
   }
 
-  it("offers Install in place of what only the integration can fill, and keeps Run on Start", async () => {
+  it("offers Install in place of what only the integration can fill, and keeps Restore Command", async () => {
     withoutIntegration("missing");
     expect(await screen.findByText(/Install Claude Code integration/)).toBeTruthy();
     expect(screen.getByText("Claude")).toBeTruthy();
-    expect(screen.getByText("Run on Start")).toBeTruthy();
+    expect(screen.getByText("Restore Command")).toBeTruthy();
     expect(screen.queryByText("claude-opus-4")).toBeNull();
     expect(screen.queryByText("Copy Session ID")).toBeNull();
     expect(screen.queryByText("Open Transcript Folder")).toBeNull();
@@ -237,7 +237,7 @@ describe("TabAgentMenuItems without the integration", () => {
 
   it("hides the dead entries and offers nothing when Install cannot run", async () => {
     withoutIntegration("malformed");
-    await screen.findByText("Run on Start");
+    await screen.findByText("Restore Command");
     expect(screen.queryByText(/Install/)).toBeNull();
     expect(screen.queryByText("Copy Session ID")).toBeNull();
     expect(screen.queryByText("Transcript not created yet")).toBeNull();

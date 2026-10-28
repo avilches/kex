@@ -23,14 +23,9 @@ const plan = (over: Partial<RestorePlan> = {}): RestorePlan => ({
   ...over,
 });
 
-const base = { runOnStart: true, plan: null, persistentCommand: undefined, initialCwd: "/home", dirProblem: null };
+const base = { plan: null, persistentCommand: undefined, initialCwd: "/home", dirProblem: null };
 
 describe("decideStart", () => {
-  it("spawns plain at the initial cwd when Run on Start is off, even with a failing plan", () => {
-    const d = decideStart({ ...base, runOnStart: false, plan: plan({ errorReason: "Folder not found: /work" }) });
-    expect(d).toEqual({ kind: "spawn", cwd: "/home", inject: "none" });
-  });
-
   it("resumes the agent in its launch directory", () => {
     const d = decideStart({ ...base, plan: plan({ resumeCmd: "claude --resume 'a'" }) });
     expect(d).toEqual({ kind: "spawn", cwd: "/work", inject: "resume" });
@@ -77,11 +72,10 @@ describe("decideStart", () => {
 
 describe("needsDirCheck", () => {
   it("is only true for a saved command with a directory and no plan", () => {
-    expect(needsDirCheck({ runOnStart: true, plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(true);
-    expect(needsDirCheck({ runOnStart: false, plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ runOnStart: true, plan: plan(), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ runOnStart: true, plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ runOnStart: true, plan: null, persistentCommand: "x", initialCwd: undefined })).toBe(false);
+    expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(true);
+    expect(needsDirCheck({ plan: plan(), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
+    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(false);
+    expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: undefined })).toBe(false);
   });
 });
 

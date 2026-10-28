@@ -31,7 +31,7 @@ import type { Tab, Workspace } from "./types";
 
 type Hook = ReturnType<typeof useWorkspaces>;
 
-const term = (id: string, restoreOnRestart?: boolean): Tab => ({ id, kind: "terminal", restoreOnRestart });
+const term = (id: string): Tab => ({ id, kind: "terminal" });
 const sleeping = (id: string): Tab => ({ id, kind: "terminal", hibernation: { at: 1, agent: "claude" } });
 const editor = (id: string): Tab => ({ id, kind: "editor", path: `/tmp/${id}`, dirty: false, preview: false });
 
@@ -304,9 +304,9 @@ describe("undo close workspace", () => {
     ]);
   });
 
-  it("does not fetch or seed a resume plan for a terminal with Run on start off", async () => {
+  it("fetches and seeds a resume plan for every awake terminal of the restored workspace", async () => {
     vi.mocked(previewResumeCmd).mockImplementation(async (tabId) => planFor(tabId));
-    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1", false), term("b2")])]);
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1"), term("b2")])]);
 
     act(() => view!.h.closeWorkspace("b"));
     await act(async () => {
@@ -315,11 +315,12 @@ describe("undo close workspace", () => {
 
     const restored = view.h.workspaces[1]!;
     const [newB1, newB2] = tabIds(restored);
-    expect(previewResumeCmd).toHaveBeenCalledTimes(1);
+    expect(previewResumeCmd).toHaveBeenCalledTimes(2);
+    expect(previewResumeCmd).toHaveBeenCalledWith("b1");
     expect(previewResumeCmd).toHaveBeenCalledWith("b2");
-    expect(seedRestorePlan).toHaveBeenCalledTimes(1);
+    expect(seedRestorePlan).toHaveBeenCalledTimes(2);
+    expect(seedRestorePlan).toHaveBeenCalledWith(newB1, expect.objectContaining({ tabId: "b1" }));
     expect(seedRestorePlan).toHaveBeenCalledWith(newB2, expect.objectContaining({ tabId: "b2" }));
-    expect(seedRestorePlan).not.toHaveBeenCalledWith(newB1, expect.anything());
   });
 
   it("keeps the id of a hibernated tab and does not look up or seed a plan for it", async () => {

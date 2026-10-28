@@ -286,8 +286,8 @@ describe("buildReopenedTab", () => {
   });
 
   it("unlocks a reopened terminal tab but keeps everything else", () => {
-    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
-    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
+    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, persistentCommand: "lazygit" };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, persistentCommand: "lazygit" });
   });
 
   it("keeps a hibernated terminal asleep", () => {

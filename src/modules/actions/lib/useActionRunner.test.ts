@@ -160,7 +160,7 @@ describe("useActionRunner", () => {
     expect(getScriptRunningSnapshot().get("tab-old")).toBe("running");
   });
 
-  it("opens a new tab instead of waking one that would come back running its Run on start command", () => {
+  it("opens a new tab instead of waking one that would come back running its Restore Command", () => {
     linkActionTab(script.id, "tab-old");
     const asleep: Tab = { id: "tab-old", kind: "terminal", cwd: "/w", hibernation: { at: 1, command: "pnpm dev" } };
     const { deps, result } = setup(ws(), { "tab-old": asleep });

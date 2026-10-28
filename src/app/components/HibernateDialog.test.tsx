@@ -89,7 +89,7 @@ describe("HibernateDialog", () => {
     expect(text()).toContain("vim");
   });
 
-  it("never offers Run on start: it is always saved", () => {
+  it("never offers to save the Restore Command: it is always saved", () => {
     mount({ mode: "hibernate", tabs: [term("t1")], processes: [{ tabId: "t1", label: "vim" }] });
     expect(button("Run on start")).toBeUndefined();
     expect(text()).not.toContain("will not come back");

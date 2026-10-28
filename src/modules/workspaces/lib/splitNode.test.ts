@@ -501,7 +501,6 @@ test("terminal tab locked field round-trips through the type", () => {
     id: "p1",
     kind: "terminal" as const,
     locked: true,
-    restoreOnRestart: false,
     persistentCommand: "lazygit",
   };
   expect(tab.locked).toBe(true);

@@ -112,35 +112,23 @@ export function editorTabIds(ws: Workspace): string[] {
     .map((t) => t.id);
 }
 
-// What the restore will type into the tab: the agent resume command, else the run-on-start command.
+// What the restore will type into the tab: the agent resume command, else the Restore Command.
 export function restoreCommandFor(tab: TerminalTab, plan: { resumeCmd: string } | null | undefined): string | undefined {
-  return plan?.resumeCmd.trim() || (tab.restoreOnRestart ? tab.persistentCommand : undefined) || undefined;
+  return plan?.resumeCmd.trim() || tab.persistentCommand || undefined;
 }
 
-export function enableRunOnStart(tab: Tab, runningCommand?: string): Tab {
-  if (tab.kind !== "terminal") return tab;
-  return {
-    ...tab,
-    restoreOnRestart: true,
-    persistentCommand: tab.persistentCommand ?? runningCommand,
-  };
-}
-
-// Run on start is saved every time a terminal stops (hibernate or close), so waking it or undoing
-// the close brings back what it was running. A user who switched it off keeps it off. A shell with
-// nothing to run is left alone, an agent that resumes its own session never copies the running
-// command, and a command the user typed by hand is never replaced by the running one.
-export function saveRunOnStart(
+// The Restore Command is saved every time a terminal stops (hibernate or close), so waking it or
+// undoing the close brings back what it was running. A shell with nothing to run is left alone, an
+// agent that resumes its own session never copies the running command, and a command the user
+// typed by hand is never replaced by the running one.
+export function saveRestoreCommand(
   tab: Tab,
   live: { running: string | null; agentResumable: boolean | undefined },
 ): Tab {
-  if (tab.kind !== "terminal" || tab.hibernation || tab.restoreOnRestart === false) return tab;
-  const resumes = live.agentResumable === true;
-  const running = resumes ? undefined : (live.running ?? undefined);
+  if (tab.kind !== "terminal" || tab.hibernation || live.agentResumable === true) return tab;
+  const running = live.running ?? undefined;
   const command = tab.persistentCommandManual ? tab.persistentCommand : (running ?? tab.persistentCommand);
-  if (!resumes && !command) return tab;
-  if (tab.restoreOnRestart === true && tab.persistentCommand === command) return tab;
-  return { ...tab, restoreOnRestart: true, persistentCommand: command };
+  return command === tab.persistentCommand ? tab : { ...tab, persistentCommand: command };
 }
 
 export function isPendingStale(pendingId: string | null, workspaces: readonly { id: string }[]): boolean {

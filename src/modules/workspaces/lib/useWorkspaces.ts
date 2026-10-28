@@ -61,14 +61,12 @@ import {
   reviveWorkspace,
 } from "./closedStack";
 import { dismissCloseNotice, showCloseNotice } from "./closedNotice";
-import { withLiveRunOnStart, withLiveRunOnStartAll } from "./runOnStartSave";
+import { withLiveRestoreCommand, withLiveRestoreCommandAll } from "./restoreCommandSave";
 
-// Whether a reopened closed tab is worth asking Rust for a live agent resume plan.
-// Mirrors the same "Run on start" gate the startup restore flow already applies
-// (useTerminalSession.ts), so a tab with it off never even fetches a plan it would
-// discard anyway.
+// Whether a reopened closed tab is worth asking Rust for a live agent resume plan: only a
+// terminal can have an agent session.
 export function needsResumePlanLookup(tab: Tab): boolean {
-  return tab.kind === "terminal" && tab.restoreOnRestart !== false;
+  return tab.kind === "terminal";
 }
 
 export function planWake(tabs: readonly Tab[]): string[] {
@@ -619,7 +617,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       setClosedStack(
         captureClosedWorkspace(
           before,
-          withLiveRunOnStartAll(closing),
+          withLiveRestoreCommandAll(closing),
           workspacesRef.current.findIndex((w) => w.id === id),
           undefined,
           explicit,
@@ -847,7 +845,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         history = paneActivationHistoryRef.current.get(found.pane.id);
         setClosedStack(captureClosedEntry(closedTabsRef.current, {
           kind: "tab",
-          tab: withLiveRunOnStart(found.tab),
+          tab: withLiveRestoreCommand(found.tab),
           paneId: found.pane.id,
           workspaceId,
           prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,

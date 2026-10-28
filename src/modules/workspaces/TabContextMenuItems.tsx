@@ -31,7 +31,7 @@ import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
+import { RestoreCommandMenu } from "@/modules/terminal/RestoreCommandMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
 import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
@@ -86,9 +86,9 @@ export function TabContextMenuItems({
   const worktree = useAgentStore((s) => s.sessions[tab.id]?.meta?.worktreeCwd ?? null);
   const focusTarget =
     focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
-  const runOnStart =
+  const restoreCommand =
     tab.kind === "terminal" && onUpdateTab ? (
-      <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
+      <RestoreCommandMenu tab={tab} onUpdateTab={onUpdateTab} />
     ) : null;
   const rowActions =
     tab.kind === "terminal" ? (
@@ -239,7 +239,7 @@ export function TabContextMenuItems({
         tabId={tab.id}
         process={<TabProcessMenuItems tab={tab} />}
       >
-        {runOnStart}
+        {restoreCommand}
       </TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       {tab.kind === "terminal" && (

@@ -23,7 +23,7 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     live: () => idle,
     collectProcesses: async () => new Map(),
     warnProcesses: () => true,
-    withRunOnStart: (t) => t,
+    withRestoreCommand: (t) => t,
     updateTab: (_id, t) => void calls.push(`update:${t.id}`),
     finishAgent: (id) => void calls.push(`finish:${id}`),
     snapshotTabs: async (tabs) => Object.fromEntries(tabs.map((t) => [t.id, { at: 1 }])),
@@ -38,7 +38,7 @@ describe("createHibernateFlow", () => {
   beforeEach(() => unmarkHibernating(["t1", "t2", "t3"]));
 
   it("hibernates straight away when there is nothing to warn about", async () => {
-    const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
+    const { flow, calls } = setup(ws([term("t1", { persistentCommand: "make" })]));
     await flow.request("w1", ["t1"]);
     expect(calls).toContain("hibernate:t1");
     expect(calls.some((c) => c.startsWith("pending:w1"))).toBe(false);
@@ -124,7 +124,7 @@ describe("createHibernateFlow", () => {
     });
   });
 
-  describe("Run on start", () => {
+  describe("Restore Command", () => {
     it("is stored on every tab that sleeps, before the agent session ends", async () => {
       const { flow, calls } = setup(ws([term("t1"), term("t2")]));
       await flow.perform("w1", ["t1", "t2"]);
@@ -134,14 +134,14 @@ describe("createHibernateFlow", () => {
     it("snapshots the tab as it will be stored, so the restore command matches", async () => {
       let seen: Tab[] = [];
       const { flow } = setup(ws([term("t1")]), {
-        withRunOnStart: (t) => ({ ...t, restoreOnRestart: true, persistentCommand: "make" }) as Tab,
+        withRestoreCommand: (t) => ({ ...t, persistentCommand: "make" }) as Tab,
         snapshotTabs: async (tabs) => {
           seen = tabs;
           return {};
         },
       });
       await flow.perform("w1", ["t1"]);
-      expect(seen[0]).toMatchObject({ restoreOnRestart: true, persistentCommand: "make" });
+      expect(seen[0]).toMatchObject({ persistentCommand: "make" });
     });
 
     it("is not stored for a tab that stopped being valid, so nothing changes if it did not sleep", async () => {
@@ -175,7 +175,7 @@ describe("createHibernateFlow", () => {
 
   describe("requestAuto", () => {
     it("hibernates a hidden tab when nothing would be lost", async () => {
-      const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
+      const { flow, calls } = setup(ws([term("t1", { persistentCommand: "make" })]));
       expect(await flow.requestAuto("w1", ["t1"])).toBe(true);
       expect(calls).toContain("hibernate:t1");
     });
@@ -213,7 +213,7 @@ describe("createHibernateFlow", () => {
     });
 
     it("does nothing when an agent is waiting for the user", async () => {
-      const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true })]), {
+      const { flow, calls } = setup(ws([term("t1")]), {
         live: () => ({ ...idle, agentOf: () => ({ agent: "claude", status: "attention", resumable: true }) }),
       });
       expect(await flow.requestAuto("w1", ["t1"])).toBe(false);
@@ -221,7 +221,7 @@ describe("createHibernateFlow", () => {
     });
 
     it("does nothing for a working agent or a running script", async () => {
-      const working = setup(ws([term("t1", { restoreOnRestart: true })]), {
+      const working = setup(ws([term("t1")]), {
         live: () => ({ ...idle, agentOf: () => ({ agent: "claude", status: "working", resumable: true }) }),
       });
       expect(await working.flow.requestAuto("w1", ["t1"])).toBe(false);

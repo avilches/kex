@@ -34,7 +34,7 @@ type TabCommon = {
 };
 
 export type Tab =
-  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation; agentTitle?: string })
+  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation; agentTitle?: string })
   | (TabCommon & {
       kind: "editor";
       path: string;

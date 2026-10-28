@@ -18,7 +18,7 @@ import {
   type ForegroundProcesses,
   type HibernateLive,
 } from "./hibernateReview";
-import { withLiveRunOnStart } from "./runOnStartSave";
+import { withLiveRestoreCommand } from "./restoreCommandSave";
 import { visibleTabIds } from "./autoHibernate";
 import { liveScripts } from "./liveScripts";
 import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
@@ -39,8 +39,8 @@ export type HibernateFlowDeps = {
   // Foreground process the PTY reports for each of these tabs, labelled with the command.
   collectProcesses: (tabs: readonly TerminalTab[]) => Promise<ForegroundProcesses>;
   warnProcesses: () => boolean;
-  // The tab as it must be stored when it sleeps: Run on start on, with what it runs now.
-  withRunOnStart: (tab: TerminalTab) => Tab;
+  // The tab as it must be stored when it sleeps, with the Restore Command it runs now.
+  withRestoreCommand: (tab: TerminalTab) => Tab;
   updateTab: (workspaceId: string, tab: Tab) => void;
   finishAgent: (tabId: string) => void;
   // Title, agent and restore command of the tabs, read while their PTYs are still alive.
@@ -88,7 +88,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     try {
       // First, so the dialog stops watching the stores this call is about to change.
       d.setPending(null);
-      const kept = tabs.map((t) => d.withRunOnStart(t) as TerminalTab);
+      const kept = tabs.map((t) => d.withRestoreCommand(t) as TerminalTab);
       const snapshots = await d.snapshotTabs(kept);
       const current = d.getWorkspace(workspaceId);
       if (!current) return false;
@@ -206,13 +206,12 @@ export function useHibernateFlow(deps: HookDeps) {
           );
         },
         warnProcesses: () => usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
-        withRunOnStart: withLiveRunOnStart,
+        withRestoreCommand: withLiveRestoreCommand,
         updateTab: (workspaceId, saved) =>
           depsRef.current.updateTabData(workspaceId, saved.id, (t) =>
             t.kind === "terminal" && saved.kind === "terminal"
               ? {
                   ...t,
-                  restoreOnRestart: saved.restoreOnRestart,
                   persistentCommand: saved.persistentCommand,
                   persistentCommandManual: saved.persistentCommandManual,
                 }

@@ -47,8 +47,7 @@ type Props = {
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */
   blocks?: boolean;
-  /** "Run on start": resume the agent or run the saved command on first spawn. */
-  restoreOnRestart?: boolean;
+  /** Restore Command: resume the agent or run the saved command on first spawn. */
   persistentCommand?: string;
   /** Persisted scratchpad enabled flag, seeded on first mount. */
   initialScratchpadEnabled?: boolean;
@@ -67,7 +66,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused = true,
       initialCwd,
       blocks = false,
-      restoreOnRestart,
       persistentCommand,
       initialScratchpadEnabled,
       onSearchReady,
@@ -90,7 +88,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused,
       initialCwd,
       blocks,
-      restoreOnRestart,
       persistentCommand,
       initialScratchpadEnabled,
       onSearchReady: (a) => onSearchReady?.(tabId, a),

@@ -99,8 +99,8 @@ function reviewTerminal(
 }
 
 // An unattended hibernation must not take a terminal whose command would not come back on wake:
-// with the tab's Run on start explicitly off, or an agent with no stored session and no saved
-// command. Mirrors what useTerminalSession does on spawn.
+// an agent with no stored session and no saved command, or a process nothing remembers. Mirrors
+// what useTerminalSession does on spawn.
 export function staysBehind(
   tab: Extract<Tab, { kind: "terminal" }>,
   live: HibernateLive,
@@ -109,7 +109,6 @@ export function staysBehind(
   const agent = live.agentOf(tab.id);
   const command = processes.get(tab.id) ?? tab.persistentCommand ?? agent?.agent;
   if (!command) return false;
-  if (tab.restoreOnRestart === false) return true;
   return !(agent?.resumable === true || tab.persistentCommand);
 }
 

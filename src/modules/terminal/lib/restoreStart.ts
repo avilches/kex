@@ -16,7 +16,6 @@ export type StartDecision =
   | { kind: "blocked"; block: RestoreBlock };
 
 type StartInput = {
-  runOnStart: boolean;
   plan: RestorePlan | null;
   persistentCommand: string | undefined;
   initialCwd: string | undefined;
@@ -24,11 +23,10 @@ type StartInput = {
 
 // A saved command with no agent plan is the only start whose directory nobody has checked yet.
 export function needsDirCheck(i: StartInput): boolean {
-  return i.runOnStart && !i.plan && !!i.persistentCommand && !!i.initialCwd;
+  return !i.plan && !!i.persistentCommand && !!i.initialCwd;
 }
 
 export function decideStart(i: StartInput & { dirProblem: string | null }): StartDecision {
-  if (!i.runOnStart) return { kind: "spawn", cwd: i.initialCwd, inject: "none" };
   const { plan } = i;
   if (plan) {
     if (plan.errorReason) {

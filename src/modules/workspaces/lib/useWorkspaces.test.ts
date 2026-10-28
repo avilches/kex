@@ -362,16 +362,8 @@ describe("collectRunningTerminals", () => {
 });
 
 describe("needsResumePlanLookup", () => {
-  it("is true for a terminal tab with no explicit restoreOnRestart", () => {
+  it("is true for a terminal tab", () => {
     expect(needsResumePlanLookup({ id: "t1", kind: "terminal" })).toBe(true);
-  });
-
-  it("is true for a terminal tab with restoreOnRestart explicitly on", () => {
-    expect(needsResumePlanLookup({ id: "t1", kind: "terminal", restoreOnRestart: true })).toBe(true);
-  });
-
-  it("is false for a terminal tab with restoreOnRestart explicitly off", () => {
-    expect(needsResumePlanLookup({ id: "t1", kind: "terminal", restoreOnRestart: false })).toBe(false);
   });
 
   it("is false for non-terminal kinds", () => {
@@ -565,10 +557,9 @@ describe("applyMoveTabToWorkspace", () => {
 });
 
 describe("planWake", () => {
-  it("asks for a resume plan only on terminals that did not opt out of Run on start", () => {
+  it("asks for a resume plan only on terminals", () => {
     const tabs: Tab[] = [
       { id: "a", kind: "terminal" },
-      { id: "b", kind: "terminal", restoreOnRestart: false },
       { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
     ];
     expect(planWake(tabs)).toEqual(["a"]);
@@ -621,9 +612,9 @@ describe("seedWakePlans", () => {
     expect(seeded).toEqual([["a", plan]]);
   });
 
-  it("does not look up terminals that opted out", async () => {
+  it("does not look up tabs that are not terminals", async () => {
     const asked: string[] = [];
-    const tabs: Tab[] = [{ id: "a", kind: "terminal", restoreOnRestart: false }];
+    const tabs: Tab[] = [{ id: "a", kind: "browser", url: "https://example.com" }];
     await seedWakePlans(
       tabs,
       async (id) => {

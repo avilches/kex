@@ -8,7 +8,7 @@ type Fields = Pick<TerminalTab, "persistentCommand" | "persistentCommandManual">
 export const REPORTED_COMMAND_LIMIT = 256;
 
 /**
- * The command a tab can persist as Run on Start, from what the shell reports.
+ * The command a tab can persist as its Restore Command, from what the shell reports.
  * A running script reports its typed wrapper, so the script's own command
  * replaces it; a report as long as the hook's limit may be cut short and is
  * never followed.
@@ -22,34 +22,23 @@ export function followableCommand(
   return running;
 }
 
-/** Command to store when Run on Start is switched on; an agent tab never copies the running one. */
-export function commandOnEnable(
-  tab: Fields,
-  followable: string | null,
-  isAgent: boolean,
-): string | undefined {
-  return tab.persistentCommand ?? (isAgent ? undefined : (followable ?? undefined));
-}
-
-export function effectiveRunOnStartCommand(tab: Fields, running: string | null): string {
+export function effectiveRestoreCommand(tab: Fields, running: string | null): string {
   if (tab.persistentCommandManual) return tab.persistentCommand ?? "";
   return running ?? tab.persistentCommand ?? "";
 }
 
-/** Command a closed tab would run if its close is undone, or null when Run on Start is off or has nothing to run. */
+/** Command a closed tab would run if its close is undone, or null when it has nothing to run. */
 export function commandOnUndoClose(
-  tab: Fields & Pick<TerminalTab, "restoreOnRestart">,
+  tab: Fields,
   running: string | null,
   agentResumeCmd: string | null,
   isAgent: boolean,
 ): string | null {
-  const enabled = isAgent ? tab.restoreOnRestart !== false : (tab.restoreOnRestart ?? false);
-  if (!enabled) return null;
-  const command = isAgent && agentResumeCmd ? agentResumeCmd : effectiveRunOnStartCommand(tab, running);
+  const command = isAgent && agentResumeCmd ? agentResumeCmd : effectiveRestoreCommand(tab, running);
   return command || null;
 }
 
-export function commitRunOnStartEdit(value: string, running: string | null): Fields {
+export function commitRestoreCommandEdit(value: string, running: string | null): Fields {
   const v = value.trim();
   if (v) return { persistentCommand: v, persistentCommandManual: true };
   return { persistentCommand: running ?? undefined, persistentCommandManual: false };
