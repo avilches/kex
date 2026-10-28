@@ -16,6 +16,12 @@ export function tabWorktree(tab: Tab | null | undefined, live: string | null | u
   return live || (isHibernatedTab(tab) ? tab.hibernation.worktreeCwd : undefined) || null;
 }
 
+// The worktree to keep when a tab goes to sleep: the live session's, else the one the resume
+// plan read back from the agent's transcript.
+export function worktreeToKeep(live: string | null | undefined, planned: string | null | undefined): string | undefined {
+  return live || planned || undefined;
+}
+
 // A sleeping tab has no terminal behind it, so only what acts on a live terminal is
 // blocked; tab, pane, sidebar and explorer shortcuts work on it like on any other tab.
 const BLOCKED_PREFIXES = ["terminal."];

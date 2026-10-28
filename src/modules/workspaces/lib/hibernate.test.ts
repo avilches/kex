@@ -15,6 +15,7 @@ import {
   formatHibernatedFor,
   restoreCommandFor,
   tabWorktree,
+  worktreeToKeep,
   saveRestoreCommand,
   terminalTabs,
 } from "./hibernate";
@@ -163,6 +164,21 @@ describe("tabWorktree", () => {
     expect(tabWorktree(term("a"), null)).toBeNull();
     expect(tabWorktree(term("a", { hibernation: snap() } as Partial<Terminal>), undefined)).toBeNull();
     expect(tabWorktree(null, null)).toBeNull();
+  });
+});
+
+describe("worktreeToKeep", () => {
+  it("keeps the live session's worktree over the planned one", () => {
+    expect(worktreeToKeep("/w/live", "/w/plan")).toBe("/w/live");
+  });
+
+  it("falls back to the resume plan when the session has none", () => {
+    expect(worktreeToKeep(undefined, "/w/plan")).toBe("/w/plan");
+    expect(worktreeToKeep(null, "/w/plan")).toBe("/w/plan");
+  });
+
+  it("keeps nothing when neither knows a worktree", () => {
+    expect(worktreeToKeep(undefined, null)).toBeUndefined();
   });
 });
 

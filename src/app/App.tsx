@@ -2422,8 +2422,10 @@ export default function App() {
               )
             ) {
               focusSidebar(
-                useAgentStore.getState().sessions[tabId]?.meta?.worktreeCwd ??
-                  cwd,
+                tabWorktree(
+                  found.tab,
+                  useAgentStore.getState().sessions[tabId]?.meta?.worktreeCwd,
+                ) ?? cwd,
                 { fromShortcut: false },
               );
             }
