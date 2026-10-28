@@ -1,4 +1,3 @@
-import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { useMemo } from "react";
 import { IS_WINDOWS } from "@/lib/platform";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -17,7 +16,6 @@ import type { BarContext, FocusPlace } from "./actionsBar";
 export type ActionContext = {
   vars: Record<string, string>;
   shell: CommandShell;
-  hibernated: boolean;
   place: FocusPlace;
   folders: NonNullable<BarContext["folders"]>;
 };
@@ -36,14 +34,13 @@ export function useActionContext(
   // The focused tab owns the folder: a command that ends in it can have changed the branch.
   const info = useDirGit(dir, focused?.id);
   const vars = ws ? buildCommandVars(focused, ws, info, sys.host) : null;
-  const hibernated = isHibernatedTab(focused);
   const folders = {
     focusFolder: tabFolder(focused),
     workspaceRoot: ws?.workspaceRoot ?? null,
     workspaceCwd: ws?.cwd ?? null,
   };
   const key = vars
-    ? JSON.stringify([vars, envKind, hibernated, focused?.kind, focused && tabFilePath(focused), folders])
+    ? JSON.stringify([vars, envKind, focused?.kind, focused && tabFilePath(focused), folders])
     : null;
   return useMemo(
     () =>
@@ -51,7 +48,6 @@ export function useActionContext(
         ? {
             vars,
             shell: scriptShellFor(IS_WINDOWS, envKind),
-            hibernated,
             place: focusPlace(focused),
             folders,
           }
