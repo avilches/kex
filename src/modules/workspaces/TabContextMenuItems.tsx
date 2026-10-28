@@ -1,7 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
-  ArrowReloadHorizontalIcon,
   ArrowRight01Icon,
   Cancel01Icon,
   CancelCircleIcon,
@@ -112,12 +111,6 @@ export function TabContextMenuItems({
             Rename Tab
             <Shortcut id="tab.rename" />
           </ContextMenuItem>
-          {tab.title && (
-            <ContextMenuItem onSelect={() => onRenameTab(tab.id, undefined)}>
-              <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
-              Reset Tab Name
-            </ContextMenuItem>
-          )}
           {onUpdateTab && (
             <ContextMenuItem
               onSelect={() => {

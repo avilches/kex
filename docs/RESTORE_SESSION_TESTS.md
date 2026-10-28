@@ -295,7 +295,7 @@ El indicador va a la derecha del tab, sobre el boton de cerrar (que lo sustituye
 
 | Estado del agente | Indicador |
 |-------------------|-----------|
-| Trabajando | rueda (spinner), estilo `arc`, `braille` o `cursor` segun Settings > Appearance |
+| Trabajando | rueda (spinner), estilo `arc`, `cursor` u otros de solo CSS segun Settings > Appearance |
 | Esperando al usuario (permiso, pregunta o fin de turno) | punto ambar fijo de 6 px |
 | Restaurando la sesion | rueda |
 | Error de restore, o sesion interrumpida al cerrar Kex | punto rojo fijo de 6 px |
@@ -720,7 +720,7 @@ fichero /tmp/x`) con los permisos en modo "preguntar".
 
 - [ ] Mandar un prompt: el tab gira. Pulsar ESC una vez: deja de girar
 - [ ] Mandar un prompt que lance un subagente en segundo plano y esperar a que el agente principal termine su turno: el tab SIGUE girando y no sale el punto ambar hasta que acaba el subagente y llega su propio fin de turno
-- [ ] Cambiar Settings > Appearance > spinner (`arc`, `braille`, `cursor`): el tab cambia de rueda sin reiniciar
+- [ ] Cambiar Settings > Appearance > spinner (`arc`, `cursor`, `bar`, ...): el tab cambia de rueda sin reiniciar
 
 ### M7 Apagar los avisos
 

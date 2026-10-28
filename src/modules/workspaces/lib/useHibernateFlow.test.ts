@@ -49,20 +49,20 @@ describe("createHibernateFlow", () => {
     expect(calls).toContain("hibernate:t1");
   });
 
-  it("does not put a locked tab to sleep by hand, and still takes the others it was asked for", async () => {
+  it("puts a locked tab to sleep: the lock only stops closing", async () => {
     const { flow, calls } = setup(ws([term("t1", { locked: true }), term("t2")]));
     await flow.request("w1", ["t1", "t2"]);
-    expect(calls).toContain("hibernate:t2");
-    expect(isHibernating("t1")).toBe(false);
+    expect(calls).toContain("hibernate:t1,t2");
+    expect(isHibernating("t1")).toBe(true);
   });
 
-  it("does nothing at all when the only tab asked for is locked", async () => {
+  it("puts a locked tab to sleep when it is the only one asked for", async () => {
     const { flow, calls } = setup(ws([term("t1", { locked: true })]));
     await flow.request("w1", ["t1"]);
-    expect(calls).toEqual([]);
+    expect(calls).toContain("hibernate:t1");
   });
 
-  it("keeps hibernating a locked tab on its own when the automatic hibernation takes it", async () => {
+  it("also takes a locked tab on its own when the automatic hibernation chooses it", async () => {
     const { flow, calls } = setup(ws([term("t1", { locked: true })]));
     expect(await flow.requestAuto("w1", ["t1"])).toBe(true);
     expect(calls).toContain("hibernate:t1");

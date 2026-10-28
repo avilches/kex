@@ -109,7 +109,7 @@ export function TabItem({
             icon={SleepingIcon}
             size={12}
             strokeWidth={1.75}
-            className="text-muted-foreground"
+            className="opacity-40"
           />
         </span>
       ) : null}

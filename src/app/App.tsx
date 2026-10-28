@@ -196,7 +196,6 @@ import {
 } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { HibernateDialog } from "./components/HibernateDialog";
-import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
@@ -249,7 +248,6 @@ import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteS
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
-import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
@@ -288,7 +286,8 @@ import {
   displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
 import { isAutofocusActive } from "@/modules/workspaces/lib/types";
-import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
+import { pathBasename, pathDirname, toForwardSlashes } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
 // Same reference for every workspace whose nested list is closed, so the bar items stay stable.
@@ -353,7 +352,6 @@ export default function App() {
     setShowHidden,
     setWorkspaceSidebarView,
     setWorkspaceRoot,
-    clearWorkspaceRoot,
     setFsRoot,
     setWorkspaceTitle,
     setWorkspaceColor,
@@ -1008,6 +1006,14 @@ export default function App() {
     if (activeWorkspace)
       setShowHidden(activeWorkspace.id, !(activeWorkspace.showHidden ?? false));
   }, [activeWorkspace, setShowHidden]);
+
+  const pickWorkspaceRoot = useCallback(async () => {
+    if (!activeWorkspace) return;
+    const selected = await openFolderDialog({ directory: true });
+    if (typeof selected === "string") {
+      setWorkspaceRoot(activeWorkspace.id, toForwardSlashes(selected));
+    }
+  }, [activeWorkspace, setWorkspaceRoot]);
 
   const handleSetAsRoot = useCallback(
     (path: string) => {
@@ -2043,7 +2049,6 @@ export default function App() {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind !== "terminal") return;
       if (found.tab.hibernation) void wakeAndFocusTab(tabId);
-      else if (found.tab.locked) flashLockIcon(tabId);
       else void requestHibernate(found.workspace.id, [tabId]);
     },
     [findTabGlobal, wakeAndFocusTab, requestHibernate],
@@ -2944,16 +2949,6 @@ export default function App() {
         }
         if (activeWorkspaceId) store.startRename(activeWorkspaceId);
       },
-      "workspace.settings": () => {
-        if (activeWorkspaceId) {
-          const store = useWorkspaceSettingsStore.getState();
-          if (store.open && store.workspaceId === activeWorkspaceId) {
-            store.closeSettings();
-          } else {
-            store.openSettings(activeWorkspaceId);
-          }
-        }
-      },
       "tab.hibernate": () => {
         if (activeTabId) toggleTabHibernate(activeTabId);
       },
@@ -3245,15 +3240,6 @@ export default function App() {
         shortcutBlockedByPalette(
           id,
           openPaletteOf(commandPaletteOpenRef.current, folderPaletteOpenRef.current),
-        )
-      ) {
-        return true;
-      }
-      if (
-        id === "workspace.settings" &&
-        !useWorkspaceSettingsStore.getState().open &&
-        document.querySelector(
-          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
         )
       ) {
         return true;
@@ -3670,10 +3656,6 @@ export default function App() {
     async (tabId: string) => {
       const found = findTabGlobal(tabId);
       if (found?.tab.kind !== "terminal" || found.tab.hibernation) return;
-      if (found.tab.locked) {
-        flashLockIcon(tabId);
-        return;
-      }
       await requestHibernate(found.workspace.id, [tabId]);
     },
     [findTabGlobal, requestHibernate],
@@ -3685,10 +3667,6 @@ export default function App() {
   const onPaletteCloseAllTabs = useCallback(
     (workspaceId: string) => void closeAllTabsInWorkspace(workspaceId),
     [closeAllTabsInWorkspace],
-  );
-  const onPaletteWorkspaceSettings = useCallback(
-    (workspaceId: string) => useWorkspaceSettingsStore.getState().openSettings(workspaceId),
-    [],
   );
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {
@@ -3747,10 +3725,6 @@ export default function App() {
               if (activeTab && activeWorkspace)
                 updateTabData(activeWorkspace.id, activeTab.id, (p) => ({ ...p, title: undefined }));
             },
-            openWorkspaceProperties: () =>
-              useWorkspaceSettingsStore
-                .getState()
-                .openSettings(activeWorkspaceId),
             openActionsConfiguration: () => void openWorkspaceActionsSettings(),
             shortcutHandlers,
             isShortcutAvailable: (id) => !paletteShortcutUnavailable(id, shortcutContext),
@@ -3951,9 +3925,6 @@ export default function App() {
               onRename={(id, title) => setWorkspaceTitle(id, title)}
               onHibernate={hibernateAllInWorkspace}
               onWakeTab={(_workspaceId, tabId) => void wakeAndFocusTab(tabId)}
-              onOpenSettings={(id) =>
-                useWorkspaceSettingsStore.getState().openSettings(id)
-              }
               onSetColor={setWorkspaceColor}
               onSetIcon={setWorkspaceIcon}
               width={workspaceBarWidth}
@@ -4018,15 +3989,7 @@ export default function App() {
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
                         onFocusOnExplorer={tabCallbacks.onFocusOnExplorer}
-                        onOpenWorkspaceProperties={() =>
-                          useWorkspaceSettingsStore
-                            .getState()
-                            .openSettings(
-                              activeWorkspaceId,
-                              "properties",
-                              "workspaceRoot",
-                            )
-                        }
+                        onPickWorkspaceRoot={pickWorkspaceRoot}
                         onExplorerSearchClose={onExplorerSearchClose}
                         openFiles={openFiles}
                         workspaceCwd={explorerRoot}
@@ -4130,15 +4093,7 @@ export default function App() {
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
                         onFocusOnExplorer={tabCallbacks.onFocusOnExplorer}
-                        onOpenWorkspaceProperties={() =>
-                          useWorkspaceSettingsStore
-                            .getState()
-                            .openSettings(
-                              activeWorkspaceId,
-                              "properties",
-                              "workspaceRoot",
-                            )
-                        }
+                        onPickWorkspaceRoot={pickWorkspaceRoot}
                         onExplorerSearchClose={onExplorerSearchClose}
                         openFiles={openFiles}
                         workspaceCwd={explorerRoot}
@@ -4213,7 +4168,6 @@ export default function App() {
             onRenameWorkspace={onPaletteRenameWorkspace}
             onHibernateWorkspace={hibernateAllInWorkspace}
             onCloseAllTabs={onPaletteCloseAllTabs}
-            onOpenWorkspaceSettings={onPaletteWorkspaceSettings}
           />
 
           <FolderPalette
@@ -4234,18 +4188,6 @@ export default function App() {
           />
 
           <UpdaterDialog />
-
-          <WorkspaceSettingsDialog
-            workspaces={workspaces}
-            onSetTitle={setWorkspaceTitle}
-            onSetColor={setWorkspaceColor}
-            onSetIcon={setWorkspaceIcon}
-            onSetWorkspaceRoot={(id, path) => {
-              if (path !== undefined) setWorkspaceRoot(id, path);
-              else clearWorkspaceRoot(id);
-            }}
-            onRestoreFocus={restoreLeafFocus}
-          />
 
           <HibernateDialog
             workspace={

@@ -111,7 +111,6 @@ export type CommandPaletteActionContext = {
   closeOtherTabs: () => void;
   closeAllTabs: () => void;
   resetActiveTabTitle: () => void;
-  openWorkspaceProperties: () => void;
   openActionsConfiguration: () => void;
   shortcutHandlers: ShortcutHandlers;
   isShortcutAvailable: (id: ShortcutId) => boolean;
@@ -370,14 +369,6 @@ export function createCommandItems(
       icon: SidebarLeftIcon,
       shortcutId: "sidebar.toggle",
       run: ctx.toggleSidebar,
-    },
-    {
-      id: "workspace.properties",
-      title: "Workspace properties",
-      group: "General",
-      keywords: ["workspace", "settings", "name", "root", "properties", "configure"],
-      icon: Settings01Icon,
-      run: ctx.openWorkspaceProperties,
     },
     {
       id: "workspace.runScripts",

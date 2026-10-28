@@ -114,7 +114,8 @@ describe("spinnerStyle", () => {
 
   it("accepts only the known styles", () => {
     expect(parseSpinnerStyle("arc")).toBe("arc");
-    expect(parseSpinnerStyle("braille")).toBe("braille");
+    expect(parseSpinnerStyle("braille")).toBe("arc");
+    expect(parseSpinnerStyle("equalizer")).toBe("equalizer");
     expect(parseSpinnerStyle("cursor")).toBe("cursor");
     expect(parseSpinnerStyle("dots")).toBe("arc");
     expect(parseSpinnerStyle(undefined)).toBe("arc");

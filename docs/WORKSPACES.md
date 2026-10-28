@@ -390,6 +390,12 @@ sleeping terminal and any other kind of tab only have Close. This holds in the t
 list (`WorkspaceDetailList`). A middle click hibernates an awake terminal and closes anything else (`tabMiddleClick`), so
 a second click closes it. The context menu keeps Hibernate and Close as separate items and `tab.close` (Cmd+W) closes at once.
 
+The lock only stops closing. A locked awake terminal keeps its Hibernate button, with the padlock where the `×` would be, and
+hibernating it by any route (button, middle click, shortcut, menu, palette, "Hibernate all") works; a locked tab is never
+closed by a bulk close. The sleeping icon (`SleepingIcon`) takes the colour of the tab title and the same fade, so a
+hibernated tab reads as one dimmed unit; in the sidebar and in the palette, where the icon sits next to the dimmed row and
+not inside it, it carries its own `opacity-40`.
+
 Neither closing nor hibernating asks, except about a working agent (and, when closing a workspace, unsaved documents and
 Actions to delete). `closeQueue` asks only for an awake terminal with a working agent (`hasBusyAgent`); a sleeping one, an
 idle one and one with a foreground process close without a question.

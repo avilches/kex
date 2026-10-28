@@ -1,6 +1,7 @@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import {
   type AutofocusMode,
   setAutofocusMode,
@@ -18,6 +19,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
+  const focusShortcut = useShortcutLabel("tab.focusOnExplorer");
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const performanceProfiler = usePreferencesStore((s) => s.performanceProfiler);
@@ -54,10 +56,7 @@ export function GeneralSection() {
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[12.5px] font-medium">
-              Autofocus{"  "}
-              <span className="inline-flex translate-y-[2px] text-primary">
-                <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
-              </span>
+              Autofocus
             </span>
             <span className="text-[10.5px] leading-relaxed text-muted-foreground">
               Autofocus refreshes the explorer with the terminal current folder changes with <code className="font-mono">cd</code> commands.
@@ -88,7 +87,14 @@ export function GeneralSection() {
               <label htmlFor="autofocus-manual" className="cursor-pointer text-[12px]">
                 Manual{" "}
                 <span className="text-[10.5px] text-muted-foreground">
-                  Only the explorer crosshair button or F4 refresh it.
+                  Click on{" "}
+                  <HugeiconsIcon
+                    icon={CrosshairIcon}
+                    size={11}
+                    strokeWidth={2}
+                    className="inline-block -translate-y-px"
+                  />{" "}
+                  on explorer{focusShortcut ? ` or press ${focusShortcut}` : ""}.
                 </span>
               </label>
             </div>

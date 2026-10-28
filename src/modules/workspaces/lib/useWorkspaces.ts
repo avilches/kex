@@ -985,16 +985,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyWorkspaceRoot(prev, workspaceId, path));
   }, []);
 
-  const clearWorkspaceRoot = useCallback((workspaceId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) =>
-        w.id === workspaceId
-          ? { ...w, workspaceRoot: undefined, explorerRootMode: "filesystem" }
-          : w,
-      ),
-    );
-  }, []);
-
   const setFsRoot = useCallback((workspaceId: string, path: string) => {
     setWorkspaces((prev) => applyFsRoot(prev, workspaceId, path));
   }, []);
@@ -1235,7 +1225,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceSidebarView,
     applyExplorerSnapshotBatch,
     setWorkspaceRoot,
-    clearWorkspaceRoot,
     setFsRoot,
     setWorkspaceGitConfig,
     setWorkspaceTitle,

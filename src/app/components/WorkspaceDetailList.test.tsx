@@ -394,7 +394,44 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     return { container, rows, onWake, onActivate, unmount: track(root) };
   }
 
-  it("marks the sleeping row and keeps its lock and note; a locked row has neither hibernate nor close", () => {
+  function mountAwakeLocked(onToggleHibernate = vi.fn()) {
+    const locked = (t: Tab): Tab => (t.id === "t-work" ? ({ ...t, locked: true } as Tab) : t);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        createElement(
+          SidebarTabMenuProvider,
+          {
+            value: {
+              paneTabCount: () => 3,
+              onClose: vi.fn(),
+              onCloseOtherTabs: vi.fn(),
+              onRenameTab: vi.fn(),
+              onUpdateTab: vi.fn(),
+              onSaveTab: vi.fn(),
+              onToggleHibernate,
+              onRevealInExplorer: vi.fn(),
+              workspaceRoot: () => null,
+            },
+          },
+          createElement(WorkspaceDetailList, {
+            workspaceId: "ws-1",
+            tabs: tabs.filter((t) => t.id === "t-work").map(locked),
+            entries: [],
+            filter: { ...base },
+            focusedTabId: null,
+            onActivate: vi.fn(),
+            onWake: vi.fn(),
+          }),
+        ),
+      );
+    });
+    return { container, unmount: track(root) };
+  }
+
+  it("marks the sleeping row and keeps its lock and note; a locked sleeping row has neither hibernate nor close", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
@@ -402,6 +439,18 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
     expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
+    unmount();
+  });
+
+  it("a locked awake terminal can still be hibernated: the lock only replaces the close button", () => {
+    const onToggleHibernate = vi.fn();
+    const { container, unmount } = mountAwakeLocked(onToggleHibernate);
+    expect(container.querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Close tab"]')).toBeNull();
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Hibernate tab"]')!;
+    expect(button).not.toBeNull();
+    act(() => button.click());
+    expect(onToggleHibernate).toHaveBeenCalledWith("t-work");
     unmount();
   });
 
@@ -442,8 +491,10 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     const onActivate = vi.fn();
     const { container, unmount } = mountAsleep(onWake, onActivate, vi.fn(), false);
     const button = container.querySelector<HTMLButtonElement>('button[aria-label="Restore tab"]')!;
-    expect(button.className).toContain("opacity-0");
-    expect(button.className).toContain("group-hover/tab:opacity-100");
+    expect(button.className).not.toContain("opacity-0");
+    const [sleeping, arrow] = Array.from(button.querySelectorAll("svg"));
+    expect(sleeping!.getAttribute("class")).toContain("group-hover/tab:hidden");
+    expect(arrow!.getAttribute("class")).toContain("group-hover/tab:block");
     act(() => button.click());
     expect(onWake).toHaveBeenCalledTimes(1);
     expect(onActivate).not.toHaveBeenCalled();

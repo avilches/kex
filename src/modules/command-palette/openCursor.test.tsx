@@ -171,7 +171,6 @@ const Harness: FunctionComponent<{ tabs?: TabEntry[]; activeTabId?: string | nul
       onRenameWorkspace={() => {}}
       onHibernateWorkspace={() => {}}
       onCloseAllTabs={() => {}}
-      onOpenWorkspaceSettings={() => {}}
     />
   );
 };

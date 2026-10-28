@@ -106,16 +106,13 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     }
   }
 
-  // A tab the user locked is not put to sleep by hand, as it is not closed by hand. The automatic
-  // hibernation is the user's own setting and keeps taking them.
   async function request(workspaceId: string, tabIds: readonly string[]): Promise<void> {
     const ws = d.getWorkspace(workspaceId);
     if (!ws) return;
-    const tabs = awake(ws, tabIds).filter((t) => !t.locked);
+    const tabs = awake(ws, tabIds);
     if (tabs.length === 0) return;
-    const allowed = tabs.map((t) => t.id);
     if (!needsConfirmation(tabsReview(tabs, d.live(ws)))) {
-      await perform(workspaceId, allowed);
+      await perform(workspaceId, tabIds);
       return;
     }
     d.setPending({ workspaceId, tabIds: tabs.map((t) => t.id) });

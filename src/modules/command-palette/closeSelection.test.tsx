@@ -114,7 +114,6 @@ function Harness({
       onRenameWorkspace={() => {}}
       onHibernateWorkspace={() => {}}
       onCloseAllTabs={() => {}}
-      onOpenWorkspaceSettings={() => {}}
     />
   );
 }

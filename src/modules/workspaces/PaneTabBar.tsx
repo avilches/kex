@@ -248,7 +248,13 @@ function DraggableTab({
       title={tooltip.title}
       onPointerEnter={tooltip.onPointerEnter}
       onClick={() => onActivate(tab.id)}
-      onDoubleClick={sleeping ? () => onWake?.(tab.id) : undefined}
+      onDoubleClick={
+        sleeping
+          ? () => onWake?.(tab.id)
+          : onRenameTab
+            ? () => useTabRenameStore.getState().startRename(tab.id, "pane")
+            : undefined
+      }
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault();
         // This div is draggable (dnd-kit's useDraggable sets tabIndex=0), so
@@ -375,9 +381,24 @@ function DraggableTab({
       {isLocked ? (
         <>
         {sleeping && (
-          <span className="ml-0.5 shrink-0 text-muted-foreground" title="Hibernated: double click to restore">
+          <span className="ml-0.5 shrink-0" title="Hibernated: double click to restore">
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
           </span>
+        )}
+        {canHibernate && (
+          <button
+            type="button"
+            className="ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleHibernate(tab.id);
+            }}
+            title="Hibernate tab"
+            aria-label="Hibernate tab"
+          >
+            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+          </button>
         )}
         <button
           type="button"
@@ -398,7 +419,7 @@ function DraggableTab({
         <span className={cn("relative ml-0.5 flex h-[16px] shrink-0 items-center justify-center", canHibernate ? "w-[34px] gap-0.5" : "w-[16px]")}>
           {sleeping && (
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground transition-opacity group-hover:opacity-0"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0"
               title="Hibernated: double click to restore"
             >
               <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />

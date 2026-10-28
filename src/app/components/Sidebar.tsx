@@ -80,7 +80,7 @@ export type SidebarProps = {
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
-  onOpenWorkspaceProperties?: () => void;
+  onPickWorkspaceRoot?: () => void;
   onExplorerSearchClose?: () => void;
   openFiles: ReadonlySet<string>;
   // SourceControlPanel props
@@ -202,7 +202,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onRevealInTerminal={props.onRevealInTerminal}
               onNewWorkspaceFromFolder={props.onNewWorkspaceFromFolder}
               onAddToGitignore={props.onAddToGitignore}
-              onOpenWorkspaceProperties={props.onOpenWorkspaceProperties}
+              onPickWorkspaceRoot={props.onPickWorkspaceRoot}
               gitStatus={props.sourceControl.status}
               onSearchClose={props.onExplorerSearchClose}
               openFiles={props.openFiles}

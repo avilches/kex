@@ -86,7 +86,6 @@ const PaletteHarness: FunctionComponent<{
       onRenameWorkspace={noop}
       onHibernateWorkspace={noop}
       onCloseAllTabs={noop}
-      onOpenWorkspaceSettings={noop}
     />
   );
 }

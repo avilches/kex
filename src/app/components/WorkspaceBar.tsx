@@ -33,7 +33,6 @@ import {
   Image01Icon,
   PaintBoardIcon,
   PencilEdit01Icon,
-  Settings01Icon,
   SleepingIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -91,6 +90,7 @@ import {
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
+import { RenameInput } from "@/modules/workspaces/RenameInput";
 import { RenameTemplates } from "@/modules/workspaces/RenameTemplates";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
@@ -135,7 +135,6 @@ export type WorkspaceBarProps = {
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
   onWakeTab?: (workspaceId: string, tabId: string) => void;
-  onOpenSettings: (id: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
   width: number;
@@ -170,7 +169,6 @@ function SortableWorkspaceItem({
   onRename,
   onHibernate,
   onWakeTab,
-  onOpenSettings,
   onSetColor,
   onSetIcon,
   onSetGroup,
@@ -193,7 +191,6 @@ function SortableWorkspaceItem({
   onRename: (id: string, newTitle: string) => void;
   onHibernate?: (id: string) => void;
   onWakeTab?: (workspaceId: string, tabId: string) => void;
-  onOpenSettings: (id: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
   onSetGroup: (id: string, groupId: string | null) => void;
@@ -248,7 +245,6 @@ function SortableWorkspaceItem({
 
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
   const renameLabel = getShortcutLabel("workspace.rename", shortcuts);
-  const settingsLabel = getShortcutLabel("workspace.settings", shortcuts);
   const closeLabel = getShortcutLabel("workspace.close", shortcuts);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -398,7 +394,7 @@ function SortableWorkspaceItem({
             if (active) onRestoreFocus();
             else onSelect(ws.id);
           }}
-          onDoubleClick={() => onOpenSettings(ws.id)}
+          onDoubleClick={() => startRename(ws.id)}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             compact
@@ -618,14 +614,6 @@ function SortableWorkspaceItem({
               )}
             </ContextMenuItem>
           )}
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onOpenSettings(ws.id)}>
-            <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={2} />
-            Properties
-            {settingsLabel && (
-              <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>
-            )}
-          </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       <PopoverContent
@@ -637,8 +625,9 @@ function SortableWorkspaceItem({
         onEscapeKeyDown={handleCancel}
       >
         <span className="px-0.5 text-[12px] text-muted-foreground">Rename workspace</span>
-        <input
-          ref={inputRef}
+        <RenameInput
+          inputRef={inputRef}
+          onCleared={() => setTitleDraft(ws.id, "")}
           type="text"
           defaultValue={ws.title}
           onChange={(e) => setTitleDraft(ws.id, e.target.value)}
@@ -983,7 +972,6 @@ export function WorkspaceBar({
   onRename,
   onHibernate,
   onWakeTab,
-  onOpenSettings,
   onSetColor,
   onSetIcon,
   width,
@@ -1253,7 +1241,6 @@ export function WorkspaceBar({
                                 onRename={onRename}
                                 onHibernate={onHibernate}
                                 onWakeTab={onWakeTab}
-                                onOpenSettings={onOpenSettings}
                                 onSetColor={onSetColor}
                                 onSetIcon={onSetIcon}
                                 onSetGroup={onSetGroup}
@@ -1288,7 +1275,6 @@ export function WorkspaceBar({
                                 onRename={onRename}
                                 onHibernate={onHibernate}
                                 onWakeTab={onWakeTab}
-                                onOpenSettings={onOpenSettings}
                                 onSetColor={onSetColor}
                                 onSetIcon={onSetIcon}
                                 onSetGroup={onSetGroup}

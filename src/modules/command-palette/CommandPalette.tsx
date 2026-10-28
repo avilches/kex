@@ -119,7 +119,6 @@ type Props = {
   onRenameWorkspace: (workspaceId: string) => void;
   onHibernateWorkspace: (workspaceId: string) => void;
   onCloseAllTabs: (workspaceId: string) => void;
-  onOpenWorkspaceSettings: (workspaceId: string) => void;
 };
 
 /** The tab "Move tab to workspace" moves: the highlighted row's, or the active one's for the command. */
@@ -174,7 +173,6 @@ export function CommandPalette({
   onRenameWorkspace,
   onHibernateWorkspace,
   onCloseAllTabs,
-  onOpenWorkspaceSettings,
 }: Props) {
   const [query, setQuery] = useState("");
   const barModel = useActionsBarModel({ workspace: open ? actionsWorkspace : null });
@@ -623,8 +621,6 @@ export function CommandPalette({
         runAfterClose(() => onHibernateWorkspace(entry.workspaceId));
       } else if (id === "closeTabs") {
         runAfterClose(() => onCloseAllTabs(entry.workspaceId));
-      } else if (id === "settings") {
-        runAfterClose(() => onOpenWorkspaceSettings(entry.workspaceId));
       } else if (id === "closeWorkspace") {
         closeWorkspaceFromRow(entry.workspaceId, workspaceRowKey(entry.workspaceId));
       }
@@ -638,7 +634,6 @@ export function CommandPalette({
       onRenameWorkspace,
       onHibernateWorkspace,
       onCloseAllTabs,
-      onOpenWorkspaceSettings,
       closeWorkspaceFromRow,
     ],
   );
@@ -929,7 +924,9 @@ export function CommandPalette({
         shouldFilter={false}
         loop
         value={value}
-        onValueChange={setValue}
+        onValueChange={(next) => {
+          if (open) setValue(next);
+        }}
         onKeyDown={onKeyDown}
       >
         <CommandInput
