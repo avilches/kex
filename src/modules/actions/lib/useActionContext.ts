@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { IS_WINDOWS } from "@/lib/platform";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
+import { tabWorktree } from "@/modules/workspaces/lib/hibernate";
 import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
@@ -28,7 +29,8 @@ export function useActionContext(
   const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
   const tab = ws ? focusedTab(ws.paneTree, ws.activePaneId) : null;
-  const worktree = useAgentStore((s) => (tab ? (s.sessions[tab.id]?.meta?.worktreeCwd ?? null) : null));
+  const liveWorktree = useAgentStore((s) => (tab ? (s.sessions[tab.id]?.meta?.worktreeCwd ?? null) : null));
+  const worktree = tabWorktree(tab, liveWorktree);
   const focused = useMemo(() => inWorktree(tab, worktree), [tab, worktree]);
   const dir = ws ? workspaceDir(ws, focused) : undefined;
   // The focused tab owns the folder: a command that ends in it can have changed the branch.

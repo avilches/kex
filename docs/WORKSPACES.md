@@ -282,6 +282,10 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   commands (`commandBlockedWhileHibernated`, reason "Tab hibernated", plus `history.open`). The native menu has nothing to
   grey out: `sync_menu` no longer receives a hibernated flag. Actions are never blocked by a sleeping focused tab: it keeps
   its `cwd`, so `{cwd}`, `{dir}`, `{branch}`, `{repo}` and Run in folder = Current folder still have a value.
+  When an agent had entered a worktree, the tab stands in it while asleep exactly as while awake (`tabWorktree` in
+  `lib/hibernate.ts`: the live session's worktree, else the one kept in `hibernation.worktreeCwd`), for Actions, the tab
+  tooltip, Copy Path and the Sidebar. The shell itself still starts in `Tab.cwd`, the original folder, and the resumed
+  agent re-enters the worktree on its own.
 - **Run on a sleeping tab.** A script whose linked tab is asleep (`LinkedTab.sleeping`): if the tab would come back as a
   bare shell (no agent and no restore command in its `hibernation`) `planActionRun` plans a `reuse-tab` with `wake: true` and
   the runner wakes it (`wakeTab`) before typing the command; if it would come back running something (Restore Command
@@ -310,8 +314,8 @@ testable without React):
    through `withLiveRestoreCommand`), so the wake brings back what was running (see "The Restore Command is always saved"
    below).
 2. `performHibernate` clears the pending request, stores the Restore Command on each tab (`withRestoreCommand`) and takes the
-   snapshots from those tabs (`snapshotTerminalTabs`: title, agent and restore
-   command of each tab, read while the PTYs are alive, after flushing the agent titles and the Sidebar snapshots). Then,
+   snapshots from those tabs (`snapshotTerminalTabs`: title, agent, restore
+   command and the worktree the agent had entered (`worktreeCwd`) of each tab, read while the PTYs are alive, after flushing the agent titles and the Sidebar snapshots). Then,
    with no await left, it rechecks (for the automatic path: the tab is still hidden, not busy and has nothing to lose),
    marks the tabs with `markHibernating` (so the exit of their PTYs is not reported as an agent failure), writes the stored
    Restore Command to the tabs (`updateTab`), calls `finish` on

@@ -14,6 +14,8 @@ import {
   workspaceDialogPending,
   formatHibernatedFor,
   restoreCommandFor,
+  tabWorktree,
+  worktreeToKeep,
   saveRestoreCommand,
   terminalTabs,
 } from "./hibernate";
@@ -144,6 +146,39 @@ describe("isHibernatedTab", () => {
     expect(isHibernatedTab(editor("e", false))).toBe(false);
     expect(isHibernatedTab(null)).toBe(false);
     expect(isHibernatedTab(undefined)).toBe(false);
+  });
+});
+
+describe("tabWorktree", () => {
+  const asleep = term("a", { hibernation: snap({ worktreeCwd: "/repo/.claude/worktrees/x" }) } as Partial<Terminal>);
+
+  it("prefers the live session's worktree", () => {
+    expect(tabWorktree(asleep, "/repo/.claude/worktrees/y")).toBe("/repo/.claude/worktrees/y");
+  });
+
+  it("falls back to the one kept when the tab went to sleep", () => {
+    expect(tabWorktree(asleep, null)).toBe("/repo/.claude/worktrees/x");
+  });
+
+  it("is null for an awake tab without a session, and for a sleeping one that kept none", () => {
+    expect(tabWorktree(term("a"), null)).toBeNull();
+    expect(tabWorktree(term("a", { hibernation: snap() } as Partial<Terminal>), undefined)).toBeNull();
+    expect(tabWorktree(null, null)).toBeNull();
+  });
+});
+
+describe("worktreeToKeep", () => {
+  it("keeps the live session's worktree over the planned one", () => {
+    expect(worktreeToKeep("/w/live", "/w/plan")).toBe("/w/live");
+  });
+
+  it("falls back to the resume plan when the session has none", () => {
+    expect(worktreeToKeep(undefined, "/w/plan")).toBe("/w/plan");
+    expect(worktreeToKeep(null, "/w/plan")).toBe("/w/plan");
+  });
+
+  it("keeps nothing when neither knows a worktree", () => {
+    expect(worktreeToKeep(undefined, null)).toBeUndefined();
   });
 });
 

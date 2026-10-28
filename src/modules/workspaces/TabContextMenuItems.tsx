@@ -1,3 +1,4 @@
+import { tabWorktree } from "./lib/hibernate";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
@@ -79,7 +80,8 @@ export function TabContextMenuItems({
   const isLocked = tab.locked ?? false;
   const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
   const focusFilePath = tabFilePath(tab);
-  const worktree = useAgentStore((s) => s.sessions[tab.id]?.meta?.worktreeCwd ?? null);
+  const liveWorktree = useAgentStore((s) => s.sessions[tab.id]?.meta?.worktreeCwd ?? null);
+  const worktree = tabWorktree(tab, liveWorktree);
   const restoreCommand =
     tab.kind === "terminal" && onUpdateTab ? (
       <RestoreCommandMenu tab={tab} onUpdateTab={onUpdateTab} />

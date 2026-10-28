@@ -19,6 +19,10 @@ describe("tabTooltipDir", () => {
   it("falls back to the cwd when the agent has no worktree", () => {
     expect(tabTooltipDir(terminal, agent())).toBe("/work/app");
   });
+  it("keeps the worktree of a sleeping tab, whose agent session is gone", () => {
+    const asleep = { ...terminal, hibernation: { at: 1, worktreeCwd: "/work/app/.claude/worktrees/x" } } as Tab;
+    expect(tabTooltipDir(asleep, undefined)).toBe("/work/app/.claude/worktrees/x");
+  });
   it("has no directory for non-terminal tabs", () => {
     expect(tabTooltipDir(editor, undefined)).toBeUndefined();
   });

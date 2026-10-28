@@ -3,7 +3,7 @@ import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hiberna
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { awakeTerminalTabs, restoreCommandFor } from "./hibernate";
+import { awakeTerminalTabs, restoreCommandFor, worktreeToKeep } from "./hibernate";
 import { HIBERNATE_LINES_MAX, prepareHibernateScreen, type LeafScreen } from "./hibernateLines";
 import { saveHibernateLines } from "./hibernateLinesIo";
 import { flushAgentTitles } from "./agentTitleSync";
@@ -159,7 +159,7 @@ async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
     tabs.map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab) }];
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd) }];
     }),
   );
   return Object.fromEntries(entries);

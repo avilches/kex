@@ -1,4 +1,5 @@
 import { pathDirname } from "@/lib/pathUtils";
+import { tabWorktree } from "./hibernate";
 import type { Tab } from "./types";
 
 const ABSOLUTE = /^([A-Za-z]:|\/|\\)/;
@@ -29,7 +30,7 @@ export function tabFilePath(tab: Tab): string | null {
 // What "Copy Path" puts on the clipboard: the folder a terminal is working in (the worktree
 // its agent entered wins over the shell cwd) or the file a tab shows.
 export function tabCopyPath(tab: Tab, agentWorktree: string | null): string | null {
-  if (tab.kind === "terminal") return agentWorktree ?? tab.cwd ?? null;
+  if (tab.kind === "terminal") return tabWorktree(tab, agentWorktree) ?? tab.cwd ?? null;
   return tabFilePath(tab);
 }
 
