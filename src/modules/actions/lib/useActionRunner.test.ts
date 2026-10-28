@@ -202,6 +202,14 @@ describe("useActionRunner", () => {
     expect(getActionTab(app.id)).toBeUndefined();
   });
 
+  it("runs an Action on the worktree a sleeping focused tab kept, not on its shell folder", () => {
+    const asleep: Tab = { id: "tab-user", kind: "terminal", cwd: "/w", hibernation: { at: 1, worktreeCwd: "/w/.claude/worktrees/x" } };
+    const { result } = setup(ws({ paneTree: { kind: "pane", id: "p1", tabs: [asleep], activeTabId: "tab-user" } }));
+    const here: Action = { id: "ac-c", name: "Code here", kind: "app", command: "code {cwd}", ownButton: true };
+    act(() => result.current.runAction(here));
+    expect(spawn).toHaveBeenCalledWith(["code", "/w/.claude/worktrees/x"], "/w");
+  });
+
   it("tells the user why an Action did not run", () => {
     const { result } = setup(ws({ workspaceRoot: undefined }));
     act(() => result.current.runAction(app));

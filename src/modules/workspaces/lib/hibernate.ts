@@ -9,6 +9,13 @@ export function isHibernatedTab(tab: Tab | null | undefined): tab is SleepingTab
   return tab?.kind === "terminal" && tab.hibernation !== undefined;
 }
 
+// The worktree an agent works in for this tab: the live session's while it runs, the one kept
+// when the tab went to sleep otherwise. The shell itself keeps starting in `tab.cwd`; the
+// resumed agent re-enters the worktree on its own.
+export function tabWorktree(tab: Tab | null | undefined, live: string | null | undefined): string | null {
+  return live || (isHibernatedTab(tab) ? tab.hibernation.worktreeCwd : undefined) || null;
+}
+
 // A sleeping tab has no terminal behind it, so only what acts on a live terminal is
 // blocked; tab, pane, sidebar and explorer shortcuts work on it like on any other tab.
 const BLOCKED_PREFIXES = ["terminal."];

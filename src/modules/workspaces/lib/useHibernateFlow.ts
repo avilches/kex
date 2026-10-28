@@ -159,7 +159,7 @@ async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
     tabs.map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab) }];
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab), worktreeCwd: session?.meta?.worktreeCwd }];
     }),
   );
   return Object.fromEntries(entries);

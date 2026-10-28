@@ -84,6 +84,11 @@ describe("tabCopyPath", () => {
     );
   });
 
+  it("copies the worktree kept by a sleeping terminal", () => {
+    const asleep: Tab = { ...terminal, hibernation: { at: 1, worktreeCwd: "/repo/.claude/worktrees/x" } };
+    expect(tabCopyPath(asleep, null)).toBe("/repo/.claude/worktrees/x");
+  });
+
   it("has nothing to copy for a terminal without a cwd", () => {
     expect(tabCopyPath({ id: "1", kind: "terminal" }, null)).toBeNull();
   });

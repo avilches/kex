@@ -14,6 +14,7 @@ import {
   awakeTerminalTabs,
   isPendingStale,
   terminalTabs,
+  tabWorktree,
 } from "@/modules/workspaces/lib/hibernate";
 import { tabDisplayTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
@@ -1072,9 +1073,10 @@ export default function App() {
 
   // Worktree an agent has entered in the active tab; the sidebar follows it
   // instead of the shell cwd (which stays put) until the agent leaves.
-  const agentWorktree = useAgentStore((s) =>
+  const liveAgentWorktree = useAgentStore((s) =>
     activeTabId ? (s.sessions[activeTabId]?.meta?.worktreeCwd ?? null) : null,
   );
+  const agentWorktree = tabWorktree(activeTab, liveAgentWorktree);
   scriptFocusFolderRef.current = agentWorktree ?? contextCwdRef.current;
 
   const focusSidebar = useCallback(

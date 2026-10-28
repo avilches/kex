@@ -21,7 +21,7 @@ import {
 import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
 import { buildCommandVars, inWorktree } from "./commandVars";
-import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { isHibernatedTab, tabWorktree } from "@/modules/workspaces/lib/hibernate";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
@@ -116,7 +116,7 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
 
 function focusedOf(ws: Workspace): Tab | null {
   const tab = focusedTab(ws.paneTree, ws.activePaneId);
-  return inWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null);
+  return inWorktree(tab, tabWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null));
 }
 
 function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
