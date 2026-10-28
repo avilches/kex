@@ -133,14 +133,12 @@ describe("WorkspaceDetailList", () => {
 });
 
 describe("WorkspaceDetailList row controls", () => {
-  it("renders a hibernate and a close control for every awake terminal, as real buttons beside the row, reachable by keyboard", () => {
+  it("renders a close control for every awake terminal, as a real button beside the row, reachable by keyboard, and no hibernate control", () => {
     const { container, rows, unmount } = mount({ terminals: "all" });
-    const close = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Hibernate tab"]');
-    expect(close).toHaveLength(4);
+    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]')).toHaveLength(0);
     const closeButtons = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Close tab"]');
     expect(closeButtons).toHaveLength(4);
-    for (const c of closeButtons) expect(c.tabIndex).toBe(0);
-    for (const c of close) {
+    for (const c of closeButtons) {
       expect(c.tabIndex).toBe(0);
       expect(rows().some((r) => r.contains(c))).toBe(false);
     }
@@ -251,7 +249,7 @@ describe("WorkspaceDetailList subagents", () => {
     const block = wrap(rows()[0]).parentElement as HTMLElement;
     expect(block.className).toContain("hover:bg-foreground");
     expect(block.contains(sub)).toBe(true);
-    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]')).toHaveLength(4);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(4);
     unmount();
   });
 });
@@ -431,33 +429,35 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     return { container, unmount: track(root) };
   }
 
-  it("marks the sleeping row and keeps its lock and note; a locked sleeping row has neither hibernate nor close", () => {
+  it("marks the sleeping row and keeps its lock and note; a locked sleeping row shows the sleeping mark and has neither hibernate nor close", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
     expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
-    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
+    expect(wrap(sleepingRow).querySelector("[data-sleeping-mark]")).not.toBeNull();
+    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(0);
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
     unmount();
   });
 
-  it("a locked awake terminal can still be hibernated: the lock only replaces the close button", () => {
-    const onToggleHibernate = vi.fn();
-    const { container, unmount } = mountAwakeLocked(onToggleHibernate);
+  it("a locked awake terminal only has the unlock button: no close, no hibernate, no sleeping mark", () => {
+    const { container, unmount } = mountAwakeLocked(vi.fn());
     expect(container.querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(container.querySelector('button[aria-label="Close tab"]')).toBeNull();
-    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Hibernate tab"]')!;
-    expect(button).not.toBeNull();
-    act(() => button.click());
-    expect(onToggleHibernate).toHaveBeenCalledWith("t-work");
+    expect(container.querySelector('button[aria-label="Hibernate tab"]')).toBeNull();
+    expect(container.querySelector("[data-sleeping-mark]")).toBeNull();
     unmount();
   });
 
-  it("an unlocked sleeping row only has the X, while the awake ones have both buttons", () => {
-    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+  it("an unlocked sleeping row shows the dimmed sleeping mark where the X is and the X replaces it on hover", () => {
+    const { container, rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(4);
-    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
+    const mark = wrap(sleepingRow).querySelector("[data-sleeping-mark]")!;
+    expect(mark.className).toContain("opacity-40");
+    expect(mark.className).toContain("group-hover/tab:opacity-0");
+    expect(container.querySelectorAll("[data-sleeping-mark]").length).toBe(1);
     unmount();
   });
 
@@ -475,29 +475,9 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     unmount();
   });
 
-  it("the hibernate control of an awake row hibernates it without activating the row", () => {
-    const onToggleHibernate = vi.fn();
-    const onActivate = vi.fn();
-    const { container, unmount } = mountAsleep(vi.fn(), onActivate, onToggleHibernate, false);
-    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Hibernate tab"]')!;
-    act(() => button.click());
-    expect(onToggleHibernate).toHaveBeenCalledTimes(1);
-    expect(onActivate).not.toHaveBeenCalled();
-    unmount();
-  });
-
-  it("a sleeping row has a restore button that wakes it without activating the row", () => {
-    const onWake = vi.fn();
-    const onActivate = vi.fn();
-    const { container, unmount } = mountAsleep(onWake, onActivate, vi.fn(), false);
-    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Restore tab"]')!;
-    expect(button.className).not.toContain("opacity-0");
-    const [sleeping, arrow] = Array.from(button.querySelectorAll("svg"));
-    expect(sleeping!.getAttribute("class")).toContain("group-hover/tab:hidden");
-    expect(arrow!.getAttribute("class")).toContain("group-hover/tab:block");
-    act(() => button.click());
-    expect(onWake).toHaveBeenCalledTimes(1);
-    expect(onActivate).not.toHaveBeenCalled();
+  it("a sleeping row has no restore button", () => {
+    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    expect(container.querySelector('button[aria-label="Restore tab"]')).toBeNull();
     unmount();
   });
 

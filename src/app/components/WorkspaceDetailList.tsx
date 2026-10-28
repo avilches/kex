@@ -4,7 +4,7 @@ import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CircleArrowUpIcon, LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -22,7 +22,7 @@ import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
-import { tabEndButtons, tabMiddleClick } from "@/modules/workspaces/lib/tabCloseControl";
+import { tabMiddleClick } from "@/modules/workspaces/lib/tabCloseControl";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { noteSurfaceKind } from "@/modules/theme/noteSurface";
@@ -192,7 +192,6 @@ function DetailTabRow({
   const title = info?.displayTitle ?? tab.id;
   const { onRenameTab, onClose, onUpdateTab, onToggleHibernate } = useSidebarTabMenu();
   const hibernated = isHibernatedTab(tab);
-  const canHibernate = tabEndButtons(tab).includes("hibernate");
   const agent = hibernated ? tab.hibernation.agent : info?.hasAgent ? info.agentSession?.agent : undefined;
   const isLocked = tab.locked ?? false;
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
@@ -331,7 +330,6 @@ function DetailTabRow({
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
-              {hibernated && onWake && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
@@ -364,32 +362,12 @@ function DetailTabRow({
           <HugeiconsIcon icon={StickyNote03Icon} size={13} strokeWidth={2} />
         </button>
       )}
-      {hibernated && onWake && (
-        <button
-          type="button"
-          title="Hibernated: click to restore"
-          aria-label="Restore tab"
-          style={{ right: 26 + (hasNote ? 20 : 0) }}
-          className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring group/wake group-hover/tab:text-foreground", hoverBg)}
-          onClick={onWake}
-        >
-          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40 group-hover/tab:hidden group-focus-visible/wake:hidden" />
-          <HugeiconsIcon icon={CircleArrowUpIcon} size={12} strokeWidth={1.75} className="hidden group-hover/tab:block group-focus-visible/wake:block" />
-        </button>
-      )}
       {isLocked ? (
         <>
-        {canHibernate && (
-          <button
-            type="button"
-            title="Hibernate tab"
-            aria-label="Hibernate tab"
-            style={{ right: 26 + (hasNote ? 20 : 0) }}
-            className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
-            onClick={() => onToggleHibernate(tab.id)}
-          >
+        {hibernated && (
+          <span aria-hidden data-sleeping-mark="" className="pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center opacity-40" style={{ right: 26 + (hasNote ? 20 : 0) }}>
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-          </button>
+          </span>
         )}
         <button
           type="button"
@@ -403,22 +381,16 @@ function DetailTabRow({
         </>
             ) : (
         <>
-          {visual !== null && (
-            <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
-              <StatusMark visual={visual} />
-            </span>
-          )}
-          {canHibernate && (
-            <button
-              type="button"
-              title="Hibernate tab"
-              aria-label="Hibernate tab"
-              style={{ right: 26 + (hasNote ? 20 : 0) }}
-              className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-focus-within/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
-              onClick={() => onToggleHibernate(tab.id)}
-            >
+          {hibernated ? (
+            <span aria-hidden data-sleeping-mark="" className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center opacity-40 transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
               <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-            </button>
+            </span>
+          ) : (
+            visual !== null && (
+              <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
+                <StatusMark visual={visual} />
+              </span>
+            )
           )}
           <button
             type="button"
