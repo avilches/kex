@@ -3,6 +3,7 @@ import { StartTrimmed } from "@/components/StartTrimmed";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts";
+import { alertDialogOpen } from "./lib/keepPaletteFocus";
 import {
   Add01Icon,
   ArrowReloadHorizontalIcon,
@@ -156,7 +157,7 @@ export function useRowMenu() {
   useEffect(() => {
     if (!isOpen) return;
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || alertDialogOpen()) return;
       e.preventDefault();
       e.stopPropagation();
       if (inSubmenu) back();
