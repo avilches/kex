@@ -248,7 +248,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           />
           <div className="relative min-h-0 flex-1">
             {isHibernatedTab(tab) ? (
-              <HibernatedTab tab={tab} visible={visible} onWake={() => callbacks.onWakeTab?.(tab.id)} />
+              <HibernatedTab tab={tab} visible={visible} focused={focused} onWake={() => callbacks.onWakeTab?.(tab.id)} />
             ) : (
             <TerminalPane
               ref={(h) => {
