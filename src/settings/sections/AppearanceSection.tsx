@@ -64,8 +64,15 @@ function fromSelectValue(selectValue: string): string {
 
 const SPINNER_STYLE_LABELS: Record<SpinnerStyle, string> = {
   arc: "Arc",
-  braille: "Braille",
   cursor: "Cursor",
+  bar: "Bar",
+  equalizer: "Equalizer",
+  wave: "Wave",
+  chevrons: "Chevrons",
+  grid: "Grid",
+  scanner: "Scanner",
+  tile: "Tile",
+  diamond: "Diamond",
 };
 
 export function AppearanceSection() {
@@ -201,7 +208,7 @@ export function AppearanceSection() {
           <RadioGroup
             value={spinnerStyle}
             onValueChange={(v) => void setSpinnerStyle(v as SpinnerStyle)}
-            className="flex items-center gap-2"
+            className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2"
           >
             {SPINNER_STYLES.map((s) => (
               <div key={s} className="flex items-center gap-1.5">

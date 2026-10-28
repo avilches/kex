@@ -24,7 +24,7 @@ porque son los hooks y las extensiones los que avisan de que el agente trabaja, 
 
 | Aviso | Que es | Cuando aparece | Cuando desaparece |
 |---|---|---|---|
-| Spinner del tab | Rueda en el tab del agente (estilo `arc`, `braille` o `cursor`, en Settings > Appearance) | El agente trabaja: `UserPromptSubmit`, o un `Stop` con subagentes en segundo plano todavia vivos | Cuando el agente termina el turno (`Stop`), con ESC o CTRL+C, o al salir el agente |
+| Spinner del tab | Rueda en el tab del agente (estilo `arc`, `cursor` u otros de solo CSS, en Settings > Appearance) | El agente trabaja: `UserPromptSubmit`, o un `Stop` con subagentes en segundo plano todavia vivos | Cuando el agente termina el turno (`Stop`), con ESC o CTRL+C, o al salir el agente |
 | Punto ambar del tab | Punto fijo de 6 px, no pulsa | El agente necesita al usuario: `Notification`, `PermissionRequest` o `Stop` (fin de turno), siempre que el tab no se este mirando | Al mirar el tab (tab activo y ventana con foco), en cuanto llega un prompt nuevo, o al salir el agente. "Clear all" de la campana tambien lo apaga |
 | Punto rojo del tab | Punto fijo de 6 px | La restauracion de la sesion fallo, o la sesion estaba trabajando cuando se cerro Kex (interrumpida) | Un fallo de restauracion, al abrir una shell normal o reintentar; una sesion interrumpida, con la siguiente actividad del agente |
 | Fila en la campana | Una fila por tab con algo accionable, con el mismo indicador que el tab. El numero de la campana cuenta los pendientes (atencion y error sin leer) | Con el spinner, el punto ambar o el rojo | Cuando el indicador desaparece. Se marca como leido al abrir el popover |

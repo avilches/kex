@@ -36,7 +36,18 @@ export type GitColorScheme = "vscode" | "jetbrains";
 export type AutofocusMode = "manual" | "noRoot" | "always";
 
 export type ScmViewMode = "list" | "tree";
-export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
+export const SPINNER_STYLES = [
+  "arc",
+  "cursor",
+  "bar",
+  "equalizer",
+  "wave",
+  "chevrons",
+  "grid",
+  "scanner",
+  "tile",
+  "diamond",
+] as const;
 export type SpinnerStyle = (typeof SPINNER_STYLES)[number];
 
 
