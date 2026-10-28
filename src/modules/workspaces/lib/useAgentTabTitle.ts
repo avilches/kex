@@ -100,8 +100,9 @@ export function resolveAgentTabTitle(
   scriptName?: string,
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
-  // A sleeping tab has no process left to feed its template, so it keeps the name it had.
-  const frozen = tab.kind === "terminal" ? tab.hibernation?.title : undefined;
+  // A sleeping tab has no process left to feed its template, so it keeps the name it had, unless
+  // the user gave it a name of their own since: that one is live, and a rename shows at once.
+  const frozen = tab.kind === "terminal" && !tab.title ? tab.hibernation?.title : undefined;
   if (frozen !== undefined) {
     return { displayTitle: frozen, isDescription: true, hasAgent, isRunning: false, agentSession };
   }

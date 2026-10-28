@@ -27,7 +27,7 @@ describe("HibernatedTab", () => {
 
   it("shows what was captured when the tab went to sleep: title, command and how long ago", () => {
     const { getByText } = render(
-      <HibernatedTab tab={sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" })} visible focused onWake={() => {}} />,
+      <HibernatedTab tab={{ ...sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" }), title: undefined }} visible focused onWake={() => {}} />,
     );
     expect(getByText("api server")).toBeTruthy();
     expect(getByText("claude --resume abc")).toBeTruthy();
@@ -92,5 +92,14 @@ describe("HibernatedTab", () => {
     const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
     rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
     expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj/.claude/worktrees/x");
+  });
+
+  it("follows a rename of the tab instead of the name frozen at sleep", () => {
+    const { getByText, rerender } = render(
+      <HibernatedTab tab={{ ...sleeping({ title: "api server" }), title: undefined }} visible focused onWake={() => {}} />,
+    );
+    expect(getByText("api server")).toBeTruthy();
+    rerender(<HibernatedTab tab={{ ...sleeping({ title: "api server" }), title: "renamed" }} visible focused onWake={() => {}} />);
+    expect(getByText("renamed")).toBeTruthy();
   });
 });

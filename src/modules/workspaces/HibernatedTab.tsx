@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
-import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
+import { Folder01Icon, PlayIcon, SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
@@ -33,7 +33,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const shortcutLabel = useShortcutLabel("tab.wake");
   const now = useNow(visible);
   const { agent, command, title: frozen, at } = tab.hibernation;
-  const title = frozen || info?.displayTitle || tab.title || tab.id;
+  const title = info?.displayTitle || frozen || tab.title || tab.id;
   const folder = tab.hibernation.worktreeCwd || tab.cwd;
   return (
     <div
@@ -51,13 +51,15 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
             <span className="truncate">{title}</span>
           </span>
           {folder && (
-            <span title={folder} data-hibernated-folder className="max-w-full truncate font-mono text-[11.5px]">
-              {tildePath(folder, cachedHomeDir())}
+            <span title={folder} data-hibernated-folder className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px]">
+              <HugeiconsIcon icon={Folder01Icon} size={12} strokeWidth={2} className="shrink-0" />
+              <span className="truncate">{tildePath(folder, cachedHomeDir())}</span>
             </span>
           )}
           {command && (
-            <span title={command} className="max-w-full truncate font-mono text-[11.5px] opacity-70">
-              {command}
+            <span title={command} className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70">
+              <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
+              <span className="truncate">{command}</span>
             </span>
           )}
         </div>
