@@ -398,20 +398,17 @@ describe("workspaceMenuItems", () => {
       "hibernate",
       "closeTabs",
       "closeWorkspace",
-      "settings",
     ]);
     const shortcut = (id: string) => items.find((i) => i.id === id)?.shortcutId;
     expect(shortcut("rename")).toBe("workspace.rename");
     expect(shortcut("closeWorkspace")).toBe("workspace.close");
-    expect(shortcut("settings")).toBe("workspace.settings");
-    expect(items.find((i) => i.id === "settings")?.separatorBefore).toBe(true);
   });
 
   it("leaves out hibernate when nothing is awake, close all tabs when it has none and the terminal without a root", () => {
     const ids = workspaceMenuItems(wsEntry({ canHibernate: false, tabCount: 0, root: null })).map(
       (i) => i.id,
     );
-    expect(ids).toEqual(["go", "rename", "closeWorkspace", "settings"]);
+    expect(ids).toEqual(["go", "rename", "closeWorkspace"]);
   });
 });
 

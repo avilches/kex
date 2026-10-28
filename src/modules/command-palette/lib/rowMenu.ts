@@ -25,7 +25,6 @@ export type RowMenuItemId =
   | "hibernate"
   | "closeTabs"
   | "closeWorkspace"
-  | "settings"
   | "pick"
   | "worktrees"
   | "run"
@@ -109,12 +108,6 @@ export function workspaceMenuItems(entry: WorkspaceEntry): RowMenuItem[] {
   if (entry.canHibernate) items.push({ id: "hibernate", label: "Hibernate Workspace" });
   if (entry.tabCount > 0) items.push({ id: "closeTabs", label: "Close All Tabs" });
   items.push({ id: "closeWorkspace", label: "Close Workspace", shortcutId: "workspace.close" });
-  items.push({
-    id: "settings",
-    label: "Workspace Settings",
-    shortcutId: "workspace.settings",
-    separatorBefore: true,
-  });
   return items;
 }
 

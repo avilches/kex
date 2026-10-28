@@ -61,8 +61,7 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   dialogo expone su nodo scrolleable via contexto y el popover se renderiza dentro con
   `container={host}` manteniendo `pointer-events-auto` en el `PopoverContent`; referencias
   vivas `AddActionMenu.tsx` (combo Add) en la ventana de Settings.
-  Aplicarla (con su provider, `WheelScrollDialogHost` en `WorkspaceSettingsDialog.tsx`) a todo
-  popover que abra dentro de `WorkspaceSettingsDialog` o de otros modales.
+  Aplicarla (con su provider, `DialogScrollHost`) a todo popover que abra dentro de un modal.
 - **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,
   `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}` y `{host}`. Los
   nombres canonico son `{filepath}` y `{filename}` (los antiguos `{path}`/`{file}` ya no
@@ -128,7 +127,7 @@ Diferencias importantes respecto a inputs generales:
 - `bg-transparent` (no `bg-background`): hereda el fondo del panel de settings.
 - Referencia viva: la constante `INPUT_CLASS` de `src/settings/components/inputClass.ts`.
 
-Para botones de tab dentro de dialogs/modals (como `WorkspaceSettingsDialog`):
+Para botones de tab dentro de dialogs/modals:
 - Anadir `outline-none focus-visible:outline-none` para eliminar el borde de foco del sistema operativo.
 
 ## Editor de textos en dev

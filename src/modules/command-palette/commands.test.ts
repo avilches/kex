@@ -70,7 +70,6 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     closeOtherTabs: fn(),
     closeAllTabs: fn(),
     resetActiveTabTitle: fn(),
-    openWorkspaceProperties: fn(),
     openActionsConfiguration: fn(),
     shortcutHandlers: {},
     isShortcutAvailable: () => true,
@@ -234,7 +233,7 @@ describe("createCommandItems while the focused tab is hibernated", () => {
 
   it("leaves everything that does not act on a live terminal usable", () => {
     const items = byId(true);
-    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "tab.reopenClosed", "settings.section.general", "tab.new", "tab.close", "pane.splitRight", "sidebar.toggle", "git.graph"]) {
+    for (const id of ["settings.open", "workspace.new", "window.new", "tab.reopenClosed", "settings.section.general", "tab.new", "tab.close", "pane.splitRight", "sidebar.toggle", "git.graph"]) {
       expect(items.get(id)?.disabledReason, id).toBeUndefined();
     }
   });

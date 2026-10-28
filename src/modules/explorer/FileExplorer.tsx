@@ -128,7 +128,7 @@ type Props = {
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
-  onOpenWorkspaceProperties?: () => void;
+  onPickWorkspaceRoot?: () => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
   openFiles?: ReadonlySet<string>;
@@ -390,7 +390,7 @@ export const FileExplorer = memo(
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
       onAddToGitignore,
-      onOpenWorkspaceProperties,
+      onPickWorkspaceRoot,
       gitStatus,
       onSearchClose,
       openFiles,
@@ -1226,7 +1226,7 @@ export const FileExplorer = memo(
                     disabled={info.disabled && !isSetWorkspaceRoot}
                     onSelect={() => {
                       if (isSetWorkspaceRoot) {
-                        onOpenWorkspaceProperties?.();
+                        onPickWorkspaceRoot?.();
                       } else {
                         onChangeRootMode(m.id);
                       }
