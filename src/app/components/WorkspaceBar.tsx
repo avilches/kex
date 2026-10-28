@@ -33,7 +33,7 @@ import {
   Image01Icon,
   PaintBoardIcon,
   PencilEdit01Icon,
-  SleepingIcon,
+  ZzzIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
@@ -520,7 +520,7 @@ function SortableWorkspaceItem({
           </ContextMenuItem>
           {onHibernate && ws.canHibernate && (
             <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
-              <HugeiconsIcon icon={SleepingIcon} size={14} strokeWidth={2} />
+              <HugeiconsIcon icon={ZzzIcon} size={14} strokeWidth={2} />
               Hibernate all
             </ContextMenuItem>
           )}

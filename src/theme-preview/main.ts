@@ -50,7 +50,7 @@ import {
   Refresh01Icon,
   RemoveSquareIcon,
   Search01Icon,
-  SleepingIcon,
+  ZzzIcon,
   Tick02Icon,
   SquareArrowDown02Icon,
   SquareArrowDown03Icon,
@@ -696,7 +696,7 @@ function workspaceItem(opts: {
           ),
           h("span", { class: "min-w-0 truncate" }, t.title),
           t.hibernated
-            ? h("span", { class: "absolute right-1.5 top-1/2 -translate-y-1/2 opacity-60" }, icon(SleepingIcon, 12, 1.75))
+            ? h("span", { class: "absolute right-1.5 top-1/2 -translate-y-1/2 opacity-60" }, icon(ZzzIcon, 12, 1.75))
             : "",
         ),
       );

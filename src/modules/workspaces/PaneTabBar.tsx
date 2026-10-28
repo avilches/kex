@@ -20,7 +20,7 @@ import { useTheme } from "@/modules/theme/ThemeProvider";
 import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   LockKeyIcon,
-  SleepingIcon,
+  ZzzIcon,
   StickyNote03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -376,7 +376,7 @@ function DraggableTab({
         <>
         {sleeping && (
           <span className="ml-0.5 shrink-0 text-muted-foreground" title="Hibernated: double click to restore">
-            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            <HugeiconsIcon icon={ZzzIcon} size={12} strokeWidth={1.75} />
           </span>
         )}
         <button
@@ -401,7 +401,7 @@ function DraggableTab({
               className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground transition-opacity group-hover:opacity-0"
               title="Hibernated: double click to restore"
             >
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+              <HugeiconsIcon icon={ZzzIcon} size={12} strokeWidth={1.75} />
             </span>
           )}
           {statusIndicator && (

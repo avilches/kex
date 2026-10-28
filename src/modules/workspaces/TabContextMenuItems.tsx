@@ -9,7 +9,7 @@ import {
   LockKeyIcon,
   FloppyDiskIcon,
   PencilEdit01Icon,
-  SleepingIcon,
+  ZzzIcon,
   SquareUnlock02Icon,
   StickyNote03Icon,
   UploadCircle01Icon,
@@ -204,7 +204,7 @@ export function TabContextMenuItems({
       <CopyTabIdItem tabId={tab.id} />
       {tab.kind === "terminal" && (
         <ContextMenuItem onSelect={() => onToggleHibernate(tab.id)}>
-          <HugeiconsIcon icon={tab.hibernation ? UploadCircle01Icon : SleepingIcon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={tab.hibernation ? UploadCircle01Icon : ZzzIcon} size={14} strokeWidth={2} />
           {tab.hibernation ? "Restore" : "Hibernate"}
           <Shortcut id="tab.hibernate" />
         </ContextMenuItem>

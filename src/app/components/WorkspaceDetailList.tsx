@@ -4,7 +4,7 @@ import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { LinkSquare02Icon, LockKeyIcon, SleepingIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { CircleArrowUpIcon, LinkSquare02Icon, LockKeyIcon, ZzzIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -367,10 +367,11 @@ function DetailTabRow({
           title="Hibernated: click to restore"
           aria-label="Restore tab"
           style={{ right: 26 + (hasNote ? 20 : 0) }}
-          className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/tab:opacity-100 group-focus-within/tab:opacity-100", hoverBg)}
+          className={cn("absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring group/wake group-hover/tab:text-foreground", hoverBg)}
           onClick={onWake}
         >
-          <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+          <HugeiconsIcon icon={ZzzIcon} size={12} strokeWidth={1.75} className="group-hover/tab:hidden group-focus-visible/wake:hidden" />
+          <HugeiconsIcon icon={CircleArrowUpIcon} size={12} strokeWidth={1.75} className="hidden group-hover/tab:block group-focus-visible/wake:block" />
         </button>
       )}
       {isLocked ? (
