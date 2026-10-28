@@ -389,7 +389,14 @@ its command running. Closing a tab that is hibernated never asks and `tab.reopen
 own id (its stored lines and agent session are indexed by it), exactly as it was. For that, closing a sleeping tab does not
 delete its stored lines (`useHibernateLinesCleanup` only deletes on wake); the backend sweep at startup removes the ones
 nobody brought back. Hibernating first and closing after is
-therefore the two-step way to close something without ever running it again on undo. `closeQueue` asks only for an awake
+therefore the two-step way to close something without ever running it again on undo.
+The end-of-tab control follows the same two steps (`tabCloseControl`): on an awake terminal the `×` is a Hibernate button
+(sleeping icon) and a middle click hibernates it; once the tab sleeps the `×` shows again and a middle click closes it. This
+holds in the tab strip (`PaneTabBar`) and in the sidebar list (`WorkspaceDetailList`). Other kinds of tab keep closing in
+one step. The context menu keeps Hibernate and Close as separate items and `tab.close` (Cmd+W) still closes at once, with
+the warning of `closeQueue` when something would be interrupted. A sleeping tab that leaves the closed stack for good (pushed
+off by `CLOSED_STACK_CAP`, dropped, or the stack reset) has its stored lines deleted by `setClosedStack` in `useWorkspaces`
+(`orphanedSleepers`). `closeQueue` asks only for an awake
 terminal: a working agent always (`terminalCloseWarning`, no checkbox), a foreground process while the preference is on.
 A tab with a live agent session that is not working (idle or waiting for the user) is never asked about, even though its
 process is in the foreground: `hasAgent` keeps the queue and the dialog's review in agreement. The "Don't ask me again"

@@ -133,10 +133,11 @@ describe("WorkspaceDetailList", () => {
 });
 
 describe("WorkspaceDetailList row controls", () => {
-  it("renders the close control as a real button beside the row, reachable by keyboard", () => {
+  it("renders the hibernate control of an awake terminal as a real button beside the row, reachable by keyboard", () => {
     const { container, rows, unmount } = mount({ terminals: "all" });
-    const close = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Close tab"]');
+    const close = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Hibernate tab"]');
     expect(close).toHaveLength(4);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(0);
     for (const c of close) {
       expect(c.tabIndex).toBe(0);
       expect(rows().some((r) => r.contains(c))).toBe(false);
@@ -248,7 +249,7 @@ describe("WorkspaceDetailList subagents", () => {
     const block = wrap(rows()[0]).parentElement as HTMLElement;
     expect(block.className).toContain("hover:bg-foreground");
     expect(block.contains(sub)).toBe(true);
-    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(4);
+    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]')).toHaveLength(4);
     unmount();
   });
 });
@@ -352,7 +353,7 @@ describe("WorkspaceDetailList context menu", () => {
 });
 
 describe("WorkspaceDetailList with a hibernated tab", () => {
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true) {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn()) {
     const sleeping = (t: Tab): Tab =>
       t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1 } } as Tab) : t;
     const container = document.createElement("div");
@@ -365,7 +366,7 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
           {
             value: {
               paneTabCount: () => 3,
-              onClose: vi.fn(),
+              onClose,
               onCloseOtherTabs: vi.fn(),
               onRenameTab: vi.fn(),
               onUpdateTab: vi.fn(),
@@ -391,13 +392,46 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     return { container, rows, onWake, onActivate, unmount: track(root) };
   }
 
-  it("marks the sleeping row and keeps its lock, note and close controls", () => {
+  it("marks the sleeping row and keeps its lock and note; the awake rows hibernate", () => {
     const { container, rows, unmount } = mountAsleep();
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(rows()).toHaveLength(4);
     expect(wrap(sleepingRow).querySelector('button[aria-label="Unlock tab"]')).not.toBeNull();
     expect(wrap(sleepingRow).querySelector('button[aria-label="Tab note"]')).not.toBeNull();
-    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(3);
+    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(0);
+    unmount();
+  });
+
+  it("an unlocked sleeping row closes with the X, while the awake ones hibernate", () => {
+    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(1);
+    expect(container.querySelectorAll('button[aria-label="Hibernate tab"]').length).toBe(3);
+    unmount();
+  });
+
+  it("a middle click hibernates an awake row and closes a sleeping one", () => {
+    const onToggleHibernate = vi.fn();
+    const onClose = vi.fn();
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), onToggleHibernate, false, onClose);
+    const [work, , , plain] = rows();
+    act(() => work.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 })));
+    expect(onToggleHibernate).toHaveBeenCalledWith("t-work");
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => plain.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 })));
+    expect(onClose).toHaveBeenCalledWith("t-plain");
+    expect(onToggleHibernate).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("the hibernate control of an awake row hibernates it without activating the row", () => {
+    const onToggleHibernate = vi.fn();
+    const onActivate = vi.fn();
+    const { container, unmount } = mountAsleep(vi.fn(), onActivate, onToggleHibernate, false);
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Hibernate tab"]')!;
+    act(() => button.click());
+    expect(onToggleHibernate).toHaveBeenCalledTimes(1);
+    expect(onActivate).not.toHaveBeenCalled();
     unmount();
   });
 

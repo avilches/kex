@@ -34,6 +34,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { isHibernatedTab } from "./lib/hibernate";
+import { tabCloseControl } from "./lib/tabCloseControl";
+import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { getLockFlashSnapshot, subscribeLockFlash } from "./lib/lockFlashStore";
 import { tabFolder } from "./lib/tabPath";
 import { TabBarIcon } from "./lib/tabBarIcon";
@@ -175,6 +177,8 @@ function DraggableTab({
   });
   const active = tab.id === activeTabId;
   const sleeping = isHibernatedTab(tab);
+  const closeControl = tabCloseControl(tab);
+  const { onToggleHibernate } = useSidebarTabMenu();
   // Every tab can be locked, no exception.
   const isLocked = tab.locked ?? false;
   const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
@@ -258,7 +262,8 @@ function DraggableTab({
       onAuxClick={(e) => {
         if (e.button === 1) {
           e.stopPropagation();
-          onClose(tab.id);
+          if (closeControl === "hibernate") onToggleHibernate(tab.id);
+          else onClose(tab.id);
         }
       }}
       onContextMenu={(e) => {
@@ -413,19 +418,35 @@ function DraggableTab({
               {statusIndicator}
             </span>
           )}
-          <button
-            type="button"
-            className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose(tab.id);
-            }}
-            title="Close tab"
-            aria-label="Close tab"
-          >
-            <span className="text-[14px] leading-none">×</span>
-          </button>
+          {closeControl === "hibernate" ? (
+            <button
+              type="button"
+              className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleHibernate(tab.id);
+              }}
+              title="Hibernate tab"
+              aria-label="Hibernate tab"
+            >
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose(tab.id);
+              }}
+              title="Close tab"
+              aria-label="Close tab"
+            >
+              <span className="text-[14px] leading-none">×</span>
+            </button>
+          )}
         </span>
       )}
     </div>

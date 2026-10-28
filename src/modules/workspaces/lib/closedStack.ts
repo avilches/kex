@@ -200,3 +200,22 @@ export function clearStaleFolds(entries: ClosedEntry[], workspaces: Workspace[])
   });
   return changed ? next : entries;
 }
+
+function sleepingIds(entry: ClosedEntry): string[] {
+  if (entry.kind === "tab") return entry.tab.kind === "terminal" && entry.tab.hibernation ? [entry.tab.id] : [];
+  const ids: string[] = [];
+  for (const pane of allPanes(entry.workspace.paneTree))
+    for (const t of pane.tabs) if (t.kind === "terminal" && t.hibernation) ids.push(t.id);
+  return ids;
+}
+
+// Sleeping tabs whose stored lines nobody can bring back: they were in the old stack and are in
+// neither the new one nor an open tab. A reopened tab keeps its id, so it is still "present".
+export function orphanedSleepers(
+  before: readonly ClosedEntry[],
+  after: readonly ClosedEntry[],
+  open: ReadonlySet<string>,
+): string[] {
+  const kept = new Set(after.flatMap(sleepingIds));
+  return before.flatMap(sleepingIds).filter((id) => !kept.has(id) && !open.has(id));
+}

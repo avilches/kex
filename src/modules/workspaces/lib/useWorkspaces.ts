@@ -26,7 +26,7 @@ import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agen
 import { setWakeBackdrop } from "@/modules/terminal/lib/wakeBackdrop";
 import { applyHibernate, applyWake, isHibernatedTab, terminalTabs } from "./hibernate";
 import { wakeBackdrop } from "./hibernateLines";
-import { readHibernateLines } from "./hibernateLinesIo";
+import { deleteHibernateLines, readHibernateLines } from "./hibernateLinesIo";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import {
   allPaneIds,
@@ -56,6 +56,7 @@ import {
   captureClosedWorkspace,
   clearStaleFolds,
   insertRestoredWorkspace,
+  orphanedSleepers,
   pickReopen,
   reviveWorkspace,
 } from "./closedStack";
@@ -522,9 +523,23 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedTabsRef = useRef<ClosedEntry[]>([]);
+  // Every change of the closed stack goes through here: a sleeping tab that leaves it for good
+  // (pushed off by the cap, dropped, or the stack reset) has its stored lines deleted. A tab that
+  // is reopened keeps its id and is open again, so it is left alone.
+  const setClosedStack = useCallback((next: ClosedEntry[]) => {
+    const orphans = orphanedSleepers(
+      closedTabsRef.current,
+      next,
+      new Set(workspacesRef.current.flatMap((w) => terminalTabs(w).map((t) => t.id))),
+    );
+    closedTabsRef.current = next;
+    if (orphans.length > 0) {
+      deleteHibernateLines(orphans).catch((e) => console.warn("[kex] could not delete hibernate lines:", e));
+    }
+  }, []);
   useEffect(() => {
-    closedTabsRef.current = clearStaleFolds(closedTabsRef.current, workspaces);
-  }, [workspaces]);
+    setClosedStack(clearStaleFolds(closedTabsRef.current, workspaces));
+  }, [workspaces, setClosedStack]);
 
   // paneId -> MRU activation history (tabIds, most recent first). Drives which
   // tab gets focus when the active one closes. In memory only, never persisted.
@@ -601,12 +616,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       for (const pane of allPanes(closing.paneTree))
         for (const tab of pane.tabs) recordTabClosed(tab, id);
       const before = closedTabsRef.current;
-      closedTabsRef.current = captureClosedWorkspace(
-        before,
-        withLiveRunOnStartAll(closing),
-        workspacesRef.current.findIndex((w) => w.id === id),
-        undefined,
-        explicit,
+      setClosedStack(
+        captureClosedWorkspace(
+          before,
+          withLiveRunOnStartAll(closing),
+          workspacesRef.current.findIndex((w) => w.id === id),
+          undefined,
+          explicit,
+        ),
       );
       if (closedTabsRef.current !== before) showCloseNotice(closedTabsRef.current);
     }
@@ -828,7 +845,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         recordTabClosed(found.tab, workspaceId);
         if (found.tab.kind === "terminal" && found.tab.hibernation) unmarkHibernating([tabId]);
         history = paneActivationHistoryRef.current.get(found.pane.id);
-        closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
+        setClosedStack(captureClosedEntry(closedTabsRef.current, {
           kind: "tab",
           tab: withLiveRunOnStart(found.tab),
           paneId: found.pane.id,
@@ -836,7 +853,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           prevTabId: found.pane.tabs[found.pane.tabs.findIndex((t) => t.id === tabId) - 1]?.id ?? null,
           lastOfWorkspace: workspaceTabCount(ws) === 1,
           ...(batchId ? { batchId } : {}),
-        });
+        }));
         showCloseNotice(closedTabsRef.current);
       }
     }
@@ -851,11 +868,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const reopenOne = useCallback(async (onlyBatch?: string): Promise<ClosedEntry | null> => {
     const { picked, remaining } = pickReopen(closedTabsRef.current, workspacesRef.current);
     if (!picked) {
-      if (!onlyBatch) closedTabsRef.current = remaining;
+      if (!onlyBatch) setClosedStack(remaining);
       return null;
     }
     if (onlyBatch && picked.entry.batchId !== onlyBatch) return null;
-    closedTabsRef.current = remaining;
+    setClosedStack(remaining);
 
     // A reopened terminal tab that used to run an agent gets the same live,
     // just-in-time resume plan the startup flow computes, keyed by the id the
@@ -889,7 +906,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const newId = asleep ? entry.tab.id : newTabId();
     if (!asleep) await seedPlan(entry.tab, newId);
     const newTab = buildReopenedTab(entry.tab, newId);
-    closedTabsRef.current = remapPrevTabId(closedTabsRef.current, entry.tab.id, newId);
+    setClosedStack(remapPrevTabId(closedTabsRef.current, entry.tab.id, newId));
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
     const slot = ws ? resolveReopenSlot(entry, closedTabsRef.current, ws) : { paneId: picked.paneId, index: 0 };
     openTab(picked.workspaceId, slot.paneId, newTab, slot.index);
@@ -1212,7 +1229,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const resetWorkspaces = useCallback((cwd?: string) => {
     const ws = newWorkspace(cwd);
-    closedTabsRef.current = [];
+    setClosedStack([]);
     setWorkspaces([ws]);
     setActiveWorkspaceId(ws.id);
   }, []);

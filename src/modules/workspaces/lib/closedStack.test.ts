@@ -7,6 +7,7 @@ import {
   captureClosedWorkspace,
   clearStaleFolds,
   insertRestoredWorkspace,
+  orphanedSleepers,
   pickReopen,
   remapPrevTabId,
   resolveReopenSlot,
@@ -345,5 +346,43 @@ describe("remapPrevTabId", () => {
   it("repoints entries that followed the reopened tab", () => {
     const out = remapPrevTabId([tabEntry("c", "w1", "p1", { prevTabId: "b" })], "b", "b2");
     expect(out[0]).toMatchObject({ prevTabId: "b2" });
+  });
+});
+
+describe("orphanedSleepers", () => {
+  const closed = (id: string, over: Record<string, unknown> = {}): ClosedEntry => ({
+    kind: "tab",
+    tab: { id, kind: "terminal", ...over } as Tab,
+    paneId: "p1",
+    workspaceId: "w1",
+    prevTabId: null,
+  });
+  const sleeper = (id: string) => closed(id, { hibernation: { at: 1 } });
+
+  it("names a sleeping tab that fell off the stack", () => {
+    expect(orphanedSleepers([sleeper("a"), sleeper("b")], [sleeper("a")], new Set())).toEqual(["b"]);
+  });
+
+  it("ignores awake tabs, which have no stored lines", () => {
+    expect(orphanedSleepers([closed("a")], [], new Set())).toEqual([]);
+  });
+
+  it("keeps a sleeper that is still in the stack or came back to an open tab", () => {
+    expect(orphanedSleepers([sleeper("a")], [sleeper("a")], new Set())).toEqual([]);
+    expect(orphanedSleepers([sleeper("a")], [], new Set(["a"]))).toEqual([]);
+  });
+
+  it("also finds the sleepers inside a closed workspace", () => {
+    const ws: ClosedEntry = {
+      kind: "workspace",
+      index: 0,
+      workspace: {
+        id: "w2",
+        title: "W",
+        activePaneId: "p9",
+        paneTree: { kind: "pane", id: "p9", tabs: [{ id: "s1", kind: "terminal", hibernation: { at: 1 } }], activeTabId: "s1" },
+      } as Workspace,
+    };
+    expect(orphanedSleepers([ws], [], new Set())).toEqual(["s1"]);
   });
 });
