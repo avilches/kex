@@ -1313,7 +1313,6 @@ function hibernatedTab(): HTMLElement {
         h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
         h("span", { class: "max-w-full truncate font-mono text-[11.5px]" }, "~/code/kex"),
         h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
-        h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
       ),
       h(
         "div",
@@ -1339,6 +1338,7 @@ function hibernatedTab(): HTMLElement {
           h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
         ),
       ),
+      h("span", { class: "absolute right-3 bottom-2 text-[10px] opacity-50" }, "Hibernated for 2h"),
     ),
   );
 }
