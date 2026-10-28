@@ -54,7 +54,9 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const { agent, command, title: frozen, at } = tab.hibernation;
   const title = frozen || info?.displayTitle || tab.title || tab.id;
   const folder = tab.hibernation.worktreeCwd || tab.cwd;
-  const line = preview ? describeSessionPreview(preview, now, cachedHomeDir()) : null;
+  const line = preview
+    ? describeSessionPreview(preview.cwd === folder ? { ...preview, cwd: "" } : preview, now, cachedHomeDir())
+    : null;
   return (
     <div
       data-hibernated-tab

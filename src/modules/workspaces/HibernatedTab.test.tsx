@@ -117,4 +117,14 @@ describe("HibernatedTab", () => {
     rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
     expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj/.claude/worktrees/x");
   });
+
+  it("does not repeat the folder in the session line when it is the one already shown", async () => {
+    sessionRestore.sessionPreviews.mockResolvedValue([
+      { tabId: "t1", cwd: "/Users/me/proj", lastMessage: null, updatedAt: Math.floor(Date.now() / 1000) - 3600 },
+    ]);
+    const tab = { ...sleeping(), cwd: "/Users/me/proj" };
+    const { findByText, queryByText } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
+    expect(await findByText("1h ago")).toBeTruthy();
+    expect(queryByText(/~\/proj ·/)).toBeNull();
+  });
 });
