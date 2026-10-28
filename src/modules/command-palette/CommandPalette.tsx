@@ -813,7 +813,7 @@ export function CommandPalette({
   // The "Move tab to workspace" command opens the menu of the active tab's row already turned into
   // the destinations: it clears the query so that row (Current tab) is in the list.
   useEffect(() => {
-    if (pendingMove === null || query !== "") return;
+    if (pendingMove === null) return;
     setPendingMove(null);
     const entry = highlightedTabOf(`tab:${pendingMove}`, merged);
     const box = boxRef.current;
@@ -827,7 +827,7 @@ export function CommandPalette({
       row ? anchorOf(box, row as HTMLElement) : { rowTop: 0, rowBottom: 0 },
     );
     enterMoveMenu(moveMenuItems(workspaceEntries, entry.workspaceId));
-  }, [pendingMove, query, merged, openRowMenu, enterMoveMenu, workspaceEntries, autofocusMode]);
+  }, [pendingMove, merged, openRowMenu, enterMoveMenu, workspaceEntries, autofocusMode]);
 
   const commitTheme = useCallback(
     (id: string) => {

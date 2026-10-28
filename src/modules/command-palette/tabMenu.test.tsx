@@ -587,6 +587,50 @@ describe("the Move tab to workspace command", () => {
   });
 });
 
+describe("the Move tab to workspace command with text that hides Current tab", () => {
+  it("hangs the menu from the real Current tab row once the query is cleared", async () => {
+    commands = [{ id: "tab.moveToWorkspace", title: "Move tab to workspace...", group: "Tabs", run: () => {} }];
+    render(<Harness />);
+    await wait(50);
+    act(() => {
+      fireEvent.change(input(), { target: { value: "move" } });
+    });
+    await wait(50);
+    expect(rowIds()).not.toContain("tab:cur");
+    fireEvent.click(document.querySelector('[cmdk-item][data-value^="cmd:"]') as Element);
+    await wait(80);
+    expect(input().value).toBe("");
+    expect(rowIds()).toContain("tab:cur");
+    expect(selected()).toBe("tab:cur");
+    expect(menuLabels()[0]).toBe("Back");
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
+  });
+});
+
+describe("palette.menuAction always takes the key", () => {
+  it("returns true with no menu open and with a menu that has no item for the digit", async () => {
+    await openOn("tab:c");
+    let taken = false;
+    await act(async () => {
+      taken = runPaletteShortcut("menuAction", 5);
+    });
+    expect(taken).toBe(true);
+    await key("Tab");
+    await wait(20);
+    await act(async () => {
+      taken = runPaletteShortcut("menuAction", 5);
+    });
+    expect(taken).toBe(true);
+    fireEvent.click(menuItem("Move to Workspace") as HTMLElement);
+    await wait(20);
+    await act(async () => {
+      taken = runPaletteShortcut("menuAction", 5);
+    });
+    expect(taken).toBe(true);
+    expect(calls.move).toEqual([]);
+  });
+});
+
 describe("note details", () => {
   it.each([
     ["adding a note", {}, "note"],
