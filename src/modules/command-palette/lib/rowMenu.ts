@@ -34,7 +34,10 @@ export type RowMenuItemId =
   | "run"
   | "stop"
   | "edit"
-  | "action";
+  | "action"
+  | "back"
+  | "moveNew"
+  | "moveTarget";
 
 export type RowMenuItem = {
   id: RowMenuItemId;
@@ -55,6 +58,10 @@ export type RowMenuItem = {
   actionId?: string;
   // The 1-9 key that runs it while the menu is open (Cmd+digit).
   digit?: number;
+  // The workspace a "moveTarget" item moves the tab to.
+  targetId?: string;
+  // The workspace identity drawn in place of the icon.
+  leading?: { workspaceId: string; color: string | null; icon: string | null };
   // First item of the Actions block: a rule above it.
   separatorBefore?: boolean;
   // First Action of a scope: a title above it, like the Header combo.
@@ -242,6 +249,8 @@ export function tabMenuItems(entry: TabEntry, ctx: TabMenuContext): RowMenuItem[
 export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean {
   if (id === "note") return isTabNoteOpen(entry.tab);
   return (
+    id === "moveWorkspace" ||
+    id === "back" ||
     id === "lock" ||
     id === "hibernateTab" ||
     id === "save" ||
@@ -314,6 +323,29 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
     });
   });
   return items;
+}
+
+// What "Move to Workspace" turns the menu into: Back, New workspace and the destinations (the tab's
+// own workspace left out), the first nine reachable with Cmd+digit.
+export function moveMenuItems(
+  workspaces: readonly Pick<WorkspaceEntry, "workspaceId" | "title" | "color" | "icon">[],
+  sourceWorkspaceId: string,
+): RowMenuItem[] {
+  const targets = workspaces.filter((w) => w.workspaceId !== sourceWorkspaceId);
+  return [
+    { id: "back", label: "Back" },
+    { id: "moveNew", label: "New workspace" },
+    ...targets.map(
+      (t, i): RowMenuItem => ({
+        id: "moveTarget",
+        label: t.title,
+        title: t.title,
+        targetId: t.workspaceId,
+        leading: { workspaceId: t.workspaceId, color: t.color, icon: t.icon },
+        ...(i < 9 ? { digit: i + 1 } : {}),
+      }),
+    ),
+  ];
 }
 
 // The enabled item the arrow key reaches from `from`, wrapping around; -1 when none is enabled.

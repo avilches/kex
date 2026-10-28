@@ -6,6 +6,7 @@ import {
   closedMenuItems,
   folderMenuItems,
   highlightedClosedOf,
+  moveMenuItems,
   type RowMenuItemId,
   runnableTabItem,
   type TabMenuContext,
@@ -266,6 +267,41 @@ describe("folderMenuItems", () => {
     expect(items[2]).toMatchObject({ actionId: "w1", heading: "Workspace actions", separatorBefore: true });
     expect(items[3].heading).toBeUndefined();
     expect(items[4]).toMatchObject({ actionId: "g1", heading: "Global actions", separatorBefore: true });
+  });
+});
+
+describe("moveMenuItems", () => {
+  const ws = (id: string) => ({ workspaceId: id, title: id.toUpperCase(), color: "#fff", icon: "star" });
+
+  it("lists Back, New workspace and the other workspaces in order, the source left out", () => {
+    const items = moveMenuItems([ws("a"), ws("b"), ws("c")], "b");
+    expect(items.map((i) => [i.id, i.label])).toEqual([
+      ["back", "Back"],
+      ["moveNew", "New workspace"],
+      ["moveTarget", "A"],
+      ["moveTarget", "C"],
+    ]);
+    expect(items.filter((i) => i.targetId).map((i) => i.targetId)).toEqual(["a", "c"]);
+  });
+
+  it("numbers the destinations from 1 and leaves Back and New workspace without a digit", () => {
+    const items = moveMenuItems([ws("a"), ws("b")], "none");
+    expect(items.map((i) => i.digit)).toEqual([undefined, undefined, 1, 2]);
+  });
+
+  it("gives a digit to the first nine destinations only", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ws(`w${i}`));
+    const digits = moveMenuItems(many, "none").filter((i) => i.targetId).map((i) => i.digit);
+    expect(digits).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, undefined, undefined, undefined]);
+  });
+
+  it("carries the workspace identity for the mark", () => {
+    const [, , first] = moveMenuItems([ws("a")], "x");
+    expect(first.leading).toEqual({ workspaceId: "a", color: "#fff", icon: "star" });
+  });
+
+  it("offers only Back and New workspace when there is no other workspace", () => {
+    expect(moveMenuItems([ws("a")], "a").map((i) => i.id)).toEqual(["back", "moveNew"]);
   });
 });
 
