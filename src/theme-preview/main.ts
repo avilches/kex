@@ -1312,13 +1312,28 @@ function hibernatedTab(): HTMLElement {
       h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
       h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
       h(
-        "span",
-        {
-          class:
-            "flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
-        },
-        "Restore",
-        h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
+        "div",
+        { class: "flex items-center gap-2" },
+        h(
+          "span",
+          {
+            class:
+              "flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground",
+            title: "Tab focused",
+          },
+          "Restore",
+          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
+        ),
+        h(
+          "span",
+          {
+            class:
+              "flex items-center gap-2 rounded-md bg-secondary px-4 py-1.5 text-[13px] text-secondary-foreground",
+            title: "Tab not focused",
+          },
+          "Restore",
+          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
+        ),
       ),
     ),
   );

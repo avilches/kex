@@ -42,11 +42,11 @@ function useSessionPreview(tabId: string, active: boolean): SessionPreview | und
   return preview;
 }
 
-type Props = { tab: SleepingTab; visible: boolean; onWake: () => void };
+type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () => void };
 
 // What a hibernated terminal tab shows in place of its terminal: no PTY and no render slot sit
 // behind it, only what was captured when it went to sleep.
-export function HibernatedTab({ tab, visible, onWake }: Props) {
+export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
   const shortcutLabel = useShortcutLabel("tab.wake");
   const now = useNow(visible);
@@ -81,7 +81,7 @@ export function HibernatedTab({ tab, visible, onWake }: Props) {
             </span>
           )}
         </div>
-        <Button size="lg" onClick={onWake} className="gap-2">
+        <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
           Restore
           {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}

@@ -40,7 +40,7 @@ describe("HibernatedTab", () => {
 
   it("shows what was captured when the tab went to sleep: title, command and how long ago", () => {
     const { getByText } = render(
-      <HibernatedTab tab={sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" })} visible onWake={() => {}} />,
+      <HibernatedTab tab={sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" })} visible focused onWake={() => {}} />,
     );
     expect(getByText("api server")).toBeTruthy();
     expect(getByText("claude --resume abc")).toBeTruthy();
@@ -48,13 +48,13 @@ describe("HibernatedTab", () => {
   });
 
   it("falls back to the tab title when no title was frozen", () => {
-    const { getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    const { getByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     expect(getByText("build")).toBeTruthy();
   });
 
   it("wakes through the Restore button", () => {
     const onWake = vi.fn();
-    const { getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={onWake} />);
+    const { getByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={onWake} />);
     fireEvent.click(getByText("Restore"));
     expect(onWake).toHaveBeenCalledTimes(1);
   });
@@ -63,42 +63,49 @@ describe("HibernatedTab", () => {
     sessionRestore.sessionPreviews.mockResolvedValue([
       { tabId: "t1", cwd: "/Users/me/proj", lastMessage: "Tests are green", updatedAt: Math.floor(Date.now() / 1000) - 3600 },
     ]);
-    const { findByText, queryByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible onWake={() => {}} />);
+    const { findByText, queryByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible focused onWake={() => {}} />);
     expect(await findByText(/~\/proj/)).toBeTruthy();
     expect(queryByText("Tests are green")).toBeNull();
     expect(sessionRestore.sessionPreviews).toHaveBeenCalledWith(["t1"]);
   });
 
   it("does not read the session while the tab is out of sight", () => {
-    render(<HibernatedTab tab={sleeping()} visible={false} onWake={() => {}} />);
+    render(<HibernatedTab tab={sleeping()} visible={false} focused onWake={() => {}} />);
     expect(sessionRestore.sessionPreviews).not.toHaveBeenCalled();
     expect(lines.read).not.toHaveBeenCalled();
   });
 
   it("shows the Enter shortcut on the Restore button and no other hint", () => {
-    const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     expect(getByRole("button").textContent).toMatch(/^Restore.+$/);
     expect(queryByText(/^Press /)).toBeNull();
   });
 
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {
     lines.read.mockResolvedValueOnce("\u001b[38;2;255;0;0merror: boom\u001b[0m\nplain");
-    const { findByTestId, findByText, rerender } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    const { findByTestId, findByText, rerender } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     expect(lines.read).toHaveBeenCalledWith("t1");
     const layer = await findByTestId("hibernated-lines");
     expect(layer.getAttribute("aria-hidden")).toBe("true");
     const red = await findByText("error: boom");
     expect(red.getAttribute("style")).toContain("color");
     expect(await findByText("plain")).toBeTruthy();
-    rerender(<HibernatedTab tab={{ ...sleeping(), id: "t2" }} visible onWake={() => {}} />);
+    rerender(<HibernatedTab tab={{ ...sleeping(), id: "t2" }} visible focused onWake={() => {}} />);
     expect(lines.read).toHaveBeenCalledWith("t2");
   });
 
   it("survives a failed read: the placeholder shows without lines", async () => {
     lines.read.mockRejectedValueOnce(new Error("no store"));
-    const { queryByTestId, getByText } = render(<HibernatedTab tab={sleeping()} visible onWake={() => {}} />);
+    const { queryByTestId, getByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     await Promise.resolve();
     expect(queryByTestId("hibernated-lines")).toBeNull();
     expect(getByText("Restore")).toBeTruthy();
+  });
+
+  it("accents the Restore button only while its tab has the focus", () => {
+    const { getByRole, rerender } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
+    expect(getByRole("button", { name: /Restore/ }).getAttribute("data-variant")).toBe("default");
+    rerender(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
+    expect(getByRole("button", { name: /Restore/ }).getAttribute("data-variant")).toBe("secondary");
   });
 });
