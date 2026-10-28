@@ -211,6 +211,7 @@ import {
   withSidebarSnapshotFlush,
 } from "@/modules/workspaces/lib/sidebarSnapshotSync";
 import { setEditorFlush } from "./lib/editorFlush";
+import { useRestoreFocusAfterRename } from "./hooks/useRestoreFocusAfterRename";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 import {
@@ -2086,6 +2087,8 @@ export default function App() {
     if (!tabId) return;
     focusTab(tabId);
   }, [focusTab]);
+
+  useRestoreFocusAfterRename(focusActiveTab);
 
   const handleMoveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
