@@ -3,17 +3,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const sessionRestore = vi.hoisted(() => ({
-  sessionPreviews: vi.fn(
-    async (
-      _tabIds: string[],
-    ): Promise<{ tabId: string; cwd: string; lastMessage?: string | null; updatedAt: number }[]> => [],
-  ),
-}));
-
-vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
-  sessionPreviews: sessionRestore.sessionPreviews,
-}));
 vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 
 const lines = vi.hoisted(() => ({ read: vi.fn(async (_tabId: string): Promise<string | null> => null) }));
@@ -31,8 +20,6 @@ const sleeping = (over: Partial<SleepingTab["hibernation"]> = {}): SleepingTab =
 
 describe("HibernatedTab", () => {
   beforeEach(() => {
-    sessionRestore.sessionPreviews.mockReset();
-    sessionRestore.sessionPreviews.mockResolvedValue([]);
     lines.read.mockReset();
     lines.read.mockResolvedValue(null);
   });
@@ -59,19 +46,8 @@ describe("HibernatedTab", () => {
     expect(onWake).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the folder of the session but not the last agent message", async () => {
-    sessionRestore.sessionPreviews.mockResolvedValue([
-      { tabId: "t1", cwd: "/Users/me/proj", lastMessage: "Tests are green", updatedAt: Math.floor(Date.now() / 1000) - 3600 },
-    ]);
-    const { findByText, queryByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible focused onWake={() => {}} />);
-    expect(await findByText(/~\/proj/)).toBeTruthy();
-    expect(queryByText("Tests are green")).toBeNull();
-    expect(sessionRestore.sessionPreviews).toHaveBeenCalledWith(["t1"]);
-  });
-
-  it("does not read the session while the tab is out of sight", () => {
+  it("does not read the stored lines while the tab is out of sight", () => {
     render(<HibernatedTab tab={sleeping()} visible={false} focused onWake={() => {}} />);
-    expect(sessionRestore.sessionPreviews).not.toHaveBeenCalled();
     expect(lines.read).not.toHaveBeenCalled();
   });
 
@@ -116,15 +92,5 @@ describe("HibernatedTab", () => {
     const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
     rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
     expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj/.claude/worktrees/x");
-  });
-
-  it("does not repeat the folder in the session line when it is the one already shown", async () => {
-    sessionRestore.sessionPreviews.mockResolvedValue([
-      { tabId: "t1", cwd: "/Users/me/proj", lastMessage: null, updatedAt: Math.floor(Date.now() / 1000) - 3600 },
-    ]);
-    const tab = { ...sleeping(), cwd: "/Users/me/proj" };
-    const { findByText, queryByText } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
-    expect(await findByText("1h ago")).toBeTruthy();
-    expect(queryByText(/~\/proj ·/)).toBeNull();
   });
 });

@@ -1,14 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { sessionPreviews, type SessionPreview } from "@/modules/agents/lib/agentSessionRestore";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
 import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
-import { describeSessionPreview, tildePath } from "./lib/sessionPreview";
+import { tildePath } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
@@ -25,23 +24,6 @@ function useNow(enabled: boolean): number {
   return now;
 }
 
-// Read again each time the placeholder is shown, so a message stored by the last Stop before
-// hibernating is there.
-function useSessionPreview(tabId: string, active: boolean): SessionPreview | undefined {
-  const [preview, setPreview] = useState<SessionPreview>();
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    void sessionPreviews([tabId]).then((list) => {
-      if (!cancelled) setPreview(list[0]);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [tabId, active]);
-  return preview;
-}
-
 type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () => void };
 
 // What a hibernated terminal tab shows in place of its terminal: no PTY and no render slot sit
@@ -50,13 +32,9 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
   const shortcutLabel = useShortcutLabel("tab.wake");
   const now = useNow(visible);
-  const preview = useSessionPreview(tab.id, visible);
   const { agent, command, title: frozen, at } = tab.hibernation;
   const title = frozen || info?.displayTitle || tab.title || tab.id;
   const folder = tab.hibernation.worktreeCwd || tab.cwd;
-  const line = preview
-    ? describeSessionPreview(preview.cwd === folder ? { ...preview, cwd: "" } : preview, now, cachedHomeDir())
-    : null;
   return (
     <div
       data-hibernated-tab
@@ -83,11 +61,6 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
             </span>
           )}
           <span className="text-[12px]">Hibernated for {formatHibernatedFor(now - at)}</span>
-          {line?.meta && (
-            <span title={line.metaTitle} className="max-w-full truncate text-[11px] opacity-60">
-              {line.meta}
-            </span>
-          )}
         </div>
         <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />

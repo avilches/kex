@@ -1314,7 +1314,6 @@ function hibernatedTab(): HTMLElement {
         h("span", { class: "max-w-full truncate font-mono text-[11.5px]" }, "~/code/kex"),
         h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
         h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
-        h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "2h ago"),
       ),
       h(
         "div",
