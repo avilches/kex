@@ -146,6 +146,29 @@ fn write_atomic(path: &Path, content: &str) -> bool {
     std::fs::rename(&tmp, path).is_ok()
 }
 
+/// A save that leaves this many workspaces or fewer on disk, out of `BACKUP_MIN_BEFORE` or more,
+/// is taken for a failed load rather than a user closing tabs, and the previous state is copied
+/// aside first.
+const BACKUP_MIN_BEFORE: usize = 3;
+const BACKUPS_KEPT: usize = 3;
+
+fn drops_most_workspaces(before: usize, after: usize) -> bool {
+    before >= BACKUP_MIN_BEFORE && after * 2 <= before
+}
+
+/// Ids a save would write: the safe, string ids of every window's workspaces.
+fn incoming_ids(state: &WindowStateFile) -> HashSet<String> {
+    state
+        .windows
+        .values()
+        .filter_map(|e| e.workspaces.as_array())
+        .flatten()
+        .filter_map(|b| b.get("id").and_then(Value::as_str))
+        .filter(|id| is_safe_id(id))
+        .map(str::to_string)
+        .collect()
+}
+
 fn collect_terminal_tab_ids(value: &Value, out: &mut HashSet<String>) {
     match value {
         Value::Object(map) => {
@@ -213,6 +236,54 @@ impl WindowStateManager {
         }
     }
 
+    /// Directory of the snapshots taken before a save or a cleanup could destroy most of the state.
+    fn backup_root(&self) -> PathBuf {
+        self.path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
+            .join("workspaces-backup")
+    }
+
+    /// Copies the index and every body on disk into a new `workspaces-backup/<millis>/` and
+    /// drops all but the newest `BACKUPS_KEPT`. Best effort: a failure is logged, never fatal.
+    fn snapshot_to_backup(&self, reason: &str) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let millis = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let root = self.backup_root();
+        let dest = root.join(format!("{millis:020}"));
+        let ws_dest = dest.join("workspaces");
+        if std::fs::create_dir_all(&ws_dest).is_err() {
+            log::warn!("[window-state] could not create backup dir {}", dest.display());
+            return;
+        }
+        let _ = std::fs::copy(&self.path, dest.join("workspaces.json"));
+        if let Ok(rd) = std::fs::read_dir(self.workspaces_dir()) {
+            for entry in rd.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                    continue;
+                }
+                if let Some(name) = path.file_name() {
+                    let _ = std::fs::copy(&path, ws_dest.join(name));
+                }
+            }
+        }
+        log::warn!("[window-state] backed up the previous state to {} ({reason})", dest.display());
+        let Ok(rd) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let mut dirs: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+        dirs.sort();
+        let excess = dirs.len().saturating_sub(BACKUPS_KEPT);
+        for old in dirs.into_iter().take(excess) {
+            let _ = std::fs::remove_dir_all(old);
+        }
+    }
+
     /// Returns true if the index was loaded successfully. Reconstructs each
     /// window's full workspace array from `workspaces/<id>.json`, and deletes
     /// any orphan body files no longer referenced.
@@ -226,6 +297,7 @@ impl WindowStateManager {
         };
         let Ok(index) = serde_json::from_str::<IndexFile>(&content) else {
             log::warn!("[window-state] index corrupt or wrong schema - starting fresh");
+            self.snapshot_to_backup("index corrupt or wrong schema");
             Self::gc_orphans(&ws_dir, &HashSet::new());
             return false;
         };
@@ -304,6 +376,14 @@ impl WindowStateManager {
         let _ = std::fs::create_dir_all(&ws_dir);
 
         let mut disk = self.disk.lock().expect("disk cache lock poisoned");
+
+        if drops_most_workspaces(disk.written.len(), incoming_ids(&state).len()) {
+            self.snapshot_to_backup(&format!(
+                "save would drop {} workspace(s) to {}",
+                disk.written.len(),
+                incoming_ids(&state).len()
+            ));
+        }
 
         let mut referenced: HashSet<String> = HashSet::new();
         let mut index_windows: BTreeMap<String, IndexEntry> = BTreeMap::new();
@@ -666,6 +746,95 @@ mod tests {
         mgr.save();
         assert!(ws_dir.join("ws-aaa.json").exists());
         assert!(!ws_dir.join("ws-bbb.json").exists());
+    }
+
+    fn backups(dir: &Path) -> Vec<PathBuf> {
+        let root = dir.join("workspaces-backup");
+        let mut v: Vec<PathBuf> = std::fs::read_dir(root)
+            .map(|rd| rd.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default();
+        v.sort();
+        v
+    }
+
+    fn mgr_with_workspaces(dir: &TempDir, ids: &[&str]) -> WindowStateManager {
+        let mgr = WindowStateManager::new(dir.path().join("workspaces.json"));
+        mgr.add_window("w-1".to_string());
+        let bodies: Vec<Value> = ids.iter().map(|id| serde_json::json!({ "id": id })).collect();
+        mgr.update_workspace("w-1", Value::Array(bodies), 0);
+        mgr.save();
+        mgr
+    }
+
+    #[test]
+    fn save_that_drops_most_workspaces_backs_up_the_previous_state_first() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b", "ws-c", "ws-d"]);
+        assert!(backups(dir.path()).is_empty());
+
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-fresh"}]), 0);
+        mgr.save();
+
+        let b = backups(dir.path());
+        assert_eq!(b.len(), 1);
+        for id in ["ws-a", "ws-b", "ws-c", "ws-d"] {
+            assert!(b[0].join("workspaces").join(format!("{id}.json")).exists(), "{id}");
+        }
+        let index: Value =
+            serde_json::from_str(&std::fs::read_to_string(b[0].join("workspaces.json")).unwrap()).unwrap();
+        assert_eq!(index["windows"]["w-1"]["workspaceIds"].as_array().unwrap().len(), 4);
+        assert!(!dir.path().join("workspaces/ws-a.json").exists());
+    }
+
+    #[test]
+    fn closing_one_workspace_at_a_time_takes_no_backup() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b", "ws-c", "ws-d"]);
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-a"}, {"id": "ws-b"}, {"id": "ws-c"}]), 0);
+        mgr.save();
+        assert!(backups(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn a_small_state_never_takes_a_backup() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b"]);
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-a"}]), 0);
+        mgr.save();
+        assert!(backups(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn only_the_newest_backups_are_kept() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b", "ws-c", "ws-d"]);
+        for _ in 0..(BACKUPS_KEPT + 2) {
+            mgr.update_workspace(
+                "w-1",
+                serde_json::json!([{"id": "ws-a"}, {"id": "ws-b"}, {"id": "ws-c"}, {"id": "ws-d"}]),
+                0,
+            );
+            mgr.save();
+            mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-a"}]), 0);
+            mgr.save();
+            std::thread::sleep(std::time::Duration::from_millis(3));
+        }
+        assert_eq!(backups(dir.path()).len(), BACKUPS_KEPT);
+    }
+
+    #[test]
+    fn a_corrupt_index_backs_up_the_bodies_before_the_cleanup_deletes_them() {
+        let dir = TempDir::new().unwrap();
+        let _ = mgr_with_workspaces(&dir, &["ws-a", "ws-b", "ws-c"]);
+        std::fs::write(dir.path().join("workspaces.json"), "{ not json").unwrap();
+
+        let mgr = WindowStateManager::new(dir.path().join("workspaces.json"));
+        assert!(!mgr.load());
+
+        let b = backups(dir.path());
+        assert_eq!(b.len(), 1);
+        assert!(b[0].join("workspaces/ws-b.json").exists());
+        assert!(!dir.path().join("workspaces/ws-b.json").exists());
     }
 
     #[test]

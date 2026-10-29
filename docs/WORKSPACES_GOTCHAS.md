@@ -1336,3 +1336,18 @@ su id, y de eso cuelgan varias cosas que no fallan con ruido si se tocan mal:
 El bloqueo de un restore (el dialogo "could not be restored" y el plan pendiente) vive solo en memoria (`Session.restoreBlock`, `pendingRestore`). Al hibernar o cerrar ese tab se perdia, y al volver el arranque recalculaba el estado desde `tab.cwd` y `persistentCommand`, que ya no decian lo mismo (otra carpeta, el comando ejecutado en Home). Ahora el tab que se para lleva `HeldBlock` (`TabHibernation.held` al hibernar, `Tab.held` en la entrada del closed stack), `liveHeldBlock` lo lee de `pendingRestore.ts`, y al despertar o deshacer se siembra con `seedHeldBlock` bajo el id nuevo; `startLeaf` lo consume y rehace el mismo dialogo (o deja solo el plan pendiente si no era modal) sin recalcular. Limite conocido: un tab de agente cerrado y reabierto cambia de id, y "Try again" busca el plan por el id nuevo.
 
 Al hibernar, el placeholder muestra siempre el comando que se ejecutara (`hibernatedCommand`): el escrito a mano si lo hay, si no el capturado, que con un plan bloqueado es `attemptedCmd`. El menu Restore Command de un tab dormido edita ese mismo valor. Un comando a mano gana al plan del agente al despertar o deshacer (`manualCommandWins`: no se siembra el plan), pero solo si se escribio despues del ultimo guardado: al hibernar o cerrar con un agente que se reanuda a si mismo, `saveRestoreCommand` borra el comando a mano y manda el agente. El comando del usuario se lee del tab persistido al despertar, nunca de la foto `hibernation.command`, que solo se muestra, y el error retenido solo se repone si su comando no se ha editado (`heldBlockStillValid`). Vaciar el campo devuelve el comando automatico.
+
+## Nota: la lista de workspaces del lateral desaparece tras reiniciar (dev, 2026-10-28)
+
+**Sintoma.** Tras un reload del webview en `pnpm tauri dev` la barra lateral solo tenia un workspace por defecto (un terminal en `~`) en vez de los 17 de antes. `workspaces/` pasó de 17 ficheros a 1.
+
+**Lo que dice el log.** A las 20:06:01 (hora local) `window_get_state` devolvia los 17 workspaces y 2 s despues el frontend guardo uno solo. Es decir, Rust leyo bien el disco y el frontend arranco con el workspace por defecto y lo guardo encima. El log del webview no llega a ningun fichero, asi que no se vio el error que lo provoco.
+
+**Causa raiz: no demostrada.** La candidata es que `sanitizeWorkspace` lanzara con un solo cuerpo malformado: el `catch` de `initWorkspaceState` ponia `cached = null`, la app arrancaba con un workspace nuevo y su primer guardado hacia que Rust borrara los otros 16 cuerpos (`save` quita los no referenciados). No se pudo comprobar porque los ficheros ya no existian.
+
+**Lo que si es un fallo de diseño, con o sin esa causa.** Cualquier fallo de carga acababa en "empezar de cero" y el guardado automatico lo hacia irreversible. Ahora:
+- `sanitizeSavedWorkspaces` descarta solo el workspace ilegible y conserva el resto.
+- Rust copia el estado anterior a `workspaces-backup/<millis>/` antes de un guardado que deja la mitad o menos de los workspaces (con al menos tres), y antes de limpiar con un indice corrupto (`snapshot_to_backup`). Se conservan los tres ultimos.
+
+**Leccion.** Un camino de error que cae en "estado por defecto" no puede estar conectado a un guardado automatico sin una red debajo. Si se anade otro fallback de carga, comprobar que no escriba encima de lo que no pudo leer.
+
