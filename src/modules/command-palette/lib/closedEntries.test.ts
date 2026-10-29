@@ -21,6 +21,20 @@ const liveTab = (over: Partial<TabEntry>): TabEntry => ({ kind: "terminal", cwd:
 const title = (ws: Workspace) => `title:${ws.id}`;
 
 describe("buildClosedTabEntries", () => {
+  it("carries the root of the workspace it belonged to, the file system root when it has none", () => {
+    const out = buildClosedTabEntries(
+      [record("/a", { workspaceId: "ws-1" }), record("/b", { workspaceId: "ws-2" }), record("/c", { workspaceId: "ws-3" })],
+      [
+        workspace("ws-1", { workspaceRoot: "/w" }),
+        workspace("ws-2", { fsRoot: "/fs" } as Partial<Workspace>),
+        workspace("ws-3"),
+      ],
+      [],
+      title,
+    );
+    expect(out.map((e) => e.workspaceRoot)).toEqual(["/w", "/fs", null]);
+  });
+
   it("skips an entry whose location is already open, whatever its kind", () => {
     const records = [
       record("/work/api"),

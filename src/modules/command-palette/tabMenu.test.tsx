@@ -7,6 +7,7 @@ import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteShortcut, runPaletteTabItem } from "./lib/paletteControl";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
+import type { ClosedTabEntry } from "./lib/closedEntries";
 import type { PaletteItem } from "./types";
 import { TAB_MENU_NOOPS } from "./tabMenuTestProps";
 
@@ -96,6 +97,7 @@ let initial: TabEntry[];
 let commands: PaletteItem[] = [];
 let workspaces: WorkspaceEntry[];
 let hibernateImpl: (id: string) => unknown;
+let closedRows: ClosedTabEntry[] = [];
 
 function Harness() {
   const [tabs, setTabs] = useState(initial);
@@ -117,7 +119,7 @@ function Harness() {
       activeWorkspaceId="ws"
       tabEntries={tabs}
       workspaceEntries={workspaces}
-      closedEntries={[]}
+      closedEntries={closedRows}
       onSelectTab={(entry) => calls.select.push(entry.tabId)}
       onSelectWorkspace={() => {}}
       onRunClosed={() => {}}
@@ -410,6 +412,45 @@ describe("Copy Absolute Path from the palette", () => {
     expect(sub.textContent).toContain("/p");
     expect(sub.title).toBe("/p");
     expect(document.body.textContent).not.toContain("Copy Relative Path");
+  });
+});
+
+describe("Copy Path from a closed row", () => {
+  it("opens the copies, copies the workspace path and Back restores the row menu", async () => {
+    closedRows = [
+      {
+        key: "closed:file:/p/src/a.ts",
+        kind: "file",
+        path: "/p/src/a.ts",
+        workspaceId: "ws",
+        uses: 1,
+        lastUsedAt: 1,
+        title: "a.ts",
+        detail: "/p/src/a.ts",
+        workspaceTitle: "W",
+        workspaceColor: null,
+        workspaceIcon: null,
+        workspaceRoot: "/p",
+      },
+    ];
+    try {
+      await openOn("closed:file:/p/src/a.ts");
+      await key("Tab");
+      await wait(20);
+      fireEvent.click(menuItem("Copy Path") as HTMLElement);
+      await wait(30);
+      expect(menuItem("Absolute Path")).toBeTruthy();
+      fireEvent.click(menuItem("Back") as HTMLElement);
+      await wait(30);
+      expect(menuItem("Copy Path")).toBeTruthy();
+      fireEvent.click(menuItem("Copy Path") as HTMLElement);
+      await wait(30);
+      fireEvent.click(menuItem("Workspace Path") as HTMLElement);
+      await wait(30);
+      expect(writeClipboardText).toHaveBeenLastCalledWith("src/a.ts");
+    } finally {
+      closedRows = [];
+    }
   });
 });
 
