@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PathKind } from "./notesDir";
 import {
+  applyOpsToRaw,
   DEFAULT_NOTES_CONFIG,
   deletePathInConfig,
   parseNotesConfig,
@@ -10,6 +11,30 @@ import {
   serializeNotesConfig,
   withAncestors,
 } from "./notesConfig";
+
+describe("applyOpsToRaw", () => {
+  it("keeps a note pinned by another window when this window only expands a folder", () => {
+    const onDisk = serializeNotesConfig(null, {
+      ...DEFAULT_NOTES_CONFIG,
+      quickAccess: ["x.md"],
+    });
+    const out = applyOpsToRaw(onDisk, [
+      (c) => ({ ...c, expandedFolders: [...c.expandedFolders, "docs"] }),
+    ]);
+    const cfg = parseNotesConfig(out);
+    expect(cfg.quickAccess).toEqual(["x.md"]);
+    expect(cfg.expandedFolders).toEqual(["docs"]);
+  });
+
+  it("replays the ops in order and keeps unrelated keys of the file", () => {
+    const out = applyOpsToRaw('{"other":1}', [
+      (c) => ({ ...c, quickAccess: ["a.md"] }),
+      (c) => ({ ...c, quickAccess: [...c.quickAccess, "b.md"] }),
+    ]);
+    expect(JSON.parse(out).other).toBe(1);
+    expect(parseNotesConfig(out).quickAccess).toEqual(["a.md", "b.md"]);
+  });
+});
 
 describe("parseNotesConfig", () => {
   it("returns defaults for null, invalid JSON, non-object, and missing namespace", () => {

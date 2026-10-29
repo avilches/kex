@@ -699,6 +699,10 @@ src/
     │                                `notes_read_heads`. All view state persists to `kex.json`
     │                                at the workspace root under the `notes` namespace (vault-relative forward-slash paths,
     │                                read-modify-write preserves foreign namespaces, no migrations: invalid file means defaults).
+    │                                A window writes its edits as operations replayed over the file as it is on disk
+    │                                (`applyOpsToRaw`), never its in-memory state, and adopts `fs:file-written` of
+    │                                `kex.json` when it has no edits pending, so two windows on one root do not drop
+    │                                each other's pins.
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`
     │                                tab, so it opens in Live Preview.
     ├── workspace/                 - Local + WSL environment switching
