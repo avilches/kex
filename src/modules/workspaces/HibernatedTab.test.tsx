@@ -57,6 +57,11 @@ describe("HibernatedTab", () => {
     expect(queryByText(/^Press /)).toBeNull();
   });
 
+  it("hides the Enter shortcut while the tab has no focus, since Enter would not wake it", () => {
+    const { getByRole } = render(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
+    expect(getByRole("button").textContent).toBe("Restore");
+  });
+
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {
     lines.read.mockResolvedValueOnce("\u001b[38;2;255;0;0merror: boom\u001b[0m\nplain");
     const { findByTestId, findByText, rerender } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
