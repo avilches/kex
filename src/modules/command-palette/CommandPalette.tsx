@@ -668,14 +668,15 @@ export function CommandPalette({
         backMenu();
         return;
       }
-      closeRowMenu();
-      if (id === "go") {
-        runAfterClose(() => onRunClosed(entry));
-      } else if (id === "copy" || id === "copyWorkspace" || id === "copyRepository") {
+      if (id === "copy" || id === "copyWorkspace" || id === "copyRepository") {
+        // Like a live tab: the copy only writes to the clipboard and the menu stays where it was.
         const kind = id === "copy" ? "absolute" : id === "copyWorkspace" ? "workspace" : "repository";
         const option = closedCopyOptions(entry, closedRepoRoot(entry)).find((o) => o.kind === kind);
         if (option) void copyToClipboard(option.text, option.toast);
+        return;
       }
+      closeRowMenu();
+      if (id === "go") runAfterClose(() => onRunClosed(entry));
     },
     [closeRowMenu, runAfterClose, onRunClosed, enterMoveMenu, backMenu],
   );

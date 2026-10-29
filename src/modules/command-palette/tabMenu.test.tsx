@@ -448,6 +448,7 @@ describe("Copy Path from a closed row", () => {
       fireEvent.click(menuItem("Workspace Path") as HTMLElement);
       await wait(30);
       expect(writeClipboardText).toHaveBeenLastCalledWith("src/a.ts");
+      expect(menuItem("Workspace Path")).toBeTruthy();
     } finally {
       closedRows = [];
     }
