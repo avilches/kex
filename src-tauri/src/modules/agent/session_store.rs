@@ -131,6 +131,19 @@ pub fn split_orphans(
     plans.into_iter().partition(|p| known.contains(&p.tab_id))
 }
 
+/// Plans for the tabs in `mine`, cloned. Plans are computed once per process, because
+/// computing them prunes records; each window then takes only its own.
+pub fn plans_for_tabs(
+    plans: &[RestorePlan],
+    mine: &std::collections::HashSet<String>,
+) -> Vec<RestorePlan> {
+    plans
+        .iter()
+        .filter(|p| mine.contains(&p.tab_id))
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 thread_local! {
     static STORE_OVERRIDE: std::cell::RefCell<Option<PathBuf>> =
@@ -1914,6 +1927,47 @@ mod tests {
             },
         );
         tabs
+    }
+
+    fn plan_for(tab_id: &str) -> RestorePlan {
+        RestorePlan {
+            tab_id: tab_id.to_string(),
+            agent: "claude".to_string(),
+            resume_cmd: "claude --resume x".to_string(),
+            attempted_cmd: String::new(),
+            cwd_launch: "/tmp".to_string(),
+            worktree_cwd: None,
+            error_reason: String::new(),
+            title: None,
+            notification: None,
+        }
+    }
+
+    #[test]
+    fn each_window_gets_only_the_plans_of_its_own_tabs() {
+        let plans = vec![plan_for("tab-a"), plan_for("tab-b"), plan_for("tab-c")];
+        let window_1 = std::collections::HashSet::from(["tab-a".to_string()]);
+        let window_2 = std::collections::HashSet::from(["tab-b".to_string(), "tab-c".to_string()]);
+
+        let ids = |p: Vec<RestorePlan>| p.into_iter().map(|p| p.tab_id).collect::<Vec<_>>();
+        assert_eq!(ids(plans_for_tabs(&plans, &window_1)), vec!["tab-a"]);
+        assert_eq!(ids(plans_for_tabs(&plans, &window_2)), vec!["tab-b", "tab-c"]);
+        assert!(plans_for_tabs(&plans, &Default::default()).is_empty());
+    }
+
+    #[test]
+    fn a_claude_session_without_transcript_is_pruned_when_plans_are_built_so_it_must_be_built_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        std::fs::create_dir_all(&cwd_launch).unwrap();
+        let jsonl = dir.path().join("missing.jsonl");
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, sample_tabs(&cwd_launch, &jsonl));
+
+        let first = load_restore_plan_from_path(&store_path);
+        assert_eq!(first.len(), 1);
+        let second = load_restore_plan_from_path(&store_path);
+        assert!(second.is_empty(), "a second build finds the record already pruned");
     }
 
     #[test]

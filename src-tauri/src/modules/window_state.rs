@@ -385,6 +385,16 @@ impl WindowStateManager {
         ids
     }
 
+    /// Terminal tab ids of one window; empty when the window is unknown.
+    pub fn window_terminal_tab_ids(&self, label: &str) -> HashSet<String> {
+        let state = self.inner.read().expect("window state lock poisoned");
+        let mut ids = HashSet::new();
+        if let Some(entry) = state.windows.get(label) {
+            collect_terminal_tab_ids(&entry.workspaces, &mut ids);
+        }
+        ids
+    }
+
     pub fn window_order(&self) -> Vec<String> {
         self.inner
             .read()

@@ -958,6 +958,13 @@ records: a stored session whose tab is in no window is dropped. A hibernated tab
 (carrying `hibernation`, not removed), so its record is not an orphan. A regression test
 (`terminal_tab_ids_includes_hibernated_tabs`) pins that, so a later change cannot make hibernated tabs look gone.
 
+**The plans are built once per process.** Building them prunes records (Claude with no transcript, agent with no
+provider row), so if each window built its own, the first window to ask would delete the record of a tab living in
+another window and that tab would restore without `--session-id`. `agent_session_restore_plan` computes the full list
+on the first call (`RESTORE_PLANS`, a `OnceLock`), splits the orphans against the union of every window, and returns
+to each window only the plans of its own tabs (`window_terminal_tab_ids` + `plans_for_tabs`, test
+`each_window_gets_only_the_plans_of_its_own_tabs`).
+
 ---
 
 ## Diagnosing a failed restore with Kex.log

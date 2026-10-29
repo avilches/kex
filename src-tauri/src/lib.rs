@@ -538,26 +538,42 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
     }
 }
 
+/// Computed by the first window that asks. Building the plans prunes records (a Claude session
+/// with no transcript, an agent with no provider), so doing it per window would let the first
+/// window delete the record of a tab that lives in another one.
+static RESTORE_PLANS: std::sync::OnceLock<Vec<agent::session_store::RestorePlan>> =
+    std::sync::OnceLock::new();
+
 #[tauri::command]
-fn agent_session_restore_plan(app: tauri::AppHandle) -> Vec<agent::session_store::RestorePlan> {
+fn agent_session_restore_plan(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Vec<agent::session_store::RestorePlan> {
     log::debug!("[agent-session] agent_session_restore_plan invoked");
-    let plans = agent::session_store::load_restore_plan();
-    let known = app
-        .state::<window_state::WindowStateManager>()
-        .terminal_tab_ids();
-    let (plans, orphans) = agent::session_store::split_orphans(plans, &known);
-    for orphan in &orphans {
-        log::info!(
-            "[agent-session] restore: tab {} is in no window, dropping its session",
-            orphan.tab_id
-        );
-        let _ = agent::session_store::detach_session(&orphan.tab_id);
-    }
-    log::info!(
-        "[agent-session] restore: {} plan(s) ready for frontend",
-        plans.len()
+    let mgr = app.state::<window_state::WindowStateManager>();
+    let all = RESTORE_PLANS.get_or_init(|| {
+        let plans = agent::session_store::load_restore_plan();
+        let (plans, orphans) =
+            agent::session_store::split_orphans(plans, &mgr.terminal_tab_ids());
+        for orphan in &orphans {
+            log::info!(
+                "[agent-session] restore: tab {} is in no window, dropping its session",
+                orphan.tab_id
+            );
+            let _ = agent::session_store::detach_session(&orphan.tab_id);
+        }
+        plans
+    });
+    let mine = agent::session_store::plans_for_tabs(
+        all,
+        &mgr.window_terminal_tab_ids(window.label()),
     );
-    plans
+    log::info!(
+        "[agent-session] restore: {} plan(s) ready for window {}",
+        mine.len(),
+        window.label()
+    );
+    mine
 }
 
 /// Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
