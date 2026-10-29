@@ -56,9 +56,9 @@ describe("tabMenuItems", () => {
       "note",
       "copy",
       "copyRelative",
-      "tabId",
       "moveWorkspace",
       "hibernateTab",
+      "tabId",
       "lock",
       "close",
     ]);

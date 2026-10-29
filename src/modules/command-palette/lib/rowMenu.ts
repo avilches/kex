@@ -201,22 +201,26 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
       ...(rel.ok ? { detail: rel.text } : {}),
     });
   }
-  items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
-  items.push({ id: "moveWorkspace", label: "Move to Workspace" });
+  items.push({ id: "moveWorkspace", label: "Move to Workspace", separatorBefore: true });
   if (tab.kind === "terminal") {
     items.push({
       id: entry.hibernated ? "restoreTab" : "hibernateTab",
       label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
       shortcutId: "tab.hibernate",
-      separatorBefore: true,
     });
   }
+  items.push({
+    id: "tabId",
+    label: "Copy Tab ID",
+    value: entry.tabId,
+    title: entry.tabId,
+    separatorBefore: true,
+  });
   items.push({
     id: "lock",
     label: locked ? "Unlock Tab" : "Lock Tab",
     shortcutId: "tab.lock",
     active: locked,
-    separatorBefore: tab.kind !== "terminal" || entry.hibernated,
   });
   items.push({ id: "close", label: "Close Tab", shortcutId: "tab.close", disabled: locked });
   return items;
