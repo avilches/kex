@@ -51,11 +51,11 @@ describe("HibernatedTab", () => {
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("hints both restore shortcuts under the button, as keys joined with or, and keeps the button clean", () => {
+  it("hints both restore shortcuts in the bottom-left corner, as keys joined with or and followed by Restore, and keeps the button clean", () => {
     const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     expect(getByRole("button").textContent).toBe("Restore");
     const hint = container.querySelector("[data-hibernated-hint]")!;
-    expect(hint.textContent).toMatch(/^Press.+or.+$/);
+    expect(hint.textContent).toMatch(/^.+or.+Restore$/);
     expect(hint.querySelectorAll("kbd")).toHaveLength(2);
   });
 

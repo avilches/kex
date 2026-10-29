@@ -1338,11 +1338,11 @@ function hibernatedTab(): HTMLElement {
       ),
       h(
         "span",
-        { class: "-mt-2 flex items-center gap-1.5 text-[11px] opacity-80", "data-surface": "hibernated-hint" },
-        "Press",
+        { class: "absolute bottom-2 left-3 flex items-center gap-1.5 text-[10px] opacity-80", "data-surface": "hibernated-hint" },
         h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "↵"),
         "or",
         h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "⌥⌘Z"),
+        "Restore",
       ),
       h("span", { class: "absolute right-3 bottom-2 text-[10px] opacity-50" }, "Hibernated for 2h"),
     ),

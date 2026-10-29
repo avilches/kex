@@ -72,14 +72,14 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
           Restore
         </Button>
         {focused && shortcuts.length > 0 && (
-          <span data-hibernated-hint className="-mt-2 flex items-center gap-1.5 text-[11px] opacity-80">
-            Press
+          <span data-hibernated-hint className="absolute bottom-2 left-3 flex items-center gap-1.5 text-[10px] opacity-80">
             {shortcuts.map((label, i) => (
               <Fragment key={label}>
                 {i > 0 && "or"}
                 <Kbd className="h-[18px] min-w-0 rounded px-1.5 text-[10.5px]">{label}</Kbd>
               </Fragment>
             ))}
+            Restore
           </span>
         )}
         <span className="absolute right-3 bottom-2 text-[10px] opacity-50">Hibernated for {formatHibernatedFor(now - at)}</span>
