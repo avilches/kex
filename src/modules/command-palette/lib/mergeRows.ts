@@ -1,5 +1,6 @@
 import { splitActionName } from "@/modules/actions/lib/actionName";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
+import { type RowTagKind, tabTagKind } from "../RowTag";
 import type { PaletteItem } from "../types";
 import {
   CLOSED_RECENT_LIMIT,
@@ -103,6 +104,33 @@ function fuzzyHit(query: string, field: string): Hit | null {
   const m = fuzzyMatchLower(query, field);
   if (m === null || !passesQuality(query.length, m.score)) return null;
   return { points: m.score, indices: m.indices };
+}
+
+// The tag a row wears is part of what it is: "work pepe" finds the workspace pepe. A word that starts
+// the tag is dropped and the rest is matched against the row, so the bare name still finds every kind.
+const MIN_TYPE_WORD = 2;
+
+function withoutTypeWord(q: string, tag: RowTagKind): string | null {
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+  const label = tag.toLowerCase();
+  const i = words.findIndex(
+    (w) => w.length >= MIN_TYPE_WORD && label.startsWith(w),
+  );
+  if (i < 0) return null;
+  return words.filter((_, k) => k !== i).join(" ");
+}
+
+function scoreWithType<T extends { points: number }>(
+  q: string,
+  tag: RowTagKind,
+  score: (query: string) => T | null,
+): T | null {
+  const whole = score(q);
+  const rest = withoutTypeWord(q, tag);
+  const typed = rest === null ? null : score(rest);
+  if (typed === null) return whole;
+  return whole === null || typed.points > whole.points ? typed : whole;
 }
 
 type FieldScored = { points: number; highlight?: RowHighlight };
@@ -269,11 +297,16 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     [];
   const blobs = buildSearchBlobs(commands);
   commands.forEach((item, i) => {
-    const hit = commandHit(blobs[i], q);
-    if (hit === null) return;
-    const p = blobs[i].some((f) => foldText(f).includes(q))
-      ? hit.points
-      : hit.points - SCATTERED_PENALTY;
+    const tag: RowTagKind = item.group === "Settings" ? "Setting" : "Action";
+    const scoreCommand = (query: string) => {
+      const found = commandHit(blobs[i], query);
+      if (found === null) return null;
+      const exact = blobs[i].some((f) => foldText(f).includes(query));
+      return { hit: found, points: exact ? found.points : found.points - SCATTERED_PENALTY };
+    };
+    const result = scoreWithType(q, tag, scoreCommand);
+    if (result === null) return;
+    const { hit, points: p } = result;
     const key = commandRowKey(item.id);
     scored.push({
       row: {
@@ -287,7 +320,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   });
   for (const item of userActions) {
-    const r = actionPoints(item, q);
+    const r = scoreWithType(q, "Action", (x) => actionPoints(item, x));
     if (r === null) continue;
     const key = actionRowKey(item.id);
     scored.push({
@@ -297,7 +330,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   }
   for (const entry of tabs) {
-    const r = tabPoints(entry, q);
+    const r = scoreWithType(q, tabTagKind(entry), (x) => tabPoints(entry, x));
     if (r === null) continue;
     const key = tabRowKey(entry.tabId);
     scored.push({
@@ -313,7 +346,9 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   }
   for (const entry of workspaces) {
-    const hit = fuzzyHit(q, entry.title);
+    const hit = scoreWithType(q, "Workspace", (x) =>
+      fuzzyHit(x, entry.title),
+    );
     if (hit === null) continue;
     const key = workspaceRowKey(entry.workspaceId);
     scored.push({
@@ -329,7 +364,11 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   }
   for (const entry of closed) {
-    const r = closedPoints(entry, q);
+    const r = scoreWithType(
+      q,
+      entry.kind === "terminal" ? "Terminal" : "File",
+      (x) => closedPoints(entry, x),
+    );
     if (r === null) continue;
     scored.push({
       row: { kind: "closed", key: entry.key, entry, highlight: r.highlight },

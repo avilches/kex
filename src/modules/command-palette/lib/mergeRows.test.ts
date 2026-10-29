@@ -694,3 +694,35 @@ describe("idle list workspaces", () => {
     expect(typed[0]).toMatchObject({ key: "tab:sleepy", current: true });
   });
 });
+
+describe("search by row type", () => {
+  const tabs = [tab("t1", { title: "pepe", workspaceTitle: "Other" })];
+  const workspaces = [ws("w1", "pepe")];
+
+  it("keeps showing every kind of row for the bare name", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "pepe" }));
+    expect(keys(rows).sort()).toEqual(["tab:t1", "ws:w1"]);
+  });
+
+  it("narrows to the workspace when a prefix of the type comes first", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "work pepe" }));
+    expect(keys(rows)).toEqual(["ws:w1"]);
+  });
+
+  it("accepts the type after the name and the full type word", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "pepe workspace" }));
+    expect(keys(rows)).toEqual(["ws:w1"]);
+  });
+
+  it("narrows to terminals with the terminal tag", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "term pepe" }));
+    expect(keys(rows)).toEqual(["tab:t1"]);
+  });
+
+  it("still matches a name that contains the type word", () => {
+    const rows = mergeRows(
+      input({ workspaces: [ws("w2", "work pepe")], term: "work pepe" }),
+    );
+    expect(keys(rows)).toEqual(["ws:w2"]);
+  });
+});
