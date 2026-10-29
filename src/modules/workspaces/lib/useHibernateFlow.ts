@@ -161,7 +161,7 @@ async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
       const held = liveHeldBlock(tab.id) ?? undefined;
-      return [tab.id, { at, agent: session?.agent ?? plan?.agent ?? held?.block.agent, command: restoreCommandFor(tab, plan) ?? (held?.block.command || undefined), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd), ...(held ? { held } : {}) }];
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent ?? held?.agent, command: restoreCommandFor(tab, plan) ?? (held?.command || undefined), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd), ...(held ? { held } : {}) }];
     }),
   );
   return Object.fromEntries(entries);

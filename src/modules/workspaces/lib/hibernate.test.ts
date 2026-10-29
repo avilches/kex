@@ -299,8 +299,7 @@ describe("hibernatedCommand", () => {
     expect(manualCommandWins(term("t", { persistentCommand: "a" }))).toBe(false);
   });
   it("drops the held error once the command it describes was edited", () => {
-    const block = { reason: "r", dir: "/d", command: "claude --resume x", restorable: true };
-    const held = { block, modal: true };
+    const held = { reason: "r", dir: "/d", command: "claude --resume x", restorable: true };
     expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "other", persistentCommandManual: true }) as never)).toBe(false);
     expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "claude --resume x", persistentCommandManual: true }) as never)).toBe(true);
     expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held } }) as never)).toBe(true);

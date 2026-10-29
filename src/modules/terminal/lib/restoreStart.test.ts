@@ -4,10 +4,6 @@ import {
   decideStart,
   needsDirCheck,
   openFailureBlock,
-  openWithoutRestoringFlow,
-  pendingAfterDirCheck,
-  pendingAfterPlan,
-  restoreCommandLine,
   retryRestoreFlow,
   type RestoreActionDeps,
   type RestoreBlock,
@@ -65,17 +61,30 @@ describe("decideStart", () => {
     });
   });
 
+  it("blocks a plain terminal whose folder is gone instead of falling back to Home", () => {
+    const d = decideStart({ ...base, initialCwd: "/pepe", dirProblem: "Folder not found: /pepe" });
+    expect(d).toEqual({
+      kind: "blocked",
+      block: { reason: "Folder not found: /pepe", dir: "/pepe", command: "", restorable: true },
+    });
+  });
+
   it("spawns plain with nothing to run", () => {
     expect(decideStart(base)).toEqual({ kind: "spawn", cwd: "/home", inject: "none" });
   });
 });
 
 describe("needsDirCheck", () => {
-  it("is only true for a saved command with a directory and no plan", () => {
+  it("is true for any start with a folder that runs no agent plan", () => {
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(true);
-    expect(needsDirCheck({ plan: plan(), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(false);
+    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(true);
+    expect(needsDirCheck({ plan: plan(), persistentCommand: undefined, initialCwd: "/a" })).toBe(true);
+  });
+
+  it("is false without a folder, or when an agent plan already checked its own", () => {
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: undefined })).toBe(false);
+    expect(needsDirCheck({ plan: plan({ resumeCmd: "claude -r" }), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
+    expect(needsDirCheck({ plan: plan({ errorReason: "gone" }), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
   });
 });
 
@@ -103,7 +112,7 @@ describe("openFailureBlock", () => {
   });
 });
 
-describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
+describe("retryRestoreFlow", () => {
   const block = (over: Partial<RestoreBlock> = {}): RestoreBlock => ({ reason: "r", dir: "/work", command: "claude", restorable: true, ...over });
   function setup(restoreBlock: RestoreBlock | null, over: Partial<RestoreActionDeps> = {}) {
     const s = { restoreBlock, ptyOpening: false, disposed: false };
@@ -125,7 +134,7 @@ describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
         calls.push("detach");
         openingAt.detach = s.ptyOpening;
       },
-      start: async (plain) => void calls.push(plain ? "start:plain" : "start"),
+      start: async () => void calls.push("start"),
       ...over,
     };
     return { s, d, calls, openingAt };
@@ -152,12 +161,6 @@ describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
     expect(seen).toEqual([b]);
   });
 
-  it("open without restoring starts a plain shell and keeps the agent session and its placeholder", async () => {
-    const { s, d, calls } = setup(block({ agent: "claude" }));
-    await openWithoutRestoringFlow(s, d);
-    expect(calls).toEqual(["unblock", "start:plain"]);
-  });
-
   it("puts the block back and frees ptyOpening when the preview fails", async () => {
     const b = block({ agent: "claude" });
     const { s, d, calls } = setup(b, {
@@ -179,44 +182,8 @@ describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
     gone.s.disposed = true;
     await retryRestoreFlow(gone.s, gone.d);
     const none = setup(null);
-    await openWithoutRestoringFlow(none.s, none.d);
+    await retryRestoreFlow(none.s, none.d);
     expect(gone.calls).toEqual([]);
     expect(none.calls).toEqual([]);
-  });
-});
-
-describe("restoreCommandLine", () => {
-  it("cds with && on Unix without a leading space", () => {
-    expect(restoreCommandLine("/work", "claude -r", false)).toBe("cd /work && claude -r\r");
-  });
-  it("quotes a directory with spaces", () => {
-    expect(restoreCommandLine("/my work", "x", false)).toBe("cd '/my work' && x\r");
-  });
-  it("joins with a semicolon on Windows", () => {
-    expect(restoreCommandLine("C:/w", "claude", true)).toBe("cd C:/w; claude\r");
-  });
-});
-
-describe("pendingAfterPlan", () => {
-  it("is gone when the store entry no longer exists", () => {
-    expect(pendingAfterPlan(null, false)).toEqual({ kind: "gone" });
-  });
-  it("stays blocked with the new reason, directory and command", () => {
-    const o = pendingAfterPlan(plan({ errorReason: "nope", cwdLaunch: "/d", attemptedCmd: "c" }), false);
-    expect(o).toEqual({ kind: "blocked", block: { reason: "nope", dir: "/d", command: "c", agent: "claude", restorable: true } });
-  });
-  it("runs the resume command in its directory", () => {
-    const o = pendingAfterPlan(plan({ resumeCmd: "claude -r", cwdLaunch: "/d" }), false);
-    expect(o).toEqual({ kind: "run", line: "cd /d && claude -r\r" });
-  });
-});
-
-describe("pendingAfterDirCheck", () => {
-  const b: RestoreBlock = { reason: "old", dir: "/d", command: "npm start", restorable: true };
-  it("keeps the block with the new problem", () => {
-    expect(pendingAfterDirCheck(b, "gone", false)).toEqual({ kind: "blocked", block: { ...b, reason: "gone" } });
-  });
-  it("runs the saved command when the directory is fine", () => {
-    expect(pendingAfterDirCheck(b, null, false)).toEqual({ kind: "run", line: "cd /d && npm start\r" });
   });
 });

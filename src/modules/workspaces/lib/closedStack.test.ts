@@ -393,7 +393,7 @@ describe("buildReopenedTab with a held restore block", () => {
     const tab = {
       id: "tab-a",
       kind: "terminal",
-      held: { modal: true, block: { reason: "r", dir: "/d", command: "c", restorable: true } },
+      held: { reason: "r", dir: "/d", command: "c", restorable: true },
     } as Tab;
     expect(buildReopenedTab(tab, "tab-b")).not.toHaveProperty("held");
   });

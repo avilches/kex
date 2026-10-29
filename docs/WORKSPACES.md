@@ -189,7 +189,7 @@ Key fields of a `Session`:
 
 A leaf whose start cannot happen (unusable restore directory, `openPty` failing) has no PTY and a non-null
 `Session.restoreBlock`; `attachSession` skips it. The modal that holds it covers that tab's content only. Flow, Try again,
-Open terminal without restoring and the pending restore (Retry restore / Discard restore plan in the Restore Command menu)
+the pending restore (Retry restore / Discard restore plan in the Restore Command menu)
 are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
 
 ### Visible vs. parked

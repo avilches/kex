@@ -853,7 +853,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         const plan = await previewResumeCmd(tab.id);
         if (plan) seedRestorePlan(newId, plan);
       }
-      if (tab.kind === "terminal" && tab.held && (!manualCommandWins(tab) || tab.held.block.command === tab.persistentCommand)) {
+      if (tab.kind === "terminal" && tab.held && (!manualCommandWins(tab) || tab.held.command === tab.persistentCommand)) {
         seedHeldBlock(newId, tab.held);
       }
     };

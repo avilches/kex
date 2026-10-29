@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useRestoreBusy } from "./lib/restoreBusy";
-import { openWithoutRestoring, retryRestore } from "./lib/useTerminalSession";
+import { retryRestore } from "./lib/useTerminalSession";
 import type { RestoreBlock } from "./lib/restoreStart";
 
 type Props = { leafId: string; block: RestoreBlock };
@@ -46,17 +46,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
         </div>
         <Field label="Folder" value={block.dir} />
         <Field label="Command" value={block.command} />
-        {block.restorable && (
-          <span className="text-[12px] text-muted-foreground">
-            The restore plan is kept. You can retry it later from Restore Command in this tab's menu.
-          </span>
-        )}
         <div className="flex justify-end gap-2">
-          {block.restorable && (
-            <Button variant="outline" disabled={busy} onClick={() => run(openWithoutRestoring)}>
-              Open terminal without restoring
-            </Button>
-          )}
           <Button autoFocus disabled={busy} onClick={() => run(retryRestore)} className="gap-2">
             {retrying && <Spinner size={16} className="text-current" />}
             Try again

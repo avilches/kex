@@ -148,7 +148,7 @@ export function hibernatedCommand(tab: SleepingTab): string {
 // The held restore error describes a command; an edited command makes it stale.
 export function heldBlockStillValid(tab: SleepingTab): boolean {
   const held = tab.hibernation.held;
-  return !!held && (!manualCommandWins(tab) || held.block.command === tab.persistentCommand);
+  return !!held && (!manualCommandWins(tab) || held.command === tab.persistentCommand);
 }
 
 // The Restore Command is saved every time a terminal stops (hibernate or close), so waking it or

@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
 import {
   consumeRestorePlan,
@@ -35,7 +34,6 @@ import {
   registerTitleHandler,
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
-import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { consumeHeldBlock, setModalBlock, getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { takeWakeBackdrop } from "./wakeBackdrop";
@@ -47,9 +45,7 @@ import {
   decideStart,
   needsDirCheck,
   openFailureBlock,
-  openWithoutRestoringFlow,
   discardPendingFlow,
-  retryPendingFlow,
   retryRestoreFlow,
   type RestoreActionDeps,
   type RestoreBlock,
@@ -977,8 +973,7 @@ function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
 // restored terminal":
 //   - had an agent (plan)             -> resume it, or hold the tab on its error
 //   - no agent, has a saved command   -> run that command, or hold the tab if its directory is unusable
-// `plain` skips all of that (the user cancelled the restore) and only opens a shell.
-async function startLeaf(leafId: string, s: Session, plain = false): Promise<void> {
+async function startLeaf(leafId: string, s: Session): Promise<void> {
   s.ptyOpening = true;
   await restorePlansReady();
   if (s.disposed || s.pty) {
@@ -987,15 +982,13 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   }
   // Consume the plan before spawning so the PTY starts in the agent's cwd
   // directly, without needing a `cd` shell command.
-  const held = plain ? null : consumeHeldBlock(leafId);
-  if (held) consumeRestorePlan(leafId);
-  if (held?.modal) {
-    blockStart(leafId, s, held.block);
+  const held = consumeHeldBlock(leafId);
+  if (held) {
+    consumeRestorePlan(leafId);
+    blockStart(leafId, s, held);
     return;
   }
-  if (held) setPendingRestore(leafId, held.block);
-  const plainStart = plain || !!held;
-  const plan = plainStart ? null : consumeRestorePlan(leafId);
+  const plan = consumeRestorePlan(leafId);
   const input = {
     plan,
     persistentCommand: s.persistentCommand,
@@ -1003,12 +996,8 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   };
   const checkDir = (path: string) =>
     invoke<string | null>("check_launch_dir", { path }).catch(() => null);
-  // A plain start falls back to the shell's default directory when the saved one is the problem.
-  const dirProblem =
-    plainStart || needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
-  const decision = plainStart
-    ? { kind: "spawn" as const, cwd: s.initialCwd && !dirProblem ? s.initialCwd : undefined, inject: "none" as const }
-    : decideStart({ ...input, dirProblem });
+  const dirProblem = needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
+  const decision = decideStart({ ...input, dirProblem });
   if (s.disposed || s.pty) {
     s.ptyOpening = false;
     return;
@@ -1028,7 +1017,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
       s.ptyOpening = false;
       return;
     }
-    const command = plan?.resumeCmd || (plainStart ? "" : (s.persistentCommand ?? ""));
+    const command = plan?.resumeCmd || (s.persistentCommand ?? "");
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
     const agent = decision.inject === "resume" ? plan?.agent : undefined;
@@ -1040,7 +1029,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     pty.close();
     return;
   }
-  if (!plainStart) setPendingRestore(leafId, null);
+  setPendingRestore(leafId, null);
   if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
   // The folder the shell actually started in, known before the first OSC 7;
@@ -1067,19 +1056,13 @@ function restoreActionDeps(leafId: string, s: Session): RestoreActionDeps {
     previewPlan: () => previewResumeCmd(leafId),
     seedPlan: (plan) => seedRestorePlan(leafId, plan),
     detachAgent: () => detachAgentSession(leafId),
-    start: (plain) => startLeaf(leafId, s, plain),
+    start: () => startLeaf(leafId, s),
   };
 }
 
 export async function retryRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
   if (s) await withRestoreBusy(leafId, () => retryRestoreFlow(s, restoreActionDeps(leafId, s)));
-}
-
-// Plain shell; the plan stays pending so the user can still run or discard it later.
-export async function openWithoutRestoring(leafId: string): Promise<void> {
-  const s = sessions.get(leafId);
-  if (s) await openWithoutRestoringFlow(s, restoreActionDeps(leafId, s));
 }
 
 const isAgentRunningIn = (leafId: string) =>
@@ -1102,31 +1085,10 @@ useAgentStore.subscribe((state) => {
   }
 });
 
-// Runs a pending restore inside the live shell. No-op while there is no PTY.
+// The menu's Retry restore is the dialog's Try again: a pending restore only exists while the
+// terminal is held, because nothing starts the shell until it can run.
 export async function retryPendingRestore(leafId: string): Promise<void> {
-  const s = sessions.get(leafId);
-  if (!s) return;
-  const pty = s.pty;
-  if (!pty) {
-    // The modal is still up (no shell yet): the menu action is its Try again.
-    if (s.restoreBlock) await retryRestore(leafId);
-    return;
-  }
-  await withRestoreBusy(leafId, () => retryPendingFlow({
-    ...pendingActionDeps(leafId),
-    isWindows: IS_WINDOWS,
-    previewPlan: () => previewResumeCmd(leafId),
-    checkDir: (path) => invoke<string | null>("check_launch_dir", { path }).catch(() => null),
-    isStale: () => s.disposed || s.pty !== pty,
-    stillBlocked: (block) => toast.error("Restore still failing", { description: block.reason }),
-    markBlocked: (block) =>
-      useAgentStore.getState().setRestoreError(leafId, leafId, block.agent ?? "", block.reason),
-    adopt: (plan) => {
-      stageRestoredSnapshot(leafId, plan);
-      watchResume(leafId, plan);
-    },
-    write: (line) => writeWhenShellReady(s, leafId, pty, line),
-  }));
+  if (sessions.get(leafId)?.restoreBlock) await retryRestore(leafId);
 }
 
 // The only place besides agent exit and tab close that deletes the agent session from the store.

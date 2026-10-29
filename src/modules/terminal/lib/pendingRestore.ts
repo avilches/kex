@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
-import { heldBlockOf, type HeldBlock, type RestoreBlock } from "./restoreStart";
+import type { RestoreBlock } from "./restoreStart";
 
 // A restore plan that has not run and that the user may still want. Kept apart from
 // Session.restoreBlock, which is the modal and goes away when the user opens a plain shell.
@@ -42,13 +42,13 @@ export function usePendingRestore(leafId: string): RestoreBlock | null {
 
 // Blocks carried across a hibernation or a close, keyed by the id the tab will have when it comes
 // back. Consumed by the first start of that terminal.
-const held = new Map<string, HeldBlock>();
+const held = new Map<string, RestoreBlock>();
 
-export function seedHeldBlock(tabId: string, block: HeldBlock): void {
+export function seedHeldBlock(tabId: string, block: RestoreBlock): void {
   held.set(tabId, block);
 }
 
-export function consumeHeldBlock(tabId: string): HeldBlock | null {
+export function consumeHeldBlock(tabId: string): RestoreBlock | null {
   const block = held.get(tabId) ?? null;
   held.delete(tabId);
   return block;
@@ -63,6 +63,6 @@ export function setModalBlock(leafId: string, block: RestoreBlock | null): void 
 }
 
 // The restore that did not run for this tab, as a stopping tab must carry it.
-export function liveHeldBlock(leafId: string): HeldBlock | null {
-  return heldBlockOf(modal.get(leafId) ?? null, getPendingRestore(leafId));
+export function liveHeldBlock(leafId: string): RestoreBlock | null {
+  return modal.get(leafId) ?? null;
 }
