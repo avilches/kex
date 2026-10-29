@@ -1,4 +1,3 @@
-import { pathBasename } from "@/lib/pathUtils";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { pathCopyOptions, type PathCopyKind, type PathCopyOption } from "@/modules/explorer/lib/pathCopyOptions";
@@ -105,7 +104,7 @@ export function workspaceRowKeys(rows: readonly MergedRow[], workspaceId: string
 export function workspaceMenuItems(entry: WorkspaceEntry): RowMenuItem[] {
   const items: RowMenuItem[] = [{ id: "go", label: "Go to Workspace", enter: true }];
   if (entry.root) {
-    items.push({ id: "terminal", label: "New Terminal", title: entry.root, shortcutId: "tab.new" });
+    items.push({ id: "terminal", label: "Open in Terminal", title: entry.root, shortcutId: "tab.new" });
   }
   items.push({ id: "rename", label: "Rename Workspace", shortcutId: "workspace.rename" });
   if (entry.canHibernate) items.push({ id: "hibernate", label: "Hibernate Workspace" });
@@ -223,7 +222,13 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
       label: entry.hibernated ? "Restore and go to Tab" : "Go to Tab",
       enter: true,
     },
-    { id: "terminal", label: "Open new Terminal", shortcutId: "tab.new", disabled: !entry.cwd },
+    {
+      id: "terminal",
+      label: "Open in Terminal",
+      shortcutId: "tab.new",
+      disabled: !entry.cwd,
+      ...(entry.cwd ? { title: entry.cwd } : {}),
+    },
   ];
   if ((tab.kind === "editor" || tab.kind === "markdown") && tab.dirty) {
     items.push({ id: "save", label: "Save", shortcutId: "editor.save" });
@@ -325,7 +330,7 @@ export function folderMenuItems(target: FolderMenuTarget): RowMenuItem[] {
   const items: RowMenuItem[] = [
     {
       id: "pick",
-      label: `New Tab in ${pathBasename(target.path, { tolerateTrailingSlash: true }) || target.path}`,
+      label: "Open in Terminal",
       title: target.path,
       enter: true,
     },

@@ -90,7 +90,7 @@ describe("FolderPalette row menu Actions", () => {
     mount("/o/src", workspace());
     await openMenu();
     expect(menuLabels()).toEqual([
-      expect.stringContaining("New Tab in src"),
+      expect.stringContaining("Open in Terminal"),
       expect.stringContaining("Copy Absolute Path"),
       expect.stringContaining("Claude Code"),
     ]);

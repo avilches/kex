@@ -571,7 +571,7 @@ function FolderFooter({
     <div className="flex min-w-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <kbd className={kbd}>{"\u21b5"}</kbd>
-        <span className="shrink-0">New Tab in</span>
+        <span className="shrink-0">Open in Terminal</span>
         <span className="min-w-0 truncate font-mono text-[10.5px]">{row.display}</span>
       </span>
       {row.repoKey && row.repoHint ? (
