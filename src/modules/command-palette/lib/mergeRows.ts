@@ -27,13 +27,21 @@ export type MergedRow =
       key: string;
       item: PaletteItem;
       highlight?: RowHighlight;
+      tagHit?: number;
     }
-  | { kind: "action"; key: string; item: BarItem; highlight?: RowHighlight }
+  | {
+      kind: "action";
+      key: string;
+      item: BarItem;
+      highlight?: RowHighlight;
+      tagHit?: number;
+    }
   | {
       kind: "tab";
       key: string;
       entry: TabEntry;
       highlight?: RowHighlight;
+      tagHit?: number;
       // The tab the user is in right now: always the first row, under its own heading.
       current?: boolean;
     }
@@ -42,6 +50,7 @@ export type MergedRow =
       key: string;
       entry: WorkspaceEntry;
       highlight?: RowHighlight;
+      tagHit?: number;
       current?: boolean;
     }
   | {
@@ -49,6 +58,7 @@ export type MergedRow =
       key: string;
       entry: ClosedTabEntry;
       highlight?: RowHighlight;
+      tagHit?: number;
     };
 
 // Which display slot the highlighted characters belong to, so an item applies them to the right span:
@@ -106,31 +116,52 @@ function fuzzyHit(query: string, field: string): Hit | null {
   return { points: m.score, indices: m.indices };
 }
 
-// The tag a row wears is part of what it is: "work pepe" finds the workspace pepe. A word that starts
-// the tag is dropped and the rest is matched against the row, so the bare name still finds every kind.
+// The tag a row wears is part of what it is: "work pepe" finds the workspace pepe, and "work" alone
+// lists every workspace. A word that starts the tag is dropped and the rest is matched against the
+// row, so the bare name still finds every kind. `tagHit` is how many letters of the tag it covered.
 const MIN_TYPE_WORD = 2;
+// Rows picked only by their type: the whole word ("workspace") is what was asked for and goes above
+// any name match; a bare prefix ("set") may just be the start of a name, so it goes below them.
+const TYPE_ONLY_POINTS = TIER_STEP;
+const TYPE_PREFIX_POINTS = SUBSTRING_BASE - 4 * TIER_STEP;
 
-function withoutTypeWord(q: string, tag: RowTagKind): string | null {
+function typeWord(
+  q: string,
+  tag: RowTagKind,
+): { rest: string; tagHit: number } | null {
   const words = q.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return null;
   const label = tag.toLowerCase();
   const i = words.findIndex(
     (w) => w.length >= MIN_TYPE_WORD && label.startsWith(w),
   );
   if (i < 0) return null;
-  return words.filter((_, k) => k !== i).join(" ");
+  return {
+    rest: words.filter((_, k) => k !== i).join(" "),
+    tagHit: words[i].length,
+  };
 }
+
+type Typed<T> = { value: T; tagHit?: number };
 
 function scoreWithType<T extends { points: number }>(
   q: string,
   tag: RowTagKind,
   score: (query: string) => T | null,
-): T | null {
+  typeOnly: (points: number) => T,
+): Typed<T> | null {
   const whole = score(q);
-  const rest = withoutTypeWord(q, tag);
-  const typed = rest === null ? null : score(rest);
-  if (typed === null) return whole;
-  return whole === null || typed.points > whole.points ? typed : whole;
+  const word = typeWord(q, tag);
+  if (word === null) return whole === null ? null : { value: whole };
+  const typed =
+    word.rest === ""
+      ? typeOnly(
+          word.tagHit === tag.length ? TYPE_ONLY_POINTS : TYPE_PREFIX_POINTS,
+        )
+      : score(word.rest);
+  if (typed === null) return whole === null ? null : { value: whole };
+  if (whole !== null && whole.points > typed.points && word.rest === "")
+    return { value: whole, tagHit: word.tagHit };
+  return { value: typed, tagHit: word.tagHit };
 }
 
 type FieldScored = { points: number; highlight?: RowHighlight };
@@ -304,9 +335,13 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       const exact = blobs[i].some((f) => foldText(f).includes(query));
       return { hit: found, points: exact ? found.points : found.points - SCATTERED_PENALTY };
     };
-    const result = scoreWithType(q, tag, scoreCommand);
+    const typedOnly = (points: number) => ({
+      hit: { points, indices: [], field: -1 },
+      points,
+    });
+    const result = scoreWithType(q, tag, scoreCommand, typedOnly);
     if (result === null) return;
-    const { hit, points: p } = result;
+    const { hit, points: p } = result.value;
     const key = commandRowKey(item.id);
     scored.push({
       row: {
@@ -314,24 +349,43 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         key,
         item,
         highlight: hit.field === 0 ? asHighlight(hit, "title") : undefined,
+        tagHit: result.tagHit,
       },
       points: p + learnedBoost(learned, q, key),
       recency: null,
     });
   });
   for (const item of userActions) {
-    const r = scoreWithType(q, "Action", (x) => actionPoints(item, x));
-    if (r === null) continue;
+    const typed = scoreWithType(
+      q,
+      "Action",
+      (x) => actionPoints(item, x),
+      (points): FieldScored => ({ points }),
+    );
+    if (typed === null) continue;
+    const r = typed.value;
     const key = actionRowKey(item.id);
     scored.push({
-      row: { kind: "action", key, item, highlight: r.highlight },
+      row: {
+        kind: "action",
+        key,
+        item,
+        highlight: r.highlight,
+        tagHit: typed.tagHit,
+      },
       points: r.points + learnedBoost(learned, q, key),
       recency: null,
     });
   }
   for (const entry of tabs) {
-    const r = scoreWithType(q, tabTagKind(entry), (x) => tabPoints(entry, x));
-    if (r === null) continue;
+    const typed = scoreWithType(
+      q,
+      tabTagKind(entry),
+      (x) => tabPoints(entry, x),
+      (points): FieldScored => ({ points }),
+    );
+    if (typed === null) continue;
+    const r = typed.value;
     const key = tabRowKey(entry.tabId);
     scored.push({
       row: {
@@ -339,6 +393,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         key,
         entry,
         highlight: r.highlight,
+        tagHit: typed.tagHit,
         current: entry.tabId === activeTabId ? true : undefined,
       },
       points: r.points,
@@ -346,10 +401,14 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   }
   for (const entry of workspaces) {
-    const hit = scoreWithType(q, "Workspace", (x) =>
-      fuzzyHit(x, entry.title),
+    const typed = scoreWithType(
+      q,
+      "Workspace",
+      (x) => fuzzyHit(x, entry.title),
+      (points) => ({ points, indices: [] }),
     );
-    if (hit === null) continue;
+    if (typed === null) continue;
+    const hit = typed.value;
     const key = workspaceRowKey(entry.workspaceId);
     scored.push({
       row: {
@@ -357,6 +416,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         key,
         entry,
         highlight: asHighlight(hit, "title"),
+        tagHit: typed.tagHit,
         current: entry.workspaceId === input.activeWorkspaceId ? true : undefined,
       },
       points: hit.points + learnedBoost(learned, q, key),
@@ -364,14 +424,24 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     });
   }
   for (const entry of closed) {
-    const r = scoreWithType(
+    const typed = scoreWithType(
       q,
       entry.kind === "terminal" ? "Terminal" : "File",
       (x) => closedPoints(entry, x),
+      (points): FieldScored => ({
+        points: points + entry.uses * TIER_STEP,
+      }),
     );
-    if (r === null) continue;
+    if (typed === null) continue;
+    const r = typed.value;
     scored.push({
-      row: { kind: "closed", key: entry.key, entry, highlight: r.highlight },
+      row: {
+        kind: "closed",
+        key: entry.key,
+        entry,
+        highlight: r.highlight,
+        tagHit: typed.tagHit,
+      },
       points: r.points,
       recency: null,
     });

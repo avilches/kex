@@ -719,6 +719,25 @@ describe("search by row type", () => {
     expect(keys(rows)).toEqual(["tab:t1"]);
   });
 
+  it("lists every row of a type when the type is all that was typed", () => {
+    const many = [ws("w1", "pepe"), ws("w2", "zeta")];
+    const rows = mergeRows(input({ tabs, workspaces: many, term: "workspace" }));
+    expect(keys(rows)).toEqual(["ws:w1", "ws:w2"]);
+    expect(rows[0]).toMatchObject({ tagHit: 9 });
+  });
+
+  it("lists the terminals for a prefix of the type", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "te" }));
+    expect(keys(rows)).toEqual(["tab:t1"]);
+  });
+
+  it("marks how much of the tag the typed word covered", () => {
+    const rows = mergeRows(input({ tabs, workspaces, term: "wo pepe" }));
+    expect(rows[0]).toMatchObject({ key: "ws:w1", tagHit: 2 });
+    const bare = mergeRows(input({ tabs, workspaces, term: "pepe" }));
+    expect(bare.every((r) => r.tagHit === undefined)).toBe(true);
+  });
+
   it("still matches a name that contains the type word", () => {
     const rows = mergeRows(
       input({ workspaces: [ws("w2", "work pepe")], term: "work pepe" }),

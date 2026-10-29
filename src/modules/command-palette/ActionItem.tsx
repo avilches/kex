@@ -8,11 +8,13 @@ import type { PaletteItem } from "./types";
 export function ActionItem({
   item,
   highlight,
+  tagHit,
   shortcutLabel,
   onRun,
 }: {
   item: PaletteItem;
   highlight?: RowHighlight;
+  tagHit?: number;
   shortcutLabel: string | null;
   onRun: () => void;
 }) {
@@ -24,7 +26,10 @@ export function ActionItem({
       onSelect={onRun}
       className="text-[12.5px]"
     >
-      <RowTag kind={item.group === "Settings" ? "Setting" : "Action"} />
+      <RowTag
+        kind={item.group === "Settings" ? "Setting" : "Action"}
+        hit={tagHit}
+      />
       {item.icon ? (
         <HugeiconsIcon
           icon={item.icon}

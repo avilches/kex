@@ -10,11 +10,13 @@ import { RowTag } from "./RowTag";
 export function ClosedItem({
   entry,
   term = "",
+  tagHit,
   onRun,
   onContextMenu,
 }: {
   entry: ClosedTabEntry;
   term?: string;
+  tagHit?: number;
   onRun: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
@@ -31,7 +33,7 @@ export function ClosedItem({
       className="text-[12.5px]"
     >
       <span className="flex min-w-0 flex-1 items-center gap-2 opacity-60">
-      <RowTag kind={folder ? "Terminal" : "File"} closed />
+      <RowTag kind={folder ? "Terminal" : "File"} closed hit={tagHit} />
       <span className="shrink-0 text-muted-foreground">
         <HugeiconsIcon
           icon={folder ? Folder01Icon : File01Icon}

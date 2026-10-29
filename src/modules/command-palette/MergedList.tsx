@@ -45,6 +45,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <ActionRowItem
         item={row.item}
         highlight={row.highlight}
+      tagHit={row.tagHit}
         onRun={() => p.onRunAction(row.item)}
         onContextMenu={
           p.onContextMenuAction ? (e) => p.onContextMenuAction?.(row.item, e) : undefined
@@ -57,6 +58,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <TabItem
         entry={row.entry}
         highlight={row.highlight}
+      tagHit={row.tagHit}
         term={p.term}
         onRun={() => p.onRunTab(row.entry)}
         onContextMenu={
@@ -70,6 +72,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <WorkspaceItem
         entry={row.entry}
         highlight={row.highlight}
+      tagHit={row.tagHit}
         current={row.current}
         onRun={() => p.onRunWorkspace(row.entry)}
         onContextMenu={
@@ -85,6 +88,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <ClosedItem
         entry={row.entry}
         term={p.term}
+        tagHit={row.tagHit}
         onRun={() => p.onRunClosed(row.entry)}
         onContextMenu={
           p.onContextMenuClosed ? (e) => p.onContextMenuClosed?.(row.entry, e) : undefined
@@ -96,6 +100,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
     <ActionItem
       item={row.item}
       highlight={row.highlight}
+      tagHit={row.tagHit}
       shortcutLabel={shortcutLabel(row.item.shortcutId, p.userShortcuts)}
       onRun={() => p.onRunCommand(row.item)}
     />

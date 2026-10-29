@@ -25,12 +25,14 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
 export function TabItem({
   entry,
   highlight,
+  tagHit,
   term = "",
   onRun,
   onContextMenu,
 }: {
   entry: TabEntry;
   highlight?: RowHighlight;
+  tagHit?: number;
   term?: string;
   onRun: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
@@ -51,7 +53,7 @@ export function TabItem({
       className="text-[12.5px]"
     >
       <span className={cn("flex min-w-0 flex-1 items-center gap-2", entry.hibernated && "opacity-40")}>
-      <RowTag kind={tabTagKind(entry)} />
+      <RowTag kind={tabTagKind(entry)} hit={tagHit} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
         <TabBarIcon
           tab={entry.tab}

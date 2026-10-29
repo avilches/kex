@@ -9,11 +9,13 @@ import { RowTag } from "./RowTag";
 export function ActionRowItem({
   item,
   highlight,
+  tagHit,
   onRun,
   onContextMenu,
 }: {
   item: BarItem;
   highlight?: RowHighlight;
+  tagHit?: number;
   onRun: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
@@ -25,7 +27,7 @@ export function ActionRowItem({
       title={item.title ?? undefined}
       className="text-[12.5px]"
     >
-      <RowTag kind="Action" />
+      <RowTag kind="Action" hit={tagHit} />
       <span className="shrink-0 text-muted-foreground">
         <ActionIcon action={item.action} />
       </span>

@@ -8,12 +8,14 @@ import { RowTag } from "./RowTag";
 export function WorkspaceItem({
   entry,
   highlight,
+  tagHit,
   current,
   onRun,
   onContextMenu,
 }: {
   entry: WorkspaceEntry;
   highlight?: RowHighlight;
+  tagHit?: number;
   current?: boolean;
   onRun: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
@@ -25,7 +27,7 @@ export function WorkspaceItem({
       onContextMenu={onContextMenu}
       className="text-[12.5px]"
     >
-      <RowTag kind="Workspace" />
+      <RowTag kind="Workspace" hit={tagHit} />
       <WorkspaceMark
         id={entry.workspaceId}
         color={entry.color}
