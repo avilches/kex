@@ -58,7 +58,7 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   stderr siga recibiéndolo. Se busca con `grep '\[panic\]' user-data/logs/Kex.log`. TASK-912.
 - **`strip = "debuginfo"` en `[profile.release]` (temporal)**: conserva los nombres de función para que el backtrace del
   hook se pueda leer. Con `strip = true` el ejecutable no tiene símbolos. Medido el 2026-10-21: 11,0 MB recortado y
-  13,8 MB sin recortar; el tamaño con `"debuginfo"` no está medido. Hay que volver a `strip = true` cuando se
+  13,8 MB sin recortar; con `"debuginfo"` el ejecutable mide 13,4 MB (2026-10-28, otro código fuente que los 11,0 MB, así que no es una comparación limpia; para una limpia, compilar las dos variantes sobre el mismo commit). Hay que volver a `strip = true` cuando se
   encuentre la causa de los crashes: TASK-913.
 - **Documentación**: `docs/BUILD.md` ("Profiling a slow window"), `docs/ARCHITECTURE.md` (mapa de módulos) y
   `docs/FORK.md` ("Performance profiler").
