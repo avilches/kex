@@ -8,11 +8,13 @@ import { RowTag } from "./RowTag";
 export function WorkspaceItem({
   entry,
   highlight,
+  current,
   onRun,
   onContextMenu,
 }: {
   entry: WorkspaceEntry;
   highlight?: RowHighlight;
+  current?: boolean;
   onRun: () => void;
   onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
@@ -37,6 +39,7 @@ export function WorkspaceItem({
         />
       </span>
       <span className="ml-auto shrink-0 text-[11px] font-normal text-muted-foreground">
+        {current ? "active, " : ""}
         {entry.tabCount === 0
           ? "empty"
           : `${entry.tabCount} ${entry.tabCount === 1 ? "tab" : "tabs"}`}

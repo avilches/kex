@@ -170,7 +170,7 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:ping", "tab:busy", "tab:recent", "tab:old"]);
   });
 
-  it("drops a workspace row when one of its tabs is already in the results", () => {
+  it("keeps a workspace row even when one of its tabs is already in the results, after the tabs", () => {
     const rows = mergeRows(
       input({
         term: "back",
@@ -178,7 +178,19 @@ describe("mergeRows", () => {
         workspaces: [ws("w1", "Backlog"), ws("w2", "Backup")],
       }),
     );
-    expect(keys(rows)).toEqual(["tab:t", "ws:w2"]);
+    expect(keys(rows)).toEqual(["tab:t", "ws:w1", "ws:w2"]);
+  });
+
+  it("lists the active workspace while typing, flagged as current", () => {
+    const rows = mergeRows(
+      input({
+        term: "back",
+        activeWorkspaceId: "w1",
+        workspaces: [ws("w1", "Backlog"), ws("w2", "Backup")],
+      }),
+    );
+    expect(keys(rows)).toEqual(["ws:w1", "ws:w2"]);
+    expect(rows.map((r) => r.kind === "workspace" && r.current)).toEqual([true, undefined]);
   });
 
   it("with an empty term lists closed entries between recents and actions", () => {
@@ -582,7 +594,7 @@ describe("idle list workspaces", () => {
     mru: {},
   };
 
-  it("offers every workspace but the active one, empty ones included, most recent first", () => {
+  it("offers every workspace, the active one flagged, empty ones included, most recent first", () => {
     const rows = mergeRows({
       ...base,
       activeWorkspaceId: "a",
@@ -592,7 +604,8 @@ describe("idle list workspaces", () => {
         { ...ws("c", "C"), lastUsedAt: 5 },
       ],
     });
-    expect(rows.map((r) => r.key)).toEqual(["ws:c", "ws:b"]);
+    expect(rows.map((r) => r.key)).toEqual(["ws:c", "ws:b", "ws:a"]);
+    expect(rows.map((r) => r.kind === "workspace" && r.current)).toEqual([undefined, undefined, true]);
   });
 
   describe("current tab", () => {
