@@ -1323,9 +1323,10 @@ export async function setPerformanceProfiler(value: boolean): Promise<void> {
   await writePref(KEY_PERFORMANCE_PROFILER, value);
 }
 
-// Read, change and write the list in one step, one at a time: two rows (or two windows) that
+// Read, change and write the list in one step, one at a time: two rows in this window that
 // install different agents at once must both end up in it, which a list captured at render
-// time would not guarantee.
+// time would not guarantee. The queue is per webview, so two windows can still race, within
+// milliseconds and only on a list that holds a handful of ids.
 let integrationsQueue: Promise<unknown> = Promise.resolve();
 
 export function updateInstalledIntegrations(
