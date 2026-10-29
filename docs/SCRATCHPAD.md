@@ -13,7 +13,7 @@ full war-story history of how this model was arrived at (three separate redesign
 ## 1. The binary model
 
 The scratchpad is a per-terminal input bar (`ScratchpadBar.tsx`) floated over the bottom of the terminal grid
-(`ScratchpadOverlay.tsx`, mounted from `TerminalPane.tsx`) on a dimmed `bg-black/30` layer, so it never resizes the terminal.
+(`ScratchpadOverlay.tsx`, mounted from `TerminalPane.tsx`) on a dimmed `bg-black/30` layer, like a launcher (centered, `max-w-3xl`, lifted off the bottom edge), so it never resizes the terminal.
 The layer ignores the pointer, so clicking the dimmed terminal still dismisses the scratchpad. Its entire state is one boolean, `Session.scratchpadOpen`
 (`src/modules/terminal/lib/useTerminalSession.ts`), kept in the module-scope `sessions` map alongside
 the rest of a terminal leaf's live state (`visibleNow`, `focusedNow`, etc.).
