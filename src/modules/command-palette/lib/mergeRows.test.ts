@@ -156,7 +156,7 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["ws:w1"]);
   });
 
-  it("with an empty term puts attention tabs first, then busy ones, then the rest by recency", () => {
+  it("with an empty term lists the tabs by recency, whatever state they are in", () => {
     const rows = mergeRows(
       input({
         tabs: [
@@ -167,7 +167,7 @@ describe("mergeRows", () => {
         ],
       }),
     );
-    expect(keys(rows)).toEqual(["tab:ping", "tab:busy", "tab:recent", "tab:old"]);
+    expect(keys(rows)).toEqual(["tab:recent", "tab:busy", "tab:old", "tab:ping"]);
   });
 
   it("keeps a workspace row even when one of its tabs is already in the results, after the tabs", () => {
@@ -323,12 +323,12 @@ describe("mergeRows", () => {
       tab("alert", { branch: "kex", indicator: "attention", lastUsedAt: 0 }),
     ];
     expect(keys(mergeRows(input({ term: "kex", tabs })))).toEqual([
-      "tab:alert",
-      "tab:busy",
       "tab:branch",
       "tab:workspace",
       "tab:title",
       "tab:process",
+      "tab:busy",
+      "tab:alert",
     ]);
   });
 
@@ -670,9 +670,9 @@ describe("idle list workspaces", () => {
       );
       expect(keys(rows)).toEqual([
         "tab:cur",
-        "tab:busy",
         "tab:exact",
         "tab:old",
+        "tab:busy",
         "cmd:c",
       ]);
     });

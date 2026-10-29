@@ -14,7 +14,6 @@ import { buildSearchBlobs, commandRowKey } from "./rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import {
   byRecency,
-  byRecentList,
   RECENT_LIMIT,
   SEARCH_LIMIT,
   tabRowKey,
@@ -280,7 +279,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       : [];
     const recents = tabs
       .filter((t) => t.tabId !== activeTabId)
-      .sort(byRecentList)
+      .sort(byRecency)
       .slice(0, RECENT_LIMIT)
       .map(
         (entry): MergedRow => ({
@@ -469,6 +468,6 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     others.push(row);
   }
   // The tabs that fit keep the order of the empty list, so typing narrows it instead of reshuffling it.
-  tabRows.sort((a, b) => byRecentList(a.entry, b.entry));
+  tabRows.sort((a, b) => byRecency(a.entry, b.entry));
   return [...currentRows, ...tabRows, ...others];
 }
