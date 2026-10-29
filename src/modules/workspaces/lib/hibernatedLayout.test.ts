@@ -16,6 +16,12 @@ describe("hibernatedLayout", () => {
   it("keeps only the button when the pane is very small", () => {
     expect(hibernatedLayout(359, 700)).toBe("bare");
     expect(hibernatedLayout(900, 299)).toBe("bare");
-    expect(hibernatedLayout(0, 0)).toBe("bare");
+    expect(hibernatedLayout(300, 110)).toBe("bare");
+  });
+
+  it("drops the hint too when even that does not fit", () => {
+    expect(hibernatedLayout(299, 700)).toBe("button");
+    expect(hibernatedLayout(900, 109)).toBe("button");
+    expect(hibernatedLayout(0, 0)).toBe("button");
   });
 });
