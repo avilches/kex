@@ -22,7 +22,7 @@ import {
   openShortcutsSettings,
 } from "@/modules/settings/openSettingsWindow";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
-import { ENTER_KEY } from "@/lib/platform";
+import { ENTER_KEY, fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   BACKGROUND_MEMORY_REFERENCE_COLS,
@@ -81,6 +81,7 @@ import {
 import { useEffect, useState } from "react";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
+import { sendPlaceholder } from "@/modules/terminal/lib/scratchpadHints";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { FontFamilyInput } from "../components/FontFamilyInput";
 import {
@@ -238,7 +239,7 @@ export function TerminalSection() {
               </span>
             </div>
             <div className="flex flex-col gap-2.5 px-3 py-2.5">
-              <span className="text-[12.5px] font-medium">Send</span>
+              <span className="text-[12.5px] font-medium">Send style</span>
               <SegmentedControl
                 label="Scratchpad send key"
                 value={scratchpadEnterSends ? "enter" : "shift-enter"}
@@ -246,15 +247,18 @@ export function TerminalSection() {
                   void setTerminalScratchpadEnterSends(v === "enter")
                 }
                 options={[
-                  { value: "enter", label: `${ENTER_KEY} sends` },
-                  { value: "shift-enter", label: `${ENTER_KEY} new line` },
+                  {
+                    value: "enter",
+                    label: "Terminal",
+                    sublabel: `${ENTER_KEY} sends`,
+                  },
+                  {
+                    value: "shift-enter",
+                    label: "Text field",
+                    sublabel: `${fmtShortcut(SHIFT_KEY, ENTER_KEY)} sends`,
+                  },
                 ]}
               />
-              <span className="min-h-[15px] text-[10.5px] text-muted-foreground">
-                {scratchpadEnterSends
-                  ? "Like Terminal. Shift+Enter adds a line."
-                  : "Like a text field. Shift+Enter sends."}
-              </span>
             </div>
           </div>
           <div className="flex flex-col gap-1.5 border-t border-border/60 bg-muted/30 px-3 py-3">
@@ -288,9 +292,7 @@ export function TerminalSection() {
                   : "inherit",
               }}
             >
-              {scratchpadEnterSends
-                ? "Enter sends. Shift+Enter new line"
-                : "Shift+Enter sends. Enter new line"}
+              {sendPlaceholder(scratchpadEnterSends)}
             </div>
           </div>
         </div>

@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { sendPlaceholder } from "./lib/scratchpadHints";
 import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
@@ -40,7 +41,8 @@ import {
 } from "./lib/useTerminalSession";
 
 const MAX_TEXTAREA_HEIGHT = 160; // px, ~6 lines
-const ROTATE_MS = 5_000;
+// Fast in dev so the phrases are easy to review; a slow drip in production.
+const ROTATE_MS = import.meta.env.PROD ? 10 * 60_000 : 5_000;
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -53,9 +55,7 @@ function placeholderMessages(
   hasAgent: boolean,
 ): string[] {
   return [
-    enterSends
-      ? "Enter sends. Shift+Enter new line"
-      : "Shift+Enter sends. Enter new line",
+    sendPlaceholder(enterSends),
     switchLabel
       ? `Esc closes. ${switchLabel} opens the scratchpad again`
       : "Esc closes the scratchpad",
@@ -63,7 +63,6 @@ function placeholderMessages(
       ? `${switchLabel} switches to the terminal`
       : "Define a shortcut to toggle the scratchpad in settings",
     hasAgent ? "Enter your prompt" : "Enter your command",
-    "Drag files onto the scratchpad",
   ];
 }
 
