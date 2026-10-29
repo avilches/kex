@@ -306,7 +306,7 @@ hot-reloaded session.
 | `src/app/components/WorkspaceBar.tsx` | Click-active-workspace restores focus; workspace context menu `onCloseAutoFocus` |
 | `src/modules/actions/ActionsBar.tsx` | Menu `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/terminal/lib/rendererPool.ts` | `scheduleUnhide` calls `adapter.focusLeaf` (`requestLeafFocus`) after a slot rebind or GPU retry, only when the leaf is the focused one |
-| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` and `scratchpadMonospace` (inside the Scratchpad box) |
+| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` and `scratchpadMonospace`: the Scratchpad box has two segmented controls (Font, Send), a live preview bar, the toggle shortcut and a "Change shortcut" link that opens Settings > Shortcuts filtered by "Scratchpad" (`openShortcutsSettings`, `shortcuts:<query>` section param) |
 | `src/modules/settings/store.ts` | Preference keys/defaults: `scratchpadEnterSends` (default `true`), `scratchpadMonospace` (default `true`) |
 | `src/modules/workspaces/WorkspaceDndProvider.tsx` | Drag-and-drop of explorer paths onto the scratchpad bar (`handleScratchpadDrop`, collision priority): see `WORKSPACES.md`'s drag-and-drop section for the full mechanism |
 | `docs/WORKSPACES_GOTCHAS.md` | Bug 7 and its six addenda: the full history of how this model was arrived at |
