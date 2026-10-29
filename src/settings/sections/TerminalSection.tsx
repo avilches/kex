@@ -202,6 +202,21 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Scratchpad</FieldLabel>
+        <p className="flex flex-wrap items-center gap-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
+          <span>
+            Open the scratchpad to send commands or prompts
+            {scratchpadShortcut ? " with" : ""}
+          </span>
+          {scratchpadShortcut && <Kbd>{scratchpadShortcut}</Kbd>}
+          <span>at any time.</span>
+          <button
+            type="button"
+            onClick={() => void openShortcutsSettings("Scratchpad")}
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            {scratchpadShortcut ? "Change shortcut" : "Set shortcut"}
+          </button>
+        </p>
         <div className="overflow-hidden rounded-lg border border-border/60 bg-card/60">
           <div className="grid grid-cols-1 divide-border/60 sm:grid-cols-2 sm:divide-x">
             <div className="flex flex-col gap-2.5 px-3 py-2.5">
@@ -262,28 +277,9 @@ export function TerminalSection() {
             </div>
           </div>
           <div className="flex flex-col gap-1.5 border-t border-border/60 bg-muted/30 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Preview
-              </span>
-              <span className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
-                {scratchpadShortcut ? (
-                  <>
-                    <Kbd>{scratchpadShortcut}</Kbd>
-                    toggles the scratchpad.
-                  </>
-                ) : (
-                  "No shortcut set."
-                )}
-                <button
-                  type="button"
-                  onClick={() => void openShortcutsSettings("Scratchpad")}
-                  className="underline underline-offset-2 transition-colors hover:text-foreground"
-                >
-                  {scratchpadShortcut ? "Change shortcut" : "Set shortcut"}
-                </button>
-              </span>
-            </div>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Preview
+            </span>
             <div
               className="rounded-xl bg-background px-4 py-3 text-sm leading-[1.4] text-muted-foreground/70 shadow-[0_0_14px_3px_var(--tw-shadow-color)] shadow-primary/40 ring-1 ring-inset ring-primary/50"
               style={{
