@@ -77,6 +77,7 @@ describe("tabMenuItems", () => {
     const shortcutOf = (id: RowMenuItemId) => item(e, id)?.shortcutId;
     expect(shortcutOf("terminal")).toBe("tab.new");
     expect(shortcutOf("note")).toBe("tab.note");
+    expect(shortcutOf("rename")).toBe("tab.rename");
     expect(shortcutOf("copy")).toBe("path.copy");
     expect(shortcutOf("hibernateTab")).toBe("tab.hibernate");
     expect(shortcutOf("lock")).toBe("tab.lock");

@@ -53,7 +53,7 @@ describe("PALETTE_TAB_SHORTCUTS", () => {
       expect(isPaletteShortcut(id)).toBe(true);
       expect(isPaletteTabShortcut(id)).toBe(false);
     }
-    for (const id of ["tab.rename", "tab.next", "workspace.new", "editor.undo"] as const) {
+    for (const id of ["tab.next", "workspace.new", "editor.undo"] as const) {
       expect(isPaletteShortcut(id)).toBe(false);
     }
   });
@@ -82,11 +82,11 @@ describe("withPaletteTabShortcuts", () => {
   });
 
   it("leaves the other handlers alone", () => {
-    const rename = vi.fn();
+    const next = vi.fn();
     const offer = vi.fn(() => true);
-    const wrapped = withPaletteTabShortcuts({ "tab.rename": rename }, offer);
-    wrapped["tab.rename"]?.(key);
-    expect(rename).toHaveBeenCalledTimes(1);
+    const wrapped = withPaletteTabShortcuts({ "tab.next": next }, offer);
+    wrapped["tab.next"]?.(key);
+    expect(next).toHaveBeenCalledTimes(1);
     expect(offer).not.toHaveBeenCalled();
   });
 });

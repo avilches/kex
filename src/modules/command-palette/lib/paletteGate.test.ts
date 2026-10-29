@@ -21,6 +21,7 @@ const TABS: ShortcutId[] = [
   "tab.lock",
   "tab.hibernate",
   "tab.note",
+  "tab.rename",
   "editor.save",
   "tab.new",
   "workspace.close",
