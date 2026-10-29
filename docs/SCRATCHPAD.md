@@ -60,7 +60,7 @@ Nothing reopens it on its own: a new terminal starts with it closed, and leaving
 workspace closes it for good. The `scratchpadInNewTerminals` and `scratchpadRememberFocus` preferences
 and the transient `Session.scratchpadResume` mark that backed them were removed (TASK-776). The only
 settings left are `scratchpadEnterSends` (Enter vs Shift+Enter to send) and `scratchpadMonospace`
-(terminal font family when on, system font when off), neither of which affects when the bar shows.
+(terminal font family when on, the Appearance UI font when off), neither of which affects when the bar shows.
 
 Consequently `closeScratchpadState(s, leafId)` has a single behavior, whatever the trigger (Escape,
 the toggle, clicking the terminal, or leaving the leaf). There is no "leave" vs "dismiss" distinction

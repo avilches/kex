@@ -227,7 +227,7 @@ export function ScratchpadBar({ leafId }: Props) {
           maxHeight: MAX_TEXTAREA_HEIGHT,
           fontFamily: monospace
             ? resolveMonoFontFamily(terminalFontFamily)
-            : "system-ui, sans-serif",
+            : "inherit",
         }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
