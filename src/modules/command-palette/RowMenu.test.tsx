@@ -65,6 +65,22 @@ describe("the move level of the row menu", () => {
     expect(result.current.menu).toBeNull();
   });
 
+  it("keeps the active slot when Hibernate flips to Restore and back", () => {
+    const hook = renderHook(() => useRowMenu());
+    const items = (id: "hibernateTab" | "restoreTab"): RowMenuItem[] => [
+      { id: "go", label: "Go to Tab" },
+      { id: "tabId", label: "Copy Tab ID" },
+      { id, label: id },
+      { id: "lock", label: "Lock Tab" },
+    ];
+    act(() => hook.result.current.open("tab:t", items("hibernateTab"), anchor));
+    act(() => hook.result.current.setActive(2));
+    act(() => hook.result.current.setItems(items("restoreTab")));
+    expect(hook.result.current.menu?.active).toBe(2);
+    act(() => hook.result.current.setItems(items("hibernateTab")));
+    expect(hook.result.current.menu?.active).toBe(2);
+  });
+
   it("keeps the parent items fresh when a toggle flips while in the submenu", () => {
     const result = openMove();
     const next: RowMenuItem[] = [...root, { id: "lock", label: "Lock" }];
