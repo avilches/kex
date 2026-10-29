@@ -1325,7 +1325,7 @@ function hibernatedTab(): HTMLElement {
             title: "Tab focused",
           },
           "Restore",
-          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
+          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵ or ⌥⌘Z"),
         ),
         h(
           "span",
