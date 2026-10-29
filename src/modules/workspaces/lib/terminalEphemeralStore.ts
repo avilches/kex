@@ -5,6 +5,7 @@
 type Listener = () => void;
 
 const runningCommands = new Map<string, string>();
+const runningSince = new Map<string, number>();
 const listeners = new Set<Listener>();
 let snapshot: ReadonlyMap<string, string> = new Map();
 
@@ -42,15 +43,22 @@ export function getRunningCommand(tabId: string): string | null {
   return runningCommands.get(tabId) ?? null;
 }
 
+// When the tab became busy: kept while the command text changes within one run.
+export function getRunningSince(tabId: string): number | null {
+  return runningSince.get(tabId) ?? null;
+}
+
 export function setRunningCommand(tabId: string, cmd: string | null): void {
   if (cmd === null) {
     if (!runningCommands.has(tabId)) return;
     runningCommands.delete(tabId);
+    runningSince.delete(tabId);
     notify();
     notifyFinished(tabId);
     return;
   }
   if (runningCommands.get(tabId) === cmd) return;
+  if (!runningCommands.has(tabId)) runningSince.set(tabId, Date.now());
   runningCommands.set(tabId, cmd);
   notify();
 }
@@ -58,6 +66,7 @@ export function setRunningCommand(tabId: string, cmd: string | null): void {
 export function clearRunningCommandEntry(tabId: string): void {
   if (!runningCommands.has(tabId)) return;
   runningCommands.delete(tabId);
+  runningSince.delete(tabId);
   notify();
   notifyFinished(tabId);
 }

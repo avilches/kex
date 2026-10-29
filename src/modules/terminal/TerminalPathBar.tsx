@@ -12,6 +12,7 @@ import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { AppWindowMacIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ProcessSegmentContextMenu } from "./ProcessSegmentContextMenu";
+import { RunningTimer } from "./RunningTimer";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 
 type Props = {
@@ -68,7 +69,7 @@ export function TerminalPathBar({
           )}
         />
         {process && (
-          <ProcessSegmentContextMenu tabId={tabId} running={!!running}>
+          <ProcessSegmentContextMenu tabId={tabId} command={running}>
             <span
               title={process}
               className={cn(
@@ -88,6 +89,12 @@ export function TerminalPathBar({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
+        {running && (
+          <>
+            <RunningTimer tabId={tabId} />
+            <span className="text-border/60">&middot;</span>
+          </>
+        )}
         {metrics && (
           <>
             <span className={cn(metrics.cpuPercent < 0.05 && "text-muted-foreground/50")}>
