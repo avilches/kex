@@ -65,6 +65,13 @@ import {
   type TabEntry,
   type WorkspaceEntry,
 } from "@/modules/command-palette";
+import {
+  TabSwitcher,
+  openSwitcher,
+  stepSwitcher,
+  switcherActive,
+  switcherOrder,
+} from "@/modules/tab-switcher";
 import { useProfilerSetting } from "@/modules/profiler";
 import {
   buildFolderGroups,
@@ -2918,6 +2925,18 @@ export default function App() {
     setCommandPaletteOpen(false);
     setFolderPaletteOpen(false);
   }, []);
+  // Every tab of the window in recency order. Choosing one only goes to it: a hibernated tab shows its
+  // placeholder and stays asleep, the user wakes it on purpose.
+  const openTabSwitcher = useCallback(
+    (e: KeyboardEvent, delta: 1 | -1) => {
+      const entries = switcherOrder(
+        buildTabEntries(workspacesRef.current, liveTabSources()),
+        activeTabId,
+      );
+      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId));
+    },
+    [activeTabId, goToTab],
+  );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -3064,6 +3083,16 @@ export default function App() {
         const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
         onActivateTabStable(activeWorkspace.id, prev.id);
       },
+      "tab.switcher": (e) => {
+        if (switcherActive()) return stepSwitcher(1);
+        dismissPalettes();
+        openTabSwitcher(e, 1);
+      },
+      "tab.switcherBack": (e) => {
+        if (switcherActive()) return stepSwitcher(-1);
+        dismissPalettes();
+        openTabSwitcher(e, -1);
+      },
       "tab.selectByIndex": (e) => {
         dismissPalettes();
         if (!activeWorkspace || !activePane) return;
@@ -3196,6 +3225,7 @@ export default function App() {
       collapsedGroups,
       openCommandPalette,
       dismissPalettes,
+      openTabSwitcher,
       cycleLinear,
       onActivateTabStable,
       handleCloseActiveTab,
@@ -3240,6 +3270,7 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
+      if (switcherActive() && id !== "tab.switcher" && id !== "tab.switcherBack") return true;
       if (
         shortcutSwallowedByPalette(
           id,
@@ -4142,6 +4173,7 @@ export default function App() {
             onActivate={onActivateAgent}
           />
           <Toaster position="bottom-right" />
+          <TabSwitcher />
 
           <CommandPalette
             open={commandPaletteOpen}

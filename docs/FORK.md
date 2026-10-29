@@ -328,6 +328,10 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   order in serialized output changes from alphabetical to insertion order.
 - `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` - shared across all modules.
 
+### Tab switcher
+
+`Ctrl+Tab` opens an app-switcher style grid over every tab of the window in recency order, confirmed by releasing the modifier. Not in the upstream. See `docs/ARCHITECTURE.md` 3.9a.
+
 ### Native macOS menu
 
 The fork builds its own macOS menu bar instead of the default Tauri menu (`#[cfg(target_os = "macos")]` in `lib.rs`

@@ -32,6 +32,8 @@ export type ShortcutId =
   | "file.delete"
   | "tab.next"
   | "tab.prev"
+  | "tab.switcher"
+  | "tab.switcherBack"
   | "tab.selectByIndex"
   | "pane.splitRight"
   | "pane.splitDown"
@@ -442,6 +444,20 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Previous Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
+  },
+  {
+    id: "tab.switcher",
+    label: "Switch Tab (hold to cycle, release to go)",
+    group: "Tabs",
+    defaultBindings: [{ ctrl: true, key: "Tab" }],
+    allowRepeat: true,
+  },
+  {
+    id: "tab.switcherBack",
+    label: "Switch Tab Backwards",
+    group: "Tabs",
+    defaultBindings: [{ ctrl: true, shift: true, key: "Tab" }],
+    allowRepeat: true,
   },
   {
     id: "tab.selectByIndex",

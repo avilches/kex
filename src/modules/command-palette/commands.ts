@@ -61,6 +61,8 @@ export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
   "editor.redo": "buffer transaction of the focused editor",
   "tab.next": "relative navigation with no target to pick",
   "tab.prev": "relative navigation with no target to pick",
+  "tab.switcher": "holds the modifier to cycle, a palette row cannot",
+  "tab.switcherBack": "holds the modifier to cycle, a palette row cannot",
   "pane.focusUp": "relative navigation with no target to pick",
   "pane.focusDown": "relative navigation with no target to pick",
   "pane.focusLeft": "relative navigation with no target to pick",
