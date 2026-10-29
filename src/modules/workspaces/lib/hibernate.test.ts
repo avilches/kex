@@ -363,6 +363,13 @@ describe("saveRestoreCommand", () => {
     expect(saveRestoreCommand(tab, { running: "claude", agentResumable: true })).toBe(tab);
   });
 
+  it("lets an agent that resumes its own session replace a command typed earlier", () => {
+    const tab = term("t1", { persistentCommand: "lazygit", persistentCommandManual: true });
+    const saved = saveRestoreCommand(tab, { running: "claude", agentResumable: true }) as Terminal;
+    expect(saved.persistentCommand).toBeUndefined();
+    expect(saved.persistentCommandManual).toBe(false);
+  });
+
   it("stores the launch command of an agent that has not reported a session", () => {
     expect(saveRestoreCommand(term("t1"), { running: "opencode", agentResumable: false })).toMatchObject({
       persistentCommand: "opencode",

@@ -160,7 +160,12 @@ export function saveRestoreCommand(
   tab: Tab,
   live: { running: string | null; agentResumable: boolean | undefined },
 ): Tab {
-  if (tab.kind !== "terminal" || tab.hibernation || live.agentResumable === true) return tab;
+  if (tab.kind !== "terminal" || tab.hibernation) return tab;
+  // The agent's own session is what comes back, so it replaces a command typed earlier; one typed
+  // while the tab sleeps is read at wake time and wins again.
+  if (live.agentResumable === true) {
+    return tab.persistentCommandManual ? { ...tab, persistentCommand: undefined, persistentCommandManual: false } : tab;
+  }
   if (tab.persistentCommandManual) return tab;
   const command = live.running ?? undefined;
   return command === tab.persistentCommand ? tab : { ...tab, persistentCommand: command, persistentCommandManual: false };
