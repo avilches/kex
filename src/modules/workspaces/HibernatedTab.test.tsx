@@ -51,15 +51,18 @@ describe("HibernatedTab", () => {
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("shows both restore shortcuts, joined with or, on the Restore button and no other hint", () => {
-    const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
-    expect(getByRole("button").textContent).toMatch(/^Restore.+ or .+$/);
-    expect(queryByText(/^Press /)).toBeNull();
+  it("hints both restore shortcuts under the button, as keys joined with or, and keeps the button clean", () => {
+    const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
+    expect(getByRole("button").textContent).toBe("Restore");
+    const hint = container.querySelector("[data-hibernated-hint]")!;
+    expect(hint.textContent).toMatch(/^Press.+or.+$/);
+    expect(hint.querySelectorAll("kbd")).toHaveLength(2);
   });
 
-  it("hides the Enter shortcut while the tab has no focus, since Enter would not wake it", () => {
-    const { getByRole } = render(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
+  it("shows no hint while the tab has no focus, since Enter would not wake it", () => {
+    const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
     expect(getByRole("button").textContent).toBe("Restore");
+    expect(container.querySelector("[data-hibernated-hint]")).toBeNull();
   });
 
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {

@@ -1325,7 +1325,6 @@ function hibernatedTab(): HTMLElement {
             title: "Tab focused",
           },
           "Restore",
-          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵ or ⌥⌘Z"),
         ),
         h(
           "span",
@@ -1336,6 +1335,14 @@ function hibernatedTab(): HTMLElement {
           },
           "Restore",
         ),
+      ),
+      h(
+        "span",
+        { class: "-mt-2 flex items-center gap-1.5 text-[11px] opacity-80", "data-surface": "hibernated-hint" },
+        "Press",
+        h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "↵"),
+        "or",
+        h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "⌥⌘Z"),
       ),
       h("span", { class: "absolute right-3 bottom-2 text-[10px] opacity-50" }, "Hibernated for 2h"),
     ),
