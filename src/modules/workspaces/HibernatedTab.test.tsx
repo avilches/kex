@@ -8,6 +8,8 @@ vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 const lines = vi.hoisted(() => ({ read: vi.fn(async (_tabId: string): Promise<string | null> => null) }));
 vi.mock("./lib/hibernateLinesIo", () => ({ readHibernateLines: lines.read }));
 
+vi.mock("./lib/infoVariant", () => ({ infoVariantFor: () => "indent" }));
+
 import { HibernatedTab } from "./HibernatedTab";
 import type { SleepingTab } from "./lib/hibernate";
 
