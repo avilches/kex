@@ -150,6 +150,10 @@ describe("DEFAULT_PREFERENCES", () => {
   it("scratchpadEnterSends defaults to true", () => {
     expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
   });
+
+  it("scratchpadFontFamily defaults to the empty string", () => {
+    expect(DEFAULT_PREFERENCES.scratchpadFontFamily).toBe("");
+  });
 });
 
 describe("diffViewMode", () => {
@@ -169,6 +173,10 @@ describe("PREF_KEY_MAP", () => {
   // anything unmapped. Regression guard for the scratchpad Enter=Send toggle.
   it("maps scratchpadEnterSends so its toggle reaches subscribers", () => {
     expect(PREF_KEY_MAP.scratchpadEnterSends).toBe("scratchpadEnterSends");
+  });
+
+  it("maps scratchpadFontFamily so the font reaches subscribers", () => {
+    expect(PREF_KEY_MAP.scratchpadFontFamily).toBe("scratchpadFontFamily");
   });
 });
 

@@ -65,6 +65,7 @@ import {
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalScratchpadEnterSends,
+  setTerminalScratchpadFontFamily,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -119,6 +120,9 @@ export function TerminalSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const terminalBackgroundMemoryBudgetMB = usePreferencesStore(
     (s) => s.terminalBackgroundMemoryBudgetMB,
+  );
+  const scratchpadFontFamily = usePreferencesStore(
+    (s) => s.scratchpadFontFamily,
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
@@ -221,6 +225,11 @@ export function TerminalSection() {
             </div>
           </RadioGroup>
         </SettingRow>
+        <FontFamilyInput
+          value={scratchpadFontFamily}
+          defaultFamily={defaultMonoFontFamily()}
+          onChange={(v) => void setTerminalScratchpadFontFamily(v)}
+        />
       </div>
 
       <div className="flex flex-col gap-2">

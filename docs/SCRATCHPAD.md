@@ -59,8 +59,8 @@ The scratchpad only ever appears when the user presses its shortcut (`Cmd+U`, `t
 Nothing reopens it on its own: a new terminal starts with it closed, and leaving a tab, pane or
 workspace closes it for good. The `scratchpadInNewTerminals` and `scratchpadRememberFocus` preferences
 and the transient `Session.scratchpadResume` mark that backed them were removed (TASK-776). The only
-setting left is `scratchpadEnterSends` (Enter vs Shift+Enter to send), which does not affect when the
-bar shows.
+settings left are `scratchpadEnterSends` (Enter vs Shift+Enter to send) and `scratchpadFontFamily`
+(empty means the default monospace), neither of which affects when the bar shows.
 
 Consequently `closeScratchpadState(s, leafId)` has a single behavior, whatever the trigger (Escape,
 the toggle, clicking the terminal, or leaving the leaf). There is no "leave" vs "dismiss" distinction
@@ -306,7 +306,7 @@ hot-reloaded session.
 | `src/app/components/WorkspaceBar.tsx` | Click-active-workspace restores focus; workspace context menu `onCloseAutoFocus` |
 | `src/modules/actions/ActionsBar.tsx` | Menu `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/terminal/lib/rendererPool.ts` | `scheduleUnhide` calls `adapter.focusLeaf` (`requestLeafFocus`) after a slot rebind or GPU retry, only when the leaf is the focused one |
-| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` |
-| `src/modules/settings/store.ts` | Preference key/default: `scratchpadEnterSends` (default `true`) |
+| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` and `scratchpadFontFamily` (inside the Scratchpad box) |
+| `src/modules/settings/store.ts` | Preference keys/defaults: `scratchpadEnterSends` (default `true`), `scratchpadFontFamily` (default empty) |
 | `src/modules/workspaces/WorkspaceDndProvider.tsx` | Drag-and-drop of explorer paths onto the scratchpad bar (`handleScratchpadDrop`, collision priority): see `WORKSPACES.md`'s drag-and-drop section for the full mechanism |
 | `docs/WORKSPACES_GOTCHAS.md` | Bug 7 and its six addenda: the full history of how this model was arrived at |
