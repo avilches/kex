@@ -79,7 +79,7 @@ export function TerminalPathBar({
             <span
               title={process}
               className={cn(
-                "flex min-w-0 shrink items-center gap-1 font-mono text-muted-foreground",
+                "flex min-w-0 shrink items-center gap-1 rounded px-1 py-0.5 font-mono text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground",
                 running && "text-foreground",
               )}
             >
