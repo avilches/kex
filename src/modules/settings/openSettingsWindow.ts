@@ -23,6 +23,12 @@ export async function openTitleTemplatesSettings(): Promise<void> {
   await invoke("open_settings_window", { section: "appearance:titles" });
 }
 
+// Opens Settings > Shortcuts with the search box filled in. The query travels unencoded in the
+// section string, so keep it to plain words (no ":" or "&").
+export async function openShortcutsSettings(query: string): Promise<void> {
+  await invoke("open_settings_window", { section: `shortcuts:${query}` });
+}
+
 // Opens Settings > Actions, on the Global or the current workspace tab.
 export async function openGlobalActionsSettings(): Promise<void> {
   await invoke("open_settings_window", { section: actionsSectionParam("global") });
