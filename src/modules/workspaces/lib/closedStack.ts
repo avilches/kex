@@ -204,6 +204,23 @@ export function clearStaleFolds(entries: ClosedEntry[], workspaces: Workspace[])
   return changed ? next : entries;
 }
 
+function terminalIds(entry: ClosedEntry): string[] {
+  if (entry.kind === "tab") return entry.tab.kind === "terminal" ? [entry.tab.id] : [];
+  return allPanes(entry.workspace.paneTree).flatMap((p) => p.tabs.filter((t) => t.kind === "terminal").map((t) => t.id));
+}
+
+// Terminals that left the stack for good, asleep or not: nothing can bring them back, so the
+// agent record kept under their id has no use left. A tab reopened awake gets a new id, which is
+// why its old one is not "open" and is released here.
+export function orphanedTerminals(
+  before: readonly ClosedEntry[],
+  after: readonly ClosedEntry[],
+  open: ReadonlySet<string>,
+): string[] {
+  const kept = new Set(after.flatMap(terminalIds));
+  return before.flatMap(terminalIds).filter((id) => !kept.has(id) && !open.has(id));
+}
+
 function sleepingIds(entry: ClosedEntry): string[] {
   if (entry.kind === "tab") return entry.tab.kind === "terminal" && entry.tab.hibernation ? [entry.tab.id] : [];
   const ids: string[] = [];

@@ -1316,10 +1316,9 @@ su id, y de eso cuelgan varias cosas que no fallan con ruido si se tocan mal:
   los tabs dormidos como conocidos (`split_orphans` borraria el registro de un tab que no esta en ninguna ventana). El test
   `terminal_tab_ids_includes_hibernated_tabs` lo fija. Cerrar un tab dormido hay que quitarlo de `hibernatingTabs` (`closeTab`), o la marca
   se queda para siempre.
-- **Deshacer el cierre de un tab dormido lo reabre despierto.** `buildReopenedTab` quita `hibernation`; si no, el tab
-  nuevo (con id nuevo) montaria como un placeholder sin PTY y sin plan de resume sembrado. Deshacer el cierre de un
-  workspace hace lo contrario con los tabs dormidos: `reviveWorkspace` les conserva el id y la bandera, porque su plan
-  se siembra al despertar y no al reabrir, y solo a los demas terminales les da id nuevo.
+- **Deshacer el cierre de un tab dormido lo reabre dormido, con su mismo id.** Sus lineas guardadas y su registro de
+  agente se indexan por ese id y su plan se siembra al despertar, no al reabrir (`reopenOne`, rama `asleep`).
+  `reviveWorkspace` hace lo mismo con los tabs dormidos de un workspace y solo a los demas terminales les da id nuevo.
 - **Desmontar el `TerminalPane` no libera el slot.** Lo libera el barrido de `App.tsx` (`liveTerminalIds`, que deja fuera
   los dormidos) llamando a `disposeSession`, que cierra el PTY y `disposeLeafSlot`. Si un tab dormido siguiera en ese
   conjunto, su xterm y su contexto WebGL se quedarian vivos dentro de un pane vivo. Lo cubre el test de `liveTerminalIds`.

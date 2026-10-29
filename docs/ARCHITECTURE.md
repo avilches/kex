@@ -486,8 +486,9 @@ last close, whatever it closed. The closed stack (in memory, capped at 10) holds
 
 - A tab entry (`closeTab`) reopens only in the workspace it was closed in. If that workspace was closed, the entry is
   dropped (unless a workspace entry restores it first, see below). A tab that was hibernated when it closed reopens
-  awake: `buildReopenedTab` drops `hibernation`, and the reopen seeds the resume plan from the old id like for any
-  closed agent tab.
+  asleep with its own id (its stored lines and agent record are indexed by it, and its plan is seeded when it wakes);
+  an awake one gets a new id and the reopen seeds the resume plan from the old id. When an entry leaves the stack for
+  good (cap, dropped, reset), `orphanedTerminals` releases the agent record kept under each of its terminals.
 -   It remembers the tab on its left (`prevTabId`) and reopens right after it, in whatever pane that tab is in now
   (`resolveReopenSlot`). A predecessor that was closed too is looked up in the stack and its own predecessor takes
   over; with none left it goes first in its old pane (the active pane if that one is gone). Reopened tabs get new
