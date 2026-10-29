@@ -14,6 +14,7 @@ import { normalizeActions } from "@/modules/actions/lib/actions";
 import type { Action } from "@/modules/actions/lib/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
+import { DEFAULT_WORKSPACE_ICON } from "@/modules/workspaces/lib/defaultWorkspaceIcon";
 import {
   parseInstalledIntegrations,
   type IntegrationAgent,
@@ -231,6 +232,7 @@ export type Preferences = {
   seededAgents: string[];
   appActionsSeeded: boolean;
   randomWorkspaceColor: boolean;
+  defaultWorkspaceIcon: string;
   workspaceDetailTerminalsEnabled: boolean;
   workspaceDetailTerminals: TerminalDetail;
   workspaceDetailEditors: boolean;
@@ -290,6 +292,7 @@ const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
+const KEY_DEFAULT_WORKSPACE_ICON = "defaultWorkspaceIcon";
 const KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED = "workspaceDetailTerminalsEnabled";
 const KEY_WORKSPACE_DETAIL_TERMINALS = "workspaceDetailTerminals";
 const KEY_WORKSPACE_DETAIL_EDITORS = "workspaceDetailEditors";
@@ -505,6 +508,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   seededAgents: [],
   appActionsSeeded: false,
   randomWorkspaceColor: true,
+  defaultWorkspaceIcon: DEFAULT_WORKSPACE_ICON,
   workspaceDetailTerminalsEnabled: true,
   workspaceDetailTerminals: "all",
   workspaceDetailEditors: true,
@@ -805,6 +809,9 @@ export async function loadPreferences(): Promise<Preferences> {
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
+    defaultWorkspaceIcon:
+      getGeneral<string>(KEY_DEFAULT_WORKSPACE_ICON) ??
+      DEFAULT_PREFERENCES.defaultWorkspaceIcon,
     workspaceDetailTerminalsEnabled:
       getGeneral<boolean>(KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED) ??
       DEFAULT_PREFERENCES.workspaceDetailTerminalsEnabled,
@@ -1162,6 +1169,10 @@ export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
 
+export async function setDefaultWorkspaceIcon(value: string): Promise<void> {
+  await writePref(KEY_DEFAULT_WORKSPACE_ICON, value);
+}
+
 export async function setWorkspaceDetailTerminalsEnabled(
   value: boolean,
 ): Promise<void> {
@@ -1391,6 +1402,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
+  [KEY_DEFAULT_WORKSPACE_ICON]: "defaultWorkspaceIcon",
   [KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED]: "workspaceDetailTerminalsEnabled",
   [KEY_WORKSPACE_DETAIL_TERMINALS]: "workspaceDetailTerminals",
   [KEY_WORKSPACE_DETAIL_EDITORS]: "workspaceDetailEditors",

@@ -3,6 +3,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  setDefaultWorkspaceIcon,
   setRandomWorkspaceColor,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
@@ -15,11 +16,13 @@ import {
   TERMINAL_DETAIL_MODES,
   type TerminalDetail,
 } from "@/modules/workspaces/lib/workspaceDetail";
+import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
+  const defaultIcon = usePreferencesStore((s) => s.defaultWorkspaceIcon);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
   const detailEditors = usePreferencesStore((s) => s.workspaceDetailEditors);
@@ -49,6 +52,17 @@ export function WorkspacesSection() {
           <Switch
             checked={randomWorkspaceColor}
             onCheckedChange={(v) => void setRandomWorkspaceColor(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Default workspace icon"
+          description="Drawn next to the workspace name in the palette and the other lists when a workspace has no icon of its own, in the workspace color. The crossed cell goes back to a plain color dot."
+          className="flex-col items-stretch"
+        >
+          <IconPaletteGrid
+            layout="inline"
+            value={defaultIcon || undefined}
+            onSelect={(icon) => void setDefaultWorkspaceIcon(icon ?? "")}
           />
         </SettingRow>
         <SettingRow

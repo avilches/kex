@@ -212,3 +212,13 @@ export function getWorkspaceIcon(name: string): IconSvgElement | null {
   if (palette) return palette.icon as IconSvgElement;
   return catalogIcon(name);
 }
+
+export { DEFAULT_WORKSPACE_ICON } from "./defaultWorkspaceIcon";
+
+export function markGlyph(
+  icon: string | undefined,
+  fallback: string,
+): IconSvgElement | null {
+  if (icon) return getWorkspaceIcon(icon);
+  return fallback ? getWorkspaceIcon(fallback) : null;
+}
