@@ -1335,7 +1335,6 @@ function hibernatedTab(): HTMLElement {
             title: "Tab not focused",
           },
           "Restore",
-          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
         ),
       ),
       h("span", { class: "absolute right-3 bottom-2 text-[10px] opacity-50" }, "Hibernated for 2h"),
