@@ -51,9 +51,9 @@ describe("HibernatedTab", () => {
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("shows the Enter shortcut on the Restore button and no other hint", () => {
+  it("shows both restore shortcuts, joined with or, on the Restore button and no other hint", () => {
     const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
-    expect(getByRole("button").textContent).toMatch(/^Restore.+$/);
+    expect(getByRole("button").textContent).toMatch(/^Restore.+ or .+$/);
     expect(queryByText(/^Press /)).toBeNull();
   });
 

@@ -30,7 +30,9 @@ type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () 
 // behind it, only what was captured when it went to sleep.
 export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
-  const shortcutLabel = useShortcutLabel("tab.wake");
+  const wakeLabel = useShortcutLabel("tab.wake");
+  const toggleLabel = useShortcutLabel("tab.hibernate");
+  const shortcutLabel = [wakeLabel, toggleLabel].filter(Boolean).join(" or ");
   const now = useNow(visible);
   const { agent, title: frozen, at } = tab.hibernation;
   const command = hibernatedCommand(tab);
