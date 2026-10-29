@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BombIcon, Copy01Icon, StopIcon } from "@hugeicons/core-free-icons";
+import { BombIcon, Copy01Icon, CommandLineIcon, StopIcon } from "@hugeicons/core-free-icons";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -13,30 +13,30 @@ import { native, type PtyProcessInfo } from "@/lib/native";
 import { IS_WINDOWS } from "@/lib/platform";
 import { ptyIdForTab } from "./lib/useTerminalSession";
 
-// Context menu of the process segment of the terminal path bar: copy the pid
-// or take the process tree down. Stop and Kill signal the descendants of the
+// Context menu of the process segment of the terminal path bar: copy the pid or
+// the full command line, or take the process tree down. Stop and Kill signal the descendants of the
 // shell, so they are only offered while something runs. The content mounts
 // while open, so the snapshot is fetched fresh each time.
 export function ProcessSegmentContextMenu({
   tabId,
-  running,
+  command,
   children,
 }: {
   tabId: string;
-  running: boolean;
+  command: string | null;
   children: ReactNode;
 }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
-        <ProcessMenuItems tabId={tabId} running={running} />
+        <ProcessMenuItems tabId={tabId} command={command} />
       </ContextMenuContent>
     </ContextMenu>
   );
 }
 
-function ProcessMenuItems({ tabId, running }: { tabId: string; running: boolean }) {
+function ProcessMenuItems({ tabId, command }: { tabId: string; command: string | null }) {
   const [info, setInfo] = useState<PtyProcessInfo | null>(null);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function ProcessMenuItems({ tabId, running }: { tabId: string; running: boolean 
   }, [tabId]);
 
   const pid = info ? String(info.pid) : null;
-  const busy = running || !!info?.fg_name;
+  const busy = !!command || !!info?.fg_name;
   const noStop = IS_WINDOWS || !info;
   const noStopTitle = IS_WINDOWS ? "Stop the process with Ctrl+C in the terminal" : undefined;
 
@@ -70,6 +70,12 @@ function ProcessMenuItems({ tabId, running }: { tabId: string; running: boolean 
           </span>
         )}
       </ContextMenuItem>
+      {command && (
+        <ContextMenuItem onSelect={() => void writeClipboardText(command)}>
+          <HugeiconsIcon icon={CommandLineIcon} size={14} strokeWidth={2} />
+          Copy Command
+        </ContextMenuItem>
+      )}
       {busy && (
         <>
           <ContextMenuItem
