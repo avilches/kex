@@ -10,7 +10,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   type DropAnimation,
-  type Modifier,
 } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
@@ -18,6 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { closestCenter } from "@dnd-kit/core";
 import { pointerLeftWindow, renderDragIcon, startNativeFileDrag, tabNativeDragPath } from "@/modules/explorer/lib/nativeDragOut";
+import { DragGhost } from "./DragGhost";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
 import {
@@ -119,20 +119,6 @@ export { sidebarTabDragId };
 function sideRowData(data: Record<string, unknown> | undefined): SideRowDropData | null {
   return data?.sideRow === true ? (data as unknown as SideRowDropData) : null;
 }
-
-// A row of the WorkspaceBar is much wider than its ghost, so the overlay is
-// pinned next to the pointer instead of keeping the row's own offset.
-const GHOST_OFFSET = 8;
-const pinSidebarTabGhost: Modifier = ({ active, activatorEvent, draggingNodeRect, transform }) => {
-  if (active?.data.current?.type !== "tab" || !draggingNodeRect || !activatorEvent) return transform;
-  const pointer = getEventCoordinates(activatorEvent);
-  if (!pointer) return transform;
-  return {
-    ...transform,
-    x: transform.x + pointer.x - draggingNodeRect.left + GHOST_OFFSET,
-    y: transform.y + pointer.y - draggingNodeRect.top + GHOST_OFFSET,
-  };
-};
 
 export function useWorkspaceDndInsert(): string | null {
   return useContext(WorkspaceDndInsertContext);
@@ -570,26 +556,29 @@ export function WorkspaceDndProvider({
       </WorkspaceDndContext.Provider>
       {/* Without pointer-events-none the overlay under the cursor swallows the WorkspaceBar hover. */}
       <DragOverlay
-        modifiers={[pinSidebarTabGhost]}
         dropAnimation={draggingItem ? null : (barOverlay?.dropAnimation ?? null)}
         className="pointer-events-none"
       >
         {!draggingItem && barOverlay?.node}
-        {draggingItem?.kind === "tab" && (
-          <div className="pointer-events-none flex items-center gap-1 text-[12px] text-foreground">
+      </DragOverlay>
+      {draggingItem?.kind === "tab" && (
+        <DragGhost>
+          <div className="flex items-center gap-1 text-[12px] text-foreground">
             <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab)}</span>
             <span className="max-w-[120px] truncate">{tabDisplayTitleNow(draggingItem.tab)}</span>
           </div>
-        )}
-        {draggingItem?.kind === "file" && (
-          <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
+        </DragGhost>
+      )}
+      {draggingItem?.kind === "file" && (
+        <DragGhost>
+          <div className="flex items-center gap-1 text-[11px] text-foreground">
             <span className="shrink-0 opacity-70">
               <HugeiconsIcon icon={draggingItem.isDir ? Folder01Icon : File01Icon} size={14} strokeWidth={1.5} />
             </span>
             <span className="max-w-[120px] truncate">{basename(draggingItem.path)}</span>
           </div>
-        )}
-      </DragOverlay>
+        </DragGhost>
+      )}
     </DndContext>
   );
 }
