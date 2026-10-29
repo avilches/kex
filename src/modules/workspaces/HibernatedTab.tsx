@@ -3,10 +3,12 @@ import { Kbd } from "@/components/ui/kbd";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
-import { CommandLineIcon, Folder01Icon, SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
+import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, useEffect, useState } from "react";
+import { HibernatedInfo } from "./HibernatedInfo";
 import { HibernatedLines } from "./HibernatedLines";
+import { infoVariantFor } from "./lib/infoVariant";
 import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
 import { tildePath } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
@@ -47,26 +49,13 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       <HibernatedLines tabId={tab.id} visible={visible} />
       <div className="relative flex max-w-[80%] flex-col items-center gap-5 rounded-xl border border-border bg-background px-10 py-8 shadow-sm">
         <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
-        <div className="flex max-w-full flex-col items-start gap-1.5 self-stretch text-left">
-          <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
-            <span className="flex size-4 shrink-0 items-center justify-center">
-              {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
-            </span>
-            <span className="truncate">{title}</span>
-          </span>
-          {folder && (
-            <span title={folder} data-hibernated-folder className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px]">
-              <HugeiconsIcon icon={Folder01Icon} size={12} strokeWidth={2} className="shrink-0" />
-              <span className="truncate">{tildePath(folder, cachedHomeDir())}</span>
-            </span>
-          )}
-          {command && (
-            <span title={command} className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70">
-              <HugeiconsIcon icon={CommandLineIcon} size={12} strokeWidth={2} className="shrink-0" />
-              <span className="truncate">{command}</span>
-            </span>
-          )}
-        </div>
+        <HibernatedInfo
+          variant={infoVariantFor(tab.id)}
+          icon={agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
+          title={title}
+          folder={folder ? tildePath(folder, cachedHomeDir()) : null}
+          command={command || null}
+        />
         <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
           Restore
