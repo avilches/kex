@@ -1,7 +1,7 @@
 import { pathBasename } from "@/lib/pathUtils";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
-import { relativeCopyFor } from "@/modules/explorer/lib/relativeCopy";
+import { pathCopyOptions, type PathCopyKind, type PathCopyOption } from "@/modules/explorer/lib/pathCopyOptions";
 import { hasTabNote, isTabNoteOpen } from "@/modules/workspaces/lib/tabNote";
 import { tabCopyPath } from "@/modules/workspaces/lib/tabPath";
 import type { ClosedTabEntry } from "./closedEntries";
@@ -12,7 +12,9 @@ export type RowMenuItemId =
   | "go"
   | "terminal"
   | "copy"
-  | "copyRelative"
+  | "copyPath"
+  | "copyWorkspace"
+  | "copyRepository"
   | "tabId"
   | "close"
   | "lock"
@@ -155,10 +157,38 @@ export function tabEntryCopyPath(entry: TabEntry): string | null {
 }
 
 
-export function tabEntryRelativePath(entry: TabEntry) {
-  if (entry.kind === "browser") return null;
+// What the row can copy: its absolute path, and the path against the workspace root and the
+// repository root when it has them. A browser tab only has its url.
+export function tabCopyOptions(entry: TabEntry): PathCopyOption[] {
   const path = tabEntryCopyPath(entry);
-  return path ? relativeCopyFor(path, entry.workspaceRoot) : null;
+  if (!path) return [];
+  const local = entry.kind !== "browser";
+  return pathCopyOptions(path, {
+    workspaceRoot: local ? entry.workspaceRoot : null,
+    repoRoot: local ? (entry.repoRoot ?? null) : null,
+  });
+}
+
+const COPY_ITEM_IDS: Partial<Record<PathCopyKind, RowMenuItemId>> = {
+  absolute: "copy",
+  workspace: "copyWorkspace",
+  repository: "copyRepository",
+};
+
+// What "Copy Path" turns the menu into: Back and one item per path the row can copy.
+export function tabCopySubmenuItems(entry: TabEntry): RowMenuItem[] {
+  const items: RowMenuItem[] = [{ id: "back", label: "Back" }];
+  for (const option of tabCopyOptions(entry)) {
+    const id = COPY_ITEM_IDS[option.kind];
+    if (!id) continue;
+    items.push({
+      id,
+      label: option.label,
+      detail: option.text,
+      ...(id === "copy" ? { shortcutId: "path.copy" as const } : {}),
+    });
+  }
+  return items;
 }
 
 export function noteLabel(entry: TabEntry): string {
@@ -183,22 +213,16 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note", separatorBefore: true });
   if (hasTabNote(tab)) items.push({ id: "removeNote", label: "Remove Note" });
   const absolute = tabEntryCopyPath(entry);
-  items.push({
-    id: "copy",
-    label: "Copy Absolute Path",
-    shortcutId: "path.copy",
-    disabled: !absolute,
-    separatorBefore: true,
-    ...(absolute ? { detail: absolute } : {}),
-  });
-  const rel = tabEntryRelativePath(entry);
-  if (rel && !(rel.ok && rel.text === ".")) {
+  if (tabCopyOptions(entry).length > 1) {
+    items.push({ id: "copyPath", label: "Copy Path", separatorBefore: true });
+  } else {
     items.push({
-      id: "copyRelative",
-      label: "Copy Relative Path",
-      title: rel.ok ? rel.text : rel.reason,
-      disabled: !rel.ok,
-      ...(rel.ok ? { detail: rel.text } : {}),
+      id: "copy",
+      label: "Copy Absolute Path",
+      shortcutId: "path.copy",
+      disabled: !absolute,
+      separatorBefore: true,
+      ...(absolute ? { detail: absolute } : {}),
     });
   }
   items.push({ id: "tabId", label: "Copy Tab ID", value: entry.tabId, title: entry.tabId });
@@ -232,7 +256,9 @@ export function tabItemKeepsPalette(id: RowMenuItemId, entry: TabEntry): boolean
     id === "moveWorkspace" ||
     id === "back" ||
     id === "copy" ||
-    id === "copyRelative" ||
+    id === "copyPath" ||
+    id === "copyWorkspace" ||
+    id === "copyRepository" ||
     id === "tabId" ||
     id === "lock" ||
     id === "hibernateTab" ||
@@ -250,7 +276,7 @@ export function runnableTabItem(
 ): RowMenuItem | null {
   // The hibernate key is the restore key on a sleeping row: one slot, two items.
   const wanted = id === "hibernateTab" && entry.hibernated ? "restoreTab" : id;
-  const item = tabMenuItems(entry).find((i) => i.id === wanted);
+  const item = [...tabMenuItems(entry), ...tabCopySubmenuItems(entry)].find((i) => i.id === wanted);
   if (!item || (item.disabled && id !== "close")) return null;
   return item;
 }

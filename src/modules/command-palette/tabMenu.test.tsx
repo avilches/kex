@@ -409,8 +409,26 @@ describe("Copy Absolute Path from the palette", () => {
     const sub = item.querySelector(".font-mono") as HTMLElement;
     expect(sub.textContent).toContain("/p");
     expect(sub.title).toBe("/p");
-    const relative = menuItem("Copy Relative Path") as HTMLElement;
-    expect(relative.querySelector(".font-mono")).toBeNull();
+    expect(document.body.textContent).not.toContain("Copy Relative Path");
+  });
+});
+
+describe("Copy Path from the palette", () => {
+  it("opens the copies, copies the workspace path, and Back restores the row menu", async () => {
+    initial = [mk("cur", 0), mk("b", 1, { cwd: "/p/src" }, { workspaceRoot: "/p", cwd: "/p/src", detail: "/p/src" })];
+    await openOn("tab:b");
+    await key("Tab");
+    await wait(20);
+    fireEvent.click(menuItem("Copy Path") as HTMLElement);
+    await wait(30);
+    expect(menuItem("Absolute Path")).toBeTruthy();
+    fireEvent.click(menuItem("Workspace Path") as HTMLElement);
+    await wait(30);
+    expect(writeClipboardText).toHaveBeenLastCalledWith("src");
+    expect(calls.openChange).toEqual([]);
+    fireEvent.click(menuItem("Back") as HTMLElement);
+    await wait(30);
+    expect(menuItem("Copy Path")).toBeTruthy();
   });
 });
 
