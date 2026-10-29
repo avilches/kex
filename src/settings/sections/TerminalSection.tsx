@@ -14,7 +14,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { defaultMonoFontFamily } from "@/lib/fonts";
+import { defaultMonoFontFamily, resolveMonoFontFamily } from "@/lib/fonts";
+import { uiFontLabel } from "@/lib/uiFonts";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { ENTER_KEY, fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -65,6 +67,7 @@ import {
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalScratchpadEnterSends,
+  setTerminalScratchpadMonospace,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -119,6 +122,10 @@ export function TerminalSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const terminalBackgroundMemoryBudgetMB = usePreferencesStore(
     (s) => s.terminalBackgroundMemoryBudgetMB,
+  );
+  const uiFont = usePreferencesStore((s) => s.uiFont);
+  const scratchpadMonospace = usePreferencesStore(
+    (s) => s.scratchpadMonospace,
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
@@ -221,6 +228,43 @@ export function TerminalSection() {
             </div>
           </RadioGroup>
         </SettingRow>
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <span className="text-[12.5px] font-medium">Font</span>
+          <RadioGroup
+            className="grid grid-cols-2 gap-4"
+            value={scratchpadMonospace ? "mono" : "system"}
+            onValueChange={(v) =>
+              void setTerminalScratchpadMonospace(v === "mono")
+            }
+          >
+            <div className="flex flex-col items-start gap-1.5">
+              <label
+                htmlFor="scratchpad-font-system"
+                className="cursor-pointer text-[13px]"
+              >
+                {uiFontLabel(uiFont)}
+              </label>
+              <RadioGroupItem value="system" id="scratchpad-font-system" />
+              <button
+                type="button"
+                onClick={() => void openSettingsWindow("appearance")}
+                className="text-[10.5px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                Change font
+              </button>
+            </div>
+            <div className="flex flex-col items-start gap-1.5">
+              <label
+                htmlFor="scratchpad-font-mono"
+                className="cursor-pointer text-[13px]"
+                style={{ fontFamily: resolveMonoFontFamily(terminalFontFamily) }}
+              >
+                Monospace
+              </label>
+              <RadioGroupItem value="mono" id="scratchpad-font-mono" />
+            </div>
+          </RadioGroup>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

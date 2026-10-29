@@ -1,4 +1,5 @@
 pub mod modules;
+mod panic_log;
 
 use modules::{
     actions, agent, editors, float_browser, fs, git, hibernate_lines, history, menu_route, pty,
@@ -537,6 +538,7 @@ async fn check_launch_dir(path: String) -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    panic_log::install();
     let cli_dir = parse_launch_dir();
     workspace::init_launch_cwd(cli_dir.as_deref());
 

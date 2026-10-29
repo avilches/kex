@@ -43,7 +43,7 @@ import {
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
-import { CopyAbsolutePathItem, CopyRelativePathItem } from "./lib/copyPathItems";
+import { CopyPathMenu } from "./lib/copyPathItems";
 import { gitignoreEntryFor } from "./lib/gitignore";
 import { gitStatusHexColor } from "./lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -79,6 +79,7 @@ export type EntryRowProps = {
   isExpanded: boolean;
   depth: number;
   rootPath: string;
+  workspaceRoot: string | null;
   actions: RowActions;
   renameInProgress: boolean;
   isSelected: boolean;
@@ -110,6 +111,7 @@ function EntryRowImpl(props: EntryRowProps) {
     isExpanded,
     depth,
     rootPath,
+    workspaceRoot,
     actions,
     renameInProgress,
     isSelected,
@@ -432,8 +434,13 @@ function EntryRowImpl(props: EntryRowProps) {
           Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <CopyRelativePathItem path={path} workspaceRoot={rootPath} />
-        <CopyAbsolutePathItem path={path} />
+        <CopyPathMenu
+          path={path}
+          isDir={isDir}
+          workspaceRoot={workspaceRoot}
+          repoRoot={gitRootPath}
+          relativeRoot={rootPath}
+        />
         {gitRootPath &&
           onAddToGitignore &&
           gitignoreEntryFor(gitRootPath, path, isDir) && (
@@ -514,6 +521,7 @@ const LRM = "\u200e";
 export type FsRootRowProps = {
   path: string;
   isWorkspaceRoot: boolean;
+  workspaceRoot: string | null;
   flashToken: number;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -527,6 +535,7 @@ export type FsRootRowProps = {
 export function FsRootRow({
   path,
   isWorkspaceRoot,
+  workspaceRoot,
   flashToken,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
@@ -642,7 +651,7 @@ export function FsRootRow({
           <ShortcutHint id="file.paste" />
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <CopyAbsolutePathItem path={path} />
+        <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => onRefresh?.(path)}
@@ -657,11 +666,13 @@ export function FsRootRow({
 
 export function FsUpRow({
   path,
+  workspaceRoot,
   onNavigateUp,
   onRevealInTerminal,
   onRefresh,
 }: {
   path: string;
+  workspaceRoot: string | null;
   onNavigateUp?: () => void;
   onRevealInTerminal?: (path: string) => void;
   onRefresh?: () => void;
@@ -719,7 +730,7 @@ export function FsUpRow({
           {REVEAL_LABEL}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <CopyAbsolutePathItem path={path} />
+        <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         {onRefresh && (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRefresh()}>
             <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />

@@ -13,20 +13,13 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  CopyAbsolutePathItem,
-  CopyRelativePathItem,
-  CopyRelativeTextItem,
-} from "./copyPathItems";
+import { CopyAbsolutePathItem, CopyPathMenu } from "./copyPathItems";
 
-function open() {
+function open(menu: React.ReactNode) {
   render(
     <ContextMenu>
       <ContextMenuTrigger>target</ContextMenuTrigger>
-      <ContextMenuContent>
-        <CopyRelativeTextItem text="src/a/b.ts" />
-        <CopyAbsolutePathItem path="/ws/src/a/b.ts" />
-      </ContextMenuContent>
+      <ContextMenuContent>{menu}</ContextMenuContent>
     </ContextMenu>,
   );
   act(() => {
@@ -34,18 +27,10 @@ function open() {
   });
 }
 
-function openAtWorkspaceRoot() {
-  render(
-    <ContextMenu>
-      <ContextMenuTrigger>target</ContextMenuTrigger>
-      <ContextMenuContent>
-        <CopyRelativeTextItem text="." />
-        <CopyRelativePathItem path="/ws" workspaceRoot="/ws" />
-      </ContextMenuContent>
-    </ContextMenu>,
-  );
+function openSubmenu() {
+  const trigger = screen.getByText("Copy Path").closest("[role=menuitem]")!;
   act(() => {
-    fireEvent.contextMenu(screen.getByText("target"));
+    fireEvent.keyDown(trigger, { key: "ArrowRight" });
   });
 }
 
@@ -56,13 +41,12 @@ describe("copy path items", () => {
   });
 
   it("shows the text each entry copies, muted, below its label", () => {
-    open();
-    expect(screen.getByText("src/a/b.ts").closest("[title]")?.className).toContain("text-muted-foreground");
+    open(<CopyAbsolutePathItem path="/ws/src/a/b.ts" />);
     expect(screen.getByText("/ws/src/a/b.ts").closest("[title]")?.className).toContain("text-muted-foreground");
   });
 
   it("keeps a short path left aligned with no ellipsis", () => {
-    open();
+    open(<CopyAbsolutePathItem path="/ws/src/a/b.ts" />);
     const box = screen.getByText("/ws/src/a/b.ts").parentElement!;
     expect(box.getAttribute("dir")).toBe("rtl");
     expect(box.className).toContain("overflow-hidden");
@@ -75,23 +59,46 @@ describe("copy path items", () => {
     const scrollWidth = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(300);
     const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
     try {
-      open();
-      expect(screen.getAllByText("…")).toHaveLength(2);
+      open(<CopyAbsolutePathItem path="/ws/src/a/b.ts" />);
+      expect(screen.getAllByText("…")).toHaveLength(1);
     } finally {
       scrollWidth.mockRestore();
       clientWidth.mockRestore();
     }
   });
 
-  it("copies the relative text it was given", () => {
-    open();
-    fireEvent.click(screen.getByText("Copy Relative Path"));
-    expect(copyToClipboard).toHaveBeenCalledWith("src/a/b.ts", "Copied relative path");
+  it("is a plain Copy Absolute Path item when nothing else can be offered", () => {
+    open(<CopyPathMenu path="/ws/a.ts" isDir={false} workspaceRoot={null} repoRoot={null} />);
+    expect(screen.queryByText("Copy Path")).toBeNull();
+    fireEvent.click(screen.getByText("Copy Absolute Path"));
+    expect(copyToClipboard).toHaveBeenCalledWith("/ws/a.ts", "Copied absolute path");
   });
 
-  it("omits relative-path entries that would copy the workspace-root dot", () => {
-    openAtWorkspaceRoot();
+  it("groups every base the path can be copied against under Copy Path", () => {
+    open(
+      <CopyPathMenu
+        path="/w/app/src/a.ts"
+        isDir={false}
+        workspaceRoot="/w"
+        repoRoot="/w/app"
+        relativeRoot="/w/app/src"
+      />,
+    );
+    openSubmenu();
+    expect(
+      ["Absolute Path", "Workspace Path", "Repository Path", "Relative Path"].map(
+        (label) => screen.queryByText(label) !== null,
+      ),
+    ).toEqual([true, true, true, true]);
+    fireEvent.click(screen.getByText("Repository Path"));
+    expect(copyToClipboard).toHaveBeenCalledWith("src/a.ts", "Copied repository path");
+  });
 
-    expect(screen.queryByText("Copy Relative Path")).toBeNull();
+  it("leaves out the entries whose base is missing", () => {
+    open(<CopyPathMenu path="/w/a.ts" isDir={false} workspaceRoot="/w" repoRoot={null} />);
+    openSubmenu();
+    expect(screen.queryByText("Workspace Path")).not.toBeNull();
+    expect(screen.queryByText("Repository Path")).toBeNull();
+    expect(screen.queryByText("Relative Path")).toBeNull();
   });
 });

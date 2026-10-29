@@ -40,7 +40,9 @@ import {
   ChevronRightIcon,
   CommandLineIcon,
   ComputerTerminal01Icon,
+  Copy01Icon,
   CrosshairIcon,
+  Folder02Icon,
   FolderTreeIcon,
   GitBranchIcon,
   Home03Icon,
@@ -1307,10 +1309,30 @@ function hibernatedTab(): HTMLElement {
       h("div", {
         class: "size-12 rounded-full border border-current opacity-70",
       }),
-      h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
-      h("span", { class: "max-w-full truncate font-mono text-[11.5px] opacity-70" }, "claude --resume 7f3a"),
-      h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
-      h("span", { class: "truncate text-[11px] opacity-60", "data-surface": "hibernated-session-preview" }, "~/code/kex · 2h ago"),
+      h(
+        "div",
+        { class: "flex max-w-full flex-col items-start gap-2 self-stretch text-left" },
+        h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
+        h(
+          "div",
+          {
+            class: "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5",
+            "data-surface": "hibernated-table",
+          },
+          ...[
+            [Folder02Icon, "Folder", "~/code/kex"],
+            [CommandLineIcon, "Command", "claude --resume 7f3a"],
+          ].flatMap(([ic, label, value]) => [
+            h("span", { class: "flex items-center opacity-70", title: label as string }, icon(ic as typeof CommandLineIcon, 12, 2)),
+            h("span", { class: "truncate font-mono text-[11.5px] opacity-70" }, value as string),
+            h(
+              "span",
+              { class: "flex size-[22px] items-center justify-center rounded text-muted-foreground opacity-70" },
+              icon(Copy01Icon, 12, 2),
+            ),
+          ]),
+        ),
+      ),
       h(
         "div",
         { class: "flex items-center gap-2" },
@@ -1322,7 +1344,6 @@ function hibernatedTab(): HTMLElement {
             title: "Tab focused",
           },
           "Restore",
-          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
         ),
         h(
           "span",
@@ -1332,9 +1353,17 @@ function hibernatedTab(): HTMLElement {
             title: "Tab not focused",
           },
           "Restore",
-          h("span", { class: "text-[11px] font-normal opacity-70" }, "↵"),
         ),
       ),
+      h(
+        "span",
+        { class: "absolute bottom-2 left-3 flex items-center gap-1.5 text-[10px] opacity-80", "data-surface": "hibernated-hint" },
+        h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "↵"),
+        "or",
+        h("kbd", { class: "inline-flex h-[18px] items-center rounded bg-muted px-1.5 font-sans text-[10.5px] font-medium text-muted-foreground" }, "⌥⌘Z"),
+        "Restore",
+      ),
+      h("span", { class: "absolute right-3 bottom-2 text-[10px] opacity-50" }, "Hibernated for 2h"),
     ),
   );
 }

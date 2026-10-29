@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -22,7 +21,7 @@ import {
 } from "./lib/useTerminalSession";
 import { pasteIntoLeaf } from "./lib/rendererPool";
 import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
-import { ScratchpadBar } from "./ScratchpadBar";
+import { ScratchpadOverlay } from "./ScratchpadOverlay";
 import { TerminalContextMenu } from "./TerminalContextMenu";
 
 // Lazy: ShellInput pulls the CodeMirror stack, which must stay out of the
@@ -126,10 +125,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           style={hideStyle}
         >
           <div
-            className={cn(
-              "relative min-h-0 flex-1 transition-opacity",
-              session.scratchpadOpen && "opacity-50",
-            )}
+            className="relative min-h-0 flex-1"
           >
             <TerminalContextMenu
               getSelection={session.getSelection}
@@ -181,7 +177,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
             </Suspense>
           </div>
           {session.scratchpadOpen && focused && (
-            <ScratchpadBar leafId={tabId} />
+            <ScratchpadOverlay leafId={tabId} />
           )}
           {session.restoreBlock && (
             <RestoreBlockedOverlay leafId={tabId} block={session.restoreBlock} />
@@ -199,15 +195,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         >
           <div
             ref={containerRef}
-            className={cn(
-              "min-h-0 flex-1 transition-opacity",
-              session.scratchpadOpen && "opacity-50",
-            )}
+            className="min-h-0 flex-1"
             onFocus={() => setLeafTerminalFocused(tabId)}
           />
         </TerminalContextMenu>
         {session.scratchpadOpen && focused && (
-          <ScratchpadBar leafId={tabId} />
+          <ScratchpadOverlay leafId={tabId} />
         )}
         {session.restoreBlock && (
           <RestoreBlockedOverlay leafId={tabId} block={session.restoreBlock} />

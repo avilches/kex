@@ -8,6 +8,7 @@ import {
   clearStaleFolds,
   insertRestoredWorkspace,
   orphanedSleepers,
+  orphanedTerminals,
   pickReopen,
   remapPrevTabId,
   resolveReopenSlot,
@@ -384,5 +385,38 @@ describe("orphanedSleepers", () => {
       } as Workspace,
     };
     expect(orphanedSleepers([ws], [], new Set())).toEqual(["s1"]);
+  });
+});
+
+describe("buildReopenedTab with a held restore block", () => {
+  it("drops the block from the live tab, it is seeded apart", () => {
+    const tab = {
+      id: "tab-a",
+      kind: "terminal",
+      held: { modal: true, block: { reason: "r", dir: "/d", command: "c", restorable: true } },
+    } as Tab;
+    expect(buildReopenedTab(tab, "tab-b")).not.toHaveProperty("held");
+  });
+});
+
+describe("orphanedTerminals", () => {
+  const closed = (id: string, over: Record<string, unknown> = {}): ClosedEntry => ({
+    kind: "tab",
+    tab: { id, kind: "terminal", ...over } as Tab,
+    paneId: "p1",
+    workspaceId: "w1",
+    prevTabId: null,
+  });
+
+  it("names awake and sleeping terminals that fell off the stack", () => {
+    const sleeper = closed("b", { hibernation: { at: 1 } });
+    expect(orphanedTerminals([closed("a"), sleeper, closed("c")], [closed("c")], new Set())).toEqual(["a", "b"]);
+  });
+
+  it("keeps what is still in the stack or open, and ignores other kinds of tab", () => {
+    expect(orphanedTerminals([closed("a")], [closed("a")], new Set())).toEqual([]);
+    expect(orphanedTerminals([closed("a")], [], new Set(["a"]))).toEqual([]);
+    const doc = { kind: "tab", tab: { id: "e", kind: "editor" }, paneId: "p", workspaceId: "w", prevTabId: null } as ClosedEntry;
+    expect(orphanedTerminals([doc], [], new Set())).toEqual([]);
   });
 });

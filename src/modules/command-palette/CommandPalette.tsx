@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { writeClipboardText } from "@/lib/clipboard";
-import { pathBasename } from "@/lib/pathUtils";
+import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { cn } from "@/lib/utils";
 import { type BarItem, paletteActions } from "@/modules/actions/lib/actionsBar";
 import { useActionsBarModel } from "@/modules/actions/lib/useActionsBar";
@@ -56,6 +57,8 @@ import { enterHintOf } from "./lib/enterHint";
 import { registerPaletteControl } from "./lib/paletteControl";
 import {
   actionMenuItems,
+  closedCopyOptions,
+  closedCopySubmenuItems,
   closedMenuItems,
   highlightedActionOf,
   highlightedClosedOf,
@@ -66,7 +69,8 @@ import {
   runnableTabItem,
   type RowMenuItemId,
   tabEntryCopyPath,
-  tabEntryRelativePath,
+  tabCopyOptions,
+  tabCopySubmenuItems,
   tabItemKeepsPalette,
   tabMenuItems,
   workspaceMenuItems,
@@ -131,6 +135,13 @@ const THEME_PREVIEW_DELAY_MS = 140;
 // cmdk overrides the rendered input's id attribute, so helpers that focus or select the palette
 // input query it by its cmdk marker instead of by id. The folder palette's input carries the same
 // marker and is still in the page while it closes, so this palette's own attribute is part of the query.
+
+// A closed row has no live state to ask: the repository is whatever the cache already knows of its
+// folder, so opening the menu never costs a request.
+function closedRepoRoot(entry: ClosedTabEntry): string | null {
+  const dir = entry.kind === "terminal" ? entry.path : pathDirname(entry.path);
+  return getDirGit(dir).repoRoot || null;
+}
 
 function paletteInputElement(): HTMLInputElement | null {
   return document.querySelector<HTMLInputElement>(PALETTE_INPUT_SELECTOR);
@@ -552,9 +563,12 @@ export function CommandPalette({
         if (path) void copyToClipboard(path, "Copied absolute path");
       } else if (id === "close") {
         closeTabFromRow(entry);
-      } else if (id === "copyRelative") {
-        const rel = tabEntryRelativePath(entry);
-        if (rel?.ok) void copyToClipboard(rel.text, "Copied relative path");
+      } else if (id === "copyPath") {
+        enterMoveMenu(tabCopySubmenuItems(entry), "copyPath");
+      } else if (id === "copyWorkspace" || id === "copyRepository") {
+        const kind = id === "copyWorkspace" ? "workspace" : "repository";
+        const option = tabCopyOptions(entry).find((o) => o.kind === kind);
+        if (option) void copyToClipboard(option.text, option.toast);
       } else if (id === "tabId") {
         void writeClipboardText(tabId);
       } else if (id === "lock") {
@@ -646,15 +660,25 @@ export function CommandPalette({
 
   const runClosedAction = useCallback(
     (id: RowMenuItemId, entry: ClosedTabEntry) => {
-      closeRowMenu();
-      if (id === "go") {
-        runAfterClose(() => onRunClosed(entry));
-      } else if (id === "copy" && entry.path) {
-        const path = entry.path;
-        void copyToClipboard(path, "Copied absolute path");
+      if (id === "copyPath") {
+        enterMoveMenu(closedCopySubmenuItems(entry, closedRepoRoot(entry)), "copyPath");
+        return;
       }
+      if (id === "back") {
+        backMenu();
+        return;
+      }
+      if (id === "copy" || id === "copyWorkspace" || id === "copyRepository") {
+        // Like a live tab: the copy only writes to the clipboard and the menu stays where it was.
+        const kind = id === "copy" ? "absolute" : id === "copyWorkspace" ? "workspace" : "repository";
+        const option = closedCopyOptions(entry, closedRepoRoot(entry)).find((o) => o.kind === kind);
+        if (option) void copyToClipboard(option.text, option.toast);
+        return;
+      }
+      closeRowMenu();
+      if (id === "go") runAfterClose(() => onRunClosed(entry));
     },
-    [closeRowMenu, runAfterClose, onRunClosed],
+    [closeRowMenu, runAfterClose, onRunClosed, enterMoveMenu, backMenu],
   );
 
   const openClosedMenu = useCallback(
@@ -667,7 +691,7 @@ export function CommandPalette({
       if (!box || !row) return;
       openRowMenu(
         entry.key,
-        closedMenuItems(entry),
+        closedMenuItems(entry, closedRepoRoot(entry)),
         anchorOf(box, row as HTMLElement, pointer),
       );
     },

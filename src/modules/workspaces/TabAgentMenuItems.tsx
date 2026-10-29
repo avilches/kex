@@ -119,16 +119,14 @@ export function CopyTabIdItem({ tabId }: { tabId: string }) {
   );
 }
 
-// The agent block of the tab menu. `process` renders first, right under the
-// agent name and icon; `children` render right after it (Restore Command belongs
-// to the agent, so it sits with it instead of with the generic tab items).
+// The agent block of the tab menu. `children` render right under the agent name
+// and icon (Restore Command belongs to the agent, so it sits with it instead of
+// with the generic tab items).
 export function TabAgentMenuItems({
   tabId,
-  process,
   children,
 }: {
   tabId: string;
-  process?: ReactNode;
   children?: ReactNode;
 }) {
   const session = useAgentStore((s) => s.sessions[tabId]);
@@ -141,13 +139,12 @@ export function TabAgentMenuItems({
     useIntegrationStatus(session?.agent),
   );
   if (!session || !showsAgentMenu(session)) {
-    return process || children ? (
+    return (
       <>
-        {process}
         {children}
         <ContextMenuSeparator />
       </>
-    ) : null;
+    );
   }
   const sessionId = meta?.sessionId;
   const hasTranscript = !!transcriptPath && transcriptExists !== false;
@@ -163,7 +160,6 @@ export function TabAgentMenuItems({
           )}
         </span>
       </ContextMenuLabel>
-      {process}
       {children}
       {integration.mode === "install" && (
         <ContextMenuItem

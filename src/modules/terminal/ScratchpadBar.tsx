@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { resolveMonoFontFamily } from "@/lib/fonts";
 import { ENTER_KEY } from "@/lib/platform";
 import { isImeComposing } from "@/lib/imeEnter";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,8 @@ export function ScratchpadBar({ leafId }: Props) {
   const [focused, setFocused] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const enterSends = usePreferencesStore((s) => s.scratchpadEnterSends);
+  const monospace = usePreferencesStore((s) => s.scratchpadMonospace);
+  const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const hasAgent = useAgentStore((s) => Boolean(s.sessions[leafId]));
   const { setNodeRef, isOver } = useDroppable({
@@ -194,9 +197,9 @@ export function ScratchpadBar({ leafId }: Props) {
         // before PaneView's overflow-hidden clips it; the blur/spread below are
         // sized to mostly fade out within that 8px margin so the glow reads as
         // an outward halo instead of getting cut off mid-fade.
-        "m-2 flex shrink-0 items-end gap-2 px-3 py-2 transition-colors",
+        "m-2 flex shrink-0 items-end gap-3 rounded-xl bg-[var(--terminal-background)] px-4 py-3 transition-colors",
         focused &&
-          "ring-1 ring-inset ring-primary/50 shadow-[0_0_6px_2px_var(--tw-shadow-color)] shadow-primary/50",
+          "ring-1 ring-inset ring-primary/50 shadow-[0_0_14px_3px_var(--tw-shadow-color)] shadow-primary/60",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
       onMouseDown={(e) => {
@@ -219,8 +222,13 @@ export function ScratchpadBar({ leafId }: Props) {
         value={text}
         rows={1}
         placeholder={focused ? placeholder : ""}
-        className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent font-mono text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-        style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
+        className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+        style={{
+          maxHeight: MAX_TEXTAREA_HEIGHT,
+          fontFamily: monospace
+            ? resolveMonoFontFamily(terminalFontFamily)
+            : "inherit",
+        }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onFocus={() => setFocused(true)}

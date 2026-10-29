@@ -14,6 +14,9 @@ import {
   workspaceDialogPending,
   formatHibernatedFor,
   restoreCommandFor,
+  hibernatedCommand,
+  heldBlockStillValid,
+  manualCommandWins,
   tabWorktree,
   worktreeToKeep,
   saveRestoreCommand,
@@ -274,6 +277,36 @@ describe("restoreCommandFor", () => {
   });
 });
 
+describe("restoreCommandFor with a blocked plan", () => {
+  it("falls back to the command the plan tried, so the placeholder always shows one", () => {
+    expect(restoreCommandFor(term("t") as Terminal, { resumeCmd: "", attemptedCmd: "claude --resume x" })).toBe("claude --resume x");
+  });
+});
+
+describe("hibernatedCommand", () => {
+  const asleep = (extra: object, command?: string) =>
+    term("t", { hibernation: { at: 1, command }, ...extra }) as unknown as Parameters<typeof hibernatedCommand>[0];
+
+  it("shows what was captured when the tab went to sleep", () => {
+    expect(hibernatedCommand(asleep({}, "claude --resume x"))).toBe("claude --resume x");
+  });
+  it("shows a hand-typed command over the captured one", () => {
+    expect(hibernatedCommand(asleep({ persistentCommand: "claude --resume y", persistentCommandManual: true }, "claude --resume x"))).toBe("claude --resume y");
+  });
+  it("manualCommandWins needs a non-empty hand-typed command", () => {
+    expect(manualCommandWins(term("t", { persistentCommand: "a", persistentCommandManual: true }))).toBe(true);
+    expect(manualCommandWins(term("t", { persistentCommand: "", persistentCommandManual: true }))).toBe(false);
+    expect(manualCommandWins(term("t", { persistentCommand: "a" }))).toBe(false);
+  });
+  it("drops the held error once the command it describes was edited", () => {
+    const block = { reason: "r", dir: "/d", command: "claude --resume x", restorable: true };
+    const held = { block, modal: true };
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "other", persistentCommandManual: true }) as never)).toBe(false);
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held }, persistentCommand: "claude --resume x", persistentCommandManual: true }) as never)).toBe(true);
+    expect(heldBlockStillValid(term("t", { hibernation: { at: 1, held } }) as never)).toBe(true);
+  });
+});
+
 describe("isPendingStale", () => {
   it("is false without a pending id", () => {
     expect(isPendingStale(null, [{ id: "a" }])).toBe(false);
@@ -328,6 +361,13 @@ describe("saveRestoreCommand", () => {
   it("never copies the running command into an agent that resumes its own session", () => {
     const tab = term("t1");
     expect(saveRestoreCommand(tab, { running: "claude", agentResumable: true })).toBe(tab);
+  });
+
+  it("lets an agent that resumes its own session replace a command typed earlier", () => {
+    const tab = term("t1", { persistentCommand: "lazygit", persistentCommandManual: true });
+    const saved = saveRestoreCommand(tab, { running: "claude", agentResumable: true }) as Terminal;
+    expect(saved.persistentCommand).toBeUndefined();
+    expect(saved.persistentCommandManual).toBe(false);
   });
 
   it("stores the launch command of an agent that has not reported a session", () => {

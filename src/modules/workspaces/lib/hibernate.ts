@@ -126,8 +126,29 @@ export function editorTabIds(ws: Workspace): string[] {
 }
 
 // What the restore will type into the tab: the agent resume command, else the Restore Command.
-export function restoreCommandFor(tab: TerminalTab, plan: { resumeCmd: string } | null | undefined): string | undefined {
-  return plan?.resumeCmd.trim() || tab.persistentCommand || undefined;
+export function restoreCommandFor(
+  tab: TerminalTab,
+  plan: { resumeCmd: string; attemptedCmd?: string } | null | undefined,
+): string | undefined {
+  return plan?.resumeCmd.trim() || plan?.attemptedCmd?.trim() || tab.persistentCommand || undefined;
+}
+
+// A command typed by hand wins over the agent's resume plan: the user chose what the tab runs.
+export function manualCommandWins(tab: Tab): boolean {
+  return tab.kind === "terminal" && !!tab.persistentCommandManual && !!tab.persistentCommand;
+}
+
+// What a sleeping tab will run when it wakes: the hand-typed command, else what was captured
+// when it went to sleep.
+export function hibernatedCommand(tab: SleepingTab): string {
+  if (manualCommandWins(tab)) return tab.persistentCommand ?? "";
+  return tab.hibernation.command || tab.persistentCommand || "";
+}
+
+// The held restore error describes a command; an edited command makes it stale.
+export function heldBlockStillValid(tab: SleepingTab): boolean {
+  const held = tab.hibernation.held;
+  return !!held && (!manualCommandWins(tab) || held.block.command === tab.persistentCommand);
 }
 
 // The Restore Command is saved every time a terminal stops (hibernate or close), so waking it or
@@ -139,7 +160,12 @@ export function saveRestoreCommand(
   tab: Tab,
   live: { running: string | null; agentResumable: boolean | undefined },
 ): Tab {
-  if (tab.kind !== "terminal" || tab.hibernation || live.agentResumable === true) return tab;
+  if (tab.kind !== "terminal" || tab.hibernation) return tab;
+  // The agent's own session is what comes back, so it replaces a command typed earlier; one typed
+  // while the tab sleeps is read at wake time and wins again.
+  if (live.agentResumable === true) {
+    return tab.persistentCommandManual ? { ...tab, persistentCommand: undefined, persistentCommandManual: false } : tab;
+  }
   if (tab.persistentCommandManual) return tab;
   const command = live.running ?? undefined;
   return command === tab.persistentCommand ? tab : { ...tab, persistentCommand: command, persistentCommandManual: false };

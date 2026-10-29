@@ -519,7 +519,7 @@ describe("FolderPalette", () => {
         fireEvent.keyDown(inputEl(), { key: "Tab" });
       });
       const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent);
-      expect(items[0]).toContain("New Tab in repo");
+      expect(items[0]).toContain("Open in Terminal");
       expect(items[1]).toContain("worktrees");
       expect(items[2]).toContain("Copy Absolute Path");
       expect(onToggle).not.toHaveBeenCalled();

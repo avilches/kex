@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Copy01Icon, CommandLineIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ContextMenuItem,
@@ -27,6 +27,7 @@ import {
 import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
 import { pendingCdLine, restoreCommandSections } from "@/modules/terminal/lib/restoreCommandSections";
 import { discardPendingRestore, retryPendingRestore } from "@/modules/terminal/lib/useTerminalSession";
+import { hibernatedCommand, isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -70,6 +71,7 @@ export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
   }, [open, tab.id, agentSession, sessionId]);
 
   const [draft, setDraft] = useState<string | null>(null);
+  const currentCommand = isHibernatedTab(tab) ? hibernatedCommand(tab) : effectiveRestoreCommand(tab, running);
   const plain = !agentSession || (previewPlan !== undefined && !previewPlan?.resumeCmd && !previewPlan?.errorReason);
 
   // A followed command has to reach the persisted tab, otherwise restart would replay a stale one.
@@ -114,7 +116,7 @@ export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
       <input
         type="text"
         placeholder="command to run (e.g. lazygit)"
-        value={draft ?? effectiveRestoreCommand(tab, running)}
+        value={draft ?? currentCommand}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
         onKeyDown={(e) => {
@@ -127,7 +129,7 @@ export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
 
   const shownCommand = agentSession
     ? (previewPlan?.resumeCmd ?? "")
-    : (draft ?? effectiveRestoreCommand(tab, running));
+    : (draft ?? currentCommand);
 
   return (
     <ContextMenuSub
@@ -137,7 +139,7 @@ export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
       }}
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
-        <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
+        <HugeiconsIcon icon={CommandLineIcon} size={14} strokeWidth={2} />
         <span className="min-w-0 flex-1">Restore Command</span>
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">

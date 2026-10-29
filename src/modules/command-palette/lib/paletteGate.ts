@@ -96,3 +96,17 @@ export function menuItemBlockedByPalette(id: string, palette: OpenPalette): bool
   if (shortcut === "tab.new" && palette === "folder") return false;
   return shortcutBlockedByPalette(shortcut, palette);
 }
+
+// Whether a global shortcut is swallowed: any shortcut a palette does not list is blocked while it
+// is open, and one it owns acts on the highlighted row, so the tab behind cannot make it
+// unavailable. `unavailableForTab` is the tab-context rule, evaluated by the caller.
+export function shortcutSwallowedByPalette(
+  id: ShortcutId,
+  palette: OpenPalette,
+  ownsTabShortcut: boolean,
+  unavailableForTab: boolean,
+): boolean {
+  if (shortcutBlockedByPalette(id, palette)) return true;
+  if (palette !== "none" && ownsTabShortcut) return false;
+  return unavailableForTab;
+}

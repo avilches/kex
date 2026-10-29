@@ -83,7 +83,7 @@ codegen-units = 1
 lto = "fat"
 opt-level = "s"
 panic = "abort"
-strip = true
+strip = "debuginfo"
 
 [profile.release.build-override]
 strip = "none"

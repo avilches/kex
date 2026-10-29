@@ -407,10 +407,10 @@ This breadcrumb replaced the bottom status bar (`StatusBar`, with its `CwdBreadc
 The terminal path bar cwd is now a navigable breadcrumb (`PathBreadcrumb` / `buildCwdBreadcrumb` in
 `modules/workspaces/pathbar/`) shared with the editor bar. Each directory segment has a right-click context menu
 (`DirSegmentContextMenu` / `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
-Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
+Terminal, Reveal in Finder, Copy Path (a submenu: Absolute, Workspace, Repository and, in the explorer, Relative), Add to .gitignore.
 
 The editor path bar file-name leaf has a right-click context menu (`FileLeafContextMenu` / `fileLeafMenuItems`):
-Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitignore, Delete. Mutations route
+Reveal in Finder, Rename, Duplicate, Copy Path, Add to .gitignore, Delete. Mutations route
 through `RevealRequest.pendingAction` so the explorer performs the action immediately after revealing the file in
 the tree (nonce-guarded, fires once).
 
@@ -421,7 +421,7 @@ Terax.
 
 ### Terminal info bar
 
-Every terminal panel now has a thin top bar (`TerminalPathBar`, h-6) showing the cwd on the left and live process metrics on the right: the shell PID, the running foreground command (or the shell name when idle), CPU percentage, and resident memory. The upstream has no equivalent.
+Every terminal panel now has a thin top bar (`TerminalPathBar`, h-6) showing the cwd and the running foreground command (or the shell name when idle) on the left, and, on the right, how long the running command has been going (`RunningTimer`, mounted only while one runs) followed by live CPU percentage and resident memory. A context menu on the process segment offers Copy PID, Copy Command and, while something runs, Stop and Kill Process Tree. The upstream has no equivalent.
 
 Metrics are sampled every 5 s via the `pty_metrics` Tauri command (backed by the `sysinfo` crate, 0.39). A persistent `sysinfo::System` is kept in Rust-managed state (`ProcessMonitor`) so the CPU reading is a real delta between calls (normalized 0..=100 across logical cores) rather than an instantaneous value. The sample covers the shell PID and all its descendants, so a `cargo build` or `npm install` subprocess is included. Sampling is limited to the visible terminals of the active workspace and suspended when the document is hidden, so the background cost is negligible when the window is not in use. Results are stored in the ephemeral `terminalMetricsStore` (`useSyncExternalStore`), which is never persisted.
 

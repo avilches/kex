@@ -1,18 +1,20 @@
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { sessionPreviews, type SessionPreview } from "@/modules/agents/lib/agentSessionRestore";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
+import { HibernatedInfo } from "./HibernatedInfo";
 import { HibernatedLines } from "./HibernatedLines";
-import { formatHibernatedFor, type SleepingTab } from "./lib/hibernate";
-import { describeSessionPreview } from "./lib/sessionPreview";
+import { hibernatedLayout, type HibernatedLayout } from "./lib/hibernatedLayout";
+import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
 const TICK_MS = 30_000;
+const DOUBLE_CLICK_LABEL = "Double click";
 
 function useNow(enabled: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -25,21 +27,23 @@ function useNow(enabled: boolean): number {
   return now;
 }
 
-// Read again each time the placeholder is shown, so a message stored by the last Stop before
-// hibernating is there.
-function useSessionPreview(tabId: string, active: boolean): SessionPreview | undefined {
-  const [preview, setPreview] = useState<SessionPreview>();
+// Measured on the pane itself, so a split or a resize picks the layout that fits. A hidden tab
+// measures 0x0 and keeps the layout it had.
+function useLayout(): [RefObject<HTMLDivElement | null>, HibernatedLayout] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<HibernatedLayout>("full");
   useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    void sessionPreviews([tabId]).then((list) => {
-      if (!cancelled) setPreview(list[0]);
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width === 0 && height === 0) return;
+      setLayout(hibernatedLayout(width, height));
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [tabId, active]);
-  return preview;
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, layout];
 }
 
 type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () => void };
@@ -48,45 +52,66 @@ type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () 
 // behind it, only what was captured when it went to sleep.
 export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
-  const shortcutLabel = useShortcutLabel("tab.wake");
+  const wakeLabel = useShortcutLabel("tab.wake");
+  const toggleLabel = useShortcutLabel("tab.hibernate");
+  const shortcuts = focused
+    ? [wakeLabel, toggleLabel, DOUBLE_CLICK_LABEL].filter((l): l is string => !!l)
+    : [DOUBLE_CLICK_LABEL];
   const now = useNow(visible);
-  const preview = useSessionPreview(tab.id, visible);
-  const { agent, command, title: frozen, at } = tab.hibernation;
-  const title = frozen || info?.displayTitle || tab.title || tab.id;
-  const line = preview ? describeSessionPreview(preview, now, cachedHomeDir()) : null;
+  const [ref, layout] = useLayout();
+  const { agent, title: frozen, at } = tab.hibernation;
+  const command = hibernatedCommand(tab);
+  const title = info?.displayTitle || frozen || tab.title || tab.id;
+  const folder = tab.hibernation.worktreeCwd || tab.cwd;
+  const full = layout === "full";
+  const restore = (
+    <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
+      <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
+      Restore
+    </Button>
+  );
+  const hint = (
+    <span data-hibernated-hint className="flex items-center gap-1.5 text-[10px] opacity-80">
+      {shortcuts.map((label, i) => (
+        <Fragment key={label}>
+          {i > 0 && "or"}
+          <Kbd className="h-[18px] min-w-0 rounded px-1.5 text-[10.5px]">{label}</Kbd>
+        </Fragment>
+      ))}
+      Restore
+    </span>
+  );
   return (
     <div
+      ref={ref}
       data-hibernated-tab
+      data-layout={layout}
+      onDoubleClick={onWake}
       className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
     >
       <HibernatedLines tabId={tab.id} visible={visible} />
-      <div className="relative flex max-w-[80%] flex-col items-center gap-5 rounded-xl border border-border bg-background px-10 py-8 shadow-sm">
-        <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
-        <div className="flex max-w-full flex-col items-center gap-1.5">
-          <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
-            <span className="flex size-4 shrink-0 items-center justify-center">
-              {agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
-            </span>
-            <span className="truncate">{title}</span>
-          </span>
-          {command && (
-            <span title={command} className="max-w-full truncate font-mono text-[11.5px] opacity-70">
-              {command}
-            </span>
-          )}
-          <span className="text-[12px]">Hibernated for {formatHibernatedFor(now - at)}</span>
-          {line?.meta && (
-            <span title={line.metaTitle} className="max-w-full truncate text-[11px] opacity-60">
-              {line.meta}
-            </span>
-          )}
+      {layout === "bare" || layout === "button" ? (
+        <div className="relative flex flex-col items-center gap-2">
+          {restore}
+          {layout === "bare" && hint}
         </div>
-        <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
-          <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
-          Restore
-          {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
-        </Button>
-      </div>
+      ) : (
+        <div className="relative flex w-[80%] max-w-[480px] min-w-[320px] flex-col items-center gap-5 rounded-xl border border-border bg-background px-8 pt-8 pb-3 shadow-sm">
+          <HugeiconsIcon icon={SleepingIcon} size={full ? 96 : 64} strokeWidth={1} className="opacity-70" />
+          <HibernatedInfo
+            icon={agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
+            title={title}
+            folder={full ? folder || null : null}
+            command={full ? command || null : null}
+            home={cachedHomeDir()}
+          />
+          {restore}
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px]">
+            {hint}
+            <span className="opacity-50">Hibernated for {formatHibernatedFor(now - at)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

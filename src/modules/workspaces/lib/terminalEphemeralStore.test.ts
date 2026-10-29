@@ -4,6 +4,7 @@ import {
   clearRunningCommandEntry,
   getRunningCommand,
   getRunningCommandsSnapshot,
+  getRunningSince,
   setRunningCommand,
   subscribeToCommandFinished,
   subscribeToRunningCommands,
@@ -88,5 +89,19 @@ describe("terminalEphemeralStore running commands", () => {
     setRunningCommand("tab-a", "pnpm dev");
     expect(cb).not.toHaveBeenCalled();
     unsub();
+  });
+});
+
+describe("terminalEphemeralStore running since", () => {
+  it("stamps the start once per run and clears it when the command ends", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    setRunningCommand("tab-t", "make");
+    vi.setSystemTime(5000);
+    setRunningCommand("tab-t", "make all");
+    expect(getRunningSince("tab-t")).toBe(1000);
+    setRunningCommand("tab-t", null);
+    expect(getRunningSince("tab-t")).toBeNull();
+    vi.useRealTimers();
   });
 });

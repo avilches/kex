@@ -62,6 +62,20 @@ export function sanitizeWorkspace(w: Workspace): Workspace {
   };
 }
 
+// One workspace body that cannot be read must not take the others down with it: if the load threw,
+// the app would start on a fresh workspace and its first save would replace the whole layout.
+export function sanitizeSavedWorkspaces(saved: Workspace[]): Workspace[] {
+  const kept: Workspace[] = [];
+  for (const w of saved) {
+    try {
+      kept.push(sanitizeWorkspace(w));
+    } catch (err) {
+      console.error("[workspace-state] skipping an unreadable workspace:", w?.id, err);
+    }
+  }
+  return kept;
+}
+
 export async function initWorkspaceState(): Promise<void> {
   try {
     const label = getCurrentWebviewWindow().label;
@@ -71,11 +85,13 @@ export async function initWorkspaceState(): Promise<void> {
       ? `${entry.workspaces.length} workspace(s), activeIndex=${entry.activeIndex}`
       : "null (no saved state)");
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
-      const sanitized = entry.workspaces.map(sanitizeWorkspace);
-      cached = {
-        workspaces: sanitized,
-        activeIndex: entry.activeIndex,
-      };
+      const sanitized = sanitizeSavedWorkspaces(entry.workspaces);
+      if (sanitized.length > 0) {
+        cached = {
+          workspaces: sanitized,
+          activeIndex: Math.min(entry.activeIndex, sanitized.length - 1),
+        };
+      }
     }
     setSavedSidebarState(entry?.sidebar);
     setSavedWorkspaceBarWidth(entry?.workspaceBarWidth);

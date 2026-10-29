@@ -1,19 +1,8 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const sessionRestore = vi.hoisted(() => ({
-  sessionPreviews: vi.fn(
-    async (
-      _tabIds: string[],
-    ): Promise<{ tabId: string; cwd: string; lastMessage?: string | null; updatedAt: number }[]> => [],
-  ),
-}));
-
-vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
-  sessionPreviews: sessionRestore.sessionPreviews,
-}));
 vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 
 const lines = vi.hoisted(() => ({ read: vi.fn(async (_tabId: string): Promise<string | null> => null) }));
@@ -31,8 +20,6 @@ const sleeping = (over: Partial<SleepingTab["hibernation"]> = {}): SleepingTab =
 
 describe("HibernatedTab", () => {
   beforeEach(() => {
-    sessionRestore.sessionPreviews.mockReset();
-    sessionRestore.sessionPreviews.mockResolvedValue([]);
     lines.read.mockReset();
     lines.read.mockResolvedValue(null);
   });
@@ -40,7 +27,7 @@ describe("HibernatedTab", () => {
 
   it("shows what was captured when the tab went to sleep: title, command and how long ago", () => {
     const { getByText } = render(
-      <HibernatedTab tab={sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" })} visible focused onWake={() => {}} />,
+      <HibernatedTab tab={{ ...sleeping({ title: "api server", command: "claude --resume abc", agent: "claude" }), title: undefined }} visible focused onWake={() => {}} />,
     );
     expect(getByText("api server")).toBeTruthy();
     expect(getByText("claude --resume abc")).toBeTruthy();
@@ -59,26 +46,32 @@ describe("HibernatedTab", () => {
     expect(onWake).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the folder of the session but not the last agent message", async () => {
-    sessionRestore.sessionPreviews.mockResolvedValue([
-      { tabId: "t1", cwd: "/Users/me/proj", lastMessage: "Tests are green", updatedAt: Math.floor(Date.now() / 1000) - 3600 },
-    ]);
-    const { findByText, queryByText } = render(<HibernatedTab tab={sleeping({ agent: "claude" })} visible focused onWake={() => {}} />);
-    expect(await findByText(/~\/proj/)).toBeTruthy();
-    expect(queryByText("Tests are green")).toBeNull();
-    expect(sessionRestore.sessionPreviews).toHaveBeenCalledWith(["t1"]);
-  });
-
-  it("does not read the session while the tab is out of sight", () => {
+  it("does not read the stored lines while the tab is out of sight", () => {
     render(<HibernatedTab tab={sleeping()} visible={false} focused onWake={() => {}} />);
-    expect(sessionRestore.sessionPreviews).not.toHaveBeenCalled();
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("shows the Enter shortcut on the Restore button and no other hint", () => {
-    const { getByRole, queryByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
-    expect(getByRole("button").textContent).toMatch(/^Restore.+$/);
-    expect(queryByText(/^Press /)).toBeNull();
+  it("hints the two keys and the double click in the bottom-left corner, joined with or and followed by Restore, and keeps the button clean", () => {
+    const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
+    expect(getByRole("button").textContent).toBe("Restore");
+    const hint = container.querySelector("[data-hibernated-hint]")!;
+    expect(hint.textContent).toMatch(/^.+or.+orDouble clickRestore$/);
+    expect(hint.querySelectorAll("kbd")).toHaveLength(3);
+  });
+
+  it("hints only the double click while the tab has no focus, since Enter would not wake it", () => {
+    const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
+    expect(getByRole("button").textContent).toBe("Restore");
+    const hint = container.querySelector("[data-hibernated-hint]")!;
+    expect(hint.textContent).toBe("Double clickRestore");
+    expect(hint.querySelectorAll("kbd")).toHaveLength(1);
+  });
+
+  it("wakes on a double click anywhere on the placeholder", () => {
+    const onWake = vi.fn();
+    const { container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={onWake} />);
+    fireEvent.doubleClick(container.querySelector("[data-hibernated-tab]")!);
+    expect(onWake).toHaveBeenCalledTimes(1);
   });
 
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {
@@ -107,5 +100,52 @@ describe("HibernatedTab", () => {
     expect(getByRole("button", { name: /Restore/ }).getAttribute("data-variant")).toBe("default");
     rerender(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
     expect(getByRole("button", { name: /Restore/ }).getAttribute("data-variant")).toBe("secondary");
+  });
+
+  it("shows the folder under the name, preferring the kept worktree", () => {
+    const tab = { ...sleeping(), cwd: "/Users/me/proj" };
+    const { container, rerender } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-value='folder']")?.textContent).toBe("~/proj");
+    const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
+    rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-value='folder']")?.textContent).toBe("~/proj/.claude/worktrees/x");
+  });
+
+  it("sheds the table and then the card as the pane shrinks", () => {
+    let notify: (width: number, height: number) => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: (entries: { contentRect: { width: number; height: number } }[]) => void) {
+          notify = (width, height) => cb([{ contentRect: { width, height } }]);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const tab = { ...sleeping({ command: "top" }), cwd: "/Users/me/proj" };
+    const { container, queryByText, getByText } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-table]")).toBeTruthy();
+    act(() => notify(400, 700));
+    expect(container.querySelector("[data-hibernated-table]")).toBeNull();
+    expect(getByText("build")).toBeTruthy();
+    act(() => notify(300, 700));
+    expect(queryByText("build")).toBeNull();
+    expect(queryByText(/Hibernated for/)).toBeNull();
+    expect(getByText("Restore")).toBeTruthy();
+    expect(container.querySelector("[data-hibernated-hint]")).toBeTruthy();
+    act(() => notify(250, 700));
+    expect(getByText("Restore")).toBeTruthy();
+    expect(container.querySelector("[data-hibernated-hint]")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("follows a rename of the tab instead of the name frozen at sleep", () => {
+    const { getByText, rerender } = render(
+      <HibernatedTab tab={{ ...sleeping({ title: "api server" }), title: undefined }} visible focused onWake={() => {}} />,
+    );
+    expect(getByText("api server")).toBeTruthy();
+    rerender(<HibernatedTab tab={{ ...sleeping({ title: "api server" }), title: "renamed" }} visible focused onWake={() => {}} />);
+    expect(getByText("renamed")).toBeTruthy();
   });
 });

@@ -12,8 +12,9 @@ full war-story history of how this model was arrived at (three separate redesign
 
 ## 1. The binary model
 
-The scratchpad is a per-terminal input bar (`ScratchpadBar.tsx`) mounted below the terminal grid
-(`TerminalPane.tsx`). Its entire state is one boolean, `Session.scratchpadOpen`
+The scratchpad is a per-terminal input bar (`ScratchpadBar.tsx`) floated over the bottom of the terminal grid
+(`ScratchpadOverlay.tsx`, mounted from `TerminalPane.tsx`) on a dimmed `bg-black/30` layer, like a launcher (centered, `max-w-3xl`, lifted off the bottom edge), so it never resizes the terminal.
+The layer ignores the pointer, so clicking the dimmed terminal still dismisses the scratchpad. Its entire state is one boolean, `Session.scratchpadOpen`
 (`src/modules/terminal/lib/useTerminalSession.ts`), kept in the module-scope `sessions` map alongside
 the rest of a terminal leaf's live state (`visibleNow`, `focusedNow`, etc.).
 
@@ -58,8 +59,8 @@ The scratchpad only ever appears when the user presses its shortcut (`Cmd+U`, `t
 Nothing reopens it on its own: a new terminal starts with it closed, and leaving a tab, pane or
 workspace closes it for good. The `scratchpadInNewTerminals` and `scratchpadRememberFocus` preferences
 and the transient `Session.scratchpadResume` mark that backed them were removed (TASK-776). The only
-setting left is `scratchpadEnterSends` (Enter vs Shift+Enter to send), which does not affect when the
-bar shows.
+settings left are `scratchpadEnterSends` (Enter vs Shift+Enter to send) and `scratchpadMonospace`
+(terminal font family when on, the Appearance UI font when off), neither of which affects when the bar shows.
 
 Consequently `closeScratchpadState(s, leafId)` has a single behavior, whatever the trigger (Escape,
 the toggle, clicking the terminal, or leaving the leaf). There is no "leave" vs "dismiss" distinction
@@ -305,7 +306,7 @@ hot-reloaded session.
 | `src/app/components/WorkspaceBar.tsx` | Click-active-workspace restores focus; workspace context menu `onCloseAutoFocus` |
 | `src/modules/actions/ActionsBar.tsx` | Menu `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/terminal/lib/rendererPool.ts` | `scheduleUnhide` calls `adapter.focusLeaf` (`requestLeafFocus`) after a slot rebind or GPU retry, only when the leaf is the focused one |
-| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` |
-| `src/modules/settings/store.ts` | Preference key/default: `scratchpadEnterSends` (default `true`) |
+| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` and `scratchpadMonospace` (inside the Scratchpad box) |
+| `src/modules/settings/store.ts` | Preference keys/defaults: `scratchpadEnterSends` (default `true`), `scratchpadMonospace` (default `true`) |
 | `src/modules/workspaces/WorkspaceDndProvider.tsx` | Drag-and-drop of explorer paths onto the scratchpad bar (`handleScratchpadDrop`, collision priority): see `WORKSPACES.md`'s drag-and-drop section for the full mechanism |
 | `docs/WORKSPACES_GOTCHAS.md` | Bug 7 and its six addenda: the full history of how this model was arrived at |

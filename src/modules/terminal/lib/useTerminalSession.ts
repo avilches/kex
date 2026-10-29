@@ -37,7 +37,7 @@ import {
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
-import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
+import { consumeHeldBlock, setModalBlock, getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { takeWakeBackdrop } from "./wakeBackdrop";
 import { openPty, type PtySession } from "./pty-bridge";
 import { spawnCwdUpdate } from "./spawnCwd";
@@ -948,6 +948,7 @@ const restoreBlockListeners = new Map<string, Set<() => void>>();
 
 function setRestoreBlock(leafId: string, s: Session, block: RestoreBlock | null): void {
   s.restoreBlock = block;
+  setModalBlock(leafId, block);
   for (const l of restoreBlockListeners.get(leafId) ?? []) l();
 }
 
@@ -986,7 +987,15 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   }
   // Consume the plan before spawning so the PTY starts in the agent's cwd
   // directly, without needing a `cd` shell command.
-  const plan = plain ? null : consumeRestorePlan(leafId);
+  const held = plain ? null : consumeHeldBlock(leafId);
+  if (held) consumeRestorePlan(leafId);
+  if (held?.modal) {
+    blockStart(leafId, s, held.block);
+    return;
+  }
+  if (held) setPendingRestore(leafId, held.block);
+  const plainStart = plain || !!held;
+  const plan = plainStart ? null : consumeRestorePlan(leafId);
   const input = {
     plan,
     persistentCommand: s.persistentCommand,
@@ -996,8 +1005,8 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     invoke<string | null>("check_launch_dir", { path }).catch(() => null);
   // A plain start falls back to the shell's default directory when the saved one is the problem.
   const dirProblem =
-    plain || needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
-  const decision = plain
+    plainStart || needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
+  const decision = plainStart
     ? { kind: "spawn" as const, cwd: s.initialCwd && !dirProblem ? s.initialCwd : undefined, inject: "none" as const }
     : decideStart({ ...input, dirProblem });
   if (s.disposed || s.pty) {
@@ -1019,7 +1028,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
       s.ptyOpening = false;
       return;
     }
-    const command = plan?.resumeCmd || (plain ? "" : (s.persistentCommand ?? ""));
+    const command = plan?.resumeCmd || (plainStart ? "" : (s.persistentCommand ?? ""));
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
     const agent = decision.inject === "resume" ? plan?.agent : undefined;
@@ -1031,7 +1040,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     pty.close();
     return;
   }
-  if (!plain) setPendingRestore(leafId, null);
+  if (!plainStart) setPendingRestore(leafId, null);
   if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
   // The folder the shell actually started in, known before the first OSC 7;
@@ -1207,6 +1216,7 @@ export async function leafHasForegroundProcess(leafId: string): Promise<string |
 }
 
 export function disposeSession(leafId: string): void {
+  consumeHeldBlock(leafId);
   const s = sessions.get(leafId);
   if (!s) return;
   s.disposed = true;
@@ -1219,6 +1229,7 @@ export function disposeSession(leafId: string): void {
   s.pendingInput = "";
   clearOscTitle(leafId);
   setPendingRestore(leafId, null);
+  setModalBlock(leafId, null);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   scratchpadListeners.delete(leafId);

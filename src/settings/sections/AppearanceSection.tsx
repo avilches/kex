@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { UI_FONT_PRESETS } from "@/lib/uiFonts";
 import { cn } from "@/lib/utils";
 import {
   ACTION_ICON_SIZE_MAX,
@@ -35,18 +36,6 @@ import { SectionHeader } from "../components/SectionHeader";
 import { ThemeModeSelector } from "../components/ThemeModeSelector";
 import { SliderRow } from "../components/SliderRow";
 import { TitleTemplatesBlock } from "../components/TitleTemplatesBlock";
-
-const UI_FONT_PRESETS: { label: string; value: string }[] = [
-  { label: "Default (Inter)", value: "" },
-  { label: "Geist Variable", value: "Geist Variable" },
-  { label: "DM Sans", value: "DM Sans Variable" },
-  { label: "System UI", value: "system-ui" },
-  { label: "SF Pro (macOS)", value: "-apple-system, BlinkMacSystemFont" },
-  { label: "Helvetica Neue", value: "Helvetica Neue, Helvetica, Arial" },
-  { label: "Georgia (serif)", value: "Georgia, serif" },
-  { label: "Trebuchet MS", value: "Trebuchet MS, sans-serif" },
-  { label: "Custom...", value: "__custom__" },
-];
 
 // Radix's Select treats an item value of "" as "no selection" (the trigger
 // renders blank instead of the item's label), so the "Default" preset's real
