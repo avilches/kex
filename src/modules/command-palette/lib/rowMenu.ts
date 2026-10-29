@@ -104,7 +104,7 @@ export function workspaceRowKeys(rows: readonly MergedRow[], workspaceId: string
 export function workspaceMenuItems(entry: WorkspaceEntry): RowMenuItem[] {
   const items: RowMenuItem[] = [{ id: "go", label: "Go to Workspace", enter: true }];
   if (entry.root) {
-    items.push({ id: "terminal", label: "Open in Terminal", title: entry.root, shortcutId: "tab.new" });
+    items.push({ id: "terminal", label: "Terminal in Workspace Root", title: entry.root, shortcutId: "tab.new" });
   }
   items.push({ id: "rename", label: "Rename Workspace", shortcutId: "workspace.rename" });
   if (entry.canHibernate) items.push({ id: "hibernate", label: "Hibernate Workspace" });

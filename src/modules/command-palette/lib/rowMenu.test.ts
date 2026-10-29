@@ -439,6 +439,7 @@ describe("workspaceMenuItems", () => {
       "closeWorkspace",
     ]);
     const shortcut = (id: string) => items.find((i) => i.id === id)?.shortcutId;
+    expect(items.find((i) => i.id === "terminal")?.label).toBe("Terminal in Workspace Root");
     expect(shortcut("rename")).toBe("workspace.rename");
     expect(shortcut("closeWorkspace")).toBe("workspace.close");
   });
