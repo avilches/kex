@@ -8,8 +8,6 @@ vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
 const lines = vi.hoisted(() => ({ read: vi.fn(async (_tabId: string): Promise<string | null> => null) }));
 vi.mock("./lib/hibernateLinesIo", () => ({ readHibernateLines: lines.read }));
 
-vi.mock("./lib/infoVariant", () => ({ infoVariantFor: () => "indent" }));
-
 import { HibernatedTab } from "./HibernatedTab";
 import type { SleepingTab } from "./lib/hibernate";
 
@@ -98,10 +96,10 @@ describe("HibernatedTab", () => {
   it("shows the folder under the name, preferring the kept worktree", () => {
     const tab = { ...sleeping(), cwd: "/Users/me/proj" };
     const { container, rerender } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
-    expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj");
+    expect(container.querySelector("[data-hibernated-value='folder']")?.textContent).toBe("~/proj");
     const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
     rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
-    expect(container.querySelector("[data-hibernated-folder]")?.textContent).toBe("~/proj/.claude/worktrees/x");
+    expect(container.querySelector("[data-hibernated-value='folder']")?.textContent).toBe("~/proj/.claude/worktrees/x");
   });
 
   it("follows a rename of the tab instead of the name frozen at sleep", () => {

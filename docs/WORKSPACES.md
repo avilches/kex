@@ -238,14 +238,15 @@ Not to be confused with the dormant ring above: a hibernated tab is a terminal t
 persisted with the tab; the workspace knows nothing about it. Only terminals (and the agents in them) hibernate: editors,
 browsers and the rest never do. The tab keeps its id, its place in the `paneTree`, its note, color, lock and title.
 
-- **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the frozen title, the restore command in
-  monospace, "Hibernated for 3h 20m" from `hibernation.at` via `formatHibernatedFor`, and a primary Restore button) in
-  place of `TerminalPane` for a sleeping terminal; the terminal path bar stays. A terminal tab with a recorded agent
-  session adds the last thing the assistant said (`SessionRecord.last_message`, clamped to two lines with the full text in
-  the native tooltip) and, below, the launch folder with the home abbreviated to `~` and how long ago the last turn ended
-  (`describeSessionPreview` in `lib/sessionPreview.ts`). It reads them with one `agent_session_previews` call each time the
-  tab becomes visible, never while it is in the background. The rest of the workspace (other tabs, panes, Sidebar) is
-  untouched.
+- **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the title, a small table, the Restore
+  button) in place of `TerminalPane` for a sleeping terminal; the terminal path bar stays. The table (`HibernatedInfo`)
+  has a Folder row (the worktree the agent had entered, else the tab's folder, with the home abbreviated to `~`) and a
+  Command row (what Restore will run), both dimmed alike, each ending in a small copy button that puts the full path or
+  command on the clipboard and shows a tick for a moment. "Hibernated for 3h 20m" (`formatHibernatedFor`) sits dimmed in
+  the card's bottom-right corner. While the tab has the focus, its restore shortcuts (`tab.wake` and `tab.hibernate`)
+  show as keys in the bottom-left corner, followed by "Restore", and the button is accented; without the focus the
+  button is grey and the keys are hidden, since Enter would not wake it. The rest of the workspace (other tabs, panes,
+  Sidebar) is untouched.
 - **Click, double click, shortcuts.** A click on a sleeping tab (pane tab bar, nested list of the WorkspaceBar, palette)
   only focuses it and shows the placeholder. A double click on the tab, the Restore button, the tab context menu item
   "Restore", the command palette ("Restore and go to Tab") and the shortcut `tab.hibernate` wake it. The next and previous
