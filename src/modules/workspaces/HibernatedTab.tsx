@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { CommandLineIcon, Folder01Icon, SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
 import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
 import { tildePath } from "./lib/sessionPreview";
@@ -32,7 +33,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
   const wakeLabel = useShortcutLabel("tab.wake");
   const toggleLabel = useShortcutLabel("tab.hibernate");
-  const shortcutLabel = [wakeLabel, toggleLabel].filter(Boolean).join(" or ");
+  const shortcuts = [wakeLabel, toggleLabel].filter((l): l is string => !!l);
   const now = useNow(visible);
   const { agent, title: frozen, at } = tab.hibernation;
   const command = hibernatedCommand(tab);
@@ -69,8 +70,18 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
         <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
           Restore
-          {focused && shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
         </Button>
+        {focused && shortcuts.length > 0 && (
+          <span data-hibernated-hint className="-mt-2 flex items-center gap-1.5 text-[11px] opacity-80">
+            Press
+            {shortcuts.map((label, i) => (
+              <Fragment key={label}>
+                {i > 0 && "or"}
+                <Kbd className="h-[18px] min-w-0 rounded px-1.5 text-[10.5px]">{label}</Kbd>
+              </Fragment>
+            ))}
+          </span>
+        )}
         <span className="absolute right-3 bottom-2 text-[10px] opacity-50">Hibernated for {formatHibernatedFor(now - at)}</span>
       </div>
     </div>
