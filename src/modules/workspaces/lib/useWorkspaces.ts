@@ -21,7 +21,7 @@ import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
-import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { detachAgentSession, previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
 import { setWakeBackdrop } from "@/modules/terminal/lib/wakeBackdrop";
 import { applyHibernate, applyWake, heldBlockStillValid, isHibernatedTab, manualCommandWins, terminalTabs } from "./hibernate";
@@ -57,6 +57,7 @@ import {
   clearStaleFolds,
   insertRestoredWorkspace,
   orphanedSleepers,
+  orphanedTerminals,
   pickReopen,
   reviveWorkspace,
 } from "./closedStack";
@@ -497,11 +498,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const before = closedTabsRef.current;
     closedTabsRef.current = next;
     if (!leaving || next === before) return;
-    const orphans = orphanedSleepers(
-      before,
-      next,
-      new Set(workspacesRef.current.flatMap((w) => terminalTabs(w).map((t) => t.id))),
-    );
+    const open = new Set(workspacesRef.current.flatMap((w) => terminalTabs(w).map((t) => t.id)));
+    for (const id of orphanedTerminals(before, next, open)) {
+      detachAgentSession(id).catch((e) => console.warn("[kex] could not drop the agent record of", id, e));
+    }
+    const orphans = orphanedSleepers(before, next, open);
     if (orphans.length > 0) {
       deleteHibernateLines(orphans).catch((e) => console.warn("[kex] could not delete hibernate lines:", e));
     }

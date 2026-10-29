@@ -1216,6 +1216,7 @@ export async function leafHasForegroundProcess(leafId: string): Promise<string |
 }
 
 export function disposeSession(leafId: string): void {
+  consumeHeldBlock(leafId);
   const s = sessions.get(leafId);
   if (!s) return;
   s.disposed = true;

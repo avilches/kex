@@ -11,6 +11,7 @@ vi.mock("./workspaceState", () => ({ claimClose: () => false, flushWorkspaceStat
 vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
   previewResumeCmd: vi.fn(async () => null),
   seedRestorePlan: vi.fn(),
+  detachAgentSession: vi.fn(async () => {}),
 }));
 vi.mock("@/modules/settings/preferences", () => ({
   usePreferencesStore: {
@@ -21,6 +22,7 @@ vi.mock("@/modules/settings/preferences", () => ({
 import {
   previewResumeCmd,
   seedRestorePlan,
+  detachAgentSession,
   type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
 import { invoke } from "@tauri-apps/api/core";
@@ -411,6 +413,7 @@ describe("undo close of a hibernated tab", () => {
     for (const t of many) act(() => view!.h.closeTab("b", t.id));
 
     expect(deletedLines()).toEqual(["b1"]);
+    expect(vi.mocked(detachAgentSession).mock.calls.map((c) => c[0])).toEqual(["b1", "x0"]);
   });
 
   it("reopens a tab that was awake awake, with a new id and a seeded plan", async () => {
