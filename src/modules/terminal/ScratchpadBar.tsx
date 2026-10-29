@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { sendPlaceholder } from "./lib/scratchpadHints";
 import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
@@ -53,9 +54,7 @@ function placeholderMessages(
   hasAgent: boolean,
 ): string[] {
   return [
-    enterSends
-      ? "Enter sends. Shift+Enter new line"
-      : "Shift+Enter sends. Enter new line",
+    sendPlaceholder(enterSends),
     switchLabel
       ? `Esc closes. ${switchLabel} opens the scratchpad again`
       : "Esc closes the scratchpad",

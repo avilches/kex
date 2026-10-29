@@ -81,6 +81,7 @@ import {
 import { useEffect, useState } from "react";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
+import { sendPlaceholder } from "@/modules/terminal/lib/scratchpadHints";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { FontFamilyInput } from "../components/FontFamilyInput";
 import {
@@ -238,7 +239,9 @@ export function TerminalSection() {
               </span>
             </div>
             <div className="flex flex-col gap-2.5 px-3 py-2.5">
-              <span className="text-[12.5px] font-medium">Send</span>
+              <span className="text-[12.5px] font-medium">
+                Press {ENTER_KEY} behavior
+              </span>
               <SegmentedControl
                 label="Scratchpad send key"
                 value={scratchpadEnterSends ? "enter" : "shift-enter"}
@@ -288,9 +291,7 @@ export function TerminalSection() {
                   : "inherit",
               }}
             >
-              {scratchpadEnterSends
-                ? "Enter sends. Shift+Enter new line"
-                : "Shift+Enter sends. Enter new line"}
+              {sendPlaceholder(scratchpadEnterSends)}
             </div>
           </div>
         </div>
