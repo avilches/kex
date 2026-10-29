@@ -51,6 +51,15 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   que limitan el tamaño de función que el JIT intenta optimizar. Sin argumentos aplica los topes por defecto del script;
   acepta `NOMBRE=VALOR` para probar otros y `--verify` para registrar las opciones recibidas. Se niega a arrancar si
   Kex ya corre, porque el entorno solo vale al lanzar el proceso.
+- **`src-tauri/src/panic_log.rs`**: hook de panic instalado al principio de `run()`. Con `panic = "abort"` en el perfil
+  release un panic de Rust mata la app y su mensaje va a stderr, que se pierde cuando Kex se lanza con `open` o desde
+  el Dock (también con `scripts/run-performance.sh`). El hook escribe en `Kex.log` una línea
+  `[panic] thread '...' panicked at fichero:línea: mensaje` más el backtrace, y encadena el hook anterior para que
+  stderr siga recibiéndolo. Se busca con `grep '\[panic\]' user-data/logs/Kex.log`. TASK-912.
+- **`strip = "debuginfo"` en `[profile.release]` (temporal)**: conserva los nombres de función para que el backtrace del
+  hook se pueda leer. Con `strip = true` el ejecutable no tiene símbolos. Medido el 2026-10-21: 11,0 MB recortado y
+  13,8 MB sin recortar; el tamaño con `"debuginfo"` no está medido. Hay que volver a `strip = true` cuando se
+  encuentre la causa de los crashes: TASK-913.
 - **Documentación**: `docs/BUILD.md` ("Profiling a slow window"), `docs/ARCHITECTURE.md` (mapa de módulos) y
   `docs/FORK.md` ("Performance profiler").
 
@@ -125,8 +134,40 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
   de DFG (`mergeTo`, `mergeConstantsImpl`). El profiler de la misma franja registró un hueco de hasta 50,9 s entre
   fotogramas. JavaScriptCore no tiene una opción para apagar esa fase: solo `useFTLJIT`, `useDFGJIT` y
   `useConcurrentJIT`, y no se probó que lleguen por `JSC_*` a la webview de Tauri.
+- 2026-10-28: el monitor corre con `watch --above 25` (umbral bajo a propósito) y sacó dos volcados automáticos de la
+  misma app: a las 09:58 (webview al 37 %) el hilo principal dormía el 48,5 % con renderizado 24 % y layout 11 %; a las 10:31
+  (25 %) dormía solo el 14,3 % con renderizado 67,6 %, layout 31,5 %, estilos 9 % y JavaScript 7,7 %, casi la línea
+  base de "lenta" y coincidiendo con ventanas del profiler de 30 fotogramas lentos. En ambos `jit_wait` es 0 %, la
+  webview está en 465 a 735 MB y el coste es layout y estilos, no JavaScript.
+- 2026-10-28, `profiler --hours` de 5 h: mediana de `rafShare` 0,001 y p90 0,02 (casi siempre holgada), 2517 fotogramas
+  de 100 ms o más, peor hueco 4237 ms. El callback más caro, con diferencia, es el repintado de xterm (`_innerRefresh`
+  desde `refresh`): 46,8 s en 16860 llamadas, de 2,8 ms de media.
+- Un volcado tomado a mano con `sample` frena el proceso mientras mide: los huecos de 4,2 s y 1,3 s del profiler a la hora
+  del volcado (10:36) los causó el propio volcado. No los cuentes como lentitud.
+
 - El monitor externo corre como LaunchAgent `com.avilches.kexperf-watch` (`~/Library/Logs/kexperf-watch.log`), sin
   versionar: 3,4 s de CPU en 47 min y 17 MB de RSS.
+
+## Crashes de Kex (no son lentitud)
+
+Los informes están en `~/Library/Logs/DiagnosticReports/kex-*.ips` (JSON: una línea de cabecera y luego el cuerpo; se
+leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben mezclar:
+
+- **`SIGSEGV` en WebKit, hilo principal** (medido): `WebCore::ScrollingTree::takePendingScrollUpdates()` desreferencia un
+  puntero casi nulo, llamado desde `RemoteScrollingCoordinatorProxy::sendScrollingTreeNodeUpdate()` en el callback del
+  display link. Ningún frame de Kex participa. Informes del 2026-09-30 (macOS 26.5.2) y del 22, 25 y 27 de octubre
+  (macOS 27.0.1), uno cada dos o tres días. El del 30/09 llegó 11 s después de abrir un tab de terminal con la app abierta
+  desde hacía 20 h y el Mac recién despertado: si ese es el disparador es hipótesis. No hay reporte público con esas
+  funciones en WebKit, Tauri ni wry. TASK-910.
+- **`SIGABRT` en código de Kex, hilo principal** (medido): informes del 2026-10-28 a las 09:50 (6 min después de
+  arrancar) y a las 21:43 (8 h 20 min después), con las 24 direcciones de la pila idénticas, así que es siempre el mismo
+  punto. Con `panic = "abort"` lo más probable es un `panic!` o un `unwrap()` que falla (hipótesis), pero hasta que
+  `panic_log.rs` deje el mensaje en `Kex.log` no se sabe cuál. TASK-912.
+
+Las horas de `Kex.log` están en UTC y las de los informes de macOS en hora local: 16:12 en el log es 12:12 en UTC-4.
+`scripts/run-performance.sh` abre la app con `open`, así que no se ve stderr. `useFTLJIT=false` y los topes del JIT no
+tienen relación conocida con estos crashes (el `SIGSEGV` es del código de scroll de WebKit, no del JIT, y el `SIGABRT`
+es de Kex); si se usan, anota desde qué fecha, porque confunden la comparación.
 
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
 
@@ -136,7 +177,11 @@ desconoce de quién, el volcado no lo dice); con la otra, estilos y layout.
 1. **El spinner `braille`** (el usuario lo tiene): un único `setInterval` de 80 ms re-renderiza todos los spinners y
    cambia un carácter en cada uno, lo que fuerza estilos y layout en las filas `flex` de la barra de workspaces y de las
    pestañas mientras haya agentes trabajando. Prueba: cambiar a `arc` o `cursor` en Settings > Appearance y comparar
-   `status` y los volcados durante un episodio. Código: `src/components/ui/spinner.tsx`.
+   `status` y los volcados durante un episodio. Código: `src/components/ui/spinner.tsx`. Medido en el código (no en rendimiento): `braille` es
+   el único que usa JavaScript, un `setInterval` compartido de 80 ms que re-renderiza todos los spinners con React;
+   `arc` es un SVG con `animate-spin` de Tailwind y `cursor` un `<span>` con un parpadeo CSS de 1 s en un paso
+   (`steps(1)`), los dos sin JavaScript. El 2026-10-28 el usuario cambió a `arc`; el efecto sobre los episodios (layout
+   al 30 % como el de las 10:31) se comprobará con los volcados automáticos de los días siguientes.
 2. **Las terminales ocultas se repintan igual** (renderizador de DOM tras soltar el WebGL, un elemento por fila). Prueba
    barata: `backgroundMemoryBudgetMb` en 0 libera cada terminal oculta y su salida va a un búfer sin renderizar. El
    campo `census` del profiler (`domRendererTerminals`, `domRows`) enseña cuántas hay.
