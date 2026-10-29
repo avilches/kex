@@ -171,7 +171,7 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   aserción de AppKit del afordance de Siri sobre texto seleccionado (hipótesis para Kex; no sabemos qué excepción fue,
   porque al desenrollarse desaparecen los frames que la lanzaron). Mismo bug en el upstream de Kex: crynta/terax-ai#1309,
   abierto sin arreglo. `tauri-runtime-wry` 2.11.3 exige `tao ^0.35`, así que el arreglo requiere subir Tauri a 2.12 (con
-  `cargo update` arrastra también casi todos los plugins). TASK-912 (hook) y TASK-914.
+  `cargo update` arrastra también casi todos los plugins). TASK-912 (hook) y TASK-914. Aplicado el 2026-10-29: Tauri 2.12.5, `tao` 0.37.2 (confirmado `extern "C-unwind"` en `send_event`), wry 0.57.1, TASK-917. El usuario pulsaba Cmd derecha al crashear. Pendiente: reinstalar y vigilar varios dias.
 
 Las horas de `Kex.log` están en UTC y las de los informes de macOS en hora local: 16:12 en el log es 12:12 en UTC-4.
 `scripts/run-performance.sh` abre la app con `open`, así que no se ve stderr. `useFTLJIT=false` y los topes del JIT no
