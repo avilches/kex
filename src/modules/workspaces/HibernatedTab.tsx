@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
-import { Folder01Icon, PlayIcon, SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
+import { CommandLineIcon, Folder01Icon, SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { HibernatedLines } from "./HibernatedLines";
@@ -59,7 +59,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
           )}
           {command && (
             <span title={command} className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70">
-              <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
+              <HugeiconsIcon icon={CommandLineIcon} size={12} strokeWidth={2} className="shrink-0" />
               <span className="truncate">{command}</span>
             </span>
           )}

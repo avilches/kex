@@ -1312,7 +1312,7 @@ function hibernatedTab(): HTMLElement {
         { class: "flex max-w-full flex-col items-start gap-1.5 self-stretch text-left" },
         h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
         h("span", { class: "flex max-w-full items-center gap-1.5 font-mono text-[11.5px]" }, "▭", h("span", { class: "truncate" }, "~/code/kex")),
-        h("span", { class: "flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70" }, "▷", h("span", { class: "truncate" }, "claude --resume 7f3a")),
+        h("span", { class: "flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70" }, icon(CommandLineIcon, 12, 2), h("span", { class: "truncate" }, "claude --resume 7f3a")),
       ),
       h(
         "div",
