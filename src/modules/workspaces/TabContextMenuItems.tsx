@@ -33,7 +33,6 @@ import { RestoreCommandMenu } from "@/modules/terminal/RestoreCommandMenu";
 import { IconPaletteGrid } from "./IconPaletteGrid";
 import { ColorPaletteGrid } from "./ColorPaletteGrid";
 import { CopyTabIdItem, TabAgentMenuItems } from "./TabAgentMenuItems";
-import { TabProcessMenuItems } from "./TabProcessMenuItems";
 import { TabCopyPathItems } from "./TabCopyPathItems";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
@@ -197,12 +196,7 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <TabAgentMenuItems
-        tabId={tab.id}
-        process={<TabProcessMenuItems tab={tab} />}
-      >
-        {restoreCommand}
-      </TabAgentMenuItems>
+      <TabAgentMenuItems tabId={tab.id}>{restoreCommand}</TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       {tab.kind === "terminal" && (
         <ContextMenuItem onSelect={() => onToggleHibernate(tab.id)}>

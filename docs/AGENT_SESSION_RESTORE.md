@@ -870,7 +870,7 @@ while an agent's integration is missing (`agentMenuIntegration`, pure, in `works
 "Install <Agent> integration" (the same `installWithToast` path as the install toast) and Restore Command, and hides the session id, the model and the transcript
 entries, which can never be filled without it. With the status not yet known, or already installed, the block is the usual one and never offers Install; when Install
 cannot run (`malformed`, `uneditable`, `unavailable`) the dead entries are hidden and nothing is offered. "Restore Command" lives in the tab context menu (`RestoreCommandMenu`, used by `TabContextMenuItems`), as a
-`Restore Command` submenu with the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the Process entry. There is no switch to turn it on or off: the command is saved by itself every time the tab hibernates or closes (see `docs/WORKSPACES.md`, "The Restore Command is always saved"). The path bar has no restore icon; while
+`Restore Command` submenu with the command field inline and a Copy command item (no third submenu). In the agent block it sits right under the agent name. There is no switch to turn it on or off: the command is saved by itself every time the tab hibernates or closes (see `docs/WORKSPACES.md`, "The Restore Command is always saved"). The path bar has no restore icon; while
 an agent is alive the path bar shows no status dot, only the model name, because the tab icon already carries the working and attention states.
 
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
