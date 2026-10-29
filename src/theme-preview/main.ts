@@ -40,7 +40,9 @@ import {
   ChevronRightIcon,
   CommandLineIcon,
   ComputerTerminal01Icon,
+  Copy01Icon,
   CrosshairIcon,
+  Folder02Icon,
   FolderTreeIcon,
   GitBranchIcon,
   Home03Icon,
@@ -1309,10 +1311,32 @@ function hibernatedTab(): HTMLElement {
       }),
       h(
         "div",
-        { class: "flex max-w-full flex-col items-start gap-1.5 self-stretch text-left" },
+        { class: "flex max-w-full flex-col items-start gap-2 self-stretch text-left" },
         h("span", { class: "text-[15px] text-foreground" }, "build · idle"),
-        h("span", { class: "flex max-w-full items-center gap-1.5 font-mono text-[11.5px]" }, "▭", h("span", { class: "truncate" }, "~/code/kex")),
-        h("span", { class: "flex max-w-full items-center gap-1.5 font-mono text-[11.5px] opacity-70" }, icon(CommandLineIcon, 12, 2), h("span", { class: "truncate" }, "claude --resume 7f3a")),
+        h(
+          "div",
+          {
+            class: "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5",
+            "data-surface": "hibernated-table",
+          },
+          ...[
+            [Folder02Icon, "Folder", "~/code/kex"],
+            [CommandLineIcon, "Command", "claude --resume 7f3a"],
+          ].flatMap(([ic, label, value]) => [
+            h(
+              "span",
+              { class: "flex items-center gap-1.5 text-[9.5px] uppercase tracking-wider opacity-60" },
+              icon(ic as typeof CommandLineIcon, 11, 2),
+              label as string,
+            ),
+            h("span", { class: "truncate font-mono text-[11.5px] opacity-70" }, value as string),
+            h(
+              "span",
+              { class: "flex size-[22px] items-center justify-center rounded text-muted-foreground" },
+              icon(Copy01Icon, 12, 2),
+            ),
+          ]),
+        ),
       ),
       h(
         "div",

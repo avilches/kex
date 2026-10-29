@@ -8,9 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, useEffect, useState } from "react";
 import { HibernatedInfo } from "./HibernatedInfo";
 import { HibernatedLines } from "./HibernatedLines";
-import { infoVariantFor } from "./lib/infoVariant";
 import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
-import { tildePath } from "./lib/sessionPreview";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
@@ -50,11 +48,11 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       <div className="relative flex max-w-[80%] flex-col items-center gap-5 rounded-xl border border-border bg-background px-10 py-8 shadow-sm">
         <HugeiconsIcon icon={SleepingIcon} size={96} strokeWidth={1} className="opacity-70" />
         <HibernatedInfo
-          variant={infoVariantFor(tab.id)}
           icon={agent && !tab.icon ? <AgentIcon agent={agent} size={14} /> : tabIcon(tab)}
           title={title}
-          folder={folder ? tildePath(folder, cachedHomeDir()) : null}
+          folder={folder || null}
           command={command || null}
+          home={cachedHomeDir()}
         />
         <Button size="lg" variant={focused ? "default" : "secondary"} onClick={onWake} className="gap-2">
           <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
