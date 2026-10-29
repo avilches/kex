@@ -421,7 +421,7 @@ Terax.
 
 ### Terminal info bar
 
-Every terminal panel now has a thin top bar (`TerminalPathBar`, h-6) showing the cwd on the left and live process metrics on the right: the shell PID, the running foreground command (or the shell name when idle), CPU percentage, and resident memory. The upstream has no equivalent.
+Every terminal panel now has a thin top bar (`TerminalPathBar`, h-6) showing the cwd and the running foreground command (or the shell name when idle) on the left, and live CPU percentage and resident memory on the right. A context menu on the process segment offers Copy PID and, while something runs, Stop and Kill Process Tree. The upstream has no equivalent.
 
 Metrics are sampled every 5 s via the `pty_metrics` Tauri command (backed by the `sysinfo` crate, 0.39). A persistent `sysinfo::System` is kept in Rust-managed state (`ProcessMonitor`) so the CPU reading is a real delta between calls (normalized 0..=100 across logical cores) rather than an instantaneous value. The sample covers the shell PID and all its descendants, so a `cargo build` or `npm install` subprocess is included. Sampling is limited to the visible terminals of the active workspace and suspended when the document is hidden, so the background cost is negligible when the window is not in use. Results are stored in the ephemeral `terminalMetricsStore` (`useSyncExternalStore`), which is never persisted.
 
