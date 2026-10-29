@@ -24,8 +24,9 @@ export type TabEntry = {
   workspaceTitle: string;
   workspaceColor: string | null;
   workspaceIcon: string | null;
-  // Where "Copy Relative Path" is relative to.
+  // The bases "Copy Path" copies against.
   workspaceRoot: string | null;
+  repoRoot?: string | null;
   // The terminal behind the tab is asleep.
   hibernated: boolean;
   kind: Tab["kind"];
@@ -94,6 +95,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
           workspaceIcon: ws.icon ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          repoRoot: git.repoRoot || null,
           hibernated: isHibernatedTab(tab),
           kind: tab.kind,
           title: src.displayTitle(tab),

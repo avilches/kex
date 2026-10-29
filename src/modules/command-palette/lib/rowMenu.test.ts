@@ -9,6 +9,8 @@ import {
   moveMenuItems,
   type RowMenuItemId,
   runnableTabItem,
+  tabCopyOptions,
+  tabCopySubmenuItems,
   tabItemKeepsPalette,
   placeMenuLeft,
   placeMenuTop,
@@ -54,8 +56,7 @@ describe("tabMenuItems", () => {
       "go",
       "terminal",
       "note",
-      "copy",
-      "copyRelative",
+      "copyPath",
       "moveWorkspace",
       "hibernateTab",
       "tabId",
@@ -134,28 +135,39 @@ describe("tabMenuItems", () => {
     expect(ids(open)).toContain("removeNote");
   });
 
-  it("copies the relative path only when it can and hides it for the root itself", () => {
-    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false });
-    expect(item(inside, "copyRelative")).toMatchObject({ title: "src/a.ts" });
-    expect(item(inside, "copyRelative")?.disabled).toBeFalsy();
-    const outside = entry({ kind: "editor", path: "/other/a.ts", dirty: false });
-    expect(item(outside, "copyRelative")).toMatchObject({ disabled: true, title: "Outside the workspace root" });
-    expect(item(entry({}, { workspaceRoot: null }), "copyRelative")).toMatchObject({
-      disabled: true,
-      title: "No workspace root",
-    });
-    expect(ids(entry({ cwd: "/repo" }))).not.toContain("copyRelative");
-    expect(ids(entry({ kind: "browser", url: "https://a.b" }, { detail: "https://a.b" }))).not.toContain(
-      "copyRelative",
-    );
+  it("groups the copies under Copy Path when the row has more than its absolute path", () => {
+    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false }, { repoRoot: "/repo/src" });
+    expect(ids(inside)).toContain("copyPath");
+    expect(ids(inside)).not.toContain("copy");
+    expect(tabCopySubmenuItems(inside).map((i) => [i.id, i.detail])).toEqual([
+      ["back", undefined],
+      ["copy", "/repo/src/a.ts"],
+      ["copyWorkspace", "src/a.ts"],
+      ["copyRepository", "a.ts"],
+    ]);
+    expect(tabCopySubmenuItems(inside).find((i) => i.id === "copy")?.shortcutId).toBe("path.copy");
   });
 
-  it("shows the paths to copy as a second line, and nothing when the item is disabled", () => {
-    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false });
+  it("is a plain Copy Absolute Path when no other base applies", () => {
+    for (const e of [
+      entry({ kind: "editor", path: "/other/a.ts", dirty: false }),
+      entry({}, { workspaceRoot: null }),
+      entry({ cwd: "/repo" }),
+      entry({ kind: "browser", url: "https://a.b" }, { detail: "https://a.b" }),
+    ]) {
+      expect(ids(e)).toContain("copy");
+      expect(ids(e)).not.toContain("copyPath");
+    }
+  });
+
+  it("copies a url as it is, without a workspace or repository path", () => {
+    const browser = entry({ kind: "browser", url: "https://a.b" }, { detail: "https://a.b", repoRoot: "/repo" });
+    expect(tabCopyOptions(browser).map((o) => o.kind)).toEqual(["absolute"]);
+  });
+
+  it("shows the path to copy as a second line, and nothing when the item is disabled", () => {
+    const inside = entry({ kind: "editor", path: "/repo/src/a.ts", dirty: false }, { workspaceRoot: null });
     expect(item(inside, "copy")?.detail).toBe("/repo/src/a.ts");
-    expect(item(inside, "copyRelative")?.detail).toBe("src/a.ts");
-    const outside = entry({ kind: "editor", path: "/other/a.ts", dirty: false });
-    expect(item(outside, "copyRelative")?.detail).toBeUndefined();
     const none = entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" });
     expect(item(none, "copy")?.detail).toBeUndefined();
     expect(item(entry(), "tabId")?.detail).toBeUndefined();
@@ -169,7 +181,7 @@ describe("tabMenuItems", () => {
     const e = entry({ kind: "git-history", repoRoot: "/r" }, { cwd: "" });
     expect(item(e, "terminal")?.disabled).toBe(true);
     expect(item(e, "copy")?.disabled).toBe(true);
-    expect(ids(e)).not.toContain("copyRelative");
+    expect(ids(e)).not.toContain("copyPath");
   });
 
   it("always offers moving the tab to another workspace", () => {
@@ -181,7 +193,7 @@ describe("tabMenuItems", () => {
 
 describe("tabItemKeepsPalette", () => {
   it("keeps the palette for the toggles that change the row in place", () => {
-    for (const id of ["lock", "hibernateTab", "save", "removeNote", "copy", "copyRelative", "tabId"] as const) {
+    for (const id of ["lock", "hibernateTab", "save", "removeNote", "copy", "copyPath", "copyWorkspace", "copyRepository", "tabId"] as const) {
       expect(tabItemKeepsPalette(id, entry())).toBe(true);
     }
   });

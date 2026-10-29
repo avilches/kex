@@ -5,9 +5,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const glob = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/native", () => ({ native: { glob } }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), warning: vi.fn() }) }));
-vi.mock("@/modules/explorer/lib/contextActions", () => ({
-  relativePath: (root: string, path: string) => path.slice(root.length + 1),
-}));
 
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { useWikiLinkHost } from "./useWikiLinkHost";

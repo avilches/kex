@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { native } from "@/lib/native";
-import { relativePath } from "@/modules/explorer/lib/contextActions";
 import { markdownIndex, markdownIndexAdd, reloadMarkdownIndex } from "@/modules/markdown/lib/mdIndex";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { newWikiNotePath, resolveWikiTarget, wikiBoundary } from "@/modules/markdown/lib/wikiLinks";
@@ -15,7 +14,7 @@ import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 // as Obsidian does. The host's identity only changes with root, currentPath
 // and files; onOpenFile and isFileOpen are read through refs so an app-level
 // rerender cannot reconfigure the editor facet and rebuild decorations.
-export type WikiNoteInfo = { path: string; relativePath: string; isOpen: boolean };
+export type WikiNoteInfo = { path: string; workspaceRoot: string | null; isOpen: boolean };
 
 // The editor host plus what its right-click menu needs: the note a name
 // points at, and a way to open it.
@@ -84,7 +83,7 @@ export function useWikiLinkHost(
       infoFor: (target) => {
         const path = resolveWikiTarget(target, root, files);
         if (path === null) return null;
-        return { path, relativePath: relativePath(root, path), isOpen: isFileOpenRef.current?.(path) ?? false };
+        return { path, workspaceRoot, isOpen: isFileOpenRef.current?.(path) ?? false };
       },
       openPath: (path) => onOpenFileRef.current?.(path),
       resolve: (target) => resolveWikiTarget(target, root, files),

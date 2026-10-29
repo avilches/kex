@@ -45,6 +45,13 @@ function open(tab: Tab, root: string | null = "/repo") {
   });
 }
 
+function openSubmenu() {
+  const trigger = screen.getByText("Copy Path").closest("[role=menuitem]")!;
+  act(() => {
+    fireEvent.keyDown(trigger, { key: "ArrowRight" });
+  });
+}
+
 beforeEach(() => {
   writeClipboardText.mockClear();
   useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
@@ -52,15 +59,16 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("TabCopyPathItems", () => {
-  it("offers the absolute and relative path of a terminal folder", async () => {
+  it("offers the absolute and workspace path of a terminal folder", async () => {
     open({ id: "t1", kind: "terminal", cwd: "/repo/src" });
+    openSubmenu();
 
-    expect(screen.getByText("Copy Absolute Path")).toBeTruthy();
-    expect(screen.getByText("Copy Relative Path")).toBeTruthy();
+    expect(screen.getByText("Absolute Path")).toBeTruthy();
+    expect(screen.getByText("Workspace Path")).toBeTruthy();
     expect(screen.getByText("/repo/src")).toBeTruthy();
     expect(screen.getByText("src")).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByText("Copy Relative Path"));
+      fireEvent.click(screen.getByText("Workspace Path"));
     });
     expect(writeClipboardText).toHaveBeenCalledWith("src");
   });
@@ -69,26 +77,30 @@ describe("TabCopyPathItems", () => {
     useAgentStore.getState().startIdle("t1", "ws-1", "claude");
     useAgentStore.getState().setMeta("t1", { worktreeCwd: "/repo/.claude/worktrees/x" });
     open({ id: "t1", kind: "terminal", cwd: "/repo" });
+    openSubmenu();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Copy Absolute Path"));
+      fireEvent.click(screen.getByText("Absolute Path"));
     });
     expect(writeClipboardText).toHaveBeenCalledWith("/repo/.claude/worktrees/x");
   });
 
   it("copies the file of an editor tab", async () => {
     open({ id: "e1", kind: "editor", path: "/repo/a/b.ts", dirty: false, preview: false });
+    openSubmenu();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Copy Absolute Path"));
+      fireEvent.click(screen.getByText("Absolute Path"));
     });
     expect(writeClipboardText).toHaveBeenCalledWith("/repo/a/b.ts");
   });
 
-  it("disables the relative path when the workspace has no root", () => {
+  it("offers only the absolute path when the workspace has no root", () => {
     open({ id: "t1", kind: "terminal", cwd: "/repo" }, null);
 
-    expect(screen.getByText("No workspace root")).toBeTruthy();
+    expect(screen.queryByText("Copy Path")).toBeNull();
+    expect(screen.getByText("Copy Absolute Path")).toBeTruthy();
+    expect(screen.queryByText("No workspace root")).toBeNull();
   });
 
   it("renders nothing for a tab without a path", () => {

@@ -407,10 +407,10 @@ This breadcrumb replaced the bottom status bar (`StatusBar`, with its `CwdBreadc
 The terminal path bar cwd is now a navigable breadcrumb (`PathBreadcrumb` / `buildCwdBreadcrumb` in
 `modules/workspaces/pathbar/`) shared with the editor bar. Each directory segment has a right-click context menu
 (`DirSegmentContextMenu` / `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
-Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
+Terminal, Reveal in Finder, Copy Path (a submenu: Absolute, Workspace, Repository and, in the explorer, Relative), Add to .gitignore.
 
 The editor path bar file-name leaf has a right-click context menu (`FileLeafContextMenu` / `fileLeafMenuItems`):
-Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitignore, Delete. Mutations route
+Reveal in Finder, Rename, Duplicate, Copy Path, Add to .gitignore, Delete. Mutations route
 through `RevealRequest.pendingAction` so the explorer performs the action immediately after revealing the file in
 the tree (nonce-guarded, fires once).
 
