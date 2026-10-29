@@ -7,7 +7,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
-  ArrowDown01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
   CrosshairIcon,
@@ -22,17 +21,10 @@ import {
   PinOffIcon,
   Refresh01Icon,
   Search01Icon,
-  Tick02Icon,
   ViewIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -72,16 +64,10 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
-import { IS_MAC } from "@/lib/platform";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  getBindingTokens,
-  matchesShortcut,
-  SHORTCUTS_BY_ID,
-  type ShortcutId,
-} from "@/modules/shortcuts/shortcuts";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
 import {
   ancestorsToExpand,
@@ -118,17 +104,14 @@ type Props = {
   onFsRootMissing?: (path: string) => void;
   canNavigateUp: boolean;
   homePath: string | null;
-  fsRootPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
-  workspaceRootExists: boolean;
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
-  onPickWorkspaceRoot?: () => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
   openFiles?: ReadonlySet<string>;
@@ -136,46 +119,6 @@ type Props = {
   initialExplorer?: ExplorerSnapshot | null;
   onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
 };
-
-const ROOT_MODES: {
-  id: ExplorerRootMode;
-  label: string;
-  icon: typeof Search01Icon;
-}[] = [
-  { id: "filesystem", label: "File System", icon: HierarchyFilesIcon },
-  { id: "workspace", label: "Workspace Root", icon: PinIcon },
-];
-
-// Both modes surface Cmd+E, the key that cycles the explorer root between them.
-const MODE_SHORTCUT: Record<string, ShortcutId> = {
-  filesystem: "sidebar.showExplorer",
-  workspace: "sidebar.showExplorer",
-};
-
-type RootModeContext = {
-  fsRootPath: string | null;
-  workspaceRootPath: string | null;
-  workspaceRootExists: boolean;
-};
-
-function rootModeInfo(
-  id: ExplorerRootMode,
-  ctx: RootModeContext,
-): { subtitle: string | null; disabled: boolean } {
-  switch (id) {
-    case "filesystem":
-      return { subtitle: ctx.fsRootPath, disabled: false };
-    case "workspace":
-      if (!ctx.workspaceRootPath)
-        return {
-          subtitle: "No workspace defined yet. Set a new one in the explorer",
-          disabled: true,
-        };
-      if (!ctx.workspaceRootExists)
-        return { subtitle: "Folder not found", disabled: true };
-      return { subtitle: ctx.workspaceRootPath, disabled: false };
-  }
-}
 
 export type Row =
   | {
@@ -380,17 +323,14 @@ export const FileExplorer = memo(
       onFsRootMissing,
       canNavigateUp,
       homePath,
-      fsRootPath,
       gitRootPath,
       workspaceRootPath,
-      workspaceRootExists,
       revealRequest,
       onOpenFile,
       onPathRenamed,
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
       onAddToGitignore,
-      onPickWorkspaceRoot,
       gitStatus,
       onSearchClose,
       openFiles,
@@ -954,8 +894,6 @@ export const FileExplorer = memo(
     }
 
     const root = tree.nodes[rootPath];
-    const activeMode =
-      ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0];
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (
@@ -1189,102 +1127,20 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-                title={rootPath ?? undefined}
-              >
-                <HugeiconsIcon
-                  icon={activeMode.icon}
-                  size={13}
-                  strokeWidth={2}
-                  className="shrink-0 text-primary"
-                />
-                <span className="truncate">{activeMode.label}</span>
-                <HugeiconsIcon
-                  icon={ArrowDown01Icon}
-                  size={12}
-                  strokeWidth={2}
-                  className="shrink-0"
-                />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-auto min-w-56 max-w-[90vw]"
-            >
-              {ROOT_MODES.map((m) => {
-                const info = rootModeInfo(m.id, {
-                  fsRootPath,
-                  workspaceRootPath,
-                  workspaceRootExists,
-                });
-                const isSetWorkspaceRoot =
-                  m.id === "workspace" && workspaceRootPath === null;
-                return (
-                  <DropdownMenuItem
-                    key={m.id}
-                    disabled={info.disabled && !isSetWorkspaceRoot}
-                    onSelect={() => {
-                      if (isSetWorkspaceRoot) {
-                        onPickWorkspaceRoot?.();
-                      } else {
-                        onChangeRootMode(m.id);
-                      }
-                    }}
-                    className="flex items-start gap-2.5"
-                  >
-                    <HugeiconsIcon
-                      icon={m.icon}
-                      size={14}
-                      strokeWidth={2}
-                      className="mt-0.5 shrink-0 text-primary"
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-xs font-medium">
-                        {isSetWorkspaceRoot ? "Set Workspace root" : m.label}
-                      </span>
-                      {!isSetWorkspaceRoot && info.subtitle && (
-                        <span className="break-all text-[11px] text-muted-foreground">
-                          {info.subtitle}
-                        </span>
-                      )}
-                    </span>
-                    {rootMode === m.id && !isSetWorkspaceRoot && (
-                      <HugeiconsIcon
-                        icon={Tick02Icon}
-                        size={13}
-                        strokeWidth={2}
-                        className="mt-0.5 ml-auto shrink-0 text-primary"
-                      />
-                    )}
-                    {!isSetWorkspaceRoot && (() => {
-                      const scId = MODE_SHORTCUT[m.id];
-                      const sc = scId
-                        ? (userShortcuts[scId] ??
-                          (SHORTCUTS_BY_ID.get(scId)?.defaultBindings ?? []))
-                        : [];
-                      const tokens = getBindingTokens(sc[0]);
-                      if (tokens.length === 0) return null;
-                      const text = IS_MAC ? tokens.join("") : tokens.join("+");
-                      return (
-                        <span
-                          className={cn(
-                            "mt-0.5 shrink-0 text-[11px] tracking-wide text-muted-foreground",
-                            rootMode !== m.id && "ml-auto",
-                          )}
-                        >
-                          {text}
-                        </span>
-                      );
-                    })()}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
+            title={rootPath ?? undefined}
+          >
+            <HugeiconsIcon
+              icon={rootMode === "workspace" ? PinIcon : HierarchyFilesIcon}
+              size={13}
+              strokeWidth={2}
+              className="shrink-0 text-primary"
+            />
+            <span className="truncate">
+              {rootPath.split(/[\\/]/).filter(Boolean).pop() ?? rootPath}
+            </span>
+          </div>
 
           {rootMode === "filesystem" && homePath && (
             <Button
