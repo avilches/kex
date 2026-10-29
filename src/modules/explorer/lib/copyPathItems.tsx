@@ -11,7 +11,7 @@ import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
-import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
+import { useLogicalRepoRoot } from "./useLogicalRepoRoot";
 import { StartTrimmed } from "@/components/StartTrimmed";
 import { copyToClipboard } from "./contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./menuItemClass";
@@ -97,10 +97,10 @@ export function CopyPathMenu({
   compact?: boolean;
   shortcut?: ShortcutId;
 }) {
-  const asked = useDirGit(repoRoot === undefined ? (isDir ? path : pathDirname(path)) : undefined);
+  const asked = useLogicalRepoRoot(repoRoot === undefined ? (isDir ? path : pathDirname(path)) : undefined);
   const bases: PathCopyBases = {
     workspaceRoot,
-    repoRoot: repoRoot === undefined ? asked.repoRoot || null : repoRoot,
+    repoRoot: repoRoot === undefined ? asked : repoRoot,
     relativeRoot,
   };
   const options = pathCopyOptions(path, bases);
