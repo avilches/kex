@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 export type SegmentedOption<T extends string> = {
   value: T;
   label: string;
+  sublabel?: string;
   style?: CSSProperties;
 };
 
@@ -38,6 +39,11 @@ export function SegmentedControl<T extends string>({
           )}
         >
           {o.label}
+          {o.sublabel && (
+            <span className="block truncate text-[10.5px] opacity-70">
+              {o.sublabel}
+            </span>
+          )}
         </RadioGroupPrimitive.Item>
       ))}
     </RadioGroupPrimitive.Root>
