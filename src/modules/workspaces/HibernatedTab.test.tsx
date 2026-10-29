@@ -134,6 +134,9 @@ describe("HibernatedTab", () => {
     expect(queryByText(/Hibernated for/)).toBeNull();
     expect(getByText("Restore")).toBeTruthy();
     expect(container.querySelector("[data-hibernated-hint]")).toBeTruthy();
+    act(() => notify(250, 700));
+    expect(getByText("Restore")).toBeTruthy();
+    expect(container.querySelector("[data-hibernated-hint]")).toBeNull();
     vi.unstubAllGlobals();
   });
 

@@ -90,10 +90,10 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
     >
       <HibernatedLines tabId={tab.id} visible={visible} />
-      {layout === "bare" ? (
+      {layout === "bare" || layout === "button" ? (
         <div className="relative flex flex-col items-center gap-2">
           {restore}
-          {hint}
+          {layout === "bare" && hint}
         </div>
       ) : (
         <div className="relative flex w-[80%] max-w-[480px] min-w-[320px] flex-col items-center gap-5 rounded-xl border border-border bg-background px-8 pt-8 pb-3 shadow-sm">
