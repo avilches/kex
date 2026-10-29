@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/homeDir", () => ({ cachedHomeDir: () => "/Users/me" }));
@@ -100,6 +100,31 @@ describe("HibernatedTab", () => {
     const kept = { ...tab, hibernation: { ...tab.hibernation, worktreeCwd: "/Users/me/proj/.claude/worktrees/x" } };
     rerender(<HibernatedTab tab={kept} visible focused onWake={() => {}} />);
     expect(container.querySelector("[data-hibernated-value='folder']")?.textContent).toBe("~/proj/.claude/worktrees/x");
+  });
+
+  it("sheds the table and then the card as the pane shrinks", () => {
+    let notify: (width: number, height: number) => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: (entries: { contentRect: { width: number; height: number } }[]) => void) {
+          notify = (width, height) => cb([{ contentRect: { width, height } }]);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const tab = { ...sleeping({ command: "top" }), cwd: "/Users/me/proj" };
+    const { container, queryByText, getByText } = render(<HibernatedTab tab={tab} visible focused onWake={() => {}} />);
+    expect(container.querySelector("[data-hibernated-table]")).toBeTruthy();
+    act(() => notify(400, 700));
+    expect(container.querySelector("[data-hibernated-table]")).toBeNull();
+    expect(getByText("build")).toBeTruthy();
+    act(() => notify(300, 700));
+    expect(queryByText("build")).toBeNull();
+    expect(queryByText(/Hibernated for/)).toBeNull();
+    expect(getByText("Restore")).toBeTruthy();
+    vi.unstubAllGlobals();
   });
 
   it("follows a rename of the tab instead of the name frozen at sleep", () => {
