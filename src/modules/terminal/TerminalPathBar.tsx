@@ -13,6 +13,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AppWindowMacIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { ProcessSegmentContextMenu } from "./ProcessSegmentContextMenu";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 
 function AgentChipIndicator({ session }: { session: AgentSession }) {
@@ -74,21 +75,23 @@ export function TerminalPathBar({
           )}
         />
         {process && (
-          <span
-            title={process}
-            className={cn(
-              "flex min-w-0 shrink items-center gap-1 font-mono text-muted-foreground",
-              running && "text-foreground",
-            )}
-          >
-            <HugeiconsIcon
-              icon={running ? AppWindowMacIcon : ComputerTerminal01Icon}
-              size={12}
-              strokeWidth={1.75}
-              className="shrink-0"
-            />
-            <span className="truncate">{process}</span>
-          </span>
+          <ProcessSegmentContextMenu tabId={tabId}>
+            <span
+              title={process}
+              className={cn(
+                "flex min-w-0 shrink items-center gap-1 font-mono text-muted-foreground",
+                running && "text-foreground",
+              )}
+            >
+              <HugeiconsIcon
+                icon={running ? AppWindowMacIcon : ComputerTerminal01Icon}
+                size={12}
+                strokeWidth={1.75}
+                className="shrink-0"
+              />
+              <span className="truncate">{process}</span>
+            </span>
+          </ProcessSegmentContextMenu>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2 font-mono text-muted-foreground">

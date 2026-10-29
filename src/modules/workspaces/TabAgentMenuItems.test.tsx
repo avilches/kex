@@ -127,7 +127,7 @@ describe("TabAgentMenuItems", () => {
     expect(reveal).toHaveBeenCalledWith("/t/dir");
   });
 
-  it("places the extra items inside the agent block, right after the process entry", () => {
+  it("places the extra items inside the agent block, right under the agent name", () => {
     useAgentStore.getState().start("tab-1", "ws-1", "omp");
     open(noop, <div>Restore Command</div>);
     const html = document.body.innerHTML;
