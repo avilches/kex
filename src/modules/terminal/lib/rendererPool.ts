@@ -18,6 +18,7 @@ import { type FontWeight, Terminal } from "@xterm/xterm";
 import { registerTerminalLinks, parseFileUri } from "@/modules/terminal/lib/terminalLinks";
 import { dispatchFileLink } from "@/modules/terminal/lib/terminalLinkBridge";
 import { shouldCursorBlink } from "./cursorBlink";
+import { paletteHoldsFocus } from "./paletteHoldsFocus";
 import {
   terminalDeleteSequence,
   terminalLineNavigationSequence,
@@ -976,12 +977,10 @@ export function applyTheme(): void {
 }
 
 // The command palette keeps the keyboard while it is open: a terminal that mounts or wakes under it
-// (restoring a tab from a row) must not take the focus from its input. Same selector as
-// PALETTE_INPUT_SELECTOR; the palette module imports this one, so it cannot be imported from here.
-export const PALETTE_INPUT_ATTR = '[cmdk-input=""][data-palette="command"]';
-
+// (restoring a tab from a row) must not take the focus from its input. Once it is closing, the focus
+// is the terminal's again: Escape asks for it while the exit animation still has the input in the DOM.
 export function focusSlot(leafId: string): void {
-  if (document.querySelector(PALETTE_INPUT_ATTR)) return;
+  if (paletteHoldsFocus()) return;
   const slot = slots.find((s) => s.currentLeafId === leafId);
   slot?.term.focus();
 }

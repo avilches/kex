@@ -233,3 +233,26 @@ La paleta conserva el foco (el dialogo se monta en un portal sin robarlo), asi q
 ### Leccion
 
 Un modal abierto sobre una paleta que no suelta el foco debe poder recibir Enter y Escape desde ella; Escape ya lo atiende Radix, Enter hay que reenviarlo.
+
+## Bug 7: Escape tras restaurar un tab no devuelve el foco al terminal (RESUELTO)
+
+### Sintoma
+
+Restaurar un tab desde la paleta (atajo, menu o item) y cerrar la paleta con Escape dejaba el foco fuera del terminal restaurado.
+
+### Pistas falsas descartadas
+
+- `refocusInput` y el foco del terminal al despertar: eso era el Bug 3, que ya mantenia el foco en el input mientras la paleta esta abierta.
+- Un test de integracion con la paleta real en happy-dom: no sirve, porque ahi Radix desmonta el dialogo sin animacion y el input ya no esta en el DOM cuando corre `restoreFocus`; pasa con la guarda buena y con la mala.
+
+### Causa raiz
+
+La guarda que añadio el arreglo del Bug 3 en `focusSlot` miraba solo si existia un input de paleta en el DOM. Al cerrar con Escape, Radix deja el contenido montado unos 100 ms con `data-state="closed"` (animacion de salida), y justo entonces `useRestoreFocusOnEscape` pide el foco del terminal. La guarda veia el input, creia la paleta abierta y se saltaba ese foco.
+
+### Fix
+
+`paletteHoldsFocus` (`terminal/lib/paletteHoldsFocus.ts`) exige que el input cuelgue de un `[data-slot="dialog-content"][data-state="open"]`. Una paleta que se esta cerrando ya no retiene el foco. `focusSlotPalette.test.ts` fija la regla sobre el DOM que genera Radix.
+
+### Leccion
+
+Con Radix, "el elemento existe" no significa "esta abierto": comprobar siempre `data-state`. La animacion de salida no se reproduce en happy-dom, asi que este caso solo se verifica a mano en la app.
