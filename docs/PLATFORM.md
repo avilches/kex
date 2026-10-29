@@ -61,6 +61,9 @@ hidden via `invisible pointer-events-none` so PTYs and dev servers keep streamin
   `emit_to` the focused window: `kex:menu`, `kex://theme-edit` (`request_theme_edit`) and `kex:open-folder`.
 - **Quit.** `kex:before-quit` goes to every main window; the app exits when the last one calls `confirm_quit`
   (`QuitGuard.flushing`), or after a 3 s timeout.
+- **Once per launch.** The startup editor scan (`claim_startup_scan`) and the automatic update check
+  (`claim_update_check`) are claimed through a process-wide flag, so only the first window does them; an update
+  install is guarded the same way (`claim_update_install`).
 - **Lists written whole.** JS queues only order writes inside one webview. A store key that holds a list shared by
   windows is updated in Rust under a lock (`custom_theme_save` / `custom_theme_delete`).
 

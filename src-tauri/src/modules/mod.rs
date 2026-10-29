@@ -11,5 +11,6 @@ pub mod proc;
 pub mod pty;
 pub mod shell;
 pub mod tab_history;
+pub mod update_guard;
 pub mod window_state;
 pub mod workspace;
