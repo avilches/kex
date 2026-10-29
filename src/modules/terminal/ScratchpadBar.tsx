@@ -194,9 +194,9 @@ export function ScratchpadBar({ leafId }: Props) {
         // before PaneView's overflow-hidden clips it; the blur/spread below are
         // sized to mostly fade out within that 8px margin so the glow reads as
         // an outward halo instead of getting cut off mid-fade.
-        "m-2 flex shrink-0 items-end gap-2 px-3 py-2 transition-colors",
+        "m-2 flex shrink-0 items-end gap-2 bg-[var(--terminal-background)] px-3 py-2 transition-colors",
         focused &&
-          "ring-1 ring-inset ring-primary/50 shadow-[0_0_6px_2px_var(--tw-shadow-color)] shadow-primary/50",
+          "ring-1 ring-inset ring-primary/50 shadow-[0_0_14px_3px_var(--tw-shadow-color)] shadow-primary/60",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
       onMouseDown={(e) => {
