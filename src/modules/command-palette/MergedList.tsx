@@ -70,6 +70,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
       <WorkspaceItem
         entry={row.entry}
         highlight={row.highlight}
+        current={row.current}
         onRun={() => p.onRunWorkspace(row.entry)}
         onContextMenu={
           p.onContextMenuWorkspace

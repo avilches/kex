@@ -41,6 +41,7 @@ export type MergedRow =
       key: string;
       entry: WorkspaceEntry;
       highlight?: RowHighlight;
+      current?: boolean;
     }
   | {
       kind: "closed";
@@ -244,20 +245,24 @@ export function mergeRows(input: MergeInput): MergedRow[] {
           item,
         }),
       );
-    const otherWorkspaces = workspaces
-      .filter((w) => w.workspaceId !== input.activeWorkspaceId)
+    const workspaceRows = [...workspaces]
       .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
       .map(
         (entry): MergedRow => ({
           kind: "workspace",
           key: workspaceRowKey(entry.workspaceId),
           entry,
+          current: entry.workspaceId === input.activeWorkspaceId ? true : undefined,
         }),
       );
     return [
       ...current,
       ...recents,
-      ...otherWorkspaces, ...recentlyClosed, ...userRows, ...actions];
+      ...workspaceRows,
+      ...recentlyClosed,
+      ...userRows,
+      ...actions,
+    ];
   }
 
   const scored: { row: MergedRow; points: number; recency: TabEntry | null }[] =
@@ -317,6 +322,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         key,
         entry,
         highlight: asHighlight(hit, "title"),
+        current: entry.workspaceId === input.activeWorkspaceId ? true : undefined,
       },
       points: hit.points + learnedBoost(learned, q, key),
       recency: null,
@@ -355,17 +361,5 @@ export function mergeRows(input: MergeInput): MergedRow[] {
   }
   // The tabs that fit keep the order of the empty list, so typing narrows it instead of reshuffling it.
   tabRows.sort((a, b) => byRecentList(a.entry, b.entry));
-  const shownWorkspaces = new Set(
-    [...currentRows, ...tabRows].flatMap((r) =>
-      r.kind === "tab" ? [r.entry.workspaceId] : [],
-    ),
-  );
-  return [
-    ...currentRows,
-    ...tabRows,
-    ...others.filter(
-      (r) =>
-        r.kind !== "workspace" || !shownWorkspaces.has(r.entry.workspaceId),
-    ),
-  ];
+  return [...currentRows, ...tabRows, ...others];
 }

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { displayOrder } from "./lib/closeSuccessor";
 import type { MergedRow } from "./lib/mergeRows";
 import { COMMAND_GROUPS } from "./commands";
-import type { TabEntry } from "./lib/tabEntries";
+import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
 import { MergedList } from "./MergedList";
 import type { PaletteItem } from "./types";
 
@@ -127,6 +127,30 @@ describe("MergedList", () => {
     mount(withCurrent, true);
     expect(screen.getByText("Current tab")).toBeTruthy();
     expect(screen.queryByText("Recent tabs")).toBeNull();
+  });
+
+  it("draws the active workspace as a row marked active, next to the others", () => {
+    const wsEntry = (id: string, title: string): WorkspaceEntry => ({
+      workspaceId: id,
+      title,
+      color: null,
+      icon: null,
+      tabCount: 2,
+      root: null,
+      canHibernate: false,
+      lastUsedAt: 0,
+    });
+    mount(
+      [
+        { kind: "workspace", key: "ws:a", entry: wsEntry("a", "Alpha"), current: true },
+        { kind: "workspace", key: "ws:b", entry: wsEntry("b", "Beta") },
+      ],
+      true,
+    );
+    const t = titles();
+    expect(t).toHaveLength(2);
+    expect(t[0]).toContain("active, 2 tabs");
+    expect(t[1]).not.toContain("active");
   });
 
   it("leaves no empty group while typing when the current tab is the only result", () => {
