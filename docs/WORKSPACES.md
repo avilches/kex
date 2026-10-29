@@ -240,8 +240,9 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
 
 - **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the title, a small table, the Restore
   button) in place of `TerminalPane` for a sleeping terminal; the terminal path bar stays. The table (`HibernatedInfo`)
-  has a Folder row (the worktree the agent had entered, else the tab's folder, with the home abbreviated to `~`) and a
-  Command row (what Restore will run), both dimmed alike, each ending in a small copy button that puts the full path or
+  has a folder row (the worktree the agent had entered, else the tab's folder, with the home abbreviated to `~`) and a
+  command row (what Restore will run), each marked by an icon only (`Folder02Icon`, `CommandLineIcon`; the name is the
+  tooltip), both dimmed alike, each ending in a small, equally dimmed copy button that puts the full path or
   command on the clipboard and shows a tick for a moment. "Hibernated for 3h 20m" (`formatHibernatedFor`) sits dimmed in
   the card's bottom-right corner. While the tab has the focus, its restore shortcuts (`tab.wake` and `tab.hibernate`)
   show as keys in the bottom-left corner, followed by "Restore", and the button is accented; without the focus the

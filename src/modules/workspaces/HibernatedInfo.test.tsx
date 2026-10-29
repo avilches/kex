@@ -20,21 +20,25 @@ describe("HibernatedInfo", () => {
   beforeEach(() => clipboard.write.mockClear());
   afterEach(cleanup);
 
-  it("lists the folder (with ~) and the command under their labels", () => {
-    const { getByText } = render(<HibernatedInfo {...props} />);
+  it("lists the folder (with ~) and the command, each marked by an icon and no text label", () => {
+    const { getByText, getByTitle, queryByText } = render(<HibernatedInfo {...props} />);
     expect(getByText("Claude Code")).toBeTruthy();
-    expect(getByText("Folder")).toBeTruthy();
-    expect(getByText("Command")).toBeTruthy();
+    expect(queryByText("Folder")).toBeNull();
+    expect(queryByText("Command")).toBeNull();
+    expect(getByTitle("Folder").querySelector("svg")).toBeTruthy();
+    expect(getByTitle("Command").querySelector("svg")).toBeTruthy();
     expect(getByText("~/Hub/Kex")).toBeTruthy();
     expect(getByText("claude --resume abc")).toBeTruthy();
   });
 
-  it("dims the folder and the command the same", () => {
-    const { container } = render(<HibernatedInfo {...props} />);
+  it("dims the folder, the command and the copy buttons", () => {
+    const { container, getByLabelText } = render(<HibernatedInfo {...props} />);
     const folder = container.querySelector('[data-hibernated-value="folder"]')!;
     const command = container.querySelector('[data-hibernated-value="command"]')!;
     expect(folder.className).toContain("opacity-70");
     expect(command.className).toContain("opacity-70");
+    expect(getByLabelText("Copy folder").className).toContain("opacity-70");
+    expect(getByLabelText("Copy command").className).toContain("opacity-70");
   });
 
   it("copies the full folder path, not the abbreviated one, and shows it was copied", async () => {
@@ -59,8 +63,8 @@ describe("HibernatedInfo", () => {
   });
 
   it("leaves out the rows it has nothing for, and the table with them", () => {
-    const { container, queryByText } = render(<HibernatedInfo {...props} folder={null} command={null} />);
+    const { container, queryByTitle } = render(<HibernatedInfo {...props} folder={null} command={null} />);
     expect(container.querySelector("[data-hibernated-table]")).toBeNull();
-    expect(queryByText("Folder")).toBeNull();
+    expect(queryByTitle("Folder")).toBeNull();
   });
 });

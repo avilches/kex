@@ -1323,16 +1323,11 @@ function hibernatedTab(): HTMLElement {
             [Folder02Icon, "Folder", "~/code/kex"],
             [CommandLineIcon, "Command", "claude --resume 7f3a"],
           ].flatMap(([ic, label, value]) => [
-            h(
-              "span",
-              { class: "flex items-center gap-1.5 text-[9.5px] uppercase tracking-wider opacity-60" },
-              icon(ic as typeof CommandLineIcon, 11, 2),
-              label as string,
-            ),
+            h("span", { class: "flex items-center opacity-70", title: label as string }, icon(ic as typeof CommandLineIcon, 12, 2)),
             h("span", { class: "truncate font-mono text-[11.5px] opacity-70" }, value as string),
             h(
               "span",
-              { class: "flex size-[22px] items-center justify-center rounded text-muted-foreground" },
+              { class: "flex size-[22px] items-center justify-center rounded text-muted-foreground opacity-70" },
               icon(Copy01Icon, 12, 2),
             ),
           ]),

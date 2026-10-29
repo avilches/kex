@@ -23,7 +23,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       title={copied ? "Copied" : label}
       aria-label={label}
       onClick={() => void copy()}
-      className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+      className="flex size-[22px] items-center justify-center rounded text-muted-foreground opacity-70 transition-all hover:text-foreground hover:opacity-100"
     >
       <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={2} />
     </button>
@@ -33,9 +33,8 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 function InfoRow({ icon, label, shown, full, copyLabel }: { icon: IconSvgElement; label: string; shown: string; full: string; copyLabel: string }) {
   return (
     <>
-      <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-wider opacity-60">
-        <HugeiconsIcon icon={icon} size={11} strokeWidth={2} className="shrink-0" />
-        {label}
+      <span title={label} className="flex items-center opacity-70">
+        <HugeiconsIcon icon={icon} size={12} strokeWidth={2} className="shrink-0" />
       </span>
       <span title={full} data-hibernated-value={label.toLowerCase()} className="truncate font-mono text-[11.5px] opacity-70">
         {shown}
