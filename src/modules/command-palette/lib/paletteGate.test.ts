@@ -8,8 +8,10 @@ import {
   openPaletteOf,
   PALETTE_ALLOWED_SHORTCUTS,
   shortcutBlockedByPalette,
+  shortcutSwallowedByPalette,
 } from "./paletteGate";
-import { isPaletteShortcut } from "./paletteShortcuts";
+import { isPaletteShortcut, isPaletteTabShortcut } from "./paletteShortcuts";
+import { shortcutUnavailableBehindPalette } from "@/modules/workspaces/lib/shortcutContext";
 
 const ALL = SHORTCUTS.map((s) => s.id);
 
@@ -131,6 +133,50 @@ describe("menuItemBlockedByPalette", () => {
     for (const id of built) {
       if (rustOnly.has(id)) continue;
       expect(known.has(id), `menu item ${id} is not in MENU_ITEM_IDS`).toBe(true);
+    }
+  });
+});
+
+describe("shortcutSwallowedByPalette", () => {
+  const sleeping = { activeTab: { id: "t", kind: "terminal", hibernation: { at: 1 } } as never, hasWorkspaceRoot: true };
+  const awake = { activeTab: { id: "t", kind: "terminal" } as never, hasWorkspaceRoot: true };
+
+  it("swallows everything a palette does not list, whatever the tab behind", () => {
+    for (const palette of ["commands", "folder"] as const) {
+      for (const id of ALL) {
+        if (PALETTE_ALLOWED_SHORTCUTS[palette].includes(id)) continue;
+        expect(shortcutSwallowedByPalette(id, palette, isPaletteTabShortcut(id), false), `${palette} ${id}`).toBe(true);
+      }
+    }
+  });
+
+  it("lets a tab shortcut the palette owns through even when the tab behind makes it unavailable", () => {
+    expect(shortcutSwallowedByPalette("tab.hibernate", "commands", true, true)).toBe(false);
+    expect(shortcutSwallowedByPalette("editor.save", "commands", true, true)).toBe(false);
+  });
+
+  it("keeps the tab-context rule when no palette is open", () => {
+    expect(shortcutSwallowedByPalette("editor.save", "none", true, true)).toBe(true);
+    expect(shortcutSwallowedByPalette("tab.close", "none", true, false)).toBe(false);
+  });
+
+  it("blocks the palette-only shortcuts when no palette is open", () => {
+    expect(shortcutSwallowedByPalette("palette.worktrees", "none", false, false)).toBe(true);
+  });
+
+  it("decides exactly like the two checks App.tsx used to make one after the other", () => {
+    for (const palette of ["none", "commands", "folder"] as const) {
+      for (const ctx of [awake, sleeping]) {
+        for (const id of ALL) {
+          const owns = isPaletteTabShortcut(id);
+          const unavailable = shortcutUnavailableBehindPalette(id, ctx, { open: false, ownsTabShortcut: owns });
+          const before =
+            shortcutUnavailableBehindPalette(id, ctx, { open: palette !== "none", ownsTabShortcut: owns }) ||
+            shortcutBlockedByPalette(id, palette);
+          const now = shortcutSwallowedByPalette(id, palette, owns, unavailable);
+          expect(now, `${palette} ${id}`).toBe(before);
+        }
+      }
     }
   });
 });
