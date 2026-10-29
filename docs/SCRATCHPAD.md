@@ -159,6 +159,11 @@ all of it:
   `containerRef` but is not the textarea itself (i.e. a click on the bar's own padding/hint area). This
   prevents the blur from firing in the first place for that click, rather than guarding inside the
   handler once it fires.
+  Explorer rows are dnd-kit drag sources (`tabIndex` from `useDraggable`), so their mousedown would
+  blur the textarea and close the bar before a path drag could be dropped on it. `TreeRow.tsx`
+  therefore calls `keepScratchpadFocus` (`lib/keepScratchpadFocus.ts`) on mousedown: with the
+  scratchpad open it prevents the default focus move, so a drag lands on the bar and a plain click on
+  a row no longer closes it (opening a file still does, through the tab activation close).
 - **`setLeafTerminalFocused(leafId)`**: called when the terminal grid gains real DOM focus (a
   leaf-scoped `focusin`). Guard: `if (!s.focusedNow) return;`. **This is the crux of the
   focus-vs-pane-switch distinction.** A click on the terminal of the leaf that is already focused is a
