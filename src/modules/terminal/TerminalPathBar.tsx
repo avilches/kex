@@ -75,7 +75,7 @@ export function TerminalPathBar({
           )}
         />
         {process && (
-          <ProcessSegmentContextMenu tabId={tabId}>
+          <ProcessSegmentContextMenu tabId={tabId} running={!!running}>
             <span
               title={process}
               className={cn(
