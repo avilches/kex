@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowReloadHorizontalIcon, Copy01Icon, Delete02Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Copy01Icon, CommandLineIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ContextMenuItem,
@@ -139,7 +139,7 @@ export function RestoreCommandMenu({ tab, onUpdateTab }: Props) {
       }}
     >
       <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
-        <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
+        <HugeiconsIcon icon={CommandLineIcon} size={14} strokeWidth={2} />
         <span className="min-w-0 flex-1">Restore Command</span>
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
