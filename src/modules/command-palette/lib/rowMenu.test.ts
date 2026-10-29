@@ -3,6 +3,8 @@ import type { ClosedTabEntry } from "./closedEntries";
 import type { MergedRow } from "./mergeRows";
 import {
   actionMenuItems,
+  closedCopyOptions,
+  closedCopySubmenuItems,
   closedMenuItems,
   folderMenuItems,
   highlightedClosedOf,
@@ -342,6 +344,23 @@ describe("closedMenuItems", () => {
     expect(items.map((i) => i.id)).toEqual(["go", "copy"]);
     expect(items[0]).toMatchObject({ label: "Reopen Closed Tab", enter: true });
     expect(items[1].disabled).toBe(false);
+  });
+
+  it("groups the copies under Copy Path when the row has a workspace or repository path", () => {
+    const entry = { ...closed("/repo/src/a.ts"), workspaceRoot: "/repo" } as ClosedTabEntry;
+    expect(closedMenuItems(entry, "/repo/src").map((i) => i.id)).toEqual(["go", "copyPath"]);
+    expect(closedCopySubmenuItems(entry, "/repo/src").map((i) => [i.id, i.detail])).toEqual([
+      ["back", undefined],
+      ["copy", "/repo/src/a.ts"],
+      ["copyWorkspace", "src/a.ts"],
+      ["copyRepository", "a.ts"],
+    ]);
+  });
+
+  it("stays a plain Copy Absolute Path with no root to copy against", () => {
+    const outside = { ...closed("/other/a.ts"), workspaceRoot: "/repo" } as ClosedTabEntry;
+    expect(closedMenuItems(outside).map((i) => i.id)).toEqual(["go", "copy"]);
+    expect(closedCopyOptions(closed("/repo")).map((o) => o.kind)).toEqual(["absolute"]);
   });
 });
 

@@ -12,6 +12,8 @@ export type ClosedTabEntry = TabHistoryRecord & {
   workspaceTitle: string;
   workspaceColor: string | null;
   workspaceIcon: string | null;
+  // The base of the Workspace Path copy.
+  workspaceRoot?: string | null;
 };
 
 // Closed rows are capped apart from live tabs so a long history cannot crowd them out.
@@ -55,6 +57,7 @@ export function buildClosedTabEntries(
       workspaceTitle: workspaceTitle(ws),
       workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
       workspaceIcon: ws.icon ?? null,
+      workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
     });
   }
   return out;

@@ -139,9 +139,23 @@ export function highlightedClosedOf(
   return null;
 }
 
-export function closedMenuItems(entry: ClosedTabEntry): RowMenuItem[] {
+// A closed row has no live git state, so the repository root is whatever the caller knows now.
+export function closedCopyOptions(entry: ClosedTabEntry, repoRoot: string | null = null): PathCopyOption[] {
+  if (!entry.path) return [];
+  return pathCopyOptions(entry.path, { workspaceRoot: entry.workspaceRoot ?? null, repoRoot });
+}
+
+export function closedCopySubmenuItems(entry: ClosedTabEntry, repoRoot: string | null = null): RowMenuItem[] {
+  return copySubmenuItems(closedCopyOptions(entry, repoRoot));
+}
+
+export function closedMenuItems(entry: ClosedTabEntry, repoRoot: string | null = null): RowMenuItem[] {
+  const reopen: RowMenuItem = { id: "go", label: "Reopen Closed Tab", enter: true };
+  if (closedCopyOptions(entry, repoRoot).length > 1) {
+    return [reopen, { id: "copyPath", label: "Copy Path" }];
+  }
   return [
-    { id: "go", label: "Reopen Closed Tab", enter: true },
+    reopen,
     {
       id: "copy",
       label: "Copy Absolute Path",
@@ -176,9 +190,9 @@ const COPY_ITEM_IDS: Partial<Record<PathCopyKind, RowMenuItemId>> = {
 };
 
 // What "Copy Path" turns the menu into: Back and one item per path the row can copy.
-export function tabCopySubmenuItems(entry: TabEntry): RowMenuItem[] {
+function copySubmenuItems(options: readonly PathCopyOption[]): RowMenuItem[] {
   const items: RowMenuItem[] = [{ id: "back", label: "Back" }];
-  for (const option of tabCopyOptions(entry)) {
+  for (const option of options) {
     const id = COPY_ITEM_IDS[option.kind];
     if (!id) continue;
     items.push({
@@ -189,6 +203,10 @@ export function tabCopySubmenuItems(entry: TabEntry): RowMenuItem[] {
     });
   }
   return items;
+}
+
+export function tabCopySubmenuItems(entry: TabEntry): RowMenuItem[] {
+  return copySubmenuItems(tabCopyOptions(entry));
 }
 
 export function noteLabel(entry: TabEntry): string {
