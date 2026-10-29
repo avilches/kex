@@ -1,31 +1,32 @@
 // @vitest-environment happy-dom
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { WorkspaceMark } from "./WorkspaceMark";
 
-afterEach(() => {
-  cleanup();
-  usePreferencesStore.setState({ defaultWorkspaceIcon: "LayersIcon" });
-});
+afterEach(cleanup);
 
 describe("WorkspaceMark", () => {
-  it("draws the default icon when the workspace has none", () => {
+  it("draws a circle in the workspace color when it has no icon", () => {
     const { container } = render(<WorkspaceMark id="ws-1" color="#3b82f6" />);
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.getAttribute("style")).toContain("color");
+  });
+
+  it("draws nothing when the workspace has neither a color nor an icon", () => {
+    const { container } = render(<WorkspaceMark id="ws-1" color={null} />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("keeps the workspace's own icon even without a color", () => {
+    const { container } = render(<WorkspaceMark id="ws-1" color={null} icon="HeartIcon" />);
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
-  it("draws the color dot when the default icon is none", () => {
-    usePreferencesStore.setState({ defaultWorkspaceIcon: "" });
-    const { container } = render(<WorkspaceMark id="ws-1" color="#3b82f6" />);
-    expect(container.querySelector("svg")).toBeNull();
-    expect(container.querySelector("span[aria-hidden]")).not.toBeNull();
-  });
-
-  it("keeps the workspace's own icon over the default", () => {
+  it("draws a different glyph for the workspace's own icon than for the circle", () => {
     const own = render(<WorkspaceMark id="ws-1" icon="HeartIcon" />).container.innerHTML;
     cleanup();
-    const dflt = render(<WorkspaceMark id="ws-1" />).container.innerHTML;
-    expect(own).not.toBe(dflt);
+    const circle = render(<WorkspaceMark id="ws-1" />).container.innerHTML;
+    expect(own).not.toBe(circle);
   });
 });

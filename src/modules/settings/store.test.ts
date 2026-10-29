@@ -180,9 +180,3 @@ describe("PREF_KEY_MAP", () => {
   });
 });
 
-
-describe("defaultWorkspaceIcon", () => {
-  it("is a named icon, so a workspace without one is not drawn as a dot", () => {
-    expect(DEFAULT_PREFERENCES.defaultWorkspaceIcon).toBe("LayersIcon");
-  });
-});

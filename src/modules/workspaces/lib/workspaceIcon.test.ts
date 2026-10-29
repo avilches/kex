@@ -1,6 +1,6 @@
+import { CircleIcon } from "@hugeicons/core-free-icons";
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_WORKSPACE_ICON,
   PALETTE_PAGE_SIZE,
   WORKSPACE_ICON_PALETTE,
   getWorkspaceIcon,
@@ -26,20 +26,21 @@ describe("WORKSPACE_ICON_PALETTE", () => {
 });
 
 describe("markGlyph", () => {
-  it("prefers the workspace's own icon", () => {
-    expect(markGlyph("HeartIcon", "StarIcon")).toBe(getWorkspaceIcon("HeartIcon"));
+  it("prefers the workspace's own icon, colored or not", () => {
+    expect(markGlyph("HeartIcon", true)).toBe(getWorkspaceIcon("HeartIcon"));
+    expect(markGlyph("HeartIcon", false)).toBe(getWorkspaceIcon("HeartIcon"));
   });
 
-  it("falls back to the default icon when the workspace has none", () => {
-    expect(markGlyph(undefined, "StarIcon")).toBe(getWorkspaceIcon("StarIcon"));
+  it("is a circle when the workspace has a color and no icon", () => {
+    expect(markGlyph(undefined, true)).toBe(CircleIcon);
   });
 
-  it("is null, so a color dot is drawn, when the default is empty or unknown", () => {
-    expect(markGlyph(undefined, "")).toBeNull();
-    expect(markGlyph(undefined, "Nope")).toBeNull();
+  it("is nothing when the workspace has neither", () => {
+    expect(markGlyph(undefined, false)).toBeNull();
   });
 
-  it("ships a default that exists in the palette", () => {
-    expect(getWorkspaceIcon(DEFAULT_WORKSPACE_ICON)).not.toBeNull();
+  it("is the circle, not nothing, while an icon of the catalog has not loaded", () => {
+    expect(markGlyph("NotLoadedYetIcon", true)).toBe(CircleIcon);
+    expect(markGlyph("NotLoadedYetIcon", false)).toBeNull();
   });
 });

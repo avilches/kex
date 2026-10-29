@@ -6,13 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runPaletteShortcut, runPaletteTabItem } from "@/modules/command-palette/lib/paletteControl";
 import { PALETTE_TAB_SHORTCUTS } from "@/modules/command-palette/lib/paletteShortcuts";
 import { FolderPalette } from "./FolderPalette";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
-
-// The heading checks tell the repository icon from the workspace mark by its svg, so the mark is a dot here.
-beforeEach(() => {
-  usePreferencesStore.setState({ defaultWorkspaceIcon: "" });
-});
 
 // `label` and `slot` are shorthands for a row that is only one thing; `labels` and `slots` say several.
 type RowOver = Partial<FolderRow> & { label?: FolderRow["labels"][number]; slot?: FolderRow["slots"][number] };
