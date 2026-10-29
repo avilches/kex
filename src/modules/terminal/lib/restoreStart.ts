@@ -20,11 +20,10 @@ type StartInput = {
   initialCwd: string | undefined;
 };
 
-// A start that runs no agent plan is the one whose folder nobody has checked yet: the shell would
-// silently fall back to Home and forget where the tab was.
+// A saved command with no agent plan is the only start whose directory nobody has checked yet. A
+// shell with nothing to run needs no check: Rust starts it in the nearest folder that exists.
 export function needsDirCheck(i: StartInput): boolean {
-  const planChecked = !!i.plan && (!!i.plan.errorReason || !!i.plan.resumeCmd);
-  return !planChecked && !!i.initialCwd;
+  return !i.plan && !!i.persistentCommand && !!i.initialCwd;
 }
 
 export function decideStart(i: StartInput & { dirProblem: string | null }): StartDecision {
@@ -42,18 +41,15 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
     };
   }
   if (plan?.resumeCmd) return { kind: "spawn", cwd: plan.cwdLaunch, inject: "resume" };
-  if (i.initialCwd && i.dirProblem) {
-    return {
-      kind: "blocked",
-      block: {
-        reason: i.dirProblem,
-        dir: i.initialCwd,
-        command: i.persistentCommand ?? "",
-        restorable: true,
-      },
-    };
+  if (!plan && i.persistentCommand) {
+    if (i.initialCwd && i.dirProblem) {
+      return {
+        kind: "blocked",
+        block: { reason: i.dirProblem, dir: i.initialCwd, command: i.persistentCommand, restorable: true },
+      };
+    }
+    return { kind: "spawn", cwd: i.initialCwd, inject: "command" };
   }
-  if (!plan && i.persistentCommand) return { kind: "spawn", cwd: i.initialCwd, inject: "command" };
   return { kind: "spawn", cwd: i.initialCwd, inject: "none" };
 }
 

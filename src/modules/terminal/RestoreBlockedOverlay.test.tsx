@@ -84,8 +84,8 @@ describe("RestoreBlockedOverlay", () => {
     unmount();
   });
 
-  it("offers only Try again, also for a terminal that has no command", () => {
-    for (const b of [block, { ...block, restorable: false }, { ...block, agent: undefined, command: "" }]) {
+  it("offers only Try again", () => {
+    for (const b of [block, { ...block, restorable: false }]) {
       const { container, unmount } = mount(b);
       expect([...container.querySelectorAll("button")].map((x) => x.textContent)).toEqual(["Try again"]);
       unmount();

@@ -61,12 +61,9 @@ describe("decideStart", () => {
     });
   });
 
-  it("blocks a plain terminal whose folder is gone instead of falling back to Home", () => {
+  it("spawns a plain terminal whose folder is gone, Rust picks the nearest folder that exists", () => {
     const d = decideStart({ ...base, initialCwd: "/pepe", dirProblem: "Folder not found: /pepe" });
-    expect(d).toEqual({
-      kind: "blocked",
-      block: { reason: "Folder not found: /pepe", dir: "/pepe", command: "", restorable: true },
-    });
+    expect(d).toEqual({ kind: "spawn", cwd: "/pepe", inject: "none" });
   });
 
   it("spawns plain with nothing to run", () => {
@@ -75,16 +72,11 @@ describe("decideStart", () => {
 });
 
 describe("needsDirCheck", () => {
-  it("is true for any start with a folder that runs no agent plan", () => {
+  it("is only true for a saved command with a directory and no plan", () => {
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(true);
-    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(true);
-    expect(needsDirCheck({ plan: plan(), persistentCommand: undefined, initialCwd: "/a" })).toBe(true);
-  });
-
-  it("is false without a folder, or when an agent plan already checked its own", () => {
+    expect(needsDirCheck({ plan: plan(), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
+    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(false);
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: undefined })).toBe(false);
-    expect(needsDirCheck({ plan: plan({ resumeCmd: "claude -r" }), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ plan: plan({ errorReason: "gone" }), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
   });
 });
 

@@ -237,13 +237,26 @@ fn apply_common(
     }
 }
 
+/// The nearest folder at or above `path` that exists. The filesystem root does
+/// not count: landing in `/` says nothing about where the tab was.
+fn nearest_existing_dir(path: &std::path::Path) -> Option<PathBuf> {
+    if !path.is_absolute() {
+        return None;
+    }
+    path.ancestors()
+        .filter(|a| a.parent().is_some())
+        .find(|a| a.is_dir())
+        .map(PathBuf::from)
+}
+
 /// The folder a spawned shell starts in on this machine: the given cwd when it
-/// is a directory, else the launch folder, else home. `apply_common` resolves
-/// through here, so this is the same chain the shell itself will follow.
+/// is a directory, else the nearest existing folder above it, else the launch
+/// folder, else home. `apply_common` resolves through here, so this is the same
+/// chain the shell itself will follow.
 /// Non-WSL only; a WSL cwd is a path inside the distro, not a host path.
 pub(crate) fn resolve_spawn_dir(cwd: Option<String>) -> Option<PathBuf> {
     cwd.map(PathBuf::from)
-        .filter(|p| p.is_dir())
+        .and_then(|p| nearest_existing_dir(&p))
         .or_else(|| workspace::launch_cwd_snapshot().filter(|p| p.is_dir()))
         .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
 }
@@ -1140,6 +1153,32 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let resolved = resolve_spawn_dir(Some(dir.path().to_string_lossy().into_owned()));
         assert_eq!(resolved.as_deref(), Some(dir.path()));
+    }
+
+    #[test]
+    fn resolve_spawn_dir_climbs_to_the_nearest_existing_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = dir.path().join("pepe").join("deeper");
+        let resolved = resolve_spawn_dir(Some(gone.to_string_lossy().into_owned()));
+        assert_eq!(resolved.as_deref(), Some(dir.path()));
+    }
+
+    #[test]
+    fn resolve_spawn_dir_does_not_stop_at_the_filesystem_root() {
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(
+            resolve_spawn_dir(Some("/kex-no-such-top/dir".into())).as_deref(),
+            Some(home.as_path())
+        );
+    }
+
+    #[test]
+    fn resolve_spawn_dir_ignores_a_relative_path() {
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(
+            resolve_spawn_dir(Some("src".into())).as_deref(),
+            Some(home.as_path())
+        );
     }
 
     #[test]

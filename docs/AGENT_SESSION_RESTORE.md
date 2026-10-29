@@ -755,8 +755,9 @@ set. For an agent plan the tab also gets the `restoreError` placeholder (the `âš
 There is no way to skip the restore and open a plain shell: the modal shows the folder and the command so the user can
 fix the cause (recreate the folder, mount the volume) and press Try again, or close the tab. Undoing that close brings the
 same block back (`TabHibernation.held` / `Tab.held`, seeded with `seedHeldBlock`). A terminal with no command and no
-agent is held too when its folder is gone (`needsDirCheck`, `decideStart`): the shell would otherwise fall back to Home
-in `resolve_spawn_dir` and `applySpawnCwdReport` would overwrite the tab's folder with it.
+agent is never held for a missing folder: there is nothing to lose, so `resolve_spawn_dir` (Rust) starts it in the
+nearest folder above the saved one that exists (never the filesystem root), then the launch folder, then Home, and
+`applySpawnCwdReport` records that folder on the tab.
 
 A PTY open failure (`openFailureBlock`, `restorable: false`) has no terminal to continue in, so its modal shows only
 Try again and leaves nothing pending. Every other block is `restorable: true`.
