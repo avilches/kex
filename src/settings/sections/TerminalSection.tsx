@@ -16,7 +16,12 @@ import {
 } from "@/components/ui/tooltip";
 import { defaultMonoFontFamily, resolveMonoFontFamily } from "@/lib/fonts";
 import { uiFontLabel } from "@/lib/uiFonts";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { Kbd } from "@/components/ui/kbd";
+import {
+  openSettingsWindow,
+  openShortcutsSettings,
+} from "@/modules/settings/openSettingsWindow";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { ENTER_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -76,6 +81,7 @@ import {
 import { useEffect, useState } from "react";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { FontFamilyInput } from "../components/FontFamilyInput";
 import {
   formatPx,
@@ -124,6 +130,12 @@ export function TerminalSection() {
     (s) => s.terminalBackgroundMemoryBudgetMB,
   );
   const uiFont = usePreferencesStore((s) => s.uiFont);
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const scratchpadShortcut = getShortcutLabel(
+    "terminal.scratchpad",
+    userShortcuts,
+  );
+  const scratchpadMonoFamily = resolveMonoFontFamily(terminalFontFamily);
   const scratchpadMonospace = usePreferencesStore(
     (s) => s.scratchpadMonospace,
   );
@@ -189,92 +201,97 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Scratchpad</FieldLabel>
-        <div className="grid grid-cols-2 divide-x divide-border/60 rounded-lg border border-border/60 bg-card/60">
-          <div className="flex flex-col gap-2 px-3 py-2.5">
-            <span className="text-[12.5px] font-medium">Font</span>
-            <RadioGroup
-              value={scratchpadMonospace ? "mono" : "system"}
-              onValueChange={(v) =>
-                void setTerminalScratchpadMonospace(v === "mono")
-              }
-            >
-              <div className="flex items-start gap-2">
-                <RadioGroupItem
-                  value="system"
-                  id="scratchpad-font-system"
-                  className="mt-0.5"
-                />
-                <div className="flex flex-col items-start">
-                  <label
-                    htmlFor="scratchpad-font-system"
-                    className="cursor-pointer text-[12px]"
-                  >
-                    {uiFontLabel(uiFont)}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => void openSettingsWindow("appearance")}
-                    className="text-[10.5px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
-                  >
-                    Change font
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="mono" id="scratchpad-font-mono" />
-                <label
-                  htmlFor="scratchpad-font-mono"
-                  className="cursor-pointer text-[12px]"
-                  style={{
-                    fontFamily: resolveMonoFontFamily(terminalFontFamily),
-                  }}
-                >
-                  Monospace
-                </label>
-              </div>
-            </RadioGroup>
+        <div className="overflow-hidden rounded-lg border border-border/60 bg-card/60">
+          <div className="grid grid-cols-1 divide-border/60 sm:grid-cols-2 sm:divide-x">
+            <div className="flex flex-col gap-2.5 px-3 py-2.5">
+              <span className="text-[12.5px] font-medium">Font</span>
+              <SegmentedControl
+                label="Scratchpad font"
+                value={scratchpadMonospace ? "mono" : "ui"}
+                onChange={(v) =>
+                  void setTerminalScratchpadMonospace(v === "mono")
+                }
+                options={[
+                  { value: "ui", label: uiFontLabel(uiFont) },
+                  {
+                    value: "mono",
+                    label: "Monospace",
+                    style: { fontFamily: scratchpadMonoFamily },
+                  },
+                ]}
+              />
+              <span className="min-h-[15px] text-[10.5px] text-muted-foreground">
+                {scratchpadMonospace ? (
+                  "Same as the terminal."
+                ) : (
+                  <>
+                    UI font.{" "}
+                    <button
+                      type="button"
+                      onClick={() => void openSettingsWindow("appearance")}
+                      className="underline underline-offset-2 transition-colors hover:text-foreground"
+                    >
+                      Change font
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="flex flex-col gap-2.5 px-3 py-2.5">
+              <span className="text-[12.5px] font-medium">Send</span>
+              <SegmentedControl
+                label="Scratchpad send key"
+                value={scratchpadEnterSends ? "enter" : "shift-enter"}
+                onChange={(v) =>
+                  void setTerminalScratchpadEnterSends(v === "enter")
+                }
+                options={[
+                  { value: "enter", label: `${ENTER_KEY} sends` },
+                  { value: "shift-enter", label: `${ENTER_KEY} new line` },
+                ]}
+              />
+              <span className="min-h-[15px] text-[10.5px] text-muted-foreground">
+                {scratchpadEnterSends
+                  ? "Like Terminal. Shift+Enter adds a line."
+                  : "Like a text field. Shift+Enter sends."}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col gap-2 px-3 py-2.5">
-            <span className="text-[12.5px] font-medium">Send</span>
-            <RadioGroup
-              value={scratchpadEnterSends ? "enter" : "shift-enter"}
-              onValueChange={(v) =>
-                void setTerminalScratchpadEnterSends(v === "enter")
-              }
+          <div className="flex flex-col gap-1.5 border-t border-border/60 bg-muted/30 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Preview
+              </span>
+              <span className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
+                {scratchpadShortcut ? (
+                  <>
+                    <Kbd>{scratchpadShortcut}</Kbd>
+                    toggles the scratchpad.
+                  </>
+                ) : (
+                  "No shortcut set."
+                )}
+                <button
+                  type="button"
+                  onClick={() => void openShortcutsSettings("Scratchpad")}
+                  className="underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  {scratchpadShortcut ? "Change shortcut" : "Set shortcut"}
+                </button>
+              </span>
+            </div>
+            <div
+              className="rounded-xl bg-background px-4 py-3 text-sm leading-[1.4] text-muted-foreground/70 shadow-[0_0_14px_3px_var(--tw-shadow-color)] shadow-primary/40 ring-1 ring-inset ring-primary/50"
+              style={{
+                fontFamily: scratchpadMonospace
+                  ? scratchpadMonoFamily
+                  : "inherit",
+              }}
             >
-              <div className="flex items-start gap-2">
-                <RadioGroupItem
-                  value="enter"
-                  id="scratchpad-send-enter"
-                  className="mt-0.5"
-                />
-                <label
-                  htmlFor="scratchpad-send-enter"
-                  className="flex cursor-pointer flex-col text-[12px]"
-                >
-                  {ENTER_KEY} sends
-                  <span className="text-[10.5px] text-muted-foreground">
-                    Like Terminal
-                  </span>
-                </label>
-              </div>
-              <div className="flex items-start gap-2">
-                <RadioGroupItem
-                  value="shift-enter"
-                  id="scratchpad-send-shift"
-                  className="mt-0.5"
-                />
-                <label
-                  htmlFor="scratchpad-send-shift"
-                  className="flex cursor-pointer flex-col text-[12px]"
-                >
-                  {ENTER_KEY} new line
-                  <span className="text-[10.5px] text-muted-foreground">
-                    Like text field
-                  </span>
-                </label>
-              </div>
-            </RadioGroup>
+              {scratchpadEnterSends
+                ? "Enter sends. Shift+Enter new line"
+                : "Shift+Enter sends. Enter new line"}
+            </div>
           </div>
         </div>
       </div>

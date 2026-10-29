@@ -19,7 +19,7 @@ import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
-import { ShortcutsSection } from "./sections/ShortcutsSection";
+import { ShortcutsSection, type ShortcutsSearchRequest } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
 import { WorkspacesSection } from "./sections/WorkspacesSection";
@@ -68,6 +68,12 @@ function readInitialSection(): SettingsSection {
   return parseSectionParam(url.searchParams.get("section")).section;
 }
 
+function readInitialShortcutsSearch(): ShortcutsSearchRequest | null {
+  if (typeof window === "undefined") return null;
+  const { section, ext } = parseSectionParam(new URL(window.location.href).searchParams.get("section"));
+  return section === "shortcuts" && ext ? { query: ext, nonce: 0 } : null;
+}
+
 function readInitialActionsTarget(): ActionsRequest | null {
   if (typeof window === "undefined") return null;
   const { section, ext } = parseSectionParam(new URL(window.location.href).searchParams.get("section"));
@@ -80,6 +86,7 @@ export function SettingsApp() {
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
   const [anchor, setAnchor] = useState<string | undefined>(readInitialAnchor);
+  const [shortcutsSearch, setShortcutsSearch] = useState<ShortcutsSearchRequest | null>(readInitialShortcutsSearch);
   const [actionsTarget, setActionsTarget] = useState<ActionsRequest | null>(readInitialActionsTarget);
 
   useEffect(() => {
@@ -138,6 +145,7 @@ export function SettingsApp() {
       const { section, ext } = parseSectionParam(raw);
       setActive(section);
       setAnchor(section === "appearance" ? ext : undefined);
+      if (section === "shortcuts" && ext) setShortcutsSearch((prev) => ({ query: ext, nonce: (prev?.nonce ?? 0) + 1 }));
       const target = section === "actions" ? parseActionsTarget(ext) : null;
       if (target) setActionsTarget((prev) => ({ ...target, nonce: (prev?.nonce ?? 0) + 1 }));
     };
@@ -210,6 +218,8 @@ export function SettingsApp() {
             <div className="mx-auto w-full max-w-160">
               {active === "actions" ? (
                 <ActionsSection target={actionsTarget} />
+              ) : active === "shortcuts" ? (
+                <ShortcutsSection searchRequest={shortcutsSearch} />
               ) : (
                 ActiveSection && createElement(ActiveSection)
               )}

@@ -43,9 +43,20 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
-export function ShortcutsSection() {
+export type ShortcutsSearchRequest = { query: string; nonce: number };
+
+export function ShortcutsSection({
+  searchRequest = null,
+}: {
+  searchRequest?: ShortcutsSearchRequest | null;
+}) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchRequest?.query ?? "");
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new request (nonce) re-fills the box, never the query text itself
+  useEffect(() => {
+    if (searchRequest) setSearch(searchRequest.query);
+  }, [searchRequest?.nonce]);
   const [recordingId, setRecordingId] = useState<ShortcutId | null>(null);
   const [recordingConflict, setRecordingConflict] = useState<{
     binding: KeyBinding;

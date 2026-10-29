@@ -11,5 +11,6 @@ describe("parseSectionParam", () => {
     expect(parseSectionParam("unknown:junk")).toEqual({ section: "general", ext: "junk" });
     expect(parseSectionParam(null)).toEqual({ section: "general" });
     expect(parseSectionParam("actions")).toEqual({ section: "actions" });
+    expect(parseSectionParam("shortcuts:Scratchpad")).toEqual({ section: "shortcuts", ext: "Scratchpad" });
   });
 });
