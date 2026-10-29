@@ -3,7 +3,6 @@ import { listen } from "@tauri-apps/api/event";
 import {
   consumeRestorePlan,
   detachAgentSession,
-  forgetAgentRecordAlias,
   previewResumeCmd,
   restorePlansReady,
   seedRestorePlan,
@@ -1207,7 +1206,6 @@ export function disposeSession(leafId: string): void {
   clearOscTitle(leafId);
   setPendingRestore(leafId, null);
   setModalBlock(leafId, null);
-  forgetAgentRecordAlias(leafId);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   scratchpadListeners.delete(leafId);

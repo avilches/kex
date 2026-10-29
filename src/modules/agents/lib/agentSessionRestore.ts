@@ -165,12 +165,12 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
 // one has no use left and is released.
 const recordAlias = new Map<string, string>();
 
+// Always points at the record itself: reopening a tab that was already a reopened one moves the
+// alias on instead of chaining it. It also has to outlive the tab's session, because closing the
+// reopened tab puts it on the closed stack and the next undo still needs it.
 export function aliasAgentRecord(newId: string, oldId: string): void {
-  recordAlias.set(newId, oldId);
-}
-
-export function forgetAgentRecordAlias(tabId: string): void {
-  recordAlias.delete(tabId);
+  recordAlias.set(newId, recordAlias.get(oldId) ?? oldId);
+  recordAlias.delete(oldId);
 }
 
 const planOf = (tabId: string) => invoke<RestorePlan | null>("agent_session_preview_cmd", { tabId });

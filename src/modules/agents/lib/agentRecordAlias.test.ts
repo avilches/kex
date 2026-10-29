@@ -50,6 +50,23 @@ describe("record alias of a reopened tab", () => {
     expect(calls()).toEqual(["agent_detach_session:old", "agent_detach_session:new-c"]);
   });
 
+  it("still finds the first record after the tab is reopened twice", async () => {
+    const plan = makePlan("old");
+    vi.mocked(invoke).mockImplementation(async (_c, a) => ((a as { tabId?: string } | undefined)?.tabId === "old" ? plan : null));
+    aliasAgentRecord("hop-1", "old");
+    aliasAgentRecord("hop-2", "hop-1");
+    expect(await previewResumeCmd("hop-2")).toBe(plan);
+    expect(calls()).toEqual(["agent_session_preview_cmd:hop-2", "agent_session_preview_cmd:old"]);
+  });
+
+  it("detaching the last hop releases the first record", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    aliasAgentRecord("hop-3", "old");
+    aliasAgentRecord("hop-4", "hop-3");
+    await detachAgentSession("hop-4");
+    expect(calls()).toEqual(["agent_detach_session:old", "agent_detach_session:hop-4"]);
+  });
+
   it("does nothing different for a tab without alias", async () => {
     vi.mocked(invoke).mockResolvedValue(null);
     expect(await previewResumeCmd("plain")).toBeNull();
