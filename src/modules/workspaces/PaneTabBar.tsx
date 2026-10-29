@@ -454,7 +454,6 @@ function DraggableTab({
             onActivate={onActivate}
             onClose={onClose}
             onCloseOtherTabs={onCloseOtherTabs}
-            onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
           />
         </ContextMenuContent>

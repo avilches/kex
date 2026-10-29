@@ -49,7 +49,6 @@ type Props = {
   onActivate: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
 };
 
@@ -69,7 +68,6 @@ export function TabContextMenuItems({
   onActivate,
   onClose,
   onCloseOtherTabs,
-  onRenameTab,
   onUpdateTab,
 }: Props) {
   const { targets, moveTab } = useWorkspaceMove();
@@ -105,97 +103,93 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      {onRenameTab && (
-        <>
-          <ContextMenuItem onSelect={() => startRename(tab.id, renameOrigin)}>
-            <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
-            Rename Tab
-            <Shortcut id="tab.rename" />
-          </ContextMenuItem>
-          {onUpdateTab && (
-            <ContextMenuItem
-              onSelect={() => {
-                if (!isTabNoteOpen(tab)) onActivate(tab.id);
-                onUpdateTab(tab.id, toggleTabNote);
-              }}
-            >
-              <HugeiconsIcon icon={StickyNote03Icon} size={14} strokeWidth={2} />
-              {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
-              <Shortcut id="tab.note" />
-            </ContextMenuItem>
-          )}
-          {onUpdateTab && tab.note !== undefined && (
-            <ContextMenuItem onSelect={() => onUpdateTab(tab.id, removeTabNote)}>
-              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-              Remove Note
-            </ContextMenuItem>
-          )}
-          {onUpdateTab && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger className="gap-2">
-                <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
-                Color
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-[232px] p-2">
-                <ColorPaletteGrid
-                  value={tab.color}
-                  displayColor={tab.color ?? null}
-                  noneSelected={tab.color === undefined}
-                  onSelect={(color) =>
-                    onUpdateTab(tab.id, (p) => {
-                      const { color: _drop, ...rest } = p;
-                      return (color ? { ...rest, color } : rest) as Tab;
-                    })
-                  }
-                />
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
-          {onUpdateTab && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger className="gap-2">
-                <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
-                Icon
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="max-h-[320px] w-[288px] overflow-y-auto p-2">
-                <IconPaletteGrid
-                  value={tab.icon}
-                  onSelect={(icon) =>
-                    onUpdateTab(tab.id, (p) => {
-                      const { icon: _drop, ...rest } = p;
-                      return (icon ? { ...rest, icon } : rest) as Tab;
-                    })
-                  }
-                />
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
-          <TabCopyPathItems tab={tab} workspaceId={workspaceId} />
-          <ContextMenuSub>
-            <ContextMenuSubTrigger className="gap-2">
-              <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
-              Move to Workspace
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
-              <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
-                <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                New
-              </ContextMenuItem>
-              {otherTargets.length > 0 && <ContextMenuSeparator />}
-              {otherTargets.map((t) => (
-                <ContextMenuItem
-                  key={t.id}
-                  onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
-                >
-                  <WorkspaceMark id={t.id} color={t.color} icon={t.icon} />
-                  <span className="truncate">{t.title}</span>
-                </ContextMenuItem>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-          <ContextMenuSeparator />
-        </>
+      <ContextMenuItem onSelect={() => startRename(tab.id, renameOrigin)}>
+        <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+        Rename Tab
+        <Shortcut id="tab.rename" />
+      </ContextMenuItem>
+      {onUpdateTab && (
+        <ContextMenuItem
+          onSelect={() => {
+            if (!isTabNoteOpen(tab)) onActivate(tab.id);
+            onUpdateTab(tab.id, toggleTabNote);
+          }}
+        >
+          <HugeiconsIcon icon={StickyNote03Icon} size={14} strokeWidth={2} />
+          {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
+          <Shortcut id="tab.note" />
+        </ContextMenuItem>
       )}
+      {onUpdateTab && tab.note !== undefined && (
+        <ContextMenuItem onSelect={() => onUpdateTab(tab.id, removeTabNote)}>
+          <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+          Remove Note
+        </ContextMenuItem>
+      )}
+      {onUpdateTab && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
+            Color
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-[232px] p-2">
+            <ColorPaletteGrid
+              value={tab.color}
+              displayColor={tab.color ?? null}
+              noneSelected={tab.color === undefined}
+              onSelect={(color) =>
+                onUpdateTab(tab.id, (p) => {
+                  const { color: _drop, ...rest } = p;
+                  return (color ? { ...rest, color } : rest) as Tab;
+                })
+              }
+            />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+      {onUpdateTab && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
+            Icon
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="max-h-[320px] w-[288px] overflow-y-auto p-2">
+            <IconPaletteGrid
+              value={tab.icon}
+              onSelect={(icon) =>
+                onUpdateTab(tab.id, (p) => {
+                  const { icon: _drop, ...rest } = p;
+                  return (icon ? { ...rest, icon } : rest) as Tab;
+                })
+              }
+            />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+      <TabCopyPathItems tab={tab} workspaceId={workspaceId} />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger className="gap-2">
+          <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+          Move to Workspace
+        </ContextMenuSubTrigger>
+        <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
+          <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+            New
+          </ContextMenuItem>
+          {otherTargets.length > 0 && <ContextMenuSeparator />}
+          {otherTargets.map((t) => (
+            <ContextMenuItem
+              key={t.id}
+              onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
+            >
+              <WorkspaceMark id={t.id} color={t.color} icon={t.icon} />
+              <span className="truncate">{t.title}</span>
+            </ContextMenuItem>
+          ))}
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
       <TabAgentMenuItems tabId={tab.id}>{restoreCommand}</TabAgentMenuItems>
       <CopyTabIdItem tabId={tab.id} />
       {tab.kind === "terminal" && (
