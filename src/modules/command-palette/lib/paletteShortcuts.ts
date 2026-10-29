@@ -10,6 +10,7 @@ export const PALETTE_TAB_SHORTCUTS = {
   "tab.lock": "lock",
   "tab.hibernate": "hibernateTab",
   "tab.note": "note",
+  "tab.rename": "rename",
   "editor.save": "save",
 } as const satisfies Partial<Record<ShortcutId, RowMenuItemId>>;
 

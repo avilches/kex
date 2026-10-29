@@ -233,7 +233,7 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   if ((tab.kind === "editor" || tab.kind === "markdown") && tab.dirty) {
     items.push({ id: "save", label: "Save", shortcutId: "editor.save" });
   }
-  items.push({ id: "rename", label: "Rename Tab", separatorBefore: true });
+  items.push({ id: "rename", label: "Rename Tab", shortcutId: "tab.rename", separatorBefore: true });
   items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note" });
   if (hasTabNote(tab)) items.push({ id: "removeNote", label: "Remove Note" });
   const absolute = tabEntryCopyPath(entry);
