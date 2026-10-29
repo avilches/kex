@@ -14,6 +14,7 @@ import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
 const TICK_MS = 30_000;
+const DOUBLE_CLICK_LABEL = "Double click";
 
 function useNow(enabled: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -53,7 +54,9 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
   const wakeLabel = useShortcutLabel("tab.wake");
   const toggleLabel = useShortcutLabel("tab.hibernate");
-  const shortcuts = [wakeLabel, toggleLabel].filter((l): l is string => !!l);
+  const shortcuts = focused
+    ? [wakeLabel, toggleLabel, DOUBLE_CLICK_LABEL].filter((l): l is string => !!l)
+    : [DOUBLE_CLICK_LABEL];
   const now = useNow(visible);
   const [ref, layout] = useLayout();
   const { agent, title: frozen, at } = tab.hibernation;
@@ -67,16 +70,31 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       Restore
     </Button>
   );
+  const hint = (
+    <span data-hibernated-hint className="flex items-center gap-1.5 text-[10px] opacity-80">
+      {shortcuts.map((label, i) => (
+        <Fragment key={label}>
+          {i > 0 && "or"}
+          <Kbd className="h-[18px] min-w-0 rounded px-1.5 text-[10.5px]">{label}</Kbd>
+        </Fragment>
+      ))}
+      Restore
+    </span>
+  );
   return (
     <div
       ref={ref}
       data-hibernated-tab
       data-layout={layout}
+      onDoubleClick={onWake}
       className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
     >
       <HibernatedLines tabId={tab.id} visible={visible} />
       {layout === "bare" ? (
-        <div className="relative">{restore}</div>
+        <div className="relative flex flex-col items-center gap-2">
+          {restore}
+          {hint}
+        </div>
       ) : (
         <div className="relative flex w-[80%] max-w-[480px] min-w-[320px] flex-col items-center gap-5 rounded-xl border border-border bg-background px-8 pt-8 pb-3 shadow-sm">
           <HugeiconsIcon icon={SleepingIcon} size={full ? 96 : 64} strokeWidth={1} className="opacity-70" />
@@ -89,19 +107,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
           />
           {restore}
           <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px]">
-            {focused && shortcuts.length > 0 ? (
-              <span data-hibernated-hint className="flex items-center gap-1.5 opacity-80">
-                {shortcuts.map((label, i) => (
-                  <Fragment key={label}>
-                    {i > 0 && "or"}
-                    <Kbd className="h-[18px] min-w-0 rounded px-1.5 text-[10.5px]">{label}</Kbd>
-                  </Fragment>
-                ))}
-                Restore
-              </span>
-            ) : (
-              <span />
-            )}
+            {hint}
             <span className="opacity-50">Hibernated for {formatHibernatedFor(now - at)}</span>
           </div>
         </div>

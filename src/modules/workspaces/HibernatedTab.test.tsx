@@ -51,18 +51,27 @@ describe("HibernatedTab", () => {
     expect(lines.read).not.toHaveBeenCalled();
   });
 
-  it("hints both restore shortcuts in the bottom-left corner, as keys joined with or and followed by Restore, and keeps the button clean", () => {
+  it("hints the two keys and the double click in the bottom-left corner, joined with or and followed by Restore, and keeps the button clean", () => {
     const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
     expect(getByRole("button").textContent).toBe("Restore");
     const hint = container.querySelector("[data-hibernated-hint]")!;
-    expect(hint.textContent).toMatch(/^.+or.+Restore$/);
-    expect(hint.querySelectorAll("kbd")).toHaveLength(2);
+    expect(hint.textContent).toMatch(/^.+or.+orDouble clickRestore$/);
+    expect(hint.querySelectorAll("kbd")).toHaveLength(3);
   });
 
-  it("shows no hint while the tab has no focus, since Enter would not wake it", () => {
+  it("hints only the double click while the tab has no focus, since Enter would not wake it", () => {
     const { getByRole, container } = render(<HibernatedTab tab={sleeping()} visible focused={false} onWake={() => {}} />);
     expect(getByRole("button").textContent).toBe("Restore");
-    expect(container.querySelector("[data-hibernated-hint]")).toBeNull();
+    const hint = container.querySelector("[data-hibernated-hint]")!;
+    expect(hint.textContent).toBe("Double clickRestore");
+    expect(hint.querySelectorAll("kbd")).toHaveLength(1);
+  });
+
+  it("wakes on a double click anywhere on the placeholder", () => {
+    const onWake = vi.fn();
+    const { container } = render(<HibernatedTab tab={sleeping()} visible focused onWake={onWake} />);
+    fireEvent.doubleClick(container.querySelector("[data-hibernated-tab]")!);
+    expect(onWake).toHaveBeenCalledTimes(1);
   });
 
   it("shows the stored lines behind the placeholder, with their colours, and nothing when there are none", async () => {
@@ -124,6 +133,7 @@ describe("HibernatedTab", () => {
     expect(queryByText("build")).toBeNull();
     expect(queryByText(/Hibernated for/)).toBeNull();
     expect(getByText("Restore")).toBeTruthy();
+    expect(container.querySelector("[data-hibernated-hint]")).toBeTruthy();
     vi.unstubAllGlobals();
   });
 
