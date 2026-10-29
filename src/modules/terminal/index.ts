@@ -19,6 +19,7 @@ export {
   whenSessionReady,
   writeToSession,
 } from "./lib/useTerminalSession";
+export { keepScratchpadFocus } from "./lib/keepScratchpadFocus";
 export { scratchpadRefForDrop, SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 export { useTerminalFileDrop } from "./lib/useTerminalFileDrop";
 export { subscribeToPool, poolSlotStats } from "./lib/rendererPool";

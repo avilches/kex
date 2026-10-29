@@ -47,6 +47,7 @@ import { CopyPathMenu } from "./lib/copyPathItems";
 import { gitignoreEntryFor } from "./lib/gitignore";
 import { gitStatusHexColor } from "./lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
+import { keepScratchpadFocus } from "@/modules/terminal";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
@@ -259,6 +260,7 @@ function EntryRowImpl(props: EntryRowProps) {
             style={{ paddingLeft }}
             {...listeners}
             {...attributes}
+            onMouseDown={keepScratchpadFocus}
           >
             <FlashOverlay token={flashToken} />
             <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
@@ -559,6 +561,7 @@ export function FsRootRow({
           ref={setNodeRef}
           {...listeners}
           {...attributes}
+          onMouseDown={keepScratchpadFocus}
           className={cn(
             "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
             isDragging && "opacity-50",
@@ -689,6 +692,7 @@ export function FsUpRow({
           ref={setNodeRef}
           {...listeners}
           {...attributes}
+          onMouseDown={keepScratchpadFocus}
           type="button"
           onDoubleClick={() => onNavigateUp?.()}
           title="Double-click to go up one folder"

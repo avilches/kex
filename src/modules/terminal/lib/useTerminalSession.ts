@@ -559,6 +559,13 @@ export function setLeafScratchpadDraft(leafId: string, text: string): void {
   if (s) s.scratchpadDraft = text;
 }
 
+export function isScratchpadOpen(): boolean {
+  for (const s of sessions.values()) {
+    if (s.scratchpadOpen && s.focusedNow) return true;
+  }
+  return false;
+}
+
 /**
  * Clear the scrollback and screen of the currently focused terminal, keeping
  * the active prompt line - macOS Terminal's ⌘K behaviour. Returns false when no
