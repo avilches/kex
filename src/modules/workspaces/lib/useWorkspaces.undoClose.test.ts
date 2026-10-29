@@ -12,6 +12,7 @@ vi.mock("@/modules/agents/lib/agentSessionRestore", () => ({
   previewResumeCmd: vi.fn(async () => null),
   seedRestorePlan: vi.fn(),
   detachAgentSession: vi.fn(async () => {}),
+  aliasAgentRecord: vi.fn(),
 }));
 vi.mock("@/modules/settings/preferences", () => ({
   usePreferencesStore: {

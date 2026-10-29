@@ -4,6 +4,7 @@ import {
   decideStart,
   needsDirCheck,
   openFailureBlock,
+  refreshHeldBlock,
   retryRestoreFlow,
   type RestoreActionDeps,
   type RestoreBlock,
@@ -177,5 +178,29 @@ describe("retryRestoreFlow", () => {
     await retryRestoreFlow(none.s, none.d);
     expect(gone.calls).toEqual([]);
     expect(none.calls).toEqual([]);
+  });
+});
+
+describe("refreshHeldBlock", () => {
+  const agentHeld: RestoreBlock = { reason: "old", dir: "/work", command: "claude --resume 'a'", agent: "claude", restorable: true };
+  const cmdHeld: RestoreBlock = { reason: "old", dir: "/proj", command: "pnpm dev", restorable: true };
+
+  it("lets a command tab start once its folder exists again", () => {
+    expect(refreshHeldBlock(cmdHeld, null, null)).toBeNull();
+  });
+  it("keeps the values of a command tab and refreshes the reason while the folder is missing", () => {
+    expect(refreshHeldBlock(cmdHeld, null, "Folder not found: /proj")).toEqual({ ...cmdHeld, reason: "Folder not found: /proj" });
+  });
+  it("lets an agent tab resume when the fresh plan is good", () => {
+    expect(refreshHeldBlock(agentHeld, plan({ resumeCmd: "claude -r" }), null)).toBeNull();
+  });
+  it("refreshes the reason from a fresh plan that still fails, keeping the agent and command", () => {
+    expect(refreshHeldBlock(agentHeld, plan({ errorReason: "Folder not found: /work" }), null)).toEqual({
+      ...agentHeld,
+      reason: "Folder not found: /work",
+    });
+  });
+  it("keeps an agent block as it was when there is no plan to judge by", () => {
+    expect(refreshHeldBlock(agentHeld, null, null)).toBe(agentHeld);
   });
 });

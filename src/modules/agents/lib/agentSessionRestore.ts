@@ -160,9 +160,30 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
 // Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
 // start" menu). Unlike the startup restore plan, it is not consumed and never mutates
 // agent-sessions.json, so it can be called on demand while a session is live.
+// A reopened closed tab gets a new id while the agent's stored record keeps the old one. Lookups for
+// the new id fall back to the old record until the new id has one of its own, at which point the old
+// one has no use left and is released.
+const recordAlias = new Map<string, string>();
+
+export function aliasAgentRecord(newId: string, oldId: string): void {
+  recordAlias.set(newId, oldId);
+}
+
+export function forgetAgentRecordAlias(tabId: string): void {
+  recordAlias.delete(tabId);
+}
+
+const planOf = (tabId: string) => invoke<RestorePlan | null>("agent_session_preview_cmd", { tabId });
+
 export async function previewResumeCmd(tabId: string): Promise<RestorePlan | null> {
   try {
-    return await invoke<RestorePlan | null>("agent_session_preview_cmd", { tabId });
+    const own = await planOf(tabId);
+    const old = recordAlias.get(tabId);
+    if (!old) return own;
+    if (!own) return await planOf(old);
+    recordAlias.delete(tabId);
+    invoke("agent_detach_session", { tabId: old }).catch(() => {});
+    return own;
   } catch (err) {
     console.error("[agent-session] previewResumeCmd error:", err);
     return null;
@@ -191,6 +212,9 @@ export async function sessionPreviews(tabIds: string[]): Promise<SessionPreview[
 
 export async function detachAgentSession(tabId: string): Promise<void> {
   restorePlans?.delete(tabId);
+  const old = recordAlias.get(tabId);
+  recordAlias.delete(tabId);
+  if (old) await invoke("agent_detach_session", { tabId: old }).catch(() => {});
   await invoke("agent_detach_session", { tabId });
 }
 

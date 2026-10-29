@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   consumeRestorePlan,
   detachAgentSession,
+  forgetAgentRecordAlias,
   previewResumeCmd,
   restorePlansReady,
   seedRestorePlan,
@@ -45,6 +46,7 @@ import {
   decideStart,
   needsDirCheck,
   openFailureBlock,
+  refreshHeldBlock,
   discardPendingFlow,
   retryRestoreFlow,
   type RestoreActionDeps,
@@ -944,7 +946,7 @@ const restoreBlockListeners = new Map<string, Set<() => void>>();
 
 function setRestoreBlock(leafId: string, s: Session, block: RestoreBlock | null): void {
   s.restoreBlock = block;
-  setModalBlock(leafId, block);
+  setModalBlock(leafId, block?.restorable ? block : null);
   for (const l of restoreBlockListeners.get(leafId) ?? []) l();
 }
 
@@ -983,19 +985,25 @@ async function startLeaf(leafId: string, s: Session): Promise<void> {
   // Consume the plan before spawning so the PTY starts in the agent's cwd
   // directly, without needing a `cd` shell command.
   const held = consumeHeldBlock(leafId);
-  if (held) {
-    consumeRestorePlan(leafId);
-    blockStart(leafId, s, held);
-    return;
-  }
   const plan = consumeRestorePlan(leafId);
+  const checkDir = (path: string) =>
+    invoke<string | null>("check_launch_dir", { path }).catch(() => null);
+  if (held) {
+    const block = refreshHeldBlock(held, plan, held.agent ? null : await checkDir(held.dir));
+    if (s.disposed || s.pty) {
+      s.ptyOpening = false;
+      return;
+    }
+    if (block) {
+      blockStart(leafId, s, block);
+      return;
+    }
+  }
   const input = {
     plan,
     persistentCommand: s.persistentCommand,
     initialCwd: s.initialCwd,
   };
-  const checkDir = (path: string) =>
-    invoke<string | null>("check_launch_dir", { path }).catch(() => null);
   const dirProblem = needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
   const decision = decideStart({ ...input, dirProblem });
   if (s.disposed || s.pty) {
@@ -1192,6 +1200,7 @@ export function disposeSession(leafId: string): void {
   clearOscTitle(leafId);
   setPendingRestore(leafId, null);
   setModalBlock(leafId, null);
+  forgetAgentRecordAlias(leafId);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   scratchpadListeners.delete(leafId);

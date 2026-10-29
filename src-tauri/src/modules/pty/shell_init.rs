@@ -237,18 +237,6 @@ fn apply_common(
     }
 }
 
-/// The nearest folder at or above `path` that exists. The filesystem root does
-/// not count: landing in `/` says nothing about where the tab was.
-fn nearest_existing_dir(path: &std::path::Path) -> Option<PathBuf> {
-    if !path.is_absolute() {
-        return None;
-    }
-    path.ancestors()
-        .filter(|a| a.parent().is_some())
-        .find(|a| a.is_dir())
-        .map(PathBuf::from)
-}
-
 /// The folder a spawned shell starts in on this machine: the given cwd when it
 /// is a directory, else the nearest existing folder above it, else the launch
 /// folder, else home. `apply_common` resolves through here, so this is the same
@@ -256,7 +244,7 @@ fn nearest_existing_dir(path: &std::path::Path) -> Option<PathBuf> {
 /// Non-WSL only; a WSL cwd is a path inside the distro, not a host path.
 pub(crate) fn resolve_spawn_dir(cwd: Option<String>) -> Option<PathBuf> {
     cwd.map(PathBuf::from)
-        .and_then(|p| nearest_existing_dir(&p))
+        .and_then(|p| workspace::nearest_existing_dir(&p))
         .or_else(|| workspace::launch_cwd_snapshot().filter(|p| p.is_dir()))
         .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
 }

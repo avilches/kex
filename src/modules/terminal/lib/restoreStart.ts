@@ -53,6 +53,22 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
   return { kind: "spawn", cwd: i.initialCwd, inject: "none" };
 }
 
+// A held block is what the tab showed when it stopped. By the time it comes back the problem may
+// be gone, so it is checked again: null means the tab can start as usual, otherwise the block to
+// show, with the reason as it stands now. An agent block is judged by the fresh plan; with no plan
+// to judge by it stays as it was.
+export function refreshHeldBlock(
+  held: RestoreBlock,
+  plan: RestorePlan | null,
+  dirProblem: string | null,
+): RestoreBlock | null {
+  if (held.agent) {
+    if (plan && !plan.errorReason && plan.resumeCmd) return null;
+    return plan?.errorReason ? { ...held, reason: plan.errorReason } : held;
+  }
+  return dirProblem ? { ...held, reason: dirProblem } : null;
+}
+
 export function openFailureBlock(
   error: unknown,
   dir: string | undefined,

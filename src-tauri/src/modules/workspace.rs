@@ -156,10 +156,23 @@ pub fn validate_spawn_cwd(
     Ok(Some(canonical))
 }
 
+// The nearest folder at or above `path` that exists. The filesystem root does
+// not count: landing in `/` says nothing about where the tab was.
+pub fn nearest_existing_dir(path: &Path) -> Option<PathBuf> {
+    if !path.is_absolute() {
+        return None;
+    }
+    path.ancestors()
+        .filter(|a| a.parent().is_some())
+        .find(|a| a.is_dir())
+        .map(PathBuf::from)
+}
+
 // A saved cwd can be stale or from another environment (e.g. a Windows path in
 // a now-WSL workspace, or a since-deleted dir); the terminal must still open, so
-// fall back to home instead of rejecting. Returns the cwd to spawn in (None
-// meaning home) and the canonical path to authorize after a successful spawn.
+// it climbs to the nearest folder above that exists and only then falls back to
+// home instead of rejecting. Returns the cwd to spawn in (None meaning home) and
+// the canonical path to authorize after a successful spawn.
 pub fn spawn_cwd_or_home(
     cwd: Option<String>,
     workspace: &WorkspaceEnv,
@@ -168,6 +181,21 @@ pub fn spawn_cwd_or_home(
         Ok(Some(canonical)) => (cwd, Some(canonical)),
         Ok(None) => (None, None),
         Err(e) => {
+            let nearest = matches!(workspace, WorkspaceEnv::Local)
+                .then(|| cwd.as_deref().map(str::trim).map(PathBuf::from))
+                .flatten()
+                .and_then(|p| nearest_existing_dir(&p))
+                .and_then(|near| {
+                    let near = near.to_string_lossy().into_owned();
+                    match validate_spawn_cwd(Some(&near), workspace) {
+                        Ok(Some(canonical)) => Some((near, canonical)),
+                        _ => None,
+                    }
+                });
+            if let Some((near, canonical)) = nearest {
+                log::warn!("pty cwd {cwd:?} unusable ({e}); opening the nearest folder {near:?}");
+                return (Some(near), Some(canonical));
+            }
             log::warn!("pty cwd {cwd:?} unusable in {workspace:?} ({e}); opening home");
             (None, None)
         }
@@ -864,22 +892,25 @@ mod auth_tests {
     }
 
     #[test]
-    fn spawn_cwd_or_home_falls_back_when_inaccessible() {
-        let mut missing = env::temp_dir();
-        missing.push(format!(
-            "kex-spawn-orhome-missing-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+    fn spawn_cwd_or_home_falls_back_when_no_folder_above_exists() {
         let (spawn, canonical) = spawn_cwd_or_home(
-            Some(missing.to_string_lossy().into_owned()),
+            Some("kex-relative/missing".to_owned()),
             &WorkspaceEnv::Local,
         );
         assert_eq!(spawn, None);
         assert_eq!(canonical, None);
+    }
+
+    #[test]
+    fn spawn_cwd_or_home_climbs_to_the_nearest_existing_folder() {
+        let dir = tempdir("spawn-orhome-climb");
+        let gone = dir.join("pepe").join("deeper");
+        let (spawn, canonical) = spawn_cwd_or_home(
+            Some(gone.to_string_lossy().into_owned()),
+            &WorkspaceEnv::Local,
+        );
+        assert_eq!(spawn, Some(dir.to_string_lossy().into_owned()));
+        assert_eq!(canonical, Some(std::fs::canonicalize(&dir).unwrap()));
     }
 
     #[test]
