@@ -9,16 +9,10 @@ import {
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
-import type { AgentSession } from "@/modules/agents/lib/types";
 import { AppWindowMacIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ProcessSegmentContextMenu } from "./ProcessSegmentContextMenu";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
-
-function AgentChipIndicator({ session }: { session: AgentSession }) {
-  return <span>{session.meta?.model ?? session.agent}</span>;
-}
 
 type Props = {
   tabId: string;
@@ -49,7 +43,6 @@ export function TerminalPathBar({
   const running =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tabId) ??
     null;
-  const agentSession = useAgentStore((s) => s.sessions[tabId] ?? null);
   const { segments } = buildCwdBreadcrumb(cwd, workspaceRoot, home);
   const process = running ?? metrics?.foregroundChild ?? metrics?.shellName ?? null;
   return (
@@ -96,11 +89,7 @@ export function TerminalPathBar({
       </div>
       <div className="flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
         {metrics && (
-          <span title="Process ID">{metrics.pid}</span>
-        )}
-        {metrics && (
           <>
-            <span className="text-border/60">&middot;</span>
             <span className={cn(metrics.cpuPercent < 0.05 && "text-muted-foreground/50")}>
               {formatCpu(metrics.cpuPercent)}
             </span>
@@ -108,7 +97,6 @@ export function TerminalPathBar({
             <span>{formatMem(metrics.memBytes)}</span>
           </>
         )}
-        {agentSession && <AgentChipIndicator session={agentSession} />}
       </div>
     </div>
   );
