@@ -228,6 +228,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onNavigateToWorktree={props.onNavigateToWorktree}
               onFocusOnExplorer={props.onFocusOnExplorer}
               workspaceCwd={props.workspaceCwd}
+              workspaceRoot={props.workspaceRootPath}
             />
           </div>
           <div

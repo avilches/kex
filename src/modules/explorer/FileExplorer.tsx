@@ -59,7 +59,7 @@ import {
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
-import { CopyAbsolutePathItem } from "./lib/copyPathItems";
+import { CopyPathMenu } from "./lib/copyPathItems";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
@@ -1095,6 +1095,7 @@ export const FileExplorer = memo(
               isExpanded={row.kind === "entry" ? row.isExpanded : false}
               depth={row.depth}
               rootPath={rootPath}
+              workspaceRoot={workspaceRootPath}
               actions={rowActions}
               renameInProgress={renameInProgress}
               isSelected={selectedPath === row.path}
@@ -1129,6 +1130,7 @@ export const FileExplorer = memo(
             <FsRootRow
               path={row.path}
               isWorkspaceRoot={rootMode === "workspace"}
+              workspaceRoot={workspaceRootPath}
               flashToken={flash.path === row.path ? flash.token : 0}
               onSetAsRoot={onSetAsRoot}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
@@ -1143,6 +1145,7 @@ export const FileExplorer = memo(
           return (
             <FsUpRow
               path={row.path}
+              workspaceRoot={workspaceRootPath}
               onNavigateUp={onNavigateUp}
               onRevealInTerminal={onRevealInTerminal}
               onRefresh={() => tree.refresh(rootPath)}
@@ -1393,6 +1396,8 @@ export const FileExplorer = memo(
             <ExplorerSearch
               ref={searchRef}
               rootPath={rootPath}
+              workspaceRoot={workspaceRootPath}
+              gitRootPath={gitRootPath}
               showHidden={showHidden}
               onOpenFile={onOpenFile}
               open={isSearchOpen}
@@ -1552,7 +1557,7 @@ export const FileExplorer = memo(
                     Paste
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <CopyAbsolutePathItem path={rootPath} />
+                  <CopyPathMenu path={rootPath} isDir workspaceRoot={workspaceRootPath} repoRoot={gitRootPath} />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.refresh(rootPath)}

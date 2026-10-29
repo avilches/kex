@@ -10,8 +10,7 @@ import {
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
 import {
-  CopyAbsolutePathItem,
-  CopyRelativePathItem,
+  CopyPathMenu,
 } from "@/modules/explorer/lib/copyPathItems";
 import { gitignoreEntryFor } from "@/modules/explorer/lib/gitignore";
 import { COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
@@ -126,8 +125,7 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
         </>
       )}
       <ContextMenuSeparator />
-      <CopyRelativePathItem path={path} workspaceRoot={workspaceRoot} />
-      <CopyAbsolutePathItem path={path} />
+      <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} repoRoot={gitRootPath} />
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />
@@ -204,8 +202,7 @@ export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
         Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <CopyAbsolutePathItem path={path} />
-      <CopyRelativePathItem path={path} workspaceRoot={workspaceRoot} />
+      <CopyPathMenu path={path} isDir={false} workspaceRoot={workspaceRoot} repoRoot={gitRootPath} />
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />

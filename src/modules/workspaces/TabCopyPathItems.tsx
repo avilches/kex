@@ -1,9 +1,6 @@
 import { ContextMenuSeparator } from "@/components/ui/context-menu";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import {
-  CopyAbsolutePathItem,
-  CopyRelativePathItem,
-} from "@/modules/explorer/lib/copyPathItems";
+import { CopyPathMenu } from "@/modules/explorer/lib/copyPathItems";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { tabCopyPath } from "./lib/tabPath";
 import type { Tab } from "./lib/types";
@@ -17,8 +14,14 @@ export function TabCopyPathItems({ tab, workspaceId }: { tab: Tab; workspaceId: 
   return (
     <>
       <ContextMenuSeparator />
-      <CopyAbsolutePathItem path={path} compact={false} shortcut="path.copy" />
-      <CopyRelativePathItem path={path} workspaceRoot={workspaceRoot(workspaceId)} compact={false} />
+      <CopyPathMenu
+        path={path}
+        isDir={tab.kind === "terminal"}
+        workspaceRoot={workspaceRoot(workspaceId)}
+        repoRoot={"repoRoot" in tab ? tab.repoRoot : undefined}
+        compact={false}
+        shortcut="path.copy"
+      />
       <ContextMenuSeparator />
     </>
   );

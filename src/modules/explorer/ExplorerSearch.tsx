@@ -39,7 +39,7 @@ import {
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
-import { CopyAbsolutePathItem, CopyRelativePathItem } from "./lib/copyPathItems";
+import { CopyPathMenu } from "./lib/copyPathItems";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +67,8 @@ const PHASE_1_DEPTH = 3;
 
 type Props = {
   rootPath: string;
+  workspaceRoot: string | null;
+  gitRootPath: string | null;
   showHidden: boolean;
   onOpenFile: (path: string) => void;
   open: boolean;
@@ -85,6 +87,8 @@ export type ExplorerSearchHandle = {
 
 export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function ExplorerSearch({
   rootPath,
+  workspaceRoot,
+  gitRootPath,
   showHidden,
   onOpenFile,
   open,
@@ -441,8 +445,13 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
               <ContextMenuSeparator />
               {contextHit && (
                 <>
-                  <CopyRelativePathItem path={contextHit.path} workspaceRoot={rootPath} />
-                  <CopyAbsolutePathItem path={contextHit.path} />
+                  <CopyPathMenu
+                    path={contextHit.path}
+                    isDir={contextHit.is_dir}
+                    workspaceRoot={workspaceRoot}
+                    repoRoot={gitRootPath}
+                    relativeRoot={rootPath}
+                  />
                 </>
               )}
             </ContextMenuContent>

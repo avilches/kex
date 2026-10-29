@@ -14,10 +14,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { IS_MAC } from "@/lib/platform";
-import {
-  CopyAbsolutePathItem,
-  CopyRelativeTextItem,
-} from "@/modules/explorer/lib/copyPathItems";
+import { CopyPathMenu } from "@/modules/explorer/lib/copyPathItems";
 import {
   OPEN_EXTERNAL_LABEL,
   openWithDefaultApp,
@@ -72,8 +69,7 @@ export function WikiLinkContextMenu({
             {REVEAL_LABEL}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <CopyAbsolutePathItem path={note.path} />
-          <CopyRelativeTextItem text={note.relativePath} />
+          <CopyPathMenu path={note.path} isDir={false} workspaceRoot={note.workspaceRoot} />
         </ContextMenuContent>
       ) : null}
     </ContextMenu>

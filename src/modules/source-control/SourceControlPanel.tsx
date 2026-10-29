@@ -36,9 +36,7 @@ import {
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
 import {
-  CopyAbsolutePathItem,
-  CopyRelativePathItem,
-  CopyRelativeTextItem,
+  CopyPathMenu,
 } from "@/modules/explorer/lib/copyPathItems";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
@@ -137,6 +135,7 @@ type Props = {
   onNavigateToWorktree?: (path: string) => void;
   onFocusOnExplorer?: (path: string, action?: RevealAction) => void;
   workspaceCwd?: string | null;
+  workspaceRoot?: string | null;
 };
 
 export type SourceControlPanelHandle = {
@@ -228,6 +227,7 @@ export const SourceControlPanel = memo(
       onNavigateToWorktree,
       onFocusOnExplorer,
       workspaceCwd,
+      workspaceRoot = null,
     }: Props,
     ref,
   ) {
@@ -1369,6 +1369,7 @@ export const SourceControlPanel = memo(
                               selected={scm.selected}
                               actionBusy={scm.actionBusy}
                               repoRoot={scm.repo?.repoRoot ?? null}
+                              workspaceRoot={workspaceRoot}
                               stagedCollapsed={stagedCollapsed}
                               changesCollapsed={changesCollapsed}
                               treeCollapsed={treeCollapsed}
@@ -1505,6 +1506,7 @@ type RowRendererProps = {
   selected: DiffSelection | null;
   actionBusy: string | null;
   repoRoot: string | null;
+  workspaceRoot: string | null;
   stagedCollapsed: boolean;
   changesCollapsed: boolean;
   treeCollapsed: ReadonlySet<string>;
@@ -1668,6 +1670,7 @@ function TreeDirRow({
   focused,
   actionBusy,
   repoRoot,
+  workspaceRoot,
   treeCollapsed,
   onFocusRow,
   onToggleTreeDir,
@@ -1780,8 +1783,7 @@ function TreeDirRow({
             </>
           ) : null}
           <ContextMenuSeparator />
-          <CopyRelativePathItem path={absolutePath} workspaceRoot={repoRoot} />
-          <CopyAbsolutePathItem path={absolutePath} />
+          <CopyPathMenu path={absolutePath} isDir workspaceRoot={workspaceRoot} repoRoot={repoRoot} />
         </ContextMenuContent>
       ) : null}
     </ContextMenu>
@@ -1794,6 +1796,7 @@ const EntryRow = memo(function EntryRow({
   selected,
   actionBusy,
   repoRoot,
+  workspaceRoot,
   onFocusRow,
   onSelectEntry,
   onStageEntry,
@@ -2042,8 +2045,9 @@ const EntryRow = memo(function EntryRow({
           </>
         )}
         <ContextMenuSeparator />
-        <CopyRelativeTextItem text={entry.path.replace(/\\/g, "/")} />
-        {absolutePath ? <CopyAbsolutePathItem path={absolutePath} /> : null}
+        {absolutePath ? (
+          <CopyPathMenu path={absolutePath} isDir={false} workspaceRoot={workspaceRoot} repoRoot={repoRoot} />
+        ) : null}
         {!isDeleted && absolutePath && onFocusOnExplorer ? (
           <>
             <ContextMenuSeparator />
