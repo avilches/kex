@@ -123,6 +123,9 @@ export function anchorOf(
   return anchor;
 }
 
+// Hibernate and Restore are one slot whose id flips with the tab state.
+const toggleSlot = (id: string) => (id === "restoreTab" ? "hibernateTab" : id);
+
 // The menu of the highlighted row, opened with Tab or the right button. The palette input keeps
 // the focus the whole time, so the menu is driven from the palette's own keydown.
 export function useRowMenu() {
@@ -212,7 +215,10 @@ export function useRowMenu() {
       if (!m) return m;
       if (m.parent) return { ...m, parent: { ...m.parent, items } };
       const prev = m.items[m.active];
-      let active = items.findIndex((i) => i.id === prev?.id && i.actionId === prev?.actionId);
+      const prevSlot = prev && toggleSlot(prev.id);
+      let active = items.findIndex(
+        (i) => toggleSlot(i.id) === prevSlot && i.actionId === prev?.actionId,
+      );
       if (active < 0 || items[active].disabled) active = Math.max(0, stepEnabled(items, -1, 1));
       return { ...m, items, active };
     });
