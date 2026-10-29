@@ -50,7 +50,7 @@ export function ClosedItem({
         </span>
       </span>
       {entry.workspaceTitle ? (
-        <span className="ml-auto flex max-w-56 shrink-0 items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+        <span className="ml-auto flex max-w-56 shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 py-0.5 pr-2 pl-1.5 text-[11px] font-normal text-muted-foreground">
           <WorkspaceMark
             id={entry.workspaceId}
             color={entry.workspaceColor}
