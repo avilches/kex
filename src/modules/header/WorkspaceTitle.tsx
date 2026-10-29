@@ -1,4 +1,5 @@
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
@@ -34,7 +35,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
     <div className="flex min-w-0 max-w-[340px] items-center gap-2">
       <WorkspaceMark
         id={workspace.id}
-        color={workspace.color}
+        color={workspaceDisplayColor(workspace)}
         icon={workspace.icon}
         size={26}
       />

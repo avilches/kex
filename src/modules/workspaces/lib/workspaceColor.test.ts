@@ -5,7 +5,26 @@ import {
   initialColorForId,
   chipColorOnWhite,
   resolveWorkspaceColor,
+  workspaceDisplayColor,
 } from "./workspaceColor";
+
+describe("workspaceDisplayColor", () => {
+  test("a workspace without a root shows no automatic color", () => {
+    expect(workspaceDisplayColor({ id: "ws-1", color: undefined })).toBeNull();
+    expect(workspaceDisplayColor({ id: "ws-1", color: null })).toBeNull();
+  });
+
+  test("a workspace without a root keeps the color the user picked", () => {
+    expect(workspaceDisplayColor({ id: "ws-1", color: "#112233" })).toBe("#112233");
+  });
+
+  test("a workspace with a root resolves the automatic color", () => {
+    expect(workspaceDisplayColor({ id: "ws-1", color: undefined, workspaceRoot: "/a" })).toBe(
+      initialColorForId("ws-1"),
+    );
+    expect(workspaceDisplayColor({ id: "ws-1", color: null, workspaceRoot: "/a" })).toBeNull();
+  });
+});
 
 describe("idHue", () => {
   test("returns 0-359", () => {

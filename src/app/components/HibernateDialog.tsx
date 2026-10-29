@@ -1,4 +1,5 @@
 import { Spinner } from "@/components/ui/spinner";
+import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertDialog,
@@ -148,7 +149,7 @@ export function HibernateDialog({ workspace, tabIds, groupLabel, mode = "hiberna
           </AlertDialogTitle>
           <div className="flex w-full min-w-0 items-center gap-2 text-sm font-medium">
             {titleWs && (
-              <WorkspaceMark id={titleWs.id} color={titleWs.color} icon={titleWs.icon} size={18} />
+              <WorkspaceMark id={titleWs.id} color={workspaceDisplayColor(titleWs)} icon={titleWs.icon} size={18} />
             )}
             <span className="min-w-0 truncate" title={titleWsName}>{titleWsName || "this workspace"}</span>
             {titleGroup && (

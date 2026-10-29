@@ -1,5 +1,5 @@
 import { WorkspaceColorProvider } from "./lib/workspaceColorContext";
-import { resolveWorkspaceColor } from "./lib/workspaceColor";
+import { workspaceDisplayColor } from "./lib/workspaceColor";
 import { cn } from "@/lib/utils";
 import { refreshTerminalLeaf } from "@/modules/terminal";
 import { useEffect } from "react";
@@ -69,7 +69,7 @@ export function WorkspaceView({
             ws.id !== activeWorkspaceId && "opacity-0 invisible",
           )}
         >
-          <WorkspaceColorProvider value={resolveWorkspaceColor(ws.color, ws.id)}>
+          <WorkspaceColorProvider value={workspaceDisplayColor(ws)}>
           <SplitNodeView
             node={ws.paneTree}
             workspaceId={ws.id}

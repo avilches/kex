@@ -135,15 +135,21 @@ describe("buildTabEntries", () => {
     expect(e.workspaceIcon).toBe("code");
   });
 
-  it("gives a workspace without an explicit color its automatic one, and keeps an explicit no-color", () => {
-    const auto = workspace("ws-auto", "Auto", [term("tab-1")]);
-    const none = workspace("ws-none", "None", [term("tab-2")], { color: null });
+  it("gives a rooted workspace without an explicit color its automatic one, and keeps an explicit no-color", () => {
+    const auto = workspace("ws-auto", "Auto", [term("tab-1")], { workspaceRoot: "/a" });
+    const none = workspace("ws-none", "None", [term("tab-2")], { color: null, workspaceRoot: "/b" });
     const [a, b] = buildTabEntries([auto, none], sources());
     expect(a.workspaceColor).toBe(initialColorForId("ws-auto"));
     expect(b.workspaceColor).toBeNull();
     const [wa, wb] = buildWorkspaceEntries([auto, none], sources());
     expect(wa.color).toBe(initialColorForId("ws-auto"));
     expect(wb.color).toBeNull();
+  });
+
+  it("gives a workspace without a root no automatic color", () => {
+    const rootless = workspace("ws-rootless", "Rootless", [term("tab-1")]);
+    const [e] = buildTabEntries([rootless], sources());
+    expect(e.workspaceColor).toBeNull();
   });
 
   it("carries last use and indicator", () => {

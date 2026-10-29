@@ -41,7 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   chipColorOnWhite,
-  resolveWorkspaceColor,
+  workspaceDisplayColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
 import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
@@ -211,7 +211,8 @@ function SortableWorkspaceItem({
     id: ws.id,
     data: { type: "workspace" },
   });
-  const displayColor = resolveWorkspaceColor(ws.color, ws.id);
+  const displayColor = workspaceDisplayColor(ws);
+  const rootless = !ws.workspaceRoot;
   const dropTarget = useWorkspaceDropTarget();
   const dragging = useWorkspaceDnd().draggingItem;
   const tabDragActive = dragging?.kind === "tab";
@@ -367,6 +368,29 @@ function SortableWorkspaceItem({
     </button>
   ) : null;
 
+  const litStyle: CSSProperties | undefined = lit
+    ? expanded
+      ? { boxShadow: `inset 0 0 0 1px ${displayColor ?? "var(--ring)"}` }
+      : displayColor !== null
+        ? {
+            backgroundColor: chipColorOnWhite(displayColor),
+            color: "#ffffff",
+            boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
+          }
+        : {
+            backgroundColor: "var(--muted)",
+            boxShadow: "inset 0 0 0 1px var(--ring)",
+          }
+    : undefined;
+  // The dashed border already marks the chip, so the inset ring of the lit state is dropped.
+  const chipStyle: CSSProperties | undefined = rootless
+    ? {
+        ...litStyle,
+        boxShadow: undefined,
+        ...(displayColor !== null ? { borderColor: displayColor } : null),
+      }
+    : litStyle;
+
   const button = (
     <div
       ref={setRootRef}
@@ -397,6 +421,8 @@ function SortableWorkspaceItem({
           onDoubleClick={() => startRename(ws.id)}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
+            rootless && "border-[1.5px] border-dashed",
+            rootless && !displayColor && "border-foreground/40",
             compact
               ? "h-9 justify-center text-[13px]"
               : "h-9 gap-2 px-2.5 text-[13px]",
@@ -404,24 +430,7 @@ function SortableWorkspaceItem({
               ? "text-foreground"
               : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
           )}
-          style={
-            lit
-              ? expanded
-                ? {
-                    boxShadow: `inset 0 0 0 1px ${displayColor ?? "var(--ring)"}`,
-                  }
-                : displayColor !== null
-                ? {
-                    backgroundColor: chipColorOnWhite(displayColor),
-                    color: "#ffffff",
-                    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
-                  }
-                : {
-                    backgroundColor: "var(--muted)",
-                    boxShadow: "inset 0 0 0 1px var(--ring)",
-                  }
-              : undefined
-          }
+          style={chipStyle}
           {...attributes}
           {...listeners}
           aria-pressed={active}
@@ -1136,10 +1145,7 @@ export function WorkspaceBar({
     barBinding.setOverlay(
       dragActiveWs
             ? (() => {
-                const displayColor = resolveWorkspaceColor(
-                  dragActiveWs.color,
-                  dragActiveWs.id,
-                );
+                const displayColor = workspaceDisplayColor(dragActiveWs);
                 return (
                   <div
                     className={cn(

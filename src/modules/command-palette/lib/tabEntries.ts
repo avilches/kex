@@ -3,7 +3,7 @@ import { awakeTerminalTabs, isHibernatedTab } from "@/modules/workspaces/lib/hib
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { tabDirIn } from "@/modules/workspaces/lib/titleVars";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
@@ -92,7 +92,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           tabId: tab.id,
           workspaceId: ws.id,
           workspaceTitle,
-          workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
+          workspaceColor: workspaceDisplayColor(ws),
           workspaceIcon: ws.icon ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
           repoRoot: git.repoRoot || null,
@@ -127,7 +127,7 @@ export function buildWorkspaceEntries(workspaces: readonly Workspace[], src: Tab
     return {
       workspaceId: ws.id,
       title: src.workspaceTitle(ws),
-      color: resolveWorkspaceColor(ws.color, ws.id),
+      color: workspaceDisplayColor(ws),
       icon: ws.icon ?? null,
       tabCount: tabs.length,
       root: ws.workspaceRoot ?? ws.fsRoot ?? null,
