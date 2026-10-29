@@ -161,8 +161,17 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   funciones en WebKit, Tauri ni wry. TASK-910.
 - **`SIGABRT` en código de Kex, hilo principal** (medido): informes del 2026-10-28 a las 09:50 (6 min después de
   arrancar) y a las 21:43 (8 h 20 min después), con las 24 direcciones de la pila idénticas, así que es siempre el mismo
-  punto. Con `panic = "abort"` lo más probable es un `panic!` o un `unwrap()` que falla (hipótesis), pero hasta que
-  `panic_log.rs` deje el mensaje en `Kex.log` no se sabe cuál. TASK-912.
+  punto. Causa localizada el 2026-10-29 (tercer informe, ya con
+  nombres de función y la línea `[panic]` en `Kex.log`): la pila termina en `tao::platform_impl::platform::app::send_event`
+  llamando a `core::panicking::panic_cannot_unwind`, con el mensaje "panic in a function that cannot unwind" y sin
+  ningún panic de Rust antes (medido). `send_event` es el override `extern "C"` de `-[NSApplication sendEvent:]` de `tao`
+  0.35.3: una excepción de Objective-C lanzada por AppKit debajo de ese frame no puede desenrollarse a través de él y Rust
+  aborta la app. Es un bug conocido de `tao` en macOS 27: tauri-apps/tao#1354 lo arregla con `extern "C-unwind"` y salió en
+  `tao` 0.37.2 (según reportes de terceros; no comprobado en el código de `tao`). Disparador citado en esos reportes: una
+  aserción de AppKit del afordance de Siri sobre texto seleccionado (hipótesis para Kex; no sabemos qué excepción fue,
+  porque al desenrollarse desaparecen los frames que la lanzaron). Mismo bug en el upstream de Kex: crynta/terax-ai#1309,
+  abierto sin arreglo. `tauri-runtime-wry` 2.11.3 exige `tao ^0.35`, así que el arreglo requiere subir Tauri a 2.12 (con
+  `cargo update` arrastra también casi todos los plugins). TASK-912 (hook) y TASK-914.
 
 Las horas de `Kex.log` están en UTC y las de los informes de macOS en hora local: 16:12 en el log es 12:12 en UTC-4.
 `scripts/run-performance.sh` abre la app con `open`, así que no se ve stderr. `useFTLJIT=false` y los topes del JIT no
