@@ -247,7 +247,11 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   the card's bottom-right corner. While the tab has the focus, its restore shortcuts (`tab.wake` and `tab.hibernate`)
   show as keys in the bottom-left corner, followed by "Restore", and the button is accented; without the focus the
   button is grey and the keys are hidden, since Enter would not wake it. The rest of the workspace (other tabs, panes,
-  Sidebar) is untouched.
+  Sidebar) is untouched. The layout follows the pane's size (`hibernatedLayout`, measured with a `ResizeObserver`,
+  `data-layout` on the root): `full` as above, `compact` (narrower than 440 or shorter than 430 px) without the folder
+  and command table and with a smaller icon, and `bare` (narrower than 360 or shorter than 300 px) with no card, icon
+  or title, only the Restore button. The card is at least 320 px wide, and its footer (shortcut hint and "Hibernated
+  for") is a wrapping row, so the two never overlap.
 - **Click, double click, shortcuts.** A click on a sleeping tab (pane tab bar, nested list of the WorkspaceBar, palette)
   only focuses it and shows the placeholder. A double click on the tab, the Restore button, the tab context menu item
   "Restore", the command palette ("Restore and go to Tab") and the shortcut `tab.hibernate` wake it. The next and previous
