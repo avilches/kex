@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 import {
   getSavedWorkspaceState,
   initWorkspaceState,
+  sanitizeSavedWorkspaces,
   sanitizeWorkspace,
 } from "./workspaceState";
 import { isAutofocusActive, type Tab } from "./types";
@@ -145,5 +146,23 @@ describe("initWorkspaceState", () => {
     const state = getSavedWorkspaceState()!;
     expect(state.activeIndex).toBe(0);
     expect(state.workspaces[1]!.paneTree).toMatchObject({ tabs: [{ id: "t1", hibernation: { at: 5 } }] });
+  });
+
+  it("keeps the readable workspaces when one saved body is malformed, instead of starting over", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken = { ...saved("b"), paneTree: undefined } as unknown as Workspace;
+    invokeMock.mockResolvedValue({ workspaces: [saved("a"), broken, saved("c")], activeIndex: 2 });
+    await initWorkspaceState();
+    const state = getSavedWorkspaceState()!;
+    expect(state.workspaces.map((w) => w.id)).toEqual(["a", "c"]);
+    expect(state.activeIndex).toBe(1);
+    spy.mockRestore();
+  });
+
+  it("reports nothing readable as an empty list, so the app does not take it for a saved layout", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken = { ...saved("a"), paneTree: undefined } as unknown as Workspace;
+    expect(sanitizeSavedWorkspaces([broken])).toEqual([]);
+    spy.mockRestore();
   });
 });
