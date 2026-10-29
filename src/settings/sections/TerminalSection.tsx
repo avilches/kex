@@ -65,7 +65,7 @@ import {
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalScratchpadEnterSends,
-  setTerminalScratchpadFontFamily,
+  setTerminalScratchpadMonospace,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -121,8 +121,8 @@ export function TerminalSection() {
   const terminalBackgroundMemoryBudgetMB = usePreferencesStore(
     (s) => s.terminalBackgroundMemoryBudgetMB,
   );
-  const scratchpadFontFamily = usePreferencesStore(
-    (s) => s.scratchpadFontFamily,
+  const scratchpadMonospace = usePreferencesStore(
+    (s) => s.scratchpadMonospace,
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
@@ -225,11 +225,36 @@ export function TerminalSection() {
             </div>
           </RadioGroup>
         </SettingRow>
-        <FontFamilyInput
-          value={scratchpadFontFamily}
-          defaultFamily={defaultMonoFontFamily()}
-          onChange={(v) => void setTerminalScratchpadFontFamily(v)}
-        />
+        <SettingRow
+          title="Font"
+          description="Monospace uses the terminal font family."
+        >
+          <RadioGroup
+            value={scratchpadMonospace ? "mono" : "system"}
+            onValueChange={(v) =>
+              void setTerminalScratchpadMonospace(v === "mono")
+            }
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="mono" id="scratchpad-font-mono" />
+              <label
+                htmlFor="scratchpad-font-mono"
+                className="cursor-pointer text-[12px]"
+              >
+                Monospace
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="system" id="scratchpad-font-system" />
+              <label
+                htmlFor="scratchpad-font-system"
+                className="cursor-pointer text-[12px]"
+              >
+                System font
+              </label>
+            </div>
+          </RadioGroup>
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

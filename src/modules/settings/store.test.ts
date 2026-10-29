@@ -151,8 +151,8 @@ describe("DEFAULT_PREFERENCES", () => {
     expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
   });
 
-  it("scratchpadFontFamily defaults to the empty string", () => {
-    expect(DEFAULT_PREFERENCES.scratchpadFontFamily).toBe("");
+  it("scratchpadMonospace defaults to true", () => {
+    expect(DEFAULT_PREFERENCES.scratchpadMonospace).toBe(true);
   });
 });
 
@@ -175,8 +175,8 @@ describe("PREF_KEY_MAP", () => {
     expect(PREF_KEY_MAP.scratchpadEnterSends).toBe("scratchpadEnterSends");
   });
 
-  it("maps scratchpadFontFamily so the font reaches subscribers", () => {
-    expect(PREF_KEY_MAP.scratchpadFontFamily).toBe("scratchpadFontFamily");
+  it("maps scratchpadMonospace so the choice reaches subscribers", () => {
+    expect(PREF_KEY_MAP.scratchpadMonospace).toBe("scratchpadMonospace");
   });
 });
 

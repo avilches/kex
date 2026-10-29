@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { buildFontStack, defaultMonoFontFamily } from "@/lib/fonts";
+import { resolveMonoFontFamily } from "@/lib/fonts";
 import { ENTER_KEY } from "@/lib/platform";
 import { isImeComposing } from "@/lib/imeEnter";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,8 @@ export function ScratchpadBar({ leafId }: Props) {
   const [focused, setFocused] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const enterSends = usePreferencesStore((s) => s.scratchpadEnterSends);
-  const fontFamily = usePreferencesStore((s) => s.scratchpadFontFamily);
+  const monospace = usePreferencesStore((s) => s.scratchpadMonospace);
+  const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const hasAgent = useAgentStore((s) => Boolean(s.sessions[leafId]));
   const { setNodeRef, isOver } = useDroppable({
@@ -221,12 +222,12 @@ export function ScratchpadBar({ leafId }: Props) {
         value={text}
         rows={1}
         placeholder={focused ? placeholder : ""}
-        className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent font-mono text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+        className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
         style={{
           maxHeight: MAX_TEXTAREA_HEIGHT,
-          ...(fontFamily && {
-            fontFamily: buildFontStack(fontFamily, defaultMonoFontFamily()),
-          }),
+          fontFamily: monospace
+            ? resolveMonoFontFamily(terminalFontFamily)
+            : "system-ui, sans-serif",
         }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

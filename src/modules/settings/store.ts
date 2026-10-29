@@ -223,7 +223,7 @@ export type Preferences = {
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
-  scratchpadFontFamily: string;
+  scratchpadMonospace: boolean;
   detectedEditors: DetectedEditor[];
   // Global Actions, available in every workspace. Each workspace has its own on top.
   actions: Action[];
@@ -313,7 +313,7 @@ const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "cursorInactiveStyle";
 const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
 const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
-const KEY_SCRATCHPAD_FONT_FAMILY = "scratchpadFontFamily";
+const KEY_SCRATCHPAD_MONOSPACE = "scratchpadMonospace";
 
 // Editor store keys - no "editor" prefix since the file is already settings-editor.json
 const KEY_EDITOR_THEME = "theme";
@@ -499,7 +499,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   scratchpadEnterSends: true,
-  scratchpadFontFamily: "",
+  scratchpadMonospace: true,
   detectedEditors: [],
   actions: [],
   seededAgents: [],
@@ -788,9 +788,9 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadEnterSends:
       getTerminal<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
-    scratchpadFontFamily:
-      getTerminal<string>(KEY_SCRATCHPAD_FONT_FAMILY) ??
-      DEFAULT_PREFERENCES.scratchpadFontFamily,
+    scratchpadMonospace:
+      getTerminal<boolean>(KEY_SCRATCHPAD_MONOSPACE) ??
+      DEFAULT_PREFERENCES.scratchpadMonospace,
     detectedEditors: (() => {
       const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
@@ -1138,8 +1138,8 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
   await writeTerminalPref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
-export async function setTerminalScratchpadFontFamily(value: string): Promise<void> {
-  await writeTerminalPref(KEY_SCRATCHPAD_FONT_FAMILY, value.trim());
+export async function setTerminalScratchpadMonospace(value: boolean): Promise<void> {
+  await writeTerminalPref(KEY_SCRATCHPAD_MONOSPACE, value);
 }
 
 export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
@@ -1423,7 +1423,7 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",
   [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
-  [KEY_SCRATCHPAD_FONT_FAMILY]: "scratchpadFontFamily",
+  [KEY_SCRATCHPAD_MONOSPACE]: "scratchpadMonospace",
 };
 
 const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
