@@ -20,6 +20,7 @@ import { getShortcutLabel } from "@/modules/shortcuts";
 import { listBuiltinThemes, useTheme } from "@/modules/theme";
 import { removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { toggleTabLock } from "@/modules/workspaces/lib/tabLock";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import {
@@ -583,6 +584,11 @@ export function CommandPalette({
         void Promise.resolve(onWakeTab(entry.workspaceId, tabId))
           .catch((e) => console.error("Restoring the tab failed", e))
           .finally(refocusInput);
+      } else if (id === "rename") {
+        runAfterClose(() => {
+          onGoToTab(tabId);
+          useTabRenameStore.getState().startRename(tabId);
+        });
       } else if (id === "removeNote") {
         flushTabNote(tabId);
         onUpdateTab(tabId, removeTabNote);

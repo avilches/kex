@@ -233,7 +233,8 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
   if ((tab.kind === "editor" || tab.kind === "markdown") && tab.dirty) {
     items.push({ id: "save", label: "Save", shortcutId: "editor.save" });
   }
-  items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note", separatorBefore: true });
+  items.push({ id: "rename", label: "Rename Tab", separatorBefore: true });
+  items.push({ id: "note", label: noteLabel(entry), shortcutId: "tab.note" });
   if (hasTabNote(tab)) items.push({ id: "removeNote", label: "Remove Note" });
   const absolute = tabEntryCopyPath(entry);
   if (tabCopyOptions(entry).length > 1) {
@@ -249,13 +250,6 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
     });
   }
   items.push({ id: "moveWorkspace", label: "Move to Workspace", separatorBefore: true });
-  if (tab.kind === "terminal") {
-    items.push({
-      id: entry.hibernated ? "restoreTab" : "hibernateTab",
-      label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
-      shortcutId: "tab.hibernate",
-    });
-  }
   items.push({
     id: "tabId",
     label: "Copy Tab ID",
@@ -263,6 +257,13 @@ export function tabMenuItems(entry: TabEntry): RowMenuItem[] {
     title: entry.tabId,
     separatorBefore: true,
   });
+  if (tab.kind === "terminal") {
+    items.push({
+      id: entry.hibernated ? "restoreTab" : "hibernateTab",
+      label: entry.hibernated ? "Restore Tab" : "Hibernate Tab",
+      shortcutId: "tab.hibernate",
+    });
+  }
   items.push({
     id: "lock",
     label: locked ? "Unlock Tab" : "Lock Tab",

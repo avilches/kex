@@ -57,11 +57,12 @@ describe("tabMenuItems", () => {
     expect(ids(entry({ cwd: "/repo/sub" }))).toEqual([
       "go",
       "terminal",
+      "rename",
       "note",
       "copyPath",
       "moveWorkspace",
-      "hibernateTab",
       "tabId",
+      "hibernateTab",
       "lock",
       "close",
     ]);
