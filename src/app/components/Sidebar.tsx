@@ -10,6 +10,7 @@ import {
   GitHistoryPane,
   type GitHistorySearchHandle,
 } from "@/modules/git-history/GitHistoryPane";
+import { SetRootHint } from "@/modules/explorer/SetRootHint";
 import { NotesView } from "@/modules/notes";
 import type {
   SourceControlPanelHandle,
@@ -320,11 +321,12 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                     strokeWidth={2}
                     className="mt-0.5 shrink-0 text-primary"
                   />
-                  <span className="flex min-w-0 flex-col">
+                  <span className="flex min-w-0 flex-1 flex-col">
                     <span className="font-medium">Pick it in the Explorer</span>
                     <span className="text-[10px] text-muted-foreground">
                       Right-click a folder and choose Set as Workspace Root
                     </span>
+                    <SetRootHint />
                   </span>
                 </button>
               </div>

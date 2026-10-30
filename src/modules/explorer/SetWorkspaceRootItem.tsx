@@ -4,6 +4,8 @@ import { PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { COMPACT_ITEM } from "./lib/menuItemClass";
 
+export const MISSING_ROOT_ITEM = "font-medium text-primary focus:text-primary";
+
 type Props = {
   path: string;
   workspaceRoot: string | null;
@@ -25,7 +27,7 @@ export function SetWorkspaceRootItem({
     <ContextMenuItem
       className={cn(
         COMPACT_ITEM,
-        missing ? "font-medium text-primary focus:text-primary" : "opacity-60",
+        missing ? MISSING_ROOT_ITEM : "opacity-60",
       )}
       disabled={disabled}
       onSelect={() => onSetAsRoot(path)}
