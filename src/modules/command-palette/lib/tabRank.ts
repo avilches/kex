@@ -12,3 +12,12 @@ export const workspaceRowKey = (id: string) => `ws:${id}`;
 export function byRecency(a: TabEntry, b: TabEntry): number {
   return b.lastUsedAt - a.lastUsedAt || a.order - b.order;
 }
+
+// The red dot (error) first, then the orange one (attention), then the spinner (working), then the rest.
+const INDICATOR_RANK = { error: 0, attention: 1, working: 2 } as const;
+
+// The order of the palette's tab list, empty or filtered: what asks for the user first, each group by recency.
+export function byPriority(a: TabEntry, b: TabEntry): number {
+  const rank = (e: TabEntry) => (e.indicator ? INDICATOR_RANK[e.indicator] : 3);
+  return rank(a) - rank(b) || byRecency(a, b);
+}
