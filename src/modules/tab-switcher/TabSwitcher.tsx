@@ -25,13 +25,29 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         selected ? "border-primary bg-primary/10" : "hover:bg-accent/50",
       )}
     >
-      <span
-        className={cn(
-          "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground [&_img]:size-6 [&_svg]:size-6",
-          entry.hibernated && "opacity-40 grayscale",
-        )}
-      >
-        <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+      <span className="relative">
+        <span
+          className={cn(
+            "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground [&_img]:size-6 [&_svg]:size-6",
+            entry.hibernated && "opacity-40 grayscale",
+          )}
+        >
+          <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+        </span>
+        {entry.indicator === "working" ? (
+          <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
+            <Spinner size={12} />
+          </span>
+        ) : entry.indicator ? (
+          <span
+            role="img"
+            aria-label="Agent needs attention"
+            className={cn(
+              "absolute -top-1 -right-1 size-3.5 rounded-full ring-2 ring-popover",
+              entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
+            )}
+          />
+        ) : null}
       </span>
       <span
         className={cn(
@@ -45,18 +61,6 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         <WorkspaceMark id={entry.workspaceId} color={entry.workspaceColor} icon={entry.workspaceIcon ?? undefined} size={10} />
         <span className="truncate">{entry.workspaceTitle}</span>
       </span>
-      {entry.indicator === "working" ? (
-        <Spinner size={11} className="absolute top-2 right-3" />
-      ) : entry.indicator ? (
-        <span
-          role="img"
-          aria-label="Agent needs attention"
-          className={cn(
-            "absolute top-2.5 right-3.5 size-[7px] rounded-full",
-            entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
-          )}
-        />
-      ) : null}
     </button>
   );
 }
