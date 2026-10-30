@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  GRID_GAP,
+  GRID_PAD,
+  TILE_HEIGHT,
+  gridViewportHeight,
   heldModifiers,
   modifiersReleased,
   pointerMoved,
@@ -65,6 +69,39 @@ describe("rowIndex", () => {
   });
   it("treats a zero column count as one", () => {
     expect(rowIndex(2, 10, 0, 1)).toBe(3);
+  });
+});
+
+describe("gridViewportHeight", () => {
+  const row = TILE_HEIGHT + GRID_GAP;
+
+  it("shows whole rows only: the scroller is the rows that fit, with no padding of its own", () => {
+    expect(gridViewportHeight(3.5 * row + 2 * GRID_PAD, 6)).toBe(3 * TILE_HEIGHT + 2 * GRID_GAP);
+  });
+
+  it("leaves the height to the content when every row fits, so a short list has no scroll", () => {
+    expect(gridViewportHeight(5 * row, 4)).toBeNull();
+    expect(gridViewportHeight(4 * row + 2 * GRID_PAD - GRID_GAP, 4)).toBeNull();
+  });
+
+  it("never shows less than one row, however small the window", () => {
+    expect(gridViewportHeight(10, 5)).toBe(TILE_HEIGHT);
+    expect(gridViewportHeight(-50, 5)).toBe(TILE_HEIGHT);
+  });
+
+  it("is a whole number of rows for any space, so no row is ever cut at the bottom", () => {
+    for (let avail = 150; avail < 700; avail += 7) {
+      const h = gridViewportHeight(avail, 40);
+      expect(h).not.toBeNull();
+      expect((h! + GRID_GAP) % row).toBe(0);
+    }
+  });
+
+  it("never asks for more than the space it was given, unless one row alone needs more", () => {
+    for (let avail = 150; avail < 700; avail += 7) {
+      const h = gridViewportHeight(avail, 40)!;
+      expect(h <= avail - 2 * GRID_PAD || h === TILE_HEIGHT).toBe(true);
+    }
   });
 });
 

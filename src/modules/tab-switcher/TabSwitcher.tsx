@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
 
 // The icon is asked for at this size instead of stretched with CSS: the agent marks carry an inline size
 // that no class can override, which left them at 13 px inside a 44 px square.
@@ -47,8 +48,9 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
       aria-selected={selected}
       onMouseMove={(e) => hoverSwitcher(index, { x: e.clientX, y: e.clientY })}
       onClick={() => commitSwitcher(index)}
+      style={{ height: TILE_HEIGHT }}
       className={cn(
-        "relative flex h-[118px] min-w-0 scroll-mt-3 scroll-mb-3 flex-col items-center gap-1.5 rounded-xl border-2 border-transparent px-2 pt-3 text-center outline-none",
+        "relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl border-2 border-transparent px-2 pt-3 text-center outline-none",
         selected ? "border-primary bg-primary/10" : "hover:bg-accent/50",
       )}
     >
@@ -98,10 +100,21 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
   );
 }
 
-function Footer({ entry, position, total }: { entry: TabEntry; position: number; total: number }) {
+function Footer({
+  entry,
+  position,
+  total,
+  ref,
+}: {
+  entry: TabEntry;
+  position: number;
+  total: number;
+  ref?: React.Ref<HTMLDivElement>;
+}) {
   const detail = tabDetailLines(entry).join("  ·  ");
   return (
     <div
+      ref={ref}
       data-testid="tab-switcher-footer"
       className="flex items-center justify-between gap-4 border-t border-border px-4 py-2.5"
     >
@@ -130,28 +143,55 @@ function Footer({ entry, position, total }: { entry: TabEntry; position: number;
   );
 }
 
+// The grid shows whole rows only: its height is the rows that fit in what the box leaves once the footer
+// is counted, so the last visible row is never cut in half and every scroll stop lands on a row.
+function useWholeRows(count: number, shown: boolean) {
+  const box = useRef<HTMLDivElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  const foot = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!shown || !box.current || !grid.current || !foot.current) return;
+      const max = Math.min(520, window.innerHeight - 32);
+      const columns = Math.max(1, getComputedStyle(grid.current).gridTemplateColumns.split(" ").filter(Boolean).length);
+      setHeight(gridViewportHeight(max - foot.current.offsetHeight, Math.ceil(count / columns)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [count, shown]);
+  return { box, grid, foot, height };
+}
+
 // Mounted by the parent only while a session is on, and it paints nothing during the first moments of one.
 export function TabSwitcher() {
   const revealed = useSwitcherStore((s) => s.revealed);
   const entries = useSwitcherStore((s) => s.entries);
   const index = useSwitcherStore((s) => s.index);
+  const { box, grid, foot, height } = useWholeRows(entries.length, revealed);
   if (!revealed || entries.length === 0) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/40">
       <div
+        ref={box}
         role="listbox"
         aria-label="Switch tab"
         className="flex max-h-[min(520px,calc(100vh-2rem))] w-[min(880px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-popover/90 text-popover-foreground shadow-xl ring-1 ring-foreground/10 backdrop-blur-xl"
       >
-        <div
-          data-tab-switcher-grid
-          className="grid grid-cols-[repeat(auto-fill,minmax(122px,1fr))] gap-1.5 overflow-y-auto p-3"
-        >
-          {entries.map((entry, i) => (
-            <Tile key={entry.tabId} entry={entry} selected={i === index} index={i} />
-          ))}
+        <div style={{ padding: GRID_PAD }} className="min-h-0">
+          <div
+            ref={grid}
+            data-tab-switcher-grid
+            style={{ height: height ?? undefined, gap: GRID_GAP }}
+            className="grid grid-cols-[repeat(auto-fill,minmax(122px,1fr))] overflow-y-auto"
+          >
+            {entries.map((entry, i) => (
+              <Tile key={entry.tabId} entry={entry} selected={i === index} index={i} />
+            ))}
+          </div>
         </div>
-        <Footer entry={entries[index]} position={index + 1} total={entries.length} />
+        <Footer ref={foot} entry={entries[index]} position={index + 1} total={entries.length} />
       </div>
     </div>
   );

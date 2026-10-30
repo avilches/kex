@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TabEntry } from "@/modules/command-palette";
 import { cancelSwitcher, openSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { GRID_GAP, GRID_PAD, TILE_HEIGHT } from "./lib/switcherModel";
 import { TabSwitcher } from "./TabSwitcher";
 
 const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
@@ -63,18 +64,71 @@ describe("TabSwitcher tile", () => {
   it("keeps every tile the same height whatever the title length", () => {
     show([entry({ tabId: "a", title: "x" }), entry({ tabId: "b", title: "a very long title ".repeat(8) })]);
     const [a, b] = tiles();
-    const height = (t: HTMLElement) => /(?:^| )(h-\[[^\]]+\])/.exec(t.className)?.[1];
-    expect(height(a)).toBeTruthy();
-    expect(height(a)).toBe(height(b));
+    expect(a.style.height).toBe(`${TILE_HEIGHT}px`);
+    expect(b.style.height).toBe(a.style.height);
     expect(a.className).not.toMatch(/min-h-|\bh-auto\b/);
   });
 
-  it("keeps room around the selected tile when the grid scrolls to it", () => {
+  it("lets the tile reach the edge of the scroller, so a scroll stop never shows a strip of its neighbour", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
     for (const t of tiles()) {
-      expect(t.className).toContain("scroll-mt-");
-      expect(t.className).toContain("scroll-mb-");
+      expect(t.style.scrollMarginTop).toBe("");
+      expect(t.style.scrollMarginBottom).toBe("");
     }
+  });
+});
+
+describe("TabSwitcher grid", () => {
+  // happy-dom lays nothing out, so the two numbers the hook reads are faked.
+  function withLayout(columns: number, footer: number, run: () => void) {
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
+    const computed = window.getComputedStyle;
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => footer });
+    window.getComputedStyle = ((el: Element) => {
+      const style = computed(el);
+      return el.hasAttribute("data-tab-switcher-grid")
+        ? ({ gridTemplateColumns: Array(columns).fill("120px").join(" ") } as CSSStyleDeclaration)
+        : style;
+    }) as typeof window.getComputedStyle;
+    try {
+      run();
+    } finally {
+      window.getComputedStyle = computed;
+      if (offset) Object.defineProperty(HTMLElement.prototype, "offsetHeight", offset);
+      else delete (HTMLElement.prototype as { offsetHeight?: number }).offsetHeight;
+    }
+  }
+
+  it("fixes the scroller to whole rows once it appears, not only when the tab count changes", () => {
+    const many = Array.from({ length: 21 }, (_, i) => entry({ tabId: `t${i}` }));
+    withLayout(6, 57, () => {
+      // opened while still hidden, as a session starts: nothing can be measured yet
+      openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, many, () => {});
+      const view = render(<TabSwitcher />);
+      expect(document.querySelector("[data-tab-switcher-grid]")).toBeNull();
+      act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+      view.rerender(<TabSwitcher />);
+      const grid = document.querySelector("[data-tab-switcher-grid]") as HTMLElement;
+      const rows = (parseInt(grid.style.height, 10) + GRID_GAP) / (TILE_HEIGHT + GRID_GAP);
+      expect(Number.isInteger(rows)).toBe(true);
+      expect(rows).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("leaves a short list to its content, with no fixed height and no scroll", () => {
+    withLayout(6, 57, () => {
+      show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+      const grid = document.querySelector("[data-tab-switcher-grid]") as HTMLElement;
+      expect(grid.style.height).toBe("");
+    });
+  });
+
+  it("puts the padding on a wrapper, not on the scroller, and uses the shared gap", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+    const grid = document.querySelector("[data-tab-switcher-grid]") as HTMLElement;
+    expect(grid.style.gap).toBe(`${GRID_GAP}px`);
+    expect(grid.style.padding).toBe("");
+    expect((grid.parentElement as HTMLElement).style.padding).toBe(`${GRID_PAD}px`);
   });
 });
 
