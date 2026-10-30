@@ -217,7 +217,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               }
               className={cn(
                 "relative flex h-full items-center gap-1.5 px-3 text-[11px] font-medium transition-colors",
-                tab === "root" && !hasRoot && "border-[1.5px] border-dashed border-muted-foreground/40",
+                tab === "root" && !hasRoot && selected !== tab && "border-[1.5px] border-dashed border-muted-foreground/40",
                 selected === tab
                   ? "bg-card text-foreground"
                   : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
@@ -231,7 +231,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                 size={12}
                 strokeWidth={2}
               />
-              <span className={cn(tab === "root" && !hasRoot && "opacity-50")}>
+              <span className={cn(tab === "root" && !hasRoot && selected !== tab && "opacity-50")}>
                 {STRIP_LABELS[tab]}
               </span>
             </button>

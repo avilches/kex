@@ -1,4 +1,5 @@
 // These are curated subsets of the full explorer context menu; TreeRow.tsx (src/modules/explorer/TreeRow.tsx) is the canonical reference for the complete item order.
+import { SetWorkspaceRootItem } from "@/modules/explorer/SetWorkspaceRootItem";
 import {
   ContextMenuItem,
   ContextMenuSeparator,
@@ -25,7 +26,6 @@ import {
   FolderOpenIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
-  PinIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -63,13 +63,11 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
   return (
     <>
       {onSetAsRoot && (
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => onSetAsRoot(path)}
-        >
-          <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-          Set as Workspace Root
-        </ContextMenuItem>
+        <SetWorkspaceRootItem
+          path={path}
+          workspaceRoot={workspaceRoot}
+          onSetAsRoot={onSetAsRoot}
+        />
       )}
       {onNewWorkspaceFromFolder && (
         <ContextMenuItem

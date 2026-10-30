@@ -5,6 +5,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
@@ -27,9 +28,9 @@ import {
   FileEmptyIcon,
   FolderAddIcon,
   FolderOpenIcon,
+  FolderUploadIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
-  PinIcon,
   Refresh01Icon,
   Scissor01Icon,
   ViewOffSlashIcon,
@@ -316,13 +317,11 @@ function EntryRowImpl(props: EntryRowProps) {
       >
         <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {isDir && onSetAsRoot && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onSetAsRoot(path)}
-          >
-            <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-            Set as Workspace Root
-          </ContextMenuItem>
+          <SetWorkspaceRootItem
+            path={path}
+            workspaceRoot={workspaceRoot}
+            onSetAsRoot={onSetAsRoot}
+          />
         )}
         {isDir && onNewWorkspaceFromFolder && (
           <ContextMenuItem
@@ -580,16 +579,17 @@ export function FsRootRow({
       <ContextMenuContent className={COMPACT_CONTENT}>
         <RowActionsMenu kind="folder" path={path} />
         {onSetAsRoot && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
+          <SetWorkspaceRootItem
+            path={path}
+            workspaceRoot={workspaceRoot}
+            onSetAsRoot={onSetAsRoot}
             disabled={isWorkspaceRoot}
-            onSelect={() => onSetAsRoot(path)}
-          >
-            <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-            {isWorkspaceRoot
-              ? "This is the Workspace Root"
-              : "Set as Workspace Root"}
-          </ContextMenuItem>
+            label={
+              isWorkspaceRoot
+                ? "This is the Workspace Root"
+                : "Set as Workspace Root"
+            }
+          />
         )}
         {onNewWorkspaceFromFolder && (
           <ContextMenuItem
@@ -699,11 +699,11 @@ export function FsUpRow({
           style={{ paddingLeft: 6 }}
         >
           <span className="size-3.5 shrink-0" />
-          <img
-            src={folderIconUrl("", false)}
-            alt=""
-            draggable={false}
-            className="size-4 shrink-0"
+          <HugeiconsIcon
+            icon={FolderUploadIcon}
+            size={16}
+            strokeWidth={1.75}
+            className="shrink-0 text-muted-foreground"
           />
           <span className="min-w-0 flex-1 truncate">..</span>
         </button>

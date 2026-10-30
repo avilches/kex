@@ -15,9 +15,7 @@ import {
   Folder01Icon,
   FolderAddIcon,
   FolderOpenIcon,
-  HierarchyFilesIcon,
   Home01Icon,
-  PinIcon,
   PinOffIcon,
   Refresh01Icon,
   Search01Icon,
@@ -64,6 +62,7 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -1137,12 +1136,6 @@ export const FileExplorer = memo(
             className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
             title={rootPath ?? undefined}
           >
-            <HugeiconsIcon
-              icon={rootMode === "workspace" ? PinIcon : HierarchyFilesIcon}
-              size={13}
-              strokeWidth={2}
-              className="shrink-0 text-primary"
-            />
             <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
               {LRM + rootPath}
             </span>
@@ -1338,16 +1331,17 @@ export const FileExplorer = memo(
                   }}
                 >
                   {onSetAsRoot && (
-                    <ContextMenuItem
-                      className={COMPACT_ITEM}
+                    <SetWorkspaceRootItem
+                      path={rootPath}
+                      workspaceRoot={workspaceRootPath}
+                      onSetAsRoot={onSetAsRoot}
                       disabled={rootMode === "workspace"}
-                      onSelect={() => onSetAsRoot(rootPath)}
-                    >
-                      <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-                      {rootMode === "workspace"
-                        ? "This is the Workspace Root"
-                        : "Set as Workspace Root"}
-                    </ContextMenuItem>
+                      label={
+                        rootMode === "workspace"
+                          ? "This is the Workspace Root"
+                          : "Set as Workspace Root"
+                      }
+                    />
                   )}
                   {onNewWorkspaceFromFolder && (
                     <ContextMenuItem
