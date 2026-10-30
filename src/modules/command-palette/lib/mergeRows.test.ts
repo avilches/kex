@@ -286,6 +286,32 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:here", "tab:other"]);
   });
 
+  it("with an empty term lists every tab that asks for the user or is busy, whatever the recents cap", () => {
+    const many = Array.from({ length: 12 }, (_, i) =>
+      tab(`agent-${i}`, { indicator: i % 2 ? "working" : "attention" }),
+    );
+    const idle = Array.from({ length: 12 }, (_, i) =>
+      tab(`idle-${i}`, { lastUsedAt: 100 - i }),
+    );
+    const rows = mergeRows(input({ tabs: [...idle, ...many] }));
+    const tabKeys = keys(rows).filter((k) => k.startsWith("tab:"));
+    expect(tabKeys.filter((k) => k.startsWith("tab:agent-"))).toHaveLength(12);
+    expect(tabKeys.filter((k) => k.startsWith("tab:idle-"))).toHaveLength(8);
+    expect(tabKeys.slice(0, 12).every((k) => k.startsWith("tab:agent-"))).toBe(true);
+  });
+
+  it("with an empty term keeps an idle agent among the recents, ranked by use", () => {
+    const rows = mergeRows(
+      input({
+        tabs: [
+          tab("plain", { lastUsedAt: 1 }),
+          tab("idle-agent", { agent: "claude", lastUsedAt: 2 }),
+        ],
+      }),
+    );
+    expect(keys(rows)).toEqual(["tab:idle-agent", "tab:plain"]);
+  });
+
   it("with an empty term orders actions by recent use", () => {
     const rows = mergeRows(
       input({ commands: [cmd("a", "A"), cmd("b", "B")], mru: { b: 9 } }),
