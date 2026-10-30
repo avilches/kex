@@ -4,10 +4,12 @@ import {
   REVEAL_DELAY_MS,
   heldModifiers,
   modifiersReleased,
+  pointerMoved,
   rowIndex,
   startIndex,
   stepIndex,
   type Held,
+  type Point,
 } from "./switcherModel";
 
 type SwitcherState = {
@@ -19,7 +21,12 @@ type SwitcherState = {
 
 export const useSwitcherStore = create<SwitcherState>(() => ({ revealed: false, entries: [], index: 0 }));
 
-type Session = { held: Held; onCommit: (entry: TabEntry) => void; timer: ReturnType<typeof setTimeout> | null };
+type Session = {
+  held: Held;
+  onCommit: (entry: TabEntry) => void;
+  timer: ReturnType<typeof setTimeout> | null;
+  pointer: Point | null;
+};
 
 // One switcher per window and it lives outside React: the keys that drive it arrive while the
 // modifier is held, and no render may sit between the key and the state.
@@ -66,8 +73,13 @@ export function stepSwitcher(delta: number) {
   reveal();
 }
 
-export function selectSwitcher(index: number) {
-  if (session) useSwitcherStore.setState({ index });
+// Fed by the tiles on every pointer move. The reference point only advances when the pointer really
+// travelled, so a slow drift cannot add up to a pick, and a still cursor never picks anything.
+export function hoverSwitcher(index: number, at: Point) {
+  if (!session) return;
+  const moved = pointerMoved(session.pointer, at);
+  if (session.pointer === null || moved) session.pointer = at;
+  if (moved) useSwitcherStore.setState({ index });
 }
 
 function gridColumns(): number {
@@ -111,7 +123,7 @@ export function openSwitcher(
 ) {
   if (session || entries.length < 2) return;
   const held = heldModifiers(e);
-  session = { held, onCommit, timer: null };
+  session = { held, onCommit, timer: null, pointer: null };
   useSwitcherStore.setState({ revealed: false, entries, index: startIndex(entries.length, delta) });
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("keyup", onKeyUp, true);

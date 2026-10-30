@@ -40,5 +40,17 @@ export function rowIndex(index: number, length: number, columns: number, directi
   return Math.max(0, Math.min(length - 1, index + direction * Math.max(1, columns)));
 }
 
+export type Point = { x: number; y: number };
+
+// A resting cursor must not steer the pick: the overlay appearing under it, or the grid scrolling to
+// follow the keyboard, makes the browser report a move with no hand behind it. Only a real shift of
+// the pointer counts, and the first sample of a session is just the place to measure from.
+export const POINTER_SLOP_PX = 4;
+
+export function pointerMoved(from: Point | null, to: Point): boolean {
+  if (!from) return false;
+  return Math.hypot(to.x - from.x, to.y - from.y) >= POINTER_SLOP_PX;
+}
+
 // Time the switcher stays unpainted: a tap that releases before it only toggles the last two tabs.
 export const REVEAL_DELAY_MS = 120;

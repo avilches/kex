@@ -4,6 +4,7 @@ import type { TabEntry } from "@/modules/command-palette";
 import {
   cancelSwitcher,
   commitSwitcher,
+  hoverSwitcher,
   openSwitcher,
   stepSwitcher,
   switcherActive,
@@ -90,6 +91,39 @@ describe("switcher session", () => {
     openSwitcher(chord(), 1, entries, onCommit);
     commitSwitcher(3);
     expect(onCommit).toHaveBeenCalledWith(entries[3]);
+  });
+
+  it("a resting cursor never steers the pick, however many synthetic moves it reports", () => {
+    openSwitcher(chord(), 1, entries, onCommit);
+    stepSwitcher(1);
+    expect(useSwitcherStore.getState().index).toBe(2);
+    hoverSwitcher(0, { x: 50, y: 50 });
+    hoverSwitcher(3, { x: 50, y: 50 });
+    hoverSwitcher(0, { x: 51, y: 50 });
+    expect(useSwitcherStore.getState().index).toBe(2);
+  });
+
+  it("a real shift of the pointer picks the tile under it", () => {
+    openSwitcher(chord(), 1, entries, onCommit);
+    hoverSwitcher(0, { x: 50, y: 50 });
+    hoverSwitcher(3, { x: 90, y: 50 });
+    expect(useSwitcherStore.getState().index).toBe(3);
+  });
+
+  it("slow drift under the slop never adds up to a pick", () => {
+    openSwitcher(chord(), 1, entries, onCommit);
+    hoverSwitcher(0, { x: 50, y: 50 });
+    for (let x = 51; x <= 53; x++) hoverSwitcher(3, { x, y: 50 });
+    expect(useSwitcherStore.getState().index).toBe(1);
+  });
+
+  it("forgets the pointer between sessions", () => {
+    openSwitcher(chord(), 1, entries, onCommit);
+    hoverSwitcher(0, { x: 50, y: 50 });
+    cancelSwitcher();
+    openSwitcher(chord(), 1, entries, onCommit);
+    hoverSwitcher(3, { x: 200, y: 200 });
+    expect(useSwitcherStore.getState().index).toBe(1);
   });
 
   it("swallows the keys it does not own so the terminal behind never sees them", () => {

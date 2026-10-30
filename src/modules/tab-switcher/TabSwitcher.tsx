@@ -5,7 +5,7 @@ import type { TabEntry } from "@/modules/command-palette";
 import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { commitSwitcher, selectSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
 
 function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -18,7 +18,7 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
       type="button"
       role="option"
       aria-selected={selected}
-      onMouseEnter={() => selectSwitcher(index)}
+      onMouseMove={(e) => hoverSwitcher(index, { x: e.clientX, y: e.clientY })}
       onClick={() => commitSwitcher(index)}
       className={cn(
         "relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl border-2 border-transparent px-2 pt-3 pb-2 text-center outline-none",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   heldModifiers,
   modifiersReleased,
+  pointerMoved,
   rowIndex,
   startIndex,
   stepIndex,
@@ -64,6 +65,17 @@ describe("rowIndex", () => {
   });
   it("treats a zero column count as one", () => {
     expect(rowIndex(2, 10, 0, 1)).toBe(3);
+  });
+});
+
+describe("pointerMoved", () => {
+  it("never counts the first sample, which only sets the reference", () => {
+    expect(pointerMoved(null, { x: 10, y: 10 })).toBe(false);
+  });
+  it("ignores a jitter below the slop and counts a real shift", () => {
+    expect(pointerMoved({ x: 10, y: 10 }, { x: 12, y: 11 })).toBe(false);
+    expect(pointerMoved({ x: 10, y: 10 }, { x: 10, y: 10 })).toBe(false);
+    expect(pointerMoved({ x: 10, y: 10 }, { x: 16, y: 10 })).toBe(true);
   });
 });
 
