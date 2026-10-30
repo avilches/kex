@@ -662,12 +662,13 @@ function workspaceItem(opts: {
   active?: boolean;
   expanded?: boolean;
   tabs?: TabRow[];
+  rootless?: boolean;
 }): HTMLElement {
   const row = h(
     "button",
     {
-      class: `flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition-all ${opts.active ? "text-foreground" : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground"}`,
-      style: opts.active ? "box-shadow:inset 0 0 0 1px var(--ring)" : "",
+      class: `flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-semibold transition-all ${opts.rootless ? "border-[1.5px] border-dashed border-foreground/40" : ""} ${opts.active ? "text-foreground" : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground"}`,
+      style: opts.active && !opts.rootless ? "box-shadow:inset 0 0 0 1px var(--ring)" : "",
       "data-workspace": opts.title,
       "data-active": String(!!opts.active),
     },
@@ -780,7 +781,7 @@ function workspaceBar(): HTMLElement {
         "~/Work/Proy/Repos/demo-gitde...",
       ),
     }),
-    workspaceItem({ title: "old" }),
+    workspaceItem({ title: "old", rootless: true }),
     h("div", { class: "mt-1 flex justify-center" }, newButton),
   );
 }

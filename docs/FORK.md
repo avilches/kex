@@ -157,10 +157,10 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic
   `Cmd+[` / `Cmd+]` shortcuts.
 - **Explorer root modes** - the explorer root is no longer hardwired to the active terminal cwd. A per-workspace mode
-  (selector above the tree) picks between File System (home, navigable) and Workspace Root (set via "Set as workspace
+  (the Workspace Root and File Explorer tabs of the Sidebar) picks between File System (home, navigable) and Workspace Root (set via "Set as workspace
   root" on any folder). The upstream "Follow Terminal" and "Follow Git Root" modes are removed; their reactive
-  behavior is replaced by the explicit per-terminal autofocus mechanism (see below). The Workspace Root option is
-  disabled when unset or missing. The mode is the single source of truth for the root, so focusing an editor no
+  behavior is replaced by the explicit per-terminal autofocus mechanism (see below). Without a root the Workspace
+  Root tab shows an invitation to set one. The mode is the single source of truth for the root, so focusing an editor no
   longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspaces/<id>.json` (`explorerRootMode`,
   `workspaceRoot`).
