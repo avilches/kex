@@ -120,6 +120,10 @@ type Props = {
   onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
 };
 
+// A left-to-right mark anchors the leading "/" so the rtl-based left-truncation
+// does not reorder it (otherwise "/Users/foo" renders as "Users/foo/").
+const LRM = "‎";
+
 export type Row =
   | {
       kind: "entry";
@@ -170,7 +174,9 @@ function buildRows(
   const rows: Row[] = [];
   const entryIndexByPath = new Map<string, number>();
 
-  rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
+  if (!fsNav.filesystem) {
+    rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
+  }
   if (fsNav.filesystem && fsNav.canNavigateUp) {
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
@@ -1137,8 +1143,8 @@ export const FileExplorer = memo(
               strokeWidth={2}
               className="shrink-0 text-primary"
             />
-            <span className="truncate">
-              {rootPath.split(/[\\/]/).filter(Boolean).pop() ?? rootPath}
+            <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
+              {LRM + rootPath}
             </span>
           </div>
 
@@ -1165,7 +1171,7 @@ export const FileExplorer = memo(
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
           </Button>
-          {autofocusMode === "manual" && (
+          {autofocusMode !== "always" && (
             <Button
               variant="ghost"
               size="icon"

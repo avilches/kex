@@ -126,8 +126,8 @@ const STRIP_ICONS = {
 } as const;
 
 const STRIP_LABELS: Record<StripTab, string> = {
-  root: "Workspace Root",
-  explorer: "File Explorer",
+  root: "Workspace",
+  explorer: "Explorer",
   git: "Git",
   notes: "Notes",
 };
@@ -211,10 +211,13 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               title={
                 tab === "root" && !hasRoot
                   ? "Workspace Root (not set yet)"
-                  : STRIP_LABELS[tab]
+                  : tab === "root"
+                    ? "Workspace Root"
+                    : STRIP_LABELS[tab]
               }
               className={cn(
                 "relative flex h-full items-center gap-1.5 px-3 text-[11px] font-medium transition-colors",
+                tab === "root" && !hasRoot && "border-[1.5px] border-dashed border-muted-foreground/40",
                 selected === tab
                   ? "bg-card text-foreground"
                   : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
@@ -223,14 +226,14 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               {selected === tab && (
                 <div className="absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator" />
               )}
-              <HugeiconsIcon icon={STRIP_ICONS[tab]} size={12} strokeWidth={2} />
-              {STRIP_LABELS[tab]}
-              {tab === "root" && !hasRoot && (
-                <span
-                  aria-hidden
-                  className="absolute right-1 top-1 size-1.5 rounded-full bg-orange-500"
-                />
-              )}
+              <HugeiconsIcon
+                icon={tab === "root" && !hasRoot ? PinOffIcon : STRIP_ICONS[tab]}
+                size={12}
+                strokeWidth={2}
+              />
+              <span className={cn(tab === "root" && !hasRoot && "opacity-50")}>
+                {STRIP_LABELS[tab]}
+              </span>
             </button>
           ))}
         </div>
@@ -318,7 +321,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                     className="mt-0.5 shrink-0 text-primary"
                   />
                   <span className="flex min-w-0 flex-col">
-                    <span className="font-medium">Pick it in the File Explorer</span>
+                    <span className="font-medium">Pick it in the Explorer</span>
                     <span className="text-[10px] text-muted-foreground">
                       Right-click a folder and choose Set as Workspace Root
                     </span>

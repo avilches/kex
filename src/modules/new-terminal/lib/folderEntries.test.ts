@@ -201,6 +201,12 @@ describe("fixed rows", () => {
   const shape = (group: { rows: { labels: string[]; slots: string[]; path: string }[] }) =>
     group.rows.map((r) => [r.labels, r.slots, r.path]);
 
+  it("offers no Workspace Root row to a workspace without a root, even with a navigated File System folder", () => {
+    const group = inRepo({ workspaces: [ws({ id: "ws-1", title: "Kex", fsRoot: "/navigated" })] });
+    expect(shape(group).flatMap(([labels]) => labels)).not.toContain("Workspace Root");
+    expect(shape(group).map(([, , path]) => path)).not.toContain("/navigated");
+  });
+
   it("puts the workspace root, the main checkout and home right after the current tab, in that order", () => {
     const group = inRepo({ workspaces: [ws({ id: "ws-1", title: "Kex", workspaceRoot: "/elsewhere" })] });
     expect(shape(group)).toEqual([
