@@ -321,7 +321,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
       active,
     };
   };
-  const rootOf = (ws: Workspace) => ws.workspaceRoot ?? ws.fsRoot ?? null;
+  const rootOf = (ws: Workspace) => ws.workspaceRoot ?? null;
   const looseOf = (ws: Workspace): FolderRow[] => {
     const rows: FolderRow[] = [];
     for (const e of byWorkspace.get(ws.id) ?? []) {
