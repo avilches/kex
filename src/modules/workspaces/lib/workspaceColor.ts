@@ -38,6 +38,17 @@ export function resolveWorkspaceColor(
   return color;
 }
 
+// A workspace without a root has no automatic color: it only shows one the user picked.
+// Defining the root brings back the automatic color, when the setting leaves it undefined.
+export function workspaceDisplayColor(ws: {
+  id: string;
+  color?: string | null;
+  workspaceRoot?: string;
+}): string | null {
+  if (ws.workspaceRoot) return resolveWorkspaceColor(ws.color, ws.id);
+  return typeof ws.color === "string" ? ws.color : null;
+}
+
 function hslToHex(h: number, s: number, l: number): string {
   const sl = s / 100;
   const ll = l / 100;

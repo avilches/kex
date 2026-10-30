@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { focusedTab } from "./lib/splitNode";
 import type { TabMoveRequest } from "./lib/tabTransfer";
 import type { Workspace } from "./lib/types";
-import { resolveWorkspaceColor } from "./lib/workspaceColor";
+import { workspaceDisplayColor } from "./lib/workspaceColor";
 import { workspaceTitleNow } from "./lib/workspaceTitle";
 
 export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; icon?: string };
@@ -35,7 +35,7 @@ export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props
     workspaceTitleNow({ ...w, focusedTab: focusedTab(w.paneTree, w.activePaneId) }),
   );
   const key = workspaces
-    .map((w, i) => `${w.id}\u0000${titles[i]}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}`)
+    .map((w, i) => `${w.id}\u0000${titles[i]}\u0000${workspaceDisplayColor(w) ?? ""}\u0000${w.icon ?? ""}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
@@ -43,7 +43,7 @@ export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props
       workspaces.map((w, i) => ({
         id: w.id,
         title: titles[i] || "shell",
-        color: resolveWorkspaceColor(w.color, w.id),
+        color: workspaceDisplayColor(w),
         icon: w.icon,
       })),
     [key],

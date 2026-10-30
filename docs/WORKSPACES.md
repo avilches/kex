@@ -577,9 +577,13 @@ type DraggingItem =
   the tab will move there.
   Drag-drop splits are also blocked when the workspace already has `workspacePaneLimit` panes
   (configurable in `settings-general.json`, default `8`).
-- `DragOverlay` (`WorkspaceDndProvider.tsx`): lightweight floating chip showing panel icon + title
-  for tab drags, or a file/folder icon + basename for file drags. `dropAnimation: null` to avoid
-  fighting the layout reflow on drop.
+- `DragGhost` (`DragGhost.tsx`): the floating chip of a tab drag (tab icon + title) or a file drag
+  (file/folder icon + basename). It is not a `DragOverlay`: it is a portal on `document.body` that
+  follows the pointer with `translate3d(clientX, clientY)` written straight to the DOM from a
+  window `pointermove`, so it sits at the cursor wherever the row was grabbed and is not offset by
+  the app zoom (`.zoom-content` would scale an overlay mounted inside it; the zoom is applied to
+  the inner node only). `DragOverlay` stays for the workspace-bar drags (`barOverlay`), with
+  `dropAnimation: null` for tab and file drags to avoid fighting the layout reflow on drop.
 - `TreeRow` (`explorer/TreeRow.tsx`): `useDraggable({ id: 'file:<path>' })` for files and
   `'dir:<path>'` for directories. The synthetic `FsRootRow` and `FsUpRow` (the File System root
   header and the ".." row) drag as `'dir-pane:<path>'` (root path / parent dir). Applies

@@ -985,8 +985,6 @@ export default function App() {
     explorerRoot !== null &&
     !isFilesystemRoot(explorerRoot);
 
-  const fsRootPath = fsFolderRoot ?? home;
-
   const pushOnCommit = activeWorkspace?.git?.pushOnCommit ?? false;
   const savedCommitMessage = activeWorkspace?.git?.commitMessage ?? "";
 
@@ -1189,28 +1187,6 @@ export default function App() {
   useEffect(() => {
     lastFocusFolderRef.current = null;
   }, [activeWorkspaceId]);
-
-  // Whether the saved workspace root still exists on disk, so the selector can
-  // disable the option when it is unset or missing.
-  const [workspaceRootExists, setWorkspaceRootExists] = useState(false);
-  useEffect(() => {
-    if (!workspaceRootPath) {
-      setWorkspaceRootExists(false);
-      return;
-    }
-    let cancelled = false;
-    void native
-      .fsStat(workspaceRootPath)
-      .then(() => {
-        if (!cancelled) setWorkspaceRootExists(true);
-      })
-      .catch(() => {
-        if (!cancelled) setWorkspaceRootExists(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceRootPath]);
 
   // Resolve the workspace root's own repo once per root, not on every focus.
   useEffect(() => {
@@ -4022,10 +3998,8 @@ export default function App() {
                         onFsRootMissing={handleFsRootMissing}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
-                        fsRootPath={fsRootPath}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
-                        workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
                         onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
@@ -4126,10 +4100,8 @@ export default function App() {
                         onFsRootMissing={handleFsRootMissing}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
-                        fsRootPath={fsRootPath}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
-                        workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
                         onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
