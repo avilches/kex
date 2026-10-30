@@ -1,4 +1,5 @@
 import { Spinner } from "@/components/ui/spinner";
+import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -17,7 +18,6 @@ import {
   Folder01Icon,
   FolderOpenIcon,
   HierarchyFilesIcon,
-  PinIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -414,13 +414,11 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 </ContextMenuItem>
               )}
               {contextHit?.is_dir && onSetAsRoot && (
-                <ContextMenuItem
-                  className={COMPACT_ITEM}
-                  onSelect={() => onSetAsRoot(contextHit.path)}
-                >
-                  <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-                  Set as Workspace Root
-                </ContextMenuItem>
+                <SetWorkspaceRootItem
+                  path={contextHit.path}
+                  workspaceRoot={workspaceRoot}
+                  onSetAsRoot={onSetAsRoot}
+                />
               )}
               {contextHit?.is_dir && onNewWorkspaceFromFolder && (
                 <ContextMenuItem
