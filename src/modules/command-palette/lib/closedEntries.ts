@@ -1,7 +1,7 @@
 import { pathBasename } from "@/lib/pathUtils";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { TabHistoryRecord } from "@/modules/workspaces/lib/tabHistory";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { RECENT_LIMIT } from "./tabRank";
 import type { TabEntry } from "./tabEntries";
 
@@ -55,7 +55,7 @@ export function buildClosedTabEntries(
       title: pathBasename(record.path, { tolerateTrailingSlash: true }) || record.path,
       detail: record.path,
       workspaceTitle: workspaceTitle(ws),
-      workspaceColor: resolveWorkspaceColor(ws.color, ws.id),
+      workspaceColor: workspaceDisplayColor(ws),
       workspaceIcon: ws.icon ?? null,
       workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
     });

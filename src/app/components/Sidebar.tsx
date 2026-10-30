@@ -22,9 +22,17 @@ import {
   effectiveSidebarView,
   type SidebarView,
 } from "@/modules/workspaces/lib/sidebarState";
-import { GitCommitIcon } from "@hugeicons/core-free-icons";
+import {
+  FolderOpenIcon,
+  GitBranchIcon,
+  GitCommitIcon,
+  HierarchyFilesIcon,
+  Note01Icon,
+  PinIcon,
+  PinOffIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 export type SidebarHandle = {
   focusExplorer: () => void;
@@ -70,10 +78,8 @@ export type SidebarProps = {
   onFsRootMissing?: (path: string) => void;
   canNavigateUp: boolean;
   homePath: string | null;
-  fsRootPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
-  workspaceRootExists: boolean;
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -110,17 +116,71 @@ export type SidebarProps = {
   onSearchHandle?: (handle: GitHistorySearchHandle | null) => void;
 };
 
-const VIEWS: { id: SidebarView; label: string }[] = [
-  { id: "explorer", label: "Explorer" },
-  { id: "git", label: "Git" },
-];
+type StripTab = "root" | "explorer" | "git" | "notes";
+
+const STRIP_ICONS = {
+  root: PinIcon,
+  explorer: HierarchyFilesIcon,
+  git: GitBranchIcon,
+  notes: Note01Icon,
+} as const;
+
+const STRIP_LABELS: Record<StripTab, string> = {
+  root: "Workspace Root",
+  explorer: "File Explorer",
+  git: "Git",
+  notes: "Notes",
+};
 
 export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
   function Sidebar(props, ref) {
     const view = effectiveSidebarView(props.view, props.notesRoot);
-    const views = props.notesRoot
-      ? [...VIEWS, { id: "notes" as const, label: "Notes" }]
-      : VIEWS;
+    const hasRoot = props.workspaceRootPath !== null;
+    // Without a root the Workspace Root tab shows an invitation instead of the explorer, and
+    // that choice belongs to the workspace it was made in.
+    const [promptFor, setPromptFor] = useState<string | null>(null);
+    const rootPrompt =
+      !hasRoot &&
+      view === "explorer" &&
+      (props.rootMode === "workspace" || promptFor === (props.workspaceId ?? "none"));
+    useEffect(() => {
+      if (view !== "explorer" || hasRoot) setPromptFor(null);
+    }, [view, hasRoot]);
+
+    const strip: StripTab[] = props.notesRoot
+      ? ["root", "explorer", "git", "notes"]
+      : ["root", "explorer", "git"];
+    const selected: StripTab =
+      view === "explorer"
+        ? rootPrompt || props.rootMode === "workspace"
+          ? "root"
+          : "explorer"
+        : view === "git"
+          ? "git"
+          : view === "notes"
+            ? "notes"
+            : "explorer";
+
+    const selectTab = (tab: StripTab) => {
+      if (tab === "root") {
+        if (!hasRoot) {
+          setPromptFor(props.workspaceId ?? "none");
+          props.onChangeView("explorer");
+          return;
+        }
+        setPromptFor(null);
+        props.onChangeView("explorer");
+        props.onChangeRootMode("workspace");
+        return;
+      }
+      setPromptFor(null);
+      if (tab === "explorer") {
+        props.onChangeView("explorer");
+        props.onChangeRootMode("filesystem");
+        return;
+      }
+      props.onChangeView(tab);
+    };
     const explorerRef = useRef<FileExplorerHandle>(null);
     const sourceControlRef = useRef<SourceControlPanelHandle>(null);
 
@@ -141,24 +201,36 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
           role="tablist"
           aria-label="Sidebar views"
         >
-          {views.map((tab) => (
+          {strip.map((tab) => (
             <button
-              key={tab.id}
+              key={tab}
               type="button"
               role="tab"
-              aria-selected={view === tab.id}
-              onClick={() => props.onChangeView(tab.id)}
+              aria-selected={selected === tab}
+              onClick={() => selectTab(tab)}
+              title={
+                tab === "root" && !hasRoot
+                  ? "Workspace Root (not set yet)"
+                  : STRIP_LABELS[tab]
+              }
               className={cn(
-                "relative h-full px-3 text-[11px] font-medium transition-colors",
-                view === tab.id
+                "relative flex h-full items-center gap-1.5 px-3 text-[11px] font-medium transition-colors",
+                selected === tab
                   ? "bg-card text-foreground"
                   : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
               )}
             >
-              {view === tab.id && (
+              {selected === tab && (
                 <div className="absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator" />
               )}
-              {tab.label}
+              <HugeiconsIcon icon={STRIP_ICONS[tab]} size={12} strokeWidth={2} />
+              {STRIP_LABELS[tab]}
+              {tab === "root" && !hasRoot && (
+                <span
+                  aria-hidden
+                  className="absolute right-1 top-1 size-1.5 rounded-full bg-orange-500"
+                />
+              )}
             </button>
           ))}
         </div>
@@ -189,10 +261,8 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onFsRootMissing={props.onFsRootMissing}
               canNavigateUp={props.canNavigateUp}
               homePath={props.homePath}
-              fsRootPath={props.fsRootPath}
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
-              workspaceRootExists={props.workspaceRootExists}
               revealRequest={revealForWorkspace(
                 props.revealRequest,
                 props.workspaceId,
@@ -202,12 +272,61 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onRevealInTerminal={props.onRevealInTerminal}
               onNewWorkspaceFromFolder={props.onNewWorkspaceFromFolder}
               onAddToGitignore={props.onAddToGitignore}
-              onPickWorkspaceRoot={props.onPickWorkspaceRoot}
               gitStatus={props.sourceControl.status}
               onSearchClose={props.onExplorerSearchClose}
               openFiles={props.openFiles}
             />
           </div>
+          {rootPrompt && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-sidebar px-4 py-10 text-center">
+              <HugeiconsIcon
+                icon={PinOffIcon}
+                size={26}
+                strokeWidth={1.8}
+                className="text-muted-foreground"
+              />
+              <div className="text-sm font-medium text-foreground">
+                No workspace root set
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                The root is the folder this workspace belongs to. Pick it to see its files here and
+                to use everything that depends on it.
+              </div>
+              <div className="mt-2 flex w-full flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={props.onPickWorkspaceRoot}
+                  className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+                >
+                  <HugeiconsIcon
+                    icon={FolderOpenIcon}
+                    size={14}
+                    strokeWidth={2}
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span className="font-medium">Choose a folder...</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectTab("explorer")}
+                  className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+                >
+                  <HugeiconsIcon
+                    icon={HierarchyFilesIcon}
+                    size={14}
+                    strokeWidth={2}
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium">Pick it in the File Explorer</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Right-click a folder and choose Set as Workspace Root
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
           <div
             className={cn(
               "absolute inset-0 overflow-auto",

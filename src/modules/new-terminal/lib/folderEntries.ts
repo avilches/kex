@@ -1,7 +1,7 @@
 import { foldText } from "@/modules/command-palette/lib/fuzzy";
 import type { TabEntry, WorkspaceEntry } from "@/modules/command-palette/lib/tabEntries";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 
 export type FolderRowLabel = "Current tab" | "Main checkout" | "Workspace Root" | "Home";
 
@@ -316,7 +316,7 @@ export function buildFolderGroups(input: FolderGroupsInput): FolderGroup[] {
     return {
       workspaceId: ws.id,
       workspaceTitle: e?.title ?? ws.title,
-      workspaceColor: e ? e.color : resolveWorkspaceColor(ws.color, ws.id),
+      workspaceColor: e ? e.color : workspaceDisplayColor(ws),
       workspaceIcon: e?.icon ?? ws.icon ?? null,
       active,
     };
