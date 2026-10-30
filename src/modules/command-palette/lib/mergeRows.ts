@@ -13,7 +13,7 @@ import { mruRank } from "./mru";
 import { buildSearchBlobs, commandRowKey } from "./rankCommands";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import {
-  byRecency,
+  byPriority,
   RECENT_LIMIT,
   SEARCH_LIMIT,
   tabRowKey,
@@ -279,7 +279,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
       : [];
     const recents = tabs
       .filter((t) => t.tabId !== activeTabId)
-      .sort(byRecency)
+      .sort(byPriority)
       .slice(0, RECENT_LIMIT)
       .map(
         (entry): MergedRow => ({
@@ -448,7 +448,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
 
   scored.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
-    if (a.recency && b.recency) return byRecency(a.recency, b.recency);
+    if (a.recency && b.recency) return byPriority(a.recency, b.recency);
     return 0;
   });
 
@@ -468,6 +468,6 @@ export function mergeRows(input: MergeInput): MergedRow[] {
     others.push(row);
   }
   // The tabs that fit keep the order of the empty list, so typing narrows it instead of reshuffling it.
-  tabRows.sort((a, b) => byRecency(a.entry, b.entry));
+  tabRows.sort((a, b) => byPriority(a.entry, b.entry));
   return [...currentRows, ...tabRows, ...others];
 }
