@@ -9,6 +9,10 @@ import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
 
+// The icon is asked for at this size instead of stretched with CSS: the agent marks carry an inline size
+// that no class can override, which left them at 13 px inside a 44 px square.
+const TILE_ICON = 26;
+
 function HibernatedMark({ size }: { size: number }) {
   return (
     <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 text-muted-foreground">
@@ -51,11 +55,11 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
       <span className="relative shrink-0">
         <span
           className={cn(
-            "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground [&_img]:size-6 [&_svg]:size-6",
+            "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground",
             entry.hibernated && "opacity-40 grayscale",
           )}
         >
-          <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+          <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} />
         </span>
         {entry.indicator === "working" ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">

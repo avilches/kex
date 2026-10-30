@@ -18,10 +18,12 @@ export function TabBarIcon({
   tab,
   agentSession,
   running = false,
+  size = 13,
 }: {
   tab: Tab;
   agentSession: AgentSession | undefined;
   running?: boolean;
+  size?: number;
 }) {
   const hasAgent = tab.kind === "terminal" && !!agentSession;
   const isRestoreError = agentSession?.restoreError ?? false;
@@ -32,19 +34,19 @@ export function TabBarIcon({
         className="text-amber-500"
         title={`Session restore failed: ${agentSession?.restoreErrorReason ?? "unknown error"}`}
       >
-        <HugeiconsIcon icon={Alert02Icon} size={13} strokeWidth={1.5} />
+        <HugeiconsIcon icon={Alert02Icon} size={size} strokeWidth={1.5} />
       </span>
     ) : iconMark ? (
-      <StruckAgentIcon agent={agentSession.agent} size={13} title={ICON_MARK_TITLES[iconMark]} />
+      <StruckAgentIcon agent={agentSession.agent} size={size} title={ICON_MARK_TITLES[iconMark]} />
     ) : (
-      <AgentIcon agent={agentSession.agent} size={13} />
+      <AgentIcon agent={agentSession.agent} size={size} />
     );
   }
   if (isHibernatedTab(tab) && tab.hibernation.agent && !tab.icon) {
-    return <AgentIcon agent={tab.hibernation.agent} size={13} className="grayscale" />;
+    return <AgentIcon agent={tab.hibernation.agent} size={size} className="grayscale" />;
   }
   if (tab.kind === "browser" && tab.floating) {
-    return <HugeiconsIcon icon={LinkSquare02Icon} size={13} strokeWidth={1.75} className="opacity-60" />;
+    return <HugeiconsIcon icon={LinkSquare02Icon} size={size} strokeWidth={1.75} className="opacity-60" />;
   }
-  return tabIcon(tab, running);
+  return tabIcon(tab, running, true, size);
 }
