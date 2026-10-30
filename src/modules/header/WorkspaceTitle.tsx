@@ -37,7 +37,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
         id={workspace.id}
         color={workspaceDisplayColor(workspace)}
         icon={workspace.icon}
-        size={26}
+        size={workspace.icon ? 26 : 13.5}
       />
       <div className="flex min-w-0 flex-col justify-center gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
