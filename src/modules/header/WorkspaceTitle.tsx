@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
@@ -32,7 +33,12 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const subtitle = agentTabTitle?.displayTitle ?? null;
 
   return (
-    <div className="flex min-w-0 max-w-[340px] items-center gap-2">
+    <div
+      className={cn(
+        "flex min-w-0 max-w-[340px] gap-2",
+        workspace.icon ? "items-center" : "items-start",
+      )}
+    >
       <WorkspaceMark
         id={workspace.id}
         color={workspaceDisplayColor(workspace)}
