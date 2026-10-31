@@ -22,6 +22,8 @@ const RUN_ZONE = 24;
 const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
+// The context combo: its icon, a name capped at about 100 px and the chevron.
+export const CONTEXT_RESERVE = 140;
 
 export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly = false): number {
   if (iconOnly) return PADDING + ICON;
@@ -35,33 +37,22 @@ export function stateOf(action: Action, states: ReadonlyMap<string, ScriptState>
   return isScript(action) ? (states?.get(action.id) ?? "idle") : "idle";
 }
 
-// Whether the bar renders this Action where the user is: hidden ones take no room,
-// so they must not consume a slot of the fold either. An agent has no template, so its
-// target is the workspace and it shows everywhere.
-export function shownAtPlace(
-  action: Action,
-  state: ScriptState | "idle",
-  place: FocusPlace | undefined,
-): boolean {
-  return !place || state !== "idle" || isAgent(action) || actionShownAt(actionTarget(action.command), place);
+// Whether the Header bar (own buttons and the Actions menu) carries this Action. The bar is
+// the same whatever tab is focused, so it only holds what does not depend on the tab: agents
+// (their target is the workspace) and workspace Actions. A folder or file Action lives in the
+// context combo instead, except a script that is not idle, which stays so it can be stopped.
+export function onBar(action: Action, state: ScriptState | "idle"): boolean {
+  return state !== "idle" || isAgent(action) || actionTarget(action.command) === "workspace";
 }
 
-// How many of the own buttons, taken in the user's order, fit in the room the bar has. The
-// rest fold into the menus, so the bar never pushes the search box and the window controls out.
-// Count only the buttons the place actually renders: an Action hidden by its target
-// (a file Action with a terminal focused, say) must not keep a visible one out.
-export function ownButtonsThatFit(
-  actions: readonly Action[],
-  room: number,
-  place?: FocusPlace,
-  states?: ReadonlyMap<string, ScriptState>,
-  hidden?: ReadonlySet<string>,
-): number {
-  let left = Math.floor(room) - MENUS_RESERVE;
+// How many of the own buttons, taken in the user's order, fit in the room the bar has once the
+// menus have taken theirs; `reserve` is the room of the context combo. The rest fold into the
+// menu, so the bar never pushes the search box and the window controls out.
+export function ownButtonsThatFit(actions: readonly Action[], room: number, reserve = 0): number {
+  let left = Math.floor(room) - MENUS_RESERVE - reserve;
   let shown = 0;
   const sole = soleIconButtons(actions);
   for (const action of actions) {
-    if (hidden?.has(action.id) || !shownAtPlace(action, stateOf(action, states), place)) continue;
     left -= ownButtonWidth(action, sole.has(action.id)) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
@@ -321,19 +312,16 @@ function effectKey(action: Action, ctx: BarContext): string | null {
 
 // Twins: Actions that depend on the focused tab and would do exactly what another one does
 // right now (an agent in the workspace folder and the same agent in the current folder, with
-// the focus at the root). The bar hides them so the same effect is not offered twice. With
-// the same effect, a button beats a menu entry even when both are static (the menu copy of a
-// button is hidden, so moving a button to the menu makes it vanish while a button twin exists);
-// with the same placement, a static Action beats a dynamic one, and two of the same sort are
-// the user's own doing, so both stay. A
-// script that is not idle is never hidden, and a blocked Action (or one whose start folder the
-// runner would refuse) neither hides nor survives.
-// Nothing is hidden without a real context.
+// the focus at the root). Only the new-terminal surfaces use this, so the same agent is not
+// offered twice for a folder; the Header bar hides nothing. With the same effect, a button
+// beats a menu entry even when both are static; with the same placement, a static Action beats
+// a dynamic one, and two of the same sort are the user's own doing, so both stay. A script that
+// is not idle is never hidden, and a blocked Action (or one whose start folder the runner would
+// refuse) neither hides nor survives. Nothing is hidden without a real context.
 export function twinIds(
   actions: readonly Action[],
   ctx: BarContext | null,
   states: ReadonlyMap<string, ScriptState>,
-  place?: FocusPlace,
 ): Set<string> {
   const hidden = new Set<string>();
   if (!ctx || ctx.labels) return hidden;
@@ -341,7 +329,6 @@ export function twinIds(
   for (const action of actions) {
     const state = stateOf(action, states);
     if (state === "idle" && actionAvailability(action, ctx) !== null) continue;
-    if (!shownAtPlace(action, state, place)) continue;
     const key = effectKey(action, ctx);
     if (!key) continue;
     const dynamic = dependsOnFocusedTab(action);
@@ -395,21 +382,14 @@ export function byKind<T extends Pick<Action, "kind">>(actions: readonly T[]): T
   return KIND_ORDER.flatMap((kind) => actions.filter((a) => a.kind === kind));
 }
 
-// The own buttons the bar may draw, in order: those the place shows. Each list comes already
-// in bar order, the workspace one before the global one.
+// The own buttons the bar may draw, in order: those flagged as buttons that the bar carries.
+// Each list comes already in bar order, the workspace one before the global one.
 export function ownButtonCandidates(
   local: readonly Action[],
   global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
-  place: FocusPlace | undefined,
-  hidden?: ReadonlySet<string>,
 ): Action[] {
-  return [...local, ...global].filter(
-    (action) =>
-      action.ownButton &&
-      !hidden?.has(action.id) &&
-      shownAtPlace(action, stateOf(action, states), place),
-  );
+  return [...local, ...global].filter((action) => action.ownButton && onBar(action, stateOf(action, states)));
 }
 
 // A button of a detected app or agent that is the only one of it in the bar needs no words:
@@ -542,8 +522,26 @@ export type BarModel = {
   /** The Actions that are not own buttons, apps, agents and scripts in that order: the workspace
    * ones first, then the global ones, each scope in the user's order. */
   menu: { workspace: BarItem[]; global: BarItem[] };
+  /** The folder and file Actions of the focused tab, in the one combo whose place never moves. */
+  contextCombo: ContextCombo;
   empty: boolean;
 };
+
+export type ContextCombo = {
+  /** Some Action depends on a folder or a file, so the combo is drawn (grey when nothing applies). */
+  exists: boolean;
+  /** What the focused tab offers: the folder of a terminal, the file of an editor, else nothing. */
+  kind: "folder" | "file" | null;
+  /** The folder or file name the combo acts on, and its full path for the hover. */
+  label: string;
+  path: string;
+  workspace: BarItem[];
+  global: BarItem[];
+  /** Why the combo has nothing to offer right now, or null when it does. */
+  reason: string | null;
+};
+
+export const NO_CONTEXT_REASON = "Focus a terminal or a file to use its Actions";
 
 type BuildInput = {
   local: readonly Action[];
@@ -553,21 +551,31 @@ type BuildInput = {
   activeId: string | undefined;
   /** How many own buttons are shown; the rest fold into the menus. Absent: all of them. */
   ownButtonsShown?: number;
-  /** What the focused tab is: file Actions show on a file, folder Actions on a terminal,
-   * workspace Actions always. Absent: every Action shows (nothing depends on a place). */
+  /** What the focused tab is: a folder on a terminal, a file on an editor. It feeds the context
+   * combo only; the bar itself is the same whatever tab is focused. */
   place?: FocusPlace;
-  /** Twin Actions to leave out (`twinIds`); absent: worked out from the other inputs. */
-  hidden?: ReadonlySet<string>;
   /** The bar is being rearranged: lines name what a variable stands for, not today's values. */
   arranging?: boolean;
 };
 
-// Own buttons first (workspace Actions, then global, each by kind in the user's order),
-// then the one menu for the rest: workspace Actions, then global, again in the
-// user's order. A running script is never disabled whatever its variables are now: it has
-// to stay stoppable, and it stays visible whatever the focused tab is, so its Stop keeps a
-// place to live.
-export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, hidden, arranging }: BuildInput): BarModel {
+// Folder and file Actions: the ones the context combo holds, not the bar.
+function isContextual(action: Action): boolean {
+  return !isAgent(action) && actionTarget(action.command) !== "workspace";
+}
+
+export function hasContextActions(local: readonly Action[], global: readonly Action[]): boolean {
+  return local.some(isContextual) || global.some(isContextual);
+}
+
+const lastSegment = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
+// The bar has own buttons first (workspace Actions, then global, each by kind in the user's
+// order), then the one menu for the rest: workspace Actions, then global, again in the user's
+// order. Both hold only agents and workspace Actions, so they do not change with the focused
+// tab. The folder and file Actions go to the context combo, which acts on the focused tab. A
+// running script is never disabled whatever its variables are now: it has to stay stoppable,
+// and it stays visible whatever the focused tab is, so its Stop keeps a place to live.
+export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, arranging }: BuildInput): BarModel {
   const toItem = (action: Action, isGlobal: boolean): BarItem => {
     const state = stateOf(action, states);
     const running = state === "running";
@@ -591,23 +599,37 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       iconOnly: false,
     };
   };
-  const twins = hidden ?? twinIds([...local, ...global], context, states, place);
   const limit = ownButtonsShown ?? Number.POSITIVE_INFINITY;
   const ordered = [...byKind(local).map((a) => [a, false] as const), ...byKind(global).map((a) => [a, true] as const)];
+  const kind: ContextCombo["kind"] = place?.folder ? "folder" : place?.file ? "file" : null;
+  const comboPath = kind === "folder" ? (context?.vars.cwd ?? "") : kind === "file" ? (context?.vars.filepath ?? "") : "";
   const model: BarModel = {
     buttons: [],
     menu: { workspace: [], global: [] },
+    contextCombo: {
+      exists: hasContextActions(local, global),
+      kind,
+      label: comboPath ? lastSegment(comboPath) : "",
+      path: comboPath,
+      workspace: [],
+      global: [],
+      reason: kind && comboPath ? null : NO_CONTEXT_REASON,
+    },
     empty: local.length + global.length === 0,
   };
   const buttonIds = new Set(
-    ownButtonCandidates(byKind(local), byKind(global), states, place, twins)
+    ownButtonCandidates(byKind(local), byKind(global), states)
       .slice(0, limit)
       .map((a) => a.id),
   );
   for (const [action, isGlobal] of ordered) {
-    if (twins.has(action.id)) continue;
     const item = toItem(action, isGlobal);
-    if (!shownAtPlace(action, item.state, place)) continue;
+    if (!onBar(action, item.state)) {
+      if (kind && actionShownAt(actionTarget(action.command), { folder: kind === "folder", file: kind === "file" }) && isContextual(action)) {
+        (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(item);
+      }
+      continue;
+    }
     if (buttonIds.has(action.id)) model.buttons.push(item);
     else if (isGlobal) model.menu.global.push(item);
     else model.menu.workspace.push(item);
@@ -633,8 +655,9 @@ export function menuEntries(item: BarItem): MenuEntry[] {
 // What the command palette lists: the Actions the Header offers here, runnable ones only. A
 // blocked Action is left out instead of muted, and a script already running stays so it can
 // be shown or stopped.
-export function paletteActions(model: Pick<BarModel, "buttons" | "menu">): BarItem[] {
-  return [...model.buttons, ...model.menu.workspace, ...model.menu.global].filter(
+export function paletteActions(model: Pick<BarModel, "buttons" | "menu" | "contextCombo">): BarItem[] {
+  const { workspace, global } = model.contextCombo;
+  return [...model.buttons, ...model.menu.workspace, ...model.menu.global, ...workspace, ...global].filter(
     (i) => i.disabledReason === null || i.stoppable,
   );
 }

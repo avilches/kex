@@ -87,7 +87,9 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
   workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), Run in folder primero en los scripts (Home por defecto, Workspace root con la
   chincheta del explorer, Current folder, Absolute path), nombre, comando y variables, y
-  `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra);
+  `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
+  para agentes y Actions de workspace; una de carpeta o de fichero lleva en su lugar una nota,
+  porque vive en el combo contextual del Header y nunca tiene boton propio);
   guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la
   mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
   exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega

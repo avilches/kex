@@ -42,15 +42,15 @@ describe("useActionsBarModel twins", () => {
     usePreferencesStore.setState({ actions: [] });
   });
 
-  it("hides the twin, and shows everything while arranging is set", () => {
+  it("leaves the twins alone, arranging or not: the bar does not change with the focus", () => {
     const { result, rerender } = renderHook((p: { arranging?: boolean }) => useActionsBarModel({ workspace: ws, ...p }), {
       initialProps: {},
     });
-    expect(result.current.buttons.map((b) => b.id)).toEqual(["w"]);
+    expect(result.current.buttons.map((b) => b.id)).toEqual(["w", "c"]);
     rerender({ arranging: true });
     expect(result.current.buttons.map((b) => b.id)).toEqual(["w", "c"]);
     rerender({ arranging: false });
-    expect(result.current.buttons.map((b) => b.id)).toEqual(["w"]);
+    expect(result.current.buttons.map((b) => b.id)).toEqual(["w", "c"]);
   });
 
   it("keeps the same model while arranging stays as it was", () => {

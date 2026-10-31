@@ -23,6 +23,7 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
+import { actionTarget } from "./lib/actionsBar";
 import type { ActionContext } from "./lib/useActionContext";
 import { isAgent, usesTerminal, type Action, type ActionKind } from "./lib/types";
 
@@ -341,7 +342,14 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           ))}
         </div>
 
-        <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
+        {agent || actionTarget(action.command) === "workspace" ? (
+          <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
+        ) : (
+          <div className="text-[11px] text-muted-foreground">
+            It acts on the focused {actionTarget(action.command) === "file" ? "file" : "folder"}, so it lives in the
+            folder and file combo of the header, never as a button of its own.
+          </div>
+        )}
 
         <div className="flex justify-end border-t border-border pt-3">
           <Button size="sm" className="h-8 px-4 text-[12px]" onClick={onClose}>

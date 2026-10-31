@@ -11,6 +11,10 @@ import {
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
+  CONTEXT_RESERVE,
+  NO_CONTEXT_REASON,
+  hasContextActions,
+  onBar,
   describeMissing,
   DROP_MENU,
   DROP_MENU_GLOBAL,
@@ -31,7 +35,7 @@ import {
   soleIconButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
-import type { BarContext, BarItem, FocusPlace } from "./actionsBar";
+import type { BarContext, BarItem } from "./actionsBar";
 import type { Action } from "./types";
 
 const script = (o: Partial<Action> = {}): Action => ({
@@ -197,31 +201,25 @@ describe("ownButtonsThatFit", () => {
     expect(Number.isInteger(ownButtonsThatFit(four, 333.7))).toBe(true);
   });
 
-  it("does not spend a slot on an Action the place hides", () => {
-    const hidden = script({ id: "hidden", name: "One", command: "agent {cwd}" });
-    const visible = script({ id: "visible", name: "Two" });
-    const room = [hidden, visible].reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
-    const file = { file: true, folder: false };
-    const folder = { file: false, folder: true };
-    expect(ownButtonsThatFit([hidden, visible], room, file)).toBe(1);
-    expect(ownButtonsThatFit([hidden, visible], room, folder)).toBe(2);
-    const running = new Map([["hidden", "running" as const]]);
-    expect(ownButtonsThatFit([hidden, visible], room, file, running)).toBe(2);
-    expect(ownButtonsThatFit([hidden, visible], room, folder, running)).toBe(2);
+  it("leaves room for the context combo when there is one", () => {
+    const total = four.reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
+    expect(ownButtonsThatFit(four, total)).toBe(4);
+    expect(ownButtonsThatFit(four, total, CONTEXT_RESERVE)).toBeLessThan(4);
+    expect(ownButtonsThatFit(four, total + CONTEXT_RESERVE, CONTEXT_RESERVE)).toBe(4);
   });
 
-  it("a hidden own button never folds a visible one out of the bar", () => {
-    const hidden = script({ id: "hidden", command: "agent {cwd}", ownButton: true });
-    const visible = script({ id: "visible", ownButton: true });
+  it("a folder button never takes a slot nor folds a workspace one out of the bar", () => {
+    const folder = script({ id: "folder", command: "agent {cwd}", ownButton: true });
+    const workspace = script({ id: "workspace", ownButton: true });
     const m = buildActionsBarModel({
-      local: [hidden, visible],
+      local: [folder, workspace],
       context: ctx,
       states: new Map(),
       activeId: undefined,
       ownButtonsShown: 1,
-      place: { file: true, folder: false },
+      place: { file: false, folder: true },
     });
-    expect(m.buttons.map((b) => b.id)).toEqual(["visible"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["workspace"]);
     expect(m.menu.workspace).toEqual([]);
   });
 });
@@ -257,14 +255,14 @@ describe("buildActionsBarModel", () => {
 
   it("carries the run state, the active mark and the disabled reason", () => {
     const m = buildActionsBarModel({
-      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {filepath}", ownButton: true })],
-      context: ctx,
+      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {workspace}", ownButton: true })],
+      context: { ...ctx, vars: { ...vars, workspace: "" } },
       states: new Map([["s1", "running"]]),
       activeId: "s1",
     });
     const [s, a] = m.buttons;
     expect(s).toMatchObject({ state: "running", active: true, disabledReason: null, stoppable: true });
-    expect(a).toMatchObject({ state: "idle", active: false, disabledReason: "needs an open file", stoppable: false });
+    expect(a).toMatchObject({ state: "idle", active: false, disabledReason: WORKSPACE_UNSET, stoppable: false });
   });
 
   it("never lets a running script be disabled: it must stay stoppable", () => {
@@ -296,7 +294,7 @@ describe("buildActionsBarModel", () => {
 
   it("draws a button as its icon alone only when it is the sole button of its app", () => {
     const zedWs = app({ id: "z1", appId: "zed", name: "Zed {workspace}", ownButton: true });
-    const zedFile = app({ id: "z2", appId: "zed", name: "Zed {filepath}", command: "zed {filepath}", ownButton: true });
+    const zedFile = app({ id: "z2", appId: "zed", name: "Zed docs {workspace}", command: "zed {workspace}/docs", ownButton: true });
     const code = app({ id: "c1", appId: "code", name: "Code {workspace}", ownButton: true });
     const custom = app({ id: "u1", name: "Mine", ownButton: true });
     const dev = script({ id: "s1", ownButton: true });
@@ -438,49 +436,79 @@ describe("buildActionsBarModel place", () => {
   const fileAction = app({ id: "f1", command: "code {filepath}", name: "Code {filepath}" });
   const folderAction = script({ id: "d1", command: "agent {cwd}", name: "Agent {cwd}" });
   const wsAction = app({ id: "w1", command: "pycharm {workspace}" });
+  const agentAction: Action = { id: "ag", name: "Claude", kind: "agent", command: "claude", cwdMode: "context", ownButton: false };
 
-  it("shows file Actions on a file and folder Actions on a terminal", () => {
-    const onFile = buildActionsBarModel({
-      local: [fileAction, folderAction, wsAction],
-      context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
-      states: new Map(),
-      activeId: undefined,
-      place: { file: true, folder: false },
-    });
-    expect(onFile.menu.workspace.map((i) => i.action.id)).toEqual(["f1", "w1"]);
+  const onFileCtx = { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } };
+  const build = (context: BarContext, place: { file: boolean; folder: boolean } | undefined, states = new Map<string, "running">()) =>
+    buildActionsBarModel({ local: [fileAction, folderAction, wsAction], context, states, activeId: undefined, place });
 
-    const onFolder = buildActionsBarModel({
-      local: [fileAction, folderAction, wsAction],
+  it("keeps the bar and its menu the same whatever tab is focused", () => {
+    const onFile = build(onFileCtx, { file: true, folder: false });
+    const onFolder = build(ctx, { file: false, folder: true });
+    const onNothing = build(ctx, { file: false, folder: false });
+    for (const m of [onFile, onFolder, onNothing]) {
+      expect(m.menu.workspace.map((i) => i.action.id)).toEqual(["w1"]);
+      expect(m.buttons).toEqual([]);
+    }
+  });
+
+  it("puts file Actions in the combo on a file and folder Actions on a terminal", () => {
+    const onFile = build(onFileCtx, { file: true, folder: false });
+    expect(onFile.contextCombo).toMatchObject({ exists: true, kind: "file", label: "a.ts", path: "/p/a.ts", reason: null });
+    expect(onFile.contextCombo.workspace.map((i) => i.action.id)).toEqual(["f1"]);
+
+    const onFolder = build(ctx, { file: false, folder: true });
+    expect(onFolder.contextCombo).toMatchObject({ exists: true, kind: "folder", reason: null });
+    expect(onFolder.contextCombo.workspace.map((i) => i.action.id)).toEqual(["d1"]);
+    expect(onFolder.contextCombo.path).toBe(ctx.vars.cwd);
+  });
+
+  it("splits the combo by scope and keeps the user's order", () => {
+    const m = buildActionsBarModel({
+      local: [folderAction],
+      global: [script({ id: "g1", command: "lint {cwd}" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
       place: { file: false, folder: true },
     });
-    expect(onFolder.menu.workspace.map((i) => i.action.id)).toEqual(["d1", "w1"]);
+    expect(m.contextCombo.workspace.map((i) => i.id)).toEqual(["d1"]);
+    expect(m.contextCombo.global.map((i) => i.id)).toEqual(["g1"]);
   });
 
-  it("keeps a running script visible whatever the focused tab is", () => {
-    const model = buildActionsBarModel({
-      local: [folderAction],
-      context: ctx,
-      states: new Map([["d1", "running"]]),
-      activeId: "d1",
-      place: { file: true, folder: false },
-    });
-    expect(model.menu.workspace).toHaveLength(1);
-    expect(model.menu.workspace[0]).toMatchObject({ stoppable: true, disabledReason: null });
+  it("keeps the combo, empty and with its reason, when no tab offers a folder or a file", () => {
+    const m = build(ctx, { file: false, folder: false });
+    expect(m.contextCombo).toMatchObject({ exists: true, kind: null, label: "", reason: NO_CONTEXT_REASON });
+    expect(m.contextCombo.workspace).toEqual([]);
+    expect(build(ctx, undefined).contextCombo.exists).toBe(true);
+  });
+
+  it("has no combo at all while there are no folder or file Actions", () => {
+    const m = buildActionsBarModel({ local: [wsAction], context: ctx, states: new Map(), activeId: undefined, place: { file: false, folder: true } });
+    expect(m.contextCombo.exists).toBe(false);
+    expect(hasContextActions([wsAction], [])).toBe(false);
+    expect(hasContextActions([wsAction], [folderAction])).toBe(true);
+  });
+
+  it("keeps a folder Action that is not idle in the bar menu so it can be stopped", () => {
+    const model = build(onFileCtx, { file: true, folder: false }, new Map([["d1", "running"]]));
+    expect(model.menu.workspace.map((i) => i.id)).toContain("d1");
+    expect(model.menu.workspace.find((i) => i.id === "d1")).toMatchObject({ stoppable: true, disabledReason: null });
+    expect(model.contextCombo.workspace.map((i) => i.id)).not.toContain("d1");
+  });
+
+  it("onBar holds agents, workspace Actions and anything not idle, never an idle folder or file one", () => {
+    expect(onBar(wsAction, "idle")).toBe(true);
+    expect(onBar(agentAction, "idle")).toBe(true);
+    expect(onBar(folderAction, "idle")).toBe(false);
+    expect(onBar(fileAction, "idle")).toBe(false);
+    expect(onBar(folderAction, "running")).toBe(true);
   });
 
   it("resolves the second line to what the place says and adds a Run row title", () => {
-    const model = buildActionsBarModel({
-      local: [fileAction],
-      context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
-      states: new Map(),
-      activeId: undefined,
-      place: { file: true, folder: false },
-    });
-    expect(model.menu.workspace[0]?.subtitle).toBe("a.ts");
-    expect(model.menu.workspace[0]?.title).toBe("Open a.ts with Code");
+    const model = build(onFileCtx, { file: true, folder: false });
+    expect(model.contextCombo.workspace[0]?.subtitle).toBe("a.ts");
+    expect(model.contextCombo.workspace[0]?.title).toBe("Open a.ts with Code");
   });
 });
 
@@ -815,7 +843,7 @@ describe("twinIds", () => {
     folders: { focusFolder: focus, workspaceRoot: root, workspaceCwd: root },
   });
   const none = new Map<string, "running" | "waiting">();
-  const ids = (actions: Action[], c: BarContext | null, states = none, place?: FocusPlace) => [...twinIds(actions, c, states, place)].sort();
+  const ids = (actions: Action[], c: BarContext | null, states = none) => [...twinIds(actions, c, states)].sort();
   const workspaceAgent = agent({ id: "w" });
   const contextAgent = agent({ id: "c", cwdMode: "context" });
 
@@ -936,14 +964,7 @@ describe("twinIds", () => {
   });
 
   it("finds a twin across the workspace and global scopes", () => {
-    const model = buildActionsBarModel({
-      local: [workspaceAgent],
-      global: [{ ...contextAgent, id: "g" }],
-      context: at("/p"),
-      states: none,
-      activeId: undefined,
-    });
-    expect(model.buttons.map((b) => b.id)).toEqual(["w"]);
+    expect(ids([workspaceAgent, { ...contextAgent, id: "g" }], at("/p"))).toEqual(["g"]);
   });
 
   it("leaves at least the static button in a three-way set", () => {
@@ -954,34 +975,19 @@ describe("twinIds", () => {
     expect(hidden).toEqual(["db", "dm"]);
   });
 
-  it("does not let an Action the place hides hide another one", () => {
-    const file = { file: true, folder: false };
-    const byWorkspace = app({ id: "w", command: "code /p" });
-    const byCwd = script({ id: "c", command: "code {cwd}", ownButton: true });
-    expect(ids([byWorkspace, byCwd], at("/p"), none, file)).toEqual([]);
-  });
-
-  it("takes the hidden twin out of the bar, the menu and the fit count", () => {
+  it("leaves the Header bar alone: both twins stay, in the bar and in the menu", () => {
     const context = at("/p");
     const model = buildActionsBarModel({ local: [workspaceAgent, contextAgent], context, states: none, activeId: undefined });
-    expect(model.buttons.map((b) => b.id)).toEqual(["w"]);
+    expect(model.buttons.map((b) => b.id)).toEqual(["w", "c"]);
     const asMenu = buildActionsBarModel({
       local: [{ ...workspaceAgent, ownButton: false }, { ...contextAgent, ownButton: false }],
       context,
       states: none,
       activeId: undefined,
     });
-    expect(asMenu.menu.workspace.map((i) => i.id)).toEqual(["w"]);
-    expect(paletteActions(model).map((i) => i.id)).toEqual(["w"]);
-    const hidden = twinIds([workspaceAgent, contextAgent], context, none);
-    const candidates = ownButtonCandidates([workspaceAgent, contextAgent], [], none, undefined, hidden);
-    expect(candidates.map((a) => a.id)).toEqual(["w"]);
-    const later = agent({ id: "later", command: "other" });
-    const trio = [contextAgent, workspaceAgent, later];
-    const room = trio.reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
-    expect(ownButtonsThatFit(trio, room)).toBe(3);
-    expect(ownButtonsThatFit(trio, room, undefined, none, hidden)).toBe(2);
-    expect(ownButtonsThatFit(trio, ownButtonWidth(later) * 2 + BAR_GAP * 2 + MENUS_RESERVE, undefined, none, hidden)).toBe(2);
+    expect(asMenu.menu.workspace.map((i) => i.id)).toEqual(["w", "c"]);
+    expect(paletteActions(model).map((i) => i.id)).toEqual(["w", "c"]);
+    expect(ownButtonCandidates([workspaceAgent, contextAgent], [], none).map((a) => a.id)).toEqual(["w", "c"]);
   });
 });
 
@@ -991,26 +997,23 @@ describe("buildActionsBarModel arranging", () => {
     app({ id: "c1", name: "Zed {cwd}", command: "zed {cwd}", ownButton: true }),
     app({ id: "f1", name: "Code {filepath}", command: "code {filepath}", ownButton: true }),
   ];
-  const build = (arranging: boolean, context = ctx) =>
-    buildActionsBarModel({ local: rows, context, states: new Map(), activeId: undefined, arranging });
+  const build = (arranging: boolean, context = ctx, place?: { file: boolean; folder: boolean }) =>
+    buildActionsBarModel({ local: rows, context, states: new Map(), activeId: undefined, arranging, place });
+  const lines = (items: BarItem[]) => items.map((b) => [b.subtitle, b.subtitleLead]);
 
   it("names what each variable stands for instead of today's value", () => {
-    const m = build(true);
-    expect(m.buttons.map((b) => [b.subtitle, b.subtitleLead])).toEqual([
-      ["Workspace root", "root"],
-      ["Current folder", "tab"],
-      ["Current file", "file"],
-    ]);
+    const m = build(true, ctx, { file: false, folder: true });
+    expect(lines(m.buttons)).toEqual([["Workspace root", "root"]]);
+    expect(lines(m.contextCombo.workspace)).toEqual([["Current folder", "tab"]]);
+    expect(lines(build(true, ctx, { file: true, folder: false }).contextCombo.workspace)).toEqual([["Current file", "file"]]);
     expect(m.buttons[0]?.title).toBe("Open PyCharm in Workspace root");
   });
 
   it("shows the real values otherwise, the pin only on the workspace root", () => {
-    const m = build(false);
-    expect(m.buttons.map((b) => [b.subtitle, b.subtitleLead])).toEqual([
-      [vars.workspace, "root"],
-      ["/p", "tab"],
-      ["{filepath}", null],
-    ]);
+    const m = build(false, ctx, { file: false, folder: true });
+    expect(lines(m.buttons)).toEqual([[vars.workspace, "root"]]);
+    expect(lines(m.contextCombo.workspace)).toEqual([["/p", "tab"]]);
+    expect(lines(build(false, ctx, { file: true, folder: false }).contextCombo.workspace)).toEqual([["{filepath}", null]]);
   });
 
   it("keeps the real availability while arranging", () => {

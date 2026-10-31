@@ -27,6 +27,8 @@ import {
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import {
   ArrowDown01Icon,
+  File01Icon,
+  Folder01Icon,
   PencilEdit02Icon,
   PlayIcon,
   Rocket01Icon,
@@ -34,7 +36,7 @@ import {
   StopIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +65,7 @@ import {
   type Drop,
   WORKSPACE_UNSET,
   type BarItem,
+  type ContextCombo as ContextComboModel,
 } from "./lib/actionsBar";
 import { isScript, usesTerminal, type Action, type ActionKind } from "./lib/types";
 import type { Workspace } from "@/modules/workspaces/lib/types";
@@ -443,6 +446,12 @@ function MenuSection({
 
 type MenuProps = {
   label: string;
+  /** The hover words of the trigger; absent: the label. */
+  hint?: string;
+  /** The icon before the label; absent: the rocket. */
+  icon?: IconSvgElement;
+  /** The label is a folder or file name that may be long, so it is cut. */
+  truncateLabel?: boolean;
   items: BarItem[];
   globalItems: BarItem[];
   /** The reorder modifier is held: rows can be dragged and a click does nothing. */
@@ -458,6 +467,9 @@ type MenuProps = {
 // one after, each in the user's order, with the Settings entry at the bottom.
 export function ActionsMenu({
   label,
+  hint,
+  icon = Rocket01Icon,
+  truncateLabel = false,
   items,
   globalItems,
   reorderMode,
@@ -488,11 +500,11 @@ export function ActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          title={label}
+          title={hint ?? label}
           className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
-          <span>{label}</span>
+          <HugeiconsIcon icon={icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
+          <span className={cn(truncateLabel && "max-w-[100px] truncate")}>{label}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
         </button>
       </DropdownMenuTrigger>
@@ -517,6 +529,50 @@ export function ActionsMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+// The one combo for the Actions that act on the focused tab, a folder for a terminal and a file
+// for an editor. It is drawn in the same place whatever tab is focused, once any such Action
+// exists; with nothing to act on it turns grey and says why instead of vanishing.
+export function ContextCombo({
+  combo,
+  onRestoreFocus,
+  onConfigure,
+  ...props
+}: { combo: ContextComboModel; onRestoreFocus: () => void; onConfigure: () => void } & ItemOps & Handlers) {
+  if (!combo.exists) return null;
+  const empty = combo.workspace.length + combo.global.length === 0;
+  const why = combo.reason ?? (empty ? `No ${combo.kind} Actions yet` : null);
+  const icon = combo.kind === "file" ? File01Icon : Folder01Icon;
+  if (why !== null) {
+    return (
+      <button
+        type="button"
+        disabled
+        title={why}
+        className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground opacity-50"
+      >
+        <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />
+        <span>Folder or file</span>
+        <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
+      </button>
+    );
+  }
+  return (
+    <ActionsMenu
+      label={combo.label}
+      hint={combo.path}
+      icon={icon}
+      truncateLabel
+      items={combo.workspace}
+      globalItems={combo.global}
+      reorderMode={false}
+      dragging={false}
+      onRestoreFocus={onRestoreFocus}
+      onConfigure={onConfigure}
+      {...props}
+    />
   );
 }
 
@@ -810,6 +866,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
             </Fragment>
           );
         })}
+        <ContextCombo combo={model.contextCombo} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...itemOps} {...controller} />
         <MenuDrop dragging={dragging} fromMenu={fromMenu} hasMenu={menuItems.length > 0}>
           <ActionsMenu
             label="Actions"

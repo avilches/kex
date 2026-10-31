@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { byKind, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, twinIds, type BarModel } from "./actionsBar";
+import { byKind, buildActionsBarModel, CONTEXT_RESERVE, hasContextActions, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
 import type { Action } from "./types";
 import { useActionContext } from "./useActionContext";
 import { useActionStates } from "./useActionStates";
@@ -30,35 +30,28 @@ type Input = {
   workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
   /** Pixels the bar has; absent until measured, which shows every own button. */
   room?: number;
-  /** The reorder modifier is held or a drag is in flight: every Action shows, twins included,
-   * and each says what its variable stands for instead of today's value. */
+  /** The reorder modifier is held or a drag is in flight: each Action says what its variable
+   * stands for instead of today's value. */
   arranging?: boolean;
 };
 
 const NONE: readonly Action[] = [];
-const NO_TWINS: ReadonlySet<string> = new Set();
 
 export function useActionsBarModel({ workspace, room, arranging }: Input): BarModel {
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
   const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
-  const hidden = useMemo(
-    () => (arranging ? NO_TWINS : twinIds([...local, ...global], context, states, context?.place)),
-    [local, global, context, states, arranging],
-  );
   const ownButtonsShown = useMemo(
     () =>
       room === undefined
         ? undefined
         : ownButtonsThatFit(
-            ownButtonCandidates(byKind(local), byKind(global), states, context?.place, hidden),
+            ownButtonCandidates(byKind(local), byKind(global), states),
             room,
-            context?.place,
-            states,
-            hidden,
+            hasContextActions(local, global) ? CONTEXT_RESERVE : 0,
           ),
-    [local, global, room, context, states, hidden],
+    [local, global, room, states],
   );
   return useMemo(
     () =>
@@ -70,9 +63,8 @@ export function useActionsBarModel({ workspace, room, arranging }: Input): BarMo
         activeId: workspace?.activeAction,
         ownButtonsShown,
         place: context?.place,
-        hidden,
         arranging,
       }),
-    [local, global, context, states, workspace?.activeAction, ownButtonsShown, hidden, arranging],
+    [local, global, context, states, workspace?.activeAction, ownButtonsShown, arranging],
   );
 }

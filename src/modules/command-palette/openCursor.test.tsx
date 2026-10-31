@@ -35,6 +35,7 @@ const barModel = {
     workspace: [userAction("w1", false), userAction("w2", false)],
     global: ["g1", "g2", "g3", "g4"].map((id) => userAction(id, true)),
   },
+  contextCombo: { workspace: [] as BarItem[], global: [] as BarItem[] },
 };
 
 vi.mock("@/modules/actions/lib/useActionsBar", () => ({
