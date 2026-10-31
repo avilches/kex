@@ -18,6 +18,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { type FontWeight, Terminal } from "@xterm/xterm";
 import { registerTerminalLinks, parseFileUri } from "@/modules/terminal/lib/terminalLinks";
 import { dispatchFileLink } from "@/modules/terminal/lib/terminalLinkBridge";
+import { createApplyTimer } from "./applyTiming";
 import { shouldCursorBlink } from "./cursorBlink";
 import { paletteHoldsFocus } from "./paletteHoldsFocus";
 import {
@@ -993,70 +994,106 @@ export function retryMissingWebgl(): void {
   }
 }
 
+function logApplyTiming(line: string | null): void {
+  if (line) void logInfo(line).catch(() => {});
+}
+
 export function applyFontSize(size: number): void {
+  const timer = createApplyTimer("fontSize", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.fontSize === size) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.fontSize = size;
+    timer.lap("set");
     slot.fitAddon.fit();
+    timer.lap("fit");
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;
       slot.lastRows = slot.term.rows;
       const bridge = adapter?.resolveLeaf(slot.currentLeafId);
       bridge?.resizePty(slot.term.cols, slot.term.rows);
     }
+    timer.lap("resize");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyLineHeight(lineHeight: number): void {
+  const timer = createApplyTimer("lineHeight", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.lineHeight === lineHeight) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.lineHeight = lineHeight;
+    timer.lap("set");
     slot.fitAddon.fit();
+    timer.lap("fit");
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;
       slot.lastRows = slot.term.rows;
       const bridge = adapter?.resolveLeaf(slot.currentLeafId);
       bridge?.resizePty(slot.term.cols, slot.term.rows);
     }
+    timer.lap("resize");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyLetterSpacing(spacing: number): void {
+  const timer = createApplyTimer("letterSpacing", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.letterSpacing === spacing) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.letterSpacing = spacing;
+    timer.lap("set");
     slot.fitAddon.fit();
+    timer.lap("fit");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyFontWeight(weight: string): void {
+  const timer = createApplyTimer("fontWeight", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.fontWeight === weight) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.fontWeight = weight as FontWeight;
+    timer.lap("set");
     slot.fitAddon.fit();
+    timer.lap("fit");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyFontFamily(family: string): void {
   const resolved = resolveMonoFontFamily(family);
+  const timer = createApplyTimer("fontFamily", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.fontFamily === resolved) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.fontFamily = resolved;
+    timer.lap("set");
     slot.fitAddon.fit();
+    timer.lap("fit");
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;
       slot.lastRows = slot.term.rows;
       const bridge = adapter?.resolveLeaf(slot.currentLeafId);
       bridge?.resizePty(slot.term.cols, slot.term.rows);
     }
+    timer.lap("resize");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyScrollback(value: number): void {
+  const timer = createApplyTimer("scrollback", () => performance.now());
   for (const slot of slots) {
     if (slot.term.options.scrollback === value) continue;
+    timer.begin(slot.currentLeafId);
     slot.term.options.scrollback = value;
+    timer.lap("set");
   }
+  logApplyTiming(timer.line());
 }
 
 export function applyCursorStyle(style: CursorStyle): void {

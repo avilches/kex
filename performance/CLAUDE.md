@@ -77,6 +77,12 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   única fuente de verdad, persiste entre reinicios y cada ventana ejecuta su propio profiler, por eso cada línea lleva
   el campo `window`. Apagado no cuesta nada. Encendido añade una captura de pila por cada `requestAnimationFrame` y un
   bucle propio de fotogramas; su coste **no está medido**.
+- **Líneas `[term-apply]`** (`src/modules/terminal/lib/applyTiming.ts`, conectadas en las funciones `apply*` de
+  `rendererPool.ts`): una línea por cambio de fuente, tamaño, peso, interlineado, espaciado o scrollback en Settings, con
+  el tiempo total y, por terminal, lo que costó asignar la opción (`set`), `fit()` (`fit`) y avisar al PTY (`resize`);
+  `visible` cuenta los terminales ligados a una tab. Siempre activas, no dependen del profiler y cuestan un
+  `performance.now()` por paso. Se buscan con `grep '\[term-apply\]' user-data/logs/Kex.log`. Sirven para decidir si
+  aplicar el cambio solo a los terminales visibles reduce el congelón.
 - **Rotación de logs** (`src-tauri/src/lib.rs`, `LOG_ARCHIVES_KEPT`): 20 archivos de 1 MB además de `Kex.log`, unos
   21 MB. Una línea del profiler ronda 1 KB, así que con él encendido un fichero dura de 1 a 2,5 horas y los 21 cubren
   uno o dos días. Los archivados se llaman `Kex_<fecha>.log`.
