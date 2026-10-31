@@ -160,86 +160,89 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           Changes are saved as you type. Done leaves the editor.
         </DialogDescription>
 
-        {terminal && (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Run in folder</span>
-            <Select value={cwdMode} onOpenChange={onSelectOpenChange} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
-              <SelectTrigger size="sm" aria-label="Run in folder" className="h-8 w-full text-[12px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(CWD_MODE_LABELS) as ScriptCwdMode[]).map((mode) => (
-                  <SelectItem key={mode} value={mode} className="text-[12px]">
-                    <span className="flex items-center gap-2">
-                      <HugeiconsIcon icon={CWD_MODE_ICONS[mode]} size={13} strokeWidth={2} className="shrink-0 text-muted-foreground" />
-                      {CWD_MODE_LABELS[mode]}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {cwdMode === "fixed" && (
-              <>
-                <div className="flex items-center gap-1">
-                  <input
-                    className={cn(INPUT_CLASS, "flex-1 font-mono")}
-                    aria-label="Fixed folder path"
-                    placeholder="Absolute path"
-                    spellCheck={false}
-                    defaultValue={action.cwd ?? ""}
-                    key={action.cwd ?? ""}
-                    onBlur={(e) => onChange({ ...action, cwd: e.target.value.trim() || undefined })}
-                  />
-                  <button
-                    type="button"
-                    title="Browse"
-                    aria-label="Browse for a folder"
-                    className={SMALL_BUTTON}
-                    onClick={async () => {
-                      const selected = await openFolderDialog({ directory: true, defaultPath: action.cwd || undefined });
-                      if (typeof selected === "string") onChange({ ...action, cwd: selected });
-                    }}
-                  >
-                    <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
-                  </button>
-                </div>
-                {blocking
-                  .filter((p) => p.kind === "cwd")
-                  .map((p) => (
-                    <div key={p.message} className="text-[11px] text-destructive">
-                      {p.message}
-                    </div>
-                  ))}
-              </>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-end gap-2">
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span className="text-[11px] text-muted-foreground">Name</span>
+              <input
+                className={cn(INPUT_CLASS, "w-full")}
+                aria-label="Action name"
+                placeholder="Name"
+                spellCheck={false}
+                value={shownName}
+                onFocus={() => {
+                  setName(action.name);
+                  setNameFocused(true);
+                }}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={(e) => {
+                  setNameFocused(false);
+                  saveName(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    onClose();
+                  }
+                }}
+              />
+            </label>
+            {terminal && (
+              <div className="flex w-[200px] shrink-0 flex-col gap-1.5">
+                <span className="text-[11px] text-muted-foreground">Run in folder</span>
+                <Select value={cwdMode} onOpenChange={onSelectOpenChange} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
+                  <SelectTrigger size="sm" aria-label="Run in folder" className="h-8 w-full text-[12px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CWD_MODE_LABELS) as ScriptCwdMode[]).map((mode) => (
+                      <SelectItem key={mode} value={mode} className="text-[12px]">
+                        <span className="flex items-center gap-2">
+                          <HugeiconsIcon icon={CWD_MODE_ICONS[mode]} size={13} strokeWidth={2} className="shrink-0 text-muted-foreground" />
+                          {CWD_MODE_LABELS[mode]}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
-        )}
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-muted-foreground">Name</span>
-          <input
-            className={cn(INPUT_CLASS, "w-full")}
-            aria-label="Action name"
-            placeholder="Name"
-            spellCheck={false}
-            value={shownName}
-            onFocus={() => {
-              setName(action.name);
-              setNameFocused(true);
-            }}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={(e) => {
-              setNameFocused(false);
-              saveName(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                onClose();
-              }
-            }}
-          />
-        </label>
+          {terminal && cwdMode === "fixed" && (
+            <>
+              <div className="flex items-center gap-1">
+                <input
+                  className={cn(INPUT_CLASS, "flex-1 font-mono")}
+                  aria-label="Fixed folder path"
+                  placeholder="Absolute path"
+                  spellCheck={false}
+                  defaultValue={action.cwd ?? ""}
+                  key={action.cwd ?? ""}
+                  onBlur={(e) => onChange({ ...action, cwd: e.target.value.trim() || undefined })}
+                />
+                <button
+                  type="button"
+                  title="Browse"
+                  aria-label="Browse for a folder"
+                  className={SMALL_BUTTON}
+                  onClick={async () => {
+                    const selected = await openFolderDialog({ directory: true, defaultPath: action.cwd || undefined });
+                    if (typeof selected === "string") onChange({ ...action, cwd: selected });
+                  }}
+                >
+                  <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
+                </button>
+              </div>
+              {blocking
+                .filter((p) => p.kind === "cwd")
+                .map((p) => (
+                  <div key={p.message} className="text-[11px] text-destructive">
+                    {p.message}
+                  </div>
+                ))}
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-1">
           <label className="flex flex-col gap-1.5">
