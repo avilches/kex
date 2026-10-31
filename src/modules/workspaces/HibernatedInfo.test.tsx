@@ -31,6 +31,21 @@ describe("HibernatedInfo", () => {
     expect(getByText("claude --resume abc")).toBeTruthy();
   });
 
+  it("puts the dot the tab slept with right after its name, orange for attention and red for an error", () => {
+    const attention = render(<HibernatedInfo {...props} indicator="attention" />);
+    const dot = attention.container.querySelector("[data-hibernated-dot]")!;
+    expect(dot.className).toContain("bg-amber-400");
+    expect(dot.previousElementSibling?.textContent).toBe("Claude Code");
+    cleanup();
+    const error = render(<HibernatedInfo {...props} indicator="error" />);
+    expect(error.container.querySelector("[data-hibernated-dot]")!.className).toContain("bg-destructive");
+  });
+
+  it("shows no dot when the tab slept without a notification", () => {
+    const { container } = render(<HibernatedInfo {...props} />);
+    expect(container.querySelector("[data-hibernated-dot]")).toBeNull();
+  });
+
   it("dims the folder, the command and the copy buttons", () => {
     const { container, getByLabelText } = render(<HibernatedInfo {...props} />);
     const folder = container.querySelector('[data-hibernated-value="folder"]')!;
