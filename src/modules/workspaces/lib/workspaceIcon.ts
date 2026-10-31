@@ -28,7 +28,6 @@ import {
   BracketsIcon,
   BrainIcon,
   BugIcon,
-  CircleIcon,
   CloudDownloadIcon,
   CloudIcon,
   CloudServerIcon,
@@ -212,12 +211,4 @@ export function getWorkspaceIcon(name: string): IconSvgElement | null {
   const palette = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
   if (palette) return palette.icon as IconSvgElement;
   return catalogIcon(name);
-}
-
-// The icon of a workspace mark. A workspace with a color but no icon gets a circle in that color; one with
-// neither gets nothing. An icon that is named but not loaded yet draws the same circle until it arrives.
-export function markGlyph(icon: string | undefined, colored: boolean): IconSvgElement | null {
-  const own = icon ? getWorkspaceIcon(icon) : null;
-  if (own) return own;
-  return colored ? (CircleIcon as IconSvgElement) : null;
 }

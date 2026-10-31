@@ -1,10 +1,8 @@
-import { CircleIcon } from "@hugeicons/core-free-icons";
 import { describe, expect, it } from "vitest";
 import {
   PALETTE_PAGE_SIZE,
   WORKSPACE_ICON_PALETTE,
   getWorkspaceIcon,
-  markGlyph,
 } from "./workspaceIcon";
 
 describe("WORKSPACE_ICON_PALETTE", () => {
@@ -22,25 +20,5 @@ describe("WORKSPACE_ICON_PALETTE", () => {
   it("resolves a name to its icon", () => {
     expect(getWorkspaceIcon("HeartIcon")).not.toBeNull();
     expect(getWorkspaceIcon("Nope")).toBeNull();
-  });
-});
-
-describe("markGlyph", () => {
-  it("prefers the workspace's own icon, colored or not", () => {
-    expect(markGlyph("HeartIcon", true)).toBe(getWorkspaceIcon("HeartIcon"));
-    expect(markGlyph("HeartIcon", false)).toBe(getWorkspaceIcon("HeartIcon"));
-  });
-
-  it("is a circle when the workspace has a color and no icon", () => {
-    expect(markGlyph(undefined, true)).toBe(CircleIcon);
-  });
-
-  it("is nothing when the workspace has neither", () => {
-    expect(markGlyph(undefined, false)).toBeNull();
-  });
-
-  it("is the circle, not nothing, while an icon of the catalog has not loaded", () => {
-    expect(markGlyph("NotLoadedYetIcon", true)).toBe(CircleIcon);
-    expect(markGlyph("NotLoadedYetIcon", false)).toBeNull();
   });
 });

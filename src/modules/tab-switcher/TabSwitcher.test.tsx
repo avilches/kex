@@ -197,7 +197,8 @@ describe("TabSwitcher footer", () => {
   it("draws the workspace mark before its name, with its color", () => {
     show([entry({ workspaceTitle: "Kex", workspaceColor: "#ef4444" })]);
     const name = within(footer()).getByText("Kex");
-    expect(name.parentElement?.querySelector("svg")).toBeTruthy();
+    const dot = name.parentElement?.querySelector(".rounded-full") as HTMLElement | null;
+    expect(dot?.style.backgroundColor).toBeTruthy();
   });
 
   it("shows the hibernated icon next to the title and never the word", () => {
