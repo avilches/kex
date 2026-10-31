@@ -553,3 +553,9 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 .kex-spinner-grid > i:nth-child(3) {
   animation-delay: 0.75s;
 }
+
+/* The tab switcher overlay is z-60 and Radix draws its menus at z-50; the controller flags the body while a
+   tile menu is open so the menu and its submenus sit above it. */
+body[data-switcher-menu] [data-radix-popper-content-wrapper] {
+  z-index: 70 !important;
+}

@@ -234,8 +234,10 @@ only the rendering is deferred.
 ### Hibernated tabs
 
 Not to be confused with the dormant ring above: a hibernated tab is a terminal tab (`Tab.hibernation`,
-`TabHibernation`: `at`, `agent`, `command`, `title`) with no PTY and no render slot. Its presence is the flag, and it is
-persisted with the tab; the workspace knows nothing about it. Only terminals (and the agents in them) hibernate: editors,
+`TabHibernation`: `at`, `agent`, `command`, `title`, `indicator`) with no PTY and no render slot. Its presence is the flag, and it is
+persisted with the tab; the workspace knows nothing about it. `indicator` is the attention or error dot the agent had when the tab
+went to sleep (`indicatorToKeep`, `lib/hibernateIndicator.ts`), because the live session ends with the PTY: the tab bar, the
+workspace detail list, the command palette, the tab switcher and the hibernated card itself (a dot right after the tab name, also in the switcher footer) read it with `sleepIndicator` while no live session exists. Waking drops `hibernation`, so `wakeTabs` copies the agent and the dot into `lib/wakeCarry.ts`; the palette and the switcher read them from there (`liveTabSources`) until the agent has a live session again, which is why a just-restored tab keeps its agent icon and stays under Need attention. Every surface draws a sleeping tab as its sleeping icon with the dot or spinner laid over the middle of it (the switcher tile does it in its top right corner); only the name and the tab icon dim, never the sleeping icon or the dot. As a test hook, a terminal named `Error` or `Warn` shows the red or orange dot on every surface (`titleIndicator`, in `lib/hibernateIndicator.ts`). Only terminals (and the agents in them) hibernate: editors,
 browsers and the rest never do. The tab keeps its id, its place in the `paneTree`, its note, color, lock and title.
 
 - **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the title, a small table, the Restore
@@ -508,6 +510,28 @@ active WebGL contexts ≈ number of panes in the active workspace
 Switching workspaces releases the old workspace's slots (WebGL disposed after 30s) and acquires
 new ones for the new workspace. The pool's warm slot (`IDLE_SLOTS_KEEP_WARM = 1`) means the first
 re-shown terminal after a workspace switch may reuse the still-warm slot.
+
+### Pool diagnostics in the log
+
+Every pool event writes one `[pool] <event> key=value ...` line to `Kex.log` (`poolLog` in
+`rendererPool.ts`, pure formatting and buffer inspection in `slotDiagnostics.ts`). Grep for
+`\[pool\]`. Events: `create`, `bind`, `detach`, `dispose`, `webgl-attach`, `webgl-attach-failed`,
+`webgl-skip-cap`, `webgl-context-loss`, `webgl-dispose`.
+
+Slot lines carry the leaf, where the host element is (`container`, `recycler` or `detached`), its
+visibility and size, the WebGL state, whether stdin is enabled, and the buffer health: `ok`, `cols`,
+`rows`, `bufLen`, `viewportY`, `missing` (viewport lines that are `undefined`) and `firstMissing`.
+
+Warnings that point at a black or deaf terminal:
+
+- `unhealthy where=...`: the buffer failed the check after the reset in `bindSlot` (`bind-after-reset`)
+  or when the terminal was unhidden (`unhide`). A viewport line that is `undefined` is what xterm
+  reports as `undefined is not an object (evaluating 'x.loadCell')`.
+- `xterm-error` plus one `xterm-error-slot` per slot: written the first five times a window error
+  mentions `loadCell`, `getWidth` or `_updateModel`, so the log shows which slot was broken and what
+  state the rest of the pool was in.
+- `input-dropped reason=no-leaf|no-bridge`: keystrokes that reached xterm but had nowhere to go
+  (first five only).
 
 ---
 

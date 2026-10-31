@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  afterRemoval,
   GRID_GAP,
   GRID_PAD,
   TILE_HEIGHT,
   gridViewportHeight,
   heldModifiers,
+  letterOf,
+  sleepOutcome,
+  settledSleepState,
+  carriedAgent,
+  carriedIndicator,
+  digitIndex,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -72,6 +79,89 @@ describe("rowIndex", () => {
   });
 });
 
+describe("letterOf", () => {
+  const b = (key: string, extra: object = {}) => ({ key, ...extra });
+
+  it("takes the letter of the first binding that has one, whatever its modifiers", () => {
+    expect(letterOf([b("z", { meta: true, alt: true })])).toBe("z");
+    expect(letterOf([b("F5"), b("Z", { ctrl: true })])).toBe("z");
+  });
+
+  it("is lower case, so the shifted letter of a binding is the same key", () => {
+    expect(letterOf([b("Z", { shift: true })])).toBe("z");
+  });
+
+  it("refuses what is not a single letter, since it would shadow a key of the switcher", () => {
+    for (const key of ["Enter", "Escape", "Tab", "ArrowUp", "ArrowLeft", "F2", "1", " ", ".", "ab"]) {
+      expect(letterOf([b(key)])).toBeNull();
+    }
+  });
+
+  it("refuses the letters the switcher already owns", () => {
+    expect(letterOf([b("w")])).toBeNull();
+    expect(letterOf([b("W", { meta: true })])).toBeNull();
+  });
+
+  it("skips a refused binding to reach a usable one, and is null with none", () => {
+    expect(letterOf([b("w"), b("h")])).toBe("h");
+    expect(letterOf([])).toBeNull();
+  });
+
+  it("copes with a macOS Option letter, which arrives as a symbol", () => {
+    expect(letterOf([b("\u03a9", { alt: true })])).toBeNull();
+  });
+});
+
+describe("sleepOutcome", () => {
+  it("refreshes the tile when the tab changed state", () => {
+    expect(sleepOutcome({ before: false, after: true, dialogOpen: false })).toBe("refresh");
+    expect(sleepOutcome({ before: true, after: false, dialogOpen: false })).toBe("refresh");
+  });
+
+  it("dismisses the switcher when a confirmation is open, so the user can see and answer it", () => {
+    expect(sleepOutcome({ before: false, after: false, dialogOpen: true })).toBe("dismiss");
+  });
+
+  it("leaves the tile alone when nothing changed, as when a working agent was left running", () => {
+    expect(sleepOutcome({ before: false, after: false, dialogOpen: false })).toBe("keep");
+  });
+
+  it("leaves the tile alone when the tab is gone", () => {
+    expect(sleepOutcome({ before: false, after: null, dialogOpen: false })).toBe("keep");
+  });
+});
+
+describe("afterRemoval", () => {
+  const list = ["a", "b", "c", "d"].map((tabId) => ({ tabId }));
+
+  it("keeps the selection on the tile that slides into the gap", () => {
+    const out = afterRemoval(list, 1, "b");
+    expect(out?.entries.map((e) => e.tabId)).toEqual(["a", "c", "d"]);
+    expect(out?.index).toBe(1);
+  });
+
+  it("moves to the previous tile when the last one is removed", () => {
+    const out = afterRemoval(list, 3, "d");
+    expect(out?.entries.map((e) => e.tabId)).toEqual(["a", "b", "c"]);
+    expect(out?.index).toBe(2);
+  });
+
+  it("follows the highlighted tile when another one is removed", () => {
+    expect(afterRemoval(list, 3, "a")?.index).toBe(2);
+    expect(afterRemoval(list, 0, "d")?.index).toBe(0);
+  });
+
+  it("ignores a tab that is not in the list, and does not mutate its input", () => {
+    expect(afterRemoval(list, 1, "zzz")?.entries).toHaveLength(4);
+    expect(list).toHaveLength(4);
+  });
+
+  it("returns null when fewer than two tiles would remain, since there is nothing to switch to", () => {
+    expect(afterRemoval(list.slice(0, 2), 0, "a")).toBeNull();
+    expect(afterRemoval(list.slice(0, 1), 0, "a")).toBeNull();
+  });
+});
+
 describe("gridViewportHeight", () => {
   const row = TILE_HEIGHT + GRID_GAP;
 
@@ -126,5 +216,85 @@ describe("modifiers", () => {
   it("ignores a modifier that was not part of the opening chord", () => {
     const held = heldModifiers(e({ ctrlKey: true }));
     expect(modifiersReleased(held, e({ metaKey: true }))).toBe(true);
+  });
+});
+
+describe("settledSleepState", () => {
+  it("returns the new state once a committed render shows it", async () => {
+    vi.useFakeTimers();
+    let state: boolean | null = false;
+    setTimeout(() => (state = true), 40);
+    const result = settledSleepState(() => state, false, { stepMs: 16, timeoutMs: 500 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await result).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("gives up with the unchanged state after the timeout", async () => {
+    vi.useFakeTimers();
+    const result = settledSleepState(() => false, false, { stepMs: 16, timeoutMs: 100 });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(await result).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("stops waiting as soon as the caller says it was interrupted", async () => {
+    const read = vi.fn(() => false);
+    const result = await settledSleepState(read, false, { stepMs: 16, timeoutMs: 5000, interrupted: () => true });
+    expect(result).toBe(false);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null at once when the tab is gone", async () => {
+    expect(await settledSleepState(() => null, false, { stepMs: 16, timeoutMs: 100 })).toBeNull();
+  });
+});
+
+describe("carriedAgent", () => {
+  it("keeps the agent of the old tile when the refreshed one has none yet", () => {
+    expect(carriedAgent("claude", "")).toBe("claude");
+  });
+
+  it("prefers the agent the refreshed tile already knows", () => {
+    expect(carriedAgent("claude", "codex")).toBe("codex");
+  });
+
+  it("stays empty when neither has an agent", () => {
+    expect(carriedAgent("", "")).toBe("");
+  });
+});
+
+describe("carriedIndicator", () => {
+  it("keeps the dot of the old tile while the refreshed one has none", () => {
+    expect(carriedIndicator("attention", null)).toBe("attention");
+    expect(carriedIndicator("error", null)).toBe("error");
+  });
+
+  it("prefers the dot the refreshed tile already shows", () => {
+    expect(carriedIndicator("attention", "working")).toBe("working");
+  });
+
+  it("stays empty when neither has one", () => {
+    expect(carriedIndicator(null, null)).toBeNull();
+  });
+});
+
+describe("digitIndex", () => {
+  it("maps Digit1..Digit9 and the number pad to the tile at that position", () => {
+    expect(digitIndex("Digit1", 12)).toBe(0);
+    expect(digitIndex("Digit9", 12)).toBe(8);
+    expect(digitIndex("Numpad3", 12)).toBe(2);
+  });
+
+  it("ignores a digit past the last tile", () => {
+    expect(digitIndex("Digit5", 4)).toBeNull();
+    expect(digitIndex("Digit4", 4)).toBe(3);
+  });
+
+  it("ignores zero and every key that is not a digit", () => {
+    expect(digitIndex("Digit0", 12)).toBeNull();
+    expect(digitIndex("KeyW", 12)).toBeNull();
+    expect(digitIndex("Digit10", 12)).toBeNull();
+    expect(digitIndex("", 12)).toBeNull();
   });
 });

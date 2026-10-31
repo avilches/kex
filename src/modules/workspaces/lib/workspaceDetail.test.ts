@@ -65,6 +65,24 @@ describe("workspaceDetailRows: terminals", () => {
     ).toEqual(["t2"]);
   });
 
+  test("a hibernated terminal keeps the dot it had, and in active-agents it still lists", () => {
+    const sleeping = [{ id: "s1", kind: "terminal", hibernation: { indicator: "attention" as const } }, { id: "s2", kind: "terminal" }];
+    const rows = workspaceDetailRows(sleeping, new Set(), [], filter({ terminals: "active-agents" }));
+    expect(rows).toEqual([{ tabId: "s1", visual: "attention" }]);
+    const all = workspaceDetailRows(sleeping, new Set(), [], filter({ terminals: "all" }));
+    expect(all.map((r) => r.visual)).toEqual(["attention", null]);
+  });
+
+  test("a terminal named Error or Warn shows the red or orange dot, asleep or not", () => {
+    const named = [
+      { id: "e", kind: "terminal", title: "Error" },
+      { id: "w", kind: "terminal", title: "Warn", hibernation: {} },
+      { id: "n", kind: "terminal", title: "api" },
+    ];
+    const rows = workspaceDetailRows(named, new Set(), [], filter({ terminals: "all" }));
+    expect(Object.fromEntries(rows.map((r) => [r.tabId, r.visual]))).toEqual({ e: "error", w: "attention", n: null });
+  });
+
   test("active-agents lists only the ones with an entry, in urgency order", () => {
     expect(ids({ terminals: "active-agents" })).toEqual(["t2", "t1"]);
   });

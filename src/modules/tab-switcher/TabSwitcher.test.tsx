@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TabEntry } from "@/modules/command-palette";
-import { cancelSwitcher, openSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { cancelSwitcher, openSwitcher, switcherActive, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, TILE_HEIGHT } from "./lib/switcherModel";
 import { TabSwitcher } from "./TabSwitcher";
 
@@ -59,6 +59,32 @@ describe("TabSwitcher tile", () => {
     expect(within(a).getByLabelText("Tab is hibernated")).toBeTruthy();
     expect(within(b).queryByLabelText("Tab is hibernated")).toBeNull();
     expect(screen.queryByText(/hibernated/i)).toBeNull();
+  });
+
+  it("puts the sleeping icon of a tile at the top right with the dot over it, and dims only the name", () => {
+    show([entry({ tabId: "a", title: "api", hibernated: true, indicator: "attention" }), entry({ tabId: "b" })], 1);
+    const [a] = tiles();
+    const moon = within(a).getByLabelText("Tab is hibernated");
+    const dot = within(a).getByLabelText("Agent needs attention");
+    const badge = moon.closest(".-top-1\\.5") as HTMLElement;
+    expect(badge).toBeTruthy();
+    expect(badge.contains(dot)).toBe(true);
+    expect(within(a).getByText("api").className).toContain("opacity-40");
+    expect(moon.className).not.toContain("opacity");
+    expect(dot.closest(".opacity-40")).toBeNull();
+  });
+
+  it("keeps the dot of an awake tile at the top right, alone", () => {
+    show([entry({ tabId: "a", indicator: "error" }), entry({ tabId: "b" })], 1);
+    const [a] = tiles();
+    expect(within(a).queryByLabelText("Tab is hibernated")).toBeNull();
+    expect(within(a).getByLabelText("Agent needs attention").className).toContain("bg-destructive");
+  });
+
+  it("has no CSS hover on an unselected tile, since the browser fires it under a resting pointer and the keyboard never clears it", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })], 0);
+    const [, b] = tiles();
+    expect(b.className).not.toMatch(/hover:/);
   });
 
   it("keeps every tile the same height whatever the title length", () => {
@@ -132,6 +158,105 @@ describe("TabSwitcher grid", () => {
   });
 });
 
+describe("TabSwitcher jump numbers", () => {
+  it("numbers the first nine tiles by position and leaves the rest bare", () => {
+    const many = Array.from({ length: 11 }, (_, i) => entry({ tabId: `t${i}`, title: `tab ${i}` }));
+    show(many);
+    const numbers = tiles().map((t) => t.querySelector("[data-jump-number]")?.textContent ?? null);
+    expect(numbers).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", null, null]);
+  });
+
+  it("announces the jump keys in the footer", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/1-9\s*jump/);
+  });
+});
+
+describe("TabSwitcher tile menu", () => {
+  function showMenu(renderMenu = (e: TabEntry) => <div role="menuitem" tabIndex={-1}>menu of {e.tabId}</div>) {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {});
+    act(() => useSwitcherStore.setState({ revealed: true, index: 0 }));
+    return render(<TabSwitcher renderMenu={renderMenu} />);
+  }
+
+  it("opens the app's menu for the tile that was right clicked and highlights it", () => {
+    showMenu();
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.getByRole("menuitem").textContent).toBe("menu of b");
+    expect(useSwitcherStore.getState().index).toBe(1);
+    expect(switcherActive()).toBe(true);
+  });
+
+  it("keeps the overlay while the menu is open and closes both on Escape", () => {
+    showMenu();
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.getAllByRole("option", { hidden: true }).length).toBe(2);
+    fireEvent.keyDown(screen.getByRole("menuitem"), { key: "Escape" });
+    expect(switcherActive()).toBe(false);
+  });
+
+  it("has no menu when the app gives none", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.queryByRole("menuitem")).toBeNull();
+  });
+});
+
+describe("TabSwitcher key hints", () => {
+  const hints = () => screen.getByTestId("tab-switcher-hints");
+
+  function showWith(hooks: Parameters<typeof openSwitcher>[4]) {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {}, hooks);
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    return render(<TabSwitcher />);
+  }
+
+  it("lists the keys that work, with the letter of the hibernate shortcut", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: "z" });
+    expect(hints().textContent).toMatch(/W\s*close/i);
+    expect(hints().textContent).toMatch(/Z\s*hibernate/i);
+  });
+
+  it("follows a rebinding: the hint shows the letter it was given", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: "h" });
+    expect(hints().textContent).toMatch(/H\s*hibernate/i);
+    expect(hints().textContent).not.toMatch(/Z\s*hibernate/i);
+  });
+
+  it("does not announce a key that is off", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: null });
+    expect(hints().textContent).not.toMatch(/hibernate/i);
+    expect(hints().textContent).toMatch(/W\s*close/i);
+  });
+
+  it("says restore instead of hibernate when the highlighted tab is asleep", () => {
+    openSwitcher(
+      new KeyboardEvent("keydown", { ctrlKey: true }),
+      1,
+      [entry({ tabId: "a" }), entry({ tabId: "b", hibernated: true })],
+      () => {},
+      { onSleep: () => undefined, sleepKey: "z" },
+    );
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    render(<TabSwitcher />);
+    expect(hints().textContent).toMatch(/Z\s*restore/i);
+    expect(hints().textContent).not.toMatch(/hibernate/i);
+  });
+
+  it("does not offer hibernate for a tab that cannot sleep", () => {
+    openSwitcher(
+      new KeyboardEvent("keydown", { ctrlKey: true }),
+      1,
+      [entry({ tabId: "a" }), entry({ tabId: "b", kind: "markdown", tab: { id: "b", kind: "markdown", path: "/p/a.md" } })],
+      () => {},
+      { onSleep: () => undefined, sleepKey: "z" },
+    );
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    render(<TabSwitcher />);
+    expect(hints().textContent).not.toMatch(/Z/);
+  });
+});
+
 describe("TabSwitcher footer", () => {
   it("draws the tab icon before the title, like the tab strip", () => {
     show([entry({ title: "My terminal" })]);
@@ -142,13 +267,51 @@ describe("TabSwitcher footer", () => {
   it("draws the workspace mark before its name, with its color", () => {
     show([entry({ workspaceTitle: "Kex", workspaceColor: "#ef4444" })]);
     const name = within(footer()).getByText("Kex");
-    expect(name.parentElement?.querySelector("svg")).toBeTruthy();
+    const dot = name.parentElement?.querySelector(".rounded-\\[2px\\]") as HTMLElement | null;
+    expect(dot?.style.backgroundColor).toBeTruthy();
   });
 
   it("shows the hibernated icon next to the title and never the word", () => {
     show([entry({ hibernated: true })]);
     expect(within(footer()).getByLabelText("Tab is hibernated")).toBeTruthy();
     expect(footer().textContent).not.toMatch(/hibernated/i);
+  });
+
+  it("puts the attention or error dot, or the spinner of a working agent, right after the title, and nothing for a tab without one", () => {
+    show([entry({ title: "api", indicator: "attention" })]);
+    const dot = footer().querySelector("[data-indicator-dot]")!;
+    expect(dot.className).toContain("bg-amber-400");
+    expect(dot.previousElementSibling?.textContent).toBe("api");
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api", indicator: "error" })]);
+    expect(footer().querySelector("[data-indicator-dot]")!.className).toContain("bg-destructive");
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api", indicator: "working" })]);
+    expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
+    expect(within(footer()).getByRole("status")).toBeTruthy();
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api" })]);
+    expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
+  });
+
+  it("puts the hibernated icon first and the dot after it, and dims only the name", () => {
+    show([entry({ title: "api", hibernated: true, indicator: "attention" })]);
+    const title = within(footer()).getByText("api");
+    const icon = within(footer()).getByLabelText("Tab is hibernated");
+    const dot = footer().querySelector("[data-indicator-dot]")!;
+    expect(title.nextElementSibling).toBe(icon);
+    expect(icon.nextElementSibling).toBe(dot);
+    expect(title.className).toContain("opacity-40");
+    expect(icon.className).not.toContain("opacity");
+    expect(dot.className).not.toContain("opacity");
+  });
+
+  it("does not dim the name of a tab that is awake", () => {
+    show([entry({ title: "api" })]);
+    expect(within(footer()).getByText("api").className).not.toContain("opacity");
   });
 
   it("keeps the workspace out of the detail line, since it has its own", () => {

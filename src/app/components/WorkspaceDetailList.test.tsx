@@ -353,9 +353,9 @@ describe("WorkspaceDetailList context menu", () => {
 });
 
 describe("WorkspaceDetailList with a hibernated tab", () => {
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn()) {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn(), focusedTabId: string | null = null, indicator?: "attention" | "error") {
     const sleeping = (t: Tab): Tab =>
-      t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1 } } as Tab) : t;
+      t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1, indicator } } as Tab) : t;
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -381,7 +381,7 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
             tabs: tabs.map(sleeping),
             entries: [],
             filter: { ...base },
-            focusedTabId: null,
+            focusedTabId,
             onActivate,
             onWake,
           }),
@@ -450,14 +450,55 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     unmount();
   });
 
-  it("an unlocked sleeping row shows the dimmed sleeping mark where the X is and the X replaces it on hover", () => {
+  it("reveals the X on hover or keyboard focus only, never on the programmatic focus a closed context menu leaves on the row", () => {
+    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const x = container.querySelector<HTMLButtonElement>('button[aria-label="Close tab"]')!;
+    expect(x.className).toContain("group-hover/tab:opacity-60");
+    expect(x.className).toContain("group-has-[:focus-visible]/tab:opacity-60");
+    expect(wrap(x).innerHTML).not.toContain("focus-within");
+    unmount();
+  });
+
+  it("an unlocked sleeping row hides the sleeping mark at rest, shows it on hover, and the X replaces it only under the pointer", () => {
     const { container, rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(4);
     const mark = wrap(sleepingRow).querySelector("[data-sleeping-mark]")!;
-    expect(mark.className).toContain("opacity-40");
-    expect(mark.className).toContain("group-hover/tab:opacity-0");
+    expect(mark.className).toContain("opacity-0");
+    expect(mark.className).toContain("group-hover/tab:opacity-100");
+    expect(mark.className).toContain("peer-hover/x:!opacity-0");
+    expect(mark.className).not.toContain("opacity-40");
     expect(container.querySelectorAll("[data-sleeping-mark]").length).toBe(1);
+    unmount();
+  });
+
+  it("a focused sleeping row keeps its sleeping mark visible, and the X still replaces it only under the pointer", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false, vi.fn(), "t-plain");
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    const mark = wrap(row).querySelector("[data-sleeping-mark]")!;
+    const tokens = mark.className.split(/\s+/);
+    expect(tokens).toContain("opacity-100");
+    expect(tokens).not.toContain("opacity-0");
+    expect(mark.className).toContain("peer-hover/x:!opacity-0");
+    unmount();
+  });
+
+  it("a sleeping row keeps the dot it went to sleep with, laid over the sleeping mark in the same slot", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false, vi.fn(), null, "attention");
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    const mark = wrap(row).querySelector<HTMLElement>("[data-sleeping-mark]")!;
+    const dot = wrap(row).querySelector(".bg-amber-400")!;
+    expect(mark.style.right).toBe("");
+    expect(mark.compareDocumentPosition(dot.parentElement!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(dot.closest(".opacity-40")).toBeNull();
+    unmount();
+  });
+
+  it("a sleeping row without a dot keeps the sleeping mark in the slot", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    expect(wrap(row).querySelector(".bg-amber-400")).toBeNull();
+    expect(wrap(row).querySelector<HTMLElement>("[data-sleeping-mark]")!.style.right).toBe("");
     unmount();
   });
 

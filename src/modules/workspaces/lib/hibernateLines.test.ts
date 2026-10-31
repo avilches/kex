@@ -48,6 +48,11 @@ describe("parseAnsi", () => {
     expect(plain([line])[0]).toBe("hi there!");
   });
 
+  it("turns the blank cells xterm serializes as cursor-forward and erase-characters into spaces", () => {
+    const [line] = parseAnsi(`Tienes${E}[1Crazón,${E}[3Cme${E}[0m${E}[2Xquedé${E}[C.`);
+    expect(plain([line])[0]).toBe("Tienes razón,   me  quedé .");
+  });
+
   it("normalises CRLF", () => {
     expect(plain(parseAnsi("a\r\nb"))).toEqual(["a", "b"]);
   });

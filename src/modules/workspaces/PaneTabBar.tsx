@@ -43,6 +43,7 @@ import { tabTopLineColor } from "./lib/tabColor";
 import { tabGitColor } from "./lib/tabGitColor";
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { useTabRenameStore } from "./lib/tabRenameStore";
+import { sleepIndicator } from "./lib/hibernateIndicator";
 import { tabStatusIndicator } from "./lib/tabStatusIndicator";
 import {
   getRunningCommand,
@@ -227,6 +228,7 @@ function DraggableTab({
     isRestoreError,
     interrupted: agentSession?.interrupted,
     status: agentSession?.status,
+    sleepIndicator: sleepIndicator(tab),
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (
@@ -260,8 +262,9 @@ function DraggableTab({
         // a left-click would natively steal DOM focus onto it. That fires
         // after PaneView's onMouseDownCapture already placed focus on the
         // leaf's terminal/scratchpad, undoing it. Focus is owned by the
-        // session, not the tab strip.
-        else if (e.button === 0) e.preventDefault();
+        // session, not the tab strip. The right button does the same and
+        // would also draw the system focus ring on a tab that is not active.
+        else if (e.button === 0 || e.button === 2) e.preventDefault();
       }}
       onAuxClick={(e) => {
         if (e.button === 1) {
@@ -291,7 +294,6 @@ function DraggableTab({
                 : "bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ],
         isThisDragging && "opacity-40",
-        sleeping && !isThisDragging && "opacity-40",
       )}
     >
       {/* Droppable half-zones - coordinates-based, no pointer events needed */}
@@ -331,7 +333,7 @@ function DraggableTab({
       <span
         className={cn(
           "shrink-0",
-          hasAgent && !tab.icon ? "opacity-100" : "opacity-70",
+          sleeping ? "opacity-40" : hasAgent && !tab.icon ? "opacity-100" : "opacity-70",
         )}
       >
         <TabBarIcon
@@ -348,6 +350,7 @@ function DraggableTab({
             !!runningCommand &&
             "text-center",
           isRestoreError && "text-destructive/70",
+          sleeping && "opacity-40",
           (tab.kind === "editor" ||
             tab.kind === "markdown" ||
             tab.kind === "git-diff" ||
@@ -372,16 +375,16 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
-      {isLocked && statusIndicator && (
-        <span className="ml-0.5 flex shrink-0 items-center">
-          {statusIndicator}
-        </span>
-      )}
       {isLocked ? (
         <>
         {sleeping && (
           <span className="ml-0.5 shrink-0" title="Hibernated: double click to restore">
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+          </span>
+        )}
+        {statusIndicator && (
+          <span className="ml-0.5 flex shrink-0 items-center">
+            {statusIndicator}
           </span>
         )}
         <button

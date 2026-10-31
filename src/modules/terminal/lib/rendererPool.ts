@@ -8,6 +8,7 @@ import type {
   CursorStyle,
 } from "@/modules/settings/store";
 import { buildTerminalTheme, currentMinimumContrastRatio } from "@/styles/terminalTheme";
+import { info as logInfo, warn as logWarn } from "@tauri-apps/plugin-log";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -19,6 +20,11 @@ import { registerTerminalLinks, parseFileUri } from "@/modules/terminal/lib/term
 import { dispatchFileLink } from "@/modules/terminal/lib/terminalLinkBridge";
 import { shouldCursorBlink } from "./cursorBlink";
 import { paletteHoldsFocus } from "./paletteHoldsFocus";
+import {
+  formatPoolEvent,
+  healthFields,
+  inspectTerminal,
+} from "./slotDiagnostics";
 import {
   terminalDeleteSequence,
   terminalLineNavigationSequence,
@@ -111,6 +117,75 @@ function setWindowActive(active: boolean): void {
 export function configureRendererPool(a: SlotAdapter): void {
   adapter = a;
   bindWindowActivityListeners();
+  bindXtermErrorProbe();
+}
+
+type LogFields = Parameters<typeof formatPoolEvent>[1];
+
+function poolLog(
+  level: "info" | "warn",
+  event: string,
+  fields: LogFields,
+): void {
+  const line = formatPoolEvent(event, fields);
+  (level === "warn" ? logWarn : logInfo)(line).catch(() => {});
+}
+
+function hostPlace(slot: Slot): string {
+  if (!slot.host.isConnected) return "detached";
+  return slot.host.parentNode === recyclerEl ? "recycler" : "container";
+}
+
+function slotFields(slot: Slot): LogFields {
+  return {
+    slot: slot.id,
+    leaf: slot.currentLeafId,
+    host: hostPlace(slot),
+    vis: slot.host.style.visibility || "visible",
+    w: slot.host.clientWidth,
+    h: slot.host.clientHeight,
+    webgl: !!slot.webglAddon,
+    canvases: slot.webglCanvases.length,
+    stdin: !slot.term.options.disableStdin,
+    ...healthFields(inspectTerminal(slot.term)),
+  };
+}
+
+// Logs only when the slot's buffer is unusable: this is the state that makes a
+// terminal black and unresponsive, and it is cheap enough to check on every
+// bind, detach and unhide.
+function auditSlot(slot: Slot, where: string): void {
+  const health = inspectTerminal(slot.term);
+  if (health.ok) return;
+  poolLog("warn", "unhealthy", { where, ...slotFields(slot) });
+}
+
+const MAX_DROPPED_INPUT_LOGS = 5;
+let droppedInputLogs = 0;
+
+function logDroppedInput(slot: Slot, reason: string): void {
+  if (droppedInputLogs >= MAX_DROPPED_INPUT_LOGS) return;
+  droppedInputLogs++;
+  poolLog("warn", "input-dropped", { reason, ...slotFields(slot) });
+}
+
+const XTERM_BUFFER_ERROR =/loadCell|getWidth|_updateModel/;
+const MAX_PROBE_DUMPS = 5;
+let probeBound = false;
+let probeDumps = 0;
+
+// A broken buffer throws on every frame; dump the whole pool the first few
+// times so the log shows which slot was bad and what had happened to it.
+function bindXtermErrorProbe(): void {
+  if (probeBound || typeof window === "undefined") return;
+  probeBound = true;
+  window.addEventListener("error", (e) => {
+    const msg = String(e.message ?? e.error ?? "");
+    if (!XTERM_BUFFER_ERROR.test(msg) || probeDumps >= MAX_PROBE_DUMPS) return;
+    probeDumps++;
+    poolLog("warn", "xterm-error", { n: probeDumps, msg, slots: slots.length });
+    for (const s of slots) poolLog("warn", "xterm-error-slot", slotFields(s));
+  });
 }
 
 export function forEachSlot(fn: (slot: Slot) => void): void {
@@ -331,11 +406,20 @@ function createSlot(): Slot {
 
   term.onData((data) => {
     const leafId = slot.currentLeafId;
-    if (leafId === null) return;
-    adapter?.resolveLeaf(leafId)?.writeToPty(data);
+    if (leafId === null) {
+      logDroppedInput(slot, "no-leaf");
+      return;
+    }
+    const bridge = adapter?.resolveLeaf(leafId);
+    if (!bridge) {
+      logDroppedInput(slot, "no-bridge");
+      return;
+    }
+    bridge.writeToPty(data);
   });
 
   slots.push(slot);
+  poolLog("info", "create", { slot: slot.id, pool: slots.length });
   return slot;
 }
 
@@ -396,6 +480,8 @@ export function acquireSlot(params: AcquireParams): Slot {
 function bindSlot(slot: Slot, p: AcquireParams): void {
   const stale =
     !slot.webglAddon || performance.now() - slot.lastUsedAt > SLOT_STALE_MS;
+  const idleMs = Math.round(performance.now() - slot.lastUsedAt);
+  const before = inspectTerminal(slot.term);
   slot.currentLeafId = p.leafId;
   slot.lastUsedAt = performance.now();
 
@@ -433,6 +519,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   ) {
     slot.term.resize(p.cols, p.rows);
   }
+  auditSlot(slot, "bind-after-reset");
 
   if (p.snapshot) {
     try {
@@ -486,6 +573,19 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   scheduleUnhide(slot, stale);
   notifyPool();
 
+  poolLog("info", "bind", {
+    ...slotFields(slot),
+    idleMs,
+    stale,
+    wasHealthy: before.ok,
+    reqCols: p.cols,
+    reqRows: p.rows,
+    snapshotLen: p.snapshot?.length ?? 0,
+    alt: p.altScreen,
+    exited: p.shellExited,
+    free: slots.filter((s) => s.currentLeafId === null).length,
+  });
+
   p.onSearchReady(slot.searchAddon);
 }
 
@@ -494,6 +594,7 @@ function scheduleUnhide(slot: Slot, stale: boolean): void {
     slot.unhideRaf = requestAnimationFrame(() => {
       slot.unhideRaf = null;
       slot.host.style.visibility = "";
+      auditSlot(slot, "unhide");
       if (stale) {
         if (!slot.webglAddon) attachWebgl(slot);
         try {
@@ -604,6 +705,7 @@ function serializeSlot(slot: Slot): SerializeOutput {
 }
 
 function detachSlotFromLeaf(slot: Slot): void {
+  poolLog("info", "detach", slotFields(slot));
   for (const d of slot.oscDisposers) {
     try {
       d();
@@ -680,6 +782,7 @@ function reapIdleSlot(slot: Slot): void {
 }
 
 function disposeSlot(slot: Slot): void {
+  poolLog("info", "dispose", { ...slotFields(slot), pool: slots.length });
   cancelSlotReap(slot);
   cancelWebglReap(slot);
   cancelPendingUnhide(slot);
@@ -743,6 +846,7 @@ function attachWebgl(slot: Slot): void {
       cancelWebglReap(oldest);
       disposeSlotWebgl(oldest);
     } else {
+      poolLog("warn", "webgl-skip-cap", { slot: slot.id, live: liveCount });
       return;
     }
   }
@@ -754,6 +858,7 @@ function attachWebgl(slot: Slot): void {
   try {
     const webgl = new WebglAddon();
     webgl.onContextLoss(() => {
+      poolLog("warn", "webgl-context-loss", slotFields(slot));
       const cur = slot.webglAddon;
       if (cur === webgl) {
         slot.webglAddon = null;
@@ -784,13 +889,28 @@ function attachWebgl(slot: Slot): void {
     slot.webglAddon = webgl;
     slot.webglCanvases = added;
     notifyPool();
+    poolLog("info", "webgl-attach", {
+      slot: slot.id,
+      leaf: slot.currentLeafId,
+      live: liveCount + 1,
+    });
   } catch (e) {
     console.warn("[kex-webgl] unavailable:", e);
+    poolLog("warn", "webgl-attach-failed", {
+      slot: slot.id,
+      leaf: slot.currentLeafId,
+      err: e instanceof Error ? e.message : String(e),
+    });
   }
 }
 
 function disposeSlotWebgl(slot: Slot): void {
   if (!slot.webglAddon) return;
+  poolLog("info", "webgl-dispose", {
+    slot: slot.id,
+    leaf: slot.currentLeafId,
+    ...healthFields(inspectTerminal(slot.term)),
+  });
   const addon = slot.webglAddon;
   for (const canvas of slot.webglCanvases) releaseCanvasContext(canvas);
   slot.webglCanvases = [];

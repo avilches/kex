@@ -24,6 +24,94 @@ export function switcherOrder<T extends Ordered>(entries: readonly T[], activeTa
   return sorted;
 }
 
+// Letters the switcher keeps for itself: W closes the highlighted tab.
+const OWN_LETTERS: readonly string[] = ["w"];
+
+// The key a shortcut lends the switcher: the letter of its first binding that has one, with no modifier, in
+// lower case. Only a single letter qualifies. Anything else a shortcut can be moved to (Enter, an arrow, F5, a
+// digit) would shadow a key of the switcher or mean nothing bare, and so would a letter it already uses; with
+// none left the key is simply off, which is better than a silent clash.
+export function letterOf(bindings: readonly { key: string }[]): string | null {
+  for (const { key } of bindings) {
+    const letter = key.toLowerCase();
+    if (/^[a-z]$/.test(letter) && !OWN_LETTERS.includes(letter)) return letter;
+  }
+  return null;
+}
+
+// What a hibernate or restore request did to a tab, read from its state before and after (after is null when
+// the tab no longer exists). The request does not say, because with a working agent it only opens a
+// confirmation and returns: the tile is refreshed only if the tab really changed. While that dialog is open
+// nothing has happened yet and the overlay would hide it, so the switcher is dismissed for the user to decide.
+export function sleepOutcome(s: {
+  before: boolean;
+  after: boolean | null;
+  dialogOpen: boolean;
+}): "refresh" | "keep" | "dismiss" {
+  if (s.dialogOpen) return "dismiss";
+  if (s.after === null) return "keep";
+  return s.after !== s.before ? "refresh" : "keep";
+}
+
+// A request to hibernate or wake queues a state update, and the refs the app reads the tab from only catch up
+// after React commits it. Reading right after the request therefore still shows the old state, so this waits
+// for the read to differ from `before`, up to a timeout: a request that only opens a dialog or is cancelled
+// never changes it and ends unchanged. Null when the tab no longer exists.
+export async function settledSleepState(
+  read: () => boolean | null,
+  before: boolean,
+  { stepMs = 16, timeoutMs = 400, interrupted }: { stepMs?: number; timeoutMs?: number; interrupted?: () => boolean } = {},
+): Promise<boolean | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const now = read();
+    if (now === null || now !== before || interrupted?.() || Date.now() >= deadline) return now;
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
+}
+
+// A woken tab has no agent session until its agent starts again, which takes longer than the switcher stays
+// open, so the refreshed tile would lose the agent mark. It keeps the one the tile had.
+export function carriedAgent(previous: string, refreshed: string): string {
+  return refreshed || previous;
+}
+
+// The orange or red dot comes from the live agent session, which a hibernated or just restored tab does not
+// have for a while. The refreshed tile keeps the dot the old one had until the app shows a new one, so a
+// hibernate followed by a restore inside the same switcher does not lose it.
+export function carriedIndicator<T>(previous: T | null, refreshed: T | null): T | null {
+  return refreshed ?? previous;
+}
+
+// The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the
+// previous one when the last tile went, and a highlight on another tile follows it. Null when fewer than
+// two tiles would remain, because a switcher with nothing to switch to has no reason to stay open.
+export function afterRemoval<T extends { tabId: string }>(
+  entries: readonly T[],
+  index: number,
+  tabId: string,
+): { entries: T[]; index: number } | null {
+  const at = entries.findIndex((e) => e.tabId === tabId);
+  const next = at < 0 ? [...entries] : entries.filter((_, i) => i !== at);
+  if (next.length < 2) return null;
+  if (at < 0) return { entries: next, index };
+  const kept = at < index ? index - 1 : index;
+  return { entries: next, index: Math.min(kept, next.length - 1) };
+}
+
+// How many tiles a digit can reach: 1 to 9, like the numbers the first tiles wear.
+export const JUMP_KEYS = 9;
+
+// The tile a digit key jumps to. It reads the physical key (`code`), not the character, because with Alt
+// held a Mac types a symbol for the same key. The number pad counts too. Null for any other key or for a
+// digit past the last tile.
+export function digitIndex(code: string, length: number): number | null {
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(code);
+  if (!m) return null;
+  const at = Number(m[1]) - 1;
+  return at < length ? at : null;
+}
+
 export function startIndex(length: number, delta: 1 | -1): number {
   if (length <= 1) return 0;
   return delta > 0 ? 1 : length - 1;

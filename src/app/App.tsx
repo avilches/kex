@@ -70,6 +70,12 @@ import {
   openSwitcher,
   stepSwitcher,
   switcherActive,
+  letterOf,
+  shortcutBlockedBySwitcher,
+  carriedAgent,
+  carriedIndicator,
+  settledSleepState,
+  sleepOutcome,
   switcherOrder,
 } from "@/modules/tab-switcher";
 import { useProfilerSetting } from "@/modules/profiler";
@@ -109,6 +115,7 @@ import {
   setPerformanceProfiler,
 } from "@/modules/settings/store";
 import {
+  SHORTCUTS_BY_ID,
   useGlobalShortcuts,
   type ShortcutHandlers,
   type ShortcutId,
@@ -204,6 +211,7 @@ import {
   useState,
 } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
+import { SwitcherTabMenu } from "./components/SwitcherTabMenu";
 import { HibernateDialog } from "./components/HibernateDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
@@ -2901,6 +2909,51 @@ export default function App() {
     setCommandPaletteOpen(false);
     setFolderPaletteOpen(false);
   }, []);
+  // The switcher closes tabs the way the palette does: a locked tab flashes its lock and stays (nothing is
+  // returned, so the tile stays too), and anything else goes through the close guards, which may ask the user
+  // and report whether the tab really went.
+  const closeTabFromSwitcher = useCallback((entry: TabEntry) => {
+    if (entry.tab.locked) {
+      flashLockIcon(entry.tabId);
+      return undefined;
+    }
+    return closeTabsRef.current([entry.tabId]);
+  }, []);
+
+  // Hibernates or restores the tab the way the shortcut does for the active one, but for any tab and without
+  // moving to it (restoring wakes it where it is, like Restore Tab in the palette). A request may only open a
+  // confirmation and return, so the result is read from the tab itself: the refreshed entry when its state
+  // really changed, nothing otherwise (a dialog still open, a cancelled one, a tab that cannot sleep).
+  const sleepTabFromSwitcher = useCallback(
+    async (entry: TabEntry) => {
+      const find = () => findTabGlobal(entry.tabId);
+      const before = find();
+      if (before?.tab.kind !== "terminal") return null;
+      const wasAsleep = before.tab.hibernation !== undefined;
+      if (wasAsleep) await wakeTabs(before.workspace.id, [entry.tabId]);
+      else await requestHibernate(before.workspace.id, [entry.tabId]);
+      const asleep = await settledSleepState(() => {
+        const after = find();
+        return after?.tab.kind === "terminal" ? after.tab.hibernation !== undefined : null;
+      }, wasAsleep, { interrupted: () => pendingHibernateRef.current != null });
+      const verdict = sleepOutcome({
+        before: wasAsleep,
+        after: asleep,
+        dialogOpen: pendingHibernateRef.current != null,
+      });
+      if (verdict === "dismiss") return "dismiss" as const;
+      if (verdict === "keep") return null;
+      const fresh = buildTabEntries(
+        workspacesRef.current.filter((w) => w.id === before.workspace.id),
+        liveTabSources(),
+      ).find((t) => t.tabId === entry.tabId);
+      return fresh
+        ? { ...fresh, agent: carriedAgent(entry.agent, fresh.agent), indicator: carriedIndicator(entry.indicator, fresh.indicator), lastUsedAt: entry.lastUsedAt, order: entry.order }
+        : null;
+    },
+    [findTabGlobal, wakeTabs, requestHibernate],
+  );
+
   // Every tab of the window in recency order. Choosing one only goes to it: a hibernated tab shows its
   // placeholder and stays asleep, the user wakes it on purpose.
   const openTabSwitcher = useCallback(
@@ -2909,9 +2962,24 @@ export default function App() {
         buildTabEntries(workspacesRef.current, liveTabSources()),
         activeTabId,
       );
-      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId));
+      // The key for hibernating is the letter of the shortcut as it stands now, so rebinding it moves the key.
+      const bindings = usePreferencesStore.getState().shortcuts["tab.hibernate"] ?? SHORTCUTS_BY_ID.get("tab.hibernate")?.defaultBindings ?? [];
+      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId), {
+        onClose: closeTabFromSwitcher,
+        onSleep: sleepTabFromSwitcher,
+        sleepKey: letterOf(bindings),
+      });
     },
-    [activeTabId, goToTab],
+    [activeTabId, goToTab, closeTabFromSwitcher, sleepTabFromSwitcher],
+  );
+  // Right click on a tile: the menu of the tab in its pane strip, read from the live workspaces (the tile's own
+  // entry is a snapshot). A tab that closed since the overlay opened has no menu.
+  const renderSwitcherMenu = useCallback(
+    (entry: TabEntry) => {
+      const tab = findTabGlobal(entry.tabId)?.tab;
+      return tab ? <SwitcherTabMenu entry={entry} tab={tab} onActivate={goToTab} /> : null;
+    },
+    [findTabGlobal, goToTab],
   );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -3246,7 +3314,9 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
-      if (switcherActive() && id !== "tab.switcher" && id !== "tab.switcherBack") return true;
+      // Open, the switcher owns its own keys and blocks every other shortcut; closed, its close key is off so
+      // that Cmd+W reaches tab.close, which shares it.
+      if (shortcutBlockedBySwitcher(id, switcherActive())) return true;
       if (
         shortcutSwallowedByPalette(
           id,
@@ -4145,7 +4215,11 @@ export default function App() {
             onActivate={onActivateAgent}
           />
           <Toaster position="bottom-right" />
-          <TabSwitcher />
+          <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
+            <SidebarTabMenuProvider value={sidebarTabMenu}>
+              <TabSwitcher renderMenu={renderSwitcherMenu} />
+            </SidebarTabMenuProvider>
+          </WorkspaceMoveProvider>
 
           <CommandPalette
             open={commandPaletteOpen}

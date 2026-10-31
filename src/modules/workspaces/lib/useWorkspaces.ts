@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
+import { carryOnWake } from "./wakeCarry";
 import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { aliasAgentRecord, detachAgentSession, previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles, clearAgentTitles as clearAgentTitlesFn } from "./agentTitles";
@@ -1158,6 +1159,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       for (const t of tabs) if (isHibernatedTab(t) && t.hibernation.held && heldBlockStillValid(t)) seedHeldBlock(t.id, t.hibernation.held);
       await handOverLastLines(tabs.map((t) => t.id));
       unmarkHibernating(tabs.map((t) => t.id));
+      carryOnWake(tabs.filter(isHibernatedTab));
       setWorkspaces((prev) => applyWake(prev, workspaceId, new Set(tabs.map((t) => t.id))));
     });
   }, []);

@@ -136,6 +136,20 @@ describe("PaneTabBar plus button", () => {
   });
 });
 
+describe("PaneTabBar mouse down keeps the focus where it was", () => {
+  beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([0, 1, 2])("button %i does not let the browser focus the tab", (button) => {
+    setup({ id: "tab-1", kind: "terminal" });
+    const tab = document.querySelector("[data-tab-id]")!;
+    expect(fireEvent.mouseDown(tab, { button })).toBe(false);
+  });
+});
+
 describe("PaneTabBar with a hibernated tab", () => {
   beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
   afterEach(() => {
@@ -153,6 +167,22 @@ describe("PaneTabBar with a hibernated tab", () => {
     expect(onWake).not.toHaveBeenCalled();
     fireEvent.doubleClick(tabEl());
     expect(onWake).toHaveBeenCalledWith("tab-1");
+  });
+
+  it("dims only the name and the icon of a sleeping tab, never the tab itself, the sleeping icon or the dot", () => {
+    setup({ id: "tab-1", kind: "terminal", title: "api", hibernation: { at: 1, indicator: "attention" } });
+    expect(tabEl().className).not.toContain("opacity-40");
+    expect(screen.getByText("api").className).toContain("opacity-40");
+    expect(tabEl().querySelector('[title^="Hibernated"] svg')!.getAttribute("class") ?? "").not.toContain("opacity");
+    const dot = tabEl().querySelector(".bg-amber-400")!;
+    expect(dot.closest(".opacity-40")).toBeNull();
+  });
+
+  it("puts the sleeping icon before the dot on a locked sleeping tab", () => {
+    setup({ id: "tab-1", kind: "terminal", locked: true, hibernation: { at: 1, indicator: "attention" } });
+    const icon = tabEl().querySelector('[title^="Hibernated"]')!;
+    const dot = tabEl().querySelector(".bg-amber-400")!.parentElement!;
+    expect(icon.nextElementSibling).toBe(dot);
   });
 
   it("a double click on an awake tab wakes nothing and shows no sleeping icon", () => {

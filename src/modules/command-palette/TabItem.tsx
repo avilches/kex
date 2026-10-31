@@ -1,9 +1,10 @@
 import { CommandItem } from "@/components/ui/command";
-import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
+import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { LockKeyIcon, SleepingIcon } from "@hugeicons/core-free-icons";
+import { LockKeyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HighlightText } from "./HighlightText";
 import { foldText, highlightIndices, substringIndices } from "./lib/fuzzy";
@@ -52,6 +53,7 @@ export function TabItem({
       onContextMenu={onContextMenu}
       className="text-[12.5px]"
     >
+      <span className="flex min-w-0 flex-1 items-center gap-2">
       <span className={cn("flex min-w-0 flex-1 items-center gap-2", entry.hibernated && "opacity-40")}>
       <RowTag kind={tabTagKind(entry)} hit={tagHit} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
@@ -59,6 +61,7 @@ export function TabItem({
           tab={entry.tab}
           agentSession={entry.agentSession}
           running={entry.running}
+          carriedAgent={entry.agent}
         />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
@@ -89,32 +92,12 @@ export function TabItem({
           </span>
         ) : null}
       </span>
-      {entry.indicator === "working" ? (
-        <Spinner size={11} className="shrink-0" />
-      ) : entry.indicator ? (
-        <span
-          role="img"
-          aria-label="Agent needs attention"
-          className={cn(
-            "size-[6px] shrink-0 rounded-full",
-            entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
-          )}
-        />
-      ) : null}
+      </span>
       {entry.hibernated ? (
-        <span
-          role="img"
-          aria-label="Tab is hibernated"
-          className="shrink-0"
-        >
-          <HugeiconsIcon
-            icon={SleepingIcon}
-            size={12}
-            strokeWidth={1.75}
-            className="opacity-40"
-          />
-        </span>
-      ) : null}
+        <SleepingBadge size={12} indicator={entry.indicator} />
+      ) : (
+        <TabIndicatorMark indicator={entry.indicator} />
+      )}
       {entry.tab.locked ? (
         <span role="img" aria-label="Tab is locked" className="shrink-0">
           <HugeiconsIcon
