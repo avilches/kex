@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 export const ALT_HOLD_DELAY_MS = 1200;
 
 let held = false;
+let suppressed = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
@@ -18,38 +19,51 @@ function set(next: boolean): void {
   for (const l of listeners) l();
 }
 
-// Alt only counts as held after ALT_HOLD_DELAY_MS, so a quick Alt tap or Alt+key shortcut never flashes the paths.
-const onKey = (e: KeyboardEvent) => {
-  if (!e.altKey) {
+// Alt counts as held only after ALT_HOLD_DELAY_MS, and any other key pressed meanwhile (a hotkey) cancels it
+// until Alt is released, so a hotkey with Alt never flashes the paths.
+const onKeyDown = (e: KeyboardEvent) => {
+  if (!e.altKey) return;
+  if (e.key !== "Alt" || e.metaKey || e.ctrlKey || e.shiftKey) {
+    suppressed = true;
     cancelTimer();
     set(false);
     return;
   }
-  if (held || timer !== null) return;
+  if (suppressed || held || timer !== null) return;
   timer = setTimeout(() => {
     timer = null;
     set(true);
   }, ALT_HOLD_DELAY_MS);
 };
+
+const onKeyUp = (e: KeyboardEvent) => {
+  if (e.altKey) return;
+  suppressed = false;
+  cancelTimer();
+  set(false);
+};
+
 const onBlur = () => {
+  suppressed = false;
   cancelTimer();
   set(false);
 };
 
 function subscribe(listener: () => void): () => void {
   if (listeners.size === 0) {
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("keyup", onKey);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
   }
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("keyup", onKey);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
       cancelTimer();
+      suppressed = false;
       held = false;
     }
   };
