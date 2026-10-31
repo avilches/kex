@@ -1,4 +1,4 @@
-import { useLayoutEffect, useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState, type ReactNode } from "react";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
@@ -11,8 +11,12 @@ import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
 import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
-import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { commitSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { GRID_GAP, GRID_PAD, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
+
+// What the app puts in a tile's context menu. Called on every render of the tile, so it can read live state.
+export type RenderMenu = (entry: TabEntry) => ReactNode;
 
 // The icon is asked for at this size instead of stretched with CSS: the agent marks carry an inline size
 // that no class can override, which left them at 13 px inside a 44 px square.
@@ -39,13 +43,23 @@ function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
 // is as tall as two title lines plus the workspace line, and the spare room sits under them, so the
 // workspace hugs a one-line title instead of floating at the bottom. A tile that changed height with
 // its text would move the rows below it and the scroll with them.
-function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
+function Tile({
+  entry,
+  selected,
+  index,
+  renderMenu,
+}: {
+  entry: TabEntry;
+  selected: boolean;
+  index: number;
+  renderMenu?: RenderMenu;
+}) {
   const ref = useRef<HTMLButtonElement>(null);
   const indicator = useTabIndicator(entry.tabId, entry.indicator);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
-  return (
+  const tile = (
     <button
       ref={ref}
       type="button"
@@ -59,6 +73,15 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         selected && "border-primary bg-primary/10",
       )}
     >
+      {index < JUMP_KEYS ? (
+        <span
+          data-jump-number
+          aria-hidden
+          className="absolute top-1.5 left-2 text-[10px] leading-none text-muted-foreground tabular-nums"
+        >
+          {index + 1}
+        </span>
+      ) : null}
       <span className="relative shrink-0">
         <span
           className={cn(
@@ -106,6 +129,13 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
       </span>
     </button>
   );
+  if (!renderMenu) return tile;
+  return (
+    <ContextMenu onOpenChange={(open) => menuSwitcher(open, index)}>
+      <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
+      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>{renderMenu(entry)}</ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 // Only the keys that would work right now: W when the app can close, the hibernate letter when it is on and the
@@ -115,6 +145,7 @@ function KeyHints({ entry }: { entry: TabEntry }) {
   const hints: Array<[string, string]> = [];
   if (keys.close) hints.push(["W", "close"]);
   if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "restore" : "hibernate"]);
+  hints.push(["1-9", "jump"]);
   hints.push(["Esc", "cancel"]);
   return (
     <div data-testid="tab-switcher-hints" className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
@@ -196,7 +227,7 @@ function useWholeRows(count: number, shown: boolean) {
 }
 
 // Mounted by the parent only while a session is on, and it paints nothing during the first moments of one.
-export function TabSwitcher() {
+export function TabSwitcher({ renderMenu }: { renderMenu?: RenderMenu }) {
   const revealed = useSwitcherStore((s) => s.revealed);
   const entries = useSwitcherStore((s) => s.entries);
   const index = useSwitcherStore((s) => s.index);
@@ -218,7 +249,7 @@ export function TabSwitcher() {
             className="grid grid-cols-[repeat(auto-fill,minmax(122px,1fr))] overflow-y-auto"
           >
             {entries.map((entry, i) => (
-              <Tile key={entry.tabId} entry={entry} selected={i === index} index={i} />
+              <Tile key={entry.tabId} entry={entry} selected={i === index} index={i} renderMenu={renderMenu} />
             ))}
           </div>
         </div>

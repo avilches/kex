@@ -99,6 +99,19 @@ export function afterRemoval<T extends { tabId: string }>(
   return { entries: next, index: Math.min(kept, next.length - 1) };
 }
 
+// How many tiles a digit can reach: 1 to 9, like the numbers the first tiles wear.
+export const JUMP_KEYS = 9;
+
+// The tile a digit key jumps to. It reads the physical key (`code`), not the character, because with Alt
+// held a Mac types a symbol for the same key. The number pad counts too. Null for any other key or for a
+// digit past the last tile.
+export function digitIndex(code: string, length: number): number | null {
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(code);
+  if (!m) return null;
+  const at = Number(m[1]) - 1;
+  return at < length ? at : null;
+}
+
 export function startIndex(length: number, delta: 1 | -1): number {
   if (length <= 1) return 0;
   return delta > 0 ? 1 : length - 1;

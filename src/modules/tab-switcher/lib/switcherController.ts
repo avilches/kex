@@ -3,6 +3,7 @@ import type { TabEntry } from "@/modules/command-palette";
 import {
   REVEAL_DELAY_MS,
   afterRemoval,
+  digitIndex,
   heldModifiers,
   modifiersReleased,
   pointerMoved,
@@ -75,6 +76,7 @@ function end() {
   window.removeEventListener("keydown", onKeyDown, true);
   window.removeEventListener("keyup", onKeyUp, true);
   window.removeEventListener("blur", cancelSwitcher);
+  delete document.body.dataset.switcherMenu;
   useSwitcherStore.setState({ keys: { close: false, sleep: null }, revealed: false, entries: [], index: 0 });
 }
 
@@ -92,7 +94,7 @@ export function commitSwitcher(at?: number) {
 }
 
 export function stepSwitcher(delta: number) {
-  if (!session) return;
+  if (!session || session.busy) return;
   const { entries, index } = useSwitcherStore.getState();
   useSwitcherStore.setState({ index: stepIndex(index, entries.length, delta) });
   reveal();
@@ -154,10 +156,22 @@ async function sleepSelected(): Promise<void> {
 // Fed by the tiles on every pointer move. The reference point only advances when the pointer really
 // travelled, so a slow drift cannot add up to a pick, and a still cursor never picks anything.
 export function hoverSwitcher(index: number, at: Point) {
-  if (!session) return;
+  if (!session || session.busy) return;
   const moved = pointerMoved(session.pointer, at);
   if (session.pointer === null || moved) session.pointer = at;
   if (moved) useSwitcherStore.setState({ index });
+}
+
+// A tile's context menu opened or closed. While it is open the keys and the pointer belong to the menu
+// (the same hold a close waiting on a dialog has), the tile it opened on is the highlighted one, and the
+// body is flagged so the menu is drawn above the overlay. Any way of closing the menu, an item or a click
+// outside, also ends the switcher without going to any tab: an item that should go to one does it itself.
+export function menuSwitcher(open: boolean, index: number) {
+  if (!session) return;
+  if (!open) return cancelSwitcher();
+  session.busy = true;
+  document.body.dataset.switcherMenu = "";
+  useSwitcherStore.setState({ index });
 }
 
 function gridColumns(): number {
@@ -172,6 +186,8 @@ function moveRow(direction: 1 | -1) {
   reveal();
 }
 
+const jumpTarget = (e: KeyboardEvent) => digitIndex(e.code, useSwitcherStore.getState().entries.length);
+
 // Tab itself is not handled here: it is the shortcut that opened the switcher and the global listener
 // owns it. W closes the highlighted tab on its own, with whatever modifier is held, as Q quits an app in
 // the macOS switcher, and the letter of the hibernate shortcut puts it to sleep or wakes it the same way;
@@ -181,6 +197,8 @@ function onKeyDown(e: KeyboardEvent) {
   if (!session || session.busy || e.key === "Tab") return;
   e.preventDefault();
   e.stopPropagation();
+  const jump = jumpTarget(e);
+  if (jump !== null) return commitSwitcher(jump);
   if (e.key === "Escape") cancelSwitcher();
   else if (e.key === "Enter") commitSwitcher();
   else if (e.key === "ArrowRight") stepSwitcher(1);

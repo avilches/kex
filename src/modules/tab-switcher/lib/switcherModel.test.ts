@@ -11,6 +11,7 @@ import {
   settledSleepState,
   carriedAgent,
   carriedIndicator,
+  digitIndex,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -275,5 +276,25 @@ describe("carriedIndicator", () => {
 
   it("stays empty when neither has one", () => {
     expect(carriedIndicator(null, null)).toBeNull();
+  });
+});
+
+describe("digitIndex", () => {
+  it("maps Digit1..Digit9 and the number pad to the tile at that position", () => {
+    expect(digitIndex("Digit1", 12)).toBe(0);
+    expect(digitIndex("Digit9", 12)).toBe(8);
+    expect(digitIndex("Numpad3", 12)).toBe(2);
+  });
+
+  it("ignores a digit past the last tile", () => {
+    expect(digitIndex("Digit5", 4)).toBeNull();
+    expect(digitIndex("Digit4", 4)).toBe(3);
+  });
+
+  it("ignores zero and every key that is not a digit", () => {
+    expect(digitIndex("Digit0", 12)).toBeNull();
+    expect(digitIndex("KeyW", 12)).toBeNull();
+    expect(digitIndex("Digit10", 12)).toBeNull();
+    expect(digitIndex("", 12)).toBeNull();
   });
 });

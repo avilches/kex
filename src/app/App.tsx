@@ -211,6 +211,7 @@ import {
   useState,
 } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
+import { SwitcherTabMenu } from "./components/SwitcherTabMenu";
 import { HibernateDialog } from "./components/HibernateDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
@@ -2971,6 +2972,15 @@ export default function App() {
     },
     [activeTabId, goToTab, closeTabFromSwitcher, sleepTabFromSwitcher],
   );
+  // Right click on a tile: the menu of the tab in its pane strip, read from the live workspaces (the tile's own
+  // entry is a snapshot). A tab that closed since the overlay opened has no menu.
+  const renderSwitcherMenu = useCallback(
+    (entry: TabEntry) => {
+      const tab = findTabGlobal(entry.tabId)?.tab;
+      return tab ? <SwitcherTabMenu entry={entry} tab={tab} onActivate={goToTab} /> : null;
+    },
+    [findTabGlobal, goToTab],
+  );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -4205,7 +4215,11 @@ export default function App() {
             onActivate={onActivateAgent}
           />
           <Toaster position="bottom-right" />
-          <TabSwitcher />
+          <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
+            <SidebarTabMenuProvider value={sidebarTabMenu}>
+              <TabSwitcher renderMenu={renderSwitcherMenu} />
+            </SidebarTabMenuProvider>
+          </WorkspaceMoveProvider>
 
           <CommandPalette
             open={commandPaletteOpen}
