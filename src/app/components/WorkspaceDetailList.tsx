@@ -364,7 +364,7 @@ function DetailTabRow({
       {isLocked ? (
         <>
         {hibernated && (
-          <span aria-hidden data-sleeping-mark="" className="pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center opacity-40" style={{ right: 26 + (hasNote ? 20 : 0) }}>
+          <span aria-hidden data-sleeping-mark="" className={cn("pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity", focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40")} style={{ right: 26 + (hasNote ? 20 : 0) }}>
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
           </span>
         )}
@@ -381,25 +381,45 @@ function DetailTabRow({
             ) : (
         <>
           {hibernated ? (
-            <span aria-hidden data-sleeping-mark="" className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center opacity-40 transition-opacity group-has-[:focus-visible]/tab:opacity-0 group-hover/tab:opacity-0">
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
-            </span>
-          ) : (
-            visual !== null && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-has-[:focus-visible]/tab:opacity-0 group-hover/tab:opacity-0">
-                <StatusMark visual={visual} />
+            <>
+              <button
+                type="button"
+                title="Close tab"
+                aria-label="Close tab"
+                className={cn("peer/x absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-has-[:focus-visible]/tab:opacity-60", hoverBg)}
+                onClick={() => onClose(tab.id)}
+              >
+                <span className="text-[14px] leading-none">×</span>
+              </button>
+              <span
+                aria-hidden
+                data-sleeping-mark=""
+                className={cn(
+                  "pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity peer-hover/x:!opacity-0 group-has-[:focus-visible]/tab:!opacity-0",
+                  focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40",
+                )}
+              >
+                <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
               </span>
-            )
+            </>
+          ) : (
+            <>
+              {visual !== null && (
+                <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-has-[:focus-visible]/tab:opacity-0 group-hover/tab:opacity-0">
+                  <StatusMark visual={visual} />
+                </span>
+              )}
+              <button
+                type="button"
+                title="Close tab"
+                aria-label="Close tab"
+                className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-has-[:focus-visible]/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
+                onClick={() => onClose(tab.id)}
+              >
+                <span className="text-[14px] leading-none">×</span>
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            title="Close tab"
-            aria-label="Close tab"
-            className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", "group-has-[:focus-visible]/tab:opacity-60 group-hover/tab:opacity-60", hoverBg)}
-            onClick={() => onClose(tab.id)}
-          >
-            <span className="text-[14px] leading-none">×</span>
-          </button>
         </>
       )}
     </div>
