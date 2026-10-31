@@ -2974,7 +2974,18 @@ export default function App() {
   );
   // Right click on a tile: the menu of the tab in its pane strip, read from the live workspaces (the tile's own
   // entry is a snapshot). A tab that closed since the overlay opened has no menu.
-  const liveSwitcherTab = useCallback((tabId: string) => findTabGlobal(tabId)?.tab, [findTabGlobal]);
+  // Read from the state of this render, not from `findTabGlobal`: its ref only catches up in an effect after
+  // the commit, so a Lock or Color change made from the menu would show one change late.
+  const liveSwitcherTab = useCallback(
+    (tabId: string) => {
+      for (const w of workspaces) {
+        const found = findTabPane(w.paneTree, tabId);
+        if (found) return found.tab;
+      }
+      return undefined;
+    },
+    [workspaces],
+  );
   const renderSwitcherMenu = useCallback(
     (entry: TabEntry) => {
       const tab = liveSwitcherTab(entry.tabId);

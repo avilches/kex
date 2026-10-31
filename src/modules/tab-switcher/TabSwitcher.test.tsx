@@ -199,6 +199,18 @@ describe("TabSwitcher live tab", () => {
     expect(b.querySelector("[data-tab-color]")).toBeNull();
   });
 
+  it("tints a chosen icon with the colour and draws the stripe only when there is no icon", () => {
+    show([
+      entry({ tabId: "a", tab: { id: "a", kind: "terminal", icon: "Home01Icon", color: "#ff0000" } }),
+      entry({ tabId: "b", tab: { id: "b", kind: "terminal", color: "#00ff00" } }),
+    ]);
+    const [a, b] = tiles();
+    expect(a.querySelector("[data-tab-color]")).toBeNull();
+    expect(a.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#ff0000");
+    expect(b.querySelector("[data-tab-color]")).not.toBeNull();
+    expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("");
+  });
+
   it("follows the live tab instead of the snapshot, so Lock, Color and Icon change in place", () => {
     open();
     const live: Record<string, TabEntry["tab"]> = {};
