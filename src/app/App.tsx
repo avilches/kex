@@ -2933,12 +2933,13 @@ export default function App() {
       const asleep = await settledSleepState(() => {
         const after = find();
         return after?.tab.kind === "terminal" ? after.tab.hibernation !== undefined : null;
-      }, wasAsleep);
+      }, wasAsleep, { interrupted: () => pendingHibernateRef.current != null });
       const verdict = sleepOutcome({
         before: wasAsleep,
         after: asleep,
         dialogOpen: pendingHibernateRef.current != null,
       });
+      if (verdict === "dismiss") return "dismiss" as const;
       if (verdict === "keep") return null;
       const fresh = buildTabEntries(
         workspacesRef.current.filter((w) => w.id === before.workspace.id),

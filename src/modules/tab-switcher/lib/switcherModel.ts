@@ -41,10 +41,15 @@ export function letterOf(bindings: readonly { key: string }[]): string | null {
 
 // What a hibernate or restore request did to a tab, read from its state before and after (after is null when
 // the tab no longer exists). The request does not say, because with a working agent it only opens a
-// confirmation and returns: the tile is refreshed only if the tab really changed, and never while that
-// dialog is still open, when nothing has happened yet.
-export function sleepOutcome(s: { before: boolean; after: boolean | null; dialogOpen: boolean }): "refresh" | "keep" {
-  if (s.dialogOpen || s.after === null) return "keep";
+// confirmation and returns: the tile is refreshed only if the tab really changed. While that dialog is open
+// nothing has happened yet and the overlay would hide it, so the switcher is dismissed for the user to decide.
+export function sleepOutcome(s: {
+  before: boolean;
+  after: boolean | null;
+  dialogOpen: boolean;
+}): "refresh" | "keep" | "dismiss" {
+  if (s.dialogOpen) return "dismiss";
+  if (s.after === null) return "keep";
   return s.after !== s.before ? "refresh" : "keep";
 }
 
@@ -55,12 +60,12 @@ export function sleepOutcome(s: { before: boolean; after: boolean | null; dialog
 export async function settledSleepState(
   read: () => boolean | null,
   before: boolean,
-  { stepMs = 16, timeoutMs = 400 }: { stepMs?: number; timeoutMs?: number } = {},
+  { stepMs = 16, timeoutMs = 400, interrupted }: { stepMs?: number; timeoutMs?: number; interrupted?: () => boolean } = {},
 ): Promise<boolean | null> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const now = read();
-    if (now === null || now !== before || Date.now() >= deadline) return now;
+    if (now === null || now !== before || interrupted?.() || Date.now() >= deadline) return now;
     await new Promise((resolve) => setTimeout(resolve, stepMs));
   }
 }

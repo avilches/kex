@@ -34,8 +34,9 @@ export const useSwitcherStore = create<SwitcherState>(() => ({
 export type CloseTab = (entry: TabEntry) => Promise<boolean> | undefined;
 
 // What the app does to put a tab to sleep or wake it: the refreshed entry of the tab (its tile stays and
-// shows the new state), null when the user cancelled, and nothing when the tab cannot sleep at all.
-export type SleepTab = (entry: TabEntry) => Promise<TabEntry | null> | undefined;
+// shows the new state), "dismiss" when the app opened a dialog the overlay would hide (the switcher closes
+// and the user decides there), null when the user cancelled, and nothing when the tab cannot sleep at all.
+export type SleepTab = (entry: TabEntry) => Promise<TabEntry | "dismiss" | null> | undefined;
 
 // What the app lends the switcher beyond choosing a tab. `sleepKey` is the bare letter of the hibernate
 // shortcut at the moment it opens, so rebinding the shortcut moves the key with it.
@@ -134,13 +135,14 @@ async function sleepSelected(): Promise<void> {
   const entry = entries[index];
   if (!entry) return;
   current.busy = true;
-  let fresh: TabEntry | null = null;
+  let fresh: TabEntry | "dismiss" | null = null;
   try {
     fresh = (await sleep(entry)) ?? null;
   } finally {
     current.busy = false;
   }
   if (session !== current || !fresh) return;
+  if (fresh === "dismiss") return end();
   const now = useSwitcherStore.getState();
   const at = now.entries.findIndex((e) => e.tabId === entry.tabId);
   if (at < 0) return;

@@ -263,7 +263,7 @@ describe("switcher session", () => {
   });
 
   describe("hibernating the highlighted tab", () => {
-    type Sleep = (entry: TabEntry) => Promise<TabEntry | null> | undefined;
+    type Sleep = (entry: TabEntry) => Promise<TabEntry | "dismiss" | null> | undefined;
     const open = (onSleep?: Sleep, sleepKey: string | null = "z") =>
       openSwitcher(chord(), 1, entries, onCommit, { onSleep, sleepKey });
     const press = (key: string, init: KeyboardEventInit = {}) => {
@@ -293,6 +293,14 @@ describe("switcher session", () => {
       expect(list.map((e) => e.tabId)).toEqual(["a", "b", "c", "d"]);
       expect(list[1].hibernated).toBe(true);
       expect(useSwitcherStore.getState().index).toBe(1);
+    });
+
+    it("closes the switcher without jumping when the app asks to dismiss it, as when a confirmation opens", async () => {
+      open(() => Promise.resolve("dismiss"));
+      press("z");
+      await settle();
+      expect(switcherActive()).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
     });
 
     it("takes the letter in either case and with any modifier held", async () => {

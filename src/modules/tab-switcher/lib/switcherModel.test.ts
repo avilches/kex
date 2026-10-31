@@ -116,8 +116,8 @@ describe("sleepOutcome", () => {
     expect(sleepOutcome({ before: true, after: false, dialogOpen: false })).toBe("refresh");
   });
 
-  it("leaves the tile alone when a confirmation is open, since nothing has happened yet", () => {
-    expect(sleepOutcome({ before: false, after: false, dialogOpen: true })).toBe("keep");
+  it("dismisses the switcher when a confirmation is open, so the user can see and answer it", () => {
+    expect(sleepOutcome({ before: false, after: false, dialogOpen: true })).toBe("dismiss");
   });
 
   it("leaves the tile alone when nothing changed, as when a working agent was left running", () => {
@@ -234,6 +234,13 @@ describe("settledSleepState", () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(await result).toBe(false);
     vi.useRealTimers();
+  });
+
+  it("stops waiting as soon as the caller says it was interrupted", async () => {
+    const read = vi.fn(() => false);
+    const result = await settledSleepState(read, false, { stepMs: 16, timeoutMs: 5000, interrupted: () => true });
+    expect(result).toBe(false);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
   it("returns null at once when the tab is gone", async () => {
