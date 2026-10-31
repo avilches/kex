@@ -1,5 +1,11 @@
 import { cn } from "@/lib/utils";
+import { SleepingIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { sleepIndicator } from "@/modules/workspaces/lib/hibernateIndicator";
+import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
@@ -22,6 +28,8 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
     focusedTab: tab,
   });
 
+  const indicator = useTabIndicator(tab?.id ?? "", tab?.kind === "terminal" ? sleepIndicator(tab) : null);
+
   if (!workspace) return null;
 
   const group = workspace.groupId
@@ -31,6 +39,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const hasAgent = agentTabTitle?.hasAgent ?? false;
   const agentSession = agentTabTitle?.agentSession;
   const subtitle = agentTabTitle?.displayTitle ?? null;
+  const asleep = isHibernatedTab(tab);
 
   const big = Boolean(workspace.icon);
   const mark = (
@@ -64,7 +73,13 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
                 <AgentIcon agent={agentSession!.agent} size={11} />
               </span>
             )}
-            <span className="truncate">{subtitle}</span>
+            <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
+            {asleep && (
+              <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 opacity-40">
+                <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} />
+              </span>
+            )}
+            <TabIndicatorMark indicator={indicator} size={10} />
           </span>
         )}
       </div>

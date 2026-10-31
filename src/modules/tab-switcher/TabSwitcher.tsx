@@ -1,14 +1,14 @@
-import { useLayoutEffect, useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import type { TabEntry } from "@/modules/command-palette";
 import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
-import { buildAgentEntries } from "@/modules/agents/lib/notificationList";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
@@ -38,27 +38,9 @@ function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
 // is as tall as two title lines plus the workspace line, and the spare room sits under them, so the
 // workspace hugs a one-line title instead of floating at the bottom. A tile that changed height with
 // its text would move the rows below it and the scroll with them.
-// The dot read live, so a tile and the footer follow the agent while the switcher is open; the entry's own
-// value only covers a tab with no live session yet.
-function useEntryIndicator(entry: TabEntry) {
-  const session = useAgentStore((s) => s.sessions[entry.tabId]);
-  const notifications = useAgentStore((s) => s.notifications);
-  const liveVisual = useMemo(
-    () =>
-      session || notifications.some((n) => n.tabId === entry.tabId)
-        ? (buildAgentEntries(
-            session ? { [entry.tabId]: session } : {},
-            notifications.filter((n) => n.tabId === entry.tabId),
-          )[0]?.visual ?? null)
-        : null,
-    [session, notifications, entry.tabId],
-  );
-  return liveVisual ?? entry.indicator;
-}
-
 function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const indicator = useEntryIndicator(entry);
+  const indicator = useTabIndicator(entry.tabId, entry.indicator);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -158,7 +140,7 @@ function Footer({
   ref?: React.Ref<HTMLDivElement>;
 }) {
   const detail = tabDetailLines(entry).join("  ·  ");
-  const indicator = useEntryIndicator(entry);
+  const indicator = useTabIndicator(entry.tabId, entry.indicator);
   return (
     <div
       ref={ref}
@@ -172,13 +154,7 @@ function Footer({
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
           {entry.hibernated ? <HibernatedMark size={13} className="opacity-40" /> : null}
-          {indicator === "attention" || indicator === "error" ? (
-            <span
-              aria-hidden
-              data-footer-dot=""
-              className={cn("size-[6px] shrink-0 rounded-full", indicator === "error" ? "bg-destructive" : "bg-amber-400")}
-            />
-          ) : null}
+          <TabIndicatorMark indicator={indicator} />
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />
