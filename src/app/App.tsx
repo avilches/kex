@@ -933,14 +933,22 @@ export default function App() {
       pendingExplorerSearch.current = false;
       sidebarRef.current?.focusExplorer();
     }
-    if (sidebarOpen && sidebarView === "explorer" && pendingEditRoot.current) {
-      pendingEditRoot.current = false;
-      sidebarRef.current?.editExplorerRoot();
-    }
   }, [sidebarOpen, sidebarView]);
 
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
+
+  useEffect(() => {
+    if (
+      sidebarOpen &&
+      sidebarView === "explorer" &&
+      activeRootMode === "filesystem" &&
+      pendingEditRoot.current
+    ) {
+      pendingEditRoot.current = false;
+      sidebarRef.current?.editExplorerRoot();
+    }
+  }, [sidebarOpen, sidebarView, activeRootMode]);
 
   const activeShowHidden = activeWorkspace?.showHidden ?? false;
 
@@ -1080,12 +1088,10 @@ export default function App() {
         ),
       );
       if (!path) return;
-      if (activeRootMode !== "filesystem") {
-        setExplorerRootMode(activeWorkspace.id, "filesystem");
-      }
+      if (activeRootMode !== "filesystem") return;
       setFsRoot(activeWorkspace.id, path);
     },
-    [activeWorkspace, activeRootMode, home, setFsRoot, setExplorerRootMode],
+    [activeWorkspace, activeRootMode, home, setFsRoot],
   );
 
   const handleEnterFolder = useCallback(
@@ -2886,14 +2892,17 @@ export default function App() {
 
   const handleEditExplorerRoot = useCallback(() => {
     const sidebar = sidebarStateRef.current;
-    if (sidebar.open && sidebarViewRef.current === "explorer") {
+    const inFsExplorer =
+      sidebar.open &&
+      sidebarViewRef.current === "explorer" &&
+      activeRootMode === "filesystem";
+    if (inFsExplorer) {
       sidebarRef.current?.editExplorerRoot();
-    } else {
-      pendingEditRoot.current = true;
-      setSidebarOpen(true);
-      setSidebarView("explorer");
+      return;
     }
-  }, [setSidebarOpen, setSidebarView]);
+    pendingEditRoot.current = true;
+    showExplorerWithMode("filesystem");
+  }, [activeRootMode, showExplorerWithMode]);
 
   const welcomeActions = useMemo<WelcomeActions>(
     () => ({
