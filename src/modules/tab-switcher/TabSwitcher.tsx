@@ -88,7 +88,7 @@ function Tile({
           <span
             aria-hidden
             data-tab-color
-            className="absolute top-1/2 -left-[7px] h-6 w-[3px] -translate-y-1/2 rounded-full"
+            className="absolute top-1/2 -left-[5px] h-6 w-[3px] -translate-y-1/2 rounded-full"
             style={{ backgroundColor: entry.tab.color }}
           />
         ) : null}
