@@ -61,7 +61,7 @@ describe("TabSwitcher tile", () => {
     expect(screen.queryByText(/hibernated/i)).toBeNull();
   });
 
-  it("puts the sleeping icon of a tile at the top right with the dot over it, and dims only the name", () => {
+  it("puts the dimmed sleeping icon of a tile at the top right with the dot over it, and dims the name", () => {
     show([entry({ tabId: "a", title: "api", hibernated: true, indicator: "attention" }), entry({ tabId: "b" })], 1);
     const [a] = tiles();
     const moon = within(a).getByLabelText("Tab is hibernated");
@@ -70,7 +70,7 @@ describe("TabSwitcher tile", () => {
     expect(badge).toBeTruthy();
     expect(badge.contains(dot)).toBe(true);
     expect(within(a).getByText("api").className).toContain("opacity-40");
-    expect(moon.className).not.toContain("opacity");
+    expect(moon.className).toContain("opacity-40");
     expect(dot.closest(".opacity-40")).toBeNull();
   });
 
@@ -253,15 +253,15 @@ describe("TabSwitcher footer", () => {
     expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
   });
 
-  it("puts the hibernated icon first and the dot after it, and dims only the name", () => {
+  it("lays the dot over the dimmed hibernated icon after the name, and dims the name", () => {
     show([entry({ title: "api", hibernated: true, indicator: "attention" })]);
     const title = within(footer()).getByText("api");
     const icon = within(footer()).getByLabelText("Tab is hibernated");
     const dot = footer().querySelector("[data-indicator-dot]")!;
-    expect(title.nextElementSibling).toBe(icon);
-    expect(icon.nextElementSibling).toBe(dot);
+    expect(title.nextElementSibling).toBe(icon.parentElement);
+    expect(icon.parentElement!.contains(dot)).toBe(true);
     expect(title.className).toContain("opacity-40");
-    expect(icon.className).not.toContain("opacity");
+    expect(icon.className).toContain("opacity-40");
     expect(dot.className).not.toContain("opacity");
   });
 

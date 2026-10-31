@@ -364,7 +364,7 @@ function DetailTabRow({
       {isLocked ? (
         <>
         {hibernated && (
-          <span aria-hidden data-sleeping-mark="" className={cn("pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity", focused ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100")} style={{ right: 26 + (hasNote ? 20 : 0) }}>
+          <span aria-hidden data-sleeping-mark="" className={cn("pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity", focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40")} style={{ right: 26 + (hasNote ? 20 : 0) }}>
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
           </span>
         )}
@@ -396,7 +396,7 @@ function DetailTabRow({
                 data-sleeping-mark=""
                 className={cn(
                   "pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity peer-hover/x:!opacity-0 group-has-[:focus-visible]/tab:!opacity-0",
-                  focused ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100",
+                  focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40",
                 )}
               >
                 <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />

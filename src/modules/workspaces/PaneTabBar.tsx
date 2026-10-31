@@ -379,7 +379,7 @@ function DraggableTab({
         <>
         {sleeping && (
           <span className="ml-0.5 shrink-0" title="Hibernated: double click to restore">
-            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
           </span>
         )}
         {statusIndicator && (
@@ -409,7 +409,7 @@ function DraggableTab({
               className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0"
               title="Hibernated: double click to restore"
             >
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
             </span>
           )}
           {statusIndicator && (

@@ -5,6 +5,7 @@ import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { sleepIndicator } from "@/modules/workspaces/lib/hibernateIndicator";
 import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
@@ -74,12 +75,11 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
               </span>
             )}
             <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
-            {asleep && (
-              <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0">
-                <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} />
-              </span>
+            {asleep ? (
+              <SleepingBadge size={11} indicator={indicator} />
+            ) : (
+              <TabIndicatorMark indicator={indicator} size={10} />
             )}
-            <TabIndicatorMark indicator={indicator} size={10} />
           </span>
         )}
       </div>

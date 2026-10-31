@@ -169,11 +169,11 @@ describe("PaneTabBar with a hibernated tab", () => {
     expect(onWake).toHaveBeenCalledWith("tab-1");
   });
 
-  it("dims only the name and the icon of a sleeping tab, never the tab itself, the sleeping icon or the dot", () => {
+  it("dims the name, the icon and the sleeping icon of a sleeping tab, never the tab itself or the dot", () => {
     setup({ id: "tab-1", kind: "terminal", title: "api", hibernation: { at: 1, indicator: "attention" } });
     expect(tabEl().className).not.toContain("opacity-40");
     expect(screen.getByText("api").className).toContain("opacity-40");
-    expect(tabEl().querySelector('[title^="Hibernated"] svg')!.getAttribute("class") ?? "").not.toContain("opacity");
+    expect(tabEl().querySelector('[title^="Hibernated"] svg')!.getAttribute("class") ?? "").toContain("opacity-40");
     const dot = tabEl().querySelector(".bg-amber-400")!;
     expect(dot.closest(".opacity-40")).toBeNull();
   });

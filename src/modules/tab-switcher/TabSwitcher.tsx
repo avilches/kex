@@ -18,14 +18,6 @@ import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switc
 // that no class can override, which left them at 13 px inside a 44 px square.
 const TILE_ICON = 26;
 
-function HibernatedMark({ size }: { size: number }) {
-  return (
-    <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 text-muted-foreground">
-      <HugeiconsIcon icon={SleepingIcon} size={size} strokeWidth={1.75} />
-    </span>
-  );
-}
-
 function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
   return (
     <span className="flex min-w-0 items-center gap-1">
@@ -153,8 +145,7 @@ function Footer({
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
-          {entry.hibernated ? <HibernatedMark size={13} /> : null}
-          <TabIndicatorMark indicator={indicator} />
+          {entry.hibernated ? <SleepingBadge size={13} indicator={indicator} /> : <TabIndicatorMark indicator={indicator} />}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />
