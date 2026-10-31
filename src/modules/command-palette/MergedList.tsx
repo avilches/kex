@@ -12,6 +12,7 @@ import { COMMAND_GROUPS } from "./commands";
 import type { ClosedTabEntry } from "./lib/closedEntries";
 import type { MergedRow } from "./lib/mergeRows";
 import type { TabEntry, WorkspaceEntry } from "./lib/tabEntries";
+import { tabSection } from "./lib/tabRank";
 import { TabItem } from "./TabItem";
 import type { PaletteItem } from "./types";
 import { WorkspaceItem } from "./WorkspaceItem";
@@ -37,6 +38,15 @@ function shortcutLabel(
   user: Record<ShortcutId, KeyBinding[]>,
 ): string | null {
   return id ? getShortcutLabel(id, user) : null;
+}
+
+// A group heading drawn as a thin rule with the name in the middle, so it costs far less height than a line of text.
+function SectionRule({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[9.5px] leading-none font-medium tracking-wider text-muted-foreground/70 uppercase before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+      {children}
+    </div>
+  );
 }
 
 function Row({ row, p }: { row: MergedRow; p: Props }) {
@@ -109,13 +119,13 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
 
 // Typing: the current tab, then the other matching tabs in the order of the empty list, then the rest
 // ranked by score, all in one flat list.
-// Empty box: recent tabs, then the actions under their fixed groups.
+// Empty box: the tabs by section (need attention, busy agents, recent), then the actions under their fixed groups.
 export function MergedList(p: Props) {
   const isCurrent = (r: MergedRow) => r.kind === "tab" && r.current === true;
   const currentRows = p.rows.filter(isCurrent);
   const current =
     currentRows.length > 0 ? (
-      <CommandGroup heading="Current tab">
+      <CommandGroup heading={<SectionRule>Current tab</SectionRule>}>
         {currentRows.map((row) => (
           <Row key={row.key} row={row} p={p} />
         ))}
@@ -137,6 +147,12 @@ export function MergedList(p: Props) {
     );
   }
   const tabs = p.rows.filter((r) => r.kind === "tab" && !r.current);
+  const tabGroups: [string, MergedRow[]][] = (
+    ["attention", "busy", "recent"] as const
+  ).map((section) => [
+    { attention: "Need attention", busy: "Busy agents", recent: "Recent" }[section],
+    tabs.filter((r) => r.kind === "tab" && tabSection(r.entry) === section),
+  ]);
   const closed = p.rows.filter((r) => r.kind === "closed");
   const userActions = p.rows.filter(
     (r): r is Extract<MergedRow, { kind: "action" }> => r.kind === "action",
@@ -149,29 +165,31 @@ export function MergedList(p: Props) {
   return (
     <>
       {current}
-      {tabs.length > 0 ? (
-        <CommandGroup heading="Recent tabs">
-          {tabs.map((row) => (
-            <Row key={row.key} row={row} p={p} />
-          ))}
-        </CommandGroup>
-      ) : null}
+      {tabGroups.map(([heading, group]) =>
+        group.length > 0 ? (
+          <CommandGroup key={heading} heading={<SectionRule>{heading}</SectionRule>}>
+            {group.map((row) => (
+              <Row key={row.key} row={row} p={p} />
+            ))}
+          </CommandGroup>
+        ) : null,
+      )}
       {closed.length > 0 ? (
-        <CommandGroup heading="Recently closed">
+        <CommandGroup heading={<SectionRule>Closed</SectionRule>}>
           {closed.map((row) => (
             <Row key={row.key} row={row} p={p} />
           ))}
         </CommandGroup>
       ) : null}
       {workspaceActions.length > 0 ? (
-        <CommandGroup heading="Workspace actions">
+        <CommandGroup heading={<SectionRule>Workspace actions</SectionRule>}>
           {workspaceActions.map((row) => (
             <Row key={row.key} row={row} p={p} />
           ))}
         </CommandGroup>
       ) : null}
       {globalActions.length > 0 ? (
-        <CommandGroup heading="Global actions">
+        <CommandGroup heading={<SectionRule>Global actions</SectionRule>}>
           {globalActions.map((row) => (
             <Row key={row.key} row={row} p={p} />
           ))}
@@ -181,7 +199,7 @@ export function MergedList(p: Props) {
         const inGroup = actions.filter((r) => r.item.group === group);
         if (inGroup.length === 0) return null;
         return (
-          <CommandGroup key={group} heading={`${group} actions`}>
+          <CommandGroup key={group} heading={<SectionRule>{`${group} actions`}</SectionRule>}>
             {inGroup.map((row) => (
               <Row key={row.key} row={row} p={p} />
             ))}
