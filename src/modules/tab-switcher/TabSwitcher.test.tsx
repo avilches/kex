@@ -174,7 +174,7 @@ describe("TabSwitcher grid", () => {
 describe("TabSwitcher jump numbers", () => {
   it("announces the jump keys in the footer", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
-    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/1-9\s*jump/);
+    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/1-9\s*Jump/);
   });
 });
 
