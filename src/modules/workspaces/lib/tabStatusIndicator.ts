@@ -9,6 +9,8 @@ type Input = {
   isRestoreError: boolean;
   interrupted?: boolean;
   status: AgentStatus | undefined;
+  // The dot the tab kept when it went to sleep, shown while no live session exists.
+  sleepIndicator?: "attention" | "error" | null;
 };
 
 // A retry in flight wins so the user sees something happen; when it ends the failure marker
@@ -16,7 +18,7 @@ type Input = {
 export function tabStatusIndicator(i: Input): TabStatusIndicator {
   if (i.restoreBusy) return "restoring";
   if (i.restorePending || (i.hasAgent && i.isRestoreError)) return "restore-failed";
-  if (!i.hasAgent) return null;
+  if (!i.hasAgent) return i.sleepIndicator === "error" ? "interrupted" : i.sleepIndicator === "attention" ? "attention" : null;
   if (i.interrupted) return "interrupted";
   if (i.status === "working") return "working";
   if (i.status === "attention") return "attention";

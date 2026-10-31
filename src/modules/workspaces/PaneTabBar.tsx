@@ -43,6 +43,7 @@ import { tabTopLineColor } from "./lib/tabColor";
 import { tabGitColor } from "./lib/tabGitColor";
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { useTabRenameStore } from "./lib/tabRenameStore";
+import { sleepIndicator } from "./lib/hibernateIndicator";
 import { tabStatusIndicator } from "./lib/tabStatusIndicator";
 import {
   getRunningCommand,
@@ -227,6 +228,7 @@ function DraggableTab({
     isRestoreError,
     interrupted: agentSession?.interrupted,
     status: agentSession?.status,
+    sleepIndicator: sleepIndicator(tab),
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (

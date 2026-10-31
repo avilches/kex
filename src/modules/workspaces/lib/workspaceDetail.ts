@@ -25,7 +25,7 @@ export type DetailFilter = {
   git: boolean;
 };
 
-export type DetailTab = { id: string; kind: string };
+export type DetailTab = { id: string; kind: string; hibernation?: { indicator?: "attention" | "error" } };
 
 export type DetailRow = { tabId: string; visual: AgentEntryVisual | null };
 
@@ -67,9 +67,11 @@ export function workspaceDetailRows(
 ): DetailRow[] {
   const visualByTab = new Map<string, AgentEntryVisual>();
   for (const e of entries) visualByTab.set(e.tabId, e.visual);
+  const asleepVisual = new Map<string, AgentEntryVisual>();
+  for (const t of tabs) if (t.hibernation?.indicator) asleepVisual.set(t.id, t.hibernation.indicator);
   const row = (id: string): DetailRow => ({
     tabId: id,
-    visual: visualByTab.get(id) ?? null,
+    visual: visualByTab.get(id) ?? asleepVisual.get(id) ?? null,
   });
 
   const terminalOnly = (t: DetailTab) => t.kind === "terminal";
@@ -85,7 +87,9 @@ export function workspaceDetailRows(
   }
 
   const present = new Set(tabs.filter(terminalOnly).map((t) => t.id));
-  const agents = entries.filter((e) => present.has(e.tabId)).map((e) => row(e.tabId));
+  const live = entries.filter((e) => present.has(e.tabId)).map((e) => e.tabId);
+  const asleep = tabs.filter((t) => terminalOnly(t) && !visualByTab.has(t.id) && asleepVisual.has(t.id)).map((t) => t.id);
+  const agents = [...live, ...asleep].map(row);
   const others = tabs.filter((t) => !terminalOnly(t) && wanted(t)).map((t) => row(t.id));
   return [...agents, ...others];
 }

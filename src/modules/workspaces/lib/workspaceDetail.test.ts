@@ -65,6 +65,14 @@ describe("workspaceDetailRows: terminals", () => {
     ).toEqual(["t2"]);
   });
 
+  test("a hibernated terminal keeps the dot it had, and in active-agents it still lists", () => {
+    const sleeping = [{ id: "s1", kind: "terminal", hibernation: { indicator: "attention" as const } }, { id: "s2", kind: "terminal" }];
+    const rows = workspaceDetailRows(sleeping, new Set(), [], filter({ terminals: "active-agents" }));
+    expect(rows).toEqual([{ tabId: "s1", visual: "attention" }]);
+    const all = workspaceDetailRows(sleeping, new Set(), [], filter({ terminals: "all" }));
+    expect(all.map((r) => r.visual)).toEqual(["attention", null]);
+  });
+
   test("active-agents lists only the ones with an entry, in urgency order", () => {
     expect(ids({ terminals: "active-agents" })).toEqual(["t2", "t1"]);
   });
