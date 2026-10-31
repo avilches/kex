@@ -72,6 +72,7 @@ import {
   switcherActive,
   letterOf,
   shortcutBlockedBySwitcher,
+  settledSleepState,
   sleepOutcome,
   switcherOrder,
 } from "@/modules/tab-switcher";
@@ -2928,8 +2929,10 @@ export default function App() {
       const wasAsleep = before.tab.hibernation !== undefined;
       if (wasAsleep) await wakeTabs(before.workspace.id, [entry.tabId]);
       else await requestHibernate(before.workspace.id, [entry.tabId]);
-      const after = find();
-      const asleep = after?.tab.kind === "terminal" ? after.tab.hibernation !== undefined : null;
+      const asleep = await settledSleepState(() => {
+        const after = find();
+        return after?.tab.kind === "terminal" ? after.tab.hibernation !== undefined : null;
+      }, wasAsleep);
       const verdict = sleepOutcome({
         before: wasAsleep,
         after: asleep,

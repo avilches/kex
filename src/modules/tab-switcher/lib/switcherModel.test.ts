@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   afterRemoval,
   GRID_GAP,
@@ -8,6 +8,7 @@ import {
   heldModifiers,
   letterOf,
   sleepOutcome,
+  settledSleepState,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -212,5 +213,29 @@ describe("modifiers", () => {
   it("ignores a modifier that was not part of the opening chord", () => {
     const held = heldModifiers(e({ ctrlKey: true }));
     expect(modifiersReleased(held, e({ metaKey: true }))).toBe(true);
+  });
+});
+
+describe("settledSleepState", () => {
+  it("returns the new state once a committed render shows it", async () => {
+    vi.useFakeTimers();
+    let state: boolean | null = false;
+    setTimeout(() => (state = true), 40);
+    const result = settledSleepState(() => state, false, { stepMs: 16, timeoutMs: 500 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await result).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("gives up with the unchanged state after the timeout", async () => {
+    vi.useFakeTimers();
+    const result = settledSleepState(() => false, false, { stepMs: 16, timeoutMs: 100 });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(await result).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("returns null at once when the tab is gone", async () => {
+    expect(await settledSleepState(() => null, false, { stepMs: 16, timeoutMs: 100 })).toBeNull();
   });
 });

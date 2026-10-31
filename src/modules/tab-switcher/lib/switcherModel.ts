@@ -48,6 +48,23 @@ export function sleepOutcome(s: { before: boolean; after: boolean | null; dialog
   return s.after !== s.before ? "refresh" : "keep";
 }
 
+// A request to hibernate or wake queues a state update, and the refs the app reads the tab from only catch up
+// after React commits it. Reading right after the request therefore still shows the old state, so this waits
+// for the read to differ from `before`, up to a timeout: a request that only opens a dialog or is cancelled
+// never changes it and ends unchanged. Null when the tab no longer exists.
+export async function settledSleepState(
+  read: () => boolean | null,
+  before: boolean,
+  { stepMs = 16, timeoutMs = 400 }: { stepMs?: number; timeoutMs?: number } = {},
+): Promise<boolean | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const now = read();
+    if (now === null || now !== before || Date.now() >= deadline) return now;
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
+}
+
 // The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the
 // previous one when the last tile went, and a highlight on another tile follows it. Null when fewer than
 // two tiles would remain, because a switcher with nothing to switch to has no reason to stay open.
