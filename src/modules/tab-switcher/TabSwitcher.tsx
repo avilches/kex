@@ -15,7 +15,7 @@ import { LockKeyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { commitSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { commitSwitcher, escapeMenuSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
 
 // What the app puts in a tile's context menu. Called on every render of the tile, so it can read live state.
@@ -156,7 +156,7 @@ function Tile({
   return (
     <ContextMenu onOpenChange={(open) => menuSwitcher(open, index)}>
       <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
-      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>{renderMenu(entry)}</ContextMenuContent>
+      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()} onEscapeKeyDown={escapeMenuSwitcher}>{renderMenu(entry)}</ContextMenuContent>
     </ContextMenu>
   );
 }

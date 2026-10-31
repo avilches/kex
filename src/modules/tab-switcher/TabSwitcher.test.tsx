@@ -252,6 +252,24 @@ describe("TabSwitcher tile menu", () => {
     expect(switcherActive()).toBe(false);
   });
 
+  it("opens the menu on a right click with Ctrl held, and the system menu is prevented", () => {
+    showMenu();
+    const opened = fireEvent.contextMenu(tiles()[1], { ctrlKey: true });
+    expect(opened).toBe(false);
+    expect(screen.getByRole("menuitem").textContent).toBe("menu of b");
+  });
+
+  it("Escape on the menu with Ctrl held leaves the overlay open and the menu gone", () => {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {});
+    act(() => useSwitcherStore.setState({ revealed: true, index: 0 }));
+    render(<TabSwitcher renderMenu={(e) => <div role="menuitem" tabIndex={-1}>menu of {e.tabId}</div>} />);
+    fireEvent.contextMenu(tiles()[1], { ctrlKey: true });
+    fireEvent.keyDown(screen.getByRole("menuitem"), { key: "Escape", ctrlKey: true });
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(switcherActive()).toBe(true);
+    expect(tiles().length).toBe(2);
+  });
+
   it("has no menu when the app gives none", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
     fireEvent.contextMenu(tiles()[1]);
