@@ -25,7 +25,7 @@ export type RenderMenu = (entry: TabEntry) => ReactNode;
 // the overlay open (Lock, Color, Icon) changes the tab under it, so what is drawn reads the live tab instead.
 export type LiveTab = (tabId: string) => Tab | undefined;
 
-// The tab's colour is only the tint of its icon.
+// The tab's colour tints its icon and, on a tile, draws a short line beside it like the one in the tab bar.
 const iconColor = (tab: Tab) => tab.color ?? undefined;
 
 function LockMark({ size }: { size: number }) {
@@ -84,6 +84,14 @@ function Tile({
       )}
     >
       <span className="relative shrink-0">
+        {entry.tab.color ? (
+          <span
+            aria-hidden
+            data-tab-color
+            className="absolute top-1/2 -left-3 h-5 w-0.5 -translate-y-1/2 rounded-full"
+            style={{ backgroundColor: entry.tab.color }}
+          />
+        ) : null}
         <span
           style={{ color: iconColor(entry.tab) }}
           className={cn(

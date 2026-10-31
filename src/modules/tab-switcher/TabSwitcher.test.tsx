@@ -193,9 +193,10 @@ describe("TabSwitcher live tab", () => {
     expect(within(footer()).getByLabelText("Tab is locked")).toBeTruthy();
     expect(within(b).queryByLabelText("Tab is locked")).toBeNull();
     expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("");
+    expect(b.querySelector("[data-tab-color]")).toBeNull();
   });
 
-  it("tints the icon of a coloured tab, whether or not it has a chosen icon, and draws no stripe or bar", () => {
+  it("tints the icon of a coloured tab, whether or not it has a chosen icon, and draws a short line in that colour only on the coloured tiles", () => {
     show([
       entry({ tabId: "a", tab: { id: "a", kind: "terminal", icon: "Home01Icon", color: "#ff0000" } }),
       entry({ tabId: "b", tab: { id: "b", kind: "terminal", color: "#00ff00" } }),
@@ -204,7 +205,9 @@ describe("TabSwitcher live tab", () => {
     expect(a.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#ff0000");
     expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#00ff00");
     expect(footer().querySelector<HTMLElement>("[data-tab-icon]")?.style.color).toBe("#ff0000");
-    expect(document.querySelector("[data-tab-color]")).toBeNull();
+    expect(a.querySelector<HTMLElement>("[data-tab-color]")?.style.backgroundColor).toBe("#ff0000");
+    expect(b.querySelector<HTMLElement>("[data-tab-color]")?.style.backgroundColor).toBe("#00ff00");
+    expect(footer().querySelector("[data-tab-color]")).toBeNull();
   });
 
   it("follows the live tab instead of the snapshot, so Lock, Color and Icon change in place", () => {
