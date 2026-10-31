@@ -370,7 +370,12 @@ function SortableWorkspaceItem({
 
   const litStyle: CSSProperties | undefined = lit
     ? expanded
-      ? { boxShadow: `inset 0 0 0 1px ${displayColor ?? "var(--ring)"}` }
+      ? {
+          boxShadow: `inset 0 0 0 1px ${displayColor ?? "var(--ring)"}`,
+          ...(displayColor !== null
+            ? { backgroundColor: `color-mix(in srgb, ${displayColor} 7%, transparent)` }
+            : null),
+        }
       : displayColor !== null
         ? {
             backgroundColor: chipColorOnWhite(displayColor),
