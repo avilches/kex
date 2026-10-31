@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
-import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { wakeCarryOf } from "@/modules/workspaces/lib/wakeCarry";
 import { sleepIndicator } from "@/modules/workspaces/lib/hibernateIndicator";
 import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
 import { DirtyMark } from "@/modules/workspaces/DirtyMark";
@@ -69,9 +70,15 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
         </span>
         {subtitle && (
           <span className="flex min-w-0 items-center gap-1 text-[11px] leading-none text-muted-foreground">
-            {hasAgent && (
-              <span className="shrink-0">
-                <AgentIcon agent={agentSession!.agent} size={11} />
+            {tab && (
+              <span className={cn("shrink-0", asleep ? "opacity-40" : hasAgent && !tab.icon ? "opacity-100" : "opacity-70")}>
+                <TabBarIcon
+                  tab={tab}
+                  agentSession={agentSession}
+                  running={agentTabTitle?.isRunning}
+                  size={11}
+                  carriedAgent={wakeCarryOf(tab.id)?.agent}
+                />
               </span>
             )}
             <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
