@@ -45,7 +45,6 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
 import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
-import { WorkspaceSquare } from "@/modules/workspaces/WorkspaceMark";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
@@ -456,9 +455,6 @@ function SortableWorkspaceItem({
                   strokeWidth={1.5}
                   className="shrink-0"
                 />
-              )}
-              {!(ws.icon && getWorkspaceIcon(ws.icon)) && displayColor && (
-                <WorkspaceSquare color={displayColor} />
               )}
               <span className="truncate">{shownTitle || ws.kind}</span>
               {agentCount > 0 && (
