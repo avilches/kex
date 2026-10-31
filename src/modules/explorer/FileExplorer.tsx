@@ -420,6 +420,8 @@ export const FileExplorer = memo(
     } | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isEditingRoot, setIsEditingRoot] = useState(false);
+    const canEditRoot =
+      rootMode === "filesystem" && !!rootPath && !!onSubmitRootPath;
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const closeSearch = useCallback(() => {
@@ -884,7 +886,7 @@ export const FileExplorer = memo(
           }
         },
         editRoot: () => {
-          if (rootPath && onSubmitRootPath) setIsEditingRoot(true);
+          if (canEditRoot) setIsEditingRoot(true);
         },
         refresh: (path: string) => tree.refresh(path),
       }),
@@ -894,8 +896,7 @@ export const FileExplorer = memo(
         selectedPath,
         closeSearch,
         tree.refresh,
-        rootPath,
-        onSubmitRootPath,
+        canEditRoot,
       ],
     );
 
@@ -1149,7 +1150,16 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
-          {isEditingRoot && rootPath ? (
+          {!canEditRoot ? (
+            <div
+              className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
+              title={rootPath ?? undefined}
+            >
+              <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
+                {LRM + rootPath}
+              </span>
+            </div>
+          ) : isEditingRoot && rootPath ? (
             <RootPathInput
               initial={rootPath}
               onSubmit={(value) => {
@@ -1165,7 +1175,6 @@ export const FileExplorer = memo(
                   type="button"
                   className="group/root flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
                   title={rootPath ?? undefined}
-                  disabled={!rootPath || !onSubmitRootPath}
                   onClick={() => setIsEditingRoot(true)}
                 >
                   <span className="min-w-0 truncate text-left [direction:rtl]">
@@ -1181,10 +1190,7 @@ export const FileExplorer = memo(
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent className="min-w-44">
-                <ContextMenuItem
-                  disabled={!rootPath || !onSubmitRootPath}
-                  onSelect={() => setIsEditingRoot(true)}
-                >
+                <ContextMenuItem onSelect={() => setIsEditingRoot(true)}>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
                     size={13}
