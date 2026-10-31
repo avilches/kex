@@ -49,6 +49,33 @@ describe("WorkspaceTitle tab line", () => {
     expect(screen.getByText("api").nextElementSibling).toBe(screen.getByLabelText("Unsaved changes"));
   });
 
+  it("draws the tab icon before the name, the one of its kind when it has none of its own", () => {
+    const { container, unmount } = render(<WorkspaceTitle workspace={workspace} tab={{ id: "t3", kind: "terminal", title: "api" }} groups={[]} />);
+    const row = screen.getByText("api").parentElement as HTMLElement;
+    expect(row.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("api").previousElementSibling).toBe(row.querySelector("svg")!.parentElement);
+    unmount();
+    const file: Tab = { id: "f2", kind: "editor", path: "/p/api.ts", title: "api", dirty: false, preview: false };
+    render(<WorkspaceTitle workspace={workspace} tab={file} groups={[]} />);
+    expect((screen.getByText("api").parentElement as HTMLElement).querySelector("img")).not.toBeNull();
+    expect(container).toBeTruthy();
+  });
+
+  it("colors the icon with the color of the tab", () => {
+    const colored: Tab = { id: "t4", kind: "terminal", title: "api", color: "#ef4444" };
+    render(<WorkspaceTitle workspace={workspace} tab={colored} groups={[]} />);
+    const tinted = (screen.getByText("api").parentElement as HTMLElement).querySelector<HTMLElement>("span.contents");
+    expect(tinted?.style.color).toBeTruthy();
+  });
+
+  it("dims the icon of a sleeping tab with its name, and keeps an awake one at its usual strength", () => {
+    const { unmount } = render(<WorkspaceTitle workspace={workspace} tab={asleep()} groups={[]} />);
+    expect(screen.getByText("api").previousElementSibling!.className).toContain("opacity-40");
+    unmount();
+    render(<WorkspaceTitle workspace={workspace} tab={{ id: "t5", kind: "terminal", title: "api" }} groups={[]} />);
+    expect(screen.getByText("api").previousElementSibling!.className).not.toContain("opacity-40");
+  });
+
   it("leaves the name of an awake tab at full strength and without the sleeping icon", () => {
     const awake: Tab = { id: "t2", kind: "terminal", title: "api" };
     render(<WorkspaceTitle workspace={workspace} tab={awake} groups={[]} />);
