@@ -37,6 +37,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 
 export type SidebarHandle = {
   focusExplorer: () => void;
+  focusExplorerTree: () => void;
   toggleExplorerSearch: () => void;
   editExplorerRoot: () => void;
   isExplorerFocused: () => boolean;
@@ -190,6 +191,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
 
     useImperativeHandle(ref, () => ({
       focusExplorer: () => explorerRef.current?.focusSearch?.(),
+      focusExplorerTree: () => explorerRef.current?.focus(),
       toggleExplorerSearch: () => explorerRef.current?.toggleSearch?.(),
       editExplorerRoot: () => explorerRef.current?.editRoot?.(),
       isExplorerFocused: () => explorerRef.current?.isFocused() ?? false,

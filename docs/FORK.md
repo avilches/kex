@@ -342,10 +342,10 @@ The fork builds its own macOS menu bar instead of the default Tauri menu (`#[cfg
   flush. The custom Quit item is intercepted in `on_menu_event`, which emits `kex:before-quit`; the frontend flushes
   dirty editors and workspace state, then calls the `confirm_quit` command (guarded by `QuitGuard` so the second pass
   exits). `ExitRequested` is still handled as a fallback for programmatic exits.
-- **App actions in the menu.** Kex / File / Edit / View / Window submenus. Action items emit `kex:menu` with their id,
+- **App actions in the menu.** Kex / File / Edit / View / Window submenus. File holds Command Palette (Cmd+P) and Find in Files (Cmd+Shift+P). Cmd+E (`sidebar.showExplorer`) opens the sidebar and focuses the explorer tree, Cmd+Shift+E (`explorer.viewPinned`) does the same on the workspace root; there is no sidebar toggle shortcut. Action items emit `kex:menu` with their id,
   routed via `emit_to` to the focused window only (plain `emit` broadcasts to every window), and dispatched in
   `App.tsx` to the same handlers the shortcuts use. Dynamic labels (Enable/Disable Autosave, Show/Hide
-  Sidebar/Explorer/Git/History, Move Sidebar Left/Right) are refreshed by the `sync_menu` command whenever the backing
+  Sidebar/Git/History, Move Sidebar Left/Right) are refreshed by the `sync_menu` command whenever the backing
   preferences change. While the Settings window has focus (`modules/menu_route.rs`, `route_menu_event`), the menu
   ignores everything except Quit, Close Tab (closes Settings instead) and the window-level Dock items, so
   no action lands on the main window hidden behind it. New Window is not one of them: it goes through the webview

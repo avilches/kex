@@ -27,7 +27,7 @@ describe("shortcutUnavailable", () => {
 
   it("leaves tab, pane, sidebar, explorer and hibernate usable on a sleeping tab", () => {
     const asleep = { ...base, activeTab: sleeping };
-    for (const id of ["tab.hibernate", "tab.rename", "tab.close", "tab.next", "pane.splitRight", "sidebar.toggle", "explorer.search"] as const) {
+    for (const id of ["tab.hibernate", "tab.rename", "tab.close", "tab.next", "pane.splitRight", "sidebar.showGit", "explorer.search"] as const) {
       expect(shortcutUnavailable(id, asleep), id).toBe(false);
     }
   });

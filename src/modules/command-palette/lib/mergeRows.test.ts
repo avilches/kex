@@ -438,7 +438,7 @@ describe("mergeRows", () => {
 
   it("drops sparse subsequences that would flood a short query", () => {
     const commands = [
-      cmd("sidebar.showExplorer", "Explorer (cycle root)", "Sidebar"),
+      cmd("sidebar.showExplorer", "Focus Explorer", "Sidebar"),
       cmd("search.focus", "Find in current tab", "Search"),
       cmd("settings.section.terminal", "Terminal settings", "Settings"),
       cmd("tab.hibernate", "Hibernate Tab"),

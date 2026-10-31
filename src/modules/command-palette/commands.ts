@@ -369,7 +369,6 @@ export function createCommandItems(
       group: "View",
       keywords: ["sidebar", "panel", "right", "toggle"],
       icon: SidebarLeftIcon,
-      shortcutId: "sidebar.toggle",
       run: ctx.toggleSidebar,
     },
     {
