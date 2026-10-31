@@ -39,6 +39,14 @@ describe("HibernatedTab", () => {
     expect(getByText("build")).toBeTruthy();
   });
 
+  it("shows the dot the tab slept with after its name, and none when it slept without one", () => {
+    const withDot = render(<HibernatedTab tab={sleeping({ indicator: "attention" })} visible focused onWake={() => {}} />);
+    expect(withDot.container.querySelector("[data-hibernated-dot]")).not.toBeNull();
+    cleanup();
+    const without = render(<HibernatedTab tab={sleeping()} visible focused onWake={() => {}} />);
+    expect(without.container.querySelector("[data-hibernated-dot]")).toBeNull();
+  });
+
   it("wakes through the Restore button", () => {
     const onWake = vi.fn();
     const { getByText } = render(<HibernatedTab tab={sleeping()} visible focused onWake={onWake} />);

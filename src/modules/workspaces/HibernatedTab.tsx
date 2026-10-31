@@ -10,6 +10,7 @@ import { HibernatedInfo } from "./HibernatedInfo";
 import { HibernatedLines } from "./HibernatedLines";
 import { hibernatedLayout, type HibernatedLayout } from "./lib/hibernatedLayout";
 import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
+import { sleepIndicator } from "./lib/hibernateIndicator";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
@@ -104,6 +105,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
             folder={full ? folder || null : null}
             command={full ? command || null : null}
             home={cachedHomeDir()}
+            indicator={sleepIndicator(tab)}
           />
           {restore}
           <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px]">

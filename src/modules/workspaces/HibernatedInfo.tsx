@@ -1,8 +1,10 @@
 import { writeClipboardText } from "@/lib/clipboard";
+import { cn } from "@/lib/utils";
 import { CommandLineIcon, Copy01Icon, Folder02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { HibernateIndicator } from "./lib/hibernateIndicator";
 import { tildePath } from "./lib/sessionPreview";
 
 const COPIED_MS = 1200;
@@ -50,15 +52,23 @@ type Props = {
   folder: string | null;
   command: string | null;
   home: string | null;
+  indicator?: HibernateIndicator | null;
 };
 
 // The name of the sleeping tab, then what it was doing as a small table: where and what to run.
-export function HibernatedInfo({ icon, title, folder, command, home }: Props) {
+export function HibernatedInfo({ icon, title, folder, command, home, indicator }: Props) {
   return (
     <div className="flex max-w-full flex-col items-start gap-2 self-stretch text-left">
       <span className="flex max-w-full items-center gap-2 text-[15px] text-foreground">
         <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
         <span className="truncate">{title}</span>
+        {indicator && (
+          <span
+            aria-hidden
+            data-hibernated-dot=""
+            className={cn("size-[6px] shrink-0 rounded-full", indicator === "error" ? "bg-destructive" : "bg-amber-400")}
+          />
+        )}
       </span>
       {(folder || command) && (
         <div
