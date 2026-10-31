@@ -184,12 +184,12 @@ export function menuSwitcher(open: boolean, index: number) {
   useSwitcherStore.setState({ index });
 }
 
-// Escape on the open menu. If the modifier that opened the switcher is still down, only the menu closes and the
-// overlay stays for the user to carry on, as a menu's Escape would elsewhere; with the modifier already up
-// there is nothing left to confirm with, so it closes everything like any other way out of the menu.
-export function escapeMenuSwitcher(e: Pick<KeyboardEvent, "ctrlKey" | "altKey" | "metaKey">) {
-  if (!session) return;
-  session.escapeKeeps = holdsModifier(session.held) && !modifiersReleased(session.held, e);
+// Escape on the open menu closes only the menu and the overlay stays, as a menu's Escape does elsewhere; a second
+// Escape, now with no menu, cancels the switcher. It does not look at the modifier: what a key event reports
+// about it is not reliable after a click made with it held (the Mac turns that click into a secondary one), and
+// with the modifier up the overlay is simply left for Enter, a click or Escape, like a binding with no modifier.
+export function escapeMenuSwitcher() {
+  if (session) session.escapeKeeps = true;
 }
 
 function gridColumns(): number {

@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TabEntry } from "@/modules/command-palette";
+import { ContextMenuItem } from "@/components/ui/context-menu";
 import { cancelSwitcher, openSwitcher, switcherActive, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, TILE_HEIGHT } from "./lib/switcherModel";
 import { TabSwitcher } from "./TabSwitcher";
@@ -244,11 +245,14 @@ describe("TabSwitcher tile menu", () => {
     expect(switcherActive()).toBe(true);
   });
 
-  it("keeps the overlay while the menu is open and closes both on Escape", () => {
+  it("Escape closes the menu and keeps the overlay, and a second Escape closes the overlay", () => {
     showMenu();
     fireEvent.contextMenu(tiles()[1]);
     expect(screen.getAllByRole("option", { hidden: true }).length).toBe(2);
     fireEvent.keyDown(screen.getByRole("menuitem"), { key: "Escape" });
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(switcherActive()).toBe(true);
+    fireEvent.keyDown(window, { key: "Escape" });
     expect(switcherActive()).toBe(false);
   });
 
@@ -268,6 +272,36 @@ describe("TabSwitcher tile menu", () => {
     expect(screen.queryByRole("menuitem")).toBeNull();
     expect(switcherActive()).toBe(true);
     expect(tiles().length).toBe(2);
+  });
+
+  it("Escape with Ctrl held still keeps the overlay after an item that leaves the menu open, as Lock does", () => {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {});
+    act(() => useSwitcherStore.setState({ revealed: true, index: 0 }));
+    let locked = false;
+    const live = (id: string) => (id === "b" ? ({ id: "b", kind: "terminal", locked } as TabEntry["tab"]) : undefined);
+    const ui = () => (
+      <TabSwitcher
+        liveTab={live}
+        renderMenu={() => (
+          <ContextMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              locked = !locked;
+            }}
+          >
+            {locked ? "Unlock" : "Lock"}
+          </ContextMenuItem>
+        )}
+      />
+    );
+    const view = render(ui());
+    fireEvent.contextMenu(tiles()[1], { ctrlKey: true });
+    fireEvent.click(screen.getByRole("menuitem"));
+    view.rerender(ui());
+    expect(screen.getByRole("menuitem").textContent).toBe("Unlock");
+    fireEvent.keyDown(screen.getByRole("menuitem"), { key: "Escape", ctrlKey: true });
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(switcherActive()).toBe(true);
   });
 
   it("has no menu when the app gives none", () => {
