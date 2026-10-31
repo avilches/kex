@@ -156,7 +156,7 @@ function Tile({
   return (
     <ContextMenu onOpenChange={(open) => menuSwitcher(open, index)}>
       <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
-      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()} onEscapeKeyDown={escapeMenuSwitcher}>{renderMenu(entry)}</ContextMenuContent>
+      <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()} onEscapeKeyDown={() => escapeMenuSwitcher()}>{renderMenu(entry)}</ContextMenuContent>
     </ContextMenu>
   );
 }
