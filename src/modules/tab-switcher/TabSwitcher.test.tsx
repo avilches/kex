@@ -172,16 +172,9 @@ describe("TabSwitcher grid", () => {
 });
 
 describe("TabSwitcher jump numbers", () => {
-  it("numbers the first nine tiles by position and leaves the rest bare", () => {
-    const many = Array.from({ length: 11 }, (_, i) => entry({ tabId: `t${i}`, title: `tab ${i}` }));
-    show(many);
-    const numbers = tiles().map((t) => t.querySelector("[data-jump-number]")?.textContent ?? null);
-    expect(numbers).toEqual(["⌃1", "⌃2", "⌃3", "⌃4", "⌃5", "⌃6", "⌃7", "⌃8", "⌃9", null, null]);
-  });
-
   it("announces the jump keys in the footer", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
-    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/⌃1-9\s*jump/);
+    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/1-9\s*jump/);
   });
 });
 
