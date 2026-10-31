@@ -182,6 +182,39 @@ describe("TabSwitcher jump numbers", () => {
   });
 });
 
+describe("TabSwitcher live tab", () => {
+  const two = [entry({ tabId: "a" }), entry({ tabId: "b" })];
+  const open = () => {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, two, () => {});
+    act(() => useSwitcherStore.setState({ revealed: true, index: 0 }));
+  };
+
+  it("draws a lock and the colour of a tab that has them, on its tile and in the footer", () => {
+    show([entry({ tabId: "a", tab: { id: "a", kind: "terminal", locked: true, color: "#ff0000" } }), entry({ tabId: "b" })]);
+    const [a, b] = tiles();
+    expect(within(a).getByLabelText("Tab is locked")).toBeTruthy();
+    expect(a.querySelector("[data-tab-color]")).not.toBeNull();
+    expect(within(footer()).getByLabelText("Tab is locked")).toBeTruthy();
+    expect(within(b).queryByLabelText("Tab is locked")).toBeNull();
+    expect(b.querySelector("[data-tab-color]")).toBeNull();
+  });
+
+  it("follows the live tab instead of the snapshot, so Lock, Color and Icon change in place", () => {
+    open();
+    const live: Record<string, TabEntry["tab"]> = {};
+    const view = render(<TabSwitcher liveTab={(id) => live[id]} />);
+    expect(screen.queryByLabelText("Tab is locked")).toBeNull();
+    live.a = { id: "a", kind: "terminal", locked: true, color: "#00ff00" };
+    view.rerender(<TabSwitcher liveTab={(id) => live[id]} />);
+    expect(within(tiles()[0]).getByLabelText("Tab is locked")).toBeTruthy();
+    expect(within(footer()).getByLabelText("Tab is locked")).toBeTruthy();
+    expect(tiles()[0].querySelector("[data-tab-color]")).not.toBeNull();
+    live.a = { id: "a", kind: "terminal" };
+    view.rerender(<TabSwitcher liveTab={(id) => live[id]} />);
+    expect(screen.queryByLabelText("Tab is locked")).toBeNull();
+  });
+});
+
 describe("TabSwitcher tile menu", () => {
   function showMenu(renderMenu = (e: TabEntry) => <div role="menuitem" tabIndex={-1}>menu of {e.tabId}</div>) {
     openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {});
