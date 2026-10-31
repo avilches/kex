@@ -10,6 +10,7 @@ import {
   sleepOutcome,
   settledSleepState,
   carriedAgent,
+  carriedIndicator,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -259,5 +260,20 @@ describe("carriedAgent", () => {
 
   it("stays empty when neither has an agent", () => {
     expect(carriedAgent("", "")).toBe("");
+  });
+});
+
+describe("carriedIndicator", () => {
+  it("keeps the dot of the old tile on a restore while the refreshed one has none", () => {
+    expect(carriedIndicator("attention", null, true)).toBe("attention");
+    expect(carriedIndicator("error", null, true)).toBe("error");
+  });
+
+  it("prefers the dot the refreshed tile already shows", () => {
+    expect(carriedIndicator("attention", "working", true)).toBe("working");
+  });
+
+  it("does not keep a dot on hibernating, since the agent session ends with it", () => {
+    expect(carriedIndicator("attention", null, false)).toBeNull();
   });
 });
