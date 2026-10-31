@@ -63,6 +63,7 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
 import { RootPathInput } from "./RootPathInput";
 import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
@@ -1173,7 +1174,7 @@ export const FileExplorer = memo(
               <ContextMenuTrigger asChild>
                 <button
                   type="button"
-                  className="group/root flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
+                  className="group/root flex min-w-0 flex-1 cursor-pointer items-center rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
                   title={rootPath ?? undefined}
                   onClick={() => setIsEditingRoot(true)}
                 >
@@ -1184,7 +1185,7 @@ export const FileExplorer = memo(
                     icon={PencilEdit02Icon}
                     size={12}
                     strokeWidth={2}
-                    className="shrink-0 opacity-0 transition-opacity group-hover/root:opacity-100"
+                    className="pointer-events-none ml-1.5 hidden shrink-0 group-hover/root:block"
                   />
                   <span className="flex-1" />
                 </button>
@@ -1197,6 +1198,7 @@ export const FileExplorer = memo(
                     strokeWidth={2}
                   />
                   Change Explorer Root
+                  <ShortcutHint id="sidebar.editRoot" />
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
