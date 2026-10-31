@@ -280,6 +280,7 @@ import {
   resolveExplorerRoot,
   logicalRepoRoot,
   nearestExistingDir,
+  resolveTypedRoot,
   resolveSidebarTarget,
   isFilesystemRoot,
   parentRoot,
@@ -1062,6 +1063,22 @@ export default function App() {
       setFsRoot(activeWorkspace.id, candidate);
     },
     [activeWorkspace, activeRootMode, setFsRoot],
+  );
+
+  const handleSubmitRootPath = useCallback(
+    async (typed: string) => {
+      if (!activeWorkspace) return;
+      const path = await resolveTypedRoot(typed, home, (p) =>
+        native.fsStat(p).then(
+          (st) => st.kind !== "file",
+          () => false,
+        ),
+      );
+      if (!path) return;
+      if (activeRootMode === "filesystem") setFsRoot(activeWorkspace.id, path);
+      else setWorkspaceRoot(activeWorkspace.id, path);
+    },
+    [activeWorkspace, activeRootMode, home, setFsRoot, setWorkspaceRoot],
   );
 
   const handleEnterFolder = useCallback(
@@ -4078,6 +4095,7 @@ export default function App() {
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
                         onFsRootMissing={handleFsRootMissing}
+                        onSubmitRootPath={handleSubmitRootPath}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         gitRootPath={gitRoot}
@@ -4180,6 +4198,7 @@ export default function App() {
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
                         onFsRootMissing={handleFsRootMissing}
+                        onSubmitRootPath={handleSubmitRootPath}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         gitRootPath={gitRoot}

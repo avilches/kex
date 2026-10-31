@@ -77,6 +77,7 @@ export type SidebarProps = {
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
+  onSubmitRootPath?: (typed: string) => void;
   canNavigateUp: boolean;
   homePath: string | null;
   gitRootPath: string | null;
@@ -263,6 +264,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onEnterFolder={props.onEnterFolder}
               onNavigateUp={props.onNavigateUp}
               onFsRootMissing={props.onFsRootMissing}
+              onSubmitRootPath={props.onSubmitRootPath}
               canNavigateUp={props.canNavigateUp}
               homePath={props.homePath}
               gitRootPath={props.gitRootPath}

@@ -62,6 +62,7 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { RootPathInput } from "./RootPathInput";
 import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
@@ -101,6 +102,7 @@ type Props = {
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
+  onSubmitRootPath?: (typed: string) => void;
   canNavigateUp: boolean;
   homePath: string | null;
   gitRootPath: string | null;
@@ -326,6 +328,7 @@ export const FileExplorer = memo(
       onEnterFolder,
       onNavigateUp,
       onFsRootMissing,
+      onSubmitRootPath,
       canNavigateUp,
       homePath,
       gitRootPath,
@@ -414,6 +417,7 @@ export const FileExplorer = memo(
       isDir: boolean;
     } | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isEditingRoot, setIsEditingRoot] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const closeSearch = useCallback(() => {
@@ -1132,14 +1136,28 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
-          <div
-            className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
-            title={rootPath ?? undefined}
-          >
-            <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
-              {LRM + rootPath}
-            </span>
-          </div>
+          {isEditingRoot && rootPath ? (
+            <RootPathInput
+              initial={rootPath}
+              onSubmit={(value) => {
+                setIsEditingRoot(false);
+                onSubmitRootPath?.(value);
+              }}
+              onCancel={() => setIsEditingRoot(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
+              title={rootPath ?? undefined}
+              disabled={!rootPath || !onSubmitRootPath}
+              onClick={() => setIsEditingRoot(true)}
+            >
+              <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
+                {LRM + rootPath}
+              </span>
+            </button>
+          )}
 
           {rootMode === "filesystem" && homePath && (
             <Button

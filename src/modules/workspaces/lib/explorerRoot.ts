@@ -51,6 +51,32 @@ export async function nearestExistingDir(
   return current;
 }
 
+// Turns what the user typed in the explorer path field into a folder that
+// exists, climbing to the nearest valid ancestor. Null means nothing valid.
+export async function resolveTypedRoot(
+  raw: string,
+  home: string | null,
+  isDir: (path: string) => Promise<boolean>,
+): Promise<string | null> {
+  let p = normalizeSep(raw.trim());
+  if (p === "~" || p.startsWith("~/")) {
+    if (!home) return null;
+    p = normalizeSep(home).replace(/\/+$/, "") + p.slice(1);
+  }
+  if (BARE_DRIVE.test(p)) p = `${p}/`;
+  if (!p.startsWith("/") && !DRIVE_ROOT.test(p) && !/^[A-Za-z]:\//.test(p)) {
+    return null;
+  }
+  if (p.length > 1 && !DRIVE_ROOT.test(p)) p = p.replace(/\/+$/, "") || "/";
+  for (;;) {
+    if (await isDir(p)) return p;
+    if (isFilesystemRoot(p)) return null;
+    const parent = parentRoot(p);
+    if (parent === p) return null;
+    p = parent;
+  }
+}
+
 const DRIVE_ROOT = /^[A-Za-z]:\/?$/;
 const BARE_DRIVE = /^[A-Za-z]:$/;
 
