@@ -353,7 +353,7 @@ describe("WorkspaceDetailList context menu", () => {
 });
 
 describe("WorkspaceDetailList with a hibernated tab", () => {
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn()) {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn(), focusedTabId: string | null = null) {
     const sleeping = (t: Tab): Tab =>
       t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1 } } as Tab) : t;
     const container = document.createElement("div");
@@ -381,7 +381,7 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
             tabs: tabs.map(sleeping),
             entries: [],
             filter: { ...base },
-            focusedTabId: null,
+            focusedTabId,
             onActivate,
             onWake,
           }),
@@ -464,9 +464,21 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(4);
     const mark = wrap(sleepingRow).querySelector("[data-sleeping-mark]")!;
-    expect(mark.className).toContain("opacity-40");
-    expect(mark.className).toContain("group-hover/tab:opacity-0");
+    expect(mark.className).toContain("opacity-0");
+    expect(mark.className).toContain("group-hover/tab:opacity-40");
+    expect(mark.className).toContain("peer-hover/x:!opacity-0");
     expect(container.querySelectorAll("[data-sleeping-mark]").length).toBe(1);
+    unmount();
+  });
+
+  it("a focused sleeping row keeps its sleeping mark visible, and the X still replaces it only under the pointer", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false, vi.fn(), "t-plain");
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    const mark = wrap(row).querySelector("[data-sleeping-mark]")!;
+    const tokens = mark.className.split(/\s+/);
+    expect(tokens).toContain("opacity-40");
+    expect(tokens).not.toContain("opacity-0");
+    expect(mark.className).toContain("peer-hover/x:!opacity-0");
     unmount();
   });
 
