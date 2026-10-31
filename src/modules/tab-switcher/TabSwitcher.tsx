@@ -38,8 +38,9 @@ function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
 // is as tall as two title lines plus the workspace line, and the spare room sits under them, so the
 // workspace hugs a one-line title instead of floating at the bottom. A tile that changed height with
 // its text would move the rows below it and the scroll with them.
-function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
-  const ref = useRef<HTMLButtonElement>(null);
+// The dot read live, so a tile and the footer follow the agent while the switcher is open; the entry's own
+// value only covers a tab with no live session yet.
+function useEntryIndicator(entry: TabEntry) {
   const session = useAgentStore((s) => s.sessions[entry.tabId]);
   const notifications = useAgentStore((s) => s.notifications);
   const liveVisual = useMemo(
@@ -52,7 +53,12 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         : null,
     [session, notifications, entry.tabId],
   );
-  const indicator = liveVisual ?? entry.indicator;
+  return liveVisual ?? entry.indicator;
+}
+
+function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const indicator = useEntryIndicator(entry);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -80,7 +86,7 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
           {!entry.agentSession && !entry.hibernated && entry.agent && entry.kind === "terminal" && !entry.tab.icon ? (
             <AgentIcon agent={entry.agent} size={TILE_ICON} />
           ) : (
-            <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} />
+            <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} carriedAgent={entry.agent} />
           )}
         </span>
         {indicator === "working" ? (
@@ -152,6 +158,7 @@ function Footer({
   ref?: React.Ref<HTMLDivElement>;
 }) {
   const detail = tabDetailLines(entry).join("  ·  ");
+  const indicator = useEntryIndicator(entry);
   return (
     <div
       ref={ref}
@@ -161,9 +168,16 @@ function Footer({
       <div className="min-w-0 flex-1">
         <div data-footer-line className="flex min-w-0 items-center gap-1.5">
           <span data-tab-icon className="flex shrink-0 items-center text-muted-foreground">
-            <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} />
+            <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className="truncate text-[13px] font-medium">{entry.title || entry.kind}</span>
+          {indicator === "attention" || indicator === "error" ? (
+            <span
+              aria-hidden
+              data-footer-dot=""
+              className={cn("size-[6px] shrink-0 rounded-full", indicator === "error" ? "bg-destructive" : "bg-amber-400")}
+            />
+          ) : null}
           {entry.hibernated ? <HibernatedMark size={13} /> : null}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">

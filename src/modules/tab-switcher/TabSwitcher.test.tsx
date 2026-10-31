@@ -213,6 +213,25 @@ describe("TabSwitcher footer", () => {
     expect(footer().textContent).not.toMatch(/hibernated/i);
   });
 
+  it("puts the attention or error dot right after the title, and nothing for a tab without one", () => {
+    show([entry({ title: "api", indicator: "attention" })]);
+    const dot = footer().querySelector("[data-footer-dot]")!;
+    expect(dot.className).toContain("bg-amber-400");
+    expect(dot.previousElementSibling?.textContent).toBe("api");
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api", indicator: "error" })]);
+    expect(footer().querySelector("[data-footer-dot]")!.className).toContain("bg-destructive");
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api", indicator: "working" })]);
+    expect(footer().querySelector("[data-footer-dot]")).toBeNull();
+    cleanup();
+    cancelSwitcher();
+    show([entry({ title: "api" })]);
+    expect(footer().querySelector("[data-footer-dot]")).toBeNull();
+  });
+
   it("keeps the workspace out of the detail line, since it has its own", () => {
     show([entry({ workspaceTitle: "Kex", detail: "/p/Kex" })]);
     expect(within(footer()).getAllByText(/Kex/)).toHaveLength(2);
