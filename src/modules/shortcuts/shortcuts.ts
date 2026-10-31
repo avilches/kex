@@ -268,7 +268,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "sidebar.editRoot",
     label: "Change Explorer Root",
     group: "Sidebar",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "e" }],
+    defaultBindings: [{ shift: true, key: "F2" }],
   },
   {
     id: "explorer.viewFilesystem",
