@@ -294,7 +294,6 @@ function DraggableTab({
                 : "bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ],
         isThisDragging && "opacity-40",
-        sleeping && !isThisDragging && "opacity-40",
       )}
     >
       {/* Droppable half-zones - coordinates-based, no pointer events needed */}
@@ -334,7 +333,7 @@ function DraggableTab({
       <span
         className={cn(
           "shrink-0",
-          hasAgent && !tab.icon ? "opacity-100" : "opacity-70",
+          sleeping ? "opacity-40" : hasAgent && !tab.icon ? "opacity-100" : "opacity-70",
         )}
       >
         <TabBarIcon
@@ -351,6 +350,7 @@ function DraggableTab({
             !!runningCommand &&
             "text-center",
           isRestoreError && "text-destructive/70",
+          sleeping && "opacity-40",
           (tab.kind === "editor" ||
             tab.kind === "markdown" ||
             tab.kind === "git-diff" ||
@@ -375,16 +375,16 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
-      {isLocked && statusIndicator && (
-        <span className="ml-0.5 flex shrink-0 items-center">
-          {statusIndicator}
-        </span>
-      )}
       {isLocked ? (
         <>
         {sleeping && (
           <span className="ml-0.5 shrink-0" title="Hibernated: double click to restore">
-            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
+          </span>
+        )}
+        {statusIndicator && (
+          <span className="ml-0.5 flex shrink-0 items-center">
+            {statusIndicator}
           </span>
         )}
         <button
@@ -409,7 +409,7 @@ function DraggableTab({
               className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0"
               title="Hibernated: double click to restore"
             >
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
             </span>
           )}
           {statusIndicator && (
