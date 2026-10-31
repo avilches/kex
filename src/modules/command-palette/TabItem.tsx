@@ -1,6 +1,8 @@
 import { CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
+import { DirtyMark } from "@/modules/workspaces/DirtyMark";
+import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -65,12 +67,15 @@ export function TabItem({
         />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">
-          {entry.title ? (
-            <HighlightText text={entry.title} indices={titleIndices} />
-          ) : (
-            KIND_LABEL[entry.kind]
-          )}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate">
+            {entry.title ? (
+              <HighlightText text={entry.title} indices={titleIndices} />
+            ) : (
+              KIND_LABEL[entry.kind]
+            )}
+          </span>
+          {isDirtyDocument(entry.tab) && <DirtyMark />}
         </span>
         {lines.map((line) => (
           <span

@@ -32,6 +32,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { DirtyMark } from "./DirtyMark";
+import { isDirtyDocument } from "./lib/dirtyTab";
 import { isHibernatedTab } from "./lib/hibernate";
 import { tabMiddleClick } from "./lib/tabCloseControl";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
@@ -362,9 +364,7 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
-      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-        <span className="shrink-0 text-[9px] text-primary">●</span>
-      )}
+      {isDirtyDocument(tab) && <DirtyMark />}
       {tab.note !== undefined && (
         <TabNoteButton
           open={isTabNoteOpen(tab)}
@@ -379,7 +379,7 @@ function DraggableTab({
         <>
         {sleeping && (
           <span className="ml-0.5 shrink-0" title="Hibernated: double click to restore">
-            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+            <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
           </span>
         )}
         {statusIndicator && (
@@ -409,7 +409,7 @@ function DraggableTab({
               className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0"
               title="Hibernated: double click to restore"
             >
-              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
+              <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} className="opacity-40" />
             </span>
           )}
           {statusIndicator && (

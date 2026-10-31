@@ -465,9 +465,8 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     expect(container.querySelectorAll('button[aria-label="Close tab"]').length).toBe(4);
     const mark = wrap(sleepingRow).querySelector("[data-sleeping-mark]")!;
     expect(mark.className).toContain("opacity-0");
-    expect(mark.className).toContain("group-hover/tab:opacity-100");
+    expect(mark.className).toContain("group-hover/tab:opacity-40");
     expect(mark.className).toContain("peer-hover/x:!opacity-0");
-    expect(mark.className).not.toContain("opacity-40");
     expect(container.querySelectorAll("[data-sleeping-mark]").length).toBe(1);
     unmount();
   });
@@ -477,7 +476,7 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
     const mark = wrap(row).querySelector("[data-sleeping-mark]")!;
     const tokens = mark.className.split(/\s+/);
-    expect(tokens).toContain("opacity-100");
+    expect(tokens).toContain("opacity-40");
     expect(tokens).not.toContain("opacity-0");
     expect(mark.className).toContain("peer-hover/x:!opacity-0");
     unmount();

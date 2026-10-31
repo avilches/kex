@@ -1,6 +1,4 @@
 import { useLayoutEffect, useEffect, useRef, useState, type ReactNode } from "react";
-import { SleepingIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import type { TabEntry } from "@/modules/command-palette";
@@ -8,6 +6,8 @@ import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { DirtyMark } from "@/modules/workspaces/DirtyMark";
+import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -21,14 +21,6 @@ export type RenderMenu = (entry: TabEntry) => ReactNode;
 // The icon is asked for at this size instead of stretched with CSS: the agent marks carry an inline size
 // that no class can override, which left them at 13 px inside a 44 px square.
 const TILE_ICON = 26;
-
-function HibernatedMark({ size }: { size: number }) {
-  return (
-    <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 text-muted-foreground">
-      <HugeiconsIcon icon={SleepingIcon} size={size} strokeWidth={1.75} />
-    </span>
-  );
-}
 
 function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
   return (
@@ -99,6 +91,13 @@ function Tile({
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
             <SleepingBadge size={12} indicator={indicator} dotPx={7} />
           </span>
+        ) : isDirtyDocument(entry.tab) ? (
+          <span
+            role="img"
+            aria-label="Unsaved changes"
+            data-dirty-mark=""
+            className="absolute -top-1 -right-1 size-3.5 rounded-full bg-primary ring-2 ring-popover"
+          />
         ) : indicator === "working" ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
             <Spinner size={12} />
@@ -184,8 +183,8 @@ function Footer({
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
-          {entry.hibernated ? <HibernatedMark size={13} /> : null}
-          <TabIndicatorMark indicator={indicator} />
+          {entry.hibernated ? <SleepingBadge size={13} indicator={indicator} /> : <TabIndicatorMark indicator={indicator} />}
+          {isDirtyDocument(entry.tab) && <DirtyMark />}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />

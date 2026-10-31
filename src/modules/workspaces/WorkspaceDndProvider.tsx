@@ -17,7 +17,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { closestCenter } from "@dnd-kit/core";
 import { pointerLeftWindow, renderDragIcon, startNativeFileDrag, tabNativeDragPath } from "@/modules/explorer/lib/nativeDragOut";
+import { DirtyMark } from "./DirtyMark";
 import { DragGhost } from "./DragGhost";
+import { isDirtyDocument } from "./lib/dirtyTab";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
 import {
@@ -566,6 +568,7 @@ export function WorkspaceDndProvider({
           <div className="flex items-center gap-1 text-[12px] text-foreground">
             <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab)}</span>
             <span className="max-w-[120px] truncate">{tabDisplayTitleNow(draggingItem.tab)}</span>
+            {isDirtyDocument(draggingItem.tab) && <DirtyMark />}
           </div>
         </DragGhost>
       )}

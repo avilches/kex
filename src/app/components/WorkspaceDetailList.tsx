@@ -21,7 +21,9 @@ import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
+import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { DirtyMark } from "@/modules/workspaces/DirtyMark";
 import { tabMiddleClick } from "@/modules/workspaces/lib/tabCloseControl";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -323,9 +325,7 @@ function DetailTabRow({
               >
                 {title}
               </span>
-              {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-                <span className="shrink-0 text-[9px] text-primary">●</span>
-              )}
+              {isDirtyDocument(tab) && <DirtyMark />}
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
@@ -364,7 +364,7 @@ function DetailTabRow({
       {isLocked ? (
         <>
         {hibernated && (
-          <span aria-hidden data-sleeping-mark="" className={cn("pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity", focused ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100")} style={{ right: 26 + (hasNote ? 20 : 0) }}>
+          <span aria-hidden data-sleeping-mark="" className={cn("pointer-events-none absolute top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity", focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40")} style={{ right: 26 + (hasNote ? 20 : 0) }}>
             <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
           </span>
         )}
@@ -396,7 +396,7 @@ function DetailTabRow({
                 data-sleeping-mark=""
                 className={cn(
                   "pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity peer-hover/x:!opacity-0 group-has-[:focus-visible]/tab:!opacity-0",
-                  focused ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100",
+                  focused ? "opacity-40" : "opacity-0 group-hover/tab:opacity-40",
                 )}
               >
                 <HugeiconsIcon icon={SleepingIcon} size={12} strokeWidth={1.75} />
