@@ -150,10 +150,10 @@ describe("palette catalog", () => {
 
   it("gives generated rows a title that makes sense out of its group", () => {
     const find = (id: string) => items.find((i) => i.id === id)?.title;
-    expect(find("explorer.viewFilesystem")).toBe("Explorer: File System");
-    expect(find("explorer.viewPinned")).toBe("Explorer: Workspace Root");
+    expect(find("explorer.viewFilesystem")).toBe("Focus Explorer on File System");
+    expect(find("explorer.viewPinned")).toBe("Focus Explorer on Workspace Root");
     expect(find("sidebar.showGit")).toBe("Show Git Changes");
-    expect(find("sidebar.showExplorer")).toBe("Explorer (cycle root)");
+    expect(find("sidebar.showExplorer")).toBe("Focus Explorer");
   });
 
   it("offers Remove note only when the tab has one", () => {

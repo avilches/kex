@@ -94,7 +94,6 @@ fn signal_quit_request(app: &tauri::AppHandle) {
 struct DynMenuItems {
     autosave: tauri::menu::CheckMenuItem<tauri::Wry>,
     sidebar: tauri::menu::CheckMenuItem<tauri::Wry>,
-    explorer: tauri::menu::CheckMenuItem<tauri::Wry>,
     git: tauri::menu::CheckMenuItem<tauri::Wry>,
     history: tauri::menu::CheckMenuItem<tauri::Wry>,
     show_hidden: tauri::menu::CheckMenuItem<tauri::Wry>,
@@ -129,7 +128,6 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let _ = items.autosave.set_checked(state.autosave);
         let _ = items.sidebar.set_checked(state.sidebar_open);
         let on = |view: &str| state.sidebar_open && state.active_view == view;
-        let _ = items.explorer.set_checked(on("explorer"));
         let _ = items.git.set_checked(on("git"));
         let _ = items.history.set_checked(on("history"));
         let _ = items.show_hidden.set_checked(state.show_hidden);
@@ -629,6 +627,13 @@ pub fn run() {
                 let new_browser = MenuItemBuilder::with_id("new_browser", "New Browser Tab")
                     .accelerator("Cmd+Shift+O")
                     .build(app)?;
+                let command_palette =
+                    MenuItemBuilder::with_id("command_palette", "Command Palette")
+                        .accelerator("Cmd+P")
+                        .build(app)?;
+                let find_in_files = MenuItemBuilder::with_id("find_in_files", "Find in Files")
+                    .accelerator("Cmd+Shift+P")
+                    .build(app)?;
                 let autosave = CheckMenuItemBuilder::with_id("toggle_autosave", "Autosave")
                     .checked(false)
                     .build(app)?;
@@ -645,6 +650,9 @@ pub fn run() {
                     .item(&new_workspace)
                     .item(&new_terminal)
                     .item(&new_browser)
+                    .separator()
+                    .item(&command_palette)
+                    .item(&find_in_files)
                     .separator()
                     .item(&autosave)
                     .separator()
@@ -668,10 +676,6 @@ pub fn run() {
                 let sidebar = CheckMenuItemBuilder::with_id("toggle_sidebar", "Sidebar")
                     .checked(false)
                     .build(app)?;
-                let explorer = CheckMenuItemBuilder::with_id("toggle_explorer", "Explorer")
-                    .accelerator("Cmd+E")
-                    .checked(false)
-                    .build(app)?;
                 let git = CheckMenuItemBuilder::with_id("toggle_git", "Git Changes")
                     .accelerator("Cmd+G")
                     .checked(false)
@@ -689,7 +693,6 @@ pub fn run() {
                         .build(app)?;
                 let view_menu = SubmenuBuilder::new(app, "View")
                     .item(&sidebar)
-                    .item(&explorer)
                     .item(&git)
                     .item(&history)
                     .separator()
@@ -724,7 +727,6 @@ pub fn run() {
                 app.manage(MenuHandles(Mutex::new(Some(DynMenuItems {
                     autosave,
                     sidebar,
-                    explorer,
                     git,
                     history,
                     show_hidden,

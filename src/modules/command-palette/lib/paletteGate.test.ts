@@ -108,11 +108,14 @@ describe("menuItemBlockedByPalette", () => {
     for (const id of MENU_ITEM_IDS) expect(menuItemBlockedByPalette(id, "none")).toBe(false);
   });
 
-  it("lets only close_tab and new_terminal through an open palette", () => {
-    for (const palette of ["commands", "folder"] as const) {
-      const open = MENU_ITEM_IDS.filter((id) => !menuItemBlockedByPalette(id, palette));
-      expect(open.sort()).toEqual(["close_tab", "new_terminal"]);
-    }
+  it("lets only close_tab and new_terminal through an open folder palette", () => {
+    const open = MENU_ITEM_IDS.filter((id) => !menuItemBlockedByPalette(id, "folder"));
+    expect(open.sort()).toEqual(["close_tab", "new_terminal"]);
+  });
+
+  it("lets the two palette items switch mode through an open command palette", () => {
+    const open = MENU_ITEM_IDS.filter((id) => !menuItemBlockedByPalette(id, "commands"));
+    expect(open.sort()).toEqual(["close_tab", "command_palette", "find_in_files", "new_terminal"]);
   });
 
   it("blocks an unknown menu id", () => {

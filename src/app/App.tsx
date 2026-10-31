@@ -801,6 +801,7 @@ export default function App() {
   useProfilerSetting();
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
+  const pendingExplorerFocus = useRef(false);
   const pendingEditRoot = useRef(false);
 
   // ── Live terminal tab tracking for session disposal ─────────────────────
@@ -932,6 +933,10 @@ export default function App() {
     ) {
       pendingExplorerSearch.current = false;
       sidebarRef.current?.focusExplorer();
+    }
+    if (sidebarOpen && sidebarView === "explorer" && pendingExplorerFocus.current) {
+      pendingExplorerFocus.current = false;
+      requestAnimationFrame(() => sidebarRef.current?.focusExplorerTree());
     }
   }, [sidebarOpen, sidebarView]);
 
@@ -2316,23 +2321,22 @@ export default function App() {
     [handleChangeRootMode, setSidebarOpen, setSidebarView],
   );
 
-  // Cmd+E: bring up the explorer, then on each press cycle its root between File
-  // System and Workspace Root. With no pinned root the cycle stays on File
-  // System (idempotent). It never closes the sidebar (use sidebar.toggle).
-  const rotateExplorerRoot = useCallback(() => {
-    const sidebar = sidebarStateRef.current;
-    const inExplorer = sidebar.open && sidebarViewRef.current === "explorer";
-    if (!inExplorer) {
+  // Opens the sidebar on the explorer and puts the keyboard focus in its tree. When the explorer
+  // is not on screen yet the focus waits for the effect that sees it mounted.
+  const focusExplorerTree = useCallback(
+    (mode?: ExplorerRootMode) => {
+      const visible =
+        sidebarStateRef.current.open && sidebarViewRef.current === "explorer";
+      if (mode) handleChangeRootMode(mode);
+      if (visible) {
+        requestAnimationFrame(() => sidebarRef.current?.focusExplorerTree());
+        return;
+      }
+      pendingExplorerFocus.current = true;
       showSidebarView("explorer");
-      return;
-    }
-    const mode = activeWorkspace?.explorerRootMode ?? "filesystem";
-    if (mode === "filesystem") {
-      if (activeWorkspace?.workspaceRoot) handleChangeRootMode("workspace");
-    } else {
-      handleChangeRootMode("filesystem");
-    }
-  }, [activeWorkspace, handleChangeRootMode, showSidebarView]);
+    },
+    [handleChangeRootMode, showSidebarView],
+  );
 
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
@@ -3224,15 +3228,16 @@ export default function App() {
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
-      "sidebar.toggle": toggleSidebar,
-      "sidebar.showExplorer": rotateExplorerRoot,
+      "sidebar.showExplorer": () => focusExplorerTree(),
       "sidebar.showGit": () => showSidebarView("git"),
       "sidebar.showHistory": () => showSidebarView("history"),
       "sidebar.showNotes": () => {
         if (activeWorkspace?.workspaceRoot) showSidebarView("notes");
       },
-      "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
-      "explorer.viewPinned": () => showExplorerWithMode("workspace"),
+      "explorer.viewFilesystem": () => focusExplorerTree("filesystem"),
+      "explorer.viewPinned": () => {
+        if (activeWorkspace?.workspaceRoot) focusExplorerTree("workspace");
+      },
       "explorer.toggleHidden": handleToggleShowHidden,
       "explorer.search": () => {
         dismissPalettes();
@@ -3369,7 +3374,7 @@ export default function App() {
       toggleSidebar,
       showSidebarView,
       showExplorerWithMode,
-      rotateExplorerRoot,
+      focusExplorerTree,
       toggleOverlayPreview,
       toggleSplitPreview,
       activeTabId,
@@ -3528,8 +3533,11 @@ export default function App() {
       case "toggle_sidebar":
         toggleSidebar();
         break;
-      case "toggle_explorer":
-        showSidebarView("explorer");
+      case "command_palette":
+        shortcutHandlers["commandPalette.open"]?.(new KeyboardEvent("keydown"));
+        break;
+      case "find_in_files":
+        shortcutHandlers["commandPalette.content"]?.(new KeyboardEvent("keydown"));
         break;
       case "toggle_git":
         showSidebarView("git");

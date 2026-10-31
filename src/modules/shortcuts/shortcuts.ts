@@ -45,7 +45,6 @@ export type ShortcutId =
   | "terminal.scratchpad"
   | "search.focus"
   | "explorer.search"
-  | "sidebar.toggle"
   | "sidebar.showExplorer"
   | "sidebar.showGit"
   | "sidebar.showHistory"
@@ -81,6 +80,7 @@ export type ShortcutGroup =
   | "Sidebar"
   | "Explorer"
   | "Tabs"
+  | "Tab Switcher"
   | "Panes"
   | "Terminal"
   | "View"
@@ -131,7 +131,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.hibernate",
-    label: "Hibernate Tab",
+    label: "Hibernate / Restore Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
   },
@@ -235,16 +235,22 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
   },
   {
-    id: "sidebar.toggle",
-    label: "Toggle Sidebar",
-    group: "Sidebar",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "b" }],
-  },
-  {
     id: "sidebar.showExplorer",
-    label: "Explorer (cycle root)",
+    label: "Focus Explorer",
     group: "Sidebar",
     defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
+  },
+  {
+    id: "explorer.viewPinned",
+    label: "Focus Explorer on Workspace Root",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "e" }],
+  },
+  {
+    id: "explorer.viewFilesystem",
+    label: "Focus Explorer on File System",
+    group: "Sidebar",
+    defaultBindings: [],
   },
   {
     id: "sidebar.showGit",
@@ -269,20 +275,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Change Explorer Root",
     group: "Sidebar",
     defaultBindings: [{ ctrl: true, key: "F2" }],
-  },
-  {
-    id: "explorer.viewFilesystem",
-    label: "File System",
-    group: "Explorer",
-    // No default binding: Ctrl+1/Ctrl+2 are now tab.selectByIndex. Cycle the
-    // explorer root with Cmd+E (sidebar.showExplorer); these stay reassignable.
-    defaultBindings: [],
-  },
-  {
-    id: "explorer.viewPinned",
-    label: "Workspace Root",
-    group: "Explorer",
-    defaultBindings: [],
   },
   {
     id: "explorer.toggleHidden",
@@ -455,14 +447,14 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "tab.switcher",
     label: "Switch Tab (hold to cycle, release to go)",
-    group: "Tabs",
+    group: "Tab Switcher",
     defaultBindings: [{ ctrl: true, key: "Tab" }],
     allowRepeat: true,
   },
   {
     id: "tab.switcherBack",
     label: "Switch Tab Backwards",
-    group: "Tabs",
+    group: "Tab Switcher",
     defaultBindings: [{ ctrl: true, shift: true, key: "Tab" }],
     allowRepeat: true,
   },
@@ -569,6 +561,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Palette: New Terminal",
   "Command Palette",
   "Tabs",
+  "Tab Switcher",
   "Panes",
   "Terminal",
   "View",
