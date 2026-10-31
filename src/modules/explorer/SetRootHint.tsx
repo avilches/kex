@@ -23,7 +23,7 @@ export function SetRootHint() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none relative mt-2 ml-4 h-[190px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
+      className="pointer-events-none relative mt-2 ml-4 h-[200px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
     >
       <div className="flex flex-col py-2 pl-6">
         {ROWS.map((row) => (
@@ -51,16 +51,16 @@ export function SetRootHint() {
       <div
         className={cn(
           COMPACT_CONTENT,
-          "absolute left-40 top-[86px] rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
+          "absolute left-28 top-[86px] w-max rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
         )}
       >
-        <div className={cn("flex items-center", COMPACT_ITEM)}>
+        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
           <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={2} className="shrink-0" />
           Actions
         </div>
         <div
           className={cn(
-            "flex items-center rounded-menu-item bg-accent font-medium",
+            "flex items-center whitespace-nowrap rounded-menu-item bg-accent font-medium",
             COMPACT_ITEM,
             MISSING_ROOT_ITEM,
           )}
@@ -68,14 +68,14 @@ export function SetRootHint() {
           <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} className="shrink-0 text-primary" />
           Set as Workspace Root
         </div>
-        <div className={cn("flex items-center", COMPACT_ITEM)}>
+        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
           <HugeiconsIcon icon={DashboardSquareAddIcon} size={14} strokeWidth={2} className="shrink-0" />
           New Workspace from Folder
         </div>
       </div>
       <svg
         viewBox="0 0 16 22"
-        className="absolute left-[15.5rem] top-[128px] h-[22px] w-4 drop-shadow-md"
+        className="absolute left-[14.5rem] top-[128px] h-[22px] w-4 drop-shadow-md"
       >
         <path
           d="M1 1v17l4.5-4 3 7 3-1.3-3-6.7H14z"
@@ -86,7 +86,7 @@ export function SetRootHint() {
         />
       </svg>
       <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-sidebar via-sidebar/80 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-sidebar via-sidebar/85 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-sidebar via-sidebar/80 to-transparent" />
     </div>
   );
 }
