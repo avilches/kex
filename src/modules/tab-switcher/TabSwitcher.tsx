@@ -67,7 +67,7 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
       style={{ height: TILE_HEIGHT }}
       className={cn(
         "relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl border-2 border-transparent px-2 pt-3 text-center outline-none",
-        selected ? "border-primary bg-primary/10" : "hover:bg-accent/50",
+        selected && "border-primary bg-primary/10",
       )}
     >
       <span className="relative shrink-0">
