@@ -35,6 +35,7 @@ import {
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { setCommandFailed } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { isFailedExit } from "@/modules/workspaces/lib/useCommandMark";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { consumeHeldBlock, setModalBlock, getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { takeWakeBackdrop } from "./wakeBackdrop";
@@ -896,7 +897,7 @@ function bindLeafToSlot(leafId: string, s: Session): void {
           s.integrationSeen = true;
           s.callbacks.onRunningCommand?.(cmd, started);
         },
-        (code) => setCommandFailed(leafId, code !== 0),
+        (code) => setCommandFailed(leafId, isFailedExit(code)),
       );
       const cwd = registerCwdHandler(
         term,

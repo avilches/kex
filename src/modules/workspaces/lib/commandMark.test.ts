@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getCommandFailed, setCommandFailed } from "./terminalEphemeralStore";
 import { tabStatusIndicator } from "./tabStatusIndicator";
-import { commandMark } from "./useCommandMark";
+import { commandMark, isFailedExit } from "./useCommandMark";
 
 const none = { restoreBusy: false, restorePending: false, hasAgent: false, isRestoreError: false, status: undefined };
 
@@ -19,6 +19,12 @@ describe("command mark of a plain terminal", () => {
 
   it("leaves agent tabs to their own state", () => {
     expect(tabStatusIndicator({ ...none, hasAgent: true, status: "idle", commandMark: "error" })).toBeNull();
+  });
+
+  it("does not count Ctrl-C (exit 130) as a failure", () => {
+    expect(isFailedExit(130)).toBe(false);
+    expect(isFailedExit(0)).toBe(false);
+    expect(isFailedExit(1)).toBe(true);
   });
 
   it("keeps the failure until a clean command clears it", () => {

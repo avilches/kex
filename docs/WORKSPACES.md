@@ -541,7 +541,7 @@ Warnings that point at a black or deaf terminal:
   terminal, the file of an editor or git tab, with the home folder as `~` (`altHeldStore.ts`, applied in
   `useAgentTabTitle`). The key state is read from window key events and reset on blur.
 - A plain terminal (no agent) shows a spinner while a command runs and a red dot when the last command ended with a
-  non-zero exit code (OSC 133 D). Like a shell prompt, the dot stays until the next command ends, and a clean exit
+  non-zero exit code (OSC 133 D), except 130 (Ctrl-C), which counts as a clean end. Like a shell prompt, the dot stays until the next command ends, and a clean exit
   clears it (`setCommandFailed` in `terminalEphemeralStore.ts`, `useCommandMark.ts`, `tabStatusIndicator.ts`). Agent tabs keep their own
   indicator.
 - A double click on a workspace in the WorkspaceBar expands or collapses its nested tab list; rename lives in the
