@@ -23,7 +23,7 @@ export function SetRootHint() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none relative mt-2 ml-4 h-[200px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
+      className="pointer-events-none relative mt-4 ml-4 h-[200px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
     >
       <div className="flex flex-col py-2 pl-6">
         {ROWS.map((row) => (
