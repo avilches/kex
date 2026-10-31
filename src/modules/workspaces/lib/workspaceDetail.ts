@@ -1,3 +1,4 @@
+import { sleepIndicator } from "./hibernateIndicator";
 import type {
   AgentEntry,
   AgentEntryVisual,
@@ -25,7 +26,7 @@ export type DetailFilter = {
   git: boolean;
 };
 
-export type DetailTab = { id: string; kind: string; hibernation?: { indicator?: "attention" | "error" } };
+export type DetailTab = { id: string; kind: string; title?: string; hibernation?: { indicator?: "attention" | "error" } };
 
 export type DetailRow = { tabId: string; visual: AgentEntryVisual | null };
 
@@ -68,7 +69,10 @@ export function workspaceDetailRows(
   const visualByTab = new Map<string, AgentEntryVisual>();
   for (const e of entries) visualByTab.set(e.tabId, e.visual);
   const asleepVisual = new Map<string, AgentEntryVisual>();
-  for (const t of tabs) if (t.hibernation?.indicator) asleepVisual.set(t.id, t.hibernation.indicator);
+  for (const t of tabs) {
+    const kept = sleepIndicator(t);
+    if (kept) asleepVisual.set(t.id, kept);
+  }
   const row = (id: string): DetailRow => ({
     tabId: id,
     visual: visualByTab.get(id) ?? asleepVisual.get(id) ?? null,

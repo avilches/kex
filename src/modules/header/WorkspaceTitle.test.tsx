@@ -19,13 +19,13 @@ const asleep = (indicator?: "attention" | "error"): SleepingTab => ({
 const subtitleRow = () => screen.getByText("api").parentElement as HTMLElement;
 
 describe("WorkspaceTitle tab line", () => {
-  it("dims the name of a sleeping tab, then the sleeping icon, then its dot", () => {
+  it("dims the name of a sleeping tab, then shows the sleeping icon undimmed, then its dot", () => {
     render(<WorkspaceTitle workspace={workspace} tab={asleep("attention")} groups={[]} />);
     const name = screen.getByText("api");
     const icon = screen.getByLabelText("Tab is hibernated");
     const dot = subtitleRow().querySelector("[data-indicator-dot]")!;
     expect(name.className).toContain("opacity-40");
-    expect(icon.className).toContain("opacity-40");
+    expect(icon.className).not.toContain("opacity");
     expect(name.nextElementSibling).toBe(icon);
     expect(icon.nextElementSibling).toBe(dot);
     expect(dot.className).toContain("bg-amber-400");
