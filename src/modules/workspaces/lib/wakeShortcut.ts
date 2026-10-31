@@ -19,10 +19,18 @@ const ENTER_OWNERS = [
   "[role=alertdialog]",
   ".cm-editor",
   "[data-scm-panel]",
+  "[data-file-explorer]",
 ].join(",");
 
 export function enterBelongsToFocusedElement(target: Element | null): boolean {
   if (!target) return false;
   if (target.matches(".xterm-helper-textarea")) return false;
   return target.closest(ENTER_OWNERS) !== null;
+}
+
+// The bare Enter that wakes the placeholder: no modifier, not a key repeat, and nothing else took it.
+export function isWakeEnter(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" || e.repeat || e.defaultPrevented) return false;
+  if (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return false;
+  return !enterBelongsToFocusedElement(e.target as Element | null);
 }

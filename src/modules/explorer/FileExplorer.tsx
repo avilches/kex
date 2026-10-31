@@ -1166,6 +1166,7 @@ export const FileExplorer = memo(
     return (
       <div
         ref={containerRef}
+        data-file-explorer
         className="flex h-full flex-col outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}

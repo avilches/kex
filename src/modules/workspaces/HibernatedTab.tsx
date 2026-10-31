@@ -2,7 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { cachedHomeDir } from "@/lib/homeDir";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { ENTER_KEY } from "@/lib/platform";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
+import { switcherActive } from "@/modules/tab-switcher";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
@@ -11,6 +13,7 @@ import { HibernatedLines } from "./HibernatedLines";
 import { hibernatedLayout, type HibernatedLayout } from "./lib/hibernatedLayout";
 import { formatHibernatedFor, hibernatedCommand, type SleepingTab } from "./lib/hibernate";
 import { sleepIndicator } from "./lib/hibernateIndicator";
+import { isWakeEnter } from "./lib/wakeShortcut";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 
@@ -53,11 +56,22 @@ type Props = { tab: SleepingTab; visible: boolean; focused: boolean; onWake: () 
 // behind it, only what was captured when it went to sleep.
 export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
   const info = useAgentTabTitle(tab);
-  const wakeLabel = useShortcutLabel("tab.wake");
   const toggleLabel = useShortcutLabel("tab.hibernate");
   const shortcuts = focused
-    ? [wakeLabel, toggleLabel, DOUBLE_CLICK_LABEL].filter((l): l is string => !!l)
+    ? [ENTER_KEY, toggleLabel, DOUBLE_CLICK_LABEL].filter((l): l is string => !!l)
     : [DOUBLE_CLICK_LABEL];
+  const wakeRef = useRef(onWake);
+  wakeRef.current = onWake;
+  useEffect(() => {
+    if (!focused || !visible) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (switcherActive() || !isWakeEnter(e)) return;
+      e.preventDefault();
+      wakeRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focused, visible]);
   const now = useNow(visible);
   const [ref, layout] = useLayout();
   const linesRef = useRef<HTMLDivElement>(null);

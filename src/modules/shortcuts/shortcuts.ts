@@ -23,7 +23,6 @@ export type ShortcutId =
   | "tab.note"
   | "tab.lock"
   | "tab.hibernate"
-  | "tab.wake"
   | "tab.focusOnExplorer"
   | "file.rename"
   | "file.copy"
@@ -134,12 +133,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Hibernate / Restore Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
-  },
-  {
-    id: "tab.wake",
-    label: "Restore Hibernated Tab",
-    group: "Tabs",
-    defaultBindings: [{ key: "Enter" }],
   },
   {
     id: "nav.prev",

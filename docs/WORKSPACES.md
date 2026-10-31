@@ -247,7 +247,7 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   tooltip), both dimmed alike, each ending in a small, equally dimmed copy button that puts the full path or
   command on the clipboard and shows a tick for a moment. "Hibernated for 3h 20m" (`formatHibernatedFor`) sits dimmed in
   the card's bottom-right corner. A double click anywhere on the placeholder wakes it too. The ways to wake it show as
-  keys in the bottom-left corner, followed by "Restore": with the focus `tab.wake`, `tab.hibernate` and "Double click",
+  keys in the bottom-left corner, followed by "Restore": with the focus Enter (hardwired in `HibernatedTab`, not a registry shortcut), `tab.hibernate` and "Double click",
   and the button is accented; without the focus only "Double click" (the button is grey), since the keys would not
   reach it. The rest of the workspace (other tabs, panes,
   Sidebar) is untouched. The layout follows the pane's size (`hibernatedLayout`, measured with a `ResizeObserver`,
