@@ -311,6 +311,7 @@ export function TerminalSection() {
           defaultValue={TERMINAL_FONT_SIZE_DEFAULT}
           format={formatPx}
           onChange={(v) => void setTerminalFontSize(v)}
+          appliesTo="terminalFontSize"
         />
         <SettingRow
           title="Font weight"
@@ -342,6 +343,7 @@ export function TerminalSection() {
           defaultValue={LETTER_SPACING_DEFAULT}
           format={formatSignedPx}
           onChange={(v) => void setTerminalLetterSpacing(v)}
+          appliesTo="terminalLetterSpacing"
         />
         <SliderRow
           title="Line height"
@@ -353,6 +355,7 @@ export function TerminalSection() {
           defaultValue={TERMINAL_LINE_HEIGHT_DEFAULT}
           format={formatRatio}
           onChange={(v) => void setTerminalLineHeight(v)}
+          appliesTo="terminalLineHeight"
         />
       </div>
 

@@ -27,6 +27,7 @@ Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos
   ```
 - **Checkboxes**: `Checkbox` de `@/components/ui/checkbox` con `id` y `<label htmlFor={...}>` asociado.
 - **Switches**: `Switch` de `@/components/ui/switch` (para toggles on/off dentro de `SettingRow`).
+- **Sliders**: siempre `SliderRow` (`src/settings/components/SliderRow.tsx`). Mientras se arrastra solo cambia el valor mostrado; `onChange` se llama una vez al soltar, y nunca si el valor soltado es el actual. Un ajuste que la ventana principal tarda en aplicar (hoy el tamano de fuente, el interlineado y el espaciado del terminal, que repintan todos los terminales; medido en unos 2 s por cambio con el renderizador DOM) pasa `appliesTo="<PrefKey>"`: el slider pinta "Applying..." debajo hasta que la ventana principal emite `kex://pref-applied` con esa clave (`announcePrefApplied` en `modules/settings/prefApplied.ts`, llamado desde `startPoolPreferencesSync`), o 15 s despues si la confirmacion se pierde (`useApplyingPref`). Un ajuste nuevo con coste alto necesita las dos mitades: `appliesTo` en Settings y `announcePrefApplied` justo despues de aplicarlo.
 
 Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ActionRow.tsx` en `src/modules/actions/` (Checkbox y Select en un formulario).
 
