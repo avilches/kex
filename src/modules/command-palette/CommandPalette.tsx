@@ -196,6 +196,10 @@ export function CommandPalette({
   const focusHandlers = useRestoreFocusOnEscape(restoreFocus);
   const [pickedValue, setValue] = useState("");
   const [pendingMove, setPendingMove] = useState<string | null>(null);
+  // A scroll under a resting pointer makes WebKit emit a synthetic pointermove, and cmdk selects the
+  // row under it; after a keyboard jump that overrides the row the key chose.
+  const [keyboardNav, setKeyboardNav] = useState(false);
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
   const [page, setPage] = useState<"root" | "themes">("root");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
@@ -888,7 +892,10 @@ export function CommandPalette({
         }
         return;
       }
-      if (SELECTION_KEYS.has(e.key)) cancelSettle();
+      if (SELECTION_KEYS.has(e.key)) {
+        cancelSettle();
+        setKeyboardNav(true);
+      }
       if (rowMenu.menu) {
         const key = rowMenu.menu.rowKey;
         const entry = highlightedTabOf(key, merged);
@@ -969,6 +976,7 @@ export function CommandPalette({
       <Command
         shouldFilter={false}
         loop
+        disablePointerSelection={keyboardNav}
         value={value}
         onValueChange={(next) => {
           if (open) setValue(next);
@@ -987,6 +995,12 @@ export function CommandPalette({
           ref={boxRef}
           className={cn("relative", rowMenu.menu && "min-h-[150px]")}
           onMouseDown={keepInputFocus}
+          onPointerMoveCapture={(e) => {
+            const last = lastPointer.current;
+            if (last && last.x === e.clientX && last.y === e.clientY) return;
+            lastPointer.current = { x: e.clientX, y: e.clientY };
+            setKeyboardNav(false);
+          }}
           onPointerDownCapture={(e) => {
             if (rowMenu.menu && !(e.target as HTMLElement).closest("[data-row-menu]")) {
               closeRowMenu();
