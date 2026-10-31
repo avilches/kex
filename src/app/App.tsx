@@ -2340,6 +2340,8 @@ export default function App() {
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
       explorerRoot,
+      workspaceRoot: effectiveWorkspaceRoot,
+      workspaceIsGitRepo: workspaceGitRoot !== null,
       launchCwd,
       launchCwdResolved,
       home,
@@ -2348,7 +2350,7 @@ export default function App() {
     });
 
   // Git root for explorer tree decorations and the gitignore action follows the
-  // same repo Source Control resolves from explorerRoot (single source of truth).
+  // same repo Source Control resolves (workspace root's repo first, else explorerRoot).
   const gitRoot = sourceControl.repo?.repoRoot ?? null;
 
   const editorChromeWithGit = useMemo(

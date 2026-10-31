@@ -1,10 +1,13 @@
 import { useCallback } from "react";
 import { native } from "@/lib/native";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import { resolveSourceControlPath } from "./sourceControlPath";
 import { useSourceControl } from "./useSourceControl";
 
 type Params = {
   explorerRoot: string | null;
+  workspaceRoot: string | null;
+  workspaceIsGitRepo: boolean;
   launchCwd: string | null;
   launchCwdResolved: boolean;
   home: string | null;
@@ -16,12 +19,14 @@ type Params = {
 };
 
 /**
- * Resolves the source-control repo from the explorer root and feeds the
+ * Resolves the source-control repo (workspace root first, then explorer root) and feeds the
  * source-control summary. Resolution is unconditional so the rail badge and the
  * explorer git status stay populated regardless of the active right-panel tab.
  */
 export function useSourceControlContext({
   explorerRoot,
+  workspaceRoot,
+  workspaceIsGitRepo,
   launchCwd,
   launchCwdResolved,
   home,
@@ -31,9 +36,12 @@ export function useSourceControlContext({
   const workspaceFallbackPath = launchCwdResolved
     ? (launchCwd ?? home ?? null)
     : null;
-  // explorerRootMode is always workspace|filesystem; the displayed folder is the
-  // git context so SC and explorer decorations reflect the explorer root's repo.
-  const sourceControlContextPath = explorerRoot ?? workspaceFallbackPath;
+  const sourceControlContextPath = resolveSourceControlPath({
+    workspaceRoot,
+    workspaceIsGitRepo,
+    explorerRoot,
+    fallback: workspaceFallbackPath,
+  });
   const sourceControlPath = sourceControlContextPath;
   const sourceControl = useSourceControl(sourceControlPath ?? null, true);
 
