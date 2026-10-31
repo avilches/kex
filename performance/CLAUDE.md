@@ -1,6 +1,7 @@
 # Rendimiento de Kex
 
-Lee esto entero antes de investigar cualquier queja de lentitud, congelaciones, CPU o memoria. Resume lo que se
+Lee esto entero antes de investigar cualquier queja de lentitud, congelaciones, CPU o memoria, o un crash de Kex
+(para eso, la sección "Kex acaba de crashear"). Resume lo que se
 construyó el 2026-10-20 y 21, lo que se midió y lo que sigue siendo hipótesis. Las herramientas son de macOS.
 
 ## Si el usuario dice "mira el rendimiento, mi app va lenta"
@@ -23,6 +24,46 @@ Trabaja en este orden. Todo se lanza desde la raíz del repositorio con `python3
 
 Cuando contestes: primero el resultado en una frase, después lo medido, y marca cada explicación como "medido" o
 "hipótesis". No propongas un arreglo de código hasta que un volcado lento lo respalde.
+
+## Si el usuario dice "Kex acaba de crashear" (o "se ha cerrado")
+
+El usuario no va a ejecutar nada ni a contarte qué hacía: lo recoges tú, solo, y en seguida, porque el registro de
+macOS caduca en pocos días (los de los crashes del 25 y el 27/10 ya no existían el 31/10). No preguntes "¿hubo
+crash?" ni pidas lo que puedes sacar tú. Orden:
+
+1. **Informe de macOS.** `ls -lt ~/Library/Logs/DiagnosticReports/ | grep -i kex | head`. El más reciente es el de ahora
+   (compáralo con `date`). Léelo con `json.JSONDecoder().raw_decode` (una línea de cabecera y luego el cuerpo) y mira
+   `exception.signal`, `procLaunch`, `captureTime` y los frames del `faultingThread`. Distingue el tipo antes de nada:
+   `SIGSEGV` con `ScrollingTree::takePendingScrollUpdates` arriba es el de WebKit (TASK-910); `SIGABRT` con
+   `tao::...::send_event` es el de `tao` (TASK-917); cualquier otro es nuevo y hay que describirlo desde cero.
+2. **Registro unificado de macOS, exportado YA.** Es la única fuente que dice qué hacía WebKit los últimos segundos y la
+   única que caduca. Usa `/usr/bin/log`, no `log` a secas (en zsh es un builtin y falla con "too many arguments").
+   Ventana: desde 30 s antes hasta 3 s después de la hora del informe, en hora local, formato `'YYYY-MM-DD HH:MM:SS'`
+   (sin milisegundos). Predicado `process == "kex"`; añade `AND NOT eventMessage CONTAINS "runJavaScriptInFrameInScriptWorld"
+   AND NOT eventMessage CONTAINS "ProcessThrottler::Activity"` o sale ruido de miles de líneas. Redirige a un fichero del
+   scratchpad en una llamada simple (el verificador del worktree rechaza un predicado largo dentro de un comando compuesto)
+   y después filtra con `grep`. Busca `WebPageProxy::close`, `WebPageProxy::constructor`, `removeWebPage` y cualquier
+   `pageProxyID` distinto del de la ventana principal: una página que nace y muere pocos segundos antes del crash es
+   una ventana secundaria (Settings o navegador flotante). Si hace falta conservarlo, guarda el extracto filtrado en
+   `docs/crash-evidence/<fecha>-<tipo>-unified-log.txt` (en un worktree).
+3. **`Kex.log` del tramo previo, no el de ahora.** Al relanzar Kex rota el log: el `Kex.log` actual empieza en el
+   relanzamiento y NO contiene el crash. El tramo anterior está en el archivado más reciente (`ls -t Kex_*.log | head -1`
+   en la carpeta de logs, `user-data/logs/`). Sus horas están en UTC y las del informe en hora local (en octubre
+   UTC-4: 14:03 local son las 18:03). Mira ahí las últimas líneas anteriores a la hora del crash:
+   - las `[window] <etiqueta> created|close requested|destroyed|focused=...` (`window_log.rs`): qué ventana se abrió o
+     cerró justo antes. Es la pista principal del `SIGSEGV` de WebKit;
+   - la última línea `[profiler]`: `rafShare`, `jankFrames` y `worstGapMs` dicen si la webview iba holgada o saturada;
+   - los eventos `[ipc]` de agentes (`SessionStart`, `SessionEnd`, `StopFailure`) y `[panic]` si lo hay.
+4. **Volcados automáticos.** Mira si hay un `sample-auto-*.txt` cercano, pero comprueba su hora contra la del crash antes
+   de usarlo: uno de cuatro minutos antes no describe los segundos previos (así se llegó a "saturada" por error el
+   31/10, y era falso).
+5. **Contrasta con los crashes anteriores.** Un solo caso no es patrón. Anota en TASK-910 (o en la tarea que toque) la
+   hora, el tipo, la última línea `[window]`, el `rafShare` previo y si había un `pageProxyID` secundario cerrándose.
+   Cuando haya tres o más con el mismo antecedente, entonces sí propón un workaround (por ejemplo, ocultar en vez de
+   destruir la ventana secundaria); con menos, es hipótesis.
+
+Cuando contestes: primero el resultado en una frase, después lo medido, y marca cada explicación como "medido" o
+"hipótesis". No digas que el log "no muestra nada" sin haber mirado el archivado correcto.
 
 ## Qué hay (cambios al código y herramientas)
 
