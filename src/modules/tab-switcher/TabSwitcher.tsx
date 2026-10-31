@@ -16,7 +16,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { commitSwitcher, escapeMenuSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
-import { GRID_GAP, GRID_PAD, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
+import { GRID_GAP, GRID_PAD, BADGE_SLOTS, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
 
 // What the app puts in a tile's context menu. Called on every render of the tile, so it can read live state.
 export type RenderMenu = (entry: TabEntry) => ReactNode;
@@ -66,6 +66,7 @@ function Tile({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const indicator = useTabIndicator(entry.tabId, entry.indicator);
+  const slot = useSwitcherStore((s) => s.badgeSlot);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -87,9 +88,9 @@ function Tile({
         <span
           data-jump-number
           aria-hidden
-          className="absolute top-1.5 left-2 text-[10px] leading-none text-muted-foreground tabular-nums"
+          className={cn("absolute text-[10px] leading-none whitespace-nowrap text-muted-foreground tabular-nums", BADGE_SLOTS[slot].cls)}
         >
-          {index + 1}
+          Ctrl {index + 1}
         </span>
       ) : null}
       <span className="relative shrink-0">
@@ -168,7 +169,7 @@ function KeyHints({ entry }: { entry: TabEntry }) {
   const hints: Array<[string, string]> = [];
   if (keys.close) hints.push(["W", "close"]);
   if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "restore" : "hibernate"]);
-  hints.push(["1-9", "jump"]);
+  hints.push(["Ctrl 1-9", "jump"]);
   hints.push(["Esc", "cancel"]);
   return (
     <div data-testid="tab-switcher-hints" className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
@@ -193,6 +194,7 @@ function Footer({
   total: number;
   ref?: React.Ref<HTMLDivElement>;
 }) {
+  const slot = useSwitcherStore((s) => s.badgeSlot);
   const detail = tabDetailLines(entry).join("  ·  ");
   const indicator = useTabIndicator(entry.tabId, entry.indicator);
   return (
@@ -225,6 +227,7 @@ function Footer({
           ) : null}
         </div>
       </div>
+      <span className="shrink-0 text-[10px] text-muted-foreground/60">badge: {BADGE_SLOTS[slot].name}</span>
       <KeyHints entry={entry} />
       <div className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
         {position} / {total}
