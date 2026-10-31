@@ -1,5 +1,6 @@
 pub mod modules;
 mod panic_log;
+mod window_log;
 
 use modules::{
     actions, agent, editors, float_browser, fs, git, hibernate_lines, history, menu_route, pty,
@@ -355,6 +356,10 @@ async fn open_settings_window(
     let builder = builder.decorations(false).transparent(true);
 
     let window = builder.build().map_err(|e| e.to_string())?;
+    log::info!(
+        "{}",
+        window_log::describe_created("settings", "settings", None)
+    );
 
     #[cfg(target_os = "linux")]
     {
@@ -543,6 +548,7 @@ pub fn run() {
     workspace::init_launch_cwd(cli_dir.as_deref());
 
     tauri::Builder::default()
+        .on_window_event(window_log::record)
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())

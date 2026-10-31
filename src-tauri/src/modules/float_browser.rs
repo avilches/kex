@@ -55,6 +55,7 @@ pub fn float_browser_open(
 
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
+    let host_for_log = parsed_url.host_str().map(str::to_owned);
     let tab_id_nav = tab_id.clone();
     let origin_nav = origin_window_label.clone();
     let app_nav = app.clone();
@@ -91,6 +92,10 @@ pub fn float_browser_open(
         })
         .build()
         .map_err(|e| e.to_string())?;
+    log::info!(
+        "{}",
+        crate::window_log::describe_created(&label, "float-browser", host_for_log.as_deref())
+    );
 
     // Track which float window holds OS focus so the "Dock Browser" menu item
     // reflects the active float and greys out when focus leaves it.

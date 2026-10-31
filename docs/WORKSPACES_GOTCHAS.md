@@ -1350,3 +1350,20 @@ Al hibernar, el placeholder muestra siempre el comando que se ejecutara (`hibern
 
 **Leccion.** Un camino de error que cae en "estado por defecto" no puede estar conectado a un guardado automatico sin una red debajo. Si se anade otro fallback de carga, comprobar que no escriba encima de lo que no pudo leer.
 
+
+## Nota: SIGSEGV en WebKit `ScrollingTree::takePendingScrollUpdates` y la ventana secundaria que se cierra justo antes (TASK-910, 2026-10-31)
+
+**Sintoma.** Kex se cierra sin aviso con `EXC_BAD_ACCESS` en la direccion `0x122`, hilo principal, dentro de WebKit: `ScrollingTree::takePendingScrollUpdates()` llamada desde `RemoteScrollingCoordinatorProxy::sendScrollingTreeNodeUpdate()` en el callback del display link. Ningun frame de Kex en la pila. Seis informes en `~/Library/Logs/DiagnosticReports/kex-*.ips` (30/09, 22, 25, 27 y 31/10; los del 28 y 29/10 son otro fallo, el `SIGABRT` de `tao`).
+
+**Pistas falsas descartadas.**
+- Que cayera con la webview saturada: el profiler de `Kex.log` del crash del 31/10 muestra `rafShare` entre 0,012 y 0,017 y ningun hueco largo hasta el ultimo segundo.
+- Un panic de Rust: no hay linea `[panic]`; el hook de `panic_log.rs` no ve un `SIGSEGV` dentro de WebKit.
+- Que `Kex.log` diga algo: el proceso muere antes de que JS escriba nada, y entonces no registraba aperturas ni cierres de ventanas secundarias.
+
+**Lo medido.** El registro unificado de macOS (`/usr/bin/log show --predicate 'process == "kex"'`, no el builtin `log` de zsh) conserva eventos de WebKit del proceso Kex. En el crash del 31/10 (14:03:12 local), 1,6 s antes, WebKit cierra una segunda pagina (`pageProxyID=57`, `WebContent[85597]`) creada a las 14:03:06. Extracto en `docs/crash-evidence/2026-10-31-sigsegv-unified-log.txt`. Los registros de los crashes anteriores ya habian caducado, asi que es un solo caso.
+
+**Hipotesis, sin confirmar.** Cerrar la ventana secundaria deja un nodo de scroll huerfano en el arbol de scroll de WebKit y el siguiente fotograma lo desreferencia. Las ventanas candidatas son Settings (`open_settings_window`) y los navegadores flotantes (`float_browser.rs`).
+
+**Instrumentacion aniadida.** `window_log.rs`: el `on_window_event` global del `Builder` escribe en `Kex.log` `[window] <label> close requested | destroyed | focused=<bool>` de cualquier ventana, y Settings y los flotantes escriben `[window] <label> created kind=... host=...` (solo el host, nunca la ruta ni la query). Tras el proximo crash, comparar la hora del informe con la ultima linea `[window]` de `Kex.log`.
+
+**Leccion.** Un crash dentro de WebKit no deja rastro en la app: lo que se quiere saber hay que escribirlo en el log mientras ocurre, y el registro unificado de macOS caduca en dias, asi que se exporta el mismo dia del crash.
