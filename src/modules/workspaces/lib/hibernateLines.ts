@@ -216,8 +216,10 @@ export function redactLine(line: StyledLine): StyledLine {
 
 // xterm leaves the empty rows under the content out of the serialized text and ends it with the
 // cursor moves from the last line to where the cursor was; only a cursor below that line says how many.
+const CURSOR_TAIL = /(?:\u001b\[\d*[ABCD])+$/;
+
 function rowsBelowCursor(serialized: string): number {
-  const tail = /(?:\u001b\[\d*[ABCD])+$/.exec(serialized)?.[0] ?? "";
+  const tail = CURSOR_TAIL.exec(serialized)?.[0] ?? "";
   let down = 0;
   let up = 0;
   for (const m of tail.matchAll(/\u001b\[(\d*)([AB])/g)) {
@@ -244,7 +246,7 @@ export function prepareHibernateLines(
   maxBytes = HIBERNATE_LINES_MAX_BYTES,
   rows = 0,
 ): string {
-  const tail = tailLines(parseAnsi(snapshot), max).map(redactLine);
+  const tail = tailLines(parseAnsi(snapshot.replace(CURSOR_TAIL, "")), max).map(redactLine);
   return serializeLines(clipToBytes(rows > 0 && tail.length > 0 ? padToScreen(tail, snapshot, rows) : tail, maxBytes));
 }
 
