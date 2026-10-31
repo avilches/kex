@@ -157,10 +157,10 @@ function Tile({
 function KeyHints({ entry }: { entry: TabEntry }) {
   const keys = useSwitcherStore((s) => s.keys);
   const hints: Array<[string, string]> = [];
-  if (keys.close) hints.push(["W", "close"]);
-  if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "restore" : "hibernate"]);
-  hints.push(["1-9", "jump"]);
-  hints.push(["Esc", "cancel"]);
+  if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "Restore" : "Hibernate"]);
+  if (keys.close) hints.push(["W", "Close"]);
+  hints.push(["1-9", "Jump"]);
+  hints.push(["Esc", "Cancel"]);
   return (
     <div data-testid="tab-switcher-hints" className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
       {hints.map(([key, label]) => (
