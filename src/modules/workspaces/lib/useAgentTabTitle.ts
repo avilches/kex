@@ -59,7 +59,7 @@ export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null
   if (!tab) return null;
   const info = resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources, scriptName);
   if (!altHeld) return info;
-  const path = tabCopyPath(tab, null);
+  const path = tabCopyPath(tab, agentSession?.meta?.worktreeCwd ?? null);
   if (!path) return info;
   return { ...info, displayTitle: tildePath(path, sources.home ?? null), isDescription: false };
 }
