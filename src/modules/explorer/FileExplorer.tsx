@@ -1168,7 +1168,7 @@ export const FileExplorer = memo(
                   disabled={!rootPath || !onSubmitRootPath}
                   onClick={() => setIsEditingRoot(true)}
                 >
-                  <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
+                  <span className="min-w-0 truncate text-left [direction:rtl]">
                     {LRM + rootPath}
                   </span>
                   <HugeiconsIcon
@@ -1177,6 +1177,7 @@ export const FileExplorer = memo(
                     strokeWidth={2}
                     className="shrink-0 opacity-0 transition-opacity group-hover/root:opacity-100"
                   />
+                  <span className="flex-1" />
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent className="min-w-44">

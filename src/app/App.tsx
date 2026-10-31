@@ -1080,10 +1080,12 @@ export default function App() {
         ),
       );
       if (!path) return;
-      if (activeRootMode === "filesystem") setFsRoot(activeWorkspace.id, path);
-      else setWorkspaceRoot(activeWorkspace.id, path);
+      if (activeRootMode !== "filesystem") {
+        setExplorerRootMode(activeWorkspace.id, "filesystem");
+      }
+      setFsRoot(activeWorkspace.id, path);
     },
-    [activeWorkspace, activeRootMode, home, setFsRoot, setWorkspaceRoot],
+    [activeWorkspace, activeRootMode, home, setFsRoot, setExplorerRootMode],
   );
 
   const handleEnterFolder = useCallback(
