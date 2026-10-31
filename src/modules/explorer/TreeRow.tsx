@@ -705,10 +705,11 @@ export function FsUpRow({
             strokeWidth={1.75}
             className="shrink-0 text-muted-foreground"
           />
-          <span className="min-w-0 flex-1 truncate">..</span>
+          <span className="min-w-0 truncate">..</span>
           <span className="pointer-events-none hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground group-hover:inline">
             Go to parent
           </span>
+          <span className="flex-1" />
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
