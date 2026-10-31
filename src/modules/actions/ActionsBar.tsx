@@ -377,17 +377,17 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
         onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
         className={cn(
           "relative flex min-w-0 items-center",
-          script && "pl-1.5",
+          script && "pl-2",
           reorderMode && "cursor-grab [&_*]:pointer-events-none",
           isDragging && "opacity-40",
         )}
       >
         {script ? (
           <>
-            <ScriptControl item={item} {...h} className="min-h-9 w-9 self-stretch" />
+            <ScriptControl item={item} {...h} className="min-h-9 w-[18px] self-stretch" />
             <DropdownMenuItem
               {...common}
-              className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1"
+              className="flex min-h-9 min-w-0 flex-1 items-center overflow-hidden py-0.5 pr-3 pl-1.5"
               onSelect={(e) => {
                 e.preventDefault();
                 nameClick(item, h);
