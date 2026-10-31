@@ -176,12 +176,12 @@ describe("TabSwitcher jump numbers", () => {
     const many = Array.from({ length: 11 }, (_, i) => entry({ tabId: `t${i}`, title: `tab ${i}` }));
     show(many);
     const numbers = tiles().map((t) => t.querySelector("[data-jump-number]")?.textContent ?? null);
-    expect(numbers).toEqual(["Ctrl 1", "Ctrl 2", "Ctrl 3", "Ctrl 4", "Ctrl 5", "Ctrl 6", "Ctrl 7", "Ctrl 8", "Ctrl 9", null, null]);
+    expect(numbers).toEqual(["⌃1", "⌃2", "⌃3", "⌃4", "⌃5", "⌃6", "⌃7", "⌃8", "⌃9", null, null]);
   });
 
   it("announces the jump keys in the footer", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
-    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/Ctrl 1-9\s*jump/);
+    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/⌃1-9\s*jump/);
   });
 });
 
