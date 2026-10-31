@@ -32,21 +32,22 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const agentSession = agentTabTitle?.agentSession;
   const subtitle = agentTabTitle?.displayTitle ?? null;
 
+  const big = Boolean(workspace.icon);
+  const mark = (
+    <WorkspaceMark
+      id={workspace.id}
+      color={workspaceDisplayColor(workspace)}
+      icon={workspace.icon}
+      size={big ? 26 : 13.5}
+    />
+  );
+
   return (
-    <div
-      className={cn(
-        "flex min-w-0 max-w-[340px] gap-2",
-        workspace.icon ? "items-center" : "items-start",
-      )}
-    >
-      <WorkspaceMark
-        id={workspace.id}
-        color={workspaceDisplayColor(workspace)}
-        icon={workspace.icon}
-        size={workspace.icon ? 26 : 13.5}
-      />
+    <div className={cn("flex min-w-0 max-w-[340px]", big ? "items-center gap-2" : "flex-col gap-0.5")}>
+      {big && mark}
       <div className="flex min-w-0 flex-col justify-center gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
+          {!big && mark}
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
             {shownTitle || "Workspace"}
           </span>
