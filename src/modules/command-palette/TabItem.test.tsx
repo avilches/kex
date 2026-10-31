@@ -47,13 +47,20 @@ function mount(e: TabEntry) {
 }
 
 describe("TabItem marks", () => {
-  it("puts the sleeping icon first and the dot after it, and dims only the sleeping content", () => {
+  it("lays the dot over the sleeping icon in one spot, and dims only the sleeping content", () => {
     const { getByLabelText, container } = mount(entry({ hibernated: true, indicator: "attention" }));
     const icon = getByLabelText("Tab is hibernated");
     const dot = getByLabelText("Agent needs attention");
-    expect(icon.nextElementSibling).toBe(dot);
-    expect(dot.className).not.toContain("opacity");
+    expect(icon.parentElement).toBe(dot.parentElement!.parentElement);
+    expect(icon.className).not.toContain("opacity");
     expect(dot.closest(".opacity-40")).toBeNull();
+    expect(icon.closest(".opacity-40")).toBeNull();
     expect(container.querySelector(".opacity-40")).not.toBeNull();
+  });
+
+  it("shows the dot alone on a tab that is awake", () => {
+    const { queryByLabelText, getByLabelText } = mount(entry({ indicator: "error" }));
+    expect(queryByLabelText("Tab is hibernated")).toBeNull();
+    expect(getByLabelText("Agent needs attention").className).toContain("bg-destructive");
   });
 });

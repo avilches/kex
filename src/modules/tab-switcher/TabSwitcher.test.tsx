@@ -61,14 +61,24 @@ describe("TabSwitcher tile", () => {
     expect(screen.queryByText(/hibernated/i)).toBeNull();
   });
 
-  it("dims the name and the sleeping icon of a sleeping tile, never its dot", () => {
+  it("puts the sleeping icon of a tile at the top right with the dot over it, and dims only the name", () => {
     show([entry({ tabId: "a", title: "api", hibernated: true, indicator: "attention" }), entry({ tabId: "b" })], 1);
     const [a] = tiles();
-    expect(within(a).getByText("api").className).toContain("opacity-40");
-    expect(within(a).getByLabelText("Tab is hibernated").className).toContain("opacity-40");
+    const moon = within(a).getByLabelText("Tab is hibernated");
     const dot = within(a).getByLabelText("Agent needs attention");
-    expect(dot.className).not.toContain("opacity");
+    const badge = moon.closest(".-top-1\\.5") as HTMLElement;
+    expect(badge).toBeTruthy();
+    expect(badge.contains(dot)).toBe(true);
+    expect(within(a).getByText("api").className).toContain("opacity-40");
+    expect(moon.className).not.toContain("opacity");
     expect(dot.closest(".opacity-40")).toBeNull();
+  });
+
+  it("keeps the dot of an awake tile at the top right, alone", () => {
+    show([entry({ tabId: "a", indicator: "error" }), entry({ tabId: "b" })], 1);
+    const [a] = tiles();
+    expect(within(a).queryByLabelText("Tab is hibernated")).toBeNull();
+    expect(within(a).getByLabelText("Agent needs attention").className).toContain("bg-destructive");
   });
 
   it("has no CSS hover on an unselected tile, since the browser fires it under a resting pointer and the keyboard never clears it", () => {
@@ -243,7 +253,7 @@ describe("TabSwitcher footer", () => {
     expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
   });
 
-  it("puts the hibernated icon first and the dot after it, and dims the name and the icon but not the dot", () => {
+  it("puts the hibernated icon first and the dot after it, and dims only the name", () => {
     show([entry({ title: "api", hibernated: true, indicator: "attention" })]);
     const title = within(footer()).getByText("api");
     const icon = within(footer()).getByLabelText("Tab is hibernated");
@@ -251,7 +261,7 @@ describe("TabSwitcher footer", () => {
     expect(title.nextElementSibling).toBe(icon);
     expect(icon.nextElementSibling).toBe(dot);
     expect(title.className).toContain("opacity-40");
-    expect(icon.className).toContain("opacity-40");
+    expect(icon.className).not.toContain("opacity");
     expect(dot.className).not.toContain("opacity");
   });
 

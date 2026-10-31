@@ -12,6 +12,17 @@ export function indicatorToKeep(
   return session.status === "attention" ? "attention" : undefined;
 }
 
-export function sleepIndicator(tab: { kind?: string; hibernation?: { indicator?: HibernateIndicator } }): HibernateIndicator | null {
-  return tab.hibernation?.indicator ?? null;
+// Test hook: a tab named Error shows the red dot and one named Warn the orange one, on every surface, so
+// the dot can be tried without waiting for an agent to ask for attention.
+export function titleIndicator(title: string | undefined): HibernateIndicator | null {
+  const name = title?.trim().toLowerCase();
+  return name === "error" ? "error" : name === "warn" ? "attention" : null;
+}
+
+export function sleepIndicator(tab: {
+  kind?: string;
+  title?: string;
+  hibernation?: { indicator?: HibernateIndicator };
+}): HibernateIndicator | null {
+  return tab.hibernation?.indicator ?? titleIndicator(tab.title);
 }

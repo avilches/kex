@@ -8,6 +8,7 @@ import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
@@ -17,9 +18,9 @@ import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switc
 // that no class can override, which left them at 13 px inside a 44 px square.
 const TILE_ICON = 26;
 
-function HibernatedMark({ size, className }: { size: number; className?: string }) {
+function HibernatedMark({ size }: { size: number }) {
   return (
-    <span role="img" aria-label="Tab is hibernated" className={cn("inline-flex shrink-0 text-muted-foreground", className)}>
+    <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 text-muted-foreground">
       <HugeiconsIcon icon={SleepingIcon} size={size} strokeWidth={1.75} />
     </span>
   );
@@ -71,7 +72,11 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} carriedAgent={entry.agent} />
           )}
         </span>
-        {indicator === "working" ? (
+        {entry.hibernated ? (
+          <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
+            <SleepingBadge size={12} indicator={indicator} dotPx={7} />
+          </span>
+        ) : indicator === "working" ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
             <Spinner size={12} />
           </span>
@@ -84,11 +89,6 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
               indicator === "error" ? "bg-destructive" : "bg-amber-400",
             )}
           />
-        ) : null}
-        {entry.hibernated ? (
-          <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-popover ring-2 ring-popover">
-            <HibernatedMark size={11} className="opacity-40" />
-          </span>
         ) : null}
       </span>
       <span data-title-slot className="flex w-full min-w-0 flex-col items-center gap-0.5">
@@ -153,7 +153,7 @@ function Footer({
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
-          {entry.hibernated ? <HibernatedMark size={13} className="opacity-40" /> : null}
+          {entry.hibernated ? <HibernatedMark size={13} /> : null}
           <TabIndicatorMark indicator={indicator} />
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">

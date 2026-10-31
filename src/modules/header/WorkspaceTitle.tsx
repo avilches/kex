@@ -75,7 +75,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
             )}
             <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
             {asleep && (
-              <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 opacity-40">
+              <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0">
                 <HugeiconsIcon icon={SleepingIcon} size={11} strokeWidth={1.75} />
               </span>
             )}
