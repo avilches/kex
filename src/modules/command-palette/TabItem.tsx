@@ -59,6 +59,7 @@ export function TabItem({
           tab={entry.tab}
           agentSession={entry.agentSession}
           running={entry.running}
+          carriedAgent={entry.agent}
         />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">

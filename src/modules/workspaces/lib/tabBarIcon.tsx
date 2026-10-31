@@ -19,11 +19,14 @@ export function TabBarIcon({
   agentSession,
   running = false,
   size = 13,
+  carriedAgent,
 }: {
   tab: Tab;
   agentSession: AgentSession | undefined;
   running?: boolean;
   size?: number;
+  // The agent a tab slept with, shown after it wakes until its live session exists again.
+  carriedAgent?: string;
 }) {
   const hasAgent = tab.kind === "terminal" && !!agentSession;
   const isRestoreError = agentSession?.restoreError ?? false;
@@ -44,6 +47,9 @@ export function TabBarIcon({
   }
   if (isHibernatedTab(tab) && tab.hibernation.agent && !tab.icon) {
     return <AgentIcon agent={tab.hibernation.agent} size={size} className="grayscale" />;
+  }
+  if (tab.kind === "terminal" && !agentSession && carriedAgent && !tab.icon) {
+    return <AgentIcon agent={carriedAgent} size={size} />;
   }
   if (tab.kind === "browser" && tab.floating) {
     return <HugeiconsIcon icon={LinkSquare02Icon} size={size} strokeWidth={1.75} className="opacity-60" />;

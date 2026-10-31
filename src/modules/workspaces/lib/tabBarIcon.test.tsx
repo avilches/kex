@@ -46,3 +46,18 @@ describe("TabBarIcon size", () => {
     expect(container.querySelector("img")?.className).toContain("size-3.5");
   });
 });
+
+describe("TabBarIcon carried agent", () => {
+  it("draws the agent a woken tab slept with while it has no live session", () => {
+    const withCarry = render(<TabBarIcon tab={terminal} agentSession={undefined} carriedAgent="claude" />);
+    expect(withCarry.container.querySelector("img")).not.toBeNull();
+    cleanup();
+    const plain = render(<TabBarIcon tab={terminal} agentSession={undefined} />);
+    expect(plain.container.querySelector("img")).toBeNull();
+  });
+
+  it("lets the live session win over the carried agent", () => {
+    const { container } = render(<TabBarIcon tab={terminal} agentSession={session} carriedAgent="codex" />);
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+  });
+});
