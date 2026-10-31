@@ -4,6 +4,7 @@ import type { TabEntry } from "@/modules/command-palette";
 import {
   cancelSwitcher,
   commitSwitcher,
+  escapeMenuSwitcher,
   hoverSwitcher,
   menuSwitcher,
   openSwitcher,
@@ -444,6 +445,51 @@ describe("switcher session", () => {
       hoverSwitcher(0, { x: 0, y: 0 });
       hoverSwitcher(0, { x: 50, y: 50 });
       expect(useSwitcherStore.getState().index).toBe(2);
+    });
+
+    it("Escape with the modifier still held closes only the menu: the overlay stays and takes the keys back", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      escapeMenuSwitcher({ ctrlKey: true, altKey: false, metaKey: false });
+      menuSwitcher(false, 2);
+      expect(switcherActive()).toBe(true);
+      expect(document.body.dataset.switcherMenu).toBeUndefined();
+      stepSwitcher(1);
+      expect(useSwitcherStore.getState().index).toBe(3);
+      key("keyup", { key: "Control" });
+      expect(onCommit).toHaveBeenCalledWith(entries[3]);
+    });
+
+    it("Escape with the modifier already up closes everything, there is nothing left to confirm with", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      escapeMenuSwitcher({ ctrlKey: false, altKey: false, metaKey: false });
+      menuSwitcher(false, 2);
+      expect(switcherActive()).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
+    });
+
+    it("an Escape that kept the overlay does not spare the next close of the menu", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      escapeMenuSwitcher({ ctrlKey: true, altKey: false, metaKey: false });
+      menuSwitcher(false, 2);
+      menuSwitcher(true, 1);
+      menuSwitcher(false, 1);
+      expect(switcherActive()).toBe(false);
+    });
+
+    it("never lets the system context menu through while the overlay is up, with Ctrl held or not", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      for (const ctrlKey of [true, false]) {
+        const e = new MouseEvent("contextmenu", { ctrlKey, bubbles: true, cancelable: true });
+        document.body.dispatchEvent(e);
+        expect(e.defaultPrevented).toBe(true);
+      }
+      cancelSwitcher();
+      const after = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      document.body.dispatchEvent(after);
+      expect(after.defaultPrevented).toBe(false);
     });
 
     it("ends the session without choosing any tab when the menu closes, and clears the flag", () => {

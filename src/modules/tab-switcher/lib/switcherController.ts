@@ -52,6 +52,8 @@ type Session = {
   // A close is waiting on the host, which may be asking the user to confirm it: the keys belong to that
   // dialog meanwhile, and letting go of the modifier must not commit a jump behind it.
   busy: boolean;
+  // The menu is closing because of an Escape pressed with the modifier held: the overlay stays.
+  escapeKeeps: boolean;
 };
 
 // One switcher per window and it lives outside React: the keys that drive it arrive while the
@@ -76,6 +78,7 @@ function end() {
   window.removeEventListener("keydown", onKeyDown, true);
   window.removeEventListener("keyup", onKeyUp, true);
   window.removeEventListener("blur", cancelSwitcher);
+  window.removeEventListener("contextmenu", onContextMenu);
   delete document.body.dataset.switcherMenu;
   useSwitcherStore.setState({ keys: { close: false, sleep: null }, revealed: false, entries: [], index: 0 });
 }
@@ -168,10 +171,25 @@ export function hoverSwitcher(index: number, at: Point) {
 // outside, also ends the switcher without going to any tab: an item that should go to one does it itself.
 export function menuSwitcher(open: boolean, index: number) {
   if (!session) return;
-  if (!open) return cancelSwitcher();
+  if (!open) {
+    if (!session.escapeKeeps) return cancelSwitcher();
+    session.escapeKeeps = false;
+    session.busy = false;
+    delete document.body.dataset.switcherMenu;
+    return;
+  }
+  session.escapeKeeps = false;
   session.busy = true;
   document.body.dataset.switcherMenu = "";
   useSwitcherStore.setState({ index });
+}
+
+// Escape on the open menu. If the modifier that opened the switcher is still down, only the menu closes and the
+// overlay stays for the user to carry on, as a menu's Escape would elsewhere; with the modifier already up
+// there is nothing left to confirm with, so it closes everything like any other way out of the menu.
+export function escapeMenuSwitcher(e: Pick<KeyboardEvent, "ctrlKey" | "altKey" | "metaKey">) {
+  if (!session) return;
+  session.escapeKeeps = holdsModifier(session.held) && !modifiersReleased(session.held, e);
 }
 
 function gridColumns(): number {
@@ -209,6 +227,12 @@ function onKeyDown(e: KeyboardEvent) {
   else if (session.hooks.sleepKey && e.key.toLowerCase() === session.hooks.sleepKey) void sleepSelected();
 }
 
+// The system menu (Reload, Inspect) never belongs over the overlay, with Ctrl held or not. It listens in the
+// bubble phase on purpose: the tile's own menu opens from the same event and must see it unprevented first.
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault();
+}
+
 // A binding with no modifier has nothing to release, so it can only be confirmed with Enter or a click.
 const holdsModifier = (h: Held) => h.ctrl || h.alt || h.meta;
 
@@ -227,7 +251,7 @@ export function openSwitcher(
 ) {
   if (session || entries.length < 2) return;
   const held = heldModifiers(e);
-  session = { held, onCommit, hooks, timer: null, pointer: null, busy: false };
+  session = { held, onCommit, hooks, timer: null, pointer: null, busy: false, escapeKeeps: false };
   useSwitcherStore.setState({
     keys: { close: !!hooks.onClose, sleep: hooks.onSleep ? (hooks.sleepKey ?? null) : null },
     revealed: false,
@@ -237,6 +261,7 @@ export function openSwitcher(
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("keyup", onKeyUp, true);
   window.addEventListener("blur", cancelSwitcher);
+  window.addEventListener("contextmenu", onContextMenu);
   if (holdsModifier(held)) session.timer = setTimeout(reveal, REVEAL_DELAY_MS);
   else reveal();
 }
