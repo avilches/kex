@@ -77,7 +77,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
             <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
             {isDirtyDocument(tab) && <DirtyMark />}
             {asleep ? (
-              <SleepingBadge size={11} indicator={indicator} />
+              <SleepingBadge size={12} indicator={indicator} />
             ) : (
               <TabIndicatorMark indicator={indicator} size={10} />
             )}
