@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TabEntry } from "@/modules/command-palette";
-import { cancelSwitcher, openSwitcher, useSwitcherStore } from "./lib/switcherController";
+import { cancelSwitcher, openSwitcher, switcherActive, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, TILE_HEIGHT } from "./lib/switcherModel";
 import { TabSwitcher } from "./TabSwitcher";
 
@@ -155,6 +155,50 @@ describe("TabSwitcher grid", () => {
     expect(grid.style.gap).toBe(`${GRID_GAP}px`);
     expect(grid.style.padding).toBe("");
     expect((grid.parentElement as HTMLElement).style.padding).toBe(`${GRID_PAD}px`);
+  });
+});
+
+describe("TabSwitcher jump numbers", () => {
+  it("numbers the first nine tiles by position and leaves the rest bare", () => {
+    const many = Array.from({ length: 11 }, (_, i) => entry({ tabId: `t${i}`, title: `tab ${i}` }));
+    show(many);
+    const numbers = tiles().map((t) => t.querySelector("[data-jump-number]")?.textContent ?? null);
+    expect(numbers).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", null, null]);
+  });
+
+  it("announces the jump keys in the footer", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+    expect(screen.getByTestId("tab-switcher-hints").textContent).toMatch(/1-9\s*jump/);
+  });
+});
+
+describe("TabSwitcher tile menu", () => {
+  function showMenu(renderMenu = (e: TabEntry) => <div role="menuitem" tabIndex={-1}>menu of {e.tabId}</div>) {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {});
+    act(() => useSwitcherStore.setState({ revealed: true, index: 0 }));
+    return render(<TabSwitcher renderMenu={renderMenu} />);
+  }
+
+  it("opens the app's menu for the tile that was right clicked and highlights it", () => {
+    showMenu();
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.getByRole("menuitem").textContent).toBe("menu of b");
+    expect(useSwitcherStore.getState().index).toBe(1);
+    expect(switcherActive()).toBe(true);
+  });
+
+  it("keeps the overlay while the menu is open and closes both on Escape", () => {
+    showMenu();
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.getAllByRole("option", { hidden: true }).length).toBe(2);
+    fireEvent.keyDown(screen.getByRole("menuitem"), { key: "Escape" });
+    expect(switcherActive()).toBe(false);
+  });
+
+  it("has no menu when the app gives none", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })]);
+    fireEvent.contextMenu(tiles()[1]);
+    expect(screen.queryByRole("menuitem")).toBeNull();
   });
 });
 

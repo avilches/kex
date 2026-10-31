@@ -5,6 +5,7 @@ import {
   cancelSwitcher,
   commitSwitcher,
   hoverSwitcher,
+  menuSwitcher,
   openSwitcher,
   stepSwitcher,
   switcherActive,
@@ -390,5 +391,68 @@ describe("switcher session", () => {
     const e = new KeyboardEvent("keydown", { key: "a", ctrlKey: true, cancelable: true });
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);
+  });
+
+  describe("jumping with a digit", () => {
+    it("commits the tile at that position and ends the session, with the modifier still held", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      key("keydown", { code: "Digit3", key: "3", ctrlKey: true });
+      expect(onCommit).toHaveBeenCalledWith(entries[2]);
+      expect(switcherActive()).toBe(false);
+    });
+
+    it("reads the physical key, so Alt on a Mac (which types a symbol) still jumps", () => {
+      openSwitcher(new KeyboardEvent("keydown", { altKey: true }), 1, entries, onCommit);
+      key("keydown", { code: "Digit4", key: "¢", altKey: true });
+      expect(onCommit).toHaveBeenCalledWith(entries[3]);
+    });
+
+    it("ignores a digit with no tile and keeps the session open, still swallowing the key", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      const e = new KeyboardEvent("keydown", { code: "Digit9", key: "9", ctrlKey: true, cancelable: true });
+      window.dispatchEvent(e);
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(switcherActive()).toBe(true);
+      expect(e.defaultPrevented).toBe(true);
+    });
+  });
+
+  describe("with a tile menu open", () => {
+    it("highlights the tile it opened on and flags the body so the menu draws above the overlay", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 3);
+      expect(useSwitcherStore.getState().index).toBe(3);
+      expect(document.body.dataset.switcherMenu).toBeDefined();
+    });
+
+    it("leaves the keys to the menu and does not commit when the modifier is released", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      const e = new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true });
+      window.dispatchEvent(e);
+      expect(e.defaultPrevented).toBe(false);
+      key("keydown", { code: "Digit1", key: "1" });
+      key("keyup", { key: "Control" });
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(switcherActive()).toBe(true);
+    });
+
+    it("does not let Tab or the pointer move the highlight behind the menu", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      stepSwitcher(1);
+      hoverSwitcher(0, { x: 0, y: 0 });
+      hoverSwitcher(0, { x: 50, y: 50 });
+      expect(useSwitcherStore.getState().index).toBe(2);
+    });
+
+    it("ends the session without choosing any tab when the menu closes, and clears the flag", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      menuSwitcher(true, 2);
+      menuSwitcher(false, 2);
+      expect(switcherActive()).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(document.body.dataset.switcherMenu).toBeUndefined();
+    });
   });
 });

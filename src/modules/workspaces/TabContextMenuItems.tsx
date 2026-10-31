@@ -48,7 +48,11 @@ type Props = {
   renameOrigin: RenameOrigin;
   onActivate: (tabId: string) => void;
   onClose: (tabId: string) => void;
-  onCloseOtherTabs: (tabId: string) => void;
+  // Left out, the menu has no Close Other Tabs item.
+  onCloseOtherTabs?: (tabId: string) => void;
+  // The rename field hangs from the tab's own strip or row, which a menu opened from the tab switcher does not
+  // sit on: there the tab is made the active one first so its field is on screen.
+  activateOnRename?: boolean;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
 };
 
@@ -68,6 +72,7 @@ export function TabContextMenuItems({
   onActivate,
   onClose,
   onCloseOtherTabs,
+  activateOnRename,
   onUpdateTab,
 }: Props) {
   const { targets, moveTab } = useWorkspaceMove();
@@ -103,7 +108,12 @@ export function TabContextMenuItems({
           <ContextMenuSeparator />
         </>
       )}
-      <ContextMenuItem onSelect={() => startRename(tab.id, renameOrigin)}>
+      <ContextMenuItem
+        onSelect={() => {
+          if (activateOnRename) onActivate(tab.id);
+          startRename(tab.id, renameOrigin);
+        }}
+      >
         <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
         Rename Tab
         <Shortcut id="tab.rename" />
@@ -216,10 +226,12 @@ export function TabContextMenuItems({
         Close Tab
         {!isLocked && <Shortcut id="tab.close" />}
       </ContextMenuItem>
-      <ContextMenuItem disabled={paneTabCount <= 1} onSelect={() => onCloseOtherTabs(tab.id)}>
-        <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
-        Close Other Tabs
-      </ContextMenuItem>
+      {onCloseOtherTabs && (
+        <ContextMenuItem disabled={paneTabCount <= 1} onSelect={() => onCloseOtherTabs(tab.id)}>
+          <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
+          Close Other Tabs
+        </ContextMenuItem>
+      )}
     </>
   );
 }

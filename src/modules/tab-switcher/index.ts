@@ -1,4 +1,4 @@
-export { TabSwitcher } from "./TabSwitcher";
+export { TabSwitcher, type RenderMenu } from "./TabSwitcher";
 export {
   cancelSwitcher,
   openSwitcher,
