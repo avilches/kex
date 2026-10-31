@@ -16,7 +16,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { commitSwitcher, escapeMenuSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
-import { GRID_GAP, GRID_PAD, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
+import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
 
 // What the app puts in a tile's context menu. Called on every render of the tile, so it can read live state.
 export type RenderMenu = (entry: TabEntry) => ReactNode;
@@ -83,15 +83,6 @@ function Tile({
         selected && "border-primary bg-primary/10",
       )}
     >
-      {index < JUMP_KEYS ? (
-        <kbd
-          data-jump-number
-          aria-hidden
-          className="absolute top-1 left-1 rounded border border-border bg-muted px-1 font-sans text-[10px] leading-4 whitespace-nowrap text-muted-foreground tabular-nums"
-        >
-          ⌃{index + 1}
-        </kbd>
-      ) : null}
       <span className="relative shrink-0">
         <span
           style={{ color: iconColor(entry.tab) }}
@@ -168,7 +159,7 @@ function KeyHints({ entry }: { entry: TabEntry }) {
   const hints: Array<[string, string]> = [];
   if (keys.close) hints.push(["W", "close"]);
   if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "restore" : "hibernate"]);
-  hints.push(["⌃1-9", "jump"]);
+  hints.push(["1-9", "jump"]);
   hints.push(["Esc", "cancel"]);
   return (
     <div data-testid="tab-switcher-hints" className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
