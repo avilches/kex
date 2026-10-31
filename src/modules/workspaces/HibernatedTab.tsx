@@ -59,6 +59,7 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
     : [DOUBLE_CLICK_LABEL];
   const now = useNow(visible);
   const [ref, layout] = useLayout();
+  const linesRef = useRef<HTMLDivElement>(null);
   const { agent, title: frozen, at } = tab.hibernation;
   const command = hibernatedCommand(tab);
   const title = info?.displayTitle || frozen || tab.title || tab.id;
@@ -87,9 +88,10 @@ export function HibernatedTab({ tab, visible, focused, onWake }: Props) {
       data-hibernated-tab
       data-layout={layout}
       onDoubleClick={onWake}
+      onWheel={(e) => linesRef.current?.scrollBy({ top: e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY })}
       className="relative flex h-full w-full flex-col items-center justify-center gap-5 overflow-hidden bg-background text-muted-foreground"
     >
-      <HibernatedLines tabId={tab.id} visible={visible} />
+      <HibernatedLines tabId={tab.id} visible={visible} scrollRef={linesRef} />
       {layout === "bare" || layout === "button" ? (
         <div className="relative flex flex-col items-center gap-2">
           {restore}
