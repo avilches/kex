@@ -25,6 +25,11 @@ export type RenderMenu = (entry: TabEntry) => ReactNode;
 // the overlay open (Lock, Color, Icon) changes the tab under it, so what is drawn reads the live tab instead.
 export type LiveTab = (tabId: string) => Tab | undefined;
 
+// A chosen icon wears the tab's colour. Without one the colour has no glyph to tint, so it is a stripe on the
+// left edge of the icon square, like the workspace's side line.
+const pickedIconColor = (tab: Tab) => (tab.icon && tab.color ? tab.color : undefined);
+const stripeColor = (tab: Tab) => (!tab.icon && tab.color ? tab.color : undefined);
+
 function LockMark({ size }: { size: number }) {
   return (
     <span role="img" aria-label="Tab is locked" className="inline-flex shrink-0 text-muted-foreground">
@@ -80,14 +85,6 @@ function Tile({
         selected && "border-primary bg-primary/10",
       )}
     >
-      {entry.tab.color ? (
-        <span
-          data-tab-color
-          aria-hidden
-          className="absolute inset-x-4 top-0 h-0.5 rounded-full"
-          style={{ backgroundColor: entry.tab.color }}
-        />
-      ) : null}
       {index < JUMP_KEYS ? (
         <span
           data-jump-number
@@ -99,11 +96,20 @@ function Tile({
       ) : null}
       <span className="relative shrink-0">
         <span
+          style={{ color: pickedIconColor(entry.tab) }}
           className={cn(
-            "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground",
+            "relative flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground",
             entry.hibernated && "opacity-40 grayscale",
           )}
         >
+          {stripeColor(entry.tab) ? (
+            <span
+              data-tab-color
+              aria-hidden
+              className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
+              style={{ backgroundColor: stripeColor(entry.tab) }}
+            />
+          ) : null}
           {!entry.agentSession && !entry.hibernated && entry.agent && entry.kind === "terminal" && !entry.tab.icon ? (
             <AgentIcon agent={entry.agent} size={TILE_ICON} />
           ) : (
@@ -207,21 +213,25 @@ function Footer({
     >
       <div className="min-w-0 flex-1">
         <div data-footer-line className="flex min-w-0 items-center gap-1.5">
-          <span data-tab-icon className="flex shrink-0 items-center text-muted-foreground">
+          <span
+            data-tab-icon
+            style={{ color: pickedIconColor(entry.tab) }}
+            className="relative flex shrink-0 items-center text-muted-foreground"
+          >
+            {stripeColor(entry.tab) ? (
+              <span
+                data-tab-color
+                aria-hidden
+                className="absolute -left-1.5 inset-y-0 w-[2px] rounded-full"
+                style={{ backgroundColor: stripeColor(entry.tab) }}
+              />
+            ) : null}
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
           {entry.hibernated ? <SleepingBadge size={13} indicator={indicator} /> : <TabIndicatorMark indicator={indicator} />}
           {isDirtyDocument(entry.tab) && <DirtyMark />}
           {entry.tab.locked ? <LockMark size={13} /> : null}
-          {entry.tab.color ? (
-            <span
-              data-tab-color
-              aria-hidden
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: entry.tab.color }}
-            />
-          ) : null}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />
