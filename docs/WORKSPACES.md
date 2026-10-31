@@ -509,6 +509,28 @@ Switching workspaces releases the old workspace's slots (WebGL disposed after 30
 new ones for the new workspace. The pool's warm slot (`IDLE_SLOTS_KEEP_WARM = 1`) means the first
 re-shown terminal after a workspace switch may reuse the still-warm slot.
 
+### Pool diagnostics in the log
+
+Every pool event writes one `[pool] <event> key=value ...` line to `Kex.log` (`poolLog` in
+`rendererPool.ts`, pure formatting and buffer inspection in `slotDiagnostics.ts`). Grep for
+`\[pool\]`. Events: `create`, `bind`, `detach`, `dispose`, `webgl-attach`, `webgl-attach-failed`,
+`webgl-skip-cap`, `webgl-context-loss`, `webgl-dispose`.
+
+Slot lines carry the leaf, where the host element is (`container`, `recycler` or `detached`), its
+visibility and size, the WebGL state, whether stdin is enabled, and the buffer health: `ok`, `cols`,
+`rows`, `bufLen`, `viewportY`, `missing` (viewport lines that are `undefined`) and `firstMissing`.
+
+Warnings that point at a black or deaf terminal:
+
+- `unhealthy where=...`: the buffer failed the check after the reset in `bindSlot` (`bind-after-reset`)
+  or when the terminal was unhidden (`unhide`). A viewport line that is `undefined` is what xterm
+  reports as `undefined is not an object (evaluating 'x.loadCell')`.
+- `xterm-error` plus one `xterm-error-slot` per slot: written the first five times a window error
+  mentions `loadCell`, `getWidth` or `_updateModel`, so the log shows which slot was broken and what
+  state the rest of the pool was in.
+- `input-dropped reason=no-leaf|no-bridge`: keystrokes that reached xterm but had nowhere to go
+  (first five only).
+
 ---
 
 ## Tab bar overflow scroll
