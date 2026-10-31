@@ -3224,7 +3224,7 @@ export default function App() {
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
-      "sidebar.showExplorer": () => focusExplorerTree(),
+      "sidebar.toggle": toggleSidebar,
       "sidebar.showGit": () => showSidebarView("git"),
       "sidebar.showHistory": () => showSidebarView("history"),
       "sidebar.showNotes": () => {
@@ -3522,6 +3522,12 @@ export default function App() {
         break;
       case "toggle_sidebar":
         toggleSidebar();
+        break;
+      case "focus_explorer":
+        shortcutHandlers["explorer.viewFilesystem"]?.(new KeyboardEvent("keydown"));
+        break;
+      case "focus_workspace":
+        shortcutHandlers["explorer.viewPinned"]?.(new KeyboardEvent("keydown"));
         break;
       case "command_palette":
         shortcutHandlers["commandPalette.open"]?.(new KeyboardEvent("keydown"));

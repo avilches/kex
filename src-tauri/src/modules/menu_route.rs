@@ -50,6 +50,8 @@ mod tests {
             "close_others",
             "close_all",
             "toggle_sidebar",
+            "focus_workspace",
+            "focus_explorer",
             "command_palette",
             "find_in_files",
             "toggle_git",

@@ -44,7 +44,7 @@ export type ShortcutId =
   | "terminal.scratchpad"
   | "search.focus"
   | "explorer.search"
-  | "sidebar.showExplorer"
+  | "sidebar.toggle"
   | "sidebar.showGit"
   | "sidebar.showHistory"
   | "sidebar.showNotes"
@@ -228,22 +228,22 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
   },
   {
-    id: "sidebar.showExplorer",
-    label: "Focus Explorer",
+    id: "sidebar.toggle",
+    label: "Toggle Sidebar",
     group: "Sidebar",
-    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "b" }],
   },
   {
     id: "explorer.viewPinned",
-    label: "Focus Explorer on Workspace Root",
+    label: "Focus Workspace",
     group: "Sidebar",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "e" }],
   },
   {
     id: "explorer.viewFilesystem",
-    label: "Focus Explorer on File System",
+    label: "Focus Explorer",
     group: "Sidebar",
-    defaultBindings: [],
+    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
   },
   {
     id: "sidebar.showGit",
