@@ -450,6 +450,15 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     unmount();
   });
 
+  it("reveals the X on hover or keyboard focus only, never on the programmatic focus a closed context menu leaves on the row", () => {
+    const { container, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const x = container.querySelector<HTMLButtonElement>('button[aria-label="Close tab"]')!;
+    expect(x.className).toContain("group-hover/tab:opacity-60");
+    expect(x.className).toContain("group-has-[:focus-visible]/tab:opacity-60");
+    expect(wrap(x).innerHTML).not.toContain("focus-within");
+    unmount();
+  });
+
   it("an unlocked sleeping row shows the dimmed sleeping mark where the X is and the X replaces it on hover", () => {
     const { container, rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
     const sleepingRow = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
