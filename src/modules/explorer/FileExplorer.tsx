@@ -119,7 +119,7 @@ type Props = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
-  openFiles?: ReadonlySet<string>;
+  openFiles?: ReadonlyMap<string, boolean>;
   active?: boolean;
   initialExplorer?: ExplorerSnapshot | null;
   onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
@@ -1084,6 +1084,7 @@ export const FileExplorer = memo(
               gitColorScheme={gitColorScheme}
               gitignored={row.gitignored}
               isOpenInTab={!row.isDir && openFiles?.has(row.path) === true}
+              isPreviewTab={!row.isDir && openFiles?.get(row.path) === true}
               onOpenFile={onOpenFile}
               onSelectPath={(path) => {
                 setSelectedPath(path);

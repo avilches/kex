@@ -92,7 +92,7 @@ export type SidebarProps = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   onPickWorkspaceRoot?: () => void;
   onExplorerSearchClose?: () => void;
-  openFiles: ReadonlySet<string>;
+  openFiles: ReadonlyMap<string, boolean>;
   // SourceControlPanel props
   workspaceCwd: string | null;
   sourceControl: SourceControlSummary;

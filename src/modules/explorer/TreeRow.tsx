@@ -91,6 +91,7 @@ export type EntryRowProps = {
   gitColorScheme?: GitColorScheme;
   gitignored?: boolean;
   isOpenInTab?: boolean;
+  isPreviewTab?: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -123,6 +124,7 @@ function EntryRowImpl(props: EntryRowProps) {
     gitColorScheme = "vscode",
     gitignored = false,
     isOpenInTab = false,
+    isPreviewTab = false,
     onOpenFile,
     onSelectPath,
     onRevealInTerminal,
@@ -300,7 +302,11 @@ function EntryRowImpl(props: EntryRowProps) {
             {isOpenInTab && (
               <span
                 role="button"
-                title="Focus the tab with this file"
+                title={
+                  isPreviewTab
+                    ? "Focus the preview tab with this file"
+                    : "Focus the tab with this file"
+                }
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -310,7 +316,7 @@ function EntryRowImpl(props: EntryRowProps) {
                 onDoubleClick={(e) => e.stopPropagation()}
                 className="shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:text-foreground"
               >
-                Tab
+                {isPreviewTab ? <em>Preview</em> : "Tab"}
               </span>
             )}
           </button>
