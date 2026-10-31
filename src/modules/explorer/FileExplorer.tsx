@@ -1426,6 +1426,7 @@ export const FileExplorer = memo(
                       path={rootPath}
                       workspaceRoot={workspaceRootPath}
                       onSetAsRoot={onSetAsRoot}
+                      place="top"
                       disabled={rootMode === "workspace"}
                       label={
                         rootMode === "workspace"
@@ -1433,19 +1434,6 @@ export const FileExplorer = memo(
                           : "Set as Workspace Root"
                       }
                     />
-                  )}
-                  {onNewWorkspaceFromFolder && (
-                    <ContextMenuItem
-                      className={COMPACT_ITEM}
-                      onSelect={() => onNewWorkspaceFromFolder(rootPath)}
-                    >
-                      <HugeiconsIcon
-                        icon={DashboardSquareAddIcon}
-                        size={14}
-                        strokeWidth={2}
-                      />
-                      New Workspace from Folder
-                    </ContextMenuItem>
                   )}
                   {onRevealInTerminal && (
                     <ContextMenuItem
@@ -1471,6 +1459,33 @@ export const FileExplorer = memo(
                     />
                     {REVEAL_LABEL}
                   </ContextMenuItem>
+                  {onNewWorkspaceFromFolder && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => onNewWorkspaceFromFolder(rootPath)}
+                    >
+                      <HugeiconsIcon
+                        icon={DashboardSquareAddIcon}
+                        size={14}
+                        strokeWidth={2}
+                      />
+                      New Workspace from Folder
+                    </ContextMenuItem>
+                  )}
+                  {onSetAsRoot && (
+                    <SetWorkspaceRootItem
+                      path={rootPath}
+                      workspaceRoot={workspaceRootPath}
+                      onSetAsRoot={onSetAsRoot}
+                      place="end"
+                      disabled={rootMode === "workspace"}
+                      label={
+                        rootMode === "workspace"
+                          ? "This is the Workspace Root"
+                          : "Set as Workspace Root"
+                      }
+                    />
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}

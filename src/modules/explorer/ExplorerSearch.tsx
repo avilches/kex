@@ -363,6 +363,14 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent className={COMPACT_CONTENT}>
+              {contextHit?.is_dir && onSetAsRoot && (
+                <SetWorkspaceRootItem
+                  path={contextHit.path}
+                  workspaceRoot={workspaceRoot}
+                  onSetAsRoot={onSetAsRoot}
+                  place="top"
+                />
+              )}
               {contextHit && !contextHit.is_dir && (
                 <ContextMenuItem
                   className={COMPACT_ITEM}
@@ -413,13 +421,13 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   Reveal in Explorer
                 </ContextMenuItem>
               )}
-              {contextHit?.is_dir && onSetAsRoot && (
-                <SetWorkspaceRootItem
-                  path={contextHit.path}
-                  workspaceRoot={workspaceRoot}
-                  onSetAsRoot={onSetAsRoot}
-                />
-              )}
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => contextHit && void revealInFinder(contextHit.path)}
+              >
+                <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+                {REVEAL_LABEL}
+              </ContextMenuItem>
               {contextHit?.is_dir && onNewWorkspaceFromFolder && (
                 <ContextMenuItem
                   className={COMPACT_ITEM}
@@ -433,13 +441,14 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   New Workspace from Folder
                 </ContextMenuItem>
               )}
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => contextHit && void revealInFinder(contextHit.path)}
-              >
-                <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-                {REVEAL_LABEL}
-              </ContextMenuItem>
+              {contextHit?.is_dir && onSetAsRoot && (
+                <SetWorkspaceRootItem
+                  path={contextHit.path}
+                  workspaceRoot={workspaceRoot}
+                  onSetAsRoot={onSetAsRoot}
+                  place="end"
+                />
+              )}
               <ContextMenuSeparator />
               {contextHit && (
                 <>

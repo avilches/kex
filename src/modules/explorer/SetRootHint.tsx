@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ArrowRight01Icon, DashboardSquareAddIcon, PinIcon, Rocket01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, ComputerTerminal01Icon, DashboardSquareAddIcon, FolderOpenIcon, PinIcon, Rocket01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
@@ -23,9 +23,9 @@ export function SetRootHint() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none relative mt-4 ml-4 h-[200px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
+      className="pointer-events-none relative mt-4 h-[236px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
     >
-      <div className="flex flex-col py-2 pl-6">
+      <div className="flex flex-col py-2">
         {ROWS.map((row) => (
           <div
             key={row.name}
@@ -51,13 +51,9 @@ export function SetRootHint() {
       <div
         className={cn(
           COMPACT_CONTENT,
-          "absolute left-28 top-[86px] w-max rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
+          "absolute left-28 top-[80px] w-max rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
         )}
       >
-        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
-          <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={2} className="shrink-0" />
-          Actions
-        </div>
         <div
           className={cn(
             "flex items-center whitespace-nowrap rounded-menu-item bg-accent font-medium",
@@ -69,13 +65,25 @@ export function SetRootHint() {
           Set as Workspace Root
         </div>
         <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
+          <HugeiconsIcon icon={Rocket01Icon} size={14} strokeWidth={2} className="shrink-0" />
+          Actions
+        </div>
+        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
+          <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} className="shrink-0" />
+          Open in Terminal
+        </div>
+        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
+          <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} className="shrink-0" />
+          Reveal in Finder
+        </div>
+        <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
           <HugeiconsIcon icon={DashboardSquareAddIcon} size={14} strokeWidth={2} className="shrink-0" />
           New Workspace from Folder
         </div>
       </div>
       <svg
         viewBox="0 0 16 22"
-        className="absolute left-[14.5rem] top-[128px] h-[22px] w-4 drop-shadow-md"
+        className="absolute left-[14.5rem] top-[96px] h-[22px] w-4 drop-shadow-md"
       >
         <path
           d="M1 1v17l4.5-4 3 7 3-1.3-3-6.7H14z"

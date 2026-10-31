@@ -1,4 +1,5 @@
 // These are curated subsets of the full explorer context menu; TreeRow.tsx (src/modules/explorer/TreeRow.tsx) is the canonical reference for the complete item order.
+import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { SetWorkspaceRootItem } from "@/modules/explorer/SetWorkspaceRootItem";
 import {
   ContextMenuItem,
@@ -67,21 +68,10 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
           path={path}
           workspaceRoot={workspaceRoot}
           onSetAsRoot={onSetAsRoot}
+          place="top"
         />
       )}
-      {onNewWorkspaceFromFolder && (
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => onNewWorkspaceFromFolder(path)}
-        >
-          <HugeiconsIcon
-            icon={DashboardSquareAddIcon}
-            size={14}
-            strokeWidth={2}
-          />
-          New Workspace from Folder
-        </ContextMenuItem>
-      )}
+      <RowActionsMenu kind="folder" path={path} />
       {onRevealInTerminal && (
         <ContextMenuItem
           className={COMPACT_ITEM}
@@ -102,6 +92,27 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
         <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
         {REVEAL_LABEL}
       </ContextMenuItem>
+      {onNewWorkspaceFromFolder && (
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => onNewWorkspaceFromFolder(path)}
+        >
+          <HugeiconsIcon
+            icon={DashboardSquareAddIcon}
+            size={14}
+            strokeWidth={2}
+          />
+          New Workspace from Folder
+        </ContextMenuItem>
+      )}
+      {onSetAsRoot && (
+        <SetWorkspaceRootItem
+          path={path}
+          workspaceRoot={workspaceRoot}
+          onSetAsRoot={onSetAsRoot}
+          place="end"
+        />
+      )}
       {onFocusOnExplorer && (
         <>
           <ContextMenuSeparator />
