@@ -116,8 +116,8 @@ function Tile({
           </span>
         ) : null}
         {entry.hibernated ? (
-          <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
-            <SleepingBadge size={14} indicator={indicator} dotPx={7} />
+          <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-popover ring-2 ring-popover">
+            <SleepingBadge size={12} indicator={indicator} />
           </span>
         ) : isDirtyDocument(entry.tab) ? (
           <span

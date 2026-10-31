@@ -66,8 +66,10 @@ describe("TabSwitcher tile", () => {
     const [a] = tiles();
     const moon = within(a).getByLabelText("Tab is hibernated");
     const dot = within(a).getByLabelText("Agent needs attention");
-    const badge = moon.closest(".-top-1\\.5") as HTMLElement;
+    const badge = moon.closest(".-top-1") as HTMLElement;
     expect(badge).toBeTruthy();
+    expect(badge.className).toContain("size-4");
+    expect(within(badge).getByLabelText("Agent needs attention").style.width).toBe("6px");
     expect(badge.contains(dot)).toBe(true);
     expect(within(a).getByText("api").className).toContain("opacity-40");
     expect(moon.className).toContain("opacity-40");
