@@ -159,6 +159,7 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   (macOS 27.0.1), uno cada dos o tres días. El del 30/09 llegó 11 s después de abrir un tab de terminal con la app abierta
   desde hacía 20 h y el Mac recién despertado: si ese es el disparador es hipótesis. No hay reporte público con esas
   funciones en WebKit, Tauri ni wry. TASK-910.
+  Medido el 2026-10-31 (informe de las 14:03:12 local): 1,6 s antes, el registro unificado de macOS (`/usr/bin/log show --predicate 'process == "kex"'`) muestra WebKit cerrando una segunda página web que vivió cuatro segundos (Settings o un navegador flotante). La webview principal iba holgada, así que no es saturación. Hipótesis: nodo de scroll huérfano tras cerrar esa ventana; un solo caso. `Kex.log` registra ahora `[window] <label> ...` (`window_log.rs`); tras un crash, comparar la hora del informe con la última de esas líneas, y exportar el registro unificado el mismo día porque caduca. Extracto en `docs/crash-evidence/`. Ver `docs/WORKSPACES_GOTCHAS.md`.
 - **`SIGABRT` en código de Kex, hilo principal** (medido): informes del 2026-10-28 a las 09:50 (6 min después de
   arrancar) y a las 21:43 (8 h 20 min después), con las 24 direcciones de la pila idénticas, así que es siempre el mismo
   punto. Causa localizada el 2026-10-29 (tercer informe, ya con
