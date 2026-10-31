@@ -431,13 +431,16 @@ export const FileExplorer = memo(
       setIsEditingRoot(true);
     }, [rootPath]);
     const rootNode = rootPath ? tree.nodes[rootPath] : undefined;
-    const rootDirNames = useMemo<string[]>(
+    const rootDirNames = useMemo<string[] | null>(
       () =>
         rootNode?.status === "loaded"
           ? rootNode.entries.filter((e) => e.kind === "dir").map((e) => e.name)
-          : [],
+          : null,
       [rootNode],
     );
+    useEffect(() => {
+      if (!canEditRoot) setIsEditingRoot(false);
+    }, [canEditRoot]);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const closeSearch = useCallback(() => {
@@ -1182,6 +1185,7 @@ export const FileExplorer = memo(
               origin={editOriginRef.current ?? rootPath}
               rootPath={rootPath}
               dirNames={rootDirNames}
+              home={homePath}
               onNavigate={(path) => onEnterFolder?.(path)}
               resolvePath={(typed) =>
                 onResolveRootPath?.(typed) ?? Promise.resolve(null)

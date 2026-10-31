@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
+  canonicalFolderText,
   completeSegment,
+  expandTilde,
   planTreeMove,
   sameFolder,
   splitTypedPath,
@@ -10,7 +12,8 @@ import {
 type Props = {
   origin: string;
   rootPath: string;
-  dirNames: readonly string[];
+  dirNames: readonly string[] | null;
+  home: string | null;
   onNavigate: (path: string) => void;
   resolvePath: (typed: string) => Promise<string | null>;
   onSubmit: (typed: string) => void;
@@ -21,6 +24,7 @@ export function RootPathInput({
   origin,
   rootPath,
   dirNames,
+  home,
   onNavigate,
   resolvePath,
   onSubmit,
@@ -53,12 +57,15 @@ export function RootPathInput({
 
   const evaluate = (value: string) => {
     const seq = ++verifySeq.current;
-    const plan = planTreeMove(value, rootPath, dirNames);
+    const logical = expandTilde(value, home);
+    const plan = planTreeMove(logical, rootPath, dirNames);
     if (plan.kind === "stay") {
       setInvalid(false);
     } else if (plan.kind === "go") {
       setInvalid(false);
       onNavigate(plan.path);
+      const canonical = canonicalFolderText(logical, plan.path);
+      if (canonical && ref.current) ref.current.value = canonical;
     } else if (plan.kind === "invalid") {
       setInvalid(true);
     } else {
@@ -106,10 +113,11 @@ export function RootPathInput({
         const typed = el.value;
         const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
         const atEnd = el.selectionStart === typed.length;
-        if (!inputType.startsWith("delete") && atEnd) {
-          const { folder, partial } = splitTypedPath(typed);
+        const composing = (e.nativeEvent as InputEvent).isComposing;
+        if (!inputType.startsWith("delete") && atEnd && !composing) {
+          const { folder, partial } = splitTypedPath(expandTilde(typed, home));
           if (folder !== null && sameFolder(folder, rootPath)) {
-            const match = completeSegment(partial, dirNames);
+            const match = completeSegment(partial, dirNames ?? []);
             if (match) {
               el.value = typed + match.slice(partial.length);
               el.setSelectionRange(typed.length, el.value.length);
@@ -128,8 +136,10 @@ export function RootPathInput({
           e.preventDefault();
           cancel();
         } else if (e.key === "Tab") {
-          e.preventDefault();
-          if (hasGhost(el)) acceptGhost(el, true);
+          if (hasGhost(el)) {
+            e.preventDefault();
+            acceptGhost(el, true);
+          }
         } else if (e.key === "/" && hasGhost(el)) {
           e.preventDefault();
           acceptGhost(el, true);

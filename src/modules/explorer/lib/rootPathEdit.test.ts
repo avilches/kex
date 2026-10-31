@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  canonicalFolderText,
   completeSegment,
+  expandTilde,
   planTreeMove,
   sameFolder,
   splitTypedPath,
@@ -113,6 +115,45 @@ describe("planTreeMove", () => {
       kind: "go",
       path: "/Users",
     });
+  });
+});
+
+describe("planTreeMove hardening", () => {
+  it("asks to verify instead of rejecting while the folder is not loaded", () => {
+    expect(planTreeMove("/Users/avilches/", "/Users", null)).toEqual({
+      kind: "verify",
+      path: "/Users/avilches",
+    });
+  });
+
+  it("enters a child of a drive root without eating a character", () => {
+    expect(planTreeMove("C:/Users/", "C:/", ["Users"])).toEqual({
+      kind: "go",
+      path: "C:/Users",
+    });
+  });
+});
+
+describe("expandTilde", () => {
+  it("expands only a leading tilde", () => {
+    expect(expandTilde("~", "/home/u")).toBe("/home/u");
+    expect(expandTilde("~/Hub/", "/home/u/")).toBe("/home/u/Hub/");
+    expect(expandTilde("/a/~", "/home/u")).toBe("/a/~");
+    expect(expandTilde("~x", "/home/u")).toBe("~x");
+    expect(expandTilde("~/a", null)).toBe("~/a");
+  });
+});
+
+describe("canonicalFolderText", () => {
+  it("rewrites the typed folder with the real casing", () => {
+    expect(canonicalFolderText("/Users/shared/", "/Users/Shared")).toBe(
+      "/Users/Shared/",
+    );
+  });
+
+  it("leaves text alone when it already matches or has no closing slash", () => {
+    expect(canonicalFolderText("/Users/Shared/", "/Users/Shared")).toBeNull();
+    expect(canonicalFolderText("/Users/shared", "/Users/Shared")).toBeNull();
   });
 });
 
