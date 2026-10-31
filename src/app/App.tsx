@@ -2974,12 +2974,13 @@ export default function App() {
   );
   // Right click on a tile: the menu of the tab in its pane strip, read from the live workspaces (the tile's own
   // entry is a snapshot). A tab that closed since the overlay opened has no menu.
+  const liveSwitcherTab = useCallback((tabId: string) => findTabGlobal(tabId)?.tab, [findTabGlobal]);
   const renderSwitcherMenu = useCallback(
     (entry: TabEntry) => {
-      const tab = findTabGlobal(entry.tabId)?.tab;
+      const tab = liveSwitcherTab(entry.tabId);
       return tab ? <SwitcherTabMenu entry={entry} tab={tab} onActivate={goToTab} /> : null;
     },
-    [findTabGlobal, goToTab],
+    [liveSwitcherTab, goToTab],
   );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -4217,7 +4218,7 @@ export default function App() {
           <Toaster position="bottom-right" />
           <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>
-              <TabSwitcher renderMenu={renderSwitcherMenu} />
+              <TabSwitcher renderMenu={renderSwitcherMenu} liveTab={liveSwitcherTab} />
             </SidebarTabMenuProvider>
           </WorkspaceMoveProvider>
 

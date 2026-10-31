@@ -11,12 +11,27 @@ import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
+import { LockKeyIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { commitSwitcher, hoverSwitcher, menuSwitcher, useSwitcherStore } from "./lib/switcherController";
 import { GRID_GAP, GRID_PAD, JUMP_KEYS, TILE_HEIGHT, gridViewportHeight } from "./lib/switcherModel";
 
 // What the app puts in a tile's context menu. Called on every render of the tile, so it can read live state.
 export type RenderMenu = (entry: TabEntry) => ReactNode;
+
+// The tab as it is now. The entries are a snapshot taken when the overlay opened, and a menu item that keeps
+// the overlay open (Lock, Color, Icon) changes the tab under it, so what is drawn reads the live tab instead.
+export type LiveTab = (tabId: string) => Tab | undefined;
+
+function LockMark({ size }: { size: number }) {
+  return (
+    <span role="img" aria-label="Tab is locked" className="inline-flex shrink-0 text-muted-foreground">
+      <HugeiconsIcon icon={LockKeyIcon} size={size} strokeWidth={2} />
+    </span>
+  );
+}
 
 // The icon is asked for at this size instead of stretched with CSS: the agent marks carry an inline size
 // that no class can override, which left them at 13 px inside a 44 px square.
@@ -65,6 +80,14 @@ function Tile({
         selected && "border-primary bg-primary/10",
       )}
     >
+      {entry.tab.color ? (
+        <span
+          data-tab-color
+          aria-hidden
+          className="absolute inset-x-4 top-0 h-0.5 rounded-full"
+          style={{ backgroundColor: entry.tab.color }}
+        />
+      ) : null}
       {index < JUMP_KEYS ? (
         <span
           data-jump-number
@@ -87,6 +110,11 @@ function Tile({
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} carriedAgent={entry.agent} />
           )}
         </span>
+        {entry.tab.locked ? (
+          <span className="absolute -right-1.5 -bottom-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
+            <LockMark size={11} />
+          </span>
+        ) : null}
         {entry.hibernated ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
             <SleepingBadge size={14} indicator={indicator} dotPx={7} />
@@ -185,6 +213,15 @@ function Footer({
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
           {entry.hibernated ? <SleepingBadge size={13} indicator={indicator} /> : <TabIndicatorMark indicator={indicator} />}
           {isDirtyDocument(entry.tab) && <DirtyMark />}
+          {entry.tab.locked ? <LockMark size={13} /> : null}
+          {entry.tab.color ? (
+            <span
+              data-tab-color
+              aria-hidden
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: entry.tab.color }}
+            />
+          ) : null}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />
@@ -226,9 +263,13 @@ function useWholeRows(count: number, shown: boolean) {
 }
 
 // Mounted by the parent only while a session is on, and it paints nothing during the first moments of one.
-export function TabSwitcher({ renderMenu }: { renderMenu?: RenderMenu }) {
+export function TabSwitcher({ renderMenu, liveTab }: { renderMenu?: RenderMenu; liveTab?: LiveTab }) {
   const revealed = useSwitcherStore((s) => s.revealed);
-  const entries = useSwitcherStore((s) => s.entries);
+  const snapshot = useSwitcherStore((s) => s.entries);
+  const entries = snapshot.map((e) => {
+    const tab = liveTab?.(e.tabId);
+    return tab ? { ...e, tab } : e;
+  });
   const index = useSwitcherStore((s) => s.index);
   const { box, grid, foot, height } = useWholeRows(entries.length, revealed);
   if (!revealed || entries.length === 0) return null;
