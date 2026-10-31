@@ -395,8 +395,10 @@ export function ownButtonCandidates(
 // A button of a detected app or agent that is the only one of it in the bar needs no words:
 // its icon says which one it is. With several of the same, the name and the line under it
 // tell them apart. Apps and agents count apart; the result is the ids drawn icon-only.
-export function soleIconButtons(buttons: readonly Pick<Action, "id" | "appId" | "kind">[]): Set<string> {
-  const keyOf = (a: Pick<Action, "appId" | "kind">) => ((isApp(a) || isAgent(a)) && a.appId ? `${a.kind}:${a.appId}` : null);
+// A picked icon does not say which app it is, so such a button always keeps its words.
+export function soleIconButtons(buttons: readonly Pick<Action, "id" | "appId" | "kind" | "icon">[]): Set<string> {
+  const keyOf = (a: Pick<Action, "appId" | "kind" | "icon">) =>
+    (isApp(a) || isAgent(a)) && a.appId && !a.icon ? `${a.kind}:${a.appId}` : null;
   const count = new Map<string, number>();
   for (const a of buttons) {
     const key = keyOf(a);

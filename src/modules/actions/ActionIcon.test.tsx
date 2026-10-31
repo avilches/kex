@@ -46,6 +46,31 @@ describe("ActionIcon", () => {
     plain.unmount();
   });
 
+  it("draws the icon the user picked over the one of the app it came from", () => {
+    const app = render({ action: { appId: "pycharm", kind: "app", icon: "app:zed" } });
+    expect(app.container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
+    app.unmount();
+    const agent = render({ action: { appId: "claude", kind: "agent", icon: "agent:pi" } });
+    expect(agent.container.querySelector("svg[aria-label='pi']")).not.toBeNull();
+    agent.unmount();
+    const glyph = render({ action: { appId: "pycharm", kind: "app", icon: "glyph:star" } });
+    expect(glyph.container.querySelector("img")).toBeNull();
+    expect(glyph.container.querySelector("svg")).not.toBeNull();
+    glyph.unmount();
+  });
+
+  it("falls back to the default icon when the picked one points at nothing", () => {
+    const stale = render({ action: { appId: "pycharm", kind: "app", icon: "glyph:gone" } });
+    expect(stale.container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/pycharm.svg");
+    stale.unmount();
+  });
+
+  it("draws a picked icon the same in the filled box as plain", () => {
+    const filled = render({ action: { kind: "script", icon: "app:zed" }, fill: true });
+    expect(filled.container.querySelector("[data-action-icon-fill] img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
+    filled.unmount();
+  });
+
   it("fill sizes the icon to the two lines next to it, to one constant size", () => {
     const app = render({ action: { appId: "zed", kind: "app" }, fill: true });
     const box = app.container.querySelector("[data-action-icon-fill]")!;

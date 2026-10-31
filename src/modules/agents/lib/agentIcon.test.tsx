@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AgentIcon, StruckAgentIcon } from "./agentIcon";
+import { AGENT_LOGO_IDS } from "./agentLogos";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -127,6 +128,16 @@ describe("AgentIcon", () => {
       const root = render(<AgentIcon agent={agent} size={14} />);
       expect(root.querySelector("img"), agent).not.toBeNull();
       host?.remove();
+    }
+  });
+
+  it("draws a logo of its own for every id the Action icon picker offers, never the generic robot", () => {
+    const generic = render(<AgentIcon agent="not-an-agent" size={16} />).innerHTML;
+    host?.remove();
+    for (const id of AGENT_LOGO_IDS) {
+      const drawn = render(<AgentIcon agent={id} size={16} />).innerHTML;
+      host?.remove();
+      expect(drawn, id).not.toBe(generic);
     }
   });
 });

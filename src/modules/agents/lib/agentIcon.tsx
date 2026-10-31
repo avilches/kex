@@ -6,16 +6,19 @@ import ompUrl from "@/modules/agents/assets/omp-color.svg";
 import agyUrl from "@/modules/agents/assets/agy.svg";
 import grokUrl from "@/modules/agents/assets/grok.svg";
 import openClaudeUrl from "@/modules/agents/assets/openclaude.png";
+import type { ImageLogoId, InlineMarkId } from "./agentLogos";
 
 // By exact id, so an unknown agent whose name contains a known one gets the generic icon.
-const SVG_URLS = new Map([
-  ["claude", claudeCodeUrl],
-  ["gemini", geminiCliUrl],
-  ["omp", ompUrl],
-  ["agy", agyUrl],
-  ["grok", grokUrl],
-  ["openclaude", openClaudeUrl],
-]);
+const SVG_URLS = new Map<string, string>(
+  Object.entries({
+    claude: claudeCodeUrl,
+    gemini: geminiCliUrl,
+    omp: ompUrl,
+    agy: agyUrl,
+    grok: grokUrl,
+    openclaude: openClaudeUrl,
+  } satisfies Record<ImageLogoId, string>),
+);
 
 // Marks drawn inline follow the text color, which an <img> cannot: a monochrome logo loaded
 // through <img> renders black and disappears on dark themes.
@@ -107,6 +110,17 @@ function CodexMark({ size, className }: { size: number; className?: string }) {
   );
 }
 
+type MarkProps = { size: number; className?: string };
+
+const INLINE_MARKS: Record<InlineMarkId, (props: MarkProps) => React.ReactElement> = {
+  pi: PiMark,
+  opencode: OpenCodeMark,
+  codex: CodexMark,
+  goose: GooseMark,
+  aider: AiderMark,
+  "cursor-agent": CursorMark,
+};
+
 export function AgentIcon({
   agent,
   size = 15,
@@ -130,12 +144,8 @@ export function AgentIcon({
     );
   }
 
-  if (id === "pi") return <PiMark size={size} className={className} />;
-  if (id === "opencode") return <OpenCodeMark size={size} className={className} />;
-  if (id === "codex") return <CodexMark size={size} className={className} />;
-  if (id === "goose") return <GooseMark size={size} className={className} />;
-  if (id === "aider") return <AiderMark size={size} className={className} />;
-  if (id === "cursor-agent") return <CursorMark size={size} className={className} />;
+  const Mark = (INLINE_MARKS as Record<string, ((props: MarkProps) => React.ReactElement) | undefined>)[id];
+  if (Mark) return <Mark size={size} className={className} />;
 
   const svgUrl = SVG_URLS.get(id);
   if (svgUrl) {

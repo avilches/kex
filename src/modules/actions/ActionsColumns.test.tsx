@@ -297,21 +297,42 @@ describe("ActionsColumns", () => {
     });
 
     it("clears a chosen icon with Default icon, and only offers that when one is chosen", () => {
+      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
       const withIcon: Action = { ...saved, icon: "glyph:star" };
       const { container, g, unmount } = mount([withIcon]);
       click(pencil(container));
       click(iconButton());
-      const reset = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Default icon");
-      expect(reset).toBeDefined();
-      click(reset);
+      expect(defaultRow()).toBeDefined();
+      click(defaultRow());
       expect((g.onUpdate.mock.calls[0]![1] as Action).icon).toBe("");
       unmount();
 
       const plain = mount([saved]);
       click(pencil(plain.container));
       click(iconButton());
-      expect([...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Default icon")).toBe(false);
+      expect(defaultRow()).toBeUndefined();
       plain.unmount();
+    });
+
+    it("keeps Default icon on the list while searching, so it can still be reached", () => {
+      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
+      const { container, unmount } = mount([{ ...saved, icon: "glyph:star" }]);
+      click(pencil(container));
+      click(iconButton());
+      typeField(document.querySelector<HTMLInputElement>("input[placeholder='Search icons...']")!, "pycharm");
+      expect(tile("PyCharm")).not.toBeNull();
+      expect(defaultRow()).toBeDefined();
+      unmount();
+    });
+
+    it("draws each tile with no gap and no tick, so the icon stays centered", () => {
+      const { container, unmount } = mount([saved]);
+      click(pencil(container));
+      click(iconButton());
+      const first = tile("rocket")!;
+      expect(first.className).toContain("gap-0");
+      expect(first.className).toContain("[&>svg:last-child]:hidden");
+      unmount();
     });
 
     it("keeps a chosen icon when a preset's command is edited and it becomes the user's own", () => {

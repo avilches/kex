@@ -1,5 +1,5 @@
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import { parseIcon } from "./actionIcons";
+import { parseIcon } from "./actionIconRefs";
 import { isApp, type Action, type ActionKind } from "./types";
 
 const KINDS: readonly ActionKind[] = ["app", "script", "agent"];
