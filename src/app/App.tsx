@@ -1078,20 +1078,26 @@ export default function App() {
     [activeWorkspace, activeRootMode, setFsRoot],
   );
 
-  const handleSubmitRootPath = useCallback(
-    async (typed: string) => {
-      if (!activeWorkspace) return;
-      const path = await resolveTypedRoot(typed, home, (p) =>
+  const resolveRootPath = useCallback(
+    (typed: string) =>
+      resolveTypedRoot(typed, home, (p) =>
         native.fsStat(p).then(
           (st) => st.kind !== "file",
           () => false,
         ),
-      );
+      ),
+    [home],
+  );
+
+  const handleSubmitRootPath = useCallback(
+    async (typed: string) => {
+      if (!activeWorkspace) return;
+      const path = await resolveRootPath(typed);
       if (!path) return;
       if (activeRootMode !== "filesystem") return;
       setFsRoot(activeWorkspace.id, path);
     },
-    [activeWorkspace, activeRootMode, home, setFsRoot],
+    [activeWorkspace, activeRootMode, resolveRootPath, setFsRoot],
   );
 
   const handleEnterFolder = useCallback(
@@ -4136,6 +4142,7 @@ export default function App() {
                         onNavigateUp={handleNavigateUp}
                         onFsRootMissing={handleFsRootMissing}
                         onSubmitRootPath={handleSubmitRootPath}
+                        onResolveRootPath={resolveRootPath}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         gitRootPath={gitRoot}
@@ -4239,6 +4246,7 @@ export default function App() {
                         onNavigateUp={handleNavigateUp}
                         onFsRootMissing={handleFsRootMissing}
                         onSubmitRootPath={handleSubmitRootPath}
+                        onResolveRootPath={resolveRootPath}
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         gitRootPath={gitRoot}

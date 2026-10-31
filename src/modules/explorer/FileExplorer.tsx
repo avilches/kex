@@ -106,6 +106,7 @@ type Props = {
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
   onSubmitRootPath?: (typed: string) => void;
+  onResolveRootPath?: (typed: string) => Promise<string | null>;
   canNavigateUp: boolean;
   homePath: string | null;
   gitRootPath: string | null;
@@ -332,6 +333,7 @@ export const FileExplorer = memo(
       onNavigateUp,
       onFsRootMissing,
       onSubmitRootPath,
+      onResolveRootPath,
       canNavigateUp,
       homePath,
       gitRootPath,
@@ -421,8 +423,21 @@ export const FileExplorer = memo(
     } | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isEditingRoot, setIsEditingRoot] = useState(false);
+    const editOriginRef = useRef<string | null>(null);
     const canEditRoot =
       rootMode === "filesystem" && !!rootPath && !!onSubmitRootPath;
+    const startEditRoot = useCallback(() => {
+      editOriginRef.current = rootPath;
+      setIsEditingRoot(true);
+    }, [rootPath]);
+    const rootNode = rootPath ? tree.nodes[rootPath] : undefined;
+    const rootDirNames = useMemo<string[]>(
+      () =>
+        rootNode?.status === "loaded"
+          ? rootNode.entries.filter((e) => e.kind === "dir").map((e) => e.name)
+          : [],
+      [rootNode],
+    );
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const closeSearch = useCallback(() => {
@@ -887,7 +902,7 @@ export const FileExplorer = memo(
           }
         },
         editRoot: () => {
-          if (canEditRoot) setIsEditingRoot(true);
+          if (canEditRoot) startEditRoot();
         },
         refresh: (path: string) => tree.refresh(path),
       }),
@@ -898,6 +913,7 @@ export const FileExplorer = memo(
         closeSearch,
         tree.refresh,
         canEditRoot,
+        startEditRoot,
       ],
     );
 
@@ -1162,7 +1178,13 @@ export const FileExplorer = memo(
             </div>
           ) : isEditingRoot && rootPath ? (
             <RootPathInput
-              initial={rootPath}
+              origin={editOriginRef.current ?? rootPath}
+              rootPath={rootPath}
+              dirNames={rootDirNames}
+              onNavigate={(path) => onEnterFolder?.(path)}
+              resolvePath={(typed) =>
+                onResolveRootPath?.(typed) ?? Promise.resolve(null)
+              }
               onSubmit={(value) => {
                 setIsEditingRoot(false);
                 onSubmitRootPath?.(value);
@@ -1176,7 +1198,7 @@ export const FileExplorer = memo(
                   type="button"
                   className="group/root flex min-w-0 flex-1 cursor-pointer items-center rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
                   title={rootPath ?? undefined}
-                  onClick={() => setIsEditingRoot(true)}
+                  onClick={startEditRoot}
                 >
                   <span className="min-w-0 truncate text-left [direction:rtl]">
                     {LRM + rootPath}
@@ -1191,7 +1213,7 @@ export const FileExplorer = memo(
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent className="min-w-44">
-                <ContextMenuItem onSelect={() => setIsEditingRoot(true)}>
+                <ContextMenuItem onSelect={startEditRoot}>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
                     size={13}
