@@ -197,7 +197,7 @@ describe("TabSwitcher footer", () => {
   it("draws the workspace mark before its name, with its color", () => {
     show([entry({ workspaceTitle: "Kex", workspaceColor: "#ef4444" })]);
     const name = within(footer()).getByText("Kex");
-    const dot = name.parentElement?.querySelector(".rounded-full") as HTMLElement | null;
+    const dot = name.parentElement?.querySelector(".rounded-\\[2px\\]") as HTMLElement | null;
     expect(dot?.style.backgroundColor).toBeTruthy();
   });
 
