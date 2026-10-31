@@ -30,6 +30,26 @@ export function splitTypedPath(text: string): {
   return { folder, partial: t.slice(i + 1) };
 }
 
+export function expandTilde(text: string, home: string | null): string {
+  if (!home || (text !== "~" && !text.startsWith("~/"))) return text;
+  return norm(home).replace(/\/+$/, "") + text.slice(1);
+}
+
+// When a slash closes a folder name typed with other casing than the real one
+// (case-insensitive disks), the text is rewritten with the real spelling.
+export function canonicalFolderText(
+  text: string,
+  enteredPath: string,
+): string | null {
+  const { folder } = splitTypedPath(text);
+  if (folder === null || !norm(text).endsWith("/")) return null;
+  const f = trimSlash(folder);
+  if (f === enteredPath || f.toLowerCase() !== enteredPath.toLowerCase()) {
+    return null;
+  }
+  return enteredPath.endsWith("/") ? enteredPath : `${enteredPath}/`;
+}
+
 export function sameFolder(a: string, b: string): boolean {
   return trimSlash(norm(a)) === trimSlash(norm(b));
 }
@@ -54,7 +74,7 @@ function joinChild(root: string, name: string): string {
 export function planTreeMove(
   text: string,
   currentRoot: string,
-  dirNames: readonly string[],
+  dirNames: readonly string[] | null,
 ): TreeMovePlan {
   const { folder } = splitTypedPath(text);
   if (folder === null) return { kind: "stay" };
@@ -64,8 +84,10 @@ export function planTreeMove(
   if (f === root) return { kind: "stay" };
   if (isUnder(root, f)) return { kind: "go", path: f };
   if (isUnder(f, root)) {
-    const rest = f.slice(root === "/" ? 1 : root.length + 1);
-    if (rest.includes("/")) return { kind: "verify", path: f };
+    const rest = f.slice(root.endsWith("/") ? root.length : root.length + 1);
+    if (rest.includes("/") || dirNames === null) {
+      return { kind: "verify", path: f };
+    }
     const name =
       dirNames.find((n) => n === rest) ??
       dirNames.find((n) => n.toLowerCase() === rest.toLowerCase());
