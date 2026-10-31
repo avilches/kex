@@ -801,6 +801,7 @@ export default function App() {
   useProfilerSetting();
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
+  const pendingEditRoot = useRef(false);
 
   // ── Live terminal tab tracking for session disposal ─────────────────────
 
@@ -931,6 +932,10 @@ export default function App() {
     ) {
       pendingExplorerSearch.current = false;
       sidebarRef.current?.focusExplorer();
+    }
+    if (sidebarOpen && sidebarView === "explorer" && pendingEditRoot.current) {
+      pendingEditRoot.current = false;
+      sidebarRef.current?.editExplorerRoot();
     }
   }, [sidebarOpen, sidebarView]);
 
@@ -2877,6 +2882,17 @@ export default function App() {
     }
   }, [setSidebarOpen, setSidebarView]);
 
+  const handleEditExplorerRoot = useCallback(() => {
+    const sidebar = sidebarStateRef.current;
+    if (sidebar.open && sidebarViewRef.current === "explorer") {
+      sidebarRef.current?.editExplorerRoot();
+    } else {
+      pendingEditRoot.current = true;
+      setSidebarOpen(true);
+      setSidebarView("explorer");
+    }
+  }, [setSidebarOpen, setSidebarView]);
+
   const welcomeActions = useMemo<WelcomeActions>(
     () => ({
       onNewTerminal: () => openNewTerminal(),
@@ -3195,6 +3211,10 @@ export default function App() {
       "explorer.search": () => {
         dismissPalettes();
         handleExplorerSearch();
+      },
+      "sidebar.editRoot": () => {
+        dismissPalettes();
+        handleEditExplorerRoot();
       },
       "terminal.clear": () => {
         clearFocusedTerminal();

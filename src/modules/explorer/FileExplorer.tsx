@@ -16,6 +16,7 @@ import {
   FolderAddIcon,
   FolderOpenIcon,
   Home01Icon,
+  PencilEdit02Icon,
   PinOffIcon,
   Refresh01Icon,
   Search01Icon,
@@ -88,6 +89,7 @@ export type FileExplorerHandle = {
   isFocused: () => boolean;
   focusSearch: () => void;
   toggleSearch: () => void;
+  editRoot: () => void;
   refresh: (path: string) => void;
 };
 
@@ -881,9 +883,20 @@ export const FileExplorer = memo(
             searchRef.current?.focus();
           }
         },
+        editRoot: () => {
+          if (rootPath && onSubmitRootPath) setIsEditingRoot(true);
+        },
         refresh: (path: string) => tree.refresh(path),
       }),
-      [entryPaths, scrollEntryIntoView, selectedPath, closeSearch, tree.refresh],
+      [
+        entryPaths,
+        scrollEntryIntoView,
+        selectedPath,
+        closeSearch,
+        tree.refresh,
+        rootPath,
+        onSubmitRootPath,
+      ],
     );
 
     if (!rootPath) {
@@ -1146,17 +1159,40 @@ export const FileExplorer = memo(
               onCancel={() => setIsEditingRoot(false)}
             />
           ) : (
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
-              title={rootPath ?? undefined}
-              disabled={!rootPath || !onSubmitRootPath}
-              onClick={() => setIsEditingRoot(true)}
-            >
-              <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
-                {LRM + rootPath}
-              </span>
-            </button>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="group/root flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
+                  title={rootPath ?? undefined}
+                  disabled={!rootPath || !onSubmitRootPath}
+                  onClick={() => setIsEditingRoot(true)}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
+                    {LRM + rootPath}
+                  </span>
+                  <HugeiconsIcon
+                    icon={PencilEdit02Icon}
+                    size={12}
+                    strokeWidth={2}
+                    className="shrink-0 opacity-0 transition-opacity group-hover/root:opacity-100"
+                  />
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="min-w-44">
+                <ContextMenuItem
+                  disabled={!rootPath || !onSubmitRootPath}
+                  onSelect={() => setIsEditingRoot(true)}
+                >
+                  <HugeiconsIcon
+                    icon={PencilEdit02Icon}
+                    size={13}
+                    strokeWidth={2}
+                  />
+                  Change Explorer Root
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           )}
 
           {rootMode === "filesystem" && homePath && (
