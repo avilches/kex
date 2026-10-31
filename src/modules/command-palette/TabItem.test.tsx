@@ -57,6 +57,23 @@ describe("TabItem marks", () => {
     expect(container.querySelector(".opacity-40")).not.toBeNull();
   });
 
+  it("puts the blue unsaved dot right behind the name of a dirty file, not at the far right", () => {
+    const { getByLabelText, queryByLabelText, container } = mount(
+      entry({
+        kind: "editor",
+        title: "main.ts",
+        tab: { id: "t1", kind: "editor", path: "/p/main.ts", dirty: true, preview: false },
+      }),
+    );
+    const dot = getByLabelText("Unsaved changes");
+    expect(dot.previousElementSibling?.textContent).toBe("main.ts");
+    expect(dot.className).toContain("text-primary");
+    cleanup();
+    mount(entry({ kind: "editor", title: "main.ts", tab: { id: "t1", kind: "editor", path: "/p/main.ts", dirty: false, preview: false } }));
+    expect(queryByLabelText("Unsaved changes")).toBeNull();
+    expect(container).toBeTruthy();
+  });
+
   it("shows the dot alone on a tab that is awake", () => {
     const { queryByLabelText, getByLabelText } = mount(entry({ indicator: "error" }));
     expect(queryByLabelText("Tab is hibernated")).toBeNull();

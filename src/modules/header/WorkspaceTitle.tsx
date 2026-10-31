@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
-import { SleepingIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import { sleepIndicator } from "@/modules/workspaces/lib/hibernateIndicator";
 import { useTabIndicator } from "@/modules/workspaces/lib/useTabIndicator";
+import { DirtyMark } from "@/modules/workspaces/DirtyMark";
+import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { SleepingBadge } from "@/modules/workspaces/SleepingBadge";
 import { TabIndicatorMark } from "@/modules/workspaces/TabIndicatorMark";
 import { workspaceDisplayColor } from "@/modules/workspaces/lib/workspaceColor";
@@ -75,6 +75,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
               </span>
             )}
             <span className={cn("truncate", asleep && "opacity-40")}>{subtitle}</span>
+            {isDirtyDocument(tab) && <DirtyMark />}
             {asleep ? (
               <SleepingBadge size={11} indicator={indicator} />
             ) : (

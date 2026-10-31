@@ -74,6 +74,16 @@ describe("TabSwitcher tile", () => {
     expect(dot.closest(".opacity-40")).toBeNull();
   });
 
+  it("marks a dirty file tile with the blue dot at the top right, and a saved one with nothing", () => {
+    const dirty = { id: "a", kind: "editor" as const, path: "/p/a.ts", dirty: true, preview: false };
+    show([entry({ tabId: "a", kind: "editor", title: "a.ts", tab: dirty }), entry({ tabId: "b" })], 1);
+    const [a, b] = tiles();
+    const dot = within(a).getByLabelText("Unsaved changes");
+    expect(dot.className).toContain("bg-primary");
+    expect(dot.className).toContain("-top-1");
+    expect(within(b).queryByLabelText("Unsaved changes")).toBeNull();
+  });
+
   it("keeps the dot of an awake tile at the top right, alone", () => {
     show([entry({ tabId: "a", indicator: "error" }), entry({ tabId: "b" })], 1);
     const [a] = tiles();
@@ -263,6 +273,13 @@ describe("TabSwitcher footer", () => {
     expect(title.className).toContain("opacity-40");
     expect(icon.className).toContain("opacity-40");
     expect(dot.className).not.toContain("opacity");
+  });
+
+  it("puts the blue unsaved dot right after the name in the footer of a dirty file", () => {
+    const dirty = { id: "a", kind: "editor" as const, path: "/p/a.ts", dirty: true, preview: false };
+    show([entry({ tabId: "a", kind: "editor", title: "a.ts", tab: dirty })]);
+    const dot = within(footer()).getByLabelText("Unsaved changes");
+    expect(within(footer()).getByText("a.ts").nextElementSibling).toBe(dot);
   });
 
   it("does not dim the name of a tab that is awake", () => {

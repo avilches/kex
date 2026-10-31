@@ -32,6 +32,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { DirtyMark } from "./DirtyMark";
+import { isDirtyDocument } from "./lib/dirtyTab";
 import { isHibernatedTab } from "./lib/hibernate";
 import { tabMiddleClick } from "./lib/tabCloseControl";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
@@ -362,9 +364,7 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
-      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-        <span className="shrink-0 text-[9px] text-primary">●</span>
-      )}
+      {isDirtyDocument(tab) && <DirtyMark />}
       {tab.note !== undefined && (
         <TabNoteButton
           open={isTabNoteOpen(tab)}

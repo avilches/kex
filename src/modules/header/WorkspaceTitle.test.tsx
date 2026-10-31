@@ -43,6 +43,12 @@ describe("WorkspaceTitle tab line", () => {
     expect(subtitleRow().querySelector("[data-indicator-dot]")).toBeNull();
   });
 
+  it("puts the blue unsaved dot right after the name of a dirty file", () => {
+    const file: Tab = { id: "f1", kind: "editor", path: "/p/api.ts", title: "api", dirty: true, preview: false };
+    render(<WorkspaceTitle workspace={workspace} tab={file} groups={[]} />);
+    expect(screen.getByText("api").nextElementSibling).toBe(screen.getByLabelText("Unsaved changes"));
+  });
+
   it("leaves the name of an awake tab at full strength and without the sleeping icon", () => {
     const awake: Tab = { id: "t2", kind: "terminal", title: "api" };
     render(<WorkspaceTitle workspace={workspace} tab={awake} groups={[]} />);

@@ -21,7 +21,9 @@ import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
+import { isDirtyDocument } from "@/modules/workspaces/lib/dirtyTab";
 import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
+import { DirtyMark } from "@/modules/workspaces/DirtyMark";
 import { tabMiddleClick } from "@/modules/workspaces/lib/tabCloseControl";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -323,9 +325,7 @@ function DetailTabRow({
               >
                 {title}
               </span>
-              {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
-                <span className="shrink-0 text-[9px] text-primary">●</span>
-              )}
+              {isDirtyDocument(tab) && <DirtyMark />}
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
