@@ -673,14 +673,23 @@ pub fn run() {
                     .build()?;
 
                 // View (checkmarks synced from the frontend via sync_menu)
-                let sidebar = CheckMenuItemBuilder::with_id("toggle_sidebar", "Sidebar")
+                let sidebar = CheckMenuItemBuilder::with_id("toggle_sidebar", "Toggle Sidebar")
+                    .accelerator("Cmd+Alt+B")
                     .checked(false)
+                    .build(app)?;
+                let focus_workspace =
+                    MenuItemBuilder::with_id("focus_workspace", "Focus Workspace")
+                        .accelerator("Cmd+Shift+E")
+                        .build(app)?;
+                let focus_explorer = MenuItemBuilder::with_id("focus_explorer", "Focus Explorer")
+                    .accelerator("Cmd+E")
                     .build(app)?;
                 let git = CheckMenuItemBuilder::with_id("toggle_git", "Git Changes")
                     .accelerator("Cmd+G")
                     .checked(false)
                     .build(app)?;
                 let history = CheckMenuItemBuilder::with_id("toggle_history", "Git History")
+                    .accelerator("Cmd+Alt+H")
                     .checked(false)
                     .build(app)?;
                 let show_hidden =
@@ -693,6 +702,8 @@ pub fn run() {
                         .build(app)?;
                 let view_menu = SubmenuBuilder::new(app, "View")
                     .item(&sidebar)
+                    .item(&focus_workspace)
+                    .item(&focus_explorer)
                     .item(&git)
                     .item(&history)
                     .separator()
