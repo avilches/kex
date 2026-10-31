@@ -5,5 +5,5 @@ export {
   stepSwitcher,
   switcherActive,
 } from "./lib/switcherController";
-export { switcherOrder } from "./lib/switcherModel";
+export { letterOf, sleepOutcome, switcherOrder } from "./lib/switcherModel";
 export { shortcutBlockedBySwitcher } from "./lib/switcherGate";

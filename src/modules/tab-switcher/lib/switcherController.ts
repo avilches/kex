@@ -14,27 +14,42 @@ import {
 } from "./switcherModel";
 
 type SwitcherState = {
+  // What the app lent this session, for the footer to announce only the keys that work.
+  keys: { close: boolean; sleep: string | null };
   // Painted only after REVEAL_DELAY_MS, or at once on a second step: a tap never flashes the overlay.
   revealed: boolean;
   entries: TabEntry[];
   index: number;
 };
 
-export const useSwitcherStore = create<SwitcherState>(() => ({ revealed: false, entries: [], index: 0 }));
+export const useSwitcherStore = create<SwitcherState>(() => ({
+  keys: { close: false, sleep: null },
+  revealed: false,
+  entries: [],
+  index: 0,
+}));
 
 // What the app does to close a tab: nothing returned means it refused (a locked tab), otherwise whether
 // the tab really went, since a confirmation may have been cancelled.
 export type CloseTab = (entry: TabEntry) => Promise<boolean> | undefined;
 
+// What the app does to put a tab to sleep or wake it: the refreshed entry of the tab (its tile stays and
+// shows the new state), null when the user cancelled, and nothing when the tab cannot sleep at all.
+export type SleepTab = (entry: TabEntry) => Promise<TabEntry | null> | undefined;
+
+// What the app lends the switcher beyond choosing a tab. `sleepKey` is the bare letter of the hibernate
+// shortcut at the moment it opens, so rebinding the shortcut moves the key with it.
+export type SwitcherHooks = { onClose?: CloseTab; onSleep?: SleepTab; sleepKey?: string | null };
+
 type Session = {
   held: Held;
   onCommit: (entry: TabEntry) => void;
-  onClose: CloseTab | null;
+  hooks: SwitcherHooks;
   timer: ReturnType<typeof setTimeout> | null;
   pointer: Point | null;
   // A close is waiting on the host, which may be asking the user to confirm it: the keys belong to that
   // dialog meanwhile, and letting go of the modifier must not commit a jump behind it.
-  closing: boolean;
+  busy: boolean;
 };
 
 // One switcher per window and it lives outside React: the keys that drive it arrive while the
@@ -59,7 +74,7 @@ function end() {
   window.removeEventListener("keydown", onKeyDown, true);
   window.removeEventListener("keyup", onKeyUp, true);
   window.removeEventListener("blur", cancelSwitcher);
-  useSwitcherStore.setState({ revealed: false, entries: [], index: 0 });
+  useSwitcherStore.setState({ keys: { close: false, sleep: null }, revealed: false, entries: [], index: 0 });
 }
 
 export function cancelSwitcher() {
@@ -87,24 +102,51 @@ export function stepSwitcher(delta: number) {
 // cancelled confirmation leaves everything as it was. The host returns nothing to refuse without closing.
 async function closeSelected(): Promise<void> {
   const current = session;
-  if (!current || current.closing) return;
-  const close = current.onClose;
+  if (!current || current.busy) return;
+  const close = current.hooks.onClose;
   if (!close) return;
   const { entries, index } = useSwitcherStore.getState();
   const entry = entries[index];
   if (!entry) return;
-  current.closing = true;
+  current.busy = true;
   let closed = false;
   try {
     closed = (await close(entry)) === true;
   } finally {
-    current.closing = false;
+    current.busy = false;
   }
   if (session !== current || !closed) return;
   const left = useSwitcherStore.getState();
   const next = afterRemoval(left.entries, left.index, entry.tabId);
   if (!next) return end();
   useSwitcherStore.setState(next);
+}
+
+// Hibernates or restores the highlighted tab through the app, which does what the shortcut does everywhere
+// else (a working agent asks first). The tile stays and takes the refreshed entry, so it shows the moon or
+// loses it in place; the highlight does not move. It waits like a close does, with the keys left to the dialog.
+async function sleepSelected(): Promise<void> {
+  const current = session;
+  if (!current || current.busy) return;
+  const sleep = current.hooks.onSleep;
+  if (!sleep) return;
+  const { entries, index } = useSwitcherStore.getState();
+  const entry = entries[index];
+  if (!entry) return;
+  current.busy = true;
+  let fresh: TabEntry | null = null;
+  try {
+    fresh = (await sleep(entry)) ?? null;
+  } finally {
+    current.busy = false;
+  }
+  if (session !== current || !fresh) return;
+  const now = useSwitcherStore.getState();
+  const at = now.entries.findIndex((e) => e.tabId === entry.tabId);
+  if (at < 0) return;
+  const next = [...now.entries];
+  next[at] = fresh;
+  useSwitcherStore.setState({ entries: next });
 }
 
 // Fed by the tiles on every pointer move. The reference point only advances when the pointer really
@@ -130,10 +172,11 @@ function moveRow(direction: 1 | -1) {
 
 // Tab itself is not handled here: it is the shortcut that opened the switcher and the global listener
 // owns it. W closes the highlighted tab on its own, with whatever modifier is held, as Q quits an app in
-// the macOS switcher; every shortcut is blocked meanwhile, so Cmd+W has no other meaning here. Everything
-// else is swallowed so no key reaches the terminal behind the overlay.
+// the macOS switcher, and the letter of the hibernate shortcut puts it to sleep or wakes it the same way;
+// every shortcut is blocked meanwhile, so Cmd+W and Cmd+Alt+Z have no other meaning here. Everything else
+// is swallowed so no key reaches the terminal behind the overlay.
 function onKeyDown(e: KeyboardEvent) {
-  if (!session || session.closing || e.key === "Tab") return;
+  if (!session || session.busy || e.key === "Tab") return;
   e.preventDefault();
   e.stopPropagation();
   if (e.key === "Escape") cancelSwitcher();
@@ -143,13 +186,14 @@ function onKeyDown(e: KeyboardEvent) {
   else if (e.key === "ArrowDown") moveRow(1);
   else if (e.key === "ArrowUp") moveRow(-1);
   else if (e.key.toLowerCase() === "w") void closeSelected();
+  else if (session.hooks.sleepKey && e.key.toLowerCase() === session.hooks.sleepKey) void sleepSelected();
 }
 
 // A binding with no modifier has nothing to release, so it can only be confirmed with Enter or a click.
 const holdsModifier = (h: Held) => h.ctrl || h.alt || h.meta;
 
 function onKeyUp(e: KeyboardEvent) {
-  if (session && !session.closing && holdsModifier(session.held) && modifiersReleased(session.held, e)) {
+  if (session && !session.busy && holdsModifier(session.held) && modifiersReleased(session.held, e)) {
     commitSwitcher();
   }
 }
@@ -159,12 +203,17 @@ export function openSwitcher(
   delta: 1 | -1,
   entries: TabEntry[],
   onCommit: (entry: TabEntry) => void,
-  onClose?: CloseTab,
+  hooks: SwitcherHooks = {},
 ) {
   if (session || entries.length < 2) return;
   const held = heldModifiers(e);
-  session = { held, onCommit, onClose: onClose ?? null, timer: null, pointer: null, closing: false };
-  useSwitcherStore.setState({ revealed: false, entries, index: startIndex(entries.length, delta) });
+  session = { held, onCommit, hooks, timer: null, pointer: null, busy: false };
+  useSwitcherStore.setState({
+    keys: { close: !!hooks.onClose, sleep: hooks.onSleep ? (hooks.sleepKey ?? null) : null },
+    revealed: false,
+    entries,
+    index: startIndex(entries.length, delta),
+  });
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("keyup", onKeyUp, true);
   window.addEventListener("blur", cancelSwitcher);

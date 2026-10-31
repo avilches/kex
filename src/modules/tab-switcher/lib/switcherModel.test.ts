@@ -6,6 +6,8 @@ import {
   TILE_HEIGHT,
   gridViewportHeight,
   heldModifiers,
+  letterOf,
+  sleepOutcome,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -70,6 +72,58 @@ describe("rowIndex", () => {
   });
   it("treats a zero column count as one", () => {
     expect(rowIndex(2, 10, 0, 1)).toBe(3);
+  });
+});
+
+describe("letterOf", () => {
+  const b = (key: string, extra: object = {}) => ({ key, ...extra });
+
+  it("takes the letter of the first binding that has one, whatever its modifiers", () => {
+    expect(letterOf([b("z", { meta: true, alt: true })])).toBe("z");
+    expect(letterOf([b("F5"), b("Z", { ctrl: true })])).toBe("z");
+  });
+
+  it("is lower case, so the shifted letter of a binding is the same key", () => {
+    expect(letterOf([b("Z", { shift: true })])).toBe("z");
+  });
+
+  it("refuses what is not a single letter, since it would shadow a key of the switcher", () => {
+    for (const key of ["Enter", "Escape", "Tab", "ArrowUp", "ArrowLeft", "F2", "1", " ", ".", "ab"]) {
+      expect(letterOf([b(key)])).toBeNull();
+    }
+  });
+
+  it("refuses the letters the switcher already owns", () => {
+    expect(letterOf([b("w")])).toBeNull();
+    expect(letterOf([b("W", { meta: true })])).toBeNull();
+  });
+
+  it("skips a refused binding to reach a usable one, and is null with none", () => {
+    expect(letterOf([b("w"), b("h")])).toBe("h");
+    expect(letterOf([])).toBeNull();
+  });
+
+  it("copes with a macOS Option letter, which arrives as a symbol", () => {
+    expect(letterOf([b("\u03a9", { alt: true })])).toBeNull();
+  });
+});
+
+describe("sleepOutcome", () => {
+  it("refreshes the tile when the tab changed state", () => {
+    expect(sleepOutcome({ before: false, after: true, dialogOpen: false })).toBe("refresh");
+    expect(sleepOutcome({ before: true, after: false, dialogOpen: false })).toBe("refresh");
+  });
+
+  it("leaves the tile alone when a confirmation is open, since nothing has happened yet", () => {
+    expect(sleepOutcome({ before: false, after: false, dialogOpen: true })).toBe("keep");
+  });
+
+  it("leaves the tile alone when nothing changed, as when a working agent was left running", () => {
+    expect(sleepOutcome({ before: false, after: false, dialogOpen: false })).toBe("keep");
+  });
+
+  it("leaves the tile alone when the tab is gone", () => {
+    expect(sleepOutcome({ before: false, after: null, dialogOpen: false })).toBe("keep");
   });
 });
 

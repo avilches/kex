@@ -132,6 +132,61 @@ describe("TabSwitcher grid", () => {
   });
 });
 
+describe("TabSwitcher key hints", () => {
+  const hints = () => screen.getByTestId("tab-switcher-hints");
+
+  function showWith(hooks: Parameters<typeof openSwitcher>[4]) {
+    openSwitcher(new KeyboardEvent("keydown", { ctrlKey: true }), 1, [entry({ tabId: "a" }), entry({ tabId: "b" })], () => {}, hooks);
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    return render(<TabSwitcher />);
+  }
+
+  it("lists the keys that work, with the letter of the hibernate shortcut", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: "z" });
+    expect(hints().textContent).toMatch(/W\s*close/i);
+    expect(hints().textContent).toMatch(/Z\s*hibernate/i);
+  });
+
+  it("follows a rebinding: the hint shows the letter it was given", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: "h" });
+    expect(hints().textContent).toMatch(/H\s*hibernate/i);
+    expect(hints().textContent).not.toMatch(/Z\s*hibernate/i);
+  });
+
+  it("does not announce a key that is off", () => {
+    showWith({ onClose: () => undefined, onSleep: () => undefined, sleepKey: null });
+    expect(hints().textContent).not.toMatch(/hibernate/i);
+    expect(hints().textContent).toMatch(/W\s*close/i);
+  });
+
+  it("says restore instead of hibernate when the highlighted tab is asleep", () => {
+    openSwitcher(
+      new KeyboardEvent("keydown", { ctrlKey: true }),
+      1,
+      [entry({ tabId: "a" }), entry({ tabId: "b", hibernated: true })],
+      () => {},
+      { onSleep: () => undefined, sleepKey: "z" },
+    );
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    render(<TabSwitcher />);
+    expect(hints().textContent).toMatch(/Z\s*restore/i);
+    expect(hints().textContent).not.toMatch(/hibernate/i);
+  });
+
+  it("does not offer hibernate for a tab that cannot sleep", () => {
+    openSwitcher(
+      new KeyboardEvent("keydown", { ctrlKey: true }),
+      1,
+      [entry({ tabId: "a" }), entry({ tabId: "b", kind: "markdown", tab: { id: "b", kind: "markdown", path: "/p/a.md" } })],
+      () => {},
+      { onSleep: () => undefined, sleepKey: "z" },
+    );
+    act(() => useSwitcherStore.setState({ revealed: true, index: 1 }));
+    render(<TabSwitcher />);
+    expect(hints().textContent).not.toMatch(/Z/);
+  });
+});
+
 describe("TabSwitcher footer", () => {
   it("draws the tab icon before the title, like the tab strip", () => {
     show([entry({ title: "My terminal" })]);

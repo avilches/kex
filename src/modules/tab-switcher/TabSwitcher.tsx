@@ -100,6 +100,26 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
   );
 }
 
+// Only the keys that would work right now: W when the app can close, the hibernate letter when it is on and the
+// highlighted tab is a terminal (a file tab has nothing to put to sleep), saying restore for one that is asleep.
+function KeyHints({ entry }: { entry: TabEntry }) {
+  const keys = useSwitcherStore((s) => s.keys);
+  const hints: Array<[string, string]> = [];
+  if (keys.close) hints.push(["W", "close"]);
+  if (keys.sleep && entry.kind === "terminal") hints.push([keys.sleep.toUpperCase(), entry.hibernated ? "restore" : "hibernate"]);
+  hints.push(["Esc", "cancel"]);
+  return (
+    <div data-testid="tab-switcher-hints" className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
+      {hints.map(([key, label]) => (
+        <span key={key} className="flex items-center gap-1">
+          <kbd className="rounded border border-border bg-muted px-1 font-sans text-[10px] leading-4">{key}</kbd>
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Footer({
   entry,
   position,
@@ -136,6 +156,7 @@ function Footer({
           ) : null}
         </div>
       </div>
+      <KeyHints entry={entry} />
       <div className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
         {position} / {total}
       </div>

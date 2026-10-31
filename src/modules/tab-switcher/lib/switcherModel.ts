@@ -24,6 +24,30 @@ export function switcherOrder<T extends Ordered>(entries: readonly T[], activeTa
   return sorted;
 }
 
+// Letters the switcher keeps for itself: W closes the highlighted tab.
+const OWN_LETTERS: readonly string[] = ["w"];
+
+// The key a shortcut lends the switcher: the letter of its first binding that has one, with no modifier, in
+// lower case. Only a single letter qualifies. Anything else a shortcut can be moved to (Enter, an arrow, F5, a
+// digit) would shadow a key of the switcher or mean nothing bare, and so would a letter it already uses; with
+// none left the key is simply off, which is better than a silent clash.
+export function letterOf(bindings: readonly { key: string }[]): string | null {
+  for (const { key } of bindings) {
+    const letter = key.toLowerCase();
+    if (/^[a-z]$/.test(letter) && !OWN_LETTERS.includes(letter)) return letter;
+  }
+  return null;
+}
+
+// What a hibernate or restore request did to a tab, read from its state before and after (after is null when
+// the tab no longer exists). The request does not say, because with a working agent it only opens a
+// confirmation and returns: the tile is refreshed only if the tab really changed, and never while that
+// dialog is still open, when nothing has happened yet.
+export function sleepOutcome(s: { before: boolean; after: boolean | null; dialogOpen: boolean }): "refresh" | "keep" {
+  if (s.dialogOpen || s.after === null) return "keep";
+  return s.after !== s.before ? "refresh" : "keep";
+}
+
 // The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the
 // previous one when the last tile went, and a highlight on another tile follows it. Null when fewer than
 // two tiles would remain, because a switcher with nothing to switch to has no reason to stay open.

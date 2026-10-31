@@ -70,7 +70,9 @@ import {
   openSwitcher,
   stepSwitcher,
   switcherActive,
+  letterOf,
   shortcutBlockedBySwitcher,
+  sleepOutcome,
   switcherOrder,
 } from "@/modules/tab-switcher";
 import { useProfilerSetting } from "@/modules/profiler";
@@ -110,6 +112,7 @@ import {
   setPerformanceProfiler,
 } from "@/modules/settings/store";
 import {
+  SHORTCUTS_BY_ID,
   useGlobalShortcuts,
   type ShortcutHandlers,
   type ShortcutId,
@@ -2913,6 +2916,35 @@ export default function App() {
     return closeTabsRef.current([entry.tabId]);
   }, []);
 
+  // Hibernates or restores the tab the way the shortcut does for the active one, but for any tab and without
+  // moving to it (restoring wakes it where it is, like Restore Tab in the palette). A request may only open a
+  // confirmation and return, so the result is read from the tab itself: the refreshed entry when its state
+  // really changed, nothing otherwise (a dialog still open, a cancelled one, a tab that cannot sleep).
+  const sleepTabFromSwitcher = useCallback(
+    async (entry: TabEntry) => {
+      const find = () => findTabGlobal(entry.tabId);
+      const before = find();
+      if (before?.tab.kind !== "terminal") return null;
+      const wasAsleep = before.tab.hibernation !== undefined;
+      if (wasAsleep) await wakeTabs(before.workspace.id, [entry.tabId]);
+      else await requestHibernate(before.workspace.id, [entry.tabId]);
+      const after = find();
+      const asleep = after?.tab.kind === "terminal" ? after.tab.hibernation !== undefined : null;
+      const verdict = sleepOutcome({
+        before: wasAsleep,
+        after: asleep,
+        dialogOpen: pendingHibernateRef.current != null,
+      });
+      if (verdict === "keep") return null;
+      const fresh = buildTabEntries(
+        workspacesRef.current.filter((w) => w.id === before.workspace.id),
+        liveTabSources(),
+      ).find((t) => t.tabId === entry.tabId);
+      return fresh ? { ...fresh, lastUsedAt: entry.lastUsedAt, order: entry.order } : null;
+    },
+    [findTabGlobal, wakeTabs, requestHibernate],
+  );
+
   // Every tab of the window in recency order. Choosing one only goes to it: a hibernated tab shows its
   // placeholder and stays asleep, the user wakes it on purpose.
   const openTabSwitcher = useCallback(
@@ -2921,9 +2953,15 @@ export default function App() {
         buildTabEntries(workspacesRef.current, liveTabSources()),
         activeTabId,
       );
-      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId), closeTabFromSwitcher);
+      // The key for hibernating is the letter of the shortcut as it stands now, so rebinding it moves the key.
+      const bindings = usePreferencesStore.getState().shortcuts["tab.hibernate"] ?? SHORTCUTS_BY_ID.get("tab.hibernate")?.defaultBindings ?? [];
+      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId), {
+        onClose: closeTabFromSwitcher,
+        onSleep: sleepTabFromSwitcher,
+        sleepKey: letterOf(bindings),
+      });
     },
-    [activeTabId, goToTab, closeTabFromSwitcher],
+    [activeTabId, goToTab, closeTabFromSwitcher, sleepTabFromSwitcher],
   );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({

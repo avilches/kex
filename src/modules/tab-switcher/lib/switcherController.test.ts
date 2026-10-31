@@ -128,7 +128,7 @@ describe("switcher session", () => {
 
   describe("closing the highlighted tab", () => {
     type Close = (entry: TabEntry) => Promise<boolean> | undefined;
-    const open = (n = 4, onClose?: Close) => openSwitcher(chord(), 1, entries.slice(0, n), onCommit, onClose);
+    const open = (n = 4, onClose?: Close) => openSwitcher(chord(), 1, entries.slice(0, n), onCommit, { onClose });
     const ids = () => useSwitcherStore.getState().entries.map((e) => e.tabId);
     const highlighted = () => {
       const { entries: list, index } = useSwitcherStore.getState();
@@ -259,6 +259,121 @@ describe("switcher session", () => {
       finish(true);
       await settle();
       expect(switcherActive()).toBe(false);
+    });
+  });
+
+  describe("hibernating the highlighted tab", () => {
+    type Sleep = (entry: TabEntry) => Promise<TabEntry | null> | undefined;
+    const open = (onSleep?: Sleep, sleepKey: string | null = "z") =>
+      openSwitcher(chord(), 1, entries, onCommit, { onSleep, sleepKey });
+    const press = (key: string, init: KeyboardEventInit = {}) => {
+      const e = new KeyboardEvent("keydown", { key, cancelable: true, ...init });
+      window.dispatchEvent(e);
+      return e;
+    };
+    const settle = async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    };
+    const asleep = (e: TabEntry) => ({ ...e, hibernated: true }) as TabEntry;
+
+    it("asks the app to hibernate the highlighted tab with the letter it was given", async () => {
+      const onSleep = vi.fn((e: TabEntry) => Promise.resolve(asleep(e)));
+      open(onSleep);
+      const e = press("z");
+      await settle();
+      expect(e.defaultPrevented).toBe(true);
+      expect(onSleep).toHaveBeenCalledWith(entries[1]);
+    });
+
+    it("keeps the tile and swaps in the refreshed entry, so it shows as asleep instead of vanishing", async () => {
+      open((e) => Promise.resolve(asleep(e)));
+      press("z");
+      await settle();
+      const list = useSwitcherStore.getState().entries;
+      expect(list.map((e) => e.tabId)).toEqual(["a", "b", "c", "d"]);
+      expect(list[1].hibernated).toBe(true);
+      expect(useSwitcherStore.getState().index).toBe(1);
+    });
+
+    it("takes the letter in either case and with any modifier held", async () => {
+      for (const init of [{ ctrlKey: true }, { metaKey: true, altKey: true }, { shiftKey: true }]) {
+        const onSleep = vi.fn((e: TabEntry) => Promise.resolve(asleep(e)));
+        open(onSleep);
+        press("Z", init);
+        await settle();
+        expect(onSleep).toHaveBeenCalledTimes(1);
+        cancelSwitcher();
+      }
+    });
+
+    it("uses whatever letter it was given, which is how a rebinding is followed", async () => {
+      const onSleep = vi.fn((e: TabEntry) => Promise.resolve(asleep(e)));
+      open(onSleep, "h");
+      press("z");
+      await settle();
+      expect(onSleep).not.toHaveBeenCalled();
+      press("h");
+      await settle();
+      expect(onSleep).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing, but still swallows the key, when there is no letter for it", async () => {
+      const onSleep = vi.fn((e: TabEntry) => Promise.resolve(asleep(e)));
+      open(onSleep, null);
+      const e = press("z");
+      await settle();
+      expect(e.defaultPrevented).toBe(true);
+      expect(onSleep).not.toHaveBeenCalled();
+    });
+
+    it("leaves the tile as it was when the app declines, as for a tab that cannot sleep", async () => {
+      open(() => undefined);
+      press("z");
+      await settle();
+      expect(useSwitcherStore.getState().entries[1].hibernated).toBeUndefined();
+    });
+
+    it("leaves the tile as it was when the user cancels the confirmation", async () => {
+      open(() => Promise.resolve(null));
+      press("z");
+      await settle();
+      expect(useSwitcherStore.getState().entries[1].hibernated).toBeUndefined();
+    });
+
+    it("lets keys through while it waits, so a confirmation dialog can use Enter and Escape", async () => {
+      let finish: (v: TabEntry | null) => void = () => {};
+      open(() => new Promise<TabEntry | null>((r) => (finish = r)));
+      press("z");
+      expect(press("Enter").defaultPrevented).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
+      finish(null);
+      await settle();
+      expect(press("ArrowRight").defaultPrevented).toBe(true);
+    });
+
+    it("shares its waiting with closing: neither starts while the other is pending", async () => {
+      let finish: (v: TabEntry | null) => void = () => {};
+      const onClose = vi.fn(() => Promise.resolve(true));
+      openSwitcher(chord(), 1, entries, onCommit, {
+        onClose,
+        onSleep: () => new Promise<TabEntry | null>((r) => (finish = r)),
+        sleepKey: "z",
+      });
+      press("z");
+      press("w");
+      expect(onClose).not.toHaveBeenCalled();
+      finish(null);
+      await settle();
+    });
+
+    it("does not touch a list that was replaced while it waited", async () => {
+      let finish: (v: TabEntry | null) => void = () => {};
+      open(() => new Promise<TabEntry | null>((r) => (finish = r)));
+      press("z");
+      cancelSwitcher();
+      finish(asleep(entries[1]));
+      await settle();
+      expect(useSwitcherStore.getState().entries).toEqual([]);
     });
   });
 
