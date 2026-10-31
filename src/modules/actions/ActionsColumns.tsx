@@ -69,6 +69,10 @@ function blankApp(): Action {
   return { id: newActionId(), name: "", kind: "app", command: "", ownButton: false };
 }
 
+function blankAgent(): Action {
+  return { id: newActionId(), name: "", kind: "agent", command: "", cwdMode: "workspace", ownButton: false };
+}
+
 // A preset carries its own kind: an app preset is an app, an agent preset an agent that starts
 // where the preset says.
 const GROUP_LABELS: Record<ActionKind, string> = { script: "Scripts", app: "Applications", agent: "Agents" };
@@ -245,6 +249,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
               suggestions={suggestions}
               highlighted={hoverScope === scope}
               onAddCommand={() => startDraft(scope, blankScript())}
+              onAddAgent={() => startDraft(scope, blankAgent())}
               onAddApp={(s) => addApp(scope, s)}
               onEdit={(id) => setEditing({ scope, id })}
               onRemove={(action) => remove(scope, action)}
@@ -286,6 +291,7 @@ type ColumnProps = {
   suggestions: readonly AppSuggestion[];
   highlighted: boolean;
   onAddCommand: () => void;
+  onAddAgent: () => void;
   onAddApp: (s: AppSuggestion) => void;
   onEdit: (id: string) => void;
   onRemove: (action: Action) => void;
@@ -299,6 +305,7 @@ function Column({
   suggestions,
   highlighted,
   onAddCommand,
+  onAddAgent,
   onAddApp,
   onEdit,
   onRemove,
@@ -320,7 +327,9 @@ function Column({
           <span className="truncate text-[12.5px] font-semibold">{title}</span>
           {subtitle && <span className="truncate text-[10.5px] text-muted-foreground">{subtitle}</span>}
         </div>
-        {editor.available && <AddActionMenu suggestions={available} onAddCommand={onAddCommand} onPickApp={onAddApp} />}
+        {editor.available && (
+          <AddActionMenu suggestions={available} onAddCommand={onAddCommand} onAddAgent={onAddAgent} onPickApp={onAddApp} />
+        )}
       </div>
 
       {!editor.available ? (

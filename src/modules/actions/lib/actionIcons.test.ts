@@ -1,0 +1,88 @@
+import { describe, expect, it } from "vitest";
+import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
+import { AGENT_LOGO_IDS, filterIcons, formatIcon, GLYPHS, iconOptions, parseIcon } from "./actionIcons";
+import { normalizeActions, updateAction } from "./actions";
+import { ownedAfterEdit } from "./appOwnership";
+import type { AppSuggestion } from "./appSuggestions";
+import type { Action } from "./types";
+
+describe("parseIcon", () => {
+  it("reads the three stored forms", () => {
+    expect(parseIcon("glyph:rocket")).toEqual({ source: "glyph", name: "rocket" });
+    expect(parseIcon("app:zed")).toEqual({ source: "app", id: "zed" });
+    expect(parseIcon("agent:claude")).toEqual({ source: "agent", id: "claude" });
+  });
+
+  it("refuses anything that does not resolve to an icon Kex draws", () => {
+    for (const bad of ["", undefined, null, "rocket", "glyph:nope", "app:nope", "agent:nope", "emoji:x", "glyph:", ":rocket"]) {
+      expect(parseIcon(bad as string | undefined)).toBeNull();
+    }
+  });
+
+  it("round-trips every option through its stored value", () => {
+    for (const kind of ["script", "app", "agent"] as const) {
+      for (const o of iconOptions(kind)) expect(parseIcon(o.value)).toEqual(o.ref);
+    }
+    expect(formatIcon({ source: "glyph", name: "star" })).toBe("glyph:star");
+  });
+});
+
+describe("iconOptions", () => {
+  it("offers every glyph, every cataloged app and every agent logo exactly once, whatever the kind", () => {
+    for (const kind of ["script", "app", "agent"] as const) {
+      const values = iconOptions(kind).map((o) => o.value);
+      expect(new Set(values).size).toBe(values.length);
+      expect(values).toHaveLength(Object.keys(GLYPHS).length + EDITOR_CATALOG.length + AGENT_LOGO_IDS.length);
+    }
+  });
+
+  it("leads with what fits the kind", () => {
+    expect(iconOptions("agent")[0]?.ref.source).toBe("agent");
+    expect(iconOptions("app")[0]?.ref.source).toBe("app");
+    expect(iconOptions("script")[0]?.ref.source).toBe("glyph");
+  });
+});
+
+describe("filterIcons", () => {
+  const options = iconOptions("script");
+
+  it("keeps everything for an empty query and matches case-insensitively on the label", () => {
+    expect(filterIcons(options, "  ")).toHaveLength(options.length);
+    expect(filterIcons(options, "PYCHARM").map((o) => o.value)).toEqual(["app:pycharm"]);
+  });
+
+  it("matches the words of a glyph name and the group of an app", () => {
+    expect(filterIcons(options, "magic wand").map((o) => o.value)).toEqual(["glyph:magic-wand"]);
+    expect(filterIcons(options, "jetbrains").length).toBeGreaterThan(5);
+    expect(filterIcons(options, "zzzz")).toEqual([]);
+  });
+});
+
+describe("the icon field of an Action", () => {
+  const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", ownButton: false };
+
+  it("survives normalization when valid and is dropped when it points at nothing", () => {
+    const [kept] = normalizeActions([{ ...script, icon: "glyph:rocket" }]);
+    expect(kept?.icon).toBe("glyph:rocket");
+    const [dropped] = normalizeActions([{ ...script, icon: "glyph:gone" }]);
+    expect(dropped).toBeDefined();
+    expect(dropped?.icon).toBeUndefined();
+  });
+
+  it("is set and cleared through updateAction, an empty string clearing it", () => {
+    const set = updateAction([script], "s1", { icon: "app:zed" });
+    expect(set[0]?.icon).toBe("app:zed");
+    const cleared = updateAction(set, "s1", { icon: "" });
+    expect(cleared[0]?.icon).toBeUndefined();
+  });
+
+  it("is never touched by the preset ownership rules", () => {
+    const zed: AppSuggestion = { key: "zed:ws", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
+    const preset: Action = { id: "a1", name: "Zed", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false, icon: "glyph:star" };
+    expect(ownedAfterEdit(preset, { ...preset, name: "Mine" }, [zed]).icon).toBe("glyph:star");
+    const edited = ownedAfterEdit(preset, { ...preset, command: "zed -n {workspace}" }, [zed]);
+    expect(edited).toMatchObject({ appId: "", iconId: "zed", icon: "glyph:star" });
+    const back = ownedAfterEdit(edited, { ...edited, command: "zed {workspace}" }, [zed]);
+    expect(back).toMatchObject({ appId: "zed", iconId: "", icon: "glyph:star" });
+  });
+});

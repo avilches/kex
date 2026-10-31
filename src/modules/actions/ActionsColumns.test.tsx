@@ -113,12 +113,12 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("the pencil opens a modal with Run in folder before the name for a script, and no Run in for an app", () => {
+  it("the pencil opens a modal with the name and Run in folder side by side for a script, and no Run in for an app", () => {
     const script = mount([saved]);
     click(pencil(script.container));
     const runIn = document.querySelector("[aria-label='Run in folder']")!;
     expect(runIn).not.toBeNull();
-    expect(runIn.compareDocumentPosition(nameField()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nameField()!.compareDocumentPosition(runIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(commandField()!.value).toBe("pnpm dev");
     click(dialogButton("Done"));
     expect(commandField()).toBeNull();
@@ -188,7 +188,7 @@ describe("ActionsColumns", () => {
   it("the custom app starts an empty app draft in the modal", () => {
     const { container, g, unmount } = mount([], [], { suggestions: [] });
     click(addTrigger(container, "global"));
-    click(options().find((o) => o.textContent?.includes("Custom")));
+    click(options().find((o) => o.textContent === "Custom"));
     expect(g.onAdd).not.toHaveBeenCalled();
     expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     typeField(commandField()!, "code {filepath}");
@@ -238,6 +238,91 @@ describe("ActionsColumns", () => {
     expect(document.querySelector("[role='dialog']")?.textContent).not.toMatch(/has no value|Stop/);
     click(dialogButton("Done"));
     unmount();
+  });
+
+  describe("a custom agent and a chosen icon", () => {
+    const iconButton = () => document.querySelector("button[aria-label='Choose an icon']") as HTMLElement | null;
+    const tile = (label: string) => document.querySelector(`[role='listbox'] [aria-label='${label}']`) as HTMLElement | null;
+    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace", ownButton: true };
+
+    it("Custom agent opens an agent draft and reaches the store only once it has a command", async () => {
+      const { container, g, unmount } = mount([], [], { suggestions: [] });
+      click(addTrigger(container, "global"));
+      click(options().find((o) => o.textContent?.startsWith("Custom agent")));
+      expect(document.querySelector("[role='dialog']")?.textContent).toContain("New agent");
+      expect(document.querySelector("[aria-label='Run in folder']")).not.toBeNull();
+      expect(g.onAdd).not.toHaveBeenCalled();
+      typeField(commandField()!, "my-agent --fast");
+      await tick();
+      expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "my-agent --fast", cwdMode: "workspace" });
+      unmount();
+    });
+
+    it("lets a second agent exist next to a detected one with the same binary", async () => {
+      const { container, g, unmount } = mount([detected], [], { suggestions: [claudeWs, claudeCtx] });
+      click(addTrigger(container, "global"));
+      expect(options().some((o) => o.textContent?.startsWith("Custom agent"))).toBe(true);
+      click(options().find((o) => o.textContent?.startsWith("Custom agent")));
+      typeField(commandField()!, "claude");
+      await tick();
+      expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "claude" });
+      expect(g.onAdd.mock.calls[0]![0].appId).toBeUndefined();
+      unmount();
+    });
+
+    it("the modal of any kind has an icon button, and picking a tile saves it at once", () => {
+      const { container, g, unmount } = mount([saved]);
+      click(pencil(container));
+      expect(iconButton()).not.toBeNull();
+      click(iconButton());
+      expect(tile("rocket")).not.toBeNull();
+      click(tile("rocket"));
+      const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
+      expect(id).toBe(saved.id);
+      expect(next.icon).toBe("glyph:rocket");
+      unmount();
+    });
+
+    it("offers the app icons and the agent logos too, and filters them from the search box", () => {
+      const { container, unmount } = mount([saved]);
+      click(pencil(container));
+      click(iconButton());
+      expect(tile("Zed")).not.toBeNull();
+      expect(tile("claude")).not.toBeNull();
+      const box = document.querySelector<HTMLInputElement>("input[placeholder='Search icons...']")!;
+      typeField(box, "pycharm");
+      expect(tile("PyCharm")).not.toBeNull();
+      expect(tile("rocket")).toBeNull();
+      unmount();
+    });
+
+    it("clears a chosen icon with Default icon, and only offers that when one is chosen", () => {
+      const withIcon: Action = { ...saved, icon: "glyph:star" };
+      const { container, g, unmount } = mount([withIcon]);
+      click(pencil(container));
+      click(iconButton());
+      const reset = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Default icon");
+      expect(reset).toBeDefined();
+      click(reset);
+      expect((g.onUpdate.mock.calls[0]![1] as Action).icon).toBe("");
+      unmount();
+
+      const plain = mount([saved]);
+      click(pencil(plain.container));
+      click(iconButton());
+      expect([...document.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Default icon")).toBe(false);
+      plain.unmount();
+    });
+
+    it("keeps a chosen icon when a preset's command is edited and it becomes the user's own", () => {
+      const preset: Action = { id: "ac-z", name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false, icon: "glyph:star" };
+      const { container, g, unmount } = mount([preset], [], { suggestions: [zed] });
+      click(pencil(container));
+      typeField(commandField()!, "zed -n {workspace}");
+      const [, next] = g.onUpdate.mock.calls[g.onUpdate.mock.calls.length - 1]! as [string, Action];
+      expect(next).toMatchObject({ command: "zed -n {workspace}", appId: "", iconId: "zed", icon: "glyph:star" });
+      unmount();
+    });
   });
 
   describe("the Yolo checkbox of an agent", () => {
