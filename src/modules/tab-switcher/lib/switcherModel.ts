@@ -102,19 +102,6 @@ export function afterRemoval<T extends { tabId: string }>(
 // How many tiles a digit can reach: 1 to 9, like the numbers the first tiles wear.
 export const JUMP_KEYS = 9;
 
-// Where the jump label sits on a tile. Temporary: each opening of the switcher uses the next one so the
-// owner can compare them, and the footer names the one in use.
-export const BADGE_SLOTS = [
-  { name: "top-left", cls: "top-1.5 left-2" },
-  { name: "top-right", cls: "top-1.5 right-2" },
-  { name: "bottom-left", cls: "bottom-1.5 left-2" },
-  { name: "bottom-right", cls: "bottom-1.5 right-2" },
-  { name: "top-center", cls: "top-1.5 left-1/2 -translate-x-1/2" },
-  { name: "bottom-center", cls: "bottom-1.5 left-1/2 -translate-x-1/2" },
-  { name: "top-left chip", cls: "top-1 left-1 rounded border border-border bg-muted px-1 py-0.5" },
-  { name: "bottom-right chip", cls: "bottom-1 right-1 rounded border border-border bg-muted px-1 py-0.5" },
-] as const;
-
 // The tile a digit key jumps to. It reads the physical key (`code`), not the character, because with Alt
 // held a Mac types a symbol for the same key. The number pad counts too. Null for any other key or for a
 // digit past the last tile.
