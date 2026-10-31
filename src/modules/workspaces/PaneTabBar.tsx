@@ -43,6 +43,7 @@ import { tabTopLineColor } from "./lib/tabColor";
 import { tabGitColor } from "./lib/tabGitColor";
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { useTabRenameStore } from "./lib/tabRenameStore";
+import { sleepIndicator } from "./lib/hibernateIndicator";
 import { tabStatusIndicator } from "./lib/tabStatusIndicator";
 import {
   getRunningCommand,
@@ -227,6 +228,7 @@ function DraggableTab({
     isRestoreError,
     interrupted: agentSession?.interrupted,
     status: agentSession?.status,
+    sleepIndicator: sleepIndicator(tab),
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (
@@ -260,8 +262,9 @@ function DraggableTab({
         // a left-click would natively steal DOM focus onto it. That fires
         // after PaneView's onMouseDownCapture already placed focus on the
         // leaf's terminal/scratchpad, undoing it. Focus is owned by the
-        // session, not the tab strip.
-        else if (e.button === 0) e.preventDefault();
+        // session, not the tab strip. The right button does the same and
+        // would also draw the system focus ring on a tab that is not active.
+        else if (e.button === 0 || e.button === 2) e.preventDefault();
       }}
       onAuxClick={(e) => {
         if (e.button === 1) {

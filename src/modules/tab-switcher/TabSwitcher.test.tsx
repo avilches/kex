@@ -61,6 +61,12 @@ describe("TabSwitcher tile", () => {
     expect(screen.queryByText(/hibernated/i)).toBeNull();
   });
 
+  it("has no CSS hover on an unselected tile, since the browser fires it under a resting pointer and the keyboard never clears it", () => {
+    show([entry({ tabId: "a" }), entry({ tabId: "b" })], 0);
+    const [, b] = tiles();
+    expect(b.className).not.toMatch(/hover:/);
+  });
+
   it("keeps every tile the same height whatever the title length", () => {
     show([entry({ tabId: "a", title: "x" }), entry({ tabId: "b", title: "a very long title ".repeat(8) })]);
     const [a, b] = tiles();

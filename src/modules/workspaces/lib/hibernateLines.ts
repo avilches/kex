@@ -17,6 +17,7 @@ export type StyledLine = Run[];
 export const HIBERNATE_LINES_MAX = 500;
 export const HIBERNATE_LINES_MAX_BYTES = 256 * 1024;
 export const REDACTED = "[redacted]";
+const MAX_BLANK_RUN = 1000;
 
 const ESC = "\u001b";
 // OSC (to BEL or ST), then any other CSI, then SGR is told apart by its final byte.
@@ -104,6 +105,8 @@ export function parseAnsi(input: string): StyledLine[] {
     text(input.slice(at, m.index));
     at = m.index + m[0].length;
     if (m[2] === "m" && m[1] !== undefined && !m[1].startsWith("?")) style = applySgr(style, m[1]);
+    // xterm's serializer writes the blank cells of a line as cursor-forward (or erase-characters), not as spaces.
+    else if ((m[2] === "C" || m[2] === "X") && /^\d*$/.test(m[1])) text(" ".repeat(Math.min(Number(m[1]) || 1, MAX_BLANK_RUN)));
   }
   text(input.slice(at));
   return lines;

@@ -7,6 +7,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { awakeTerminalTabs, restoreCommandFor, worktreeToKeep } from "./hibernate";
 import { HIBERNATE_LINES_MAX, prepareHibernateScreen, type LeafScreen } from "./hibernateLines";
 import { saveHibernateLines } from "./hibernateLinesIo";
+import { indicatorToKeep } from "./hibernateIndicator";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
@@ -161,7 +162,7 @@ async function snapshotTerminalTabs(tabs: TerminalTab[], readAnsi: ReadLeafAnsi)
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
       const held = liveHeldBlock(tab.id) ?? undefined;
-      return [tab.id, { at, agent: session?.agent ?? plan?.agent ?? held?.agent, command: restoreCommandFor(tab, plan) ?? (held?.command || undefined), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd), ...(held ? { held } : {}) }];
+      return [tab.id, { at, agent: session?.agent ?? plan?.agent ?? held?.agent, command: restoreCommandFor(tab, plan) ?? (held?.command || undefined), title: tabDisplayTitleNow(tab), worktreeCwd: worktreeToKeep(session?.meta?.worktreeCwd, plan?.worktreeCwd), indicator: indicatorToKeep(session), ...(held ? { held } : {}) }];
     }),
   );
   return Object.fromEntries(entries);

@@ -234,8 +234,10 @@ only the rendering is deferred.
 ### Hibernated tabs
 
 Not to be confused with the dormant ring above: a hibernated tab is a terminal tab (`Tab.hibernation`,
-`TabHibernation`: `at`, `agent`, `command`, `title`) with no PTY and no render slot. Its presence is the flag, and it is
-persisted with the tab; the workspace knows nothing about it. Only terminals (and the agents in them) hibernate: editors,
+`TabHibernation`: `at`, `agent`, `command`, `title`, `indicator`) with no PTY and no render slot. Its presence is the flag, and it is
+persisted with the tab; the workspace knows nothing about it. `indicator` is the attention or error dot the agent had when the tab
+went to sleep (`indicatorToKeep`, `lib/hibernateIndicator.ts`), because the live session ends with the PTY: the tab bar, the
+workspace detail list, the command palette and the tab switcher read it with `sleepIndicator` while no live session exists. Only terminals (and the agents in them) hibernate: editors,
 browsers and the rest never do. The tab keeps its id, its place in the `paneTree`, its note, color, lock and title.
 
 - **Placeholder.** `TabContent` renders `HibernatedTab` (large sleeping icon, the title, a small table, the Restore

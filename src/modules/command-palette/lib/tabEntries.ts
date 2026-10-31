@@ -1,3 +1,4 @@
+import { sleepIndicator } from "@/modules/workspaces/lib/hibernateIndicator";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { awakeTerminalTabs, isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { AgentEntryVisual } from "@/modules/agents/lib/notificationList";
@@ -107,7 +108,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           process: [command, agent].filter(Boolean).join(" "),
           command,
           agent,
-          indicator: src.visualOf(tab.id),
+          indicator: src.visualOf(tab.id) ?? (tab.kind === "terminal" ? sleepIndicator(tab) : null),
           tab,
           agentSession: src.agentSessionOf(tab.id),
           running: !!src.runningCommand(tab.id),
