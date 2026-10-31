@@ -155,6 +155,22 @@ describe("alternate screen", () => {
   });
 });
 
+describe("prepareHibernateScreen keeps the cursor row", () => {
+  const lines = (text: string, rows: number) => plain(parseAnsi(prepareHibernateScreen({ text, alt: false, rows })));
+
+  it("pads an unscrolled screen to its rows, so a cursor at the top stays at the top", () => {
+    expect(lines(`$ \r\nb${E}[1A${E}[1C`, 5)).toEqual(["$ ", "b", "", "", ""]);
+  });
+
+  it("keeps the rows under a cursor that moved below the last line of a scrolled screen", () => {
+    expect(lines(`a\nb\nc${E}[2B`, 2)).toEqual(["a", "b", "c", "", ""]);
+  });
+
+  it("adds nothing to a scrolled screen whose cursor is on its last line", () => {
+    expect(lines("a\nb\nc", 2)).toEqual(["a", "b", "c"]);
+  });
+});
+
 describe("prepareHibernateLines", () => {
   it("keeps colours, the tail, and crosses out secrets", () => {
     const out = prepareHibernateLines(`old\n${E}[32mok${E}[0m TOKEN=abcd1234\n\n`, 2);

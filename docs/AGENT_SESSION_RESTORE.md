@@ -937,7 +937,7 @@ screen of each tab with `leafAnsiTail` (the `SerializeAddon` output of its slot,
 default), stores it through `hibernate_lines_save` in `hibernate-lines/<tab_id>.ans` of the app data dir, never in the
 workspace JSON. `lib/hibernateLines.ts` prepares the text: it parses the colour sequences (SGR only, everything else is
 dropped), keeps the last 500 lines once the empty rows at the bottom are gone, crosses out obvious secrets and clips whole
-lines from the top to 256 KiB. A tab whose app owns the alternate screen (`top`, `vim`, an agent) is kept as the grid it
+lines from the top to 256 KiB. The empty rows under the content are put back (`padToScreen`) so the lines sit where the screen had them: xterm leaves them out of the serialized text and ends it with the cursor moves from the last line, so a screen that was not scrolled is padded to the rows of the terminal (a cursor at the top stays at the top), and a scrolled one keeps only the rows under a cursor that moved below its last line (`ESC[nB`). A tab whose app owns the alternate screen (`top`, `vim`, an agent) is kept as the grid it
 was: xterm serializes the normal buffer first and then switches with `ESC[?1049h ESC[H` and writes the alternate screen, so
 only what follows that switch is kept (`altScreenOf`), padded to the rows of the terminal with its blank rows
 (`prepareAltScreenLines`). The secret filter runs on the plain text of each line (so a colour change cannot split a token
@@ -947,7 +947,7 @@ does not catch everything (a password typed at a prompt that does not echo is no
 the file is private (folder 0700, file 0600), unencrypted like `agent-sessions.json`, read only by the placeholder of the same
 tab id, and the setting turns the whole thing off. Failing to save never stops the tab from sleeping.
 `HibernatedLines.tsx` reads the file each time the placeholder is shown and draws it behind the placeholder, faded, with
-the palette of the active terminal theme (`lib/hibernateLinesStyle.ts`) and the terminal font. On the wake, `wakeTabs`
+the palette of the active terminal theme (`lib/hibernateLinesStyle.ts`) and the terminal font, anchored to the bottom; the wheel anywhere over the placeholder (`onWheel` in `HibernatedTab`) scrolls them back through the stored history. On the wake, `wakeTabs`
 reads the file before dropping `hibernation` (`handOverLastLines`) and leaves the faint version of the lines
 (`wakeBackdrop`: every run with the faint attribute, blank rows at the bottom gone) in `terminal/lib/wakeBackdrop.ts`;
 `ensureSession` takes it as the initial `snapshot` of the new terminal, so the usual snapshot replay writes it before the

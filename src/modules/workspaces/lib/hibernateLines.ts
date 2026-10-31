@@ -211,14 +211,38 @@ export function redactLine(line: StyledLine): StyledLine {
   return out;
 }
 
+// xterm leaves the empty rows under the content out of the serialized text and ends it with the
+// cursor moves from the last line to where the cursor was; only a cursor below that line says how many.
+function rowsBelowCursor(serialized: string): number {
+  const tail = /(?:\u001b\[\d*[ABCD])+$/.exec(serialized)?.[0] ?? "";
+  let down = 0;
+  let up = 0;
+  for (const m of tail.matchAll(/\u001b\[(\d*)([AB])/g)) {
+    const n = Number(m[1]) || 1;
+    if (m[2] === "B") down += n;
+    else up += n;
+  }
+  return Math.max(0, down - up);
+}
+
+// Blank rows put back under the content, so the lines sit where the screen had them: a screen that
+// was not scrolled keeps its top (a cursor that was at the top stays there), a scrolled one keeps
+// only the rows under a cursor that had moved below the last line.
+function padToScreen(lines: StyledLine[], serialized: string, rows: number): StyledLine[] {
+  const below = rowsBelowCursor(serialized);
+  const pad = lines.length <= rows ? Math.max(rows - lines.length, below) : below;
+  return [...lines, ...Array.from({ length: pad }, (): StyledLine => [])];
+}
+
 // What gets stored for a tab: the colours kept, the last lines only, secrets crossed out, bounded in size.
 export function prepareHibernateLines(
   snapshot: string,
   max = HIBERNATE_LINES_MAX,
   maxBytes = HIBERNATE_LINES_MAX_BYTES,
+  rows = 0,
 ): string {
   const tail = tailLines(parseAnsi(snapshot), max).map(redactLine);
-  return serializeLines(clipToBytes(tail, maxBytes));
+  return serializeLines(clipToBytes(rows > 0 && tail.length > 0 ? padToScreen(tail, snapshot, rows) : tail, maxBytes));
 }
 
 // xterm serializes the normal buffer first and, when an app is on the alternate screen, switches to
@@ -259,5 +283,5 @@ export function wakeBackdrop(stored: string): string {
 export type LeafScreen ={ text: string; alt: boolean; rows: number };
 
 export function prepareHibernateScreen(screen: LeafScreen): string {
-  return screen.alt ? prepareAltScreenLines(screen.text, screen.rows) : prepareHibernateLines(screen.text);
+  return screen.alt ? prepareAltScreenLines(screen.text, screen.rows) : prepareHibernateLines(screen.text, HIBERNATE_LINES_MAX, HIBERNATE_LINES_MAX_BYTES, screen.rows);
 }
