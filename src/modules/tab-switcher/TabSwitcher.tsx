@@ -87,7 +87,7 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         ) : null}
         {entry.hibernated ? (
           <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-popover ring-2 ring-popover">
-            <HibernatedMark size={11} />
+            <HibernatedMark size={11} className="opacity-40" />
           </span>
         ) : null}
       </span>
@@ -95,7 +95,7 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
         <span
           className={cn(
             "line-clamp-2 w-full text-[12px] leading-[15px] break-words",
-            entry.hibernated && "text-muted-foreground",
+            entry.hibernated && "opacity-40",
           )}
         >
           {entry.title || entry.kind}

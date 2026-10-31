@@ -52,6 +52,7 @@ export function TabItem({
       onContextMenu={onContextMenu}
       className="text-[12.5px]"
     >
+      <span className="flex min-w-0 flex-1 items-center gap-2">
       <span className={cn("flex min-w-0 flex-1 items-center gap-2", entry.hibernated && "opacity-40")}>
       <RowTag kind={tabTagKind(entry)} hit={tagHit} />
       <span className="shrink-0 self-start pt-0.5 text-muted-foreground">
@@ -90,18 +91,7 @@ export function TabItem({
           </span>
         ) : null}
       </span>
-      {entry.indicator === "working" ? (
-        <Spinner size={11} className="shrink-0" />
-      ) : entry.indicator ? (
-        <span
-          role="img"
-          aria-label="Agent needs attention"
-          className={cn(
-            "size-[6px] shrink-0 rounded-full",
-            entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
-          )}
-        />
-      ) : null}
+      </span>
       {entry.hibernated ? (
         <span
           role="img"
@@ -115,6 +105,18 @@ export function TabItem({
             className="opacity-40"
           />
         </span>
+      ) : null}
+      {entry.indicator === "working" ? (
+        <Spinner size={11} className="shrink-0" />
+      ) : entry.indicator ? (
+        <span
+          role="img"
+          aria-label="Agent needs attention"
+          className={cn(
+            "size-[6px] shrink-0 rounded-full",
+            entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
+          )}
+        />
       ) : null}
       {entry.tab.locked ? (
         <span role="img" aria-label="Tab is locked" className="shrink-0">

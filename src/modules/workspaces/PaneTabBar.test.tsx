@@ -169,6 +169,22 @@ describe("PaneTabBar with a hibernated tab", () => {
     expect(onWake).toHaveBeenCalledWith("tab-1");
   });
 
+  it("dims only the name, the icon and the sleeping icon of a sleeping tab, never the tab itself or the dot", () => {
+    setup({ id: "tab-1", kind: "terminal", title: "api", hibernation: { at: 1, indicator: "attention" } });
+    expect(tabEl().className).not.toContain("opacity-40");
+    expect(screen.getByText("api").className).toContain("opacity-40");
+    expect(tabEl().querySelector('[title^="Hibernated"] svg')!.getAttribute("class")).toContain("opacity-40");
+    const dot = tabEl().querySelector(".bg-amber-400")!;
+    expect(dot.closest(".opacity-40")).toBeNull();
+  });
+
+  it("puts the sleeping icon before the dot on a locked sleeping tab", () => {
+    setup({ id: "tab-1", kind: "terminal", locked: true, hibernation: { at: 1, indicator: "attention" } });
+    const icon = tabEl().querySelector('[title^="Hibernated"]')!;
+    const dot = tabEl().querySelector(".bg-amber-400")!.parentElement!;
+    expect(icon.nextElementSibling).toBe(dot);
+  });
+
   it("a double click on an awake tab wakes nothing and shows no sleeping icon", () => {
     const { onWake } = setup({ id: "tab-1", kind: "terminal" });
     expect(tabEl().querySelector('[title^="Hibernated"]')).toBeNull();

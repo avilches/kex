@@ -61,6 +61,16 @@ describe("TabSwitcher tile", () => {
     expect(screen.queryByText(/hibernated/i)).toBeNull();
   });
 
+  it("dims the name and the sleeping icon of a sleeping tile, never its dot", () => {
+    show([entry({ tabId: "a", title: "api", hibernated: true, indicator: "attention" }), entry({ tabId: "b" })], 1);
+    const [a] = tiles();
+    expect(within(a).getByText("api").className).toContain("opacity-40");
+    expect(within(a).getByLabelText("Tab is hibernated").className).toContain("opacity-40");
+    const dot = within(a).getByLabelText("Agent needs attention");
+    expect(dot.className).not.toContain("opacity");
+    expect(dot.closest(".opacity-40")).toBeNull();
+  });
+
   it("has no CSS hover on an unselected tile, since the browser fires it under a resting pointer and the keyboard never clears it", () => {
     show([entry({ tabId: "a" }), entry({ tabId: "b" })], 0);
     const [, b] = tiles();

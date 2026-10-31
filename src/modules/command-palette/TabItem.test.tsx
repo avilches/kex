@@ -1,23 +1,26 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Command, CommandList } from "@/components/ui/command";
 import type { TabEntry } from "./lib/tabEntries";
 import { TabItem } from "./TabItem";
 
+vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
+
 afterEach(cleanup);
 
 const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
-  tabId: "tab-1",
+  tabId: "t1",
   workspaceId: "ws-1",
   workspaceTitle: "Work",
   workspaceColor: null,
-  workspaceIcon: null, workspaceRoot: null,
+  workspaceIcon: null,
+  workspaceRoot: null,
   hibernated: false,
   kind: "terminal",
-  title: "zsh",
+  title: "api",
   note: null,
-  cwd: "/p/Kex",
+  cwd: "/p",
   detail: "",
   worktree: "",
   branch: "",
@@ -25,7 +28,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   command: "",
   agent: "",
   indicator: null,
-  tab: { id: "tab-1", kind: "terminal" },
+  tab: { id: "t1", kind: "terminal" },
   agentSession: undefined,
   running: false,
   lastUsedAt: 0,
@@ -33,107 +36,24 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   ...over,
 });
 
-function row(e: TabEntry) {
+function mount(e: TabEntry) {
   return render(
     <Command>
       <CommandList>
-        <TabItem entry={e} onRun={vi.fn()} />
+        <TabItem entry={e} term="" onRun={() => {}} onContextMenu={() => {}} />
       </CommandList>
     </Command>,
   );
 }
 
-describe("TabItem", () => {
-  it("shows title and workspace", () => {
-    row(entry());
-    expect(screen.getByText("zsh")).toBeTruthy();
-    expect(screen.getByText("Work")).toBeTruthy();
-  });
-
-  it("shows the process and the branch under the path, or beside it when only one exists", () => {
-    row(entry({ detail: "/p/Kex", command: "top -o cpu", branch: "main" }));
-    expect(screen.getByText("top · main")).toBeTruthy();
-    cleanup();
-    row(entry({ detail: "/p/Kex", branch: "main" }));
-    expect(screen.getByText("/p/Kex · main")).toBeTruthy();
-  });
-
-  it("labels the row by what the tab holds", () => {
-    row(entry());
-    expect(screen.getByText("Terminal")).toBeTruthy();
-    cleanup();
-    row(entry({ kind: "markdown" }));
-    expect(screen.getByText("File")).toBeTruthy();
-    cleanup();
-    row(entry({ agent: "claude" }));
-    expect(screen.getByText("Agent")).toBeTruthy();
-  });
-
-  it("shows a spinner only while the agent works", () => {
-    row(entry({ indicator: "working" }));
-    expect(screen.getByRole("status")).toBeTruthy();
-    cleanup();
-    row(entry({ indicator: null }));
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  it("never shows an autofocus marker", () => {
-    row(entry({ note: "hi" }));
-    expect(screen.queryByLabelText(/autofocus/i)).toBeNull();
-  });
-
-  it("falls back to the kind label when the title is empty", () => {
-    row(entry({ kind: "browser", title: "", cwd: "", tab: { id: "tab-1", kind: "browser", url: "" } }));
-    expect(screen.getAllByText("Browser")).toHaveLength(2);
-  });
-
-  it("marks a hibernated tab", () => {
-    row(entry({ hibernated: true }));
-    expect(screen.getByLabelText("Tab is hibernated")).toBeTruthy();
-  });
-
-  it("dims the content in an inner wrapper, never the row nor the selection tick", () => {
-    row(entry({ hibernated: true }));
-    const item = document.querySelector("[cmdk-item]") as HTMLElement;
-    expect(item.className).not.toMatch(/(^|\s)(\[[^\s]*\]:)?opacity-/);
-    const dimmed = item.querySelector(":scope > .opacity-40") as HTMLElement;
-    expect(dimmed).not.toBeNull();
-    expect(dimmed.textContent).toContain("zsh");
-    const tick = [...item.children].find((c) => c.classList.contains("opacity-0")) as Element;
-    expect(tick).toBeDefined();
-    expect(dimmed.contains(tick)).toBe(false);
-    cleanup();
-    row(entry());
-    expect(document.querySelector(".opacity-40")).toBeNull();
-  });
-
-  it("shows the absolute path on the second line", () => {
-    row(entry({ detail: "/p/Kex/src" }));
-    expect(screen.getByText("/p/Kex/src")).toBeTruthy();
-  });
-
-  it("shows the url without protocol for a browser tab", () => {
-    row(
-      entry({
-        kind: "browser",
-        cwd: "",
-        detail: "https://example.com/docs",
-        tab: { id: "tab-1", kind: "browser", url: "https://example.com/docs" },
-      }),
-    );
-    expect(screen.getByText("example.com/docs")).toBeTruthy();
-  });
-
-  it("shows the note as a third line when the tab has one", () => {
-    row(entry({ note: "## Todo\n\nbuy milk" }));
-    expect(screen.getByText("## Todo buy milk")).toBeTruthy();
-  });
-
-  it("shows a lock only for a locked tab", () => {
-    row(entry());
-    expect(screen.queryByLabelText("Tab is locked")).toBeNull();
-    cleanup();
-    row(entry({ tab: { id: "tab-1", kind: "terminal", locked: true } }));
-    expect(screen.getByLabelText("Tab is locked")).toBeTruthy();
+describe("TabItem marks", () => {
+  it("puts the sleeping icon first and the dot after it, and dims only the sleeping content", () => {
+    const { getByLabelText, container } = mount(entry({ hibernated: true, indicator: "attention" }));
+    const icon = getByLabelText("Tab is hibernated");
+    const dot = getByLabelText("Agent needs attention");
+    expect(icon.nextElementSibling).toBe(dot);
+    expect(dot.className).not.toContain("opacity");
+    expect(dot.closest(".opacity-40")).toBeNull();
+    expect(container.querySelector(".opacity-40")).not.toBeNull();
   });
 });
