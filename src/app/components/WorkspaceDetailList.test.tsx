@@ -353,9 +353,9 @@ describe("WorkspaceDetailList context menu", () => {
 });
 
 describe("WorkspaceDetailList with a hibernated tab", () => {
-  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn(), focusedTabId: string | null = null) {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn(), onToggleHibernate = vi.fn(), locked = true, onClose = vi.fn(), focusedTabId: string | null = null, indicator?: "attention" | "error") {
     const sleeping = (t: Tab): Tab =>
-      t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1 } } as Tab) : t;
+      t.id === "t-plain" ? ({ ...t, locked, note: "n", hibernation: { at: 1, indicator } } as Tab) : t;
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -479,6 +479,24 @@ describe("WorkspaceDetailList with a hibernated tab", () => {
     expect(tokens).toContain("opacity-40");
     expect(tokens).not.toContain("opacity-0");
     expect(mark.className).toContain("peer-hover/x:!opacity-0");
+    unmount();
+  });
+
+  it("a sleeping row keeps the dot it went to sleep with, and the sleeping mark moves aside to make room", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false, vi.fn(), null, "attention");
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    const dot = wrap(row).querySelector(".bg-amber-400");
+    expect(dot).not.toBeNull();
+    const mark = wrap(row).querySelector<HTMLElement>("[data-sleeping-mark]")!;
+    expect(mark.style.right).not.toBe("");
+    unmount();
+  });
+
+  it("a sleeping row without a dot keeps the sleeping mark in the slot", () => {
+    const { rows, unmount } = mountAsleep(vi.fn(), vi.fn(), vi.fn(), false);
+    const row = rows().find((b) => b.getAttribute("data-detail-row-id") === "t-plain")!;
+    expect(wrap(row).querySelector(".bg-amber-400")).toBeNull();
+    expect(wrap(row).querySelector<HTMLElement>("[data-sleeping-mark]")!.style.right).toBe("");
     unmount();
   });
 
