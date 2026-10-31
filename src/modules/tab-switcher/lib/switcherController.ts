@@ -10,6 +10,7 @@ import {
   rowIndex,
   startIndex,
   stepIndex,
+  BADGE_SLOTS,
   type Held,
   type Point,
 } from "./switcherModel";
@@ -21,6 +22,7 @@ type SwitcherState = {
   revealed: boolean;
   entries: TabEntry[];
   index: number;
+  badgeSlot: number;
 };
 
 export const useSwitcherStore = create<SwitcherState>(() => ({
@@ -28,7 +30,10 @@ export const useSwitcherStore = create<SwitcherState>(() => ({
   revealed: false,
   entries: [],
   index: 0,
+  badgeSlot: 0,
 }));
+
+let openings = 0;
 
 // What the app does to close a tab: nothing returned means it refused (a locked tab), otherwise whether
 // the tab really went, since a confirmation may have been cancelled.
@@ -257,6 +262,7 @@ export function openSwitcher(
     revealed: false,
     entries,
     index: startIndex(entries.length, delta),
+    badgeSlot: openings++ % BADGE_SLOTS.length,
   });
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("keyup", onKeyUp, true);
