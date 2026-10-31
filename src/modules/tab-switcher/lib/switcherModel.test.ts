@@ -9,6 +9,7 @@ import {
   letterOf,
   sleepOutcome,
   settledSleepState,
+  carriedAgent,
   modifiersReleased,
   pointerMoved,
   rowIndex,
@@ -237,5 +238,19 @@ describe("settledSleepState", () => {
 
   it("returns null at once when the tab is gone", async () => {
     expect(await settledSleepState(() => null, false, { stepMs: 16, timeoutMs: 100 })).toBeNull();
+  });
+});
+
+describe("carriedAgent", () => {
+  it("keeps the agent of the old tile when the refreshed one has none yet", () => {
+    expect(carriedAgent("claude", "")).toBe("claude");
+  });
+
+  it("prefers the agent the refreshed tile already knows", () => {
+    expect(carriedAgent("claude", "codex")).toBe("codex");
+  });
+
+  it("stays empty when neither has an agent", () => {
+    expect(carriedAgent("", "")).toBe("");
   });
 });

@@ -72,6 +72,7 @@ import {
   switcherActive,
   letterOf,
   shortcutBlockedBySwitcher,
+  carriedAgent,
   settledSleepState,
   sleepOutcome,
   switcherOrder,
@@ -2943,7 +2944,9 @@ export default function App() {
         workspacesRef.current.filter((w) => w.id === before.workspace.id),
         liveTabSources(),
       ).find((t) => t.tabId === entry.tabId);
-      return fresh ? { ...fresh, lastUsedAt: entry.lastUsedAt, order: entry.order } : null;
+      return fresh
+        ? { ...fresh, agent: carriedAgent(entry.agent, fresh.agent), lastUsedAt: entry.lastUsedAt, order: entry.order }
+        : null;
     },
     [findTabGlobal, wakeTabs, requestHibernate],
   );

@@ -65,6 +65,12 @@ export async function settledSleepState(
   }
 }
 
+// A woken tab has no agent session until its agent starts again, which takes longer than the switcher stays
+// open, so the refreshed tile would lose the agent mark. It keeps the one the tile had.
+export function carriedAgent(previous: string, refreshed: string): string {
+  return refreshed || previous;
+}
+
 // The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the
 // previous one when the last tile went, and a highlight on another tile follows it. Null when fewer than
 // two tiles would remain, because a switcher with nothing to switch to has no reason to stay open.

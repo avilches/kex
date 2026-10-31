@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import type { TabEntry } from "@/modules/command-palette";
 import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { commitSwitcher, hoverSwitcher, useSwitcherStore } from "./lib/switcherController";
@@ -61,7 +62,11 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
             entry.hibernated && "opacity-40 grayscale",
           )}
         >
-          <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} />
+          {!entry.agentSession && !entry.hibernated && entry.agent && entry.kind === "terminal" && !entry.tab.icon ? (
+            <AgentIcon agent={entry.agent} size={TILE_ICON} />
+          ) : (
+            <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} />
+          )}
         </span>
         {entry.indicator === "working" ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
