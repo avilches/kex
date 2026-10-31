@@ -85,7 +85,7 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el `appId` no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
-  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), Run in folder primero en los scripts (Home por defecto, Workspace root con la
+  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons, y "Default icon" para volver al de siempre), Run in folder primero en los scripts (Home por defecto, Workspace root con la
   chincheta del explorer, Current folder, Absolute path), nombre, comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
   para agentes y Actions de workspace; una de carpeta o de fichero lleva en su lugar una nota,
@@ -97,7 +97,7 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   una app es un preset solo por su comando: al cambiarlo deja de serlo (`ownedAfterEdit`,
   conserva el icono en `iconId`) y el preset vuelve al combo, y si el comando vuelve a ser el
   del preset lo recupera; el nombre y Own button / Inside the combo no cuentan.
-  El combo Add pone Add script arriba y Custom como primera app y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
+  El combo Add pone Add script arriba, Custom agent como primera entrada del grupo Agents y Custom como primera app y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.
   Donde un nombre lleva dos lineas (fila de Settings, boton del Header, menu, combo Add) el icono de app mide lo que dice `actionIconSize`
   (`ActionIcon fill`, el mismo en todos los sitios, centrado sobre las dos lineas de `ActionNameLines`; slider de 14 a 32px, 20 por defecto, en Settings > Appearance > Action icon size) y el play/stop de un script ocupa

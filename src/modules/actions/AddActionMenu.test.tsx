@@ -15,15 +15,17 @@ const suggestions: AppSuggestion[] = [
 
 function mount(actions: readonly AppSuggestion[] = suggestions) {
   const onAddCommand = vi.fn();
+  const onAddAgent = vi.fn();
   const onPickApp = vi.fn();
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(createElement(AddActionMenu, { suggestions: actions as AppSuggestion[], onAddCommand, onPickApp })));
+  act(() => root.render(createElement(AddActionMenu, { suggestions: actions as AppSuggestion[], onAddCommand, onAddAgent, onPickApp })));
   const options = () => [...document.querySelectorAll("[cmdk-item]")];
   return {
     container,
     onAddCommand,
+    onAddAgent,
     onPickApp,
     options,
     trigger: [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Add"))!,
@@ -43,11 +45,12 @@ function search(text: string) {
 }
 
 describe("AddActionMenu", () => {
-  it("lists Add script first, Custom second, then one entry per preset with its icon", () => {
+  it("lists Add script first, Custom agent, Custom, then one entry per preset with its icon", () => {
     const view = mount();
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
       "Add scriptruns in a terminal",
+      "Custom agentyour own command",
       "Custom",
       "BBEditCurrent file",
       "ZedCurrent file",
@@ -85,13 +88,32 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
+  it("Custom agent closes the combo and asks for an agent draft, even with every detected agent installed", () => {
+    const view = mount([]);
+    click(view.trigger);
+    expect(view.options().map((o) => o.textContent)).toContain("Custom agentyour own command");
+    click(view.options().find((o) => o.textContent?.includes("Custom agent"))!);
+    expect(view.onAddAgent).toHaveBeenCalledTimes(1);
+    expect(view.onAddCommand).not.toHaveBeenCalled();
+    expect(view.options()).toHaveLength(0);
+    view.unmount();
+  });
+
+  it("finds Custom agent from the search box by agent or custom", () => {
+    const view = mount();
+    click(view.trigger);
+    search("custom");
+    expect(view.options().map((o) => o.textContent)).toEqual(["Custom agentyour own command", "Custom"]);
+    view.unmount();
+  });
+
   it("picking a preset hands it over and stays open for the next one", () => {
     const view = mount();
     click(view.trigger);
     click(view.options().find((o) => o.textContent?.includes("ZedWorkspace root"))!);
     expect(view.onPickApp).toHaveBeenCalledTimes(1);
     expect(view.onPickApp).toHaveBeenCalledWith(suggestions[1]);
-    expect(view.options()).toHaveLength(5);
+    expect(view.options()).toHaveLength(6);
     view.unmount();
   });
 
@@ -103,12 +125,13 @@ describe("AddActionMenu", () => {
     const groups = [...document.querySelectorAll("[cmdk-group]")];
     const agents = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Agents")!;
     expect([...agents.querySelectorAll("[cmdk-item]")].map((o) => o.textContent)).toEqual([
+      "Custom agentyour own command",
       "Claude CodeWorkspace root",
       "Claude CodeCurrent folder",
     ]);
     const apps = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Applications")!;
     expect(apps.textContent).not.toContain("Claude");
-    click(agents.querySelectorAll("[cmdk-item]")[1]!);
+    click(agents.querySelectorAll("[cmdk-item]")[2]!);
     expect(view.onPickApp).toHaveBeenCalledWith(ctxVariant);
     view.unmount();
   });
@@ -119,6 +142,7 @@ describe("AddActionMenu", () => {
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([
       "Add scriptruns in a terminal",
+      "Custom agentyour own command",
       "Claude CodeWorkspace root",
       "Custom",
       "BBEditCurrent file",

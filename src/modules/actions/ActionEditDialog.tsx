@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import { ActionIcon } from "./ActionIcon";
+import { IconPicker } from "./IconPicker";
 import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
@@ -69,6 +69,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
     if (open) selectGuard.current = true;
     else setTimeout(() => (selectGuard.current = false), 0);
   };
+  const [contentNode, setContentNode] = useState<HTMLElement | null>(null);
   const [draft, setDraft] = useState(action.command);
   const [commandFocused, setCommandFocused] = useState(false);
   const [name, setName] = useState(action.name);
@@ -112,6 +113,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
+        ref={setContentNode}
         showCloseButton={false}
         className="inset-0 m-auto h-fit max-h-[calc(100vh-3rem)] translate-x-0 translate-y-0 grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto rounded-2xl p-5 sm:max-w-[560px]"
         onInteractOutside={(e) => {
@@ -124,9 +126,12 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
         }}
       >
         <div className="flex items-center gap-2.5 pr-1">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <ActionIcon action={action} size={14} />
-          </span>
+          <IconPicker
+            action={action}
+            container={contentNode}
+            onOpenChange={onSelectOpenChange}
+            onPick={(icon) => onChange({ ...action, icon })}
+          />
           <DialogTitle className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</DialogTitle>
           <div role="radiogroup" aria-label="Where it is available" className="flex shrink-0 gap-0.5 rounded-md bg-muted p-0.5">
             {(

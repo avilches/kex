@@ -13,6 +13,8 @@ export type Action = {
   appId?: string;
   /** App icon kept after the user edits a preset: the Action is theirs now, the icon stays. */
   iconId?: string;
+  /** The icon the user picked (`app:<id>`, `agent:<id>` or `glyph:<name>`); wins over appId and iconId. */
+  icon?: string;
   /** Scripts and agents; absent means home. */
   cwdMode?: ScriptCwdMode;
   /** Only used when cwdMode is "fixed". */

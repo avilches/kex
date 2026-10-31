@@ -22,6 +22,7 @@ import type { ActionKind } from "./lib/types";
 type Props = {
   suggestions: readonly AppSuggestion[];
   onAddCommand: () => void;
+  onAddAgent: () => void;
   onPickApp: (suggestion: AppSuggestion) => void;
 };
 
@@ -29,7 +30,7 @@ type Props = {
 // Agents group with one entry per detected agent preset (icon, and under it the folder it starts
 // in), and the Applications group: Custom, then one alphabetical entry per detected app preset. Presets keep the combo open so several can be installed in a row;
 // the entries that open an editor close it. Installed presets never show up in the list.
-export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
+export function AddActionMenu({ suggestions, onAddCommand, onAddAgent, onPickApp }: Props) {
   const [open, setOpen] = useState(false);
   const host = useDialogScrollHost();
   return (
@@ -62,12 +63,23 @@ export function AddActionMenu({ suggestions, onAddCommand, onPickApp }: Props) {
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
-            {suggestions.some((s) => s.kind === "agent") && (
-              <>
-                <CommandGroup heading="Agents">{presetItems(suggestions, "agent", onPickApp)}</CommandGroup>
-                <CommandSeparator />
-              </>
-            )}
+            <CommandGroup heading="Agents">
+              <CommandItem
+                value="add-agent"
+                keywords={["agent", "custom", "ai", "coding"]}
+                onSelect={() => {
+                  setOpen(false);
+                  onAddAgent();
+                }}
+                className="text-[12px]"
+              >
+                <ActionIcon action={{ kind: "agent" }} size={13} fill />
+                <span className="min-w-0 flex-1 truncate">Custom agent</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">your own command</span>
+              </CommandItem>
+              {presetItems(suggestions, "agent", onPickApp)}
+            </CommandGroup>
+            <CommandSeparator />
             <CommandGroup heading="Applications">
               <CommandItem
                 value={CUSTOM_APP_SUGGESTION.key}
