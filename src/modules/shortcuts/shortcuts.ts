@@ -129,12 +129,6 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "r" }],
   },
   {
-    id: "tab.hibernate",
-    label: "Hibernate / Restore Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
-  },
-  {
     id: "nav.prev",
     label: "Previous Tab (then Workspace)",
     group: "General",
@@ -318,55 +312,6 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ key: "F2" }],
   },
   {
-    id: "tab.newBrowser",
-    label: "New Browser Tab",
-    group: "Tabs",
-    // Cmd/Ctrl+P now opens the command palette, so the browser moves here.
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
-  },
-  {
-    id: "tab.newEditor",
-    label: "New Editor Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "o" }],
-  },
-  {
-    id: "tab.close",
-    label: "Close Tab or Pane",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
-  },
-  {
-    id: "tab.reopenClosed",
-    label: "Reopen Closed Tab or Workspace",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
-  },
-  {
-    id: "tab.rename",
-    label: "Rename Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
-  },
-  {
-    id: "tab.note",
-    label: "Toggle Tab Note",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
-  },
-  {
-    id: "tab.lock",
-    label: "Lock Tab (Prevent Close)",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "l" }],
-  },
-  {
-    id: "tab.focusOnExplorer",
-    label: "Focus Tab File or Folder in Explorer",
-    group: "Tabs",
-    defaultBindings: [{ key: "F4" }],
-  },
-  {
     id: "pane.splitRight",
     label: "Split Pane Right",
     group: "Panes",
@@ -426,18 +371,6 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: IS_MAC ? [{ meta: true, key: "u" }] : [],
   },
   {
-    id: "tab.next",
-    label: "Next Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
-  },
-  {
-    id: "tab.prev",
-    label: "Previous Tab",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
-  },
-  {
     id: "tab.switcher",
     label: "Switch Tab (hold to cycle, release to go)",
     group: "Tab Switcher",
@@ -452,18 +385,85 @@ export const SHORTCUTS: Shortcut[] = [
     allowRepeat: true,
   },
   {
+    id: "tab.newBrowser",
+    label: "New Browser Tab",
+    group: "Tabs",
+    // Cmd/Ctrl+P now opens the command palette, so the browser moves here.
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
+  },
+  {
+    id: "tab.newEditor",
+    label: "New Editor Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "o" }],
+  },
+  {
+    id: "tab.rename",
+    label: "Rename Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
+  },
+  {
+    id: "tab.note",
+    label: "Toggle Tab Note",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
+  },
+  {
+    id: "search.focus",
+    label: "Find in Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
+  },
+  {
+    id: "tab.next",
+    label: "Next Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
+  },
+  {
+    id: "tab.prev",
+    label: "Previous Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
+  },
+  {
+    id: "tab.close",
+    label: "Close Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
+  },
+  {
+    id: "tab.lock",
+    label: "Lock Tab (Prevent Close)",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "l" }],
+  },
+  {
+    id: "tab.reopenClosed",
+    label: "Reopen Closed Tab or Workspace",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
+  },
+  {
+    id: "tab.hibernate",
+    label: "Hibernate / Restore Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "z" }],
+  },
+  {
+    id: "tab.focusOnExplorer",
+    label: "Focus Tab File or Folder in Explorer",
+    group: "Tabs",
+    defaultBindings: [{ key: "F4" }],
+  },
+  {
     id: "tab.selectByIndex",
     label: "Jump to Tab 1–9 (0 = last)",
     group: "Tabs",
     // Wildcard digit: Ctrl+1..9 select that tab in the active pane, Ctrl+0
     // selects the last one. The "1" is just the representative binding.
     defaultBindings: [{ ctrl: true, key: "1" }],
-  },
-  {
-    id: "search.focus",
-    label: "Find",
-    group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
   },
   {
     id: "notifications.toggle",
