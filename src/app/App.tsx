@@ -3231,9 +3231,7 @@ export default function App() {
         if (activeWorkspace?.workspaceRoot) showSidebarView("notes");
       },
       "explorer.viewFilesystem": () => focusExplorerTree("filesystem"),
-      "explorer.viewPinned": () => {
-        if (activeWorkspace?.workspaceRoot) focusExplorerTree("workspace");
-      },
+      "explorer.viewPinned": () => focusExplorerTree("workspace"),
       "explorer.toggleHidden": handleToggleShowHidden,
       "explorer.search": () => {
         dismissPalettes();
