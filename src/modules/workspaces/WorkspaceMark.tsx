@@ -28,7 +28,7 @@ export function WorkspaceSquare({
 }) {
   return (
     <span
-      className={cn("shrink-0 rounded-[2px]", className)}
+      className={cn("relative top-px shrink-0 rounded-[2px]", className)}
       style={{
         width: WORKSPACE_SQUARE_SIDE,
         height: WORKSPACE_SQUARE_SIDE,
