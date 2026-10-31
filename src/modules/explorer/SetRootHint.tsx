@@ -5,23 +5,24 @@ import { folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { MISSING_ROOT_ITEM } from "./SetWorkspaceRootItem";
 
-const FOLDERS = ["projects", "notes"];
+const FOLDERS = ["archive", "dotfiles", "projects", "notes", "scripts", "tmp"];
+const TARGET = 3;
 
-// A static picture of the explorer: two folders and the context menu of the second one, with the
+// A static picture of the explorer, faded at top and bottom like a screenshot: some folders and the context menu of the second one, with the
 // same highlighted entry the real menu shows while the workspace has no root. Not interactive.
 export function SetRootHint() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none relative mt-2 h-[88px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
+      className="pointer-events-none relative mt-2 h-[168px] select-none overflow-hidden rounded-md bg-sidebar ring-1 ring-border/60"
     >
-      <div className="flex flex-col py-1">
+      <div className="flex flex-col py-2 pl-3">
         {FOLDERS.map((name, i) => (
           <div
             key={name}
             className={cn(
               "flex h-6 w-full items-center gap-2 rounded-sm px-1.5 text-[13px] text-foreground/85",
-              i === 1 && "bg-accent/70",
+              i === TARGET && "bg-accent/70",
             )}
           >
             <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
@@ -35,7 +36,7 @@ export function SetRootHint() {
       <div
         className={cn(
           COMPACT_CONTENT,
-          "absolute left-10 top-9 rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
+          "absolute left-24 top-[98px] rounded-menu bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10",
         )}
       >
         <div
@@ -49,6 +50,8 @@ export function SetRootHint() {
           Set as Workspace Root
         </div>
       </div>
+      <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-sidebar to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-sidebar to-transparent" />
     </div>
   );
 }
