@@ -76,12 +76,11 @@ export function carriedAgent(previous: string, refreshed: string): string {
   return refreshed || previous;
 }
 
-// The orange or red dot comes from the live agent session, which a restored tab does not have until its agent
-// starts again. On a restore the refreshed tile keeps the dot the old one had; hibernating ends the session,
-// so there the dot goes with it.
-export function carriedIndicator<T>(previous: T | null, refreshed: T | null, restoring: boolean): T | null {
-  if (refreshed !== null) return refreshed;
-  return restoring ? previous : null;
+// The orange or red dot comes from the live agent session, which a hibernated or just restored tab does not
+// have for a while. The refreshed tile keeps the dot the old one had until the app shows a new one, so a
+// hibernate followed by a restore inside the same switcher does not lose it.
+export function carriedIndicator<T>(previous: T | null, refreshed: T | null): T | null {
+  return refreshed ?? previous;
 }
 
 // The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the

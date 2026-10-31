@@ -1,10 +1,12 @@
-import { useLayoutEffect, useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useMemo, useRef, useState } from "react";
 import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import type { TabEntry } from "@/modules/command-palette";
 import { tabDetailLines } from "@/modules/command-palette/lib/rowDetail";
+import { buildAgentEntries } from "@/modules/agents/lib/notificationList";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { TabBarIcon } from "@/modules/workspaces/lib/tabBarIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
@@ -38,6 +40,19 @@ function WorkspaceLine({ entry, size }: { entry: TabEntry; size: number }) {
 // its text would move the rows below it and the scroll with them.
 function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; index: number }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const session = useAgentStore((s) => s.sessions[entry.tabId]);
+  const notifications = useAgentStore((s) => s.notifications);
+  const liveVisual = useMemo(
+    () =>
+      session || notifications.some((n) => n.tabId === entry.tabId)
+        ? (buildAgentEntries(
+            session ? { [entry.tabId]: session } : {},
+            notifications.filter((n) => n.tabId === entry.tabId),
+          )[0]?.visual ?? null)
+        : null,
+    [session, notifications, entry.tabId],
+  );
+  const indicator = liveVisual ?? entry.indicator;
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -68,17 +83,17 @@ function Tile({ entry, selected, index }: { entry: TabEntry; selected: boolean; 
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} size={TILE_ICON} />
           )}
         </span>
-        {entry.indicator === "working" ? (
+        {indicator === "working" ? (
           <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-popover ring-2 ring-popover">
             <Spinner size={12} />
           </span>
-        ) : entry.indicator ? (
+        ) : indicator ? (
           <span
             role="img"
             aria-label="Agent needs attention"
             className={cn(
               "absolute -top-1 -right-1 size-3.5 rounded-full ring-2 ring-popover",
-              entry.indicator === "error" ? "bg-destructive" : "bg-amber-400",
+              indicator === "error" ? "bg-destructive" : "bg-amber-400",
             )}
           />
         ) : null}

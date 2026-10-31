@@ -264,16 +264,16 @@ describe("carriedAgent", () => {
 });
 
 describe("carriedIndicator", () => {
-  it("keeps the dot of the old tile on a restore while the refreshed one has none", () => {
-    expect(carriedIndicator("attention", null, true)).toBe("attention");
-    expect(carriedIndicator("error", null, true)).toBe("error");
+  it("keeps the dot of the old tile while the refreshed one has none", () => {
+    expect(carriedIndicator("attention", null)).toBe("attention");
+    expect(carriedIndicator("error", null)).toBe("error");
   });
 
   it("prefers the dot the refreshed tile already shows", () => {
-    expect(carriedIndicator("attention", "working", true)).toBe("working");
+    expect(carriedIndicator("attention", "working")).toBe("working");
   });
 
-  it("does not keep a dot on hibernating, since the agent session ends with it", () => {
-    expect(carriedIndicator("attention", null, false)).toBeNull();
+  it("stays empty when neither has one", () => {
+    expect(carriedIndicator(null, null)).toBeNull();
   });
 });
