@@ -9,6 +9,7 @@ import {
   nearestExistingDir,
   logicalRepoRoot,
   resolveSidebarTarget,
+  resolveTypedRoot,
 } from "./explorerRoot";
 
 describe("resolveExplorerRoot", () => {
@@ -280,5 +281,48 @@ describe("logicalRepoRoot", () => {
     expect(logicalRepoRoot("/x/y", "/real/repo/src", "/real/repo")).toBe(
       "/real/repo",
     );
+  });
+});
+
+describe("resolveTypedRoot", () => {
+  const dirs = new Set(["/", "/a", "/a/b", "/home/u"]);
+  const isDir = async (p: string) => dirs.has(p);
+
+  it("returns an existing folder as typed", async () => {
+    expect(await resolveTypedRoot("/a/b", "/home/u", isDir)).toBe("/a/b");
+  });
+
+  it("climbs to the nearest existing parent", async () => {
+    expect(await resolveTypedRoot("/a/b/x/y", "/home/u", isDir)).toBe("/a/b");
+  });
+
+  it("climbs past a path that exists but is not a folder", async () => {
+    expect(await resolveTypedRoot("/a/file.txt", "/home/u", isDir)).toBe("/a");
+  });
+
+  it("falls back to the filesystem root when only it exists", async () => {
+    expect(await resolveTypedRoot("/zzz/q", "/home/u", isDir)).toBe("/");
+  });
+
+  it("returns null when nothing valid exists up to the root", async () => {
+    expect(await resolveTypedRoot("/a/b", "/home/u", async () => false)).toBeNull();
+  });
+
+  it("trims, drops trailing slashes and expands ~", async () => {
+    expect(await resolveTypedRoot("  /a/b///  ", null, isDir)).toBe("/a/b");
+    expect(await resolveTypedRoot("~", "/home/u", isDir)).toBe("/home/u");
+    expect(await resolveTypedRoot("~/nope", "/home/u", isDir)).toBe("/home/u");
+  });
+
+  it("rejects empty and relative input", async () => {
+    expect(await resolveTypedRoot("   ", "/home/u", isDir)).toBeNull();
+    expect(await resolveTypedRoot("a/b", "/home/u", isDir)).toBeNull();
+  });
+
+  it("handles Windows drive paths", async () => {
+    const win = new Set(["C:/", "C:/Users"]);
+    const f = async (p: string) => win.has(p);
+    expect(await resolveTypedRoot("C:\\Users\\x", null, f)).toBe("C:/Users");
+    expect(await resolveTypedRoot("C:", null, f)).toBe("C:/");
   });
 });
