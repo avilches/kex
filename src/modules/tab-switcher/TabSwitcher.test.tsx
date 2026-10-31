@@ -195,22 +195,22 @@ describe("TabSwitcher live tab", () => {
     show([entry({ tabId: "a", tab: { id: "a", kind: "terminal", locked: true, color: "#ff0000" } }), entry({ tabId: "b" })]);
     const [a, b] = tiles();
     expect(within(a).getByLabelText("Tab is locked")).toBeTruthy();
-    expect(a.querySelector("[data-tab-color]")).not.toBeNull();
+    expect(a.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#ff0000");
     expect(within(footer()).getByLabelText("Tab is locked")).toBeTruthy();
     expect(within(b).queryByLabelText("Tab is locked")).toBeNull();
-    expect(b.querySelector("[data-tab-color]")).toBeNull();
+    expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("");
   });
 
-  it("tints a chosen icon with the colour and draws the stripe only when there is no icon", () => {
+  it("tints the icon of a coloured tab, whether or not it has a chosen icon, and draws no stripe or bar", () => {
     show([
       entry({ tabId: "a", tab: { id: "a", kind: "terminal", icon: "Home01Icon", color: "#ff0000" } }),
       entry({ tabId: "b", tab: { id: "b", kind: "terminal", color: "#00ff00" } }),
     ]);
     const [a, b] = tiles();
-    expect(a.querySelector("[data-tab-color]")).toBeNull();
     expect(a.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#ff0000");
-    expect(b.querySelector("[data-tab-color]")).not.toBeNull();
-    expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("");
+    expect(b.querySelector<HTMLElement>(".size-11")?.style.color).toBe("#00ff00");
+    expect(footer().querySelector<HTMLElement>("[data-tab-icon]")?.style.color).toBe("#ff0000");
+    expect(document.querySelector("[data-tab-color]")).toBeNull();
   });
 
   it("follows the live tab instead of the snapshot, so Lock, Color and Icon change in place", () => {
@@ -222,7 +222,7 @@ describe("TabSwitcher live tab", () => {
     view.rerender(<TabSwitcher liveTab={(id) => live[id]} />);
     expect(within(tiles()[0]).getByLabelText("Tab is locked")).toBeTruthy();
     expect(within(footer()).getByLabelText("Tab is locked")).toBeTruthy();
-    expect(tiles()[0].querySelector("[data-tab-color]")).not.toBeNull();
+    expect(tiles()[0].querySelector<HTMLElement>(".size-11")?.style.color).toBe("#00ff00");
     live.a = { id: "a", kind: "terminal" };
     view.rerender(<TabSwitcher liveTab={(id) => live[id]} />);
     expect(screen.queryByLabelText("Tab is locked")).toBeNull();

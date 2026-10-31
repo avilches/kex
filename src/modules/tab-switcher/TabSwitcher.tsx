@@ -25,10 +25,8 @@ export type RenderMenu = (entry: TabEntry) => ReactNode;
 // the overlay open (Lock, Color, Icon) changes the tab under it, so what is drawn reads the live tab instead.
 export type LiveTab = (tabId: string) => Tab | undefined;
 
-// A chosen icon wears the tab's colour. Without one the colour has no glyph to tint, so it is a stripe on the
-// left edge of the icon square, like the workspace's side line.
-const pickedIconColor = (tab: Tab) => (tab.icon && tab.color ? tab.color : undefined);
-const stripeColor = (tab: Tab) => (!tab.icon && tab.color ? tab.color : undefined);
+// The tab's colour is only the tint of its icon.
+const iconColor = (tab: Tab) => tab.color ?? undefined;
 
 function LockMark({ size }: { size: number }) {
   return (
@@ -96,20 +94,12 @@ function Tile({
       ) : null}
       <span className="relative shrink-0">
         <span
-          style={{ color: pickedIconColor(entry.tab) }}
+          style={{ color: iconColor(entry.tab) }}
           className={cn(
-            "relative flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground",
+            "flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground",
             entry.hibernated && "opacity-40 grayscale",
           )}
         >
-          {stripeColor(entry.tab) ? (
-            <span
-              data-tab-color
-              aria-hidden
-              className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
-              style={{ backgroundColor: stripeColor(entry.tab) }}
-            />
-          ) : null}
           {!entry.agentSession && !entry.hibernated && entry.agent && entry.kind === "terminal" && !entry.tab.icon ? (
             <AgentIcon agent={entry.agent} size={TILE_ICON} />
           ) : (
@@ -215,17 +205,9 @@ function Footer({
         <div data-footer-line className="flex min-w-0 items-center gap-1.5">
           <span
             data-tab-icon
-            style={{ color: pickedIconColor(entry.tab) }}
-            className="relative flex shrink-0 items-center text-muted-foreground"
+            style={{ color: iconColor(entry.tab) }}
+            className="flex shrink-0 items-center text-muted-foreground"
           >
-            {stripeColor(entry.tab) ? (
-              <span
-                data-tab-color
-                aria-hidden
-                className="absolute -left-1.5 inset-y-0 w-[2px] rounded-full"
-                style={{ backgroundColor: stripeColor(entry.tab) }}
-              />
-            ) : null}
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
           <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
