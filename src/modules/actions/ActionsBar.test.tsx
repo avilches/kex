@@ -2,8 +2,8 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { ActionsMenu, OwnButton } from "./ActionsBar";
-import { buildActionsBarModel, type BarContext, type BarItem } from "./lib/actionsBar";
+import { ActionsMenu, ContextCombo, OwnButton } from "./ActionsBar";
+import { buildActionsBarModel, NO_CONTEXT_REASON, type BarContext, type BarItem, type ContextCombo as ContextComboModel } from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -147,6 +147,60 @@ describe("OwnButton", () => {
     expect(container.querySelector("button")?.textContent).toBe("");
     expect(container.querySelector("button")?.getAttribute("aria-label")).toBe("Claude Code");
     unmount();
+  });
+});
+
+describe("ContextCombo", () => {
+  const base: ContextComboModel = { exists: true, kind: "folder", label: "api", path: "/p/api", workspace: [], global: [], reason: null };
+  function mountCombo(combo: ContextComboModel) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        createElement(ContextCombo, {
+          combo,
+          onEdit: vi.fn(),
+          onRestoreFocus: vi.fn(),
+          onConfigure: vi.fn(),
+          run: vi.fn(),
+          stop: vi.fn(),
+          focus: vi.fn(() => false),
+        }),
+      ),
+    );
+    return { container, unmount: () => act(() => root.unmount()) };
+  }
+
+  it("draws nothing while no Action depends on a folder or a file", () => {
+    const view = mountCombo({ ...base, exists: false });
+    expect(view.container.querySelector("button")).toBeNull();
+    view.unmount();
+  });
+
+  it("stays in place, grey, and says why when no tab offers a folder or a file", () => {
+    const view = mountCombo({ ...base, kind: null, label: "", path: "", reason: NO_CONTEXT_REASON });
+    const trigger = view.container.querySelector("button") as HTMLButtonElement;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.title).toBe(NO_CONTEXT_REASON);
+    view.unmount();
+  });
+
+  it("is grey too when the tab has a folder but no Action is made for folders", () => {
+    const view = mountCombo(base);
+    const trigger = view.container.querySelector("button") as HTMLButtonElement;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.title).toBe("No folder Actions yet");
+    view.unmount();
+  });
+
+  it("is named after the folder it acts on, with the full path on its hover", () => {
+    const view = mountCombo({ ...base, workspace: [item({ ...script, command: "pnpm dev {cwd}" })] });
+    const trigger = view.container.querySelector("button") as HTMLButtonElement;
+    expect(trigger.disabled).toBe(false);
+    expect(trigger.title).toBe("/p/api");
+    expect(trigger.textContent).toBe("api");
+    view.unmount();
   });
 });
 

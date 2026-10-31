@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { IS_WINDOWS } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
-import { getDirGit, useDirGit } from "@/modules/workspaces/lib/dirGitStore";
+import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
@@ -48,21 +48,6 @@ function newTabActionsFor({ ws, folder, git, host, shell, global, states }: Inpu
     states,
   );
   return { groups, overlay: { vars, focusFolder: folder, spawnCwd: folder, workspaceId: ws.id } };
-}
-
-// For the + menu of a pane: the folder the pane works in (the workspace folder when it has none).
-export function useNewTabActions(ws: MenuWorkspace | null, paneFolder: string | null): NewTabActions {
-  const sys = useSystemInfo();
-  const envKind = useWorkspaceEnvStore((s) => s.env.kind);
-  const global = usePreferencesStore((s) => s.actions) ?? NONE;
-  const states = useActionStates();
-  const folder = paneFolder || ws?.workspaceRoot || ws?.cwd || "";
-  const git = useDirGit(folder || undefined, folder ? `newtab:${folder}` : undefined);
-  const shell = scriptShellFor(IS_WINDOWS, envKind);
-  return useMemo(
-    () => (ws ? newTabActionsFor({ ws, folder, git, host: sys.host, shell, global, states }) : { groups: EMPTY, overlay: null }),
-    [ws, folder, git, sys.host, shell, global, states],
-  );
 }
 
 // For the rows of the new terminal palette: a function, since the folder is only known once a

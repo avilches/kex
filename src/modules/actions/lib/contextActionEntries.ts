@@ -80,7 +80,7 @@ export function newTabActionEntries(
     actions.filter((a) => a.command.trim() !== "" && isAgent(a) && runsInFolder(a, atWorkspace) && actionAvailability(a, ctx) === null);
   const l = pick(local);
   const g = pick(global);
-  const hidden = twinIds([...l, ...g], ctx, states, { file: false, folder: true });
+  const hidden = twinIds([...l, ...g], ctx, states);
   const keep = (actions: Action[]) => entriesOf(actions.filter((a) => !hidden.has(a.id)), ctx, true);
   return { workspace: keep(l), global: keep(g) };
 }
