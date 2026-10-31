@@ -17,6 +17,7 @@ import {
   RECENT_LIMIT,
   SEARCH_LIMIT,
   tabRowKey,
+  tabSection,
   workspaceRowKey,
 } from "./tabRank";
 
@@ -277,11 +278,12 @@ export function mergeRows(input: MergeInput): MergedRow[] {
           },
         ]
       : [];
-    const recents = tabs
-      .filter((t) => t.tabId !== activeTabId)
-      .sort(byPriority)
-      .slice(0, RECENT_LIMIT)
-      .map(
+    const others = tabs.filter((t) => t.tabId !== activeTabId).sort(byPriority);
+    // Attention and busy agents are all listed; only the plain recents are capped.
+    const recents = [
+      ...others.filter((t) => tabSection(t) !== "recent"),
+      ...others.filter((t) => tabSection(t) === "recent").slice(0, RECENT_LIMIT),
+    ].map(
         (entry): MergedRow => ({
           kind: "tab",
           key: tabRowKey(entry.tabId),

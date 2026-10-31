@@ -104,7 +104,7 @@ describe("MergedList", () => {
     expect(t.findIndex((x) => x.includes("Open settings"))).toBeLessThan(
       t.findIndex((x) => x.includes("Appearance settings")),
     );
-    expect(screen.getByText("Recent tabs")).toBeTruthy();
+    expect(screen.getByText("Recent")).toBeTruthy();
   });
 
   it("names an action group after what the actions act on, so it never reads as a row kind", () => {
@@ -122,11 +122,31 @@ describe("MergedList", () => {
     ];
     mount(withCurrent, false);
     expect(screen.getByText("Current tab")).toBeTruthy();
-    expect(screen.getByText("Recent tabs")).toBeTruthy();
+    expect(screen.getByText("Recent")).toBeTruthy();
     cleanup();
     mount(withCurrent, true);
     expect(screen.getByText("Current tab")).toBeTruthy();
-    expect(screen.queryByText("Recent tabs")).toBeNull();
+    expect(screen.queryByText("Recent")).toBeNull();
+  });
+
+  it("splits the tabs into Need attention, Busy agents and Recent, and omits the empty ones", () => {
+    const mk = (id: string, indicator: TabEntry["indicator"]): MergedRow => ({
+      kind: "tab",
+      key: `tab:${id}`,
+      entry: { ...tab, tabId: id, title: id, indicator, tab: { id, kind: "terminal" } },
+    });
+    mount([mk("asks", "attention"), mk("fails", "error"), mk("works", "working"), mk("plain", null)], false);
+    const text = document.body.textContent ?? "";
+    expect(text.indexOf("Need attention")).toBeLessThan(text.indexOf("asks"));
+    expect(text.indexOf("asks")).toBeLessThan(text.indexOf("fails"));
+    expect(text.indexOf("fails")).toBeLessThan(text.indexOf("Busy agents"));
+    expect(text.indexOf("Busy agents")).toBeLessThan(text.indexOf("works"));
+    expect(text.indexOf("works")).toBeLessThan(text.indexOf("Recent"));
+    expect(text.indexOf("Recent")).toBeLessThan(text.indexOf("plain"));
+    cleanup();
+    mount([mk("plain", null)], false);
+    expect(screen.queryByText("Need attention")).toBeNull();
+    expect(screen.queryByText("Busy agents")).toBeNull();
   });
 
   it("draws the active workspace as a row marked active, next to the others", () => {
