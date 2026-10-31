@@ -11,6 +11,8 @@ type Input = {
   status: AgentStatus | undefined;
   // The dot the tab kept when it went to sleep, shown while no live session exists.
   sleepIndicator?: "attention" | "error" | null;
+  // What a plain terminal (no agent) is doing: a command running, or the last one failed.
+  commandMark?: "working" | "error" | null;
 };
 
 // A retry in flight wins so the user sees something happen; when it ends the failure marker
@@ -18,7 +20,11 @@ type Input = {
 export function tabStatusIndicator(i: Input): TabStatusIndicator {
   if (i.restoreBusy) return "restoring";
   if (i.restorePending || (i.hasAgent && i.isRestoreError)) return "restore-failed";
-  if (!i.hasAgent) return i.sleepIndicator === "error" ? "interrupted" : i.sleepIndicator === "attention" ? "attention" : null;
+  if (!i.hasAgent) {
+    if (i.sleepIndicator === "error") return "interrupted";
+    if (i.sleepIndicator === "attention") return "attention";
+    return i.commandMark === "working" ? "working" : i.commandMark === "error" ? "interrupted" : null;
+  }
   if (i.interrupted) return "interrupted";
   if (i.status === "working") return "working";
   if (i.status === "attention") return "attention";

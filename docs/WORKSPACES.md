@@ -535,6 +535,20 @@ Warnings that point at a black or deaf terminal:
 
 ---
 
+## Tab labels: Alt paths and command marks
+
+- Holding Alt swaps every tab label (pane tab bar, nested list of the WorkspaceBar) for the tab's path: the cwd of a
+  terminal, the file of an editor or git tab, with the home folder as `~` (`altHeldStore.ts`, applied in
+  `useAgentTabTitle`). The key state is read from window key events and reset on blur.
+- A plain terminal (no agent) shows a spinner while a command runs and a red dot when the last command ended with a
+  non-zero exit code (OSC 133 D). Like a shell prompt, the dot stays until the next command ends, and a clean exit
+  clears it (`setCommandFailed` in `terminalEphemeralStore.ts`, `useCommandMark.ts`, `tabStatusIndicator.ts`). Agent tabs keep their own
+  indicator.
+- A double click on a workspace in the WorkspaceBar expands or collapses its nested tab list; rename lives in the
+  context menu.
+
+---
+
 ## Tab bar overflow scroll
 
 When a pane has many tabs and is narrow, tabs overflow the `PaneTabBar`. Two scroll behaviors keep

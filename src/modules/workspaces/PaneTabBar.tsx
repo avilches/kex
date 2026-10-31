@@ -1,3 +1,4 @@
+import { useCommandMark } from "./lib/useCommandMark";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import {
   ContextMenu,
@@ -221,6 +222,7 @@ function DraggableTab({
 
   const tooltip = useTabTooltip(tab, agentSession);
 
+  const commandMark = useCommandMark(tab.id, tab.kind === "terminal");
   const restoreBusy = useRestoreBusy(tab.id);
   const restorePending = usePendingRestore(tab.id) !== null;
   const indicatorKind = tabStatusIndicator({
@@ -231,6 +233,7 @@ function DraggableTab({
     interrupted: agentSession?.interrupted,
     status: agentSession?.status,
     sleepIndicator: sleepIndicator(tab),
+    commandMark,
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (

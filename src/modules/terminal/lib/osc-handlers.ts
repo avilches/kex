@@ -46,6 +46,7 @@ export function registerPromptTracker(
   term: Terminal,
   state?: ShellIntegrationState,
   onRunningCommand?: (cmd: string | null, started?: boolean) => void,
+  onCommandExit?: (code: number) => void,
 ): PromptTracker {
   let marker: IMarker | null = null;
   const d = term.parser.registerOscHandler(133, (data) => {
@@ -69,6 +70,8 @@ export function registerPromptTracker(
       // OSC 133 D - command ends.
       if (state) state.inCommand = false;
       onRunningCommand?.(null);
+      const code = Number.parseInt(data.split(";")[1] ?? "", 10);
+      if (Number.isFinite(code)) onCommandExit?.(code);
     }
     return true;
   });

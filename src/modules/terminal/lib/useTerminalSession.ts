@@ -34,6 +34,7 @@ import {
   registerTitleHandler,
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
+import { setCommandFailed } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { consumeHeldBlock, setModalBlock, getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { takeWakeBackdrop } from "./wakeBackdrop";
@@ -888,10 +889,15 @@ function bindLeafToSlot(leafId: string, s: Session): void {
       // 7 emitted by untrusted command output (remote SSH, `cat` of an
       // attacker file, etc.).
       const shellState = createShellIntegrationState();
-      const prompt = registerPromptTracker(term, shellState, (cmd, started) => {
-        s.integrationSeen = true;
-        s.callbacks.onRunningCommand?.(cmd, started);
-      });
+      const prompt = registerPromptTracker(
+        term,
+        shellState,
+        (cmd, started) => {
+          s.integrationSeen = true;
+          s.callbacks.onRunningCommand?.(cmd, started);
+        },
+        (code) => setCommandFailed(leafId, code !== 0),
+      );
       const cwd = registerCwdHandler(
         term,
         (next) => {

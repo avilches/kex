@@ -21,6 +21,9 @@ import {
   subscribeToScriptRunning,
 } from "./terminalEphemeralStore";
 import type { Tab } from "./types";
+import { useAltHeld } from "./altHeldStore";
+import { tabCopyPath } from "./tabPath";
+import { tildePath } from "./sessionPreview";
 
 export type AgentTabTitleInfo = {
   displayTitle: string;
@@ -51,8 +54,14 @@ export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null
   const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
   const sources = useTitleSources(tab, agentSession);
 
+  const altHeld = useAltHeld();
+
   if (!tab) return null;
-  return resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources, scriptName);
+  const info = resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources, scriptName);
+  if (!altHeld) return info;
+  const path = tabCopyPath(tab, null);
+  if (!path) return info;
+  return { ...info, displayTitle: tildePath(path, sources.home ?? null), isDescription: false };
 }
 
 // The template that titles a tab right now: its own, else the default of its kind.

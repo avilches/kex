@@ -63,7 +63,23 @@ export function setRunningCommand(tabId: string, cmd: string | null): void {
   notify();
 }
 
+// Tabs whose last command ended with a non-zero code. Like a shell prompt, the mark stays until
+// the next command ends, so a clean run clears it.
+const failedTabs = new Set<string>();
+
+export function getCommandFailed(tabId: string): boolean {
+  return failedTabs.has(tabId);
+}
+
+export function setCommandFailed(tabId: string, failed: boolean): void {
+  if (failedTabs.has(tabId) === failed) return;
+  if (failed) failedTabs.add(tabId);
+  else failedTabs.delete(tabId);
+  notify();
+}
+
 export function clearRunningCommandEntry(tabId: string): void {
+  if (failedTabs.delete(tabId)) notify();
   if (!runningCommands.has(tabId)) return;
   runningCommands.delete(tabId);
   runningSince.delete(tabId);
