@@ -262,8 +262,9 @@ function DraggableTab({
         // a left-click would natively steal DOM focus onto it. That fires
         // after PaneView's onMouseDownCapture already placed focus on the
         // leaf's terminal/scratchpad, undoing it. Focus is owned by the
-        // session, not the tab strip.
-        else if (e.button === 0) e.preventDefault();
+        // session, not the tab strip. The right button does the same and
+        // would also draw the system focus ring on a tab that is not active.
+        else if (e.button === 0 || e.button === 2) e.preventDefault();
       }}
       onAuxClick={(e) => {
         if (e.button === 1) {

@@ -136,6 +136,20 @@ describe("PaneTabBar plus button", () => {
   });
 });
 
+describe("PaneTabBar mouse down keeps the focus where it was", () => {
+  beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([0, 1, 2])("button %i does not let the browser focus the tab", (button) => {
+    setup({ id: "tab-1", kind: "terminal" });
+    const tab = document.querySelector("[data-tab-id]")!;
+    expect(fireEvent.mouseDown(tab, { button })).toBe(false);
+  });
+});
+
 describe("PaneTabBar with a hibernated tab", () => {
   beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
   afterEach(() => {
