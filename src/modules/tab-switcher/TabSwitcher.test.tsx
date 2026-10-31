@@ -213,23 +213,41 @@ describe("TabSwitcher footer", () => {
     expect(footer().textContent).not.toMatch(/hibernated/i);
   });
 
-  it("puts the attention or error dot right after the title, and nothing for a tab without one", () => {
+  it("puts the attention or error dot, or the spinner of a working agent, right after the title, and nothing for a tab without one", () => {
     show([entry({ title: "api", indicator: "attention" })]);
-    const dot = footer().querySelector("[data-footer-dot]")!;
+    const dot = footer().querySelector("[data-indicator-dot]")!;
     expect(dot.className).toContain("bg-amber-400");
     expect(dot.previousElementSibling?.textContent).toBe("api");
     cleanup();
     cancelSwitcher();
     show([entry({ title: "api", indicator: "error" })]);
-    expect(footer().querySelector("[data-footer-dot]")!.className).toContain("bg-destructive");
+    expect(footer().querySelector("[data-indicator-dot]")!.className).toContain("bg-destructive");
     cleanup();
     cancelSwitcher();
     show([entry({ title: "api", indicator: "working" })]);
-    expect(footer().querySelector("[data-footer-dot]")).toBeNull();
+    expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
+    expect(within(footer()).getByRole("status")).toBeTruthy();
     cleanup();
     cancelSwitcher();
     show([entry({ title: "api" })]);
-    expect(footer().querySelector("[data-footer-dot]")).toBeNull();
+    expect(footer().querySelector("[data-indicator-dot]")).toBeNull();
+  });
+
+  it("puts the hibernated icon first and the dot after it, and dims the name and the icon but not the dot", () => {
+    show([entry({ title: "api", hibernated: true, indicator: "attention" })]);
+    const title = within(footer()).getByText("api");
+    const icon = within(footer()).getByLabelText("Tab is hibernated");
+    const dot = footer().querySelector("[data-indicator-dot]")!;
+    expect(title.nextElementSibling).toBe(icon);
+    expect(icon.nextElementSibling).toBe(dot);
+    expect(title.className).toContain("opacity-40");
+    expect(icon.className).toContain("opacity-40");
+    expect(dot.className).not.toContain("opacity");
+  });
+
+  it("does not dim the name of a tab that is awake", () => {
+    show([entry({ title: "api" })]);
+    expect(within(footer()).getByText("api").className).not.toContain("opacity");
   });
 
   it("keeps the workspace out of the detail line, since it has its own", () => {
