@@ -24,6 +24,22 @@ export function switcherOrder<T extends Ordered>(entries: readonly T[], activeTa
   return sorted;
 }
 
+// The list without a closed tab and where the highlight goes: the tile that slides into the gap, or the
+// previous one when the last tile went, and a highlight on another tile follows it. Null when fewer than
+// two tiles would remain, because a switcher with nothing to switch to has no reason to stay open.
+export function afterRemoval<T extends { tabId: string }>(
+  entries: readonly T[],
+  index: number,
+  tabId: string,
+): { entries: T[]; index: number } | null {
+  const at = entries.findIndex((e) => e.tabId === tabId);
+  const next = at < 0 ? [...entries] : entries.filter((_, i) => i !== at);
+  if (next.length < 2) return null;
+  if (at < 0) return { entries: next, index };
+  const kept = at < index ? index - 1 : index;
+  return { entries: next, index: Math.min(kept, next.length - 1) };
+}
+
 export function startIndex(length: number, delta: 1 | -1): number {
   if (length <= 1) return 0;
   return delta > 0 ? 1 : length - 1;

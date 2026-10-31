@@ -70,6 +70,7 @@ import {
   openSwitcher,
   stepSwitcher,
   switcherActive,
+  shortcutBlockedBySwitcher,
   switcherOrder,
 } from "@/modules/tab-switcher";
 import { useProfilerSetting } from "@/modules/profiler";
@@ -2901,6 +2902,17 @@ export default function App() {
     setCommandPaletteOpen(false);
     setFolderPaletteOpen(false);
   }, []);
+  // The switcher closes tabs the way the palette does: a locked tab flashes its lock and stays (nothing is
+  // returned, so the tile stays too), and anything else goes through the close guards, which may ask the user
+  // and report whether the tab really went.
+  const closeTabFromSwitcher = useCallback((entry: TabEntry) => {
+    if (entry.tab.locked) {
+      flashLockIcon(entry.tabId);
+      return undefined;
+    }
+    return closeTabsRef.current([entry.tabId]);
+  }, []);
+
   // Every tab of the window in recency order. Choosing one only goes to it: a hibernated tab shows its
   // placeholder and stays asleep, the user wakes it on purpose.
   const openTabSwitcher = useCallback(
@@ -2909,9 +2921,9 @@ export default function App() {
         buildTabEntries(workspacesRef.current, liveTabSources()),
         activeTabId,
       );
-      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId));
+      openSwitcher(e, delta, entries, (entry) => goToTab(entry.tabId), closeTabFromSwitcher);
     },
-    [activeTabId, goToTab],
+    [activeTabId, goToTab, closeTabFromSwitcher],
   );
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -3246,7 +3258,9 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
-      if (switcherActive() && id !== "tab.switcher" && id !== "tab.switcherBack") return true;
+      // Open, the switcher owns its own keys and blocks every other shortcut; closed, its close key is off so
+      // that Cmd+W reaches tab.close, which shares it.
+      if (shortcutBlockedBySwitcher(id, switcherActive())) return true;
       if (
         shortcutSwallowedByPalette(
           id,

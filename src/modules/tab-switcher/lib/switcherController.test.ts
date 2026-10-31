@@ -126,6 +126,142 @@ describe("switcher session", () => {
     expect(useSwitcherStore.getState().index).toBe(1);
   });
 
+  describe("closing the highlighted tab", () => {
+    type Close = (entry: TabEntry) => Promise<boolean> | undefined;
+    const open = (n = 4, onClose?: Close) => openSwitcher(chord(), 1, entries.slice(0, n), onCommit, onClose);
+    const ids = () => useSwitcherStore.getState().entries.map((e) => e.tabId);
+    const highlighted = () => {
+      const { entries: list, index } = useSwitcherStore.getState();
+      return list[index]?.tabId;
+    };
+    const press = (key: string, init: KeyboardEventInit = {}) => {
+      const e = new KeyboardEvent("keydown", { key, cancelable: true, ...init });
+      window.dispatchEvent(e);
+      return e;
+    };
+    const settle = async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    };
+
+    it("closes the highlighted tab with a bare W, the way Q quits an app in the macOS switcher", async () => {
+      const onClose = vi.fn(() => Promise.resolve(true));
+      open(4, onClose);
+      const e = press("w");
+      await settle();
+      expect(e.defaultPrevented).toBe(true);
+      expect(onClose).toHaveBeenCalledWith(entries[1]);
+      expect(ids()).toEqual(["a", "c", "d"]);
+      expect(switcherActive()).toBe(true);
+    });
+
+    it("takes the W whichever modifier is held and in either case, so Cmd+W works too", async () => {
+      for (const init of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { shiftKey: true }]) {
+        const onClose = vi.fn(() => Promise.resolve(true));
+        open(4, onClose);
+        press("W", init);
+        await settle();
+        expect(onClose).toHaveBeenCalledTimes(1);
+        cancelSwitcher();
+      }
+    });
+
+    it("closes the tile that is highlighted now, not the one it opened on", async () => {
+      const onClose = vi.fn(() => Promise.resolve(true));
+      open(4, onClose);
+      stepSwitcher(1);
+      press("w");
+      await settle();
+      expect(onClose).toHaveBeenCalledWith(entries[2]);
+    });
+
+    it("keeps the tile when the close is cancelled", async () => {
+      open(4, () => Promise.resolve(false));
+      press("w");
+      await settle();
+      expect(ids()).toEqual(["a", "b", "c", "d"]);
+    });
+
+    it("keeps the tile when the host refuses without closing, as a locked tab does", async () => {
+      open(4, () => undefined);
+      press("w");
+      await settle();
+      expect(ids()).toHaveLength(4);
+    });
+
+    it("does nothing, but still swallows the key, when it was opened with no way to close", async () => {
+      open(4);
+      const e = press("w");
+      await settle();
+      expect(e.defaultPrevented).toBe(true);
+      expect(ids()).toHaveLength(4);
+    });
+
+    it("highlights the tile that slid into the gap, and the previous one after closing the last", async () => {
+      open(4, () => Promise.resolve(true));
+      stepSwitcher(1);
+      press("w");
+      await settle();
+      expect(ids()).toEqual(["a", "b", "d"]);
+      expect(highlighted()).toBe("d");
+      press("w");
+      await settle();
+      expect(ids()).toEqual(["a", "b"]);
+      expect(highlighted()).toBe("b");
+    });
+
+    it("ends the session when fewer than two tiles would remain, without choosing anything", async () => {
+      open(2, () => Promise.resolve(true));
+      press("w");
+      await settle();
+      expect(switcherActive()).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
+    });
+
+    it("lets keys through while the close waits, so a confirmation dialog can use Enter and Escape", async () => {
+      let finish: (v: boolean) => void = () => {};
+      open(4, () => new Promise<boolean>((r) => (finish = r)));
+      press("w");
+      const enter = press("Enter");
+      expect(enter.defaultPrevented).toBe(false);
+      expect(onCommit).not.toHaveBeenCalled();
+      finish(true);
+      await settle();
+      expect(press("ArrowRight").defaultPrevented).toBe(true);
+    });
+
+    it("ignores a second W while the first close is still waiting", async () => {
+      let finish: (v: boolean) => void = () => {};
+      const onClose = vi.fn(() => new Promise<boolean>((r) => (finish = r)));
+      open(4, onClose);
+      press("w");
+      press("w");
+      expect(onClose).toHaveBeenCalledTimes(1);
+      finish(true);
+      await settle();
+    });
+
+    it("does not commit a jump if the modifier is released while a confirmation is open", async () => {
+      let finish: (v: boolean) => void = () => {};
+      open(4, () => new Promise<boolean>((r) => (finish = r)));
+      press("w");
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control" }));
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(switcherActive()).toBe(true);
+      finish(false);
+      await settle();
+    });
+
+    it("does nothing when the session already ended while the close was pending", async () => {
+      let finish: (v: boolean) => void = () => {};
+      open(4, () => new Promise<boolean>((r) => (finish = r)));
+      press("w");
+      cancelSwitcher();
+      finish(true);
+      await settle();
+      expect(switcherActive()).toBe(false);
+    });
+  });
+
   it("swallows the keys it does not own so the terminal behind never sees them", () => {
     openSwitcher(chord(), 1, entries, onCommit);
     const e = new KeyboardEvent("keydown", { key: "a", ctrlKey: true, cancelable: true });

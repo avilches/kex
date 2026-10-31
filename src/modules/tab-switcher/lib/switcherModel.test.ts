@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  afterRemoval,
   GRID_GAP,
   GRID_PAD,
   TILE_HEIGHT,
@@ -69,6 +70,37 @@ describe("rowIndex", () => {
   });
   it("treats a zero column count as one", () => {
     expect(rowIndex(2, 10, 0, 1)).toBe(3);
+  });
+});
+
+describe("afterRemoval", () => {
+  const list = ["a", "b", "c", "d"].map((tabId) => ({ tabId }));
+
+  it("keeps the selection on the tile that slides into the gap", () => {
+    const out = afterRemoval(list, 1, "b");
+    expect(out?.entries.map((e) => e.tabId)).toEqual(["a", "c", "d"]);
+    expect(out?.index).toBe(1);
+  });
+
+  it("moves to the previous tile when the last one is removed", () => {
+    const out = afterRemoval(list, 3, "d");
+    expect(out?.entries.map((e) => e.tabId)).toEqual(["a", "b", "c"]);
+    expect(out?.index).toBe(2);
+  });
+
+  it("follows the highlighted tile when another one is removed", () => {
+    expect(afterRemoval(list, 3, "a")?.index).toBe(2);
+    expect(afterRemoval(list, 0, "d")?.index).toBe(0);
+  });
+
+  it("ignores a tab that is not in the list, and does not mutate its input", () => {
+    expect(afterRemoval(list, 1, "zzz")?.entries).toHaveLength(4);
+    expect(list).toHaveLength(4);
+  });
+
+  it("returns null when fewer than two tiles would remain, since there is nothing to switch to", () => {
+    expect(afterRemoval(list.slice(0, 2), 0, "a")).toBeNull();
+    expect(afterRemoval(list.slice(0, 1), 0, "a")).toBeNull();
   });
 });
 
