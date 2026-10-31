@@ -482,7 +482,7 @@ Rendering details are in `docs/WORKSPACES.md`.
 
 The placeholder is a card with a solid background (title, command, how long, the folder of the agent session, and the Restore
 button with the Enter shortcut on it) over the last lines the terminal showed, faded and with their colours
-(`HibernatedLines`). Enter is `tab.wake`, a shortcut of the registry, only live when the active tab sleeps and the focus is
+(`HibernatedLines`). Enter is hardwired in `HibernatedTab` (a window listener, live only while the placeholder is visible and focused, `isWakeEnter`) and is not a shortcut of the registry; it yields when the focus is
 not in a field, button, menu, editor or explorer (`enterBelongsToFocusedElement`); Cmd+Alt+Z toggles as before. The agent's
 last message (`SessionRecord.last_message` in `agent-sessions.json`) is still stored for the restore but no longer shown. The
 lines live in their own file per tab, off the workspace JSON, and are described in `docs/AGENT_SESSION_RESTORE.md`
