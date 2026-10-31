@@ -25,7 +25,6 @@ import {
   Delete02Icon,
   File01Icon,
   FileAddIcon,
-  FileEmptyIcon,
   FolderAddIcon,
   FolderOpenIcon,
   FolderUploadIcon,
@@ -300,10 +299,18 @@ function EntryRowImpl(props: EntryRowProps) {
             </span>
             {isOpenInTab && (
               <span
-                title="Open in a tab"
-                className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground"
+                role="button"
+                title="Focus the tab with this file"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenFile(path, true);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className="shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:text-foreground"
               >
-                <HugeiconsIcon icon={FileEmptyIcon} size={11} strokeWidth={2} />
+                Tab
               </span>
             )}
           </button>
@@ -690,8 +697,8 @@ export function FsUpRow({
           {...attributes}
           onMouseDown={keepScratchpadFocus}
           type="button"
-          onDoubleClick={() => onNavigateUp?.()}
-          title="Double-click to go up one folder"
+          onClick={() => onNavigateUp?.()}
+          title="Go up one folder"
           className={cn(
             "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
             isDragging && "opacity-50",

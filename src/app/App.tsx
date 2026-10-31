@@ -1131,16 +1131,25 @@ export default function App() {
     ) => {
       const ws = activeWorkspace;
       if (!ws) return;
-      void Promise.all([
-        native.gitResolveRepo(folder).catch(() => null),
-        native.canonicalize(folder).catch(() => folder),
-      ])
-        .then(([info, canonicalFolder]) => {
+      void native
+        .fsStat(folder)
+        .then(
+          (st) => (st.kind === "file" ? pathDirname(folder) : folder),
+          () => folder,
+        )
+        .then(async (dir) => {
+          const [info, canonicalDir] = await Promise.all([
+            native.gitResolveRepo(dir).catch(() => null),
+            native.canonicalize(dir).catch(() => dir),
+          ]);
+          return { dir, info, canonicalDir };
+        })
+        .then(({ dir, info, canonicalDir }) => {
           const resolvedGitRoot = info?.repoRoot
-            ? logicalRepoRoot(folder, canonicalFolder, info.repoRoot)
+            ? logicalRepoRoot(dir, canonicalDir, info.repoRoot)
             : null;
           const target = resolveSidebarTarget({
-            folder,
+            folder: dir,
             workspaceRoot: workspaceRootPath,
             workspaceGitRoot,
             gitRoot: resolvedGitRoot,
