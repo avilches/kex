@@ -18,10 +18,6 @@ function trimSlash(path: string): string {
     : path;
 }
 
-export function editorText(root: string): string {
-  return root.endsWith("/") ? root : `${root}/`;
-}
-
 export function splitTypedPath(text: string): {
   folder: string | null;
   partial: string;
@@ -64,6 +60,7 @@ export function planTreeMove(
   if (folder === null) return { kind: "stay" };
   const f = trimSlash(folder);
   const root = trimSlash(currentRoot);
+  if (trimSlash(norm(text.trim())) === root) return { kind: "stay" };
   if (f === root) return { kind: "stay" };
   if (isUnder(root, f)) return { kind: "go", path: f };
   if (isUnder(f, root)) {

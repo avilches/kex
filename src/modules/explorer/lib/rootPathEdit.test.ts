@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   completeSegment,
-  editorText,
   planTreeMove,
   sameFolder,
   splitTypedPath,
@@ -23,13 +22,6 @@ describe("splitTypedPath", () => {
 
   it("keeps the slash of a drive root", () => {
     expect(splitTypedPath("C:\\Us")).toEqual({ folder: "C:/", partial: "Us" });
-  });
-});
-
-describe("editorText", () => {
-  it("ends the root with a slash once", () => {
-    expect(editorText("/a/b")).toBe("/a/b/");
-    expect(editorText("/")).toBe("/");
   });
 });
 
@@ -77,8 +69,21 @@ describe("planTreeMove", () => {
     });
   });
 
-  it("goes up when the slash of the current folder is deleted", () => {
+  it("stays when only the trailing slash of the current folder is removed", () => {
     expect(planTreeMove("/Users/avilches", "/Users/avilches", dirs)).toEqual({
+      kind: "stay",
+    });
+    expect(planTreeMove("/Users/avilches/", "/Users/avilches", dirs)).toEqual({
+      kind: "stay",
+    });
+  });
+
+  it("goes up once the name of the current folder is cut or changed", () => {
+    expect(planTreeMove("/Users/avilche", "/Users/avilches", dirs)).toEqual({
+      kind: "go",
+      path: "/Users",
+    });
+    expect(planTreeMove("/Users/", "/Users/avilches", dirs)).toEqual({
       kind: "go",
       path: "/Users",
     });
