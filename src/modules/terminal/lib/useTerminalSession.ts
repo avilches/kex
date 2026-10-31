@@ -11,6 +11,7 @@ import {
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
+import { announcePrefApplied } from "@/modules/settings/prefApplied";
 import { applyZoomToDom } from "@/lib/useZoom";
 import { applyZoomThenRefit } from "@/lib/zoomSync";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -1249,18 +1250,24 @@ function startPoolPreferencesSync(): void {
         refitTerminals: () =>
           applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel)),
       });
+      if (state.terminalFontSize !== prev.terminalFontSize) {
+        announcePrefApplied("terminalFontSize");
+      }
     }
     if (state.terminalFontFamily !== prev.terminalFontFamily) {
       applyFontFamily(state.terminalFontFamily);
+      announcePrefApplied("terminalFontFamily");
     }
     if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
       applyLetterSpacing(state.terminalLetterSpacing);
+      announcePrefApplied("terminalLetterSpacing");
     }
     if (state.terminalFontWeight !== prev.terminalFontWeight) {
       applyFontWeight(state.terminalFontWeight);
     }
     if (state.terminalLineHeight !== prev.terminalLineHeight) {
       applyLineHeight(state.terminalLineHeight);
+      announcePrefApplied("terminalLineHeight");
     }
     if (state.terminalScrollback !== prev.terminalScrollback) {
       applyScrollback(state.terminalScrollback);
