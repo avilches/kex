@@ -328,27 +328,15 @@ function EntryRowImpl(props: EntryRowProps) {
           if (renameInProgress) e.preventDefault();
         }}
       >
-        <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {isDir && onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
+            place="top"
           />
         )}
-        {isDir && onNewWorkspaceFromFolder && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onNewWorkspaceFromFolder(path)}
-          >
-            <HugeiconsIcon
-              icon={DashboardSquareAddIcon}
-              size={14}
-              strokeWidth={2}
-            />
-            New Workspace from Folder
-          </ContextMenuItem>
-        )}
+        <RowActionsMenu kind={isDir ? "folder" : "file"} path={path} />
         {!isDir && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -387,6 +375,27 @@ function EntryRowImpl(props: EntryRowProps) {
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
           {REVEAL_LABEL}
         </ContextMenuItem>
+        {isDir && onNewWorkspaceFromFolder && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onNewWorkspaceFromFolder(path)}
+          >
+            <HugeiconsIcon
+              icon={DashboardSquareAddIcon}
+              size={14}
+              strokeWidth={2}
+            />
+            New Workspace from Folder
+          </ContextMenuItem>
+        )}
+        {isDir && onSetAsRoot && (
+          <SetWorkspaceRootItem
+            path={path}
+            workspaceRoot={workspaceRoot}
+            onSetAsRoot={onSetAsRoot}
+            place="end"
+          />
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
@@ -590,12 +599,12 @@ export function FsRootRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
-        <RowActionsMenu kind="folder" path={path} />
         {onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
+            place="top"
             disabled={isWorkspaceRoot}
             label={
               isWorkspaceRoot
@@ -604,19 +613,7 @@ export function FsRootRow({
             }
           />
         )}
-        {onNewWorkspaceFromFolder && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onNewWorkspaceFromFolder(path)}
-          >
-            <HugeiconsIcon
-              icon={DashboardSquareAddIcon}
-              size={14}
-              strokeWidth={2}
-            />
-            New Workspace from Folder
-          </ContextMenuItem>
-        )}
+        <RowActionsMenu kind="folder" path={path} />
         {onRevealInTerminal && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -637,6 +634,33 @@ export function FsRootRow({
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
           {REVEAL_LABEL}
         </ContextMenuItem>
+        {onNewWorkspaceFromFolder && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onNewWorkspaceFromFolder(path)}
+          >
+            <HugeiconsIcon
+              icon={DashboardSquareAddIcon}
+              size={14}
+              strokeWidth={2}
+            />
+            New Workspace from Folder
+          </ContextMenuItem>
+        )}
+        {onSetAsRoot && (
+          <SetWorkspaceRootItem
+            path={path}
+            workspaceRoot={workspaceRoot}
+            onSetAsRoot={onSetAsRoot}
+            place="end"
+            disabled={isWorkspaceRoot}
+            label={
+              isWorkspaceRoot
+                ? "This is the Workspace Root"
+                : "Set as Workspace Root"
+            }
+          />
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}

@@ -12,23 +12,23 @@ type Props = {
   onSetAsRoot: (path: string) => void;
   disabled?: boolean;
   label?: string;
+  place: "top" | "end";
 };
 
-// The way to a workspace root: highlighted while the workspace has none, dimmed once it does.
+// The way to a workspace root: first and highlighted while the workspace has none (place "top"), last of its block once it has one (place "end").
 export function SetWorkspaceRootItem({
   path,
   workspaceRoot,
   onSetAsRoot,
   disabled,
   label = "Set as Workspace Root",
+  place,
 }: Props) {
   const missing = workspaceRoot === null;
+  if ((place === "top") !== missing) return null;
   return (
     <ContextMenuItem
-      className={cn(
-        COMPACT_ITEM,
-        missing ? MISSING_ROOT_ITEM : "opacity-60",
-      )}
+      className={cn(COMPACT_ITEM, missing && MISSING_ROOT_ITEM)}
       disabled={disabled}
       onSelect={() => onSetAsRoot(path)}
     >
