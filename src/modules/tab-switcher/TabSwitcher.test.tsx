@@ -232,6 +232,23 @@ describe("TabSwitcher footer", () => {
     expect(footer().querySelector("[data-footer-dot]")).toBeNull();
   });
 
+  it("puts the hibernated icon first and the dot after it, and dims the name and the icon but not the dot", () => {
+    show([entry({ title: "api", hibernated: true, indicator: "attention" })]);
+    const title = within(footer()).getByText("api");
+    const icon = within(footer()).getByLabelText("Tab is hibernated");
+    const dot = footer().querySelector("[data-footer-dot]")!;
+    expect(title.nextElementSibling).toBe(icon);
+    expect(icon.nextElementSibling).toBe(dot);
+    expect(title.className).toContain("opacity-40");
+    expect(icon.className).toContain("opacity-40");
+    expect(dot.className).not.toContain("opacity");
+  });
+
+  it("does not dim the name of a tab that is awake", () => {
+    show([entry({ title: "api" })]);
+    expect(within(footer()).getByText("api").className).not.toContain("opacity");
+  });
+
   it("keeps the workspace out of the detail line, since it has its own", () => {
     show([entry({ workspaceTitle: "Kex", detail: "/p/Kex" })]);
     expect(within(footer()).getAllByText(/Kex/)).toHaveLength(2);

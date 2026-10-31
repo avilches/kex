@@ -17,9 +17,9 @@ import { GRID_GAP, GRID_PAD, TILE_HEIGHT, gridViewportHeight } from "./lib/switc
 // that no class can override, which left them at 13 px inside a 44 px square.
 const TILE_ICON = 26;
 
-function HibernatedMark({ size }: { size: number }) {
+function HibernatedMark({ size, className }: { size: number; className?: string }) {
   return (
-    <span role="img" aria-label="Tab is hibernated" className="inline-flex shrink-0 text-muted-foreground">
+    <span role="img" aria-label="Tab is hibernated" className={cn("inline-flex shrink-0 text-muted-foreground", className)}>
       <HugeiconsIcon icon={SleepingIcon} size={size} strokeWidth={1.75} />
     </span>
   );
@@ -170,7 +170,8 @@ function Footer({
           <span data-tab-icon className="flex shrink-0 items-center text-muted-foreground">
             <TabBarIcon tab={entry.tab} agentSession={entry.agentSession} running={entry.running} carriedAgent={entry.agent} />
           </span>
-          <span className="truncate text-[13px] font-medium">{entry.title || entry.kind}</span>
+          <span className={cn("truncate text-[13px] font-medium", entry.hibernated && "opacity-40")}>{entry.title || entry.kind}</span>
+          {entry.hibernated ? <HibernatedMark size={13} className="opacity-40" /> : null}
           {indicator === "attention" || indicator === "error" ? (
             <span
               aria-hidden
@@ -178,7 +179,6 @@ function Footer({
               className={cn("size-[6px] shrink-0 rounded-full", indicator === "error" ? "bg-destructive" : "bg-amber-400")}
             />
           ) : null}
-          {entry.hibernated ? <HibernatedMark size={13} /> : null}
         </div>
         <div data-footer-line className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <WorkspaceLine entry={entry} size={11} />
