@@ -5,7 +5,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ActionIcon } from "./ActionIcon";
-import { filterIcons, iconOptions, parseIcon, type IconOption } from "./lib/actionIcons";
+import { filterIcons, iconOptions, parseIcon, type IconOption } from "./lib/actionIconRefs";
 import type { Action } from "./lib/types";
 
 type Props = {
@@ -19,8 +19,13 @@ type Props = {
 
 const TILE = "flex size-8 items-center justify-center rounded-md transition-colors";
 
+// A CommandItem draws a hidden tick after its children and spaces them with a gap; in a 32 px
+// tile both push the icon off-center, so the tile drops the gap and the tick.
+const TILE_ITEM = "justify-center gap-0 p-0 [&>svg:last-child]:hidden data-selected:bg-accent";
+
 // The icon button of the edit form: it shows the icon the Action has now and opens a searchable
-// grid of every icon Kex can draw. Picking saves at once; "Default icon" gives the choice back.
+// grid of every icon Kex can draw. Picking saves at once; "Default icon" gives the choice back
+// and stays on the list while searching, reachable with the arrow keys like any tile.
 export function IconPicker({ action, container, onPick, onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -32,8 +37,8 @@ export function IconPicker({ action, container, onPick, onOpenChange }: Props) {
     if (!next) setQuery("");
     onOpenChange?.(next);
   };
-  const pick = (o: IconOption) => {
-    onPick(o.value);
+  const pick = (icon: string) => {
+    onPick(icon);
     change(false);
   };
   return (
@@ -54,28 +59,25 @@ export function IconPicker({ action, container, onPick, onOpenChange }: Props) {
           <CommandInput placeholder="Search icons..." value={query} onValueChange={setQuery} />
           <CommandList className="max-h-64">
             <CommandEmpty>No icon found.</CommandEmpty>
-            {chosen && !query && (
-              <button
-                type="button"
-                onClick={() => {
-                  onPick("");
-                  change(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground"
+            {chosen && (
+              <CommandItem
+                value="default-icon"
+                onSelect={() => pick("")}
+                className="mx-1 mt-1 gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground"
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
                 Default icon
-              </button>
+              </CommandItem>
             )}
             <div role="listbox" aria-label="Icons" className="grid grid-cols-7 gap-1 p-2">
-              {shown.map((o) => (
+              {shown.map((o: IconOption) => (
                 <CommandItem
                   key={o.value}
                   value={o.value}
                   title={o.label}
                   aria-label={o.label}
-                  onSelect={() => pick(o)}
-                  className={cn(TILE, "p-0 data-[selected=true]:bg-accent", o.value === action.icon && "ring-1 ring-foreground/40")}
+                  onSelect={() => pick(o.value)}
+                  className={cn(TILE, TILE_ITEM, o.value === action.icon && "ring-1 ring-foreground/40")}
                 >
                   <ActionIcon action={{ kind: action.kind, icon: o.value }} size={16} />
                 </CommandItem>

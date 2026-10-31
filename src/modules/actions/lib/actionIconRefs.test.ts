@@ -1,6 +1,8 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
-import { AGENT_LOGO_IDS, filterIcons, formatIcon, GLYPHS, iconOptions, parseIcon } from "./actionIcons";
+import { GLYPHS } from "./actionIcons";
+import { AGENT_LOGO_IDS, filterIcons, formatIcon, GLYPH_NAMES, ICON_APP_IDS, iconOptions, parseIcon } from "./actionIconRefs";
 import { normalizeActions, updateAction } from "./actions";
 import { ownedAfterEdit } from "./appOwnership";
 import type { AppSuggestion } from "./appSuggestions";
@@ -28,12 +30,24 @@ describe("parseIcon", () => {
 });
 
 describe("iconOptions", () => {
-  it("offers every glyph, every cataloged app and every agent logo exactly once, whatever the kind", () => {
+  it("offers every glyph, every app with an icon file and every agent logo exactly once, whatever the kind", () => {
     for (const kind of ["script", "app", "agent"] as const) {
       const values = iconOptions(kind).map((o) => o.value);
       expect(new Set(values).size).toBe(values.length);
-      expect(values).toHaveLength(Object.keys(GLYPHS).length + EDITOR_CATALOG.length + AGENT_LOGO_IDS.length);
+      expect(values).toHaveLength(GLYPH_NAMES.length + ICON_APP_IDS.length + AGENT_LOGO_IDS.length);
     }
+  });
+
+  it("draws every glyph name it offers, and offers every glyph it can draw", () => {
+    expect([...GLYPH_NAMES].sort()).toEqual(Object.keys(GLYPHS).sort());
+  });
+
+  it("leaves out the catalog entries that ship no icon file", () => {
+    const shipped = new Set(readdirSync("public/assets/editors").map((f) => f.replace(/\.(svg|png)$/, "")));
+    for (const id of ICON_APP_IDS) expect(shipped.has(id)).toBe(true);
+    const skipped = EDITOR_CATALOG.map((e) => e.id).filter((id) => !ICON_APP_IDS.includes(id));
+    expect(skipped.sort()).toEqual(["android-studio-canary", "trae-solo"]);
+    expect(parseIcon("app:trae-solo")).toBeNull();
   });
 
   it("leads with what fits the kind", () => {

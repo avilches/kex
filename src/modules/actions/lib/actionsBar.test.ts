@@ -309,6 +309,15 @@ describe("buildActionsBarModel", () => {
     expect(soleIconButtons([zedWs, zedFile, code])).toEqual(new Set(["c1"]));
   });
 
+  it("never draws a button with a picked icon as its icon alone, because the icon no longer says which app it is", () => {
+    const claude: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace", ownButton: true };
+    expect(soleIconButtons([claude])).toEqual(new Set(["g1"]));
+    expect(soleIconButtons([{ ...claude, icon: "glyph:star" }])).toEqual(new Set());
+    const picked = { ...claude, id: "g2", icon: "glyph:star" };
+    const plain = { ...claude, id: "g3", appId: "claude" };
+    expect(soleIconButtons([picked, plain])).toEqual(new Set(["g3"]));
+  });
+
   it("an own button of either scope still competes for the same bar room", () => {
     const m = buildActionsBarModel({
       local: [script({ id: "s1", ownButton: true })],
