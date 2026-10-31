@@ -1,3 +1,4 @@
+import { useCommandMark } from "@/modules/workspaces/lib/useCommandMark";
 import { Spinner } from "@/components/ui/spinner";
 import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
 import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
@@ -163,7 +164,7 @@ function DetailTabMenu({
 function DetailTabRow({
   tab,
   workspaceId,
-  visual,
+  visual: agentVisual,
   focused,
   grouped,
   hasSubagents,
@@ -190,6 +191,8 @@ function DetailTabRow({
   onNoteToggle: (tabId: string) => void;
 }) {
   const info = useAgentTabTitle(tab);
+  const commandMark = useCommandMark(tab.id, tab.kind === "terminal");
+  const visual = agentVisual ?? (info?.hasAgent ? null : commandMark);
   const title = info?.displayTitle ?? tab.id;
   const { onRenameTab, onClose, onUpdateTab, onToggleHibernate } = useSidebarTabMenu();
   const hibernated = isHibernatedTab(tab);

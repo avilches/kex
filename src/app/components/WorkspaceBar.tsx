@@ -423,7 +423,9 @@ function SortableWorkspaceItem({
             if (active) onRestoreFocus();
             else onSelect(ws.id);
           }}
-          onDoubleClick={() => startRename(ws.id)}
+          onDoubleClick={() => {
+            if (showDetail && ws.tabCount > 0) onSetDetailExpanded(ws.id, !expanded);
+          }}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             rootless && "border-[1.5px] border-dashed",
