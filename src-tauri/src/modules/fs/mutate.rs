@@ -54,7 +54,7 @@ pub fn fs_rename(from: String, to: String, workspace: Option<WorkspaceEnv>) -> R
 
 /// Deletes a file or directory (recursively for dirs). Callers are
 /// responsible for confirming destructive operations with the user.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_delete(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let p = resolve_path(&path, &workspace);
@@ -77,7 +77,7 @@ pub fn fs_delete(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), St
 
 /// Moves a file or directory to the system trash. Unlike `fs_delete` this is
 /// recoverable from the OS trash/recycle bin.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_trash(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let p = resolve_path(&path, &workspace);
@@ -115,7 +115,7 @@ fn copy_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Resu
 // No workspace gate / secret deny-list here, consistent with the other fs_*
 // commands (see docs/ARCHITECTURE.md §4.2). If guard_read/guard_write helpers
 // are ever added, run `sources` through guard_read and `dest` through guard_write.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_copy(
     sources: Vec<String>,
     dest_dir: String,

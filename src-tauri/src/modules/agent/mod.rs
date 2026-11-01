@@ -291,12 +291,12 @@ fn plan_settings(
     Ok(Some(json_patch::patch(existing_str, &next)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_disable_claude_hooks() -> Result<(), String> {
     apply_settings(&settings_path()?, false, None)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
     session_store::detach_session(&tab_id)
 }
@@ -455,7 +455,7 @@ fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
 /// the caller stops tracking. A missing file is not reported: a dotfiles link or a synced
 /// folder can be absent for a moment, and the sync never creates a file anyway. Nor is a
 /// shared file that does not parse right now: it is skipped and left as it is.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
     let mut dropped = Vec::new();
     for agent in agents {
@@ -484,7 +484,7 @@ pub fn agent_sync_integrations(agents: Vec<String>) -> Vec<String> {
 
 /// Deletes the integration file, but only when it is Kex's own: a same-named file the user
 /// wrote by hand is left alone. For Codex, removes Kex's handlers and trust tables only.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_remove_integration(agent: String) -> Result<(), String> {
     match resolve_integration(&agent)? {
         Integration::File(t) => remove_integration(&t),
@@ -507,7 +507,7 @@ fn remove_integration(target: &IntegrationTarget) -> Result<(), String> {
     std::fs::remove_file(&target.path).map_err(|e| format!("remove {}: {e}", target.path.display()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_setup_opencode() -> Result<(), String> {
     write_agent_file(
         opencode_plugin_path()?,
@@ -516,14 +516,14 @@ pub fn agent_setup_opencode() -> Result<(), String> {
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_opencode_plugin_status() -> bool {
     opencode_plugin_path()
         .ok()
         .is_some_and(|p| agent_file_has_version(p, OPENCODE_PLUGIN_VERSION))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_setup_omp() -> Result<(), String> {
     write_agent_file(
         omp_extension_path()?,
@@ -532,14 +532,14 @@ pub fn agent_setup_omp() -> Result<(), String> {
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_omp_extension_status() -> bool {
     omp_extension_path()
         .ok()
         .is_some_and(|p| agent_file_matches(p, &agent_extension_script("omp")))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_setup_pi() -> Result<(), String> {
     write_agent_file(
         pi_extension_path()?,
@@ -548,19 +548,19 @@ pub fn agent_setup_pi() -> Result<(), String> {
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_pi_extension_status() -> bool {
     pi_extension_path()
         .ok()
         .is_some_and(|p| agent_file_matches(p, &agent_extension_script("pi")))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_setup_codex() -> Result<(), String> {
     codex_integration::setup(&codex_integration::CodexPaths::from_env()?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_codex_status() -> codex_integration::CodexStatus {
     codex_integration::CodexPaths::from_env()
         .map_or(codex_integration::CodexStatus::Unavailable, |p| {

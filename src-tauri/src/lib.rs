@@ -584,7 +584,7 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
 /// late window can never resume a session that is already running.
 static RESTORE_PLANS: Mutex<Option<Vec<agent::session_store::RestorePlan>>> = Mutex::new(None);
 
-#[tauri::command]
+#[tauri::command(async)]
 fn agent_session_restore_plan(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
@@ -620,14 +620,14 @@ fn agent_session_restore_plan(
 /// Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
 /// start" menu). Unlike `agent_session_restore_plan`, does not consume anything and never
 /// mutates `agent-sessions.json`, so it can be called repeatedly while a session is live.
-#[tauri::command]
+#[tauri::command(async)]
 fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::RestorePlan> {
     agent::session_store::preview_resume_cmd(&tab_id)
 }
 
 /// Last assistant message, launch folder and time of the recorded sessions among `tab_ids`, for
 /// a hibernated tab. Read-only, and never opens a transcript.
-#[tauri::command]
+#[tauri::command(async)]
 fn agent_session_previews(tab_ids: Vec<String>) -> Vec<agent::session_store::SessionPreview> {
     agent::session_store::session_previews(&tab_ids)
 }

@@ -96,17 +96,17 @@ pub fn sweep(known: &HashSet<String>) {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn hibernate_lines_save(tab_id: String, text: String) -> Result<(), String> {
     save_in(dir()?, &tab_id, &text)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn hibernate_lines_read(tab_id: String) -> Result<Option<String>, String> {
     read_in(dir()?, &tab_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn hibernate_lines_delete(tab_ids: Vec<String>) -> Result<(), String> {
     let d = dir()?;
     for id in &tab_ids {

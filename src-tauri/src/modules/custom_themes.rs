@@ -55,7 +55,7 @@ fn update(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn custom_theme_save(app: tauri::AppHandle, theme: Value) -> Result<(), String> {
     if id_of(&theme).is_none() {
         return Err("theme has no id".into());
@@ -63,7 +63,7 @@ pub fn custom_theme_save(app: tauri::AppHandle, theme: Value) -> Result<(), Stri
     update(&app, |list| Some(upsert(list, theme)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn custom_theme_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
     update(&app, |list| remove(list, &id))
 }

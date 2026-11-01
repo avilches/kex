@@ -643,7 +643,7 @@ pub async fn wsl_default_distro() -> Result<Option<String>, String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn wsl_home(distro: String) -> Result<String, String> {
     #[cfg(not(windows))]
     {
