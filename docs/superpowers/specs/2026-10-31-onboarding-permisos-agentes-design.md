@@ -60,8 +60,8 @@ el fichero es la forma de volver a ver el onboarding. Un `onboarding` que quede 
 
 ## El onboarding
 
-Modal de la ventana principal, con barra de progreso. Cada paso se puede saltar y siempre hay
-"Seguir más tarde".
+Modal de la ventana principal, con barra de progreso. Cada paso se puede saltar con Next (no hay
+un botón Skip aparte, que hacía lo mismo) y siempre hay "Seguir más tarde".
 
 1. **Bienvenida.** Qué es Kex en una frase y qué se va a configurar.
 2. **Estilo.** Pregunta "JetBrains o VS Code". Al elegir fija `explorerGitColorScheme` y

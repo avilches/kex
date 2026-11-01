@@ -116,11 +116,6 @@ export function OnboardingDialog({ isMac = IS_MAC, onRestoreFocus }: Props) {
               Back
             </Button>
           )}
-          {!first && !last && (
-            <Button variant="ghost" size="sm" onClick={() => goTo(stepAfter(step, isMac))}>
-              Skip
-            </Button>
-          )}
           {last ? (
             <Button size="sm" autoFocus onClick={complete}>
               Finish

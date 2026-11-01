@@ -238,7 +238,7 @@
 
 Comportamiento:
 - `OnboardingHost`, una vez hidratadas las preferencias, evalua `startupAction`: `openModal` abre el modal y guarda `shown: true`; `remind` muestra un unico toast "Finish setting up Kex" con accion "Continue" que abre el modal, y guarda `reminded: true`; `none` no hace nada.
-- El modal tiene barra de progreso (`@/components/ui/progress`), botones Back / Next / Skip y siempre "Continue later". "Continue later" cierra sin cambiar `step` (queda en el paso actual, que se guarda en cada cambio con `updateOnboarding`). Terminar en `done`, o descartar desde la chip, llama a `finish`.
+- El modal tiene barra de progreso (`@/components/ui/progress`), botones Back / Next y siempre "Continue later" (tuvo tambien un Skip, que hacia lo mismo que Next y se quito). "Continue later" cierra sin cambiar `step` (queda en el paso actual, que se guarda en cada cambio con `updateOnboarding`). Terminar en `done`, o descartar desde la chip, llama a `finish`.
 - Paso Style: dos opciones (JetBrains, VS Code) que aplican `STYLE_PRESETS` con los dos setters; la opcion marcada sale de los valores actuales.
 - Paso Permissions solo si `IS_MAC`; paso Agents: filas de agentes (mismos componentes que Settings) y "Install all".
 - `OnboardingChip`: visible si `showChip`; texto `chipLabel`; clic abre el modal en `state.step`; un menu pequeno ofrece "Dismiss setup" (`finish`).

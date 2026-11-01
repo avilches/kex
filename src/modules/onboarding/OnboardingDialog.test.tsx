@@ -58,7 +58,8 @@ describe("OnboardingDialog", () => {
     act(() => openOnboarding());
     fireEvent.click(screen.getByRole("button", { name: "Get started" }));
     await screen.findByText("Pick your style");
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await screen.findByText("Let Kex into your folders");
     expect(onboarding().step).toBe("permissions");
 
