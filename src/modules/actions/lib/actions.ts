@@ -30,6 +30,14 @@ export function updateAction(
   });
 }
 
+// The edit that sets or clears the fixed folder of a script. A cleared folder travels as "" and not as
+// undefined: an edit of a workspace Action crosses windows as JSON, which drops undefined keys, and the
+// receiver merges the patch over the old Action, so the old folder would survive. normalizeAction reads
+// "" as no folder.
+export function withFixedCwd(action: Action, raw: string): Action {
+  return { ...action, cwd: raw.trim() };
+}
+
 export function removeAction(list: readonly Action[], id: string): Action[] {
   return list.filter((a) => a.id !== id);
 }

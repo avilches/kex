@@ -8,6 +8,7 @@ import {
   reorderActions,
   reorderBefore,
   updateAction,
+  withFixedCwd,
 } from "./actions";
 import type { Action } from "./types";
 
@@ -280,5 +281,28 @@ describe("reorderBefore", () => {
     const list = [mk("a"), mk("b")];
     expect(reorderBefore(list, "ghost", "a")).toBe(list);
     expect(reorderBefore(list, "a", "a")).toBe(list);
+  });
+});
+
+describe("clearing the fixed folder of a script", () => {
+  const fixed = act("a", { kind: "script", command: "make", cwdMode: "fixed", cwd: "/old" } as Partial<Action>);
+
+  it("survives the JSON trip a workspace edit makes between windows", () => {
+    const patch = JSON.parse(JSON.stringify(withFixedCwd(fixed, "   "))) as Action;
+    expect("cwd" in patch).toBe(true);
+    const [updated] = updateAction([fixed], "a", patch);
+    expect(updated?.cwd).toBeUndefined();
+    expect(updated?.cwdMode).toBe("fixed");
+  });
+
+  it("an undefined folder would not: the old one survives the same trip", () => {
+    const patch = JSON.parse(JSON.stringify({ ...fixed, cwd: undefined })) as Action;
+    const [updated] = updateAction([fixed], "a", patch);
+    expect(updated?.cwd).toBe("/old");
+  });
+
+  it("keeps a folder that was typed, trimmed", () => {
+    const [updated] = updateAction([fixed], "a", JSON.parse(JSON.stringify(withFixedCwd(fixed, " /new "))) as Action);
+    expect(updated?.cwd).toBe("/new");
   });
 });
