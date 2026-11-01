@@ -989,7 +989,7 @@ Un tab con el directorio de lanzamiento borrado quedo bloqueado en el restore. T
 
 Cadena de tres fallos:
 
-1. El reintento escribe en la shell ` cd '<dir>' && claude --resume '<id>'` (`restoreCommandLine`).
+1. El reintento escribia en la shell ` cd '<dir>' && claude --resume '<id>'` (`restoreCommandLine`, ya borrada). Hoy el PTY arranca en la carpeta y se teclea solo el comando de reanudar, igual que el Restore Command de un terminal normal (`typedLine`, sin espacio inicial).
 2. `match_agent` buscaba el agente en CUALQUIER token de la linea, y `OSC 133;C` llega con la linea tal como se tecleo. La armaba entera y `session_store` guardaba la linea completa como `launch_cmd`.
 3. `strip_for_resume_base` daba por hecho que el primer token era el binario. Se quedaba con `cd`, descartaba el resto (no estaba en la lista blanca) y anadia ` --resume '<id>'`.
 

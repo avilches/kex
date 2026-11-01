@@ -166,7 +166,7 @@ State: `hibernate-lines/<tab_id>.ans` in the app data dir, one file per hibernat
 |---|---|
 | `hibernate_lines_save(tabId, text)` | Replace the tab's file. Called when a tab goes to sleep |
 | `hibernate_lines_read(tabId)` | The stored text, or `null` when the tab has none |
-| `hibernate_lines_delete(tabIds)` | Delete the files of those tabs; a missing file is not an error. Called on wake and when a tab or workspace closes |
+| `hibernate_lines_delete(tabIds)` | Delete the files of those tabs; a missing file is not an error. Called on wake, and when a hibernation is cancelled, finds an empty screen or the setting is turned off. Closing a tab or workspace does not delete: undoing the close brings the tab back asleep and it needs its file, so the ones nobody brings back go with the startup sweep (skipped when the state was not fully loaded) |
 
 ---
 
