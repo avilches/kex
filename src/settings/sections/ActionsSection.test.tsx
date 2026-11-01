@@ -70,7 +70,7 @@ describe("ActionsSection", () => {
     agents = [{ id: "claude", name: "Claude Code", binary: "/usr/local/bin/claude", argsBeforePath: [], kind: "agent" }];
     const { container, unmount } = mount();
     openAdd(container);
-    const item = options().find((o) => o.textContent === "Claude CodeWorkspace root");
+    const item = options().find((o) => o.textContent === "Claude Code");
     act(() => void (item as HTMLElement).click());
     const next = change.mock.calls[0]![0]([]);
     expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude --dangerously-skip-permissions", appId: "claude" });

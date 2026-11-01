@@ -212,7 +212,7 @@ describe("ActionsColumns", () => {
     const { container, g, unmount } = mount([], [], { suggestions: [claude] });
     click(addTrigger(container, "global"));
     const entries = options().filter((o) => o.textContent?.startsWith("Claude Code"));
-    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace root"]);
+    expect(entries.map((o) => o.textContent)).toEqual(["Claude Code"]);
     click(entries[0]);
     const added = g.onAdd.mock.calls[0]![0] as Action;
     expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude" });

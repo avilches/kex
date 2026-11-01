@@ -763,15 +763,10 @@ describe("agents", () => {
     expect(m.buttons[0]?.disabledReason).toBeNull();
   });
 
-  it("says on its second line that it starts in the workspace root, the real one or the words for it", () => {
-    expect(scriptSubtitle(agent(), ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
-    expect(scriptSubtitle(agent(), SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
-  });
-
-  it("ignores any leftover folder mode: it never says Home, a fixed folder or the current folder", () => {
-    for (const o of [{ cwdMode: "home" as const }, { cwdMode: "context" as const }, { cwdMode: "fixed" as const, cwd: "/srv" }]) {
-      expect(scriptSubtitle(agent(o), ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
-      expect(scriptSubtitle(agent(o), SETTINGS_LABELS).text).toBe("Workspace root");
+  it("has no second line anywhere: it always starts in the workspace root, whatever folder mode it carries", () => {
+    for (const o of [{}, { cwdMode: "home" as const }, { cwdMode: "context" as const }, { cwdMode: "fixed" as const, cwd: "/srv" }]) {
+      expect(scriptSubtitle(agent(o), ctx).text).toBeNull();
+      expect(scriptSubtitle(agent(o), SETTINGS_LABELS).text).toBeNull();
     }
   });
 

@@ -167,10 +167,7 @@ export function scriptSubtitle(
   action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">,
   ctx: BarContext | null,
 ): ActionSubtitle {
-  // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
-  // the root itself, or the words for it in Settings.
-  if (isAgent(action)) return workspaceLine(ctx);
-  if (isApp(action)) return { text: null, startTrim: false };
+  if (isAgent(action) || isApp(action)) return { text: null, startTrim: false };
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -505,7 +502,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
-    const subtitle = isApp(action) || isAgent(action) ? { text: null, startTrim: false } : scriptSubtitle({ ...action, name: label }, words);
+    const subtitle = scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
       id: action.id,
