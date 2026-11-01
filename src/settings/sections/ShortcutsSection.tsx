@@ -1,3 +1,4 @@
+import { finderEmptyMessage } from "./shortcutsFinder";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,9 +209,9 @@ export function ShortcutsSection({
         </div>
       </div>
 
-      {found && filteredShortcuts.length === 0 && (
+      {found && finderEmptyMessage(found.matches.length, filteredShortcuts.length) && (
         <p className="text-[12px] text-muted-foreground italic">
-          No shortcut uses these keys.
+          {finderEmptyMessage(found.matches.length, filteredShortcuts.length)}
         </p>
       )}
 
