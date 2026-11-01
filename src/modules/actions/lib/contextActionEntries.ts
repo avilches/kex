@@ -1,6 +1,6 @@
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
 import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, appTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
-import { acceptsFile, acceptsFolder, appAccepts } from "./actionTargets";
+import { acceptsFile, acceptsFolder, actionTarget, appAccepts } from "./actionTargets";
 import { isAgent, isApp, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -44,6 +44,9 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
     if (action.command.trim() === "") continue;
     const agent = isAgent(action);
     if (agent && !agentFolder) continue;
+    // The target rules: a folder row offers the scripts that work on a folder, a file row the ones that
+    // work on a file, and a script of the workspace is only ever in the Header.
+    if (rowKind && isScript(action) && actionTarget(action.command) !== rowKind) continue;
     const name = action.name.trim() || "Action";
     const subtitle = agent ? { text: null, startTrim: false, lead: undefined } : scriptSubtitle({ ...action, name }, ctx);
     const reason = agent ? agentReason(action, agentFolder ?? "") : (acceptsReason(action, rowKind) ?? actionAvailability(action, ctx));
