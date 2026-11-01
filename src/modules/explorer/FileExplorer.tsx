@@ -1212,7 +1212,7 @@ export const FileExplorer = memo(
                   </span>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
-                    size={15}
+                    size={12}
                     strokeWidth={2}
                     className="pointer-events-none ml-1.5 hidden shrink-0 group-hover/root:block"
                   />

@@ -17,6 +17,7 @@ import { useWorkspaceDnd } from "@/modules/workspaces";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ArrowRight01Icon,
+  ArrowUp01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
   Copy01Icon,
@@ -27,7 +28,6 @@ import {
   FileAddIcon,
   FolderAddIcon,
   FolderOpenIcon,
-  FolderUploadIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
   Refresh01Icon,
@@ -299,6 +299,22 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
+            {isDir && onEnterFolder && (
+              <span
+                role="button"
+                title="Open this folder as the explorer root"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEnterFolder(path);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+              >
+                Open
+              </span>
+            )}
             {isOpenInTab && (
               <span
                 role="button"
@@ -735,12 +751,20 @@ export function FsUpRow({
           <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
             <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2.25} />
           </span>
-          <HugeiconsIcon
-            icon={FolderUploadIcon}
-            size={16}
-            strokeWidth={1.75}
-            className="shrink-0 text-muted-foreground"
-          />
+          <span className="relative size-4 shrink-0">
+            <img
+              src={folderIconUrl("", false)}
+              alt=""
+              draggable={false}
+              className="size-4"
+            />
+            <HugeiconsIcon
+              icon={ArrowUp01Icon}
+              size={9}
+              strokeWidth={3}
+              className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-sm"
+            />
+          </span>
           <span className="min-w-0 truncate">..</span>
           <button
             type="button"
