@@ -1,7 +1,7 @@
 import { native } from "@/lib/native";
 import { create } from "zustand";
 import { restart } from "./lib/onboardingState";
-import { persistOnboarding } from "./lib/persistOnboarding";
+import { saveOnboarding } from "./lib/persistOnboarding";
 
 export const ONBOARDING_RESTART_EVENT = "kex:onboarding-restart";
 
@@ -30,10 +30,13 @@ export function isOnboardingOpen(): boolean {
 }
 
 // Settings is its own webview and the dialog lives in the main windows; Rust passes the request
-// to the one main window used last, so a single dialog opens.
-export function requestOnboardingRestart(): void {
-  persistOnboarding(restart);
-  native
-    .requestOnboardingRestart()
-    .catch((e) => console.error("[kex] onboarding restart request failed:", e));
+// to the one main window used last, so a single dialog opens. Opening it closes Settings, so the
+// restart has to be on disk first or it dies with the window and the chip never appears.
+export async function requestOnboardingRestart(): Promise<void> {
+  try {
+    await saveOnboarding(restart);
+    await native.requestOnboardingRestart();
+  } catch (e) {
+    console.error("[kex] onboarding restart failed:", e);
+  }
 }

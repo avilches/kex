@@ -12,7 +12,10 @@ const native = vi.hoisted(() => ({
 vi.mock("@/lib/native", () => ({ native }));
 const emit = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@tauri-apps/api/event", () => ({ emit, listen: () => Promise.resolve(() => {}) }));
-vi.mock("./lib/persistOnboarding", () => ({ persistOnboarding: () => {} }));
+const persist = vi.hoisted(() => ({
+  saveOnboarding: vi.fn((_change: unknown): Promise<void> => Promise.resolve()),
+}));
+vi.mock("./lib/persistOnboarding", () => persist);
 
 import {
   closeOnboarding,
@@ -25,6 +28,7 @@ import {
 beforeEach(() => {
   native.setOnboardingOpen.mockClear().mockImplementation(() => Promise.resolve(true));
   native.requestOnboardingRestart.mockClear();
+  persist.saveOnboarding.mockClear().mockImplementation(() => Promise.resolve());
   emit.mockClear();
 });
 
@@ -96,9 +100,28 @@ describe("openOnboarding", () => {
 });
 
 describe("requestOnboardingRestart", () => {
-  it("asks Rust to restart it in one window instead of broadcasting", () => {
-    requestOnboardingRestart();
+  it("asks Rust to restart it in one window instead of broadcasting", async () => {
+    await requestOnboardingRestart();
     expect(native.requestOnboardingRestart).toHaveBeenCalledTimes(1);
     expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("saves the restart before asking Rust, because opening the dialog closes Settings", async () => {
+    let finishSave: () => void = () => {};
+    persist.saveOnboarding.mockImplementation(
+      () => new Promise<void>((resolve) => (finishSave = resolve)),
+    );
+    const pending = requestOnboardingRestart();
+    await Promise.resolve();
+    expect(native.requestOnboardingRestart).not.toHaveBeenCalled();
+    finishSave();
+    await pending;
+    expect(native.requestOnboardingRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not open the dialog on a state it failed to save", async () => {
+    persist.saveOnboarding.mockImplementation(() => Promise.reject(new Error("disk")));
+    await requestOnboardingRestart();
+    expect(native.requestOnboardingRestart).not.toHaveBeenCalled();
   });
 });
