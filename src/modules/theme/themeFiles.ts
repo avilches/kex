@@ -1,7 +1,8 @@
 import { newThemeId } from "@/lib/ids";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import type { Theme } from "./types";
 import { validateTheme, type ValidationResult } from "./validateTheme";
@@ -116,5 +117,9 @@ export function emitThemeEdit(req: ThemeEditRequest): Promise<void> {
 export function onThemeEdit(
   cb: (req: ThemeEditRequest) => void,
 ): Promise<UnlistenFn> {
-  return listen<ThemeEditRequest>(THEME_EDIT_EVENT, (e) => cb(e.payload));
+  // The window's own listen: the global one also receives events sent with emit_to to another window.
+  return getCurrentWebviewWindow().listen<ThemeEditRequest>(
+    THEME_EDIT_EVENT,
+    (e) => cb(e.payload),
+  );
 }
