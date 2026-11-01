@@ -316,8 +316,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   icon, colored status dot; `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
 - **`agentNotifications` setting** (formerly `claudeHooksEnabled`) - boolean persisted in the app settings store.
   Controls both notification routing and hook lifecycle. Enabling it calls `agent_enable_claude_hooks`; disabling it
-  calls `agent_disable_claude_hooks` (removes Kex hooks from `~/.claude/settings.json`). On every startup, the app
-  silently calls `agent_enable_claude_hooks` when this is true (idempotent). It has no switch of its own in Settings:
+  calls `agent_disable_claude_hooks` (removes Kex hooks from `~/.claude/settings.json`). At startup, the app
+  refreshes the hooks (`agent_enable_claude_hooks`) only when Claude Code is detected and its hooks are already
+  installed, and removes them when this is false; it never installs them on its own (`syncPlan`). It has no switch of its own in Settings:
   it follows installing or uninstalling the Claude Code integration (Settings > General > Agents, the bell, or the
   install toast).
 - **Minimal `~/.claude/settings.json` writes** - `agent_enable_claude_hooks` now uses `serde_json` with
@@ -565,6 +566,10 @@ Diagnostic for a window that feels slow, off by default and with no cost while o
 ### Agent Actions
 
 An Action has a `kind` of `app`, `script` or `agent` (it replaced the former boolean flag, with no migration). An agent Action opens a new terminal tab on every click and types its command verbatim plus Enter: no template, no variables, no running state, and Kex never closes the tab. The editor scan also detects coding agents, the Add combo offers one preset per agent (an agent has no folder of its own: the Header starts it in the workspace root, a folder menu or a New terminal row in that folder), and the first detection seeds each enabled agent as a global Action with its own button, and any scan seeds the same way an agent never seen before (the `seededAgents` preference lists the ones already offered, so a deleted Action is not brought back); the first detection of apps seeds each enabled app, once, as a global Action inside the combo (an app is added once and declares whether it takes files, folders or both; its command ends in `{target}`, which is the workspace root from the Header and the folder or file from a menu), once, guarded by `appActionsSeeded`. Not present upstream. See `docs/ARCHITECTURE.md` section 3.12.
+
+### First-run onboarding, Permissions and agent states
+
+Not present upstream. A first-run dialog (`modules/onboarding/`) walks a new user through the interface style, macOS folder permissions, and connecting the detected coding agents; it can be left with "Continue later", leaves a progress chip in the Header, and suppresses the integration suggestion toast until it is finished or dismissed. It shows whenever `settings-onboarding.json` is absent (delete it to replay). Settings gains a macOS-only Permissions section (`modules/permissions/`, Rust commands `permission_probe` and `permission_open_settings`), and the Agents list shows a state per agent (Not detected, Detected, installed, blocked) with Install all and Uninstall all; installing an integration for an agent that is not detected is rejected, and the startup sync only refreshes integrations that are installed and detected. The camera and microphone usage descriptions (`Info.plist`) and entitlements (`entitlements.plist`) were removed, since Kex never uses them, and usage descriptions for the Desktop, Documents and Downloads folders were added so macOS explains the prompts. See `docs/ARCHITECTURE.md`, `docs/NOTIFICATIONS.md` and `docs/SETTINGS_UI.md`.
 
 ## Roadmap (planned, not yet built)
 

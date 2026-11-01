@@ -1,6 +1,6 @@
 import type { SearchTarget } from "@/modules/header";
 import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
-import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { availableSections } from "@/modules/settings/sections";
 import type { ShortcutHandlers } from "@/modules/shortcuts";
 import { SHORTCUTS, type ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { allPaneIds } from "@/modules/workspaces/lib/splitNode";
@@ -433,7 +433,7 @@ export function createCommandItems(
       run: () => handler?.(new KeyboardEvent("keydown")),
     };
   });
-  const settings: PaletteItem[] = SETTINGS_SECTIONS.map((section) => ({
+  const settings: PaletteItem[] = availableSections().map((section) => ({
     id: `settings.section.${section.id}`,
     title: `${section.label} settings`,
     group: "Settings",

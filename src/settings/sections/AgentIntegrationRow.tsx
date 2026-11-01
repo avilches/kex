@@ -6,6 +6,7 @@ import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentId, IntegrationBlock } from "@/modules/agents/lib/integrations";
 import type { IntegrationState } from "@/modules/agents/lib/useIntegration";
 import { useEffect, useRef, useState } from "react";
+import { NotDetectedHint, StatusLabel } from "./AgentStatusRow";
 import { IntegrationDiffDialog } from "./IntegrationDiffDialog";
 
 const CHANGE_ANIMATION_MS = 700;
@@ -36,10 +37,11 @@ type Props = {
   /** Where the integration lives, as the user would type it. */
   files: string[];
   state: IntegrationState;
+  detected: boolean;
 };
 
-export function AgentIntegrationRow({ agent, name, files, state }: Props) {
-  const { ready, blocked, busy, failed, install, remove, refresh } = state;
+export function AgentIntegrationRow({ agent, name, files, state, detected }: Props) {
+  const { ready, blocked, busy, failed, notFound, install, remove, refresh } = state;
   const [previewing, setPreviewing] = useState(false);
   const [justChanged, setJustChanged] = useState(false);
   const previous = useRef(ready);
@@ -56,6 +58,21 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
 
   const installed = ready === true;
   const act = () => void (installed ? remove() : install());
+
+  if (!detected) {
+    return (
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <AgentIcon agent={agent} size={22} className="shrink-0 opacity-50" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-2 text-[12.5px] font-medium">
+            {name}
+            <StatusLabel detected={false} />
+          </span>
+          <NotDetectedHint name={name} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -142,7 +159,7 @@ export function AgentIntegrationRow({ agent, name, files, state }: Props) {
       )}
       {failed && (
         <p className="px-3 pb-2 text-[11px] text-destructive">
-          Could not change the {name} integration. Check the permissions of {files.join(", ")}.
+          {notFound ?? `Could not change the ${name} integration. Check the permissions of ${files.join(", ")}.`}
         </p>
       )}
       <IntegrationDiffDialog

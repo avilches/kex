@@ -10,7 +10,7 @@ import { flushEditors } from "./app/lib/editorFlush";
 import { installGlobalErrorLogging, reactRootErrorOptions } from "./lib/errorLog";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
-import { syncIntegrations } from "./modules/agents/lib/integrationActions";
+import { runStartupSync } from "./modules/agents/lib/startupSync";
 import { loadPreferences, updateInstalledIntegrations } from "./modules/settings/store";
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
@@ -46,18 +46,16 @@ const startupPrefs = await loadPreferences().catch((err) => {
 // Load saved workspace layout for session restore.
 await initWorkspaceState();
 
-// Sync Claude Code hooks on startup - idempotent in both directions:
-// - integration ON:  install/update script and settings.json entries (no-op if up to date)
-// - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
+// Refreshes (or, with notifications off, removes) the agent integrations already present. Not
+// awaited: a cold `claude --version` must never delay the first paint.
 if (startupPrefs) {
-  if (startupPrefs.agentNotifications) {
-    invoke("agent_enable_claude_hooks", { refresh: false }).catch(() => {});
-  } else {
-    invoke("agent_disable_claude_hooks").catch(() => {});
-  }
-  // OpenCode, OMP and Pi read their script from their own config folder, so an app update
-  // rewrites the ones the user installed instead of leaving them on an old version.
-  syncIntegrations(startupPrefs.installedIntegrations, updateInstalledIntegrations).catch(() => {});
+  void (async () => {
+    try {
+      await runStartupSync(startupPrefs, updateInstalledIntegrations);
+    } catch (err) {
+      console.error("startup integration sync failed:", err);
+    }
+  })();
 }
 
 ReactDOM.createRoot(

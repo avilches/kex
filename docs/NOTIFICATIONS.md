@@ -215,7 +215,7 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
   `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
   `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
 - Is idempotent, safe to run on an already-configured installation
-- On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
+- Is not run blindly at startup: `main.tsx` refreshes the hooks only when Claude Code is detected and Kex hooks are already present in settings.json, outdated ones included (see "Startup sync" below)
 
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).
 
@@ -234,10 +234,29 @@ is emitted by `agent_detect.rs` when the `OSC 133;C` command line names one of `
 A launcher script whose command line does not name one of those agents triggers nothing, and neither does a print-mode
 run (`claude -p`), which `agent_detect.rs` skips.
 
-Claude Code is the exception in practice. `agentNotifications` is on by default and `main.tsx` calls
-`agent_enable_claude_hooks` on every startup while it is on, so for Claude Code the reminder only appears for a user who
-turned that setting off, or whose `~/.claude/settings.json` could not be written. The other agents are never installed
-by Kex on its own, so they are where the reminder does its work.
+Kex never installs an integration on its own, Claude Code included: the startup only refreshes ones that are already
+installed (see "Startup sync"). So the reminder is the path that leads a user to an integration for every agent, and the
+onboarding (Agents step, with Install all) is the other one.
+
+### Relation with the onboarding
+
+While the first-run onboarding is unfinished, the toast is suppressed. `createIntegrationSuggester` takes a `suppressed`
+dependency (`IntegrationSuggestionToast.tsx` passes `suppressIntegrationToast(onboarding)` from
+`modules/onboarding/lib/onboardingState.ts`) and returns right after the once-per-run check, before it reads the status or
+records anything. A suppressed call does not add the agent to the per-run `seen` set and does not record an ask, so when
+the user finishes or dismisses the onboarding in the same run, the next `started` signal of that agent shows the toast
+normally. The onboarding already offers the same installs, which is why the two would otherwise say the same thing twice.
+The check may be async and the toast's waits for `whenHydrated()` first: before hydration the store holds the default
+onboarding state, which says finished, so an agent started in the first moments of a first run would otherwise get the
+toast and record an ask. After the wait the flow checks `seen` again, so two calls that waited together look once.
+
+### Detection guard
+
+`installAgent` rejects with `AgentNotDetectedError` when the agent is not in the persisted `detectedEditors`, before it
+writes anything, and it awaits `whenHydrated()` first: Settings is a separate webview whose preferences load
+asynchronously, so reading `detectedEditors` too early would reject a detected agent. Every install path (toast,
+Settings, bell, Install all, onboarding) goes through it, so none can write into the config folder of an agent that is
+not on the machine. The Settings rows reflect it: a not detected agent has no Install button (see `docs/SETTINGS_UI.md`).
 
 ### The toast (asked at most twice per agent)
 
@@ -279,9 +298,27 @@ Cuanto molesta, en cifras. Por agente, y solo si su integracion falta:
 
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
 (`lib/agentIntegration.ts`), the single install path, which records `installedOnce` after the write succeeded (a failure
-to record it is only logged, since the install itself worked). The startup repair of Claude Code hooks in `main.tsx`
+to record it is only logged, since the install itself worked). It refuses an agent that is not detected, but the scan
+runs once per launch, so an agent installed after Kex started would be refused while the toast says it is running:
+on a miss `installAgent` runs `runEditorScan` once (joining a scan already in flight) and checks its result. Only if
+the agent is still missing does it throw `AgentNotDetectedError`, before writing anything, and the toast, the bell
+and Settings show its message ("Pi was not found on this machine") instead of a write failure. The startup repair of Claude Code hooks in `main.tsx`
 calls `agent_enable_claude_hooks` directly and records nothing; the next `started` signal then finds the status
 `installed` and records it.
+
+### Startup sync
+
+`main.tsx` keeps the installed integrations up to date after an app update, and never creates a new one. It calls
+`runStartupSync` (`modules/agents/lib/startupSync.ts`) without awaiting it, so the sync never delays the first paint. The
+decision is the pure `syncPlan`, which needs both conditions per agent: the integration is already installed AND the
+agent is detected, using the persisted `detectedEditors` (`detectedAgentIds`). Before the first scan `detectedEditors` is
+empty, so nothing is refreshed. For Claude Code the rule is presence, not currency: `agent_claude_hooks_present` is
+queried only when it is detected, and it is true when settings.json holds any Kex session hook, outdated ones included
+(an old script version or events a newer Claude knows that the hooks do not cover). It reads the file only and never
+runs `claude --version`. With hooks present, `agentNotifications` on means refresh (`agent_enable_claude_hooks`) and
+off means remove (`agent_disable_claude_hooks`); a failed query counts as absent and does nothing. The UI keeps
+`agent_claude_hooks_status`, which says "installed" only for current hooks. OpenCode, OMP, Pi and Codex rewrite their script only if they are in
+`installedIntegrations` and detected.
 
 ### Where it lives
 
@@ -290,7 +327,9 @@ calls `agent_enable_claude_hooks` directly and records nothing; the next `starte
 | Rules: `shouldSuggest`, `withAsked`, `withInstalled`, `parseSuggestions`, `SUGGESTION_RETRY_MS` (pure) | `modules/agents/lib/integrationSuggestion.ts` |
 | Flow: once per run, status check, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
 | Toast, real dependencies, `suggestIntegration` | `modules/agents/components/IntegrationSuggestionToast.tsx` |
-| Single install path, records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
+| Single install path, detection guard (`AgentNotDetectedError`), records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
+| Startup sync plan (`syncPlan`) and its runner (`runStartupSync`) | `modules/agents/lib/startupSync.ts` |
+| Suppression while the onboarding is unfinished | `modules/onboarding/lib/onboardingState.ts` (`suppressIntegrationToast`) |
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent:
 `{ "asks": 1, "lastAskedAt": 1761000000000, "installedOnce": false }`. It is read and written through

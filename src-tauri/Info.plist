@@ -2,9 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>A program running within Terax would like to use the camera.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>A program running within Terax would like to use your microphone.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Kex needs to read your Desktop folder so its terminals and agents can work with the files there.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Kex needs to read your Documents folder so its terminals and agents can work with the files there.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Kex needs to read your Downloads folder so its terminals and agents can work with the files there.</string>
 </dict>
 </plist>

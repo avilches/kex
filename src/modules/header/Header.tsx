@@ -4,6 +4,7 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import { ActionsBar, type BarController } from "@/modules/actions";
 import { isCompactBar } from "@/modules/actions/lib/actionsBar";
+import { OnboardingChip } from "@/modules/onboarding";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import { DevBranchBadge } from "./DevBranchBadge";
 import { WorkspaceTitle } from "./WorkspaceTitle";
@@ -131,6 +132,8 @@ export function Header({
       <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} groups={groups} />
 
       <DevBranchBadge />
+
+      <OnboardingChip />
 
       <ActionsBar
         workspace={activeWorkspace}

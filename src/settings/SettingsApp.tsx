@@ -5,7 +5,7 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { availableSections } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -19,6 +19,7 @@ import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
+import { PermissionsSection } from "./sections/PermissionsSection";
 import { ShortcutsSection, type ShortcutsSearchRequest } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
@@ -29,6 +30,7 @@ const COMPONENTS: Record<SettingsSection, (props: never) => JSX.Element> = {
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
   agents: AgentsSection,
+  permissions: PermissionsSection,
   actions: ActionsSection,
   editor: EditorSection,
   appearance: AppearanceSection,
@@ -42,14 +44,14 @@ const SettingsTextEditor = import.meta.env.DEV
   ? lazy(() => import("./devTextEditor/SettingsTextEditor"))
   : null;
 
-const SECTIONS = SETTINGS_SECTIONS.map((s) => ({ ...s, component: COMPONENTS[s.id] }));
+const SECTIONS = availableSections().map((s) => ({ ...s, component: COMPONENTS[s.id] }));
 
-const VALID_SECTIONS: SettingsSection[] = SECTIONS.map((s) => s.id);
+const isAvailable = (id: string) => availableSections().some((s) => s.id === id);
 
 export function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
   if (!raw) return { section: "general" };
   const [sectionId, ...rest] = raw.split(":");
-  const section = (VALID_SECTIONS as string[]).includes(sectionId) ? (sectionId as SettingsSection) : "general";
+  const section = isAvailable(sectionId) ? (sectionId as SettingsSection) : "general";
   return { section, ext: rest.length > 0 ? rest.join(":") : undefined };
 }
 

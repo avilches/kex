@@ -9,13 +9,16 @@ import {
   RoboticIcon,
   Settings01Icon,
   SourceCodeIcon,
+  SquareLock01Icon,
 } from "@hugeicons/core-free-icons";
+import { IS_MAC } from "@/lib/platform";
 import type { SettingsSection } from "./openSettingsWindow";
 
 export type SettingsSectionMeta = {
   id: SettingsSection;
   label: string;
   icon: typeof Settings01Icon;
+  macOnly?: true;
 };
 
 // No components here: the main window imports this list, and pulling in the section
@@ -25,6 +28,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: "workspaces", label: "Workspaces", icon: Layers01Icon },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon },
   { id: "agents", label: "Agents", icon: RoboticIcon },
+  { id: "permissions", label: "Permissions", icon: SquareLock01Icon, macOnly: true },
   { id: "actions", label: "Actions", icon: DocumentCodeIcon },
   { id: "editor", label: "Editor", icon: SourceCodeIcon },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon },
@@ -32,3 +36,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon },
   { id: "about", label: "About", icon: InformationCircleIcon },
 ];
+
+export function availableSections(): SettingsSectionMeta[] {
+  return SETTINGS_SECTIONS.filter((s) => IS_MAC || !s.macOnly);
+}

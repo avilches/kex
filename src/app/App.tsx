@@ -45,6 +45,7 @@ import { isMarkdownPath } from "@/lib/utils";
 import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
 import { findReplaceableFilePreview, isFilePreviewTab } from "@/modules/workspaces/lib/fileTabPreview";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
+import { OnboardingHost } from "@/modules/onboarding";
 import { buildAgentEntries, entriesByWorkspace } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -4341,6 +4342,7 @@ export default function App() {
             activeWorkspaceId={activeWorkspaceId}
             onActivate={onActivateAgent}
           />
+          <OnboardingHost />
           <Toaster position="bottom-right" />
           <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>

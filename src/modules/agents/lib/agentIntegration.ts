@@ -4,9 +4,13 @@ import {
   updateInstalledIntegrations,
   updateIntegrationSuggestions,
 } from "@/modules/settings/store";
+import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
+import { runEditorScan } from "@/modules/external-editors/useExternalEditors";
+import { detectedAgentIds } from "./agentRows";
 import { installIntegration, integrationStatus, removeIntegration } from "./integrationActions";
 import { withInstalled } from "./integrationSuggestion";
 import {
+  AGENT_LABELS,
   type AgentId,
   fromInstalledFlag,
   type IntegrationStatus,
@@ -21,7 +25,33 @@ export async function agentStatus(agent: AgentId): Promise<IntegrationStatus> {
   return fromInstalledFlag(await invoke<boolean>("agent_claude_hooks_status"));
 }
 
+export class AgentNotDetectedError extends Error {
+  constructor(agent: AgentId) {
+    super(`${AGENT_LABELS[agent]} was not found on this machine`);
+    this.name = "AgentNotDetectedError";
+  }
+}
+
+export function assertDetected(agent: AgentId, detected: ReadonlySet<string>): void {
+  if (!detected.has(agent)) throw new AgentNotDetectedError(agent);
+}
+
+/** The text a failed install shows: the not-found message as is, the fallback for anything else. */
+export function installErrorText(error: unknown, fallback: string): string {
+  return error instanceof AgentNotDetectedError ? error.message : fallback;
+}
+
+// The scan runs once per launch, so an agent installed after Kex started is missing from it.
+async function ensureDetected(agent: AgentId): Promise<void> {
+  if (detectedAgentIds(usePreferencesStore.getState().detectedEditors).has(agent)) return;
+  const rescanned = await runEditorScan();
+  assertDetected(agent, detectedAgentIds(rescanned ?? []));
+}
+
 export async function installAgent(agent: AgentId): Promise<void> {
+  // The Settings webview hydrates preferences asynchronously; reading earlier sees no agents.
+  await whenHydrated();
+  await ensureDetected(agent);
   if (isIntegrationAgent(agent)) {
     await installIntegration(agent, updateInstalledIntegrations);
   } else {

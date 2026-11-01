@@ -5,19 +5,28 @@ import type { IntegrationStatus } from "./integrations";
 
 const T0 = 1_700_000_000_000;
 
-function setup(opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: number } = {}) {
-  const state = { map: opts.map ?? ({} as SuggestionMap), now: opts.now ?? T0 };
+function setup(
+  opts: { status?: IntegrationStatus; map?: SuggestionMap; now?: number; suppressed?: boolean } = {},
+) {
+  const state = {
+    map: opts.map ?? ({} as SuggestionMap),
+    now: opts.now ?? T0,
+    suppressed: opts.suppressed ?? false,
+  };
   const show = vi.fn();
+  const status = vi.fn(async () => opts.status ?? "missing");
+  const read = vi.fn(async () => state.map);
   const deps: SuggestDeps = {
     now: () => state.now,
-    status: async () => opts.status ?? "missing",
-    read: async () => state.map,
+    suppressed: () => state.suppressed,
+    status,
+    read,
     update: async (change) => {
       state.map = change(state.map);
     },
     show,
   };
-  return { state, show, suggest: createIntegrationSuggester(deps) };
+  return { state, show, status, read, suggest: createIntegrationSuggester(deps) };
 }
 
 describe("integration suggester", () => {
@@ -26,6 +35,28 @@ describe("integration suggester", () => {
     await suggest("claude");
     expect(show).toHaveBeenCalledWith("claude");
     expect(state.map.claude).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: false });
+  });
+
+  it("looks at an agent once when two calls wait on an async suppression check together", async () => {
+    let release: (v: boolean) => void = () => {};
+    const gate = new Promise<boolean>((r) => {
+      release = r;
+    });
+    const show = vi.fn();
+    const status = vi.fn(async (): Promise<IntegrationStatus> => "missing");
+    const suggest = createIntegrationSuggester({
+      now: () => T0,
+      suppressed: () => gate,
+      status,
+      read: async () => ({}),
+      update: async () => {},
+      show,
+    });
+    const both = Promise.all([suggest("pi"), suggest("pi")]);
+    release(false);
+    await both;
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(show).toHaveBeenCalledTimes(1);
   });
 
   it("ignores agents that have no integration", async () => {
@@ -85,6 +116,7 @@ describe("integration suggester", () => {
     state.now = T0 + SUGGESTION_RETRY_MS * 5;
     const later = createIntegrationSuggester({
       now: () => state.now,
+      suppressed: () => false,
       status: async () => "missing",
       read: async () => state.map,
       update: async (change) => {
@@ -104,11 +136,25 @@ describe("integration suggester", () => {
     expect(show).not.toHaveBeenCalled();
   });
 
+  it("does not look at anything nor record an ask while suppressed", async () => {
+    const { suggest, show, status, read, state } = setup({ suppressed: true });
+    await suggest("claude");
+    expect(status).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+    expect(state.map).toEqual({});
+
+    state.suppressed = false;
+    await suggest("claude");
+    expect(show).toHaveBeenCalledWith("claude");
+  });
+
   it("keeps quiet and does not throw when the store fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const show = vi.fn();
     const suggest = createIntegrationSuggester({
       now: () => T0,
+      suppressed: () => false,
       status: async () => "missing",
       read: async () => {
         throw new Error("store gone");

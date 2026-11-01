@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { SHORTCUTS } from "@/modules/shortcuts/shortcuts";
-import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { availableSections } from "@/modules/settings/sections";
 import { DEFAULT_PREFERENCES } from "@/modules/settings/store";
 import type { PaneNode, SplitNode } from "@/modules/workspaces/lib/types";
 import {
@@ -10,6 +10,14 @@ import {
   type CommandPaletteActionContext,
   createCommandItems,
 } from "./commands";
+
+const platform = vi.hoisted(() => ({ mac: true }));
+vi.mock("@/lib/platform", async (orig) => ({
+  ...(await orig<typeof import("@/lib/platform")>()),
+  get IS_MAC() {
+    return platform.mac;
+  },
+}));
 
 function paneTree(count: number): SplitNode {
   const pane = (index: number): PaneNode => ({
@@ -102,7 +110,7 @@ describe("palette catalog", () => {
   });
 
   it("has a Settings row per section that opens that section", () => {
-    for (const section of SETTINGS_SECTIONS) {
+    for (const section of availableSections()) {
       const open = vi.fn();
       const row = createCommandItems(ctx({ openSettingsSection: open })).find(
         (i) => i.id === `settings.section.${section.id}`,
@@ -112,6 +120,15 @@ describe("palette catalog", () => {
       row?.run();
       expect(open).toHaveBeenCalledWith(section.id);
     }
+  });
+
+  it("offers the Permissions settings row only on macOS", () => {
+    const has = () => createCommandItems(ctx()).some((i) => i.id === "settings.section.permissions");
+    platform.mac = true;
+    expect(has()).toBe(true);
+    platform.mac = false;
+    expect(has()).toBe(false);
+    platform.mac = true;
   });
 
   it("uses unique ids", () => {

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import type { DetectedEditor } from "@/modules/external-editors/types";
+import type { PermissionKind, ProbeState } from "@/modules/permissions/lib/permissions";
 
 export type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -402,7 +403,12 @@ export const native = {
     }),
   editorScan: (): Promise<DetectedEditor[]> =>
     invoke<DetectedEditor[]>("editor_scan"),
+  permissionProbe: (kind: PermissionKind): Promise<ProbeState> =>
+    invoke<ProbeState>("permission_probe", { kind }),
+  permissionOpenSettings: (kind: PermissionKind): Promise<void> =>
+    invoke<void>("permission_open_settings", { kind }),
   claimStartupScan: (): Promise<boolean> => invoke<boolean>("claim_startup_scan"),
+  claimOnboardingStartup: (): Promise<boolean> => invoke<boolean>("claim_onboarding_startup"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),
   /** Count of descendant processes signaled for the script of this tab; 0 means the program is gone. */

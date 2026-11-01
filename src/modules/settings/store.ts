@@ -19,6 +19,7 @@ import {
   type IntegrationAgent,
 } from "@/modules/agents/lib/integrations";
 import { parseSuggestions, type SuggestionMap } from "@/modules/agents/lib/integrationSuggestion";
+import { parseOnboarding, type OnboardingState } from "@/modules/onboarding/lib/onboardingState";
 import {
   parseAutoHibernate,
   type AutoHibernate,
@@ -208,6 +209,7 @@ export type Preferences = {
   agentNotifications: boolean;
   installedIntegrations: IntegrationAgent[];
   integrationSuggestions: SuggestionMap;
+  onboarding: OnboardingState;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
@@ -257,6 +259,10 @@ const TERMINAL_STORE_PATH = "settings-terminal.json";
 const EDITOR_STORE_PATH = "settings-editor.json";
 const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const TOOLS_STORE_PATH = "settings-tools.json";
+const ONBOARDING_STORE_PATH = "settings-onboarding.json";
+
+// Onboarding store key
+const KEY_ONBOARDING = "onboarding";
 
 // General store keys
 const KEY_THEME = "theme";
@@ -484,6 +490,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   agentNotifications: true,
   installedIntegrations: [],
   integrationSuggestions: {},
+  onboarding: { finished: true, step: "welcome", shown: true, reminded: true },
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
@@ -535,6 +542,7 @@ const terminalStore = new LazyStore(TERMINAL_STORE_PATH, { defaults: {}, autoSav
 const editorStore = new LazyStore(EDITOR_STORE_PATH, { defaults: {}, autoSave: 200 });
 const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoSave: 200 });
 const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200 });
+const onboardingStore = new LazyStore(ONBOARDING_STORE_PATH, { defaults: {}, autoSave: 200 });
 
 // LazyStore.onChange only fires within the writing process. The settings
 // page lives in a separate webview, so writes there never reach the main
@@ -542,7 +550,7 @@ const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200
 // window can listen.
 const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
-type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts";
+type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts" | "onboarding";
 type PrefsChangedPayload = { store: StoreId; key: string; value: unknown };
 
 export function parseSpinnerStyle(value: unknown): SpinnerStyle {
@@ -574,6 +582,7 @@ const writeTerminalPref = makeWriter(terminalStore, "terminal");
 const writeEditorPref = makeWriter(editorStore, "editor");
 const writeToolsPref = makeWriter(toolsStore, "tools");
 const writeShortcutsStorePref = makeWriter(shortcutsStore, "shortcuts");
+const writeOnboardingPref = makeWriter(onboardingStore, "onboarding");
 
 async function writeShortcutsPref(
   value: Partial<Record<ShortcutId, KeyBinding[]>>,
@@ -583,13 +592,15 @@ async function writeShortcutsPref(
 
 export async function loadPreferences(): Promise<Preferences> {
   // Fetch all stores in parallel - one IPC roundtrip per store.
-  const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue] = await Promise.all([
-    store.entries(),
-    terminalStore.entries(),
-    editorStore.entries(),
-    toolsStore.entries(),
-    shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
-  ]);
+  const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue, onboardingValue] =
+    await Promise.all([
+      store.entries(),
+      terminalStore.entries(),
+      editorStore.entries(),
+      toolsStore.entries(),
+      shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
+      onboardingStore.get<unknown>(KEY_ONBOARDING),
+    ]);
   // Kept as separate per-store maps, never merged into one: terminal and editor
   // share unprefixed key names (fontFamily, fontSize, letterSpacing, lineHeight,
   // cursorBlink, cursorStyle) and general vs editor both use "theme", so a single
@@ -721,6 +732,7 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.agentNotifications,
     installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
     integrationSuggestions: parseSuggestions(getGeneral<unknown>(KEY_INTEGRATION_SUGGESTIONS)),
+    onboarding: parseOnboarding(onboardingValue),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -1346,6 +1358,20 @@ export function updateIntegrationSuggestions(
   return run;
 }
 
+// Read-change-write for the onboarding state: the dialog and the chip may write it from different windows.
+let onboardingQueue: Promise<unknown> = Promise.resolve();
+
+export function updateOnboarding(
+  change: (current: OnboardingState) => OnboardingState,
+): Promise<void> {
+  const run = onboardingQueue.then(async () => {
+    const current = parseOnboarding(await onboardingStore.get<unknown>(KEY_ONBOARDING));
+    await writeOnboardingPref(KEY_ONBOARDING, change(current));
+  });
+  onboardingQueue = run.catch(() => undefined);
+  return run;
+}
+
 export async function readIntegrationSuggestions(): Promise<SuggestionMap> {
   return parseSuggestions(await store.get<unknown>(KEY_INTEGRATION_SUGGESTIONS));
 }
@@ -1458,6 +1484,10 @@ const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SHORTCUTS]: "shortcuts",
 };
 
+const ONBOARDING_PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_ONBOARDING]: "onboarding",
+};
+
 // Backwards-compat export used by tests - maps store keys from all stores
 // except where terminal/editor keys collide. Non-colliding entries are correct.
 // Do NOT use this map inside onPreferencesChange; use the per-store maps instead.
@@ -1467,6 +1497,7 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   ...EDITOR_PREF_KEY_MAP,
   ...TOOLS_PREF_KEY_MAP,
   ...SHORTCUTS_PREF_KEY_MAP,
+  ...ONBOARDING_PREF_KEY_MAP,
 };
 
 const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
@@ -1475,6 +1506,7 @@ const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
   editor: EDITOR_PREF_KEY_MAP,
   tools: TOOLS_PREF_KEY_MAP,
   shortcuts: SHORTCUTS_PREF_KEY_MAP,
+  onboarding: ONBOARDING_PREF_KEY_MAP,
 };
 
 // Every LazyStore paired with the key map that decodes its raw keys into a
@@ -1485,6 +1517,7 @@ const STORES_WITH_MAPS: ReadonlyArray<[LazyStore, Record<string, PrefKey>]> = [
   [editorStore, EDITOR_PREF_KEY_MAP],
   [toolsStore, TOOLS_PREF_KEY_MAP],
   [shortcutsStore, SHORTCUTS_PREF_KEY_MAP],
+  [onboardingStore, ONBOARDING_PREF_KEY_MAP],
 ];
 
 /** Subscribe to changes from any window (settings -> main). */

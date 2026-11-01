@@ -699,6 +699,28 @@ pub async fn agent_session_set_snapshot(
     session_store::set_snapshot(&tab_id, &session_id, &title, &notification)
 }
 
+fn settings_have_session_hook(content: Option<&str>) -> bool {
+    let Some(root) = content.and_then(|c| serde_json::from_str::<Value>(c).ok()) else {
+        return false;
+    };
+    root["hooks"].as_object().is_some_and(|events| {
+        events
+            .values()
+            .filter_map(Value::as_array)
+            .any(|groups| groups.iter().any(is_session_hook))
+    })
+}
+
+/// True when settings.json holds any Kex session hook, current or outdated. The startup sync
+/// decides on presence so it can refresh or remove old hooks; it never runs `claude --version`.
+#[tauri::command]
+pub async fn agent_claude_hooks_present() -> bool {
+    let content = settings_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok());
+    settings_have_session_hook(content.as_deref())
+}
+
 #[tauri::command]
 pub async fn agent_claude_hooks_status() -> bool {
     let version = detect_version(false).await;
@@ -1159,6 +1181,37 @@ mod tests {
         assert!(out.contains("\"SessionStart\"") || out.contains("\"Stop\""));
         let removed = plan_settings(&out, path, false, None).unwrap().unwrap();
         assert!(removed.contains("\"permissions\":{\"allow\":[ \"x\" ]}"));
+    }
+
+    #[test]
+    fn presence_is_false_without_a_settings_file() {
+        assert!(!settings_have_session_hook(None));
+        assert!(!settings_have_session_hook(Some("")));
+        assert!(!settings_have_session_hook(Some("{not json")));
+    }
+
+    #[test]
+    fn presence_is_true_for_current_hooks() {
+        let current = merge_hooks(json!({}), &all(), true).to_string();
+        assert!(settings_have_session_hook(Some(&current)));
+    }
+
+    #[test]
+    fn presence_is_true_for_outdated_hooks_that_miss_events() {
+        let outdated = merge_hooks(json!({}), &["Stop"], true).to_string();
+        assert!(settings_have_session_hook(Some(&outdated)));
+    }
+
+    #[test]
+    fn presence_is_false_for_foreign_hooks_only() {
+        let foreign = json!({
+            "hooks": {
+                "Stop": [ { "hooks": [ { "type": "command", "command": "echo hi" } ] } ],
+                "SessionStart": "not an array"
+            }
+        })
+        .to_string();
+        assert!(!settings_have_session_hook(Some(&foreign)));
     }
 
     #[test]

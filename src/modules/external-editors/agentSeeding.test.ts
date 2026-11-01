@@ -309,3 +309,32 @@ describe("startup scan", () => {
     error.mockRestore();
   });
 });
+
+describe("scan result", () => {
+  it("resolves to the detected list", async () => {
+    h.scan.mockResolvedValue([agent("pi")]);
+    expect((await runEditorScan())?.map((e) => e.id)).toEqual(["pi"]);
+  });
+
+  it("joins a scan in flight instead of resolving early without a result", async () => {
+    let finish: (v: DetectedEditor[]) => void = () => {};
+    h.scan.mockReturnValue(
+      new Promise<DetectedEditor[]>((r) => {
+        finish = r;
+      }),
+    );
+    const first = runEditorScan();
+    const second = runEditorScan();
+    finish([agent("omp")]);
+    expect((await second)?.map((e) => e.id)).toEqual(["omp"]);
+    expect((await first)?.map((e) => e.id)).toEqual(["omp"]);
+    expect(h.scan).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves to null when the scan fails", async () => {
+    h.scan.mockRejectedValue(new Error("ipc"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await runEditorScan()).toBeNull();
+    error.mockRestore();
+  });
+});
