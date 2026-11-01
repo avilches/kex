@@ -591,7 +591,7 @@ describe("runOnce", () => {
 });
 
 describe("workspace actions", () => {
-  const action = (id: string): Action => ({ id, name: id, kind: "script" as const, command: `run ${id}`, ownButton: false });
+  const action = (id: string): Action => ({ id, name: id, kind: "script" as const, command: `run ${id}`, runs: "workspace" as const, ownButton: false });
 
   it("changes the list of the matching workspace only", () => {
     const out = applyWorkspaceActions([ws(), ws({ id: "w2" })], "w1", (list) => addAction(list, action("a")));

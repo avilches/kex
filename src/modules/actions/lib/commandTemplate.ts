@@ -1,4 +1,5 @@
 import { quoteShellArg } from "@/lib/shellQuote";
+import type { ScriptRuns } from "./types";
 import { quotedVariables } from "@/modules/actions/lib/quotedVariables";
 import {
   missingTemplateVariables,
@@ -11,9 +12,21 @@ import {
 // templates, but a command is run, not shown: whitespace is kept, values are raw (home is
 // never turned into ~) and every value is quoted for how the command will be run.
 
-// A command runs against a place (folder, file, workspace), never against a running
-// program or a browser page, so only these variables exist for it.
-export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host", "target"] as const;
+// A command acts on one place, the folder or file it is offered at, and that is the only
+// variable it has: {target}.
+export const COMMAND_VARIABLES = ["target"] as const;
+
+// The variables Actions used to have. The template engine leaves an unknown name as literal
+// text, so a stale command would otherwise type "{cwd}" into a terminal without a word.
+const REMOVED_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host"] as const;
+
+function removedProblem(command: string): string | null {
+  const used = commandVariablesUsed(command);
+  const gone = REMOVED_VARIABLES.filter((n) => used.has(n));
+  if (gone.length === 0) return null;
+  const names = gone.map((n) => `{${n}}`).join(", ");
+  return `${names} no longer ${gone.length > 1 ? "exist" : "exists"}: {target} is the only variable`;
+}
 
 export type CommandVariable = (typeof COMMAND_VARIABLES)[number];
 
@@ -67,11 +80,14 @@ function quotedProblem(command: string, shell: CommandShell, isKnown = knownComm
 // the command is an app's (split into arguments); with one it is a script, whose own
 // quotes are the shell's business except around a variable.
 // With the current values of a script, a value that is unsafe to write is reported too.
-export function commandProblem(command: string, shell?: CommandShell, vars?: TemplateVars): string | null {
+export function commandProblem(command: string, shell?: CommandShell, vars?: TemplateVars, runs?: ScriptRuns): string | null {
+  const removed = command.trim() === "" ? null : removedProblem(command);
+  if (removed) return removed;
   if (shell) {
     if (command.trim() === "") return "the command is empty";
-    // A script names its place with its own variables; {target} would mean a different one per surface.
-    if (commandVariablesUsed(command).has("target")) return "{target} is only for apps: a script names its place with {cwd}, {filepath} or {workspace}";
+    const names = commandVariablesUsed(command).has("target");
+    if (names && (runs === "workspace" || runs === "fixed")) return "{target} needs a script that runs on any folder or any file";
+    if (!names && runs === "file") return "a file script must use {target}, the file it runs on";
     const quoted = quotedProblem(command, shell, vars ? (n) => typeof vars[n] === "string" : undefined);
     if (quoted || !vars) return quoted;
     const unsafe = unsafeVariables(command, vars, shell);

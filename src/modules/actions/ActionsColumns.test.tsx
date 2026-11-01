@@ -8,9 +8,9 @@ import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm dev", cwdMode: "workspace", ownButton: false };
+const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm dev", runs: "workspace", ownButton: false };
 const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", ownButton: false };
-const preset: Action = { id: "ac-3", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", appId: "zed", ownButton: false };
+const preset: Action = { id: "ac-3", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", icon: "app:zed", ownButton: false };
 
 const zed: AppSuggestion = { key: "zed:app", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {target}", kind: "app", accepts: "both" };
 const bbedit: AppSuggestion = { key: "bbedit:app", appId: "bbedit", name: "BBEdit", iconId: "bbedit", defaultCommand: "bbedit {target}", kind: "app", accepts: "file" };
@@ -99,7 +99,7 @@ describe("ActionsColumns", () => {
   });
 
   it("lists scripts before apps in each column with what they point at, and no inline expansion", () => {
-    const { container, unmount } = mount([savedApp, saved, { ...saved, id: "ac-9", name: "Fixed", cwdMode: "fixed", cwd: "/srv/app" }], [preset]);
+    const { container, unmount } = mount([savedApp, saved, { ...saved, id: "ac-9", name: "Fixed", runs: "fixed", cwd: "/srv/app" }], [preset]);
     const global = column(container, "global");
     const text = global.textContent ?? "";
     expect(text.indexOf("Dev")).toBeLessThan(text.indexOf("Zed"));
@@ -112,19 +112,25 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("the pencil opens a modal with the name and Run in folder side by side for a script, and no Run in for an app", () => {
+  it("the pencil opens a modal with the name, then Where it runs for a script, and neither for an app", () => {
     const script = mount([saved]);
     click(pencil(script.container));
-    const runIn = document.querySelector("[aria-label='Run in folder']")!;
-    expect(runIn).not.toBeNull();
-    expect(nameField()!.compareDocumentPosition(runIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const runs = document.querySelector("[aria-label='Where it runs']")!;
+    expect(runs).not.toBeNull();
+    expect(nameField()!.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect([...runs.querySelectorAll("label")].map((l) => l.textContent)).toEqual([
+      "Workspace root only",
+      "Any folder",
+      "Any file",
+      "One fixed folder",
+    ]);
     expect(commandField()!.value).toBe("pnpm dev");
     click(dialogButton("Done"));
     expect(commandField()).toBeNull();
     script.unmount();
     const app = mount([savedApp]);
     click(pencil(app.container));
-    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
+    expect(document.querySelector("[aria-label='Where it runs']")).toBeNull();
     expect(commandField()!.value).toBe("zed {target}");
     click(dialogButton("Done"));
     app.unmount();
@@ -174,12 +180,12 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("an app preset goes straight to the store with its appId and opens no modal", () => {
+  it("an app preset goes straight to the store with its icon and opens no modal", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
     click(options().find((o) => o.textContent === "ZedFiles and folders"));
     expect(g.onAdd).toHaveBeenCalledTimes(1);
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed", kind: "app", command: "zed {target}", appId: "zed", accepts: "both" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed", kind: "app", command: "zed {target}", icon: "app:zed", accepts: "both" });
     expect(commandField()).toBeNull();
     unmount();
   });
@@ -189,14 +195,14 @@ describe("ActionsColumns", () => {
     click(addTrigger(container, "global"));
     click(options().find((o) => o.textContent === "Custom"));
     expect(g.onAdd).not.toHaveBeenCalled();
-    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
-    typeField(commandField()!, "code {filepath}");
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "app", command: "code {filepath}" });
+    expect(document.querySelector("[aria-label='Where it runs']")).toBeNull();
+    typeField(commandField()!, "code {target}");
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "app", command: "code {target}" });
     unmount();
   });
 
   it("lists agents, scripts and apps in three groups of each column", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
     const { container, unmount } = mount([agent, savedApp, saved]);
     const text = column(container, "global").textContent ?? "";
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Scripts"));
@@ -215,18 +221,18 @@ describe("ActionsColumns", () => {
     expect(entries.map((o) => o.textContent)).toEqual(["Claude Code"]);
     click(entries[0]);
     const added = g.onAdd.mock.calls[0]![0] as Action;
-    expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude" });
-    expect(added.cwdMode).toBeUndefined();
+    expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude" });
+    expect(added).not.toHaveProperty("runs");
     expect(commandField()).toBeNull();
     unmount();
   });
 
-  it("the modal of an agent has name and command and no Run in folder or variables: it has no folder of its own", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", appId: "claude", ownButton: true };
+  it("the modal of an agent has name and command and no place or variables: it has no folder of its own", () => {
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", icon: "agent:claude", ownButton: true };
     const { container, unmount } = mount([agent]);
     click(pencil(container));
     expect(document.querySelector("[role='dialog']")?.textContent).toContain("Edit agent");
-    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
+    expect(document.querySelector("[aria-label='Where it runs']")).toBeNull();
     expect(nameField()!.value).toBe("Claude Code");
     expect(commandField()!.value).toBe("claude {x}");
     expect(dialogButton("Show variables")).toBeUndefined();
@@ -282,50 +288,81 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("says where an app lives and never offers it an own button", () => {
+    it("says where an app lives, from the two rules the Header and the menus use, and never offers it an own button", () => {
       const folders = mount([{ ...savedApp, accepts: "folder" }]);
       click(pencil(folders.container));
-      expect(note()).toContain("It lives in the Actions menu.");
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder.");
       expect(note()).toContain("never gets a button of its own");
       expect(preview()).toBeNull();
       folders.unmount();
       const both = mount([{ ...savedApp, accepts: "both" }]);
       click(pencil(both.container));
-      expect(note()).toContain("and in the submenu of the focused file");
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder or a file.");
       expect(preview()).toBeNull();
       both.unmount();
       const files = mount([{ ...savedApp, accepts: "file" }]);
       click(pencil(files.container));
-      expect(note()).toContain("submenu of the Actions menu named after the focused file");
+      expect(note()).toContain("It lives in the submenu of a file.");
       expect(preview()).toBeNull();
       files.unmount();
     });
 
-    it("tells {target} apart from the script variables in the list a script shows", () => {
+    it("lists Open folders before Edit files", () => {
+      const { container, unmount } = mount([savedApp]);
+      click(pencil(container));
+      const labels = [...document.querySelectorAll("[aria-label='What it opens'] label")].map((l) => l.textContent);
+      expect(labels).toEqual(["Open folders", "Edit files"]);
+      unmount();
+    });
+
+    it("says where a script lives, and offers an own button only to the ones the Header carries", () => {
+      const root = mount([saved]);
+      click(pencil(root.container));
+      expect(note()).toContain("It lives in the Header.");
+      expect(preview()).not.toBeNull();
+      root.unmount();
+      const folder = mount([{ ...saved, runs: "folder" }]);
+      click(pencil(folder.container));
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder.");
+      expect(preview()).not.toBeNull();
+      folder.unmount();
+      const file = mount([{ ...saved, runs: "file", command: "wc {target}" }]);
+      click(pencil(file.container));
+      expect(note()).toContain("It lives in the submenu of a file.");
+      expect(note()).toContain("never gets a button of its own");
+      expect(preview()).toBeNull();
+      file.unmount();
+    });
+
+    it("lists {target} for an app and for a folder script, and no variables for a script that runs in the root", () => {
       const app = mount([savedApp]);
       click(pencil(app.container));
       click(dialogButton("Show variables"));
       expect(note()).toContain("{target}");
       app.unmount();
-      const script = mount([saved]);
-      click(pencil(script.container));
+      const folder = mount([{ ...saved, runs: "folder" }]);
+      click(pencil(folder.container));
       click(dialogButton("Show variables"));
-      expect(note()).not.toContain("{target}");
-      script.unmount();
+      expect(note()).toContain("{target}");
+      folder.unmount();
+      const root = mount([saved]);
+      click(pencil(root.container));
+      expect(dialogButton("Show variables")).toBeUndefined();
+      root.unmount();
     });
   });
 
   describe("a custom agent and a chosen icon", () => {
     const iconButton = () => document.querySelector("button[aria-label='Choose an icon']") as HTMLElement | null;
     const tile = (label: string) => document.querySelector(`[role='listbox'] [aria-label='${label}']`) as HTMLElement | null;
-    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
 
     it("Custom agent opens an agent draft and reaches the store only once it has a command", async () => {
       const { container, g, unmount } = mount([], [], { suggestions: [] });
       click(addTrigger(container, "global"));
       click(options().find((o) => o.textContent?.startsWith("Custom agent")));
       expect(document.querySelector("[role='dialog']")?.textContent).toContain("New agent");
-      expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
+      expect(document.querySelector("[aria-label='Where it runs']")).toBeNull();
       expect(g.onAdd).not.toHaveBeenCalled();
       typeField(commandField()!, "my-agent --fast");
       await tick();
@@ -341,7 +378,7 @@ describe("ActionsColumns", () => {
       typeField(commandField()!, "claude");
       await tick();
       expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "claude" });
-      expect(g.onAdd.mock.calls[0]![0].appId).toBeUndefined();
+      expect(g.onAdd.mock.calls[0]![0].icon).toBeUndefined();
       unmount();
     });
 
@@ -371,32 +408,11 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("clears a chosen icon with Default icon, and only offers that when one is chosen", () => {
-      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
-      const withIcon: Action = { ...saved, icon: "glyph:star" };
-      const { container, g, unmount } = mount([withIcon]);
-      click(pencil(container));
-      click(iconButton());
-      expect(defaultRow()).toBeDefined();
-      click(defaultRow());
-      expect((g.onUpdate.mock.calls[0]![1] as Action).icon).toBe("");
-      unmount();
-
-      const plain = mount([saved]);
-      click(pencil(plain.container));
-      click(iconButton());
-      expect(defaultRow()).toBeUndefined();
-      plain.unmount();
-    });
-
-    it("keeps Default icon on the list while searching, so it can still be reached", () => {
-      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
+    it("has no Default icon entry: the icon is part of the Action", () => {
       const { container, unmount } = mount([{ ...saved, icon: "glyph:star" }]);
       click(pencil(container));
       click(iconButton());
-      typeField(document.querySelector<HTMLInputElement>("input[placeholder='Search icons...']")!, "pycharm");
-      expect(tile("PyCharm")).not.toBeNull();
-      expect(defaultRow()).toBeDefined();
+      expect([...document.querySelectorAll("[cmdk-item]")].some((o) => o.textContent?.trim() === "Default icon")).toBe(false);
       unmount();
     });
 
@@ -411,12 +427,12 @@ describe("ActionsColumns", () => {
     });
 
     it("keeps a chosen icon when a preset's command is edited and it becomes the user's own", () => {
-      const preset: Action = { id: "ac-z", name: "Zed", kind: "app", command: "zed {target}", appId: "zed", ownButton: false, icon: "glyph:star" };
+      const preset: Action = { id: "ac-z", name: "Zed", kind: "app", command: "zed {target}", ownButton: false, icon: "glyph:star" };
       const { container, g, unmount } = mount([preset], [], { suggestions: [zed] });
       click(pencil(container));
       typeField(commandField()!, "zed -n {target}");
       const [, next] = g.onUpdate.mock.calls[g.onUpdate.mock.calls.length - 1]! as [string, Action];
-      expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed", icon: "glyph:star" });
+      expect(next).toMatchObject({ command: "zed -n {target}", icon: "glyph:star" });
       unmount();
     });
   });
@@ -561,7 +577,7 @@ describe("ActionsColumns", () => {
     expect(g.onUpdate).toHaveBeenCalledTimes(1);
     const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
     expect(id).toBe("ac-3");
-    expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed" });
+    expect(next).toMatchObject({ command: "zed -n {target}" });
     unmount();
   });
 
@@ -619,7 +635,7 @@ describe("ActionsColumns", () => {
     expect(preview().querySelector("[data-preview-combo]")).not.toBeNull();
     expect(preview().textContent).toContain("Global actions");
     expect(preview().textContent).toContain("Dev");
-    expect(preview().textContent).toContain("Workspace");
+    expect(preview().textContent).toContain("Workspace root");
     click(dialogButton("Done"));
     combo.unmount();
     const button = mount([{ ...saved, ownButton: true }]);
@@ -658,27 +674,58 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("a new command runs in Home unless told otherwise, and the folder choice says so", () => {
+  it("a new script runs in the workspace root only unless told otherwise, and the radio says so", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
     click(options()[0]);
-    expect(document.querySelector("[aria-label='Run in folder']")!.textContent).toContain("Home");
+    const checked = document.querySelector("[aria-label='Where it runs'] [role='radio'][aria-checked='true']");
+    expect(checked?.getAttribute("value")).toBe("workspace");
     typeField(commandField()!, "pnpm test");
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ cwdMode: "home" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ runs: "workspace" });
+    unmount();
+  });
+
+  it("One fixed folder shows the path field first and saves only once there is a path", () => {
+    const { container, g, unmount } = mount([saved], []);
+    click(pencil(container));
+    click(document.querySelector("[aria-label='Where it runs'] [role='radio'][value='fixed']"));
+    const field = document.querySelector<HTMLInputElement>("[aria-label='Fixed folder path']")!;
+    expect(field).not.toBeNull();
+    expect(g.onUpdate).not.toHaveBeenCalled();
+    typeField(field, "/srv/app");
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ runs: "fixed", cwd: "/srv/app" }));
+    unmount();
+  });
+
+  it("leaving One fixed folder before typing a path changes nothing in the store", () => {
+    const { container, g, unmount } = mount([saved], []);
+    click(pencil(container));
+    click(document.querySelector("[aria-label='Where it runs'] [role='radio'][value='fixed']"));
+    click(document.querySelector("[aria-label='Where it runs'] [role='radio'][value='workspace']"));
+    expect(document.querySelector("[aria-label='Fixed folder path']")).toBeNull();
+    expect(g.onUpdate).toHaveBeenCalledTimes(1);
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-1", expect.objectContaining({ runs: "workspace" }));
+    unmount();
+  });
+
+  it("shows the problem of a file script saved without {target} in the modal", () => {
+    const { container, unmount } = mount([{ ...saved, runs: "file" }], []);
+    click(pencil(container));
+    expect(document.querySelector("[role='dialog']")?.textContent).toMatch(/must use \{target\}/);
     unmount();
   });
 
   it("editing the command back to the preset's gives the preset back, whatever the name", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {target}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {target}", icon: "app:zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(pencil(container));
     typeField(commandField()!, "zed {target}");
-    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {target}", appId: "zed", iconId: "" }));
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {target}" }));
     unmount();
   });
 
   it("an app whose command is a detected preset's is deleted without asking, even with no appId", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {target}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {target}", icon: "app:zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(g.onRemove).toHaveBeenCalledWith("ac-4");

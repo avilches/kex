@@ -2,103 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   equalFolder,
   folderKey,
-  resolveScriptCwd,
   scriptCwdProblem,
   scriptFolderMissingMessage,
   scriptShellFor,
 } from "./scriptCwd";
-
-const base = {
-  fixedFolder: "/opt/fixed",
-  focusFolder: "/Users/me/project/src",
-  workspaceRoot: "/Users/me/project",
-  workspaceCwd: "/Users/me/live",
-};
-
-describe("resolveScriptCwd", () => {
-  it("workspace mode returns the workspace root", () => {
-    expect(resolveScriptCwd({ ...base, mode: "workspace" })).toBe(
-      "/Users/me/project",
-    );
-  });
-
-  it("workspace mode falls back to the workspace cwd without a root", () => {
-    expect(
-      resolveScriptCwd({ ...base, mode: "workspace", workspaceRoot: null }),
-    ).toBe("/Users/me/live");
-  });
-
-  it("workspace mode is undefined when nothing is known", () => {
-    expect(
-      resolveScriptCwd({
-        mode: "workspace",
-        workspaceRoot: null,
-        workspaceCwd: null,
-      }),
-    ).toBeUndefined();
-  });
-
-  it("context mode returns the focused folder", () => {
-    expect(resolveScriptCwd({ ...base, mode: "context" })).toBe(
-      "/Users/me/project/src",
-    );
-  });
-
-  it("context mode falls back to workspace mode without a focused folder", () => {
-    expect(
-      resolveScriptCwd({ ...base, mode: "context", focusFolder: null }),
-    ).toBe("/Users/me/project");
-    expect(
-      resolveScriptCwd({
-        ...base,
-        mode: "context",
-        focusFolder: null,
-        workspaceRoot: null,
-      }),
-    ).toBe("/Users/me/live");
-  });
-
-  it("fixed mode returns the trimmed fixed folder", () => {
-    expect(
-      resolveScriptCwd({ ...base, mode: "fixed", fixedFolder: "  /opt/x " }),
-    ).toBe("/opt/x");
-  });
-
-  it("fixed mode with an empty folder falls back to workspace mode", () => {
-    expect(resolveScriptCwd({ ...base, mode: "fixed", fixedFolder: "" })).toBe(
-      "/Users/me/project",
-    );
-    expect(
-      resolveScriptCwd({ ...base, mode: "fixed", fixedFolder: "   " }),
-    ).toBe("/Users/me/project");
-    expect(
-      resolveScriptCwd({ ...base, mode: "fixed", fixedFolder: undefined }),
-    ).toBe("/Users/me/project");
-  });
-
-  it("an empty or blank focus folder counts as absent", () => {
-    expect(resolveScriptCwd({ ...base, mode: "context", focusFolder: "" })).toBe(
-      "/Users/me/project",
-    );
-    expect(
-      resolveScriptCwd({ ...base, mode: "context", focusFolder: "  " }),
-    ).toBe("/Users/me/project");
-  });
-
-  it("an absent mode behaves as home and ignores the fixed folder", () => {
-    expect(resolveScriptCwd({ ...base, mode: undefined, home: "/Users/me" })).toBe("/Users/me");
-    expect(resolveScriptCwd({ ...base, mode: "home", home: "/Users/me", fixedFolder: "/x" })).toBe("/Users/me");
-  });
-
-  it("home with no known home leaves the folder to the terminal", () => {
-    expect(resolveScriptCwd({ ...base, mode: "home" })).toBeUndefined();
-    expect(resolveScriptCwd({ ...base, mode: "home", home: "  " })).toBeUndefined();
-  });
-
-  it("workspace mode keeps using the workspace folder", () => {
-    expect(resolveScriptCwd({ ...base, mode: "workspace", home: "/Users/me" })).toBe("/Users/me/project");
-  });
-});
 
 describe("scriptShellFor", () => {
   it("is powershell only on Windows outside WSL", () => {

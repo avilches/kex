@@ -4,8 +4,6 @@ import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import { GLYPHS } from "./actionIcons";
 import { AGENT_LOGO_IDS, filterIcons, formatIcon, GLYPH_NAMES, ICON_APP_IDS, iconOptions, parseIcon } from "./actionIconRefs";
 import { normalizeActions, updateAction } from "./actions";
-import { ownedAfterEdit } from "./appOwnership";
-import type { AppSuggestion } from "./appSuggestions";
 import type { Action } from "./types";
 
 describe("parseIcon", () => {
@@ -73,7 +71,7 @@ describe("filterIcons", () => {
 });
 
 describe("the icon field of an Action", () => {
-  const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", ownButton: false };
+  const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", runs: "workspace", ownButton: false };
 
   it("survives normalization when valid and is dropped when it points at nothing", () => {
     const [kept] = normalizeActions([{ ...script, icon: "glyph:rocket" }]);
@@ -88,15 +86,5 @@ describe("the icon field of an Action", () => {
     expect(set[0]?.icon).toBe("app:zed");
     const cleared = updateAction(set, "s1", { icon: "" });
     expect(cleared[0]?.icon).toBeUndefined();
-  });
-
-  it("is never touched by the preset ownership rules", () => {
-    const zed: AppSuggestion = { key: "zed:ws", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
-    const preset: Action = { id: "a1", name: "Zed", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false, icon: "glyph:star" };
-    expect(ownedAfterEdit(preset, { ...preset, name: "Mine" }, [zed]).icon).toBe("glyph:star");
-    const edited = ownedAfterEdit(preset, { ...preset, command: "zed -n {workspace}" }, [zed]);
-    expect(edited).toMatchObject({ appId: "", iconId: "zed", icon: "glyph:star" });
-    const back = ownedAfterEdit(edited, { ...edited, command: "zed {workspace}" }, [zed]);
-    expect(back).toMatchObject({ appId: "zed", iconId: "", icon: "glyph:star" });
   });
 });

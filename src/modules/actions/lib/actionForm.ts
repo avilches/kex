@@ -1,14 +1,7 @@
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
-import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
-import {
-  commandProblem,
-  missingVariables,
-  unsafeVariables,
-  type CommandShell,
-  type CommandVariable,
-} from "./commandTemplate";
+import { commandProblem, missingVariables, unsafeVariables, type CommandShell, type CommandVariable } from "./commandTemplate";
 import { agentCommandProblem } from "./actionsBar";
-import { isAgent, isScript, usesTerminal, type Action, type ActionKind } from "./types";
+import { isAgent, isApp, isScript, usesTerminal, type Action, type ScriptRuns } from "./types";
 
 export { COMMAND_VARIABLES } from "./commandTemplate";
 
@@ -17,38 +10,28 @@ export type CommandVariableDoc = {
   description: string;
 };
 
-// The docs for the picker live here: the title templates have a different vocabulary
-// (their {file} and {path} keep their own meaning), so Actions do not reuse those names.
-const VARIABLE_DOCS: readonly CommandVariableDoc[] = [
-  { name: "cwd", description: "Full path of the folder the tab is in (for a file, the folder that holds it)" },
-  { name: "dir", description: "Only the name of that folder" },
-  { name: "branch", description: "Git branch of that folder, empty outside a repository" },
-  { name: "repo", description: "Name of the git repository" },
-  { name: "workspace", description: "Full path of the workspace root, empty when the workspace has none" },
-  { name: "filename", description: "Name of the file the tab works on" },
-  { name: "filepath", description: "Full path of that file" },
-  { name: "host", description: "Name of this computer" },
-];
-
-const TARGET_DOC: CommandVariableDoc = {
-  name: "target",
-  description: "What the app is opened on: the workspace root from the Header, the folder or the file from a menu",
+const TARGET_DOCS: Record<"app" | "folder" | "file", string> = {
+  app: "What the app is opened on: the workspace root from the Header, the folder or the file from a menu",
+  folder: "The folder the script was offered at: the workspace root from the Header, the folder of the menu otherwise",
+  file: "Full path of the file the script was offered at",
 };
 
-/** The variables a form lists. {target} belongs to apps alone, which are offered in several
- * places; a script has one place and reads it from the variables above. */
-export function commandVariableDocs(kind: ActionKind = "script"): readonly CommandVariableDoc[] {
-  return kind === "app" ? [TARGET_DOC, ...VARIABLE_DOCS] : VARIABLE_DOCS;
+/** The variables a form lists: {target} for an app and for a script that runs on any folder or any
+ * file. A script that runs in the workspace root or one fixed folder, and an agent, have none. */
+export function commandVariableDocs(action: Pick<Action, "kind" | "runs">): readonly CommandVariableDoc[] {
+  if (isApp(action)) return [{ name: "target", description: TARGET_DOCS.app }];
+  if (action.kind === "script" && action.runs === "folder") return [{ name: "target", description: TARGET_DOCS.folder }];
+  if (action.kind === "script" && action.runs === "file") return [{ name: "target", description: TARGET_DOCS.file }];
+  return [];
 }
 
-// A script row is a terminal command pointed at a folder; an app row is a background
-// program. The kind is chosen on creation by the add buttons and never switched later.
-export const CWD_MODE_LABELS: Record<ScriptCwdMode, string> = {
-  home: "Home",
-  workspace: "Workspace root",
-  context: "Current folder",
-  fixed: "Absolute path",
-};
+/** The four places a script can act, in the order the modal offers them. */
+export const SCRIPT_RUNS_OPTIONS: readonly { value: ScriptRuns; label: string; hint: string }[] = [
+  { value: "workspace", label: "Workspace root only", hint: "Always runs in the root of the workspace" },
+  { value: "folder", label: "Any folder", hint: "Runs in the folder it is offered at; {target} is that folder" },
+  { value: "file", label: "Any file", hint: "Runs in the folder of the file; {target} is the file" },
+  { value: "fixed", label: "One fixed folder", hint: "Always runs in the folder you pick" },
+];
 
 export type ActionProblem = { kind: "command" | "cwd" | "context"; message: string };
 
@@ -67,17 +50,17 @@ export function actionProblems(
   const out: ActionProblem[] = [];
   const shell = usesTerminal(action) ? context?.shell ?? "posix" : undefined;
   const agent = isAgent(action);
-  const check = agent ? agentCommandProblem : (command: string) => commandProblem(command, shell);
+  const check = agent ? agentCommandProblem : (command: string) => commandProblem(command, shell, undefined, action.runs);
   const problem = action.command.trim() ? check(action.command) : null;
   if (problem) out.push({ kind: "command", message: problem });
-  if (isScript(action) && action.cwdMode === "fixed" && action.cwd) {
+  if (isScript(action) && action.runs === "fixed" && action.cwd) {
     const cwd = scriptCwdProblem(action.cwd);
     if (cwd) out.push({ kind: "cwd", message: cwd });
   }
   if (!agent && !problem && context && action.command.trim()) {
     const missing = missingVariables(action.command, context.vars);
     if (missing.length > 0) {
-      out.push({ kind: "context", message: `${formatNames(missing)} has no value in the current tab` });
+      out.push({ kind: "context", message: `${formatNames(missing)} has no value here` });
     } else if (usesTerminal(action)) {
       const unsafe = unsafeVariables(action.command, context.vars, context.shell);
       if (unsafe.length > 0) {

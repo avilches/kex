@@ -16,6 +16,7 @@ const act = (id: string, o: Partial<Action> = {}): Action => ({
   name: id,
   kind: "script",
   command: `run ${id}`,
+  runs: "workspace",
   ownButton: false,
   ...o,
 });
@@ -45,8 +46,8 @@ describe("addAction / updateAction / removeAction", () => {
   it("keeps in memory exactly what normalize would persist", () => {
     const [added] = addAction([], act("a", { name: " A ", command: " ls " }));
     expect(added).toEqual(act("a", { name: "A", command: "ls" }));
-    const [app] = updateAction([act("a", { cwdMode: "fixed", cwd: "/x" })], "a", { kind: "app" });
-    expect(app).not.toHaveProperty("cwdMode");
+    const [app] = updateAction([act("a", { runs: "fixed", cwd: "/x" })], "a", { kind: "app" });
+    expect(app).not.toHaveProperty("runs");
     expect(app).not.toHaveProperty("cwd");
   });
 
@@ -94,29 +95,29 @@ describe("normalizeActions", () => {
     expect(normalizeActions([act("b", { kind: "bogus" as never })])).toEqual([]);
   });
 
-  it("scripts keep their cwd mode and folder", () => {
-    const [x] = normalizeActions([act("a", { kind: "script", cwdMode: "fixed", cwd: "/x" })]);
-    expect(x).toMatchObject({ cwdMode: "fixed", cwd: "/x" });
+  it("scripts keep where they run and the fixed folder", () => {
+    const [x] = normalizeActions([act("a", { kind: "script", runs: "fixed", cwd: "/x" })]);
+    expect(x).toMatchObject({ runs: "fixed", cwd: "/x" });
   });
 
-  it("agents never carry a cwd mode or folder: they have none of their own", () => {
-    const [agent] = normalizeActions([act("a", { kind: "agent", cwdMode: "fixed", cwd: "/x" })]);
+  it("agents never carry a place or folder: they have none of their own", () => {
+    const [agent] = normalizeActions([act("a", { kind: "agent", runs: "fixed", cwd: "/x" })]);
     expect(agent).toMatchObject({ kind: "agent" });
-    expect(agent).not.toHaveProperty("cwdMode");
+    expect(agent).not.toHaveProperty("runs");
     expect(agent).not.toHaveProperty("cwd");
   });
 
-  it("apps never carry a cwd mode or folder", () => {
-    const [app] = normalizeActions([act("a", { kind: "app", cwdMode: "fixed", cwd: "/x" })]);
-    expect(app).not.toHaveProperty("cwdMode");
+  it("apps never carry a place or folder", () => {
+    const [app] = normalizeActions([act("a", { kind: "app", runs: "fixed", cwd: "/x" })]);
+    expect(app).not.toHaveProperty("runs");
     expect(app).not.toHaveProperty("cwd");
   });
 
   it("a folder only survives with the fixed mode", () => {
-    const [s] = normalizeActions([act("a", { cwdMode: "workspace", cwd: "/x" })]);
-    expect(s).toHaveProperty("cwdMode", "workspace");
+    const [s] = normalizeActions([act("a", { runs: "workspace", cwd: "/x" })]);
+    expect(s).toHaveProperty("runs", "workspace");
     expect(s).not.toHaveProperty("cwd");
-    const [f] = normalizeActions([act("b", { cwdMode: "fixed", cwd: "/x" })]);
+    const [f] = normalizeActions([act("b", { runs: "fixed", cwd: "/x" })]);
     expect(f).toHaveProperty("cwd", "/x");
   });
 
@@ -161,7 +162,7 @@ describe("normalizeActions", () => {
 
     it("belongs to apps only: a script or an agent never carries it", () => {
       for (const kind of ["script", "agent"] as const) {
-        const [x] = normalizeActions([{ id: "a", kind, command: "claude", accepts: "both" }]);
+        const [x] = normalizeActions([{ id: "a", kind, command: "claude", runs: "workspace", accepts: "both" }]);
         expect(x).not.toHaveProperty("accepts");
       }
     });
@@ -178,13 +179,6 @@ describe("normalizeActions", () => {
   });
 });
 
-describe("updateAction appId", () => {
-  it("an empty appId clears the preset link, which a missing key cannot do", () => {
-    const preset: Action = { id: "a1", name: "Zed", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
-    expect(updateAction([preset], "a1", { appId: "" })[0]?.appId).toBeUndefined();
-    expect(updateAction([preset], "a1", { ownButton: true })[0]?.appId).toBe("zed");
-  });
-});
 
 describe("adoptActionAt, apps with the same command", () => {
   const app = (id: string, command: string, o: Partial<Action> = {}): Action => ({
@@ -254,14 +248,13 @@ describe("reorderBefore", () => {
 });
 
 describe("clearing the fixed folder of a script", () => {
-  const fixed = act("a", { kind: "script", command: "make", cwdMode: "fixed", cwd: "/old" } as Partial<Action>);
+  const fixed = act("a", { kind: "script", command: "make", runs: "fixed", cwd: "/old" } as Partial<Action>);
 
   it("survives the JSON trip a workspace edit makes between windows", () => {
     const patch = JSON.parse(JSON.stringify(withFixedCwd(fixed, "   "))) as Action;
     expect("cwd" in patch).toBe(true);
     const [updated] = updateAction([fixed], "a", patch);
-    expect(updated?.cwd).toBeUndefined();
-    expect(updated?.cwdMode).toBe("fixed");
+    expect(updated?.runs).toBe("fixed");
   });
 
   it("an undefined folder would not: the old one survives the same trip", () => {

@@ -21,7 +21,6 @@ const agent = (o: Partial<Action>): Action => ({
   name: "Claude",
   kind: "agent",
   command: "claude",
-  cwdMode: "workspace",
   ownButton: true,
   ...o,
 });
@@ -33,7 +32,7 @@ const ws: Workspace = {
   cwd: "/w",
   paneTree: { kind: "pane", id: "p1", tabs: [{ id: "tab-1", kind: "terminal", cwd: "/w" }], activeTabId: "tab-1" },
   activePaneId: "p1",
-  actions: [agent({ id: "w" }), agent({ id: "c", cwdMode: "context" })],
+  actions: [agent({ id: "w" }), agent({ id: "c", command: "claude --resume" })],
 };
 
 describe("useActionsBarModel twins", () => {

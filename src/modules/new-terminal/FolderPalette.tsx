@@ -171,7 +171,7 @@ export function FolderPalette({
   ) => {
     const box = boxRef.current;
     if (!row || !box || !el) return;
-    const { groups: found, overlay } = rowActions(workspaceOf(row.workspaceId), row.path, row.branch);
+    const { groups: found, overlay } = rowActions(workspaceOf(row.workspaceId), row.path);
     const scoped = [
       ...found.workspace.map((entry) => ({ entry, scope: "workspace" as const })),
       ...found.global.map((entry) => ({ entry, scope: "global" as const })),

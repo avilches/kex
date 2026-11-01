@@ -1,10 +1,8 @@
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
-  ComputerTerminal01Icon,
   FolderOpenIcon,
   Home01Icon,
-  PinIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
@@ -12,29 +10,28 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INPUT_CLASS } from "@/settings/components/inputClass";
 import { insertTitleVariable } from "@/modules/workspaces/lib/titleVariablesFor";
-import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
+import { cachedHomeDir, primeHomeDir } from "@/lib/homeDir";
 import { IconPicker } from "./IconPicker";
 import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
-import { withFixedCwd } from "./lib/actions";
-import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
+import { needsFolder, withFixedCwd, withRuns } from "./lib/actions";
+import { actionProblems, commandDraft, commandVariableDocs, commitCommand, SCRIPT_RUNS_OPTIONS } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import type { AppAccepts } from "@/modules/external-editors/catalog";
-import { acceptsFile, acceptsFolder, acceptsFromSwitches, acceptsOnlyFile, appAccepts, appCombos, inBar } from "./lib/actionTargets";
+import { acceptsFile, acceptsFolder, acceptsFromSwitches, appAccepts, inHeader, offeredAt } from "./lib/actionTargets";
 import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
-import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
+import { isAgent, isApp, isScript, type Action, type ActionKind, type ScriptRuns } from "./lib/types";
 
 const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
 
 const ACCEPTS_SWITCHES = [
-  { key: "files", label: "Edit files" },
   { key: "folders", label: "Open folders" },
+  { key: "files", label: "Edit files" },
 ] as const;
 
 const SMALL_BUTTON =
@@ -55,22 +52,18 @@ type Props = {
   onClose: () => void;
 };
 
-const CWD_MODE_ICONS = {
-  home: Home01Icon,
-  workspace: PinIcon,
-  context: ComputerTerminal01Icon,
-  fixed: FolderOpenIcon,
-} as const;
-
 
 // The edit form of one Action, in a modal. Everything saves as it is typed (the name and the
 // command when the field loses focus, the rest at once), so Close only leaves; closing with
 // Escape or the backdrop flushes what is still being typed. A preset is edited like any other
 // Action: the host decides when a change makes it the user's own.
-function appPlace(accepts: AppAccepts): string {
-  const { actions, file } = appCombos(accepts);
-  if (actions && file) return "It lives in the Actions menu, and in the submenu of the focused file.";
-  return file ? "It lives in the submenu of the Actions menu named after the focused file." : "It lives in the Actions menu.";
+// Where an Action is listed, in words, from the same two rules the Header and the menus use.
+function placeNote(action: Action): string {
+  const header = inHeader(action);
+  const at = [offeredAt(action, "folder") && "a folder", offeredAt(action, "file") && "a file"].filter(Boolean).join(" or ");
+  if (header && at) return `It lives in the Header and in the submenu of ${at}.`;
+  if (header) return "It lives in the Header.";
+  return `It lives in the submenu of ${at}.`;
 }
 
 export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, workspaceName, onScopeChange, onChange, onClose }: Props) {
@@ -93,7 +86,17 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const problems = actionProblems({ ...action, command: command.shown }, context);
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
-  const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
+  // "One fixed folder" is chosen before its path exists, and the store never holds a fixed script
+  // without one, so the choice lives here until the path arrives.
+  const [pickedFixed, setPickedFixed] = useState(false);
+  const runs: ScriptRuns = pickedFixed ? "fixed" : (action.runs ?? "workspace");
+  const fixedWithPath = (cwd: string) => {
+    const next = withFixedCwd({ ...action, runs: "fixed" }, cwd);
+    if (!needsFolder("fixed", next.cwd)) {
+      setPickedFixed(false);
+      onChange(next);
+    }
+  };
   const script = isScript(action);
   const agent = isAgent(action);
   const app = isApp(action);
@@ -208,62 +211,82 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
                 }}
               />
             </label>
-            {script && (
-              <div className="flex w-[200px] shrink-0 flex-col gap-1.5">
-                <span className="text-[11px] text-muted-foreground">Run in folder</span>
-                <Select value={cwdMode} onOpenChange={onSelectOpenChange} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
-                  <SelectTrigger size="sm" aria-label="Run in folder" className="h-8 w-full text-[12px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(CWD_MODE_LABELS) as ScriptCwdMode[]).map((mode) => (
-                      <SelectItem key={mode} value={mode} className="text-[12px]">
-                        <span className="flex items-center gap-2">
-                          <HugeiconsIcon icon={CWD_MODE_ICONS[mode]} size={13} strokeWidth={2} className="shrink-0 text-muted-foreground" />
-                          {CWD_MODE_LABELS[mode]}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          </div>
+        </div>
+
+        {script && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Where it runs</span>
+            <RadioGroup
+              value={runs}
+              aria-label="Where it runs"
+              className="grid grid-cols-2 gap-2"
+              onValueChange={(v) => {
+                if (v === "fixed") {
+                  if (needsFolder("fixed", action.cwd)) setPickedFixed(true);
+                  else onChange(withRuns(action, "fixed"));
+                  return;
+                }
+                setPickedFixed(false);
+                onChange(withRuns(action, v as ScriptRuns));
+              }}
+            >
+              {SCRIPT_RUNS_OPTIONS.map((o) => (
+                <label key={o.value} title={o.hint} className={cn(BOXED_RADIO, "items-center text-[12px]")}>
+                  <RadioGroupItem value={o.value} />
+                  {o.label}
+                </label>
+              ))}
+            </RadioGroup>
+            {runs === "fixed" && (
+              <>
+                <div className="flex items-center gap-1">
+                  <input
+                    className={cn(INPUT_CLASS, "flex-1 font-mono")}
+                    aria-label="Fixed folder path"
+                    placeholder="Absolute path"
+                    spellCheck={false}
+                    defaultValue={action.cwd ?? ""}
+                    key={action.cwd ?? ""}
+                    onBlur={(e) => fixedWithPath(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    title="Browse"
+                    aria-label="Browse for a folder"
+                    className={SMALL_BUTTON}
+                    onClick={async () => {
+                      const selected = await openFolderDialog({ directory: true, defaultPath: action.cwd || undefined });
+                      if (typeof selected === "string") fixedWithPath(selected);
+                    }}
+                  >
+                    <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Use the home folder"
+                    aria-label="Use the home folder"
+                    className={SMALL_BUTTON}
+                    onClick={async () => {
+                      await primeHomeDir();
+                      const home = cachedHomeDir();
+                      if (home) fixedWithPath(home);
+                    }}
+                  >
+                    <HugeiconsIcon icon={Home01Icon} size={12} strokeWidth={2} />
+                  </button>
+                </div>
+                {blocking
+                  .filter((p) => p.kind === "cwd")
+                  .map((p) => (
+                    <div key={p.message} className="text-[11px] text-destructive">
+                      {p.message}
+                    </div>
+                  ))}
+              </>
             )}
           </div>
-          {script && cwdMode === "fixed" && (
-            <>
-              <div className="flex items-center gap-1">
-                <input
-                  className={cn(INPUT_CLASS, "flex-1 font-mono")}
-                  aria-label="Fixed folder path"
-                  placeholder="Absolute path"
-                  spellCheck={false}
-                  defaultValue={action.cwd ?? ""}
-                  key={action.cwd ?? ""}
-                  onBlur={(e) => onChange(withFixedCwd(action, e.target.value))}
-                />
-                <button
-                  type="button"
-                  title="Browse"
-                  aria-label="Browse for a folder"
-                  className={SMALL_BUTTON}
-                  onClick={async () => {
-                    const selected = await openFolderDialog({ directory: true, defaultPath: action.cwd || undefined });
-                    if (typeof selected === "string") onChange({ ...action, cwd: selected });
-                  }}
-                >
-                  <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
-                </button>
-              </div>
-              {blocking
-                .filter((p) => p.kind === "cwd")
-                .map((p) => (
-                  <div key={p.message} className="text-[11px] text-destructive">
-                    {p.message}
-                  </div>
-                ))}
-            </>
-          )}
-        </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="flex flex-col gap-1.5">
@@ -310,7 +333,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
               </label>
             </div>
           )}
-          {!agent && (
+          {!agent && commandVariableDocs(action).length > 0 && (
             <button
               type="button"
               aria-expanded={variablesOpen}
@@ -323,7 +346,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           )}
           {!agent && variablesOpen && (
             <div className="flex min-w-0 flex-col text-[11px] leading-snug">
-              {commandVariableDocs(action.kind).map((v) => (
+              {commandVariableDocs(action).map((v) => (
                 <button
                   key={v.name}
                   type="button"
@@ -342,11 +365,6 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
                     <span className="font-mono text-foreground">{`{${v.name}}`}</span>
                     <span className="text-muted-foreground">{v.description}</span>
                   </span>
-                  {context?.vars[v.name] && (
-                    <span className="w-full truncate pl-[6.25rem] font-mono text-[10px] text-muted-foreground/80" title={context.vars[v.name]}>
-                      {context.vars[v.name]}
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
@@ -393,17 +411,12 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           </div>
         )}
 
-        {app ? (
-          <div className="text-[11px] text-muted-foreground">
-            {appPlace(appAccepts(action))} It never gets a button of its own.
-          </div>
-        ) : inBar(action) ? (
+        <div className="text-[11px] text-muted-foreground">{placeNote(action)}</div>
+        {!app && inHeader(action) && (
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
-        ) : (
-          <div className="text-[11px] text-muted-foreground">
-            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the submenu of the Actions
-            menu named after it, never as a button of its own.
-          </div>
+        )}
+        {(app || !inHeader(action)) && (
+          <div className="text-[11px] text-muted-foreground">It never gets a button of its own.</div>
         )}
 
         <div className="flex justify-end border-t border-border pt-3">

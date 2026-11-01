@@ -65,7 +65,7 @@ describe("suggestionsFromDetected", () => {
 
   it("builds an Action that carries what the app accepts and no variable in its name", () => {
     const [s] = suggestionsFromDetected([ed("pycharm", "pycharm")]);
-    expect(actionFromSuggestion(s!)).toMatchObject({ kind: "app", name: "PyCharm", command: "pycharm {target}", appId: "pycharm", accepts: "folder", ownButton: false });
+    expect(actionFromSuggestion(s!)).toMatchObject({ kind: "app", name: "PyCharm", command: "pycharm {target}", icon: "app:pycharm", accepts: "folder", ownButton: false });
     const [z] = suggestionsFromDetected([ed("zed", "zed")]);
     expect(actionFromSuggestion(z!).accepts).toBe("both");
   });

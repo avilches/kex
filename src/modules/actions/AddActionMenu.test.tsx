@@ -168,7 +168,7 @@ describe("uninstalledSuggestions", () => {
   it("hides a preset an app already has by its command, whatever its name, icon or appId", () => {
     const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed {target}", appId: "zed", ownButton: false }];
     expect(uninstalledSuggestions(suggestions, installed).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], appId: undefined, name: "Mine" }]).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], name: "Mine" }]).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
     expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: " zed {target}  " }]).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
   });
 

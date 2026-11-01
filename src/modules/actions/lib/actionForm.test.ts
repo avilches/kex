@@ -12,22 +12,31 @@ const script: Action = {
   name: "Dev",
   kind: "script",
   command: "pnpm dev",
-  cwdMode: "fixed",
+  runs: "fixed",
   cwd: "/work/kex",
   ownButton: true,
 };
-const app: Action = { id: "ac-2", name: "PyCharm", kind: "app", command: "pycharm {cwd}", appId: "pycharm", ownButton: false };
+const folderScript: Action = { ...script, runs: "folder", cwd: undefined };
+const app: Action = { id: "ac-2", name: "PyCharm", kind: "app", command: "pycharm {target}", icon: "app:pycharm", ownButton: false };
+const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude {x} 'y", ownButton: true };
 
 describe("commandVariableDocs", () => {
-  it("lists only the variables a command can have a value for, with their descriptions", () => {
-    const docs = commandVariableDocs();
-    expect(docs.map((d) => d.name)).toEqual(["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host"]);
-    expect(docs.every((d) => d.description.length > 0)).toBe(true);
+  it("lists {target} for an app and for a script on any folder or any file, and nothing else", () => {
+    expect(commandVariableDocs(app).map((d) => d.name)).toEqual(["target"]);
+    expect(commandVariableDocs(folderScript).map((d) => d.name)).toEqual(["target"]);
+    expect(commandVariableDocs({ ...script, runs: "file" }).map((d) => d.name)).toEqual(["target"]);
+    expect(commandVariableDocs(app)[0]!.description.length).toBeGreaterThan(0);
+  });
+
+  it("lists none for a script in the workspace root or one folder, nor for an agent", () => {
+    expect(commandVariableDocs({ ...script, runs: "workspace" })).toEqual([]);
+    expect(commandVariableDocs(script)).toEqual([]);
+    expect(commandVariableDocs(agent)).toEqual([]);
   });
 });
 
 describe("actionProblems", () => {
-  const ctx = { vars: { cwd: "/p", workspace: "", filefilepath: "", branch: "", repo: "", dir: "p", filename: "", host: "h" }, shell: "posix" as const };
+  const ctx = { vars: { target: "/p" }, shell: "posix" as const };
 
   it("reports nothing for a plain command", () => {
     expect(actionProblems(script, ctx)).toEqual([]);
@@ -43,24 +52,25 @@ describe("actionProblems", () => {
     expect(problems.map((p) => p.kind)).toEqual(["cwd"]);
   });
 
-  it("only checks the fixed folder of a script in fixed mode", () => {
-    expect(actionProblems({ ...script, cwdMode: "workspace", cwd: "relative" }, ctx)).toEqual([]);
+  it("only checks the folder of a script that runs in one fixed folder", () => {
+    expect(actionProblems({ ...folderScript, cwd: "relative" }, ctx)).toEqual([]);
   });
 
-  it("notes a variable with no value here without calling it an error in the command", () => {
-    const problems = actionProblems({ ...app, command: "code {workspace}" }, ctx);
-    expect(problems).toEqual([{ kind: "context", message: "{workspace} has no value in the current tab" }]);
+  it("refuses a variable that no longer exists", () => {
+    const problems = actionProblems({ ...folderScript, command: "make -C {cwd}" }, ctx);
+    expect(problems.map((p) => p.kind)).toEqual(["command"]);
+    expect(problems[0]!.message).toMatch(/\{cwd\} no longer exists/);
   });
 
   it("notes an unsafe value for a script but not for an app", () => {
-    const unsafe = { ...ctx, vars: { ...ctx.vars, cwd: "/p/it's" } };
-    const asScript = actionProblems({ ...script, command: "make -C {cwd}", cwdMode: "workspace" }, unsafe);
+    const unsafe = { ...ctx, vars: { target: "/p/it's" } };
+    const asScript = actionProblems({ ...folderScript, command: "make -C {target}" }, unsafe);
     expect(asScript.map((p) => p.kind)).toEqual(["context"]);
-    expect(actionProblems({ ...app, command: "code {cwd}" }, unsafe)).toEqual([]);
+    expect(actionProblems(app, unsafe)).toEqual([]);
   });
 
   it("skips the context checks when there is no context, as in Settings", () => {
-    expect(actionProblems({ ...app, command: "code {workspace}" }, null)).toEqual([]);
+    expect(actionProblems(app, null)).toEqual([]);
   });
 
   it("does not report a command problem for an empty command", () => {
@@ -68,9 +78,7 @@ describe("actionProblems", () => {
   });
 
   it("reads an agent command as literal text: no variables, no quotes, and no folder to check", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude {workspace} 'x", ownButton: true };
     expect(actionProblems(agent, ctx)).toEqual([]);
-    expect(actionProblems({ ...agent, cwdMode: "fixed", cwd: "rel" }, ctx)).toEqual([]);
   });
 });
 

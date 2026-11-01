@@ -25,7 +25,7 @@ Workspace           - a named environment (local or WSL distro)
 
 **Workspace fields.** A `Workspace` carries additional configuration:
 - `color?: string | null` - optional workspace accent color (hex string or null)
-- `actions?: Action[]` - the workspace-scoped Actions (name, command template, `kind` (`app` | `script` | `agent`), and for scripts and agents `cwdMode` of `home` (default) | `workspace` | `context` | `fixed` with `cwd` used only in `fixed` mode); the global ones live in `settings-tools.json`. See ARCHITECTURE 3.12
+- `actions?: Action[]` - the workspace-scoped Actions (name, command template, `kind` (`app` | `script` | `agent`), and for scripts `runs` of `folder` | `file` | `workspace` | `fixed` with `cwd` used only for `fixed`); the global ones live in `settings-tools.json`. See ARCHITECTURE 3.12
 - `scriptPaneId?: string` - the pane scripts open their tabs in; cleared at startup when that pane no longer exists
 - `explorerRootMode: "workspace" | "filesystem"` - which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
@@ -290,7 +290,7 @@ browsers and the rest never do. The tab keeps its id, its place in the `paneTree
   `blockedWhileHibernated` cover `terminal.*` (clear, scratchpad) and `search.focus`; the command palette disables the same
   commands (`commandBlockedWhileHibernated`, reason "Tab hibernated", plus `history.open`). The native menu has nothing to
   grey out: `sync_menu` no longer receives a hibernated flag. Actions are never blocked by a sleeping focused tab: it keeps
-  its `cwd`, so `{cwd}`, `{dir}`, `{branch}`, `{repo}` and Run in folder = Current folder still have a value.
+  its `cwd`, so the folder submenu of the Header still names it and a folder Action offered there still has its `{target}`.
   When an agent had entered a worktree, the tab stands in it while asleep exactly as while awake (`tabWorktree` in
   `lib/hibernate.ts`: the live session's worktree, else the one kept in `hibernation.worktreeCwd`), for Actions, the tab
   tooltip, Copy Path and the Sidebar. The shell itself still starts in `Tab.cwd`, the original folder, and the resumed

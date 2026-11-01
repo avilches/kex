@@ -119,10 +119,10 @@ describe("OwnButton", () => {
   });
 
   it("gives an agent no run or stop zone and never a Show title: each click runs it again", () => {
-    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
+    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
     const focus = vi.fn(() => true);
-    const context: BarContext = { vars: { workspace: "/p", cwd: "/p" }, shell: "posix", folders: { focusFolder: "/p", workspaceRoot: "/p" } };
-    const twin: Action = { ...agent, id: "g2", cwdMode: "fixed", cwd: "/elsewhere" };
+    const context: BarContext = { vars: { target: "/p" }, shell: "posix", folders: { workspaceRoot: "/p" } };
+    const twin: Action = { ...agent, id: "g2", command: "claude --resume" };
     const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map() }).buttons[0]!;
     expect(built).toMatchObject({ id: "g1", iconOnly: false });
     expect(built.subtitle).toBeNull();
@@ -142,7 +142,7 @@ describe("OwnButton", () => {
   });
 
   it("draws a sole agent button as its icon alone", () => {
-    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
     const { container, unmount } = mount(item(agent, { iconOnly: true }));
     expect(container.querySelector("button")?.textContent).toBe("");
     expect(container.querySelector("button")?.getAttribute("aria-label")).toBe("Claude Code");

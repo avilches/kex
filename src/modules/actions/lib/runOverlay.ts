@@ -6,7 +6,6 @@ import { pathDirname } from "@/lib/pathUtils";
 export type RunOverlay = {
   /** Values that replace the focused tab's, key by key. */
   vars?: Readonly<Record<string, string>>;
-  focusFolder?: string;
   /** Where a spawned app or an agent is launched from; the folder or file folder of the row. */
   spawnCwd?: string;
   /** The workspace to run in when it is not the active one (a row of the new terminal palette). */
@@ -17,5 +16,5 @@ export type RunOverlay = {
  * or file, and the app is launched from the folder (the file's own folder for a file). */
 export function runOverlayFor(target: string, kind: "file" | "folder" = "folder"): RunOverlay {
   const folder = kind === "file" ? pathDirname(target) : target;
-  return { vars: { target }, focusFolder: folder, spawnCwd: folder };
+  return { vars: { target }, spawnCwd: folder };
 }

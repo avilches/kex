@@ -8,7 +8,7 @@ import { parseIcon } from "./lib/actionIconRefs";
 import type { Action } from "./lib/types";
 
 type Props = {
-  action: Pick<Action, "appId" | "kind"> & { iconId?: string; icon?: string };
+  action: Pick<Action, "kind" | "icon">;
   size?: number;
   /**
    * The one size of an Action icon wherever an Action is listed, the `actionIconSize`
@@ -22,16 +22,13 @@ type Drawn =
   | { type: "agent"; id: string }
   | { type: "app"; id: string };
 
-// What an Action draws. The icon the user picked wins. Without one, an app shows the icon of the
-// detected app it came from; an agent its logo (the generic robot without one); a script the
-// terminal glyph; a user app the window glyph.
+// What an Action draws: its icon. Without one, an agent shows the generic robot, a script the
+// terminal glyph and an app the window glyph.
 function resolve(action: Props["action"]): Drawn {
   const picked = parseIcon(action.icon);
   if (picked?.source === "glyph") return { type: "glyph", icon: glyphIcon(picked.name) };
   if (picked) return { type: picked.source, id: picked.id };
-  const id = action.appId || action.iconId;
-  if (action.kind === "agent") return { type: "agent", id: id ?? "" };
-  if (id) return { type: "app", id };
+  if (action.kind === "agent") return { type: "agent", id: "" };
   return { type: "glyph", icon: action.kind === "script" ? ComputerTerminal01Icon : AppWindowIcon };
 }
 

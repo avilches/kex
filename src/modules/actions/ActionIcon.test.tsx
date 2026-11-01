@@ -16,7 +16,7 @@ function render(props: Parameters<typeof ActionIcon>[0]) {
 
 describe("ActionIcon", () => {
   it("draws the icon of the detected app an action came from", () => {
-    const { container, unmount } = render({ action: { appId: "pycharm", kind: "app" } });
+    const { container, unmount } = render({ action: { icon: "app:pycharm", kind: "app" } });
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/pycharm.svg");
     unmount();
   });
@@ -33,11 +33,11 @@ describe("ActionIcon", () => {
   });
 
   it("draws an agent with its logo, and the generic robot without one", () => {
-    const claude = render({ action: { appId: "claude", kind: "agent" } });
+    const claude = render({ action: { icon: "agent:claude", kind: "agent" } });
     expect(claude.container.querySelector("img")?.getAttribute("alt")).toBe("claude");
     expect(claude.container.querySelector("img")?.getAttribute("src")).not.toContain("/assets/editors/");
     claude.unmount();
-    const pi = render({ action: { iconId: "pi", kind: "agent" } });
+    const pi = render({ action: { icon: "agent:pi", kind: "agent" } });
     expect(pi.container.querySelector("svg[aria-label='pi']")).not.toBeNull();
     pi.unmount();
     const plain = render({ action: { kind: "agent" } });
@@ -46,22 +46,23 @@ describe("ActionIcon", () => {
     plain.unmount();
   });
 
-  it("draws the icon the user picked over the one of the app it came from", () => {
-    const app = render({ action: { appId: "pycharm", kind: "app", icon: "app:zed" } });
+  it("draws the icon of the Action, whatever kind it is", () => {
+    const app = render({ action: { kind: "app", icon: "app:zed" } });
     expect(app.container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
     app.unmount();
-    const agent = render({ action: { appId: "claude", kind: "agent", icon: "agent:pi" } });
+    const agent = render({ action: { kind: "agent", icon: "agent:pi" } });
     expect(agent.container.querySelector("svg[aria-label='pi']")).not.toBeNull();
     agent.unmount();
-    const glyph = render({ action: { appId: "pycharm", kind: "app", icon: "glyph:star" } });
+    const glyph = render({ action: { kind: "app", icon: "glyph:star" } });
     expect(glyph.container.querySelector("img")).toBeNull();
     expect(glyph.container.querySelector("svg")).not.toBeNull();
     glyph.unmount();
   });
 
-  it("falls back to the default icon when the picked one points at nothing", () => {
-    const stale = render({ action: { appId: "pycharm", kind: "app", icon: "glyph:gone" } });
-    expect(stale.container.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/pycharm.svg");
+  it("falls back to the kind's glyph when the icon points at nothing", () => {
+    const stale = render({ action: { kind: "app", icon: "glyph:gone" } });
+    expect(stale.container.querySelector("img")).toBeNull();
+    expect(stale.container.querySelector("svg")).not.toBeNull();
     stale.unmount();
   });
 
@@ -72,7 +73,7 @@ describe("ActionIcon", () => {
   });
 
   it("fill sizes the icon to the two lines next to it, to one constant size", () => {
-    const app = render({ action: { appId: "zed", kind: "app" }, fill: true });
+    const app = render({ action: { icon: "app:zed", kind: "app" }, fill: true });
     const box = app.container.querySelector("[data-action-icon-fill]")!;
     expect((box as HTMLElement).style.width).toBe("20px");
     expect(box.querySelector("img")?.getAttribute("src")).toBe("/assets/editors/zed.svg");
@@ -80,7 +81,7 @@ describe("ActionIcon", () => {
     const glyph = render({ action: { kind: "script" }, fill: true });
     expect(glyph.container.querySelector("[data-action-icon-fill] svg")).not.toBeNull();
     glyph.unmount();
-    const agent = render({ action: { appId: "claude", kind: "agent" }, fill: true });
+    const agent = render({ action: { icon: "agent:claude", kind: "agent" }, fill: true });
     expect(agent.container.querySelector("[data-action-icon-fill] img")?.getAttribute("alt")).toBe("claude");
     agent.unmount();
   });

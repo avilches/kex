@@ -3,13 +3,15 @@ import { contextActionEntries, newTabActionEntries } from "./contextActionEntrie
 import type { Action } from "./types";
 
 let n = 0;
-const action = (command: string, script = false, name = "A"): Action => ({
+type Runs = "folder" | "file" | "workspace";
+
+const script = (command: string, runs: Runs, name = "A"): Action => ({
   id: `a${n++}`,
   name,
-  kind: script ? "script" : "app",
+  kind: "script",
   command,
+  runs,
   ownButton: false,
-  ...(script ? { cwdMode: "workspace" as const } : { accepts: "folder" as const }),
 });
 
 const zed = (accepts: "file" | "folder" | "both", name = "Zed"): Action => ({
@@ -21,54 +23,48 @@ const zed = (accepts: "file" | "folder" | "both", name = "Zed"): Action => ({
   ownButton: false,
 });
 
-const vars = (over: Record<string, string> = {}) => ({
-  cwd: "/w/src",
-  dir: "src",
-  branch: "main",
-  repo: "w",
-  workspace: "/w",
-  filepath: "",
-  filename: "",
-  host: "mac",
-  target: "/w",
-  ...over,
+const ctx = (over: Record<string, string> = {}) => ({
+  vars: { target: "/w", ...over },
+  shell: "posix" as const,
+  folders: { workspaceRoot: "/w", workspaceCwd: "/w" },
 });
 
-const ctx = (over: Record<string, string> = {}) => ({ vars: vars(over), shell: "posix" as const });
-
 // What a menu on a row builds: {target} is the row itself, and the context says what kind it is.
-const rowCtx = (kind: "file" | "folder", over: Record<string, string> = {}) => {
+const rowCtx = (kind: "file" | "folder") => {
   const path = kind === "file" ? "/w/a.ts" : "/w/src";
-  const base = ctx(kind === "file" ? { filepath: path, filename: "a.ts", ...over } : { cwd: path, ...over });
-  return { ...base, vars: { ...base.vars, target: path }, targetKind: kind };
+  return {
+    ...ctx({ target: path }),
+    targetKind: kind,
+    focus: { folder: kind === "folder" ? path : "", file: kind === "file" ? path : "" },
+  };
 };
 
 describe("contextActionEntries", () => {
-  it("offers a row only the scripts of its target: folder scripts on a folder, file scripts on a file, workspace ones never", () => {
-    const local = [action("agent {cwd}", true), action("lint {filepath}", true), action("pnpm dev", true), zed("both")];
-    const global = [action("make -C {dir}", true), action("cat {filename}", true), action("echo {host}", true)];
+  it("offers a row only the scripts of its place: folder scripts on a folder, file scripts on a file, root-only ones never", () => {
+    const local = [script("ls {target}", "folder"), script("lint {target}", "file"), script("pnpm dev", "workspace"), zed("both")];
+    const global = [script("make", "folder"), script("cat {target}", "file"), script("pnpm lint", "workspace")];
     const folder = contextActionEntries(local, global, rowCtx("folder"), { rowKind: "folder" });
-    expect(folder.workspace.map((e) => e.action.command)).toEqual(["agent {cwd}", "zed {target}"]);
-    expect(folder.global.map((e) => e.action.command)).toEqual(["make -C {dir}"]);
+    expect(folder.workspace.map((e) => e.action.command)).toEqual(["ls {target}", "zed {target}"]);
+    expect(folder.global.map((e) => e.action.command)).toEqual(["make"]);
     const file = contextActionEntries(local, global, rowCtx("file"), { rowKind: "file" });
-    expect(file.workspace.map((e) => e.action.command)).toEqual(["lint {filepath}", "zed {target}"]);
-    expect(file.global.map((e) => e.action.command)).toEqual(["cat {filename}"]);
+    expect(file.workspace.map((e) => e.action.command)).toEqual(["lint {target}", "zed {target}"]);
+    expect(file.global.map((e) => e.action.command)).toEqual(["cat {target}"]);
   });
 
-  it("applies no target filter when it is not told what the row is", () => {
-    const groups = contextActionEntries([action("pnpm dev", true), action("lint {filepath}", true)], [], ctx());
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["pnpm dev", "lint {filepath}"]);
+  it("applies no place filter when it is not told what the row is", () => {
+    const groups = contextActionEntries([script("pnpm dev", "workspace"), script("lint {target}", "file")], [], ctx());
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["pnpm dev", "lint {target}"]);
   });
 
   it("puts scripts before apps inside a scope, each keeping its order", () => {
     const groups = contextActionEntries(
-      [action("make {cwd}", true), zed("both", "Code"), action("pnpm test {dir}", true), zed("both", "Zed")],
+      [script("make", "folder"), zed("both", "Code"), script("pnpm test", "folder"), zed("both", "Zed")],
       [],
       rowCtx("folder"),
       { rowKind: "folder" },
     );
     expect(groups.workspace.map((e) => e.action.kind)).toEqual(["script", "script", "app", "app"]);
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make {cwd}", "pnpm test {dir}", "zed {target}", "zed {target}"]);
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make", "pnpm test", "zed {target}", "zed {target}"]);
     expect(groups.workspace.slice(2).map((e) => e.action.name)).toEqual(["Code", "Zed"]);
   });
 
@@ -112,42 +108,31 @@ describe("contextActionEntries", () => {
     });
   });
 
-  it("a script that needs a file the row lacks is muted with why, not hidden", () => {
-    const groups = contextActionEntries([action("lint {filepath}", true, "Lint {filepath}")], [], ctx());
+  it("a file script on a row with no file is muted with why, not hidden", () => {
+    const groups = contextActionEntries([script("lint {target}", "file", "Lint")], [], ctx({ target: "" }));
     expect(groups.workspace).toHaveLength(1);
-    expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "needs an open file" });
+    expect(groups.workspace[0]).toMatchObject({ enabled: false });
+    expect(groups.workspace[0]?.reason).toContain("needs a folder or file");
   });
 
-  it("a file row fills the file scripts", () => {
-    const groups = contextActionEntries(
-      [action("lint {filepath}", true, "Lint {filepath}")],
-      [],
-      ctx({ filepath: "/w/a.ts", filename: "a.ts" }),
-    );
-    expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "a.ts" });
-  });
-
-  it("a folder without repository information mutes the branch scripts instead of hiding them", () => {
-    const groups = contextActionEntries([action("gh pr d {branch}", true)], [], ctx({ branch: "", repo: "" }));
-    expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "needs a git branch" });
+  it("a file row fills the file scripts, with no line under the name: the row already says where it is", () => {
+    const groups = contextActionEntries([script("lint {target}", "file", "Lint")], [], rowCtx("file"), { rowKind: "file" });
+    expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: null });
   });
 
   it("Actions with no command are skipped", () => {
-    const groups = contextActionEntries([action("  ", true), action("agent {cwd}", true)], [], ctx());
+    const groups = contextActionEntries([script("  ", "folder"), script("ls", "folder")], [], ctx());
     expect(groups.workspace).toHaveLength(1);
   });
 
-  it("the subtitle of a script resolves the name variable and falls back to the workspace message", () => {
-    const groups = contextActionEntries(
-      [action("agent {cwd}", true, "Agent {cwd}"), action("deploy {workspace} {cwd}", true, "Deploy {workspace}")],
-      [],
-      ctx({ workspace: "" }),
-    );
-    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "A workspace root is needed"]);
+  it("a script that always runs in one place says where on its line, one that runs where it is offered says nothing", () => {
+    const fixed: Action = { id: "f", name: "Fixed", kind: "script", command: "make", runs: "fixed", cwd: "/srv/app", ownButton: false };
+    const groups = contextActionEntries([fixed, script("ls", "folder", "Folder")], [], ctx());
+    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/srv/app", null]);
   });
 
   describe("agents", () => {
-    const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude {cwd}", ownButton: false };
+    const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude", ownButton: false };
 
     it("are left out without a folder, which is every file row", () => {
       const groups = contextActionEntries([agent, zed("both")], [agent], rowCtx("file"), { rowKind: "file" });
@@ -163,7 +148,7 @@ describe("contextActionEntries", () => {
     });
 
     it("are not blocked by a workspace with no root: the row brings its own folder", () => {
-      const groups = contextActionEntries([agent], [], ctx({ workspace: "" }), { agentFolder: "/elsewhere" });
+      const groups = contextActionEntries([agent], [], { ...ctx({ target: "" }), folders: { workspaceRoot: null } }, { agentFolder: "/elsewhere" });
       expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: null });
     });
 
@@ -185,10 +170,10 @@ describe("newTabActionEntries", () => {
     ownButton: false,
   });
   const at = (folder: string, root = "/w") => ({
-    ...ctx({ cwd: folder }),
-    folders: { focusFolder: folder, workspaceRoot: root, workspaceCwd: root },
+    ...ctx({ target: folder }),
+    focus: { folder, file: "" },
+    folders: { workspaceRoot: root, workspaceCwd: root },
   });
-  const script = (command: string): Action => action(command, true);
   const commands = (entries: { action: Action }[]) => entries.map((e) => e.action.command);
 
   it("offers every agent on any folder, started there, whatever the workspace root is", () => {
@@ -206,7 +191,7 @@ describe("newTabActionEntries", () => {
   });
 
   it("never offers an app or a script", () => {
-    const groups = newTabActionEntries([zed("both"), zed("folder"), script("echo {cwd}")], [zed("both"), script("make")], at("/w"));
+    const groups = newTabActionEntries([zed("both"), zed("folder"), script("echo {target}", "folder")], [zed("both"), script("make", "folder")], at("/w"));
     expect(groups).toEqual({ workspace: [], global: [] });
   });
 

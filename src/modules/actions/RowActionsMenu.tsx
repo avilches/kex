@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { Rocket01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { IS_WINDOWS } from "@/lib/platform";
-import { pathDirname } from "@/lib/pathUtils";
 import {
   ContextMenuItem,
   ContextMenuLabel,
@@ -15,12 +14,9 @@ import {
 } from "@/components/ui/context-menu";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
-import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
-import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
+import type { Workspace } from "@/modules/workspaces/lib/types";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
-import { buildCommandVars } from "@/modules/actions/lib/commandVars";
 import { runOverlayFor } from "@/modules/actions/lib/runOverlay";
 import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
 import { contextActionEntries, type ContextActionEntry, type ContextActionGroups, type ContextActionKind } from "@/modules/actions/lib/contextActionEntries";
@@ -34,56 +30,34 @@ const EMPTY_GROUPS: ContextActionGroups = { workspace: [], global: [] };
 
 type MenuWorkspace = Pick<Workspace, "id" | "actions" | "cwd" | "workspaceRoot"> | null;
 
-// A place a menu opened on, seen as the tab an Action would run from: the row itself is
-// the terminal of a folder row and the editor of a file row, so the same values the Header
-// bar and the runner build land here too.
-function rowTab(kind: ContextActionKind, path: string): Tab | null {
-  if (!path) return null;
-  return kind === "file"
-    ? { id: "ctx-file", kind: "editor", path, dirty: false, preview: false, title: "" }
-    : { id: "ctx-folder", kind: "terminal", cwd: path, title: "" };
-}
-
 export type ContextActions = {
   groups: ContextActionGroups;
   overlay: RunOverlay | null;
 };
 
 export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, path: string): ContextActions {
-  const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
-  const dir = kind === "file" ? (path ? pathDirname(path) : "") : path;
-  const info = useDirGit(dir || undefined, path ? `ctx-${kind}:${path}` : undefined);
-  const tab = useMemo(() => rowTab(kind, path), [kind, path]);
-  const vars = useMemo(
-    () =>
-      tab && ws
-        ? {
-            ...buildCommandVars(tab, { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, { branch: info.branch, repoRoot: info.repoRoot }, sys.host),
-            // An app opened from a row opens that row: its folder, or its file.
-            target: path,
-          }
-        : null,
-    [tab, ws, info.branch, info.repoRoot, sys.host, path],
-  );
   const shell = scriptShellFor(IS_WINDOWS, envKind);
   const groups = useMemo(
     () =>
-      vars
+      ws && path
         ? contextActionEntries(
-            ws?.actions ?? NONE,
+            ws.actions ?? NONE,
             global,
-            { vars, shell, targetKind: kind },
-            kind === "folder" ? { agentFolder: vars.cwd, rowKind: kind } : { rowKind: kind },
+            {
+              vars: { target: path },
+              shell,
+              targetKind: kind,
+              focus: { folder: kind === "folder" ? path : "", file: kind === "file" ? path : "" },
+              folders: { workspaceRoot: ws.workspaceRoot ?? null, workspaceCwd: ws.cwd ?? null },
+            },
+            kind === "folder" ? { agentFolder: path, rowKind: kind } : { rowKind: kind },
           )
         : EMPTY_GROUPS,
-    [vars, global, shell, ws?.actions, kind],
+    [ws, path, global, shell, kind],
   );
-  const overlay = useMemo<RunOverlay | null>(
-    () => (vars ? { ...runOverlayFor(path, kind), vars } : null),
-    [vars, path, kind],
-  );
+  const overlay = useMemo<RunOverlay | null>(() => (path ? runOverlayFor(path, kind) : null), [path, kind]);
   return { groups, overlay };
 }
 

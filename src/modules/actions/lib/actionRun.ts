@@ -1,4 +1,4 @@
-import { equalFolder, resolveScriptCwd, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
+import { equalFolder, scriptCwdProblem, type ScriptShell } from "@/modules/workspaces/lib/scriptCwd";
 import { planScriptStop } from "@/modules/workspaces/lib/scriptRunState";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
@@ -8,7 +8,7 @@ import {
   expandCommandShell,
   missingVariables,
 } from "./commandTemplate";
-import { agentCommandProblem, needsWorkspaceRoot, WORKSPACE_UNSET } from "./actionsBar";
+import { agentCommandProblem, WORKSPACE_UNSET } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 // Run and stop decisions for Actions, with no I/O: the shell (useActionRunner) gathers the
@@ -30,13 +30,11 @@ export type LinkedTab = {
 
 export type RunContext = {
   shell: ScriptShell;
-  /** Raw values for the command variables ({cwd}, {workspace}, {filepath}...); "" means no value. */
+  /** Raw values for the command variables ({target}); "" means no value. */
   vars: Readonly<Record<string, string>>;
   folders: {
-    focusFolder?: string | null;
     workspaceRoot?: string | null;
     workspaceCwd?: string | null;
-    home?: string | null;
   };
   /** The folder of the place the run came from (a folder menu, a New terminal palette row); an agent starts there. */
   startFolder?: string | null;
@@ -80,7 +78,7 @@ function expandFailure(e: unknown): string {
 function planApp(action: Action, ctx: RunContext): RunPlan {
   const problem = commandProblem(action.command);
   if (problem) return blocked(action, problem);
-  if (commandVariablesUsed(action.command).size === 0 && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
+  if (commandVariablesUsed(action.command).size === 0 && !ctx.folders.workspaceRoot?.trim()) return blocked(action, WORKSPACE_UNSET);
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.includes("target")) return blocked(action, WORKSPACE_UNSET);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
@@ -96,25 +94,37 @@ function newTabPlacement(ctx: RunContext): NewTabPlacement {
   return ctx.atPaneLimit ? "active-pane" : "split-scripts-pane";
 }
 
+// Where a script starts: the folder it was offered at (or the workspace root from the Header)
+// for a folder script, the folder that holds the file for a file script, the root for a
+// workspace script and its own folder for a fixed one.
+export function scriptStartFolder(
+  action: Pick<Action, "runs" | "cwd">,
+  ctx: Pick<RunContext, "startFolder" | "folders">,
+): string | undefined {
+  const root = ctx.folders.workspaceRoot?.trim() || undefined;
+  const offered = ctx.startFolder?.trim() || undefined;
+  switch (action.runs) {
+    case "folder":
+      return offered ?? root;
+    case "file":
+      return offered;
+    case "fixed":
+      return action.cwd?.trim() || undefined;
+    default:
+      return root;
+  }
+}
+
 function planScript(action: Action, ctx: RunContext): RunPlan {
   const { link } = ctx;
   if (link?.exists && link.markRunning) return { kind: "already-running", tabId: link.tabId };
-  if (commandVariablesUsed(action.command).size === 0 && needsWorkspaceRoot(action) && !ctx.vars.workspace) {
-    return blocked(action, WORKSPACE_UNSET);
-  }
+  const problem = commandProblem(action.command, ctx.shell, ctx.vars, action.runs);
+  if (problem) return blocked(action, problem);
+  const cwd = scriptStartFolder(action, ctx);
+  if (!cwd) return blocked(action, action.runs === "file" ? "it needs a file to run on" : WORKSPACE_UNSET);
   const missing = missingVariables(action.command, ctx.vars);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
-  const problem = commandProblem(action.command, ctx.shell, ctx.vars);
-  if (problem) return blocked(action, problem);
-  const cwd = resolveScriptCwd({
-    mode: action.cwdMode,
-    fixedFolder: action.cwd,
-    focusFolder: ctx.folders.focusFolder,
-    workspaceRoot: ctx.folders.workspaceRoot,
-    workspaceCwd: ctx.folders.workspaceCwd,
-    home: ctx.folders.home,
-  });
-  const cwdIssue = cwd ? scriptCwdProblem(cwd) : null;
+  const cwdIssue = scriptCwdProblem(cwd);
   if (cwdIssue) return blocked(action, cwdIssue);
   let input: string;
   try {

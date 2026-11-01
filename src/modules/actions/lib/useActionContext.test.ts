@@ -2,21 +2,12 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { _resetDirGitStore } from "@/modules/workspaces/lib/dirGitStore";
-import { setRunningCommand } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionContext } from "./useActionContext";
 
-const resolve = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/native", () => ({ native: { gitResolveRepo: resolve } }));
 vi.mock("@/modules/workspace", () => ({
   useWorkspaceEnvStore: (sel: (s: { env: { kind: string } }) => unknown) => sel({ env: { kind: "local" } }),
 }));
-vi.mock("@/modules/workspaces/lib/systemInfoStore", () => ({
-  useSystemInfo: () => ({ home: "/Users/me", host: "MacBook" }),
-}));
-
-const repo = (branch: string) => ({ repoRoot: "/w", branch, upstream: null, isDetached: false, isWorktree: false });
 
 const ws: Workspace = {
   id: "w1",
@@ -29,30 +20,27 @@ const ws: Workspace = {
 
 describe("useActionContext", () => {
   beforeEach(() => {
-    _resetDirGitStore();
-    resolve.mockReset();
     vi.useFakeTimers();
   });
   afterEach(() => vi.useRealTimers());
 
-  it("carries every command variable, host included", async () => {
-    resolve.mockResolvedValue(repo("main"));
+  it("carries {target}, the workspace root, and what the focused tab offers", async () => {
     const { result } = renderHook(() => useActionContext(ws));
     await act(async () => void (await vi.advanceTimersByTimeAsync(0)));
-    expect(result.current?.vars).toMatchObject({ cwd: "/w", workspace: "/w", branch: "main", repo: "w", host: "MacBook" });
+    expect(result.current?.vars).toEqual({ target: "/w" });
+    expect(result.current?.focus).toEqual({ folder: "/w", file: "" });
+    expect(result.current?.folders).toEqual({ workspaceRoot: "/w", workspaceCwd: "/w" });
   });
 
-  it("follows a checkout made in the focused terminal", async () => {
-    resolve.mockResolvedValueOnce(repo("main")).mockResolvedValue(repo("feat"));
-    const { result } = renderHook(() => useActionContext(ws));
+  it("offers the file of an editor tab and no folder", async () => {
+    const onFile: Workspace = {
+      ...ws,
+      paneTree: { kind: "pane", id: "p1", tabs: [{ id: "tab-2", kind: "editor", path: "/w/src/a.ts", dirty: false, preview: false, title: "" }], activeTabId: "tab-2" },
+    };
+    const { result } = renderHook(() => useActionContext(onFile));
     await act(async () => void (await vi.advanceTimersByTimeAsync(0)));
-    expect(result.current?.vars.branch).toBe("main");
-    await act(async () => {
-      setRunningCommand("tab-1", "git checkout feat");
-      setRunningCommand("tab-1", null);
-      await vi.advanceTimersByTimeAsync(500);
-    });
-    expect(result.current?.vars.branch).toBe("feat");
+    expect(result.current?.focus).toEqual({ folder: "", file: "/w/src/a.ts" });
+    expect(result.current?.place).toEqual({ folder: false, file: true });
   });
 
   it("has no context outside a workspace", () => {

@@ -12,7 +12,7 @@ import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 
 const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", ownButton: true };
 const rootAgent: Action = { id: "g2", name: "Codex", kind: "agent", command: "codex", ownButton: true };
-const devScript: Action = { id: "s1", name: "Dev {cwd}", kind: "script", command: "echo {cwd}", cwdMode: "workspace", ownButton: false };
+const devScript: Action = { id: "s1", name: "Dev", kind: "script", command: "echo hi", runs: "folder", ownButton: false };
 const app: Action = { id: "a1", name: "Zed {cwd}", kind: "app", command: "zed {cwd}", ownButton: false };
 
 const workspace = (o: Partial<Workspace> = {}): Workspace =>
@@ -115,7 +115,7 @@ describe("FolderPalette row menu Actions", () => {
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0][0]).toMatchObject({ id: "g1" });
-    expect(run.mock.calls[0][1]).toMatchObject({ workspaceId: "ws-2", focusFolder: "/o/src" });
+    expect(run.mock.calls[0][1]).toMatchObject({ workspaceId: "ws-2", spawnCwd: "/o/src" });
   });
 
   it("Cmd+digit runs the Nth Action of the open menu, and does nothing without a menu", async () => {

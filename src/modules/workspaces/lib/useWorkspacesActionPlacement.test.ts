@@ -110,7 +110,7 @@ describe("moving an Action between scopes without losing it", () => {
   });
 
   it("mints the fresh id once, outside the state updater, when the workspace already has that id", async () => {
-    const script = (command: string): Action => ({ id: "g1", name: command, kind: "script", command, ownButton: false, cwdMode: "workspace" });
+    const script = (command: string): Action => ({ id: "g1", name: command, kind: "script", command, ownButton: false, runs: "workspace" });
     usePreferencesStore.setState({ actions: [script("make global")] });
     const { result } = renderHook(() => useWorkspaces({ initialWorkspaces: [workspace([script("make local")])] }), { wrapper: strict });
     act(() => result.current.demoteGlobalAction("w1", "g1"));

@@ -375,7 +375,7 @@ describe("seeding from two windows", () => {
   });
 
   it("plans from what the store holds, so an agent another window just seeded is not added again", async () => {
-    const other: Action = { id: "from-other-window", name: "opencode", kind: "agent", command: "opencode", appId: "opencode", ownButton: true };
+    const other: Action = { id: "from-other-window", name: "opencode", kind: "agent", command: "opencode", icon: "agent:opencode", ownButton: true };
     h.disk = { actions: [other], seededAgents: ["opencode"], appActionsSeeded: false };
     h.scan.mockResolvedValue([agent("opencode")]);
     await runEditorScan();
