@@ -51,6 +51,7 @@ import {
   revealInFinder,
 } from "./lib/contextActions";
 import { CopyPathMenu } from "./lib/copyPathItems";
+import { folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
@@ -1173,12 +1174,18 @@ export const FileExplorer = memo(
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {rootMode !== "workspace" && (
-        <div className="flex h-8 shrink-0 items-center gap-1 pl-1.5 pr-9">
+        <div className="flex h-6 shrink-0 items-center gap-1 pl-1.5 pr-9">
           {!canEditRoot ? (
             <div
-              className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
+              className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium text-foreground/90"
               title={rootPath ?? undefined}
             >
+              <img
+                src={folderIconUrl("", true)}
+                alt=""
+                draggable={false}
+                className="size-4 shrink-0"
+              />
               <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
                 {LRM + rootPath}
               </span>
@@ -1204,18 +1211,24 @@ export const FileExplorer = memo(
               <ContextMenuTrigger asChild>
                 <button
                   type="button"
-                  className="group/root flex min-w-0 flex-1 cursor-pointer items-center rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
+                  className="group/root flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-medium text-foreground/90"
                   title={rootPath ?? undefined}
                   onClick={startEditRoot}
                 >
+                  <img
+                    src={folderIconUrl("", true)}
+                    alt=""
+                    draggable={false}
+                    className="size-4 shrink-0"
+                  />
                   <span className="min-w-0 truncate text-left [direction:rtl]">
                     {LRM + rootPath}
                   </span>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
-                    size={13}
+                    size={16}
                     strokeWidth={2}
-                    className="pointer-events-none ml-1.5 hidden shrink-0 group-hover/root:block"
+                    className="pointer-events-none hidden shrink-0 text-muted-foreground group-hover/root:block"
                   />
                   <span className="flex-1" />
                 </button>
