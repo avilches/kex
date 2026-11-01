@@ -284,6 +284,14 @@ function EntryRowImpl(props: EntryRowProps) {
             ) : (
               <span className="size-4 shrink-0" />
             )}
+            {isDir && workspaceRoot !== null && samePath(path, workspaceRoot) && (
+              <HugeiconsIcon
+                icon={PinIcon}
+                size={11}
+                strokeWidth={2}
+                className="shrink-0 text-primary"
+              />
+            )}
             <span
               className={cn("min-w-0 truncate", !isDir && "flex-1")}
               style={
@@ -300,14 +308,6 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
-            {isDir && workspaceRoot !== null && samePath(path, workspaceRoot) && (
-              <HugeiconsIcon
-                icon={PinIcon}
-                size={11}
-                strokeWidth={2}
-                className="shrink-0 text-primary"
-              />
-            )}
             {isDir && onEnterFolder && (
               <span
                 role="button"

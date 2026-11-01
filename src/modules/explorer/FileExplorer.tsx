@@ -1555,7 +1555,8 @@ export const FileExplorer = memo(
         <div
           className={cn(
             "absolute right-3.5 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 backdrop-blur-sm transition-opacity focus-within:opacity-100 group-hover/explorer:opacity-100",
-            isSearchOpen ? "top-12 opacity-100" : "top-1 opacity-0",
+            "top-1 opacity-0",
+            isSearchOpen && "hidden",
           )}
         >
           {canEditRoot && (
