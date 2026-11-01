@@ -137,15 +137,15 @@ describe("matchBinding", () => {
 
   test("matchBinding for tab.selectByIndex matches correct digit binding", () => {
     const binding: KeyBinding = { meta: true, key: "5" };
-    const event = createMockKeyboardEvent("5", { meta: true });
+    const event = createMockKeyboardEvent("5", { meta: true, code: "Digit5" });
     expect(matchBinding(event as KeyboardEvent, binding, "tab.selectByIndex")).toBe(true);
   });
 
   test("matchBinding for tab.selectByIndex matches any digit (wildcard)", () => {
     // The binding digit is just representative; any 0-9 with the same modifiers
-    // is a hit, the handler reads e.key for the actual index.
+    // is a hit, the handler reads eventDigit for the actual index.
     const binding: KeyBinding = { meta: true, key: "5" };
-    const event = createMockKeyboardEvent("3", { meta: true });
+    const event = createMockKeyboardEvent("3", { meta: true, code: "Digit3" });
     expect(matchBinding(event as KeyboardEvent, binding, "tab.selectByIndex")).toBe(true);
   });
 
