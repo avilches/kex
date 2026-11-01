@@ -22,14 +22,14 @@ const MAIN_THREAD: &[(&str, &str)] = &[
         "counts the windows that flushed; the exit has to be requested from here",
     ),
     ("cancel_quit", "flips an atomic and emits an event"),
-    // Known debt: these write the state to disk on the main thread. They stay here only because
-    // a second save must not overtake the first; a single-writer queue would let them leave.
+    // They update the state in memory, in the order the calls arrive (that order is why they stay on
+    // this thread), and ask the single writer thread to put it on disk (`save_writer`).
     ("window_get_state", "reads the in-memory state"),
-    ("window_save_workspace_state", "ordered write, see above"),
-    ("window_save_sidebar", "ordered write, see above"),
-    ("window_save_workspace_bar", "ordered write, see above"),
-    ("window_save_collapsed_groups", "ordered write, see above"),
-    ("window_save_groups", "ordered write, see above"),
+    ("window_save_workspace_state", "in-memory update in call order, the disk write is queued"),
+    ("window_save_sidebar", "in-memory update in call order, the disk write is queued"),
+    ("window_save_workspace_bar", "in-memory update in call order, the disk write is queued"),
+    ("window_save_collapsed_groups", "in-memory update in call order, the disk write is queued"),
+    ("window_save_groups", "in-memory update in call order, the disk write is queued"),
     // Per keystroke, and the order of the writes is the order of the input.
     // Known risk: write_all blocks if the child stops reading and the kernel buffer fills, which
     // would freeze the UI. Order is the reason it stays; a writer thread per session would fix both.

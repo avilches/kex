@@ -11,6 +11,7 @@ pub mod menu_route;
 pub mod onboarding;
 pub mod permissions;
 pub mod proc;
+pub mod save_writer;
 pub mod profile;
 pub mod pty;
 pub mod shell;

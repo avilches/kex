@@ -4,7 +4,7 @@ mod window_log;
 
 use modules::{
     actions, agent, custom_themes, editors, float_browser, fs, git, hibernate_lines, history,
-    menu_route, onboarding, permissions, pty, shell, tab_history, update_guard, window_state,
+    menu_route, onboarding, permissions, pty, save_writer, shell, tab_history, update_guard, window_state,
     workspace,
 };
 use serde::Serialize;
@@ -589,28 +589,28 @@ fn window_save_workspace_state(
     log::debug!("[window] save workspace state: label={label} workspaces={ws_count} activeIndex={active_index}");
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_workspace(&label, workspaces, active_index);
-    mgr.save();
+    app.state::<save_writer::SaveWriter>().request();
 }
 
 #[tauri::command]
 fn window_save_sidebar(app: tauri::AppHandle, label: String, open: bool, side: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_sidebar(&label, window_state::SidebarState { open, side, width });
-    mgr.save();
+    app.state::<save_writer::SaveWriter>().request();
 }
 
 #[tauri::command]
 fn window_save_workspace_bar(app: tauri::AppHandle, label: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_workspace_bar_width(&label, width);
-    mgr.save();
+    app.state::<save_writer::SaveWriter>().request();
 }
 
 #[tauri::command]
 fn window_save_collapsed_groups(app: tauri::AppHandle, label: String, ids: Vec<String>) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_collapsed_groups(&label, ids);
-    mgr.save();
+    app.state::<save_writer::SaveWriter>().request();
 }
 
 #[tauri::command]
@@ -621,7 +621,7 @@ fn window_save_groups(
 ) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_groups(&label, groups);
-    mgr.save();
+    app.state::<save_writer::SaveWriter>().request();
 }
 
 /// Called from main.tsx on startup (on_window_ready equivalent) to restore window size.
@@ -1102,6 +1102,11 @@ pub fn run() {
             }
             let order = mgr.window_order();
             app.manage(mgr);
+            // The five window_save_* commands update the state in memory and ask for this thread to write it.
+            let writer_app = app.handle().clone();
+            app.manage(save_writer::SaveWriter::start("kex-window-state-save", move || {
+                writer_app.state::<window_state::WindowStateManager>().save();
+            }));
 
             let handle = app.handle().clone();
             if order.is_empty() {

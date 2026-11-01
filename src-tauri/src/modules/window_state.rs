@@ -413,15 +413,17 @@ impl WindowStateManager {
     /// plus the small index file, then deletes bodies no longer referenced.
     /// Each file is written atomically (`.tmp` then rename).
     pub fn save(&self) {
+        let ws_dir = self.workspaces_dir();
+        let _ = std::fs::create_dir_all(&ws_dir);
+
+        // The disk lock first, the snapshot after it: a save that waited for another one then writes
+        // the newest state, so the write that lands last is never the older snapshot.
+        let mut disk = self.disk.lock().expect("disk cache lock poisoned");
         let state = self
             .inner
             .read()
             .expect("window state lock poisoned")
             .clone();
-        let ws_dir = self.workspaces_dir();
-        let _ = std::fs::create_dir_all(&ws_dir);
-
-        let mut disk = self.disk.lock().expect("disk cache lock poisoned");
 
         if drops_most_workspaces(disk.written.len(), incoming_ids(&state).len()) {
             self.snapshot_to_backup(&format!(
@@ -1238,5 +1240,24 @@ mod tests {
             "hello"
         );
         assert!(!b[0].join("hibernate-lines/.kex-x.tmp").exists());
+    }
+
+    #[test]
+    fn a_save_that_waits_for_another_writes_the_newest_state() {
+        let dir = TempDir::new().unwrap();
+        let mgr = std::sync::Arc::new(mgr_with_workspaces(&dir, &["ws-old"]));
+        // Another save holds the disk while this one starts, and the state changes meanwhile.
+        let held = mgr.disk.lock().unwrap();
+        let waiting = {
+            let mgr = std::sync::Arc::clone(&mgr);
+            std::thread::spawn(move || mgr.save())
+        };
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-new"}]), 0);
+        drop(held);
+        waiting.join().unwrap();
+        let ws_dir = dir.path().join("workspaces");
+        assert!(ws_dir.join("ws-new.json").exists(), "the save wrote a snapshot older than the state");
+        assert!(!ws_dir.join("ws-old.json").exists());
     }
 }
