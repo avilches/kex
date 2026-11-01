@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { requestOnboardingRestart } from "@/modules/onboarding";
 import { useUpdater } from "@/modules/updater";
 import { GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -173,6 +174,9 @@ export function AboutSection() {
             onClick={() => void openUrl(`${REPO_URL}/issues/new`)}
           >
             Report an issue
+          </Button>
+          <Button variant="ghost" size="sm" onClick={requestOnboardingRestart}>
+            Run onboarding again
           </Button>
         </div>
         {status.kind === "error" && (

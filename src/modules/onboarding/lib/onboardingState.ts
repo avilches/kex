@@ -60,6 +60,10 @@ export function withReminded(state: OnboardingState): OnboardingState {
   return { ...state, reminded: true };
 }
 
+export function restart(state: OnboardingState): OnboardingState {
+  return { ...state, finished: false, step: "welcome", shown: true, reminded: true };
+}
+
 export function finish(state: OnboardingState): OnboardingState {
   return { ...state, finished: true };
 }

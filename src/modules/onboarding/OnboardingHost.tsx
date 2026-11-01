@@ -1,11 +1,12 @@
 import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { startupAction, withReminded, withShown } from "./lib/onboardingState";
 import { persistOnboarding } from "./lib/persistOnboarding";
 import { OnboardingDialog } from "./OnboardingDialog";
-import { openOnboarding } from "./onboardingUi";
+import { ONBOARDING_RESTART_EVENT, openOnboarding } from "./onboardingUi";
 
 function remind(): void {
   toast("Finish setting up Kex", {
@@ -39,6 +40,21 @@ export function OnboardingHost() {
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let alive = true;
+    void listen(ONBOARDING_RESTART_EVENT, () => {
+      if (document.visibilityState === "visible") openOnboarding();
+    }).then((fn) => {
+      if (alive) unlisten = fn;
+      else fn();
+    });
+    return () => {
+      alive = false;
+      unlisten?.();
     };
   }, []);
 

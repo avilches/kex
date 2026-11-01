@@ -1,3 +1,3 @@
 export { OnboardingChip } from "./OnboardingChip";
 export { OnboardingHost } from "./OnboardingHost";
-export { openOnboarding } from "./onboardingUi";
+export { openOnboarding, requestOnboardingRestart } from "./onboardingUi";

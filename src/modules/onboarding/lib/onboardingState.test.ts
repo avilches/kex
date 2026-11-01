@@ -14,6 +14,7 @@ import {
   withShown,
   withStep,
   type OnboardingState,
+  restart,
 } from "./onboardingState";
 
 const fresh: OnboardingState = { finished: false, step: "welcome", shown: false, reminded: false };
@@ -109,5 +110,12 @@ describe("STYLE_PRESETS", () => {
   it("maps each style to its git colors and preview behavior", () => {
     expect(STYLE_PRESETS.vscode).toEqual({ explorerGitColorScheme: "vscode", previewOnClick: true });
     expect(STYLE_PRESETS.jetbrains).toEqual({ explorerGitColorScheme: "jetbrains", previewOnClick: false });
+  });
+});
+
+describe("restart", () => {
+  it("reopens a finished onboarding from the first step without a reminder", () => {
+    const done = { finished: true, step: "done", shown: true, reminded: false } as const;
+    expect(restart(done)).toEqual({ finished: false, step: "welcome", shown: true, reminded: true });
   });
 });
