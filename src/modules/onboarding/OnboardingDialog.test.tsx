@@ -25,7 +25,7 @@ vi.mock("@/modules/settings/store", async (orig) => {
     },
   };
 });
-const setOnboardingOpen = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const setOnboardingOpen = vi.hoisted(() => vi.fn((_open: boolean) => Promise.resolve(true)));
 vi.mock("@/lib/native", async (orig) => {
   const real = await orig<typeof import("@/lib/native")>();
   return { ...real, native: { ...real.native, setOnboardingOpen } };
@@ -61,7 +61,7 @@ describe("OnboardingDialog", () => {
   it("Continue later keeps the current step", async () => {
     setOnboarding({});
     render(<OnboardingDialog isMac />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     fireEvent.click(screen.getByRole("button", { name: "Get started" }));
     await screen.findByText("Pick your style");
     expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
@@ -78,7 +78,7 @@ describe("OnboardingDialog", () => {
     setOnboarding({ step: "style" });
     const restore = vi.fn();
     render(<OnboardingDialog isMac onRestoreFocus={restore} />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Pick your style");
     expect(restore).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
@@ -89,7 +89,7 @@ describe("OnboardingDialog", () => {
     setOnboarding({ step: "style" });
     render(<OnboardingDialog isMac />);
     expect(setOnboardingOpen.mock.calls).toEqual([[false]]);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Pick your style");
     expect(setOnboardingOpen).toHaveBeenLastCalledWith(true);
     fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
@@ -100,7 +100,7 @@ describe("OnboardingDialog", () => {
   it("releases the block when it unmounts while open", async () => {
     setOnboarding({ step: "style" });
     const { unmount } = render(<OnboardingDialog isMac />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Pick your style");
     expect(setOnboardingOpen).toHaveBeenLastCalledWith(true);
     unmount();
@@ -110,7 +110,7 @@ describe("OnboardingDialog", () => {
   it("Escape closes it like Continue later", async () => {
     setOnboarding({ step: "style" });
     render(<OnboardingDialog isMac />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Pick your style");
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     await waitFor(() => expect(useOnboardingUi.getState().open).toBe(false));
@@ -133,7 +133,7 @@ describe("OnboardingDialog", () => {
   it("Back goes to the previous step and saves it", async () => {
     setOnboarding({ step: "agents" });
     render(<OnboardingDialog isMac={false} />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Connect your coding agents");
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await screen.findByText("Pick your style");
@@ -143,7 +143,7 @@ describe("OnboardingDialog", () => {
   it("style step applies the JetBrains preset", async () => {
     setOnboarding({ step: "style" });
     render(<OnboardingDialog isMac />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     const vscode = await screen.findByRole("radio", { name: /VS Code/ });
     expect(vscode.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("radio", { name: /JetBrains/ }));
@@ -157,7 +157,7 @@ describe("OnboardingDialog", () => {
   it("permissions step is absent outside macOS", async () => {
     setOnboarding({ step: "style" });
     render(<OnboardingDialog isMac={false} />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("Pick your style");
     expect(screen.getByText("Step 2 of 4")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -169,7 +169,7 @@ describe("OnboardingDialog", () => {
   it("a saved permissions step opens at the first step outside macOS", async () => {
     setOnboarding({ step: "permissions" });
     render(<OnboardingDialog isMac={false} />);
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     expect(await screen.findByText("Welcome to Kex")).toBeTruthy();
   });
 
@@ -196,7 +196,7 @@ describe("OnboardingDialog", () => {
         <OnboardingDialog isMac />
       </>,
     );
-    act(() => openOnboarding());
+    await act(() => openOnboarding());
     await screen.findByText("You are all set");
     expect(screen.queryByRole("button", { name: "Continue later" })).toBeNull();
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });

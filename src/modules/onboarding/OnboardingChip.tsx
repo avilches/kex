@@ -25,7 +25,7 @@ export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
         size="sm"
         className="h-full gap-1.5 rounded-none border-0 px-2 focus-visible:ring-0 focus-visible:inset-ring-2 focus-visible:inset-ring-ring/50 text-[11px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground"
         title="Pick up the setup where you left it"
-        onClick={openOnboarding}
+        onClick={() => void openOnboarding()}
       >
         <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} className="text-primary" />
         {label}

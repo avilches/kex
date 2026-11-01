@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -15,39 +14,84 @@ pub fn claim_onboarding_startup() -> bool {
     claim(&STARTUP_CLAIMED)
 }
 
-/// The main windows whose onboarding dialog is open. While any is, no new window opens, so
-/// two onboardings never run at once.
+/// The main window whose onboarding dialog is open, if any. Only one window holds it, so two
+/// onboardings never run at once; while it is held no new window and no Settings window opens.
 #[derive(Default)]
-pub struct OnboardingBlock(Mutex<HashSet<String>>);
+pub struct OnboardingBlock(Mutex<Option<String>>);
 
 impl OnboardingBlock {
-    /// Records the dialog of `label` as open or closed and returns whether the block as a whole
-    /// changed (none open before and one now, or the other way round).
-    pub fn set(&self, label: &str, open: bool) -> bool {
-        let mut open_in = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        let was = !open_in.is_empty();
-        if open {
-            open_in.insert(label.to_string());
-        } else {
-            open_in.remove(label);
+    /// Gives the block to `label` unless another window holds it. `Some(changed)` when `label`
+    /// holds it now (`changed` is false when it already did), `None` when another window does.
+    pub fn take(&self, label: &str) -> Option<bool> {
+        let mut holder = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        match holder.as_deref() {
+            Some(h) if h == label => Some(false),
+            Some(_) => None,
+            None => {
+                *holder = Some(label.to_string());
+                Some(true)
+            }
         }
-        let now = !open_in.is_empty();
-        was != now
+    }
+
+    /// Frees the block when `label` holds it; returns whether it was freed.
+    pub fn release(&self, label: &str) -> bool {
+        let mut holder = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if holder.as_deref() == Some(label) {
+            *holder = None;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn active(&self) -> bool {
-        !self.0.lock().unwrap_or_else(|e| e.into_inner()).is_empty()
+        self.holder().is_some()
+    }
+
+    pub fn holder(&self) -> Option<String> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 }
 
-/// The calling window says its onboarding dialog opened or closed. A window that goes away
-/// with the dialog open is released from `WindowEvent::Destroyed`.
+/// The calling window asks to open its onboarding dialog (`open`) or says it closed. Opening
+/// answers whether the window got the block; when another window holds it, that window is
+/// brought to the front instead. Closing always answers true. A window that goes away with the
+/// dialog open is released from `WindowEvent::Destroyed`.
 #[tauri::command]
-pub fn set_onboarding_open(app: tauri::AppHandle, window: tauri::WebviewWindow, open: bool) {
+pub fn set_onboarding_open(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    open: bool,
+) -> bool {
     use tauri::Manager;
-    if app.state::<OnboardingBlock>().set(window.label(), open) {
-        crate::onboarding_block_changed(&app);
+    let block = app.state::<OnboardingBlock>();
+    if !open {
+        if block.release(window.label()) {
+            crate::onboarding_block_changed(&app);
+        }
+        return true;
     }
+    match block.take(window.label()) {
+        Some(changed) => {
+            if changed {
+                crate::onboarding_block_changed(&app);
+            }
+            true
+        }
+        None => {
+            crate::focus_onboarding_holder(&app);
+            false
+        }
+    }
+}
+
+/// The main window that "Run onboarding again" in Settings speaks to: the one used last if it
+/// is still open, otherwise any open one.
+pub fn restart_target(last_focused: Option<String>, live: &[String]) -> Option<String> {
+    last_focused
+        .filter(|l| live.contains(l))
+        .or_else(|| live.first().cloned())
 }
 
 #[cfg(test)]
@@ -75,40 +119,61 @@ mod tests {
     }
 
     #[test]
-    fn an_open_dialog_blocks_and_closing_it_releases() {
+    fn the_first_window_takes_the_block_and_its_release_frees_it() {
         let block = OnboardingBlock::default();
         assert!(!block.active());
-        assert!(block.set("w-a", true));
+        assert_eq!(block.take("w-a"), Some(true));
         assert!(block.active());
-        assert!(block.set("w-a", false));
+        assert!(block.release("w-a"));
         assert!(!block.active());
     }
 
     #[test]
-    fn the_block_lasts_while_any_window_has_it_open() {
+    fn a_second_window_cannot_take_a_held_block() {
         let block = OnboardingBlock::default();
-        assert!(block.set("w-a", true));
-        assert!(!block.set("w-b", true));
-        assert!(!block.set("w-a", false));
-        assert!(block.active());
-        assert!(block.set("w-b", false));
+        assert_eq!(block.take("w-a"), Some(true));
+        assert_eq!(block.take("w-b"), None);
+        assert_eq!(block.holder().as_deref(), Some("w-a"));
+    }
+
+    #[test]
+    fn the_holder_taking_it_again_is_idempotent() {
+        let block = OnboardingBlock::default();
+        assert_eq!(block.take("w-a"), Some(true));
+        assert_eq!(block.take("w-a"), Some(false));
+        assert!(block.release("w-a"));
+        assert!(!block.release("w-a"));
         assert!(!block.active());
     }
 
     #[test]
-    fn repeated_signals_do_not_count_twice() {
+    fn a_release_by_another_window_does_not_free_it() {
         let block = OnboardingBlock::default();
-        assert!(block.set("w-a", true));
-        assert!(!block.set("w-a", true));
-        assert!(block.set("w-a", false));
-        assert!(!block.set("w-a", false));
-        assert!(!block.active());
+        assert_eq!(block.take("w-a"), Some(true));
+        assert!(!block.release("w-b"));
+        assert_eq!(block.holder().as_deref(), Some("w-a"));
     }
 
     #[test]
-    fn closing_a_window_that_never_opened_it_changes_nothing() {
+    fn once_freed_another_window_can_take_it() {
         let block = OnboardingBlock::default();
-        assert!(!block.set("w-a", false));
-        assert!(!block.active());
+        assert_eq!(block.take("w-a"), Some(true));
+        assert!(block.release("w-a"));
+        assert_eq!(block.take("w-b"), Some(true));
+    }
+
+    #[test]
+    fn restart_goes_to_the_last_used_window_while_it_is_open() {
+        let live = vec!["w-a".to_string(), "w-b".to_string()];
+        assert_eq!(
+            restart_target(Some("w-b".into()), &live).as_deref(),
+            Some("w-b")
+        );
+        assert_eq!(
+            restart_target(Some("w-gone".into()), &live).as_deref(),
+            Some("w-a")
+        );
+        assert_eq!(restart_target(None, &live).as_deref(), Some("w-a"));
+        assert_eq!(restart_target(Some("w-a".into()), &[]), None);
     }
 }

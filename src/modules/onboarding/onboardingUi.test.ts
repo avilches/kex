@@ -3,13 +3,37 @@
 import { MOD_PROP } from "@/lib/platform";
 import { useGlobalShortcuts } from "@/modules/shortcuts/lib/useGlobalShortcuts";
 import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOnboarding, isOnboardingOpen, openOnboarding } from "./onboardingUi";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const native = vi.hoisted(() => ({
+  setOnboardingOpen: vi.fn((_open: boolean) => Promise.resolve(true)),
+  requestOnboardingRestart: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/native", () => ({ native }));
+const emit = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@tauri-apps/api/event", () => ({ emit, listen: () => Promise.resolve(() => {}) }));
+vi.mock("./lib/persistOnboarding", () => ({ persistOnboarding: () => {} }));
+
+import {
+  closeOnboarding,
+  isOnboardingOpen,
+  openOnboarding,
+  requestOnboardingRestart,
+  useOnboardingUi,
+} from "./onboardingUi";
+
+beforeEach(() => {
+  native.setOnboardingOpen.mockClear().mockImplementation(() => Promise.resolve(true));
+  native.requestOnboardingRestart.mockClear();
+  emit.mockClear();
+});
 
 afterEach(() => {
   cleanup();
   closeOnboarding();
 });
+
+const showDialog = () => useOnboardingUi.setState({ open: true });
 
 function pressCloseTab(): void {
   window.dispatchEvent(
@@ -22,7 +46,7 @@ describe("isOnboardingOpen as a global shortcut gate", () => {
     const closeTab = vi.fn();
     renderHook(() => useGlobalShortcuts({ "tab.close": closeTab }, { isDisabled: () => isOnboardingOpen() }));
 
-    act(() => openOnboarding());
+    act(showDialog);
     pressCloseTab();
     expect(closeTab).not.toHaveBeenCalled();
 
@@ -43,7 +67,7 @@ describe("isOnboardingOpen as a global shortcut gate", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ...mod }));
     };
 
-    act(() => openOnboarding());
+    act(showDialog);
     press();
     expect(newWindow).not.toHaveBeenCalled();
     expect(settings).not.toHaveBeenCalled();
@@ -52,5 +76,29 @@ describe("isOnboardingOpen as a global shortcut gate", () => {
     press();
     expect(newWindow).toHaveBeenCalledTimes(1);
     expect(settings).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("openOnboarding", () => {
+  it("opens the dialog once this window gets the block", async () => {
+    await openOnboarding();
+    expect(native.setOnboardingOpen).toHaveBeenCalledWith(true);
+    expect(isOnboardingOpen()).toBe(true);
+  });
+
+  it("does not open a second dialog when another window holds the block", async () => {
+    native.setOnboardingOpen.mockImplementation(() => Promise.resolve(false));
+    await openOnboarding();
+    // The refused request is what makes Rust bring the holder to the front.
+    expect(native.setOnboardingOpen).toHaveBeenCalledWith(true);
+    expect(isOnboardingOpen()).toBe(false);
+  });
+});
+
+describe("requestOnboardingRestart", () => {
+  it("asks Rust to restart it in one window instead of broadcasting", () => {
+    requestOnboardingRestart();
+    expect(native.requestOnboardingRestart).toHaveBeenCalledTimes(1);
+    expect(emit).not.toHaveBeenCalled();
   });
 });

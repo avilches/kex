@@ -263,6 +263,27 @@ pub(crate) fn onboarding_block_changed(app: &tauri::AppHandle) {
     }
 }
 
+/// Unminimizes and focuses the main window whose onboarding dialog is open, if any.
+pub(crate) fn focus_onboarding_holder(app: &tauri::AppHandle) {
+    let holder = app.state::<onboarding::OnboardingBlock>().holder();
+    if let Some(w) = holder.and_then(|l| app.get_webview_window(&l)) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// "Run onboarding again" in Settings: only one main window is asked to open the dialog.
+#[tauri::command]
+fn request_onboarding_restart(app: tauri::AppHandle) {
+    let last = app
+        .state::<window_state::WindowStateManager>()
+        .get_focused_window();
+    if let Some(label) = onboarding::restart_target(last, &main_window_labels(&app)) {
+        let _ = app.emit_to(label.as_str(), "kex:onboarding-restart", ());
+    }
+}
+
 fn close_settings_window(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.close();
@@ -385,7 +406,7 @@ fn create_app_window(
             forget_destroyed_window(&app_handle);
             if app_handle
                 .state::<onboarding::OnboardingBlock>()
-                .set(&win_label, false)
+                .release(&win_label)
             {
                 onboarding_block_changed(&app_handle);
             }
@@ -525,10 +546,12 @@ async fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
     create_new_window(&app)
 }
 
-/// Refused, as a no-op, while an onboarding dialog is open: two onboardings must never run at once.
+/// Refused while an onboarding dialog is open, so two onboardings never run at once: the window
+/// that holds it comes to the front instead (a Dock click with that window minimized lands here).
 fn create_new_window(app: &tauri::AppHandle) -> Result<(), String> {
     if app.state::<onboarding::OnboardingBlock>().active() {
         log::info!("[window] new window refused: the onboarding dialog is open");
+        focus_onboarding_holder(app);
         return Ok(());
     }
     let id = window_state::generate_window_id();
@@ -1217,6 +1240,7 @@ pub fn run() {
             update_guard::release_update_install,
             onboarding::claim_onboarding_startup,
             onboarding::set_onboarding_open,
+            request_onboarding_restart,
             actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,

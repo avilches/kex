@@ -1,18 +1,18 @@
 import { native } from "@/lib/native";
 import { useEffect } from "react";
 
-function send(open: boolean): void {
-  native.setOnboardingOpen(open).catch((e) => console.error("[kex] onboarding block failed:", e));
+function release(): void {
+  native.setOnboardingOpen(false).catch((e) => console.error("[kex] onboarding release failed:", e));
 }
 
-// Rust refuses a new window while any window has its onboarding open. Every way the dialog goes
+// `openOnboarding` takes the block in Rust before the dialog shows; every way the dialog goes
 // away (closing, unmounting) releases it, and a fresh mount releases what a reload of this
-// webview may have left behind; a window that is destroyed is released by Rust itself.
+// webview may have left behind. Rust ignores a release from a window that does not hold it, and
+// releases a destroyed window by itself.
 export function useOnboardingBlock(open: boolean): void {
-  useEffect(() => send(false), []);
+  useEffect(release, []);
   useEffect(() => {
     if (!open) return;
-    send(true);
-    return () => send(false);
+    return release;
   }, [open]);
 }
