@@ -844,6 +844,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       return null;
     }
     if (onlyBatch && picked.entry.batchId !== onlyBatch) return null;
+    // Entries pickReopen dropped (their workspace is gone) leave the stack for good: their
+    // sleepers' files and agent records go with them. The picked entry is kept in the first step
+    // so it is not mistaken for one of them; its own sleeper reopens with the same id.
+    setClosedStack([picked.entry, ...remaining]);
     setClosedStack(remaining, false);
 
     // A reopened terminal tab that used to run an agent gets the same live,

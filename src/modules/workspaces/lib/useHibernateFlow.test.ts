@@ -273,4 +273,24 @@ describe("createHibernateFlow", () => {
       expect(isHibernating("t1")).toBe(false);
     });
   });
+
+  it("drops the stored lines of a tab that stays awake after its snapshot", async () => {
+    const dropped: string[][] = [];
+    const { flow, calls } = setup(ws([term("t1", { persistentCommand: "make" })]), {
+      discardLines: (ids) => void dropped.push([...ids]),
+    });
+    const performed = await flow.perform("w1", ["t1"], async () => []);
+    expect(performed).toBe(false);
+    expect(calls.some((c) => c.startsWith("hibernate:"))).toBe(false);
+    expect(dropped).toEqual([["t1"]]);
+  });
+
+  it("keeps the lines of the tabs that do sleep and drops only the ones that do not", async () => {
+    const dropped: string[][] = [];
+    const w = ws([term("t1"), term("t2")]);
+    const { flow, calls } = setup(w, { discardLines: (ids) => void dropped.push([...ids]) });
+    await flow.perform("w1", ["t1", "t2"], async (current) => current.paneTree.kind === "pane" ? [current.paneTree.tabs[0] as never] : []);
+    expect(calls).toContain("hibernate:t1");
+    expect(dropped).toEqual([["t2"]]);
+  });
 });

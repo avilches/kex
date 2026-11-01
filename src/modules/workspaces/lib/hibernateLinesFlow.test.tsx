@@ -34,6 +34,8 @@ describe("keepLastLines", () => {
   beforeEach(() => {
     io.save.mockReset();
     io.save.mockResolvedValue(undefined);
+    io.del.mockReset();
+    io.del.mockResolvedValue(undefined);
     usePreferencesStore.setState({ hibernateSaveLines: true });
   });
 
@@ -50,10 +52,11 @@ describe("keepLastLines", () => {
     expect(t1).not.toContain("abcd1234efgh");
   });
 
-  it("stores nothing when the setting is off", async () => {
+  it("stores nothing when the setting is off, and drops what was kept before", async () => {
     usePreferencesStore.setState({ hibernateSaveLines: false });
     await keepLastLines([term("t1")], () => screen("text"));
     expect(io.save).not.toHaveBeenCalled();
+    expect(io.del).toHaveBeenCalledWith(["t1"]);
   });
 
   it("keeps the grid of an app on the alternate screen, such as top", async () => {
@@ -66,9 +69,10 @@ describe("keepLastLines", () => {
     expect(stored.split("\n")).toHaveLength(4);
   });
 
-  it("stores nothing for a tab with no screen worth keeping", async () => {
+  it("stores nothing for a tab with no screen worth keeping, and drops the lines of an earlier sleep", async () => {
     await keepLastLines([term("t1"), term("t2")], (id) => (id === "t1" ? null : screen("\n\n  \n")));
     expect(io.save).not.toHaveBeenCalled();
+    expect(io.del.mock.calls.flatMap(([ids]) => [...ids]).sort()).toEqual(["t1", "t2"]);
   });
 
   it("does not fail the hibernation when the backend refuses", async () => {
@@ -84,6 +88,13 @@ describe("useHibernateLinesCleanup", () => {
   beforeEach(() => {
     io.del.mockReset();
     io.del.mockResolvedValue(undefined);
+  });
+
+  it("deletes the lines of the tabs already asleep when the setting is off", () => {
+    usePreferencesStore.setState({ hibernateSaveLines: false });
+    renderHook(() => useHibernateLinesCleanup(applyHibernate([workspace("t1", "t2")], "w1", { t1: { at: 1 } })));
+    expect(io.del).toHaveBeenCalledWith(["t1"]);
+    usePreferencesStore.setState({ hibernateSaveLines: true });
   });
 
   const sleeping = (...ids: string[]) => applyHibernate([workspace("t1", "t2")], "w1", Object.fromEntries(ids.map((id) => [id, { at: 1 }])));
