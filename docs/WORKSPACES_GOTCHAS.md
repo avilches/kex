@@ -1346,7 +1346,7 @@ Al hibernar, el placeholder muestra siempre el comando que se ejecutara (`hibern
 
 **Lo que si es un fallo de diseño, con o sin esa causa.** Cualquier fallo de carga acababa en "empezar de cero" y el guardado automatico lo hacia irreversible. Ahora:
 - `sanitizeSavedWorkspaces` descarta solo el workspace ilegible y conserva el resto.
-- Rust copia el estado anterior a `workspaces-backup/<millis>/` antes de un guardado que deja la mitad o menos de los workspaces (con al menos tres), y antes de limpiar con un indice corrupto (`snapshot_to_backup`). Se conservan los tres ultimos.
+- Rust copia el estado anterior a `workspaces-backup/<millis>/` antes de un guardado que deja la mitad o menos de los workspaces (con al menos tres), y antes de limpiar con un indice corrupto (`snapshot_to_backup`). Se conservan los tres ultimos, cada uno con una copia de `hibernate-lines/`. El barrido de ese directorio al arrancar no corre si `load()` salto algun cuerpo o el indice (`load_was_complete`).
 
 **Leccion.** Un camino de error que cae en "estado por defecto" no puede estar conectado a un guardado automatico sin una red debajo. Si se anade otro fallback de carga, comprobar que no escriba encima de lo que no pudo leer.
 
