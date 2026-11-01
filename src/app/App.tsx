@@ -3220,10 +3220,12 @@ export default function App() {
       },
       "tab.switcher": (e) => {
         if (switcherActive()) return stepSwitcher(1);
+        dismissPalettes();
         openTabSwitcher(e, 1);
       },
       "tab.switcherBack": (e) => {
         if (switcherActive()) return stepSwitcher(-1);
+        dismissPalettes();
         openTabSwitcher(e, -1);
       },
       "tab.selectByIndex": (e) => {
