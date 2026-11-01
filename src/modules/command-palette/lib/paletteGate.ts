@@ -9,10 +9,15 @@ export function openPaletteOf(commandsOpen: boolean, folderOpen: boolean): OpenP
   return folderOpen ? "folder" : "none";
 }
 
+// Ctrl+Tab and Ctrl+Shift+Tab pass through both palettes: the handler closes the palette and opens the
+// tab switcher in its place.
+const TAB_SWITCHER: readonly ShortcutId[] = ["tab.switcher", "tab.switcherBack"];
+
 const TAB_AND_WORKSPACE: readonly ShortcutId[] = [
   ...(Object.keys(PALETTE_TAB_SHORTCUTS) as ShortcutId[]),
   "tab.new",
   "workspace.close",
+  ...TAB_SWITCHER,
 ];
 
 // Everything a palette lets through while it is open; any other shortcut, including one added

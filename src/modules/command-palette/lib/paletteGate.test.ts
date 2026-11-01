@@ -25,6 +25,8 @@ const TABS: ShortcutId[] = [
   "editor.save",
   "tab.new",
   "workspace.close",
+  "tab.switcher",
+  "tab.switcherBack",
 ];
 const EXPECTED_COMMANDS: ShortcutId[] = [
   ...TABS,
@@ -77,8 +79,15 @@ describe("shortcutBlockedByPalette", () => {
     expect(open).toEqual(["palette.menuAction"]);
   });
 
-  it("keeps every tab-switching shortcut, Ctrl+Tab included, blocked behind either palette: they do not close it", () => {
-    for (const id of ["tab.switcher", "tab.switcherBack", "tab.next", "tab.prev", "tab.selectByIndex"] as const) {
+  it("lets Ctrl+Tab and Ctrl+Shift+Tab through either palette, since they close it and open the tab switcher", () => {
+    for (const id of ["tab.switcher", "tab.switcherBack"] as const) {
+      expect(shortcutBlockedByPalette(id, "commands"), id).toBe(false);
+      expect(shortcutBlockedByPalette(id, "folder"), id).toBe(false);
+    }
+  });
+
+  it("keeps the other tab-switching shortcuts blocked behind either palette", () => {
+    for (const id of ["tab.next", "tab.prev", "tab.selectByIndex"] as const) {
       expect(shortcutBlockedByPalette(id, "commands"), id).toBe(true);
       expect(shortcutBlockedByPalette(id, "folder"), id).toBe(true);
     }
