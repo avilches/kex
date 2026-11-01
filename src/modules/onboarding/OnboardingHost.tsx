@@ -1,3 +1,4 @@
+import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
 import { useEffect } from "react";
 import { toast } from "sonner";
@@ -17,12 +18,16 @@ function remind(): void {
 }
 
 // Until hydration the stored state is the default, which says finished, so deciding earlier
-// would never show anything.
+// would never show anything. Only the window that wins the per-process claim decides, so
+// restored or new windows never repeat the modal or eat the reminder of the next launch.
 export function OnboardingHost() {
   useEffect(() => {
     let cancelled = false;
-    void whenHydrated().then(() => {
+    void (async () => {
+      await whenHydrated();
       if (cancelled) return;
+      const won = await native.claimOnboardingStartup().catch(() => false);
+      if (!won || cancelled) return;
       const action = startupAction(usePreferencesStore.getState().onboarding);
       if (action === "openModal") {
         openOnboarding();
@@ -31,7 +36,7 @@ export function OnboardingHost() {
         remind();
         persistOnboarding(withReminded);
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

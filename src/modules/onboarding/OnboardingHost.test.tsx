@@ -21,6 +21,14 @@ vi.mock("@/modules/settings/store", async (orig) => {
     },
   };
 });
+const claim = vi.hoisted(() => ({ won: true, calls: 0 }));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (cmd: string) => {
+    if (cmd !== "claim_onboarding_startup") return Promise.resolve(undefined);
+    claim.calls += 1;
+    return Promise.resolve(claim.won);
+  },
+}));
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("./OnboardingDialog", () => ({ OnboardingDialog: () => null }));
@@ -48,6 +56,8 @@ async function mountHydrated() {
 }
 
 beforeEach(() => {
+  claim.won = true;
+  claim.calls = 0;
   toast.mockClear();
   closeOnboarding();
 });
@@ -90,6 +100,21 @@ describe("OnboardingHost", () => {
     toast.mockClear();
     await mountHydrated();
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("a window that loses the startup claim neither opens the modal nor reminds", async () => {
+    claim.won = false;
+    setOnboarding({});
+    await mountHydrated();
+    expect(claim.calls).toBe(1);
+    expect(useOnboardingUi.getState().open).toBe(false);
+    expect(usePreferencesStore.getState().onboarding.shown).toBe(false);
+
+    cleanup();
+    setOnboarding({ shown: true });
+    await mountHydrated();
+    expect(toast).not.toHaveBeenCalled();
+    expect(usePreferencesStore.getState().onboarding.reminded).toBe(false);
   });
 
   it("does nothing when finished", async () => {
