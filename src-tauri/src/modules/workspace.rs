@@ -168,36 +168,77 @@ pub fn nearest_existing_dir(path: &Path) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-// A saved cwd can be stale or from another environment (e.g. a Windows path in
-// a now-WSL workspace, or a since-deleted dir); the terminal must still open, so
-// it climbs to the nearest folder above that exists and only then falls back to
-// home instead of rejecting. Returns the cwd to spawn in (None meaning home) and
-// the canonical path to authorize after a successful spawn.
+// The nearest folder above `path` that exists AND lives under `home`: a terminal whose folder is gone
+// may start there, but never in a folder outside the user's home (`/Volumes`, `/Users`, `/mnt`...),
+// where an unmounted disk would otherwise land on its mount point's parent. Both sides are canonical
+// so a symlinked home still matches.
+pub fn nearest_existing_dir_under(path: &Path, home: &Path) -> Option<PathBuf> {
+    let home = std::fs::canonicalize(home).ok()?;
+    let near = nearest_existing_dir(path)?;
+    let canonical = std::fs::canonicalize(&near).ok()?;
+    canonical.starts_with(&home).then_some(near)
+}
+
+// Why a terminal with no command cannot be started in `path`, or None when it can: the folder is
+// there, or a folder above it that lives under the user's home is (Rust starts the shell there).
+pub fn plain_dir_problem(path: &str, home: Option<&Path>) -> Option<String> {
+    let problem = crate::modules::agent::session_store::launch_dir_problem(path)?;
+    let climbs = home.is_some_and(|h| nearest_existing_dir_under(Path::new(path.trim()), h).is_some());
+    if climbs {
+        None
+    } else {
+        Some(format!("{problem}, and no folder above it is inside your home folder"))
+    }
+}
+
+// A saved cwd can be stale or from another environment (a Windows path in a now-WSL workspace, a
+// since-deleted dir); a shell with no command still opens, in the nearest folder above it that exists,
+// but only as far as the user's home. Outside the home it is an error, never a silent Home: a path on
+// an unmounted disk must not open somewhere else. Returns the cwd to spawn in (None meaning home) and
+// the canonical path to authorize after a successful spawn: only a cwd that exists is authorized, a
+// folder reached by climbing is not.
 pub fn spawn_cwd_or_home(
     cwd: Option<String>,
     workspace: &WorkspaceEnv,
-) -> (Option<String>, Option<PathBuf>) {
+) -> Result<(Option<String>, Option<PathBuf>), String> {
+    spawn_cwd_or_home_in(cwd, workspace, dirs::home_dir().as_deref())
+}
+
+fn spawn_cwd_or_home_in(
+    cwd: Option<String>,
+    workspace: &WorkspaceEnv,
+    home: Option<&Path>,
+) -> Result<(Option<String>, Option<PathBuf>), String> {
     match validate_spawn_cwd(cwd.as_deref(), workspace) {
-        Ok(Some(canonical)) => (cwd, Some(canonical)),
-        Ok(None) => (None, None),
+        Ok(Some(canonical)) => Ok((cwd, Some(canonical))),
+        Ok(None) => Ok((None, None)),
         Err(e) => {
-            let nearest = matches!(workspace, WorkspaceEnv::Local)
-                .then(|| cwd.as_deref().map(str::trim).map(PathBuf::from))
-                .flatten()
-                .and_then(|p| nearest_existing_dir(&p))
+            if !matches!(workspace, WorkspaceEnv::Local) {
+                log::warn!("pty cwd {cwd:?} unusable in {workspace:?} ({e}); opening home");
+                return Ok((None, None));
+            }
+            let requested = cwd.as_deref().map(str::trim).map(PathBuf::from);
+            let near = requested
+                .as_deref()
+                .zip(home)
+                .and_then(|(p, h)| nearest_existing_dir_under(p, h))
                 .and_then(|near| {
                     let near = near.to_string_lossy().into_owned();
-                    match validate_spawn_cwd(Some(&near), workspace) {
-                        Ok(Some(canonical)) => Some((near, canonical)),
-                        _ => None,
-                    }
+                    validate_spawn_cwd(Some(&near), workspace).ok().flatten().map(|_| near)
                 });
-            if let Some((near, canonical)) = nearest {
-                log::warn!("pty cwd {cwd:?} unusable ({e}); opening the nearest folder {near:?}");
-                return (Some(near), Some(canonical));
+            match near {
+                Some(near) => {
+                    log::warn!("pty cwd {cwd:?} unusable ({e}); opening the nearest folder {near:?} under home");
+                    Ok((Some(near), None))
+                }
+                None => {
+                    log::warn!("pty cwd {cwd:?} unusable ({e}) and no folder above it is under home");
+                    Err(format!(
+                        "The folder {} no longer exists and none above it is inside your home folder",
+                        cwd.as_deref().unwrap_or("")
+                    ))
+                }
             }
-            log::warn!("pty cwd {cwd:?} unusable in {workspace:?} ({e}); opening home");
-            (None, None)
         }
     }
 }
@@ -883,43 +924,77 @@ mod auth_tests {
     }
 
     #[test]
-    fn spawn_cwd_or_home_keeps_valid_dir() {
+    fn spawn_cwd_or_home_keeps_valid_dir_and_authorizes_it() {
         let dir = tempdir("spawn-orhome-ok");
         let s = dir.to_string_lossy().into_owned();
-        let (spawn, canonical) = spawn_cwd_or_home(Some(s.clone()), &WorkspaceEnv::Local);
+        let (spawn, canonical) = spawn_cwd_or_home_in(Some(s.clone()), &WorkspaceEnv::Local, Some(&dir)).unwrap();
         assert_eq!(spawn, Some(s));
         assert_eq!(canonical, Some(dir));
     }
 
     #[test]
-    fn spawn_cwd_or_home_falls_back_when_no_folder_above_exists() {
-        let (spawn, canonical) = spawn_cwd_or_home(
-            Some("kex-relative/missing".to_owned()),
+    fn a_missing_folder_climbs_to_a_folder_under_home_and_authorizes_nothing() {
+        let home = tempdir("spawn-orhome-climb");
+        let gone = home.join("pepe").join("deeper");
+        let (spawn, canonical) = spawn_cwd_or_home_in(
+            Some(gone.to_string_lossy().into_owned()),
             &WorkspaceEnv::Local,
-        );
-        assert_eq!(spawn, None);
-        assert_eq!(canonical, None);
+            Some(&home),
+        )
+        .unwrap();
+        assert_eq!(spawn, Some(home.to_string_lossy().into_owned()));
+        assert_eq!(canonical, None, "the folder reached by climbing must not become an authorized root");
     }
 
     #[test]
-    fn spawn_cwd_or_home_climbs_to_the_nearest_existing_folder() {
-        let dir = tempdir("spawn-orhome-climb");
-        let gone = dir.join("pepe").join("deeper");
-        let (spawn, canonical) = spawn_cwd_or_home(
+    fn a_missing_folder_whose_nearest_ancestor_is_outside_home_is_an_error() {
+        let home = tempdir("spawn-orhome-home");
+        let elsewhere = tempdir("spawn-orhome-outside");
+        let gone = elsewhere.join("disk").join("project");
+        let err = spawn_cwd_or_home_in(
             Some(gone.to_string_lossy().into_owned()),
             &WorkspaceEnv::Local,
-        );
-        assert_eq!(spawn, Some(dir.to_string_lossy().into_owned()));
-        assert_eq!(canonical, Some(std::fs::canonicalize(&dir).unwrap()));
+            Some(&home),
+        )
+        .unwrap_err();
+        assert!(err.contains("inside your home folder"), "{err}");
+    }
+
+    #[test]
+    fn broad_ancestors_like_volumes_or_users_are_never_the_landing_folder() {
+        let home = tempdir("spawn-orhome-broad");
+        for gone in ["/Volumes/kex-no-such-disk/project", "/Users/kex-no-such-user/x", "/mnt/kex-no-such/x", "/kex-no-such-top/dir"] {
+            let got = spawn_cwd_or_home_in(Some(gone.to_owned()), &WorkspaceEnv::Local, Some(&home));
+            assert!(got.is_err(), "{gone} -> {got:?}");
+        }
+    }
+
+    #[test]
+    fn a_relative_missing_path_is_an_error() {
+        let home = tempdir("spawn-orhome-rel");
+        assert!(spawn_cwd_or_home_in(Some("kex-relative/missing".to_owned()), &WorkspaceEnv::Local, Some(&home)).is_err());
     }
 
     #[test]
     fn spawn_cwd_or_home_passes_through_empty() {
-        assert_eq!(spawn_cwd_or_home(None, &WorkspaceEnv::Local), (None, None));
-        assert_eq!(
-            spawn_cwd_or_home(Some("  ".to_owned()), &WorkspaceEnv::Local),
-            (None, None)
-        );
+        assert_eq!(spawn_cwd_or_home(None, &WorkspaceEnv::Local), Ok((None, None)));
+        assert_eq!(spawn_cwd_or_home(Some("  ".to_owned()), &WorkspaceEnv::Local), Ok((None, None)));
+    }
+
+    #[test]
+    fn plain_dir_problem_is_none_when_the_folder_or_a_folder_above_it_under_home_exists() {
+        let home = tempdir("plain-problem");
+        assert_eq!(plain_dir_problem(&home.to_string_lossy(), Some(&home)), None);
+        let gone = home.join("a").join("b");
+        assert_eq!(plain_dir_problem(&gone.to_string_lossy(), Some(&home)), None);
+    }
+
+    #[test]
+    fn plain_dir_problem_says_why_when_nothing_above_is_under_home() {
+        let home = tempdir("plain-problem-home");
+        let msg = plain_dir_problem("/Volumes/kex-no-such-disk/p", Some(&home)).expect("must be a problem");
+        assert!(msg.contains("Folder not found") && msg.contains("inside your home folder"), "{msg}");
+        assert!(plain_dir_problem("/Volumes/kex-no-such-disk/p", None).is_some());
     }
 
     #[test]

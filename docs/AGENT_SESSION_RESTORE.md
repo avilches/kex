@@ -737,8 +737,10 @@ decision = decideStart(plan, persistentCommand, initialCwd, dirProblem)
   blocked          -> no PTY; session.restoreBlock = { reason, dir, command, agent?, restorable }
 ```
 
-`dirProblem` comes from the `check_launch_dir` command and is only asked for a saved command without an agent plan
-(`needsDirCheck`); an agent plan already carries its verdict from Rust.
+`dirProblem` is asked for every start without an agent plan (`needsDirCheck`); an agent plan already carries its
+verdict from Rust. A saved command asks `check_launch_dir` (the folder itself must be usable); a shell with no command
+asks `check_plain_launch_dir` (`dirCheckCommand`), which accepts a folder that is gone as long as a folder above it lives
+under the user's home.
 
 ### Blocked start
 
@@ -761,9 +763,11 @@ set. For an agent plan the tab also gets the `restoreError` placeholder (the `âš
 There is no way to skip the restore and open a plain shell: the modal shows the folder and the command so the user can
 fix the cause (recreate the folder, mount the volume) and press Try again, or close the tab. Undoing that close brings the
 same block back (`TabHibernation.held` / `Tab.held`, seeded with `seedHeldBlock`). A terminal with no command and no
-agent is never held for a missing folder: there is nothing to lose, so `spawn_cwd_or_home` (Rust, the gate of `pty_open`)
-starts it in the nearest folder above the saved one that exists (never the filesystem root), then the launch folder, then
-Home. A held block is checked again when its tab comes back (`refreshHeldBlock`): the dialog only returns if the problem
+agent opens in the nearest folder above the saved one that exists, but only up to the user's home: `spawn_cwd_or_home`
+(Rust, the gate of `pty_open`) climbs only to a folder under home, authorizes only a cwd that exists (the folder reached
+by climbing is never an authorized root) and returns an error otherwise. A path on an unmounted disk (`/Volumes/...`) or
+under `/Users`, `/home` or `/mnt` therefore never opens somewhere else: the frontend shows the same modal as for a saved
+command, built from `check_plain_launch_dir`, with Try again. A held block is checked again when its tab comes back (`refreshHeldBlock`): the dialog only returns if the problem
 is still there, with the reason as it stands now. A reopened closed agent tab has a new id, so `previewResumeCmd` falls
 back to the record under the old id (`aliasAgentRecord`) until the new id has its own, which makes Try again find the plan.
 `applySpawnCwdReport` records the folder a shell really started in on the tab.
@@ -1030,6 +1034,7 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | JSONL transcript missing (no messages sent) | Entry removed from store (unless the launch directory is unusable); `claude --session-id <id>` injected - new session reuses same UUID |
 | launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again modal and shows `âš `; store entry kept |
 | saved command (no agent) whose directory is unusable | Same modal, built on the frontend from `check_launch_dir` |
+| shell with no command whose directory is gone and has no folder above it under home | Same modal, built from `check_plain_launch_dir` (a folder gone with one above it under home just opens there) |
 | `openPty` rejects at start | Modal with the reason `Could not start the terminal: ...` and only Try again; nothing is left pending |
 | Try again with the problem still there | The modal is replaced by the new block; nothing typed |
 | Discard restore plan on a saved command | Forgets this start only; `persistentCommand` kept |

@@ -91,7 +91,7 @@ pub async fn pty_open(
         // spawn never widens the authorization surface. A stale or cross-environment
         // cwd falls back to home rather than failing the open. The stats of the cwd
         // and its ancestors run here, so a slow mount stays off the async runtime.
-        let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
+        let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace)?;
         let dir = shell_init::spawn_dir_report(cwd.clone(), &workspace);
         session::spawn(
             id, app, cols, rows, cwd, workspace, blocks, tab_id, shell, on_data, on_exit,

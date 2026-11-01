@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import {
   decideStart,
+  dirCheckCommand,
   needsDirCheck,
   openFailureBlock,
   refreshHeldBlock,
@@ -62,9 +63,25 @@ describe("decideStart", () => {
     });
   });
 
-  it("spawns a plain terminal whose folder is gone, Rust picks the nearest folder that exists", () => {
-    const d = decideStart({ ...base, initialCwd: "/pepe", dirProblem: "Folder not found: /pepe" });
-    expect(d).toEqual({ kind: "spawn", cwd: "/pepe", inject: "none" });
+  it("blocks a plain terminal when the check reports its folder gone with nothing usable above it under home", () => {
+    const d = decideStart({ ...base, initialCwd: "/Volumes/disk/p", dirProblem: "Folder not found: /Volumes/disk/p, and no folder above it is inside your home folder" });
+    expect(d).toEqual({
+      kind: "blocked",
+      block: {
+        reason: "Folder not found: /Volumes/disk/p, and no folder above it is inside your home folder",
+        dir: "/Volumes/disk/p",
+        command: "",
+        restorable: true,
+      },
+    });
+  });
+
+  it("spawns a plain terminal when the check finds no problem, even if the folder itself is gone (Rust starts it in the nearest folder under home)", () => {
+    expect(decideStart({ ...base, initialCwd: "/home/u/gone", dirProblem: null })).toEqual({
+      kind: "spawn",
+      cwd: "/home/u/gone",
+      inject: "none",
+    });
   });
 
   it("spawns plain with nothing to run", () => {
@@ -73,11 +90,21 @@ describe("decideStart", () => {
 });
 
 describe("needsDirCheck", () => {
-  it("is only true for a saved command with a directory and no plan", () => {
+  it("is true for any start with a directory and no plan, with or without a saved command", () => {
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: "/a" })).toBe(true);
+    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(true);
+    expect(needsDirCheck({ plan: null, persistentCommand: undefined, initialCwd: "/a" })).toBe(true);
+  });
+  it("is false with an agent plan or without a directory", () => {
     expect(needsDirCheck({ plan: plan(), persistentCommand: "x", initialCwd: "/a" })).toBe(false);
-    expect(needsDirCheck({ plan: null, persistentCommand: "", initialCwd: "/a" })).toBe(false);
     expect(needsDirCheck({ plan: null, persistentCommand: "x", initialCwd: undefined })).toBe(false);
+  });
+});
+
+describe("dirCheckCommand", () => {
+  it("uses the strict check for a saved command and the home-bounded one for a plain shell", () => {
+    expect(dirCheckCommand({ plan: null, persistentCommand: "make", initialCwd: "/a" })).toBe("check_launch_dir");
+    expect(dirCheckCommand({ plan: null, persistentCommand: undefined, initialCwd: "/a" })).toBe("check_plain_launch_dir");
   });
 });
 
