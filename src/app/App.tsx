@@ -2354,7 +2354,7 @@ export default function App() {
     [handleChangeRootMode, showSidebarView],
   );
 
-  const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
+  const { sourceControl, explorerGit, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
       explorerRoot,
       workspaceRoot: effectiveWorkspaceRoot,
@@ -2366,9 +2366,9 @@ export default function App() {
       openCommitHistoryTab: openGitHistoryInTab,
     });
 
-  // Git root for explorer tree decorations and the gitignore action follows the
-  // same repo Source Control resolves (workspace root's repo first, else explorerRoot).
-  const gitRoot = sourceControl.repo?.repoRoot ?? null;
+  // Git root for explorer tree decorations and the gitignore action: the repo of the folder the explorer
+  // shows. It is the Source Control repo unless the explorer sits in another repo than the workspace root.
+  const gitRoot = explorerGit.repo?.repoRoot ?? null;
 
   const editorChromeWithGit = useMemo(
     () => ({ ...editorChrome, gitRootPath: gitRoot }),
@@ -2814,11 +2814,11 @@ export default function App() {
   const sidebarGit = useMemo<SidebarGit>(
     () => ({
       workspaceId: activeWorkspaceId,
-      status: sourceControl.status,
-      statusMap: sourceControl.status ? buildGitStatusMap(sourceControl.status) : null,
+      status: explorerGit.status,
+      statusMap: explorerGit.status ? buildGitStatusMap(explorerGit.status) : null,
       scheme: gitColorScheme,
     }),
-    [activeWorkspaceId, sourceControl.status, gitColorScheme],
+    [activeWorkspaceId, explorerGit.status, gitColorScheme],
   );
 
   const detailFilter = useDetailFilter();
@@ -4257,7 +4257,7 @@ export default function App() {
                           onSplitBrowserDown={onSplitBrowserDownStable}
                           onDividerChange={onDividerChangeStable}
                           callbacks={tabCallbacks}
-                          gitStatus={sourceControl.status}
+                          gitStatus={explorerGit.status}
                           gitColorScheme={gitColorScheme}
                           onFloatBrowserTab={onFloatBrowserTab}
                           onDockBrowserTab={onDockBrowserTab}

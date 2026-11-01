@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { native } from "@/lib/native";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import { explorerGitPath } from "./explorerGitPath";
 import { resolveSourceControlPath } from "./sourceControlPath";
 import { useSourceControl } from "./useSourceControl";
 
@@ -44,6 +45,12 @@ export function useSourceControlContext({
   });
   const sourceControlPath = sourceControlContextPath;
   const sourceControl = useSourceControl(sourceControlPath ?? null, true);
+  // The explorer decorates and writes .gitignore for the folder it shows. That is the Source Control
+  // repo except when the workspace root is a repo and the explorer sits in another (a worktree, a
+  // nested repo, a folder outside): then it reads its own status, and only then.
+  const ownExplorerPath = explorerGitPath({ workspaceRoot, workspaceIsGitRepo, explorerRoot, sourceControlPath: sourceControlPath ?? null });
+  const explorerOwn = useSourceControl(ownExplorerPath, ownExplorerPath !== null);
+  const explorerGit = ownExplorerPath !== null ? explorerOwn : sourceControl;
 
   const toggleSourceControl = useCallback(() => {
     cycleSidebarView("git");
@@ -74,5 +81,5 @@ export function useSourceControlContext({
     sourceControlContextPath,
   ]);
 
-  return { sourceControl, toggleSourceControl, openGitGraphFromContext };
+  return { sourceControl, explorerGit, toggleSourceControl, openGitGraphFromContext };
 }
