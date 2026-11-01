@@ -10,11 +10,8 @@ export type Action = {
   kind: ActionKind;
   /** Command template, expanded against the current context at run time. */
   command: string;
-  /** Detected app this action came from, for its icon and default command. */
-  appId?: string;
-  /** App icon kept after the user edits a preset: the Action is theirs now, the icon stays. */
-  iconId?: string;
-  /** The icon the user picked (`app:<id>`, `agent:<id>` or `glyph:<name>`); wins over appId and iconId. */
+  /** The one identity of how it looks (`app:<id>`, `agent:<id>` or `glyph:<name>`): set when it is
+   * created from a preset, changed only when the user picks another. Editing the command never touches it. */
   icon?: string;
   /** Scripts only; absent means home. An agent has no folder of its own. */
   cwdMode?: ScriptCwdMode;

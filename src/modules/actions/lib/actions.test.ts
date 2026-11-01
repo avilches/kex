@@ -204,14 +204,6 @@ describe("promoteToGlobal", () => {
   });
 });
 
-describe("updateAction appId", () => {
-  it("an empty appId clears the preset link, which a missing key cannot do", () => {
-    const preset: Action = { id: "a1", name: "Zed", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
-    expect(updateAction([preset], "a1", { appId: "" })[0]?.appId).toBeUndefined();
-    expect(updateAction([preset], "a1", { ownButton: true })[0]?.appId).toBe("zed");
-  });
-});
-
 describe("adoptActionAt, apps with the same command", () => {
   const app = (id: string, command: string, o: Partial<Action> = {}): Action => ({
     id,

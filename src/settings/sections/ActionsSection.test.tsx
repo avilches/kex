@@ -73,7 +73,7 @@ describe("ActionsSection", () => {
     const item = options().find((o) => o.textContent === "Claude Code");
     act(() => void (item as HTMLElement).click());
     const next = change.mock.calls[0]![0]([]);
-    expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude --dangerously-skip-permissions", appId: "claude" });
+    expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude --dangerously-skip-permissions", icon: "agent:claude" });
     expect(next[0]).not.toHaveProperty("cwdMode");
     unmount();
   });
@@ -94,12 +94,12 @@ describe("ActionsSection", () => {
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ name: "PyCharm", command: expect.stringMatching(/\{target\}$/), appId: "pycharm", kind: "app", accepts: "folder", ownButton: false });
+    expect(next[0]).toMatchObject({ name: "PyCharm", command: expect.stringMatching(/\{target\}$/), icon: "app:pycharm", kind: "app", accepts: "folder", ownButton: false });
     unmount();
   });
 
   it("offers each app once: an app that is already installed leaves the combo, the others stay", () => {
-    actions = [{ id: "ac-1", name: "PyCharm", kind: "app", command: "pycharm {target}", accepts: "folder", appId: "pycharm", ownButton: false }];
+    actions = [{ id: "ac-1", name: "PyCharm", kind: "app", command: "pycharm {target}", accepts: "folder", icon: "app:pycharm", ownButton: false }];
     const { container, unmount } = mount();
     openAdd(container);
     expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(false);

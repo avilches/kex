@@ -309,19 +309,15 @@ export function ownButtonCandidates(
   return [...local, ...global].filter((action) => action.ownButton && !isApp(action) && onBar(action, stateOf(action, states)));
 }
 
-// A button of a detected app or agent that is the only one of it in the bar needs no words:
-// its icon says which one it is. With several of the same, the name and the line under it
-// tell them apart. Apps and agents count apart; the result is the ids drawn icon-only.
-// A picked icon does not say which app it is, so such a button always keeps its words.
-export function soleIconButtons(buttons: readonly Pick<Action, "id" | "appId" | "kind" | "icon">[]): Set<string> {
-  const keyOf = (a: Pick<Action, "appId" | "kind" | "icon">) =>
-    (isApp(a) || isAgent(a)) && a.appId && !a.icon ? `${a.kind}:${a.appId}` : null;
+// An agent button whose logo no other button of the bar shares needs no words: the logo says
+// which one it is. With several of the same logo (Claude and Claude with Yolo) the name tells
+// them apart. A glyph or a script never qualifies, a glyph does not say what the button is.
+export function soleIconButtons(buttons: readonly Pick<Action, "id" | "kind" | "icon">[]): Set<string> {
   const count = new Map<string, number>();
-  for (const a of buttons) {
-    const key = keyOf(a);
-    if (key) count.set(key, (count.get(key) ?? 0) + 1);
-  }
-  return new Set(buttons.filter((a) => count.get(keyOf(a) ?? "") === 1).map((a) => a.id));
+  for (const a of buttons) if (a.icon) count.set(a.icon, (count.get(a.icon) ?? 0) + 1);
+  return new Set(
+    buttons.filter((a) => isAgent(a) && a.icon?.startsWith("agent:") && count.get(a.icon) === 1).map((a) => a.id),
+  );
 }
 
 export const MENU_DRAG_PREFIX = "menu:";

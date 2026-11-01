@@ -27,8 +27,7 @@ describe("planAgentSeed", () => {
     for (const a of plan?.add ?? []) {
       expect(a).toMatchObject({ kind: "agent", ownButton: true });
       expect(a).not.toHaveProperty("cwdMode");
-      expect(a.appId).toBe(a.command);
-      expect(a.iconId).toBe(a.command);
+      expect(a.icon).toBe(`agent:${a.command}`);
     }
     expect(plan?.add.find((a) => a.command === "opencode")?.name).toBe("OPENCODE");
     expect(new Set(plan?.add.map((a) => a.id)).size).toBe(2);
@@ -109,13 +108,13 @@ describe("planAppSeed", () => {
       expect(a.name).not.toMatch(/[{}]/);
       expect(a.command).not.toMatch(/filepath|workspace|cwd/);
     }
-    expect(plan?.map((a) => a.appId).sort()).toEqual(["vscode", "zed"]);
+    expect(plan?.map((a) => a.icon).sort()).toEqual(["app:vscode", "app:zed"]);
     expect(new Set(plan?.map((a) => a.id)).size).toBe(2);
   });
 
   it("does not seed a disabled app", () => {
     const plan = planAppSeed({ seeded: false, editors: [ed("zed"), ed("vscode", false)], existing: [] });
-    expect(plan?.map((a) => a.appId)).toEqual(["zed"]);
+    expect(plan?.map((a) => a.icon)).toEqual(["app:zed"]);
   });
 
   it("has nothing to seed once seeded", () => {
@@ -139,7 +138,7 @@ describe("planAppSeed", () => {
       editors: [ed("zed"), ed("vscode")],
       existing: [appAction(zed.command, "My editor")],
     });
-    expect(plan?.map((a) => a.appId)).toEqual(["vscode"]);
+    expect(plan?.map((a) => a.icon)).toEqual(["app:vscode"]);
   });
 
   it("seeds a JetBrains-style editor once, and says it takes folders only", () => {

@@ -59,7 +59,7 @@ const claude = (o: Partial<Action> = {}): Action => ({
   name: "Claude Code",
   kind: "agent",
   command: "claude",
-  appId: "claude",
+  icon: "agent:claude",
   ownButton: true,
   ...o,
 });
@@ -305,10 +305,10 @@ describe("buildActionsBarModel", () => {
   });
 
   it("draws a button as its icon alone only when it is the sole button of its app", () => {
-    const zedWs = claude({ id: "z1", appId: "zed", name: "Zed {workspace}" });
-    const zedFile = claude({ id: "z2", appId: "zed", name: "Zed docs {workspace}", command: "zed {workspace}/docs" });
-    const code = claude({ id: "c1", appId: "code", name: "Code {workspace}" });
-    const custom = claude({ id: "u1", appId: undefined, name: "Mine" });
+    const zedWs = claude({ id: "z1", icon: "agent:zed", name: "Zed {workspace}" });
+    const zedFile = claude({ id: "z2", icon: "agent:zed", name: "Zed docs {workspace}", command: "zed {workspace}/docs" });
+    const code = claude({ id: "c1", icon: "agent:code", name: "Code {workspace}" });
+    const custom = claude({ id: "u1", icon: undefined, name: "Mine" });
     const dev = script({ id: "s1", ownButton: true });
     const m = buildActionsBarModel({ local: [zedWs, zedFile, code], global: [custom, dev], context: ctx, states: new Map(), activeId: undefined });
     expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
@@ -322,11 +322,11 @@ describe("buildActionsBarModel", () => {
   });
 
   it("never draws a button with a picked icon as its icon alone, because the icon no longer says which app it is", () => {
-    const claude: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace", ownButton: true };
+    const claude: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", cwdMode: "workspace", ownButton: true };
     expect(soleIconButtons([claude])).toEqual(new Set(["g1"]));
     expect(soleIconButtons([{ ...claude, icon: "glyph:star" }])).toEqual(new Set());
     const picked = { ...claude, id: "g2", icon: "glyph:star" };
-    const plain = { ...claude, id: "g3", appId: "claude" };
+    const plain = { ...claude, id: "g3" };
     expect(soleIconButtons([picked, plain])).toEqual(new Set(["g3"]));
   });
 
@@ -722,7 +722,7 @@ describe("agents", () => {
     name: "Claude Code",
     kind: "agent",
     command: "claude",
-    appId: "claude",
+    icon: "agent:claude",
     ownButton: true,
     ...o,
   });
@@ -825,8 +825,8 @@ describe("agents", () => {
 
   it("is drawn as its icon alone when it is the sole one of its agent, whatever the scope", () => {
     const m = buildActionsBarModel({
-      local: [agent({ id: "g1" }), agent({ id: "g2", appId: "codex", command: "codex" }), agent({ id: "g3", appId: "codex", command: "codex" })],
-      global: [agent({ id: "c1", appId: "gemini", command: "gemini" })],
+      local: [agent({ id: "g1" }), agent({ id: "g2", icon: "agent:codex", command: "codex" }), agent({ id: "g3", icon: "agent:codex", command: "codex" })],
+      global: [agent({ id: "c1", icon: "agent:gemini", command: "gemini" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,

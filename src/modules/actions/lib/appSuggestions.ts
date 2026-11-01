@@ -133,7 +133,7 @@ export function actionFromSuggestion(s: AppSuggestion, ownButton = false): Actio
     name: s.name,
     kind: s.kind,
     command: s.defaultCommand,
-    ...(s.appId ? { appId: s.appId } : {}),
+    ...(s.appId ? { icon: `${s.kind}:${s.appId}` } : {}),
     ...(s.kind === "app" ? { accepts: s.accepts ?? DEFAULT_ACCEPTS } : {}),
     ownButton,
   };

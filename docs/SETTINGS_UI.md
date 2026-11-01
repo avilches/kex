@@ -54,8 +54,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   vive en un modal (`ActionEditDialog`), abierto con el lapiz de la fila.
 - **Borrado con confirmacion**: cualquier removida de una fila guardada (fila de Action en
   `ActionRow`) abre `AlertDialog` y solo llega al
-  store con el boton destructivo confirmado. Excepcion: una Action inmutable de app (`appId`
-  presente) se borra sin pedir nada, porque vuelve una sola eleccion en el combo.
+  store con el boton destructivo confirmado. Excepcion: una Action de app que es un preset
+  (su comando es el instalado) se borra sin pedir nada, porque vuelve una sola eleccion en el combo.
 - **Popovers dentro de un Dialog modal**: el Dialog modal pone `pointer-events: none` en el
   body y un popover portalizado a body queda muerto para el raton (y `RemoveScroll` se come la
   rueda). El patron vigente es `DialogScrollHost` (`src/components/dialogScrollHost.tsx`): el
@@ -89,10 +89,10 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
 - **Editor de Actions en Settings**: dos columnas, This workspace (con el nombre del workspace debajo) a la izquierda y Global a la derecha, cada una con
   un unico combo Add (Add script primero, luego el grupo Agents con los presets de agentes y luego el grupo Applications con Custom arriba y los presets de apps). El
   combo no se cierra al elegir un preset (se pueden anadir varios de una vez) y no muestra
-  los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el `appId` no importan). La fila es asa, icono,
+  los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el icono no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
-  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons, y "Default icon" para volver al de siempre), Run in folder primero en los scripts (Home por defecto, Workspace root con la
+  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons, ), Run in folder primero en los scripts (Home por defecto, Workspace root con la
   chincheta del explorer, Current folder, Absolute path), nombre, comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
   para agentes y scripts de workspace; una app, y un script de carpeta o de fichero, llevan en su lugar una nota,
@@ -101,8 +101,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
   exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega
   (los scripts nunca se fusionan). Una Action de preset se edita igual que cualquiera:
-  una app es un preset solo por su comando: al cambiarlo deja de serlo (`ownedAfterEdit`,
-  conserva el icono en `iconId`) y el preset vuelve al combo, y si el comando vuelve a ser el
+  una app es un preset solo por su comando: al cambiarlo deja de serlo (el icono no cambia)
+  y el preset vuelve al combo, y si el comando vuelve a ser el
   del preset lo recupera; el nombre y Own button / Inside the combo no cuentan.
   El combo Add pone Add script arriba, Custom agent como primera entrada del grupo Agents y Custom como primera app y es alto, porque hay sitio. Borrar una de preset no pide confirmacion, una de
   usuario si abre `AlertDialog`.

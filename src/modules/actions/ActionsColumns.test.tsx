@@ -10,7 +10,7 @@ import type { Action } from "./lib/types";
 
 const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm dev", cwdMode: "workspace", ownButton: false };
 const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", ownButton: false };
-const preset: Action = { id: "ac-3", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", appId: "zed", ownButton: false };
+const preset: Action = { id: "ac-3", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", icon: "app:zed", ownButton: false };
 
 const zed: AppSuggestion = { key: "zed:app", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {target}", kind: "app", accepts: "both" };
 const bbedit: AppSuggestion = { key: "bbedit:app", appId: "bbedit", name: "BBEdit", iconId: "bbedit", defaultCommand: "bbedit {target}", kind: "app", accepts: "file" };
@@ -174,12 +174,12 @@ describe("ActionsColumns", () => {
     unmount();
   });
 
-  it("an app preset goes straight to the store with its appId and opens no modal", () => {
+  it("an app preset goes straight to the store with its icon and opens no modal", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
     click(options().find((o) => o.textContent === "ZedFiles and folders"));
     expect(g.onAdd).toHaveBeenCalledTimes(1);
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed", kind: "app", command: "zed {target}", appId: "zed", accepts: "both" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed", kind: "app", command: "zed {target}", icon: "app:zed", accepts: "both" });
     expect(commandField()).toBeNull();
     unmount();
   });
@@ -196,7 +196,7 @@ describe("ActionsColumns", () => {
   });
 
   it("lists agents, scripts and apps in three groups of each column", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
     const { container, unmount } = mount([agent, savedApp, saved]);
     const text = column(container, "global").textContent ?? "";
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Scripts"));
@@ -215,14 +215,14 @@ describe("ActionsColumns", () => {
     expect(entries.map((o) => o.textContent)).toEqual(["Claude Code"]);
     click(entries[0]);
     const added = g.onAdd.mock.calls[0]![0] as Action;
-    expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude" });
+    expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude" });
     expect(added.cwdMode).toBeUndefined();
     expect(commandField()).toBeNull();
     unmount();
   });
 
   it("the modal of an agent has name and command and no Run in folder or variables: it has no folder of its own", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", appId: "claude", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", icon: "agent:claude", ownButton: true };
     const { container, unmount } = mount([agent]);
     click(pencil(container));
     expect(document.querySelector("[role='dialog']")?.textContent).toContain("Edit agent");
@@ -318,7 +318,7 @@ describe("ActionsColumns", () => {
   describe("a custom agent and a chosen icon", () => {
     const iconButton = () => document.querySelector("button[aria-label='Choose an icon']") as HTMLElement | null;
     const tile = (label: string) => document.querySelector(`[role='listbox'] [aria-label='${label}']`) as HTMLElement | null;
-    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
+    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", icon: "agent:claude", ownButton: true };
 
     it("Custom agent opens an agent draft and reaches the store only once it has a command", async () => {
       const { container, g, unmount } = mount([], [], { suggestions: [] });
@@ -341,7 +341,7 @@ describe("ActionsColumns", () => {
       typeField(commandField()!, "claude");
       await tick();
       expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "claude" });
-      expect(g.onAdd.mock.calls[0]![0].appId).toBeUndefined();
+      expect(g.onAdd.mock.calls[0]![0].icon).toBeUndefined();
       unmount();
     });
 
@@ -371,32 +371,11 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("clears a chosen icon with Default icon, and only offers that when one is chosen", () => {
-      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
-      const withIcon: Action = { ...saved, icon: "glyph:star" };
-      const { container, g, unmount } = mount([withIcon]);
-      click(pencil(container));
-      click(iconButton());
-      expect(defaultRow()).toBeDefined();
-      click(defaultRow());
-      expect((g.onUpdate.mock.calls[0]![1] as Action).icon).toBe("");
-      unmount();
-
-      const plain = mount([saved]);
-      click(pencil(plain.container));
-      click(iconButton());
-      expect(defaultRow()).toBeUndefined();
-      plain.unmount();
-    });
-
-    it("keeps Default icon on the list while searching, so it can still be reached", () => {
-      const defaultRow = () => [...document.querySelectorAll("[cmdk-item]")].find((o) => o.textContent?.trim() === "Default icon");
+    it("has no Default icon entry: the icon is part of the Action", () => {
       const { container, unmount } = mount([{ ...saved, icon: "glyph:star" }]);
       click(pencil(container));
       click(iconButton());
-      typeField(document.querySelector<HTMLInputElement>("input[placeholder='Search icons...']")!, "pycharm");
-      expect(tile("PyCharm")).not.toBeNull();
-      expect(defaultRow()).toBeDefined();
+      expect([...document.querySelectorAll("[cmdk-item]")].some((o) => o.textContent?.trim() === "Default icon")).toBe(false);
       unmount();
     });
 
@@ -411,12 +390,12 @@ describe("ActionsColumns", () => {
     });
 
     it("keeps a chosen icon when a preset's command is edited and it becomes the user's own", () => {
-      const preset: Action = { id: "ac-z", name: "Zed", kind: "app", command: "zed {target}", appId: "zed", ownButton: false, icon: "glyph:star" };
+      const preset: Action = { id: "ac-z", name: "Zed", kind: "app", command: "zed {target}", ownButton: false, icon: "glyph:star" };
       const { container, g, unmount } = mount([preset], [], { suggestions: [zed] });
       click(pencil(container));
       typeField(commandField()!, "zed -n {target}");
       const [, next] = g.onUpdate.mock.calls[g.onUpdate.mock.calls.length - 1]! as [string, Action];
-      expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed", icon: "glyph:star" });
+      expect(next).toMatchObject({ command: "zed -n {target}", icon: "glyph:star" });
       unmount();
     });
   });
@@ -561,7 +540,7 @@ describe("ActionsColumns", () => {
     expect(g.onUpdate).toHaveBeenCalledTimes(1);
     const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
     expect(id).toBe("ac-3");
-    expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed" });
+    expect(next).toMatchObject({ command: "zed -n {target}" });
     unmount();
   });
 
@@ -669,16 +648,16 @@ describe("ActionsColumns", () => {
   });
 
   it("editing the command back to the preset's gives the preset back, whatever the name", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {target}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {target}", icon: "app:zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(pencil(container));
     typeField(commandField()!, "zed {target}");
-    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {target}", appId: "zed", iconId: "" }));
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {target}" }));
     unmount();
   });
 
   it("an app whose command is a detected preset's is deleted without asking, even with no appId", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {target}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {target}", icon: "app:zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(g.onRemove).toHaveBeenCalledWith("ac-4");

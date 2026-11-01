@@ -127,7 +127,7 @@ function presetItems(
           className="text-[12px]"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
-            <ActionIcon action={{ appId: s.appId, kind: s.kind }} size={13} fill />
+            <ActionIcon action={{ kind: s.kind, icon: s.appId ? `${s.kind}:${s.appId}` : undefined }} size={13} fill />
             <ActionNameLines name={s.name} value={sub.text ?? undefined} startTrim={sub.startTrim} lead={sub.lead} />
           </span>
         </CommandItem>

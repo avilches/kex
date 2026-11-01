@@ -79,8 +79,6 @@ export function normalizeAction(raw: unknown): Action | null {
     command,
     ownButton: kind !== "app" && r.ownButton === true,
   };
-  if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
-  if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;
   if (typeof r.icon === "string" && parseIcon(r.icon)) action.icon = r.icon;
   if (kind === "app") action.accepts = ACCEPTS.includes(r.accepts as AppAccepts) ? (r.accepts as AppAccepts) : DEFAULT_ACCEPTS;
   if (kind === "script" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {

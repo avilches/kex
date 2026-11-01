@@ -1,4 +1,3 @@
-import { newActionId } from "@/lib/ids";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { agentBinary } from "./agentYolo";
 import {
@@ -38,15 +37,7 @@ export function planAgentSeed({ seen, agents, existing }: Args): AgentSeedPlan |
     seen: presets.map((s) => s.appId as string),
     add: presets
       .filter((s) => !hasAgentActionFor(existing, s.appId as string))
-      .map((s) => ({
-        id: newActionId(),
-        name: s.name,
-        kind: s.kind,
-        command: s.defaultCommand,
-        appId: s.appId,
-        iconId: s.iconId ?? undefined,
-        ownButton: true,
-      })),
+      .map((s) => ({ ...actionFromSuggestion(s), ownButton: true })),
   };
 }
 

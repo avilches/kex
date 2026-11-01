@@ -27,7 +27,6 @@ import {
   type Scope,
 } from "./lib/actionDrop";
 import { KIND_ORDER } from "./lib/actionsBar";
-import { ownedAfterEdit } from "./lib/appOwnership";
 import { actionFromSuggestion, presetOf, uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionContext } from "./lib/useActionContext";
 import type { Action, ActionKind } from "./lib/types";
@@ -83,8 +82,7 @@ const COLUMN_TITLES: Record<Scope, string> = { global: "Global", workspace: "Thi
 // drag from one column to the other moves the Action. An Action is edited in a modal, never
 // inline. A new action is a draft until it has a command, because an Action with no command
 // is not valid and the stores refuse it; closing the modal forgets a draft with none. An app
-// preset arrives with a command, so it is handed straight to the store. Editing a preset
-// changes it into the user's own (see `ownedAfterEdit`).
+// preset arrives with a command, so it is handed straight to the store.
 export function ActionsColumns({ global, workspace, workspaceName, suggestions, onMove, focusRequest }: Props) {
   const scopes = { global, workspace };
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -133,16 +131,15 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
   const change = (scope: Scope, current: Action, next: Action) => {
     if (removing.current.has(current.id) || moving.current === current.id) return;
     if (moved.current === current.id && !scopesRef.current[scope].actions.some((a) => a.id === current.id)) return;
-    const owned = ownedAfterEdit(current, next, suggestions);
     const target = scopesRef.current[scope];
     if (target.actions.some((a) => a.id === current.id)) {
-      target.onUpdate(current.id, owned);
+      target.onUpdate(current.id, next);
       return;
     }
-    setDraft({ scope, action: owned });
-    if (owned.command.trim() && !handedOver.current.has(current.id)) {
+    setDraft({ scope, action: next });
+    if (next.command.trim() && !handedOver.current.has(current.id)) {
       handedOver.current.add(current.id);
-      Promise.resolve(target.onAdd(owned)).catch(() => handedOver.current.delete(current.id));
+      Promise.resolve(target.onAdd(next)).catch(() => handedOver.current.delete(current.id));
     }
   };
 
@@ -350,7 +347,7 @@ function Column({
                       <ActionRow
                         key={action.id}
                         action={action}
-                        preset={action.appId !== undefined || !!presetOf(action, suggestions)}
+                        preset={!!presetOf(action, suggestions)}
                         onEdit={() => onEdit(action.id)}
                         onRemove={() => onRemove(action)}
                       />

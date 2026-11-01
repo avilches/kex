@@ -10,7 +10,7 @@ import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { Action } from "./lib/types";
 
 type Props = {
-  action: Pick<Action, "id" | "name" | "appId" | "iconId" | "kind" | "ownButton" | "cwdMode" | "cwd">;
+  action: Pick<Action, "id" | "name" | "icon" | "kind" | "ownButton" | "cwdMode" | "cwd">;
   scope: Scope;
   onChange: (own: boolean) => void;
 };
