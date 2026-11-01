@@ -101,6 +101,7 @@ export type EntryRowProps = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitRootPath?: string | null;
   onEnterFolder?: (path: string) => void;
+  searchOpen?: boolean;
   previewOnClick: boolean;
   hasClipboard: boolean;
   isCutSource: boolean;
@@ -134,6 +135,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onAddToGitignore,
     gitRootPath,
     onEnterFolder,
+    searchOpen = false,
     previewOnClick,
     hasClipboard,
     isCutSource,
@@ -425,6 +427,7 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() =>
             actions.beginCreate(createParent, "file", createAfterPath)
           }
@@ -434,6 +437,7 @@ function EntryRowImpl(props: EntryRowProps) {
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() =>
             actions.beginCreate(createParent, "dir", createAfterPath)
           }
@@ -576,6 +580,7 @@ export type FsRootRowProps = {
   onRefresh?: (path: string) => void;
   onPaste?: (targetPath: string, targetIsDir: boolean) => void | Promise<void>;
   canPaste?: boolean;
+  searchOpen?: boolean;
 };
 
 export type FolderMenuItemsProps = Pick<
@@ -588,6 +593,7 @@ export type FolderMenuItemsProps = Pick<
   | "onRefresh"
   | "onPaste"
   | "canPaste"
+  | "searchOpen"
 > & { path: string };
 
 // The context menu every folder shares; the explorer root header prepends its own entry.
@@ -601,6 +607,7 @@ export function FolderMenuItems({
   onRefresh,
   onPaste,
   canPaste,
+  searchOpen,
 }: FolderMenuItemsProps) {
   return (
     <>
@@ -657,6 +664,7 @@ export function FolderMenuItems({
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onBeginCreate?.(path, "file")}
         >
           <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
@@ -664,6 +672,7 @@ export function FolderMenuItems({
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onBeginCreate?.(path, "dir")}
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
@@ -683,6 +692,7 @@ export function FolderMenuItems({
         <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onRefresh?.(path)}
         >
           <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
@@ -705,6 +715,7 @@ export function FsRootRow({
   onRefresh,
   onPaste,
   canPaste,
+  searchOpen,
 }: FsRootRowProps) {
   // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
   // explorer move. The workspace dnd treats it like a folder; the explorer
@@ -767,6 +778,7 @@ export function FsRootRow({
           onRefresh={onRefresh}
           onPaste={onPaste}
           canPaste={canPaste}
+          searchOpen={searchOpen}
         />
       </ContextMenuContent>
     </ContextMenu>
@@ -779,12 +791,14 @@ export function FsUpRow({
   onNavigateUp,
   onRevealInTerminal,
   onRefresh,
+  searchOpen,
 }: {
   path: string;
   workspaceRoot: string | null;
   onNavigateUp?: () => void;
   onRevealInTerminal?: (path: string) => void;
   onRefresh?: () => void;
+  searchOpen?: boolean;
 }) {
   // Same as FsRootRow: drag opens a terminal at the parent dir, no internal move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -859,7 +873,11 @@ export function FsUpRow({
         <ContextMenuSeparator />
         <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         {onRefresh && (
-          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRefresh()}>
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            disabled={searchOpen}
+            onSelect={() => onRefresh()}
+          >
             <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
             Refresh
           </ContextMenuItem>
