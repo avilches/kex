@@ -1,0 +1,22 @@
+2026-11-01 11:11:07.159322-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse entered.
+2026-11-01 11:11:07.159346-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window computed layout - origin: <private>, placement: 0
+2026-11-01 11:11:07.159397-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window setup complete.
+2026-11-01 11:11:07.762396-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse exited.
+2026-11-01 11:11:09.401792-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:11.797873-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:12.851172-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tearing down remote view connection if it existed.
+2026-11-01 11:11:13.918522-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:13.918526-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tearing down remote view connection if it existed.
+2026-11-01 11:11:13.918705-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Selection Tracking Area set up YES; rect is <private>, positioningView is <private>
+2026-11-01 11:11:13.919785-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window computed layout - origin: <private>, placement: 0
+2026-11-01 11:11:13.920861-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window setup complete.
+2026-11-01 11:11:13.920866-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tracking areas setup complete.
+2026-11-01 11:11:13.920921-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window computed layout - origin: <private>, placement: 0
+2026-11-01 11:11:13.945954-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Host window computed layout - origin: <private>, placement: 0
+2026-11-01 11:11:13.946021-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mezzanine tracking area not needed
+2026-11-01 11:11:14.150429-0500 0x1b792ee  Default     0x0                  94813  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:27.068725-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:28.253376-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 11:11:28.439708-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tearing down remote view connection if it existed.
+2026-11-01 11:11:28.452315-0500 0x1a41eef  Default     0x0                  80878  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse entered.
+2026-11-01 11:11:28.452355-0500 0x1a41eef  Error       0x0                  80878  0    kex: (Foundation) [com.apple.Foundation:general] *** Assertion failure in <private>, NSCampoLightweightUIController.m:1429

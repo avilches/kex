@@ -39,6 +39,10 @@ crash?" ni pidas lo que puedes sacar tú. Orden:
   idéntica no significa "bug ya arreglado"); cualquier otro es nuevo y hay que describirlo desde cero. En el
   `SIGABRT` de `tao`, comprueba además la versión de `tao` del binario instalado (`strings /Applications/Kex.app/Contents/MacOS/kex
   | grep -o 'tao-0\.[0-9]*\.[0-9]*'`) y busca en el registro unificado `Assertion failure` y `CampoLightweightUI`.
+  Comprueba también que el ejecutable instalado lleva el arreglo: compara su fecha (`ls -l`) con la del commit
+  `5b243b51` (`panic = "unwind"`); no hay que fiarse de que el arreglo esté en `main` (el 01/11 un crash casi se
+  atribuye a la build equivocada). No sirve buscar la cadena `panic in a function that cannot unwind` con `strings`:
+  medido, sale 1 tanto con `abort` como con `unwind`, porque vive en la biblioteca estándar.
 2. **Registro unificado de macOS, exportado YA.** Es la única fuente que dice qué hacía WebKit los últimos segundos y la
    única que caduca. Usa `/usr/bin/log`, no `log` a secas (en zsh es un builtin y falla con "too many arguments").
    Ventana: desde 30 s antes hasta 3 s después de la hora del informe, en hora local, formato `'YYYY-MM-DD HH:MM:SS'`
@@ -236,6 +240,16 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   si había texto seleccionado ni si se pulsaba Cmd derecha). Extracto en
   `docs/crash-evidence/2026-11-01-sigabrt-tao-unified-log.txt`. El volcado `sample-auto-20261101-091241` es 40 s anterior
   y no describe los segundos previos (`busy`, hilo principal dormido el 46,5 %).
+
+  **Segundo caso, mismo día (medido):** informe de las 11:11:28 local (16:11:28 UTC en `Kex.log`), Kex arrancado a las
+  09:19:48, misma pila y mismo `[panic]`. Es de la build VIEJA: el ejecutable de `/Applications` era el de las 09:32,
+  anterior al arreglo `panic = "unwind"` (commit `5b243b51`), que se mezcló en `main` después y no se había
+  reinstalado. Se deduce de las fechas, no de inspeccionar el binario. Mismo antecedente en el registro unificado:
+  varios `Dwelling completed, show affordance`, `Tearing down remote view connection`, `Mouse entered` y, a las
+  11:11:28.452, `Assertion failure in NSCampoLightweightUIController.m:1429`; la última línea `[window]` previa es
+  `focused=true` 2 s antes. Ya son dos casos seguidos con el afordance justo antes (09:13 y 11:11), y ninguno cuenta
+  como prueba contra `unwind`. Extracto en `docs/crash-evidence/2026-11-01-b-sigabrt-tao-abort-build-unified-log.txt`.
+  Lección para el procedimiento: ver el paso de comprobar el ejecutable instalado en "Kex acaba de crashear".
 
   **Por qué seguía abortando (medido en un experimento mínimo, no en Kex):** `send_event` es `extern "C-unwind"` en
   `tao` 0.37.2 (medido leyendo `src/platform_impl/macos/app.rs` del registro de cargo), pero el perfil release de Kex
