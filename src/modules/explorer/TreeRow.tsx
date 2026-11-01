@@ -315,7 +315,10 @@ function EntryRowImpl(props: EntryRowProps) {
                 role="button"
                 title="Open this folder as the explorer root"
                 onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEnterFolder(path);
@@ -754,7 +757,10 @@ export function FsRootRow({
               role="button"
               title="Open the workspace root in the file system explorer"
               onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenInExplorer(path);
@@ -841,6 +847,7 @@ export function FsUpRow({
             type="button"
             title="Go up one folder"
             onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onNavigateUp?.()}
             className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
           >
