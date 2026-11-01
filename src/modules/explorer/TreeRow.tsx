@@ -735,7 +735,9 @@ export function FsUpRow({
           )}
           style={{ paddingLeft: 6 }}
         >
-          <span className="size-3.5 shrink-0" />
+          <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+            <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2.25} />
+          </span>
           <HugeiconsIcon
             icon={FolderUploadIcon}
             size={16}
