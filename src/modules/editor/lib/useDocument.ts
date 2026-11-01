@@ -85,12 +85,19 @@ export function useDocument({
     // still in flight, from reading a stale dirty flag.
     dirtyRef.current = false;
     setDirty(false);
-    await invoke("fs_write_file", {
-      path,
-      content,
-      workspace: currentWorkspaceEnv(),
-      source: "editor",
-    });
+    try {
+      await invoke("fs_write_file", {
+        path,
+        content,
+        workspace: currentWorkspaceEnv(),
+        source: "editor",
+      });
+    } catch (e) {
+      const stillDirty = bufferRef.current !== savedRef.current;
+      dirtyRef.current = stillDirty;
+      setDirty(stillDirty);
+      throw e;
+    }
     savedRef.current = content;
   }, [path]);
 

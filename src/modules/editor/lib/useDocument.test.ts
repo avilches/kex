@@ -244,6 +244,73 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
+  it("keeps the document dirty when the write fails, and clears it once a retry succeeds", async () => {
+    vi.mocked(invoke).mockResolvedValue({
+      kind: "text",
+      content: "on disk",
+      size: 7,
+    });
+    const harness = mountUseDocument("/tmp/failing-save.txt");
+    await flush();
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    expect(harness.hook.dirty).toBe(true);
+
+    vi.mocked(invoke).mockRejectedValue(new Error("EACCES"));
+    await act(async () => {
+      await expect(harness.hook.save()).rejects.toThrow("EACCES");
+    });
+    expect(harness.hook.dirty).toBe(true);
+
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    await act(async () => {
+      await harness.hook.save();
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "fs_write_file",
+      expect.objectContaining({ content: "local edit" }),
+    );
+    expect(harness.hook.dirty).toBe(false);
+
+    harness.unmount();
+  });
+
+  it("does not report a clean document when an edit made during a failing write is still unsaved", async () => {
+    vi.mocked(invoke).mockResolvedValue({
+      kind: "text",
+      content: "on disk",
+      size: 7,
+    });
+    const harness = mountUseDocument("/tmp/failing-save-race.txt");
+    await flush();
+    act(() => {
+      harness.hook.onChange("first edit");
+    });
+
+    let rejectWrite: (e: Error) => void = () => {};
+    vi.mocked(invoke).mockReturnValue(
+      new Promise((_, reject) => {
+        rejectWrite = reject;
+      }),
+    );
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = harness.hook.save();
+    });
+    act(() => {
+      harness.hook.onChange("second edit");
+    });
+    await act(async () => {
+      rejectWrite(new Error("ENOSPC"));
+      await expect(pending).rejects.toThrow("ENOSPC");
+    });
+    expect(harness.hook.dirty).toBe(true);
+
+    harness.unmount();
+  });
+
   it("detects the file was deleted even while dirty, without touching the buffer", async () => {
     vi.mocked(invoke).mockResolvedValue({
       kind: "text",
