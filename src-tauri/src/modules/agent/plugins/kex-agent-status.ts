@@ -1,4 +1,4 @@
-// kex-agent-status-v6
+// kex-agent-status-v7
 // Kex terminal integration. Loaded by OpenCode's plugin system or by OMP/Pi extension
 // discovery, it translates the runtime's lifecycle events into the same JSON frames the
 // Claude Code hooks emit on Kex's Unix socket (KEX_IPC), shared by every tab, so each frame
@@ -91,12 +91,17 @@ type SessionManager = {
   getSessionId?: () => unknown;
   getSessionFile?: () => unknown;
   getHeader?: () => unknown;
+  getCwd?: () => unknown;
 };
 
-function sessionCoords(ctx: unknown, cwd: string): [unknown, string, string] {
+// OMP's /worktree moves the running session to the new folder, so the folder the process
+// started in goes stale; the session manager always knows where the session is now.
+function sessionCoords(ctx: unknown, startCwd: string): [unknown, string, string] {
   const manager = (ctx as { sessionManager?: SessionManager } | null)?.sessionManager;
   const file = manager?.getSessionFile?.();
-  return [manager?.getSessionId?.(), cwd, typeof file === "string" ? file : ""];
+  const live = manager?.getCwd?.();
+  const dir = typeof live === "string" && live !== "" ? live : startCwd;
+  return [manager?.getSessionId?.(), dir, typeof file === "string" ? file : ""];
 }
 
 // OMP runs a subagent in the same process and opens its own session, whose header names the

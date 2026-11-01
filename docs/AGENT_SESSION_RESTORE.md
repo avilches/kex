@@ -282,7 +282,7 @@ The OSC/`AgentDetector` layer still detects plain `opencode` invocations like an
 
 OMP and Pi share an extension API: TypeScript modules their own process loads from `~/.omp/agent/extensions/` (Pi:
 `~/.pi/agent/extensions/`, `--extension`/`-e` for ad hoc loads, `--no-extensions` to disable discovery). Kex ships one
-source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v6`, embedded with
+source, `plugins/kex-agent-status.ts` (`agent::AGENT_EXTENSION_TEMPLATE`, marker `kex-agent-status-v7`, embedded with
 `include_str!`). `agent_setup_omp` and `agent_setup_pi` stamp the runtime name into the template's `agent` constant and
 write the result atomically into the matching folder, so one file reports `agent: omp` and the other `agent: pi`. Their
 status commands compare the whole installed file with the script stamped for that runtime, so an outdated copy, or one

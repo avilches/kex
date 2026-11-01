@@ -399,7 +399,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ### G1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OMP integration"
-- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v6` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v7` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
 - [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
 
@@ -436,7 +436,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### H1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install Pi integration"
-- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v6` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
+- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v7` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
 - [ ] Lanzar `pi` desde un terminal de Kex: sin errores de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton Pi (status via `agent_pi_extension_status`)
 
@@ -463,7 +463,7 @@ Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el c
 ### I1 Kex mantiene al dia lo que instalaste
 
 - [ ] Instalar OMP, Pi y OpenCode desde Settings > General. Cerrar Kex y editar a mano la primera linea de uno de los ficheros (por ejemplo `// kex-agent-status-v1`)
-- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v6` sin pulsar nada
+- [ ] Abrir Kex: el fichero vuelve a `// kex-agent-status-v7` sin pulsar nada
 - [ ] Borrar a mano `~/.pi/agent/extensions/kex-agent-status.ts` y reabrir Kex: el fichero NO reaparece y la fila de Pi dice "Not installed"
 - [ ] Poner en ese mismo sitio un fichero propio (`export default () => {}`) y reabrir Kex: no se toca
 

@@ -52,11 +52,12 @@ function loadExtension(agent: "omp" | "pi", argv: string[] = []) {
       on: (ch: string, fn: (d: unknown) => void) => channels.set(ch, [...(channels.get(ch) ?? []), fn]),
     },
   });
-  const ctx = (id: string, parentSession?: string) => ({
+  const ctx = (id: string, parentSession?: string, getCwd?: () => string) => ({
     sessionManager: {
       getSessionId: () => id,
       getSessionFile: () => `/s/${id}.jsonl`,
       getHeader: () => (parentSession ? { parentSession } : { type: "session" }),
+      ...(getCwd ? { getCwd } : {}),
     },
   });
   return {
@@ -242,6 +243,48 @@ describe("kex-agent-status extension", () => {
       x.fire("before_agent_start", {}, x.ctx("main"));
       await settle();
       expect(names().filter((n) => n.startsWith("Subagent"))).toEqual([]);
+    });
+  });
+
+  describe("working folder", () => {
+    it("follows the session manager when /worktree moves the session", async () => {
+      const x = loadExtension("omp");
+      let dir = "/work";
+      const c = x.ctx("s1", undefined, () => dir);
+      x.fire("session_start", {}, c);
+      x.fire("before_agent_start", { prompt: "a" }, c);
+      dir = "/home/u/.omp/wt/feat-1";
+      x.fire("before_agent_start", { prompt: "b" }, c);
+      x.fire("agent_end", {}, c);
+      await settle();
+      const cwds = sent.filter((f) => f.hook_event_name !== "SessionStart").map((f) => f.cwd);
+      expect(cwds).toEqual(["/work", "/home/u/.omp/wt/feat-1", "/home/u/.omp/wt/feat-1"]);
+    });
+
+    it("falls back to the folder the process started in when the manager has no getCwd", async () => {
+      const x = loadExtension("pi");
+      x.fire("before_agent_start", { prompt: "a" }, x.ctx("s1"));
+      await settle();
+      expect(sent.find((f) => f.hook_event_name === "UserPromptSubmit")?.cwd).toBe("/work");
+    });
+
+    it("ignores a getCwd that returns something that is not a folder path", async () => {
+      const x = loadExtension("omp");
+      x.fire("before_agent_start", { prompt: "a" }, x.ctx("s1", undefined, () => "" as string));
+      await settle();
+      expect(sent.find((f) => f.hook_event_name === "UserPromptSubmit")?.cwd).toBe("/work");
+    });
+
+    it("keeps a subagent on the folder of the session the tab shows", async () => {
+      const x = loadExtension("omp");
+      let dir = "/work";
+      const main = x.ctx("main", undefined, () => dir);
+      x.fire("before_agent_start", {}, main);
+      dir = "/home/u/.omp/wt/feat-1";
+      x.fire("before_agent_start", {}, main);
+      x.channel("task:subagent:lifecycle", { id: "a1", status: "started", agent: "task", description: "d" });
+      await settle();
+      expect(sent.find((f) => f.hook_event_name === "SubagentStart")?.cwd).toBe("/home/u/.omp/wt/feat-1");
     });
   });
 });
