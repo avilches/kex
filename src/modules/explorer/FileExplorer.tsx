@@ -425,6 +425,11 @@ export const FileExplorer = memo(
       path: "",
       token: 0,
     });
+    // FlashOverlay plays whenever it mounts with a non-zero token, so a flash
+    // left over from another root would replay on coming back to that root.
+    useEffect(() => {
+      setFlash((f) => (f.path === "" ? f : { path: "", token: f.token }));
+    }, [rootPath]);
     const [pendingDelete, setPendingDelete] = useState<{
       path: string;
       isDir: boolean;
