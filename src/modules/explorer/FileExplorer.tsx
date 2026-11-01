@@ -179,6 +179,9 @@ function buildRows(
   const rows: Row[] = [];
   const entryIndexByPath = new Map<string, number>();
 
+  if (!fsNav.filesystem) {
+    rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
+  }
   if (fsNav.filesystem && fsNav.canNavigateUp) {
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
