@@ -43,13 +43,11 @@ export function inBar(action: Action): boolean {
   return actionTarget(action.command) === "workspace";
 }
 
-/** Whether the context combo lists the Action for the focused tab. An agent never. */
+/** Whether the context combo lists the Action for the focused tab. An agent never, and an app
+ * only for a file: a folder is reached from the Header or the Actions menu of a row. */
 export function inCombo(action: Action, place: FocusPlace): boolean {
   if (isAgent(action)) return false;
-  if (isApp(action)) {
-    const accepts = appAccepts(action);
-    return (place.folder && acceptsFolder(accepts)) || (place.file && acceptsFile(accepts));
-  }
+  if (isApp(action)) return place.file && acceptsFile(appAccepts(action));
   const target = actionTarget(action.command);
   return target === "file" ? place.file : target === "folder" ? place.folder : false;
 }
@@ -63,6 +61,6 @@ export function acceptsOnlyFile(action: Action): boolean {
 /** Whether the combo has anything it could ever list, which decides if it is drawn at all. */
 export function comboCandidate(action: Action): boolean {
   if (isAgent(action)) return false;
-  if (isApp(action)) return true;
+  if (isApp(action)) return acceptsFile(appAccepts(action));
   return actionTarget(action.command) !== "workspace";
 }

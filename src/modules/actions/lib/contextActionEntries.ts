@@ -58,7 +58,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: agent ? agentTitle(name, null) : isApp(action) ? appTitle(name, null, ctx, action.accepts) : actionRowTitle(name, isScript(action), null, ctx),
+      title: agent ? agentTitle(name, null) : isApp(action) ? appTitle(name, null, ctx) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }
   return rows;

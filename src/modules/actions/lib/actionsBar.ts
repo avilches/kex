@@ -166,13 +166,13 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
 export function scriptSubtitle(
-  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd"> & Partial<Pick<Action, "command" | "accepts">>,
+  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">,
   ctx: BarContext | null,
 ): ActionSubtitle {
   // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
   // the root itself, or the words for it in Settings.
   if (isAgent(action)) return workspaceLine(ctx);
-  if (isApp(action)) return appSubtitle(ctx, action.accepts);
+  if (isApp(action)) return { text: null, startTrim: false };
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -183,31 +183,6 @@ export function scriptSubtitle(
   if (mode === "context") {
     const cwd = ctx && !ctx.labels ? ctx.vars.cwd : "";
     return cwd ? { text: cwd, startTrim: true, lead: "tab" } : { text: "Current folder", startTrim: false, lead: "tab" };
-  }
-  return workspaceLine(ctx);
-}
-
-// With no real place (Settings, arranging) an app says in words what it opens; a file-only one
-// never opens the root.
-function appWords(ctx: BarContext | null, accepts: Action["accepts"]): "file" | "folder" | "root" | null {
-  if (ctx && !ctx.labels) return null;
-  return ctx?.targetKind ?? (accepts === "file" ? "file" : "root");
-}
-
-// What an app opens where it is offered.
-function appSubtitle(ctx: BarContext | null, accepts: Action["accepts"]): ActionSubtitle {
-  const words = appWords(ctx, accepts);
-  if (words === "file") return { text: "Current file", startTrim: false, lead: "file" };
-  if (words === "folder") return { text: "Current folder", startTrim: false, lead: "tab" };
-  if (words === "root") return { text: "Workspace root", startTrim: false, lead: "root" };
-  if (!ctx) return workspaceLine(ctx);
-  if (ctx.targetKind === "file") {
-    const file = ctx.vars.target ?? "";
-    return file ? { text: file.split(/[\\/]/).filter(Boolean).pop() ?? file, startTrim: false, lead: "file" } : { text: null, startTrim: false };
-  }
-  if (ctx.targetKind === "folder") {
-    const folder = ctx.vars.target ?? "";
-    return folder ? { text: folder, startTrim: true, lead: "tab" } : { text: null, startTrim: false };
   }
   return workspaceLine(ctx);
 }
@@ -225,19 +200,14 @@ export function agentTitle(label: string, disabledReason: string | null): string
   return disabledReason ? `${label}: ${disabledReason}` : `Run ${label}`;
 }
 
-// The hover of an app: what it opens, read from the context since its name has no variable.
-export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null, accepts?: Action["accepts"]): string {
+// The hover of an app, which has no line under its name: it says what it opens, read from the context.
+export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null): string {
   const { main } = splitActionName(name);
   if (disabledReason) return `${main}: ${disabledReason}`;
-  const words = appWords(ctx, accepts);
-  if (words === "file") return `Open the current file with ${main}`;
-  if (words === "folder") return `Open ${main} in the current folder`;
-  if (words === "root" || !ctx) return `Open ${main} in the workspace root`;
-  const target = ctx.vars.target ?? "";
-  if (ctx.targetKind === "file") {
-    return `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}`;
-  }
-  return target ? `Open ${main} in ${target}` : `Open ${main}`;
+  const target = ctx?.vars.target ?? "";
+  if (ctx?.targetKind === "file") return target ? `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}` : `Open the current file with ${main}`;
+  if (ctx?.targetKind === "folder") return target ? `Open ${main} in ${target}` : `Open ${main} in the current folder`;
+  return `Open ${main} in the workspace root`;
 }
 
 // The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
@@ -536,7 +506,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
-    const subtitle = scriptSubtitle({ ...action, name: label }, words);
+    const subtitle = isApp(action) ? { text: null, startTrim: false } : scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
       id: action.id,
@@ -555,7 +525,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       title: isAgent(action)
         ? agentTitle(label, disabledReason)
         : isApp(action)
-          ? appTitle(label, disabledReason, words, action.accepts)
+          ? appTitle(label, disabledReason, words)
           : actionRowTitle(label, isScript(action), disabledReason, words),
       iconOnly: false,
     };
