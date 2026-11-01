@@ -106,7 +106,7 @@ type Props = {
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
-  onSubmitRootPath?: (typed: string) => void;
+  onSubmitRootPath?: (typed: string) => void | Promise<boolean>;
   onResolveRootPath?: (typed: string) => Promise<string | null>;
   canNavigateUp: boolean;
   homePath: string | null;
@@ -1201,8 +1201,11 @@ export const FileExplorer = memo(
                 onResolveRootPath?.(typed) ?? Promise.resolve(null)
               }
               onSubmit={(value) => {
+                const origin = editOriginRef.current ?? rootPath;
                 setIsEditingRoot(false);
-                onSubmitRootPath?.(value);
+                void Promise.resolve(onSubmitRootPath?.(value)).then((ok) => {
+                  if (ok === false) onEnterFolder?.(origin);
+                });
               }}
               onCancel={() => setIsEditingRoot(false)}
             />
