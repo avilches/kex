@@ -70,8 +70,7 @@ function quotedProblem(command: string, shell: CommandShell, isKnown = knownComm
 export function commandProblem(command: string, shell?: CommandShell, vars?: TemplateVars): string | null {
   if (shell) {
     if (command.trim() === "") return "the command is empty";
-    // {target} is whatever place an app is offered at; a script has one place and names it
-    // with its own variables, so the word would mean something different on each surface.
+    // A script names its place with its own variables; {target} would mean a different one per surface.
     if (commandVariablesUsed(command).has("target")) return "{target} is only for apps: a script names its place with {cwd}, {filepath} or {workspace}";
     const quoted = quotedProblem(command, shell, vars ? (n) => typeof vars[n] === "string" : undefined);
     if (quoted || !vars) return quoted;

@@ -416,10 +416,8 @@ describe("scriptSubtitle", () => {
   describe("of an app, which says what it opens", () => {
     const zed = { name: "Zed", kind: "app" as const, command: "zed {target}" };
 
-    it("is told apart from an app saved with a variable of its own, which reads like a script", () => {
-      const old = { name: "Zed {cwd}", kind: "app" as const, command: "zed {cwd}" };
-      expect(scriptSubtitle(old, ctx)).toEqual({ text: "/p", startTrim: true, lead: "tab" });
-      expect(scriptSubtitle(old, SETTINGS_LABELS).text).toBe("Current folder");
+    it("says file in Settings when it takes files only, since it never opens the root", () => {
+      expect(scriptSubtitle({ ...zed, accepts: "file" }, SETTINGS_LABELS)).toEqual({ text: "Current file", startTrim: false, lead: "file" });
     });
 
     it("is the workspace root in the bar, the words for it in Settings, and the warning without a root", () => {
@@ -558,45 +556,6 @@ describe("where an Action is offered", () => {
     expect(onBar(folderScript, "idle")).toBe(false);
     expect(onBar(fileScript, "idle")).toBe(false);
     expect(onBar(folderScript, "running")).toBe(true);
-  });
-
-  describe("an app saved with a variable of its own in the command, from before {target}", () => {
-    const oldFile = app({ id: "of", name: "Code {filepath}", command: "code {filepath}" });
-    const oldFolder = app({ id: "od", name: "Zed {cwd}", command: "zed {cwd}" });
-    const oldRoot = app({ id: "or", name: "PyCharm {workspace}", command: "pycharm {workspace}" });
-
-    it("is placed by that variable, like a script, and not by a default accepts", () => {
-      expect(onBar(oldRoot, "idle")).toBe(true);
-      expect(onBar(oldFile, "idle")).toBe(false);
-      expect(onBar(oldFolder, "idle")).toBe(false);
-      expect(inCombo(oldFile, { file: true, folder: false })).toBe(true);
-      expect(inCombo(oldFile, { file: false, folder: true })).toBe(false);
-      expect(inCombo(oldFolder, { file: false, folder: true })).toBe(true);
-    });
-
-    it("never moves in the bar with the focused tab", () => {
-      const build = (place: { file: boolean; folder: boolean }, context: BarContext) =>
-        buildActionsBarModel({ local: [oldFile, oldFolder, oldRoot], context, states: new Map(), activeId: undefined, place });
-      const barIds = (m: ReturnType<typeof build>) => [...m.buttons, ...m.menu.workspace].map((i) => i.id).sort();
-      const onFile = build({ file: true, folder: false }, { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } });
-      const onFolder = build({ file: false, folder: true }, ctx);
-      expect(barIds(onFile)).toEqual(["or"]);
-      expect(barIds(onFolder)).toEqual(["or"]);
-      expect(onFile.contextCombo.workspace.map((i) => i.id)).toEqual(["of"]);
-      expect(onFolder.contextCombo.workspace.map((i) => i.id)).toEqual(["od"]);
-    });
-
-    it("keeps its own subtitle and runs against the focused tab, not a target", () => {
-      const m = buildActionsBarModel({
-        local: [oldFile],
-        context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
-        states: new Map(),
-        activeId: undefined,
-        place: { file: true, folder: false },
-      });
-      expect(m.contextCombo.workspace[0]).toMatchObject({ subtitle: "a.ts", subtitleLead: "file" });
-      expect(m.contextCombo.workspace[0]?.runTarget).toBeUndefined();
-    });
   });
 
   it("treats an app that never said what it accepts as a folder app", () => {
@@ -932,6 +891,19 @@ describe("paletteActions", () => {
     const ids = paletteActions(model).map((i) => i.id);
     expect(ids.filter((id) => id === "both")).toHaveLength(1);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("keeps the target of a file-only app, which is only in the combo, so the palette opens that file", () => {
+    const sublime = app({ id: "sub", name: "Sublime", command: "subl {target}", accepts: "file" });
+    const model = buildActionsBarModel({
+      local: [sublime],
+      context: { ...ctx, vars: { ...vars, filepath: "/p/src/a.ts", filename: "a.ts" } },
+      states: new Map(),
+      activeId: undefined,
+      place: { file: true, folder: false },
+    });
+    const [item] = paletteActions(model);
+    expect(item).toMatchObject({ id: "sub", runTarget: "/p/src/a.ts", runTargetKind: "file" });
   });
 
   it("lists the bar's copy, which opens the workspace root, not the combo's", () => {

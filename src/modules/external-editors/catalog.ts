@@ -3,8 +3,7 @@ export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors" | "Other IDEs
 /** What an app can be pointed at: a file, a folder, or either. */
 export type AppAccepts = "file" | "folder" | "both";
 
-/** What an app takes when nothing says otherwise: a folder, the safe side, because an app offered
- * for something it cannot open fails, while one left out of a menu is a click away in Settings. */
+/** A folder is the safe side: an app offered for what it cannot open fails, one left out is a click away. */
 export const DEFAULT_ACCEPTS: AppAccepts = "folder";
 
 export interface CatalogEntry {

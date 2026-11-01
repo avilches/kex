@@ -63,9 +63,9 @@ describe("AddActionMenu", () => {
     const view = mount();
     click(view.trigger);
     const titleOf = (text: string) => (view.options().find((o) => o.textContent === text) as HTMLElement).getAttribute("title");
-    expect(titleOf("ZedFiles and folders")).toBe("Open Zed on files and folders");
-    expect(titleOf("PyCharmFolders")).toBe("Open PyCharm on folders");
-    expect(titleOf("BBEditFiles")).toBe("Open BBEdit on files");
+    expect(titleOf("ZedFiles and folders")).toBe("Open files and folders with Zed");
+    expect(titleOf("PyCharmFolders")).toBe("Open folders with PyCharm");
+    expect(titleOf("BBEditFiles")).toBe("Open files with BBEdit");
     expect(view.options().filter((o) => o.textContent?.startsWith("Zed"))).toHaveLength(1);
     view.unmount();
   });

@@ -112,8 +112,7 @@ function presetItems(
     .filter((s) => s.kind === kind)
     .sort(compareByName)
     .map((s) => {
-      // An agent starts at the workspace root. An app is offered wherever it fits, so its line
-      // says what it takes rather than a place.
+      // An app is offered wherever it fits, so its line says what it takes rather than a place.
       const app = s.kind === "app";
       const sub = app
         ? { text: ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS], startTrim: false, lead: undefined }
@@ -124,7 +123,7 @@ function presetItems(
           value={s.key}
           keywords={[s.name, s.defaultCommand]}
           onSelect={() => onPickApp(s)}
-          title={app ? `Open ${s.name} on ${ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS].toLowerCase()}` : agentTitle(s.name, null)}
+          title={app ? `Open ${ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS].toLowerCase()} with ${s.name}` : agentTitle(s.name, null)}
           className="text-[12px]"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
