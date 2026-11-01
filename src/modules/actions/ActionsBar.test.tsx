@@ -126,7 +126,7 @@ describe("OwnButton", () => {
     const twin: Action = { ...agent, id: "g2", cwdMode: "fixed", cwd: "/elsewhere" };
     const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map(), activeId: undefined }).buttons[0]!;
     expect(built).toMatchObject({ id: "g1", iconOnly: false });
-    expect(built.subtitle).toBe("/p");
+    expect(built.subtitle).toBeNull();
     const { container, handlers, unmount } = mount(built, focus);
     expect(container.querySelectorAll("button")).toHaveLength(1);
     expect(byLabel(container, "Stop Claude Code")).toBeNull();
@@ -134,7 +134,7 @@ describe("OwnButton", () => {
     const button = container.querySelector("button")!;
     expect(button.title).toBe("Run Claude Code");
     expect(button.querySelector("img")).not.toBeNull();
-    expect(button.textContent).toContain("/p");
+    expect(button.textContent).not.toContain("/p");
     click(button);
     click(button);
     expect(handlers.run).toHaveBeenCalledTimes(2);

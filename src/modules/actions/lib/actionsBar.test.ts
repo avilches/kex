@@ -755,7 +755,7 @@ describe("agents", () => {
   it("is grey with the root message when the workspace has no root, whatever else it says", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
     const m = buildActionsBarModel({ local: [agent()], context: rootless, states: new Map(), activeId: undefined });
-    expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: WORKSPACE_UNSET });
+    expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: null });
     expect(actionAvailability(agent(), rootless)).toBe(WORKSPACE_UNSET);
   });
 
