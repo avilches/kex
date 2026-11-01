@@ -72,7 +72,7 @@ export function OnboardingDialog({ isMac = IS_MAC }: { isMac?: boolean }) {
   const view = VIEWS[step];
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && closeOnboarding()}>
+    <Dialog open={open} onOpenChange={(next) => !next && (last ? complete() : closeOnboarding())}>
       <DialogContent showCloseButton={false} className="gap-5 sm:max-w-xl">
         <div className="flex items-center gap-3">
           <Progress
@@ -92,9 +92,11 @@ export function OnboardingDialog({ isMac = IS_MAC }: { isMac?: boolean }) {
           {view.body(isMac)}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={closeOnboarding}>
-            Continue later
-          </Button>
+          {!last && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={closeOnboarding}>
+              Continue later
+            </Button>
+          )}
           <span className="flex-1" />
           {!first && (
             <Button variant="outline" size="sm" onClick={() => goTo(stepBefore(step, isMac))}>

@@ -147,6 +147,23 @@ describe("OnboardingDialog", () => {
     expect(useOnboardingUi.getState().open).toBe(false);
     expect(screen.queryByRole("button", { name: /Finish setup/ })).toBeNull();
   });
+
+  it("on the Done step there is no Continue later and closing finishes the onboarding", async () => {
+    setOnboarding({ step: "done" });
+    render(
+      <>
+        <OnboardingChip isMac />
+        <OnboardingDialog isMac />
+      </>,
+    );
+    act(() => openOnboarding());
+    await screen.findByText("You are all set");
+    expect(screen.queryByRole("button", { name: "Continue later" })).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(onboarding().finished).toBe(true));
+    expect(useOnboardingUi.getState().open).toBe(false);
+    expect(screen.queryByRole("button", { name: /Finish setup/ })).toBeNull();
+  });
 });
 
 describe("OnboardingChip", () => {
