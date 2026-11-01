@@ -475,6 +475,10 @@ export const FileExplorer = memo(
       },
       [closeSearch, onOpenInExplorer],
     );
+    const navigateUpClosingSearch = useCallback(() => {
+      closeSearch();
+      onNavigateUp?.();
+    }, [closeSearch, onNavigateUp]);
     const revealInExplorer = useCallback(
       (path: string) => {
         searchRevealNonce.current += 1;
@@ -1170,7 +1174,7 @@ export const FileExplorer = memo(
             <FsUpRow
               path={row.path}
               workspaceRoot={workspaceRootPath}
-              onNavigateUp={onNavigateUp}
+              onNavigateUp={navigateUpClosingSearch}
               onRevealInTerminal={onRevealInTerminal}
               onRefresh={() => tree.refresh(rootPath)}
               searchOpen={isSearchOpen}
