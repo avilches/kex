@@ -1170,12 +1170,25 @@ export default function App() {
           setExplorerRootMode(ws.id, target.mode);
           if (target.mode === "filesystem" && target.fsRoot) {
             setFsRoot(ws.id, target.fsRoot);
+          } else if (target.mode === "workspace") {
+            // Position the file system view too, so switching to it later
+            // lands on the same folder.
+            const other = resolveSidebarTarget({
+              folder: dir,
+              workspaceRoot: null,
+              workspaceGitRoot: null,
+              gitRoot: resolvedGitRoot,
+              currentFsRoot: fsFolderRoot,
+              home,
+            });
+            if (other.fsRoot) setFsRoot(ws.id, other.fsRoot);
           }
           setRevealRequest((r) => ({
             path: folder,
             nonce: (r?.nonce ?? 0) + 1,
             workspaceId: ws.id,
             pendingAction: opts.pendingAction,
+            forceFlash: opts.fromShortcut,
           }));
         });
 

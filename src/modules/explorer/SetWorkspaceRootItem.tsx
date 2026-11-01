@@ -4,14 +4,17 @@ import { PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { COMPACT_ITEM } from "./lib/menuItemClass";
 
+export function samePath(a: string, b: string): boolean {
+  const n = (p: string) => p.replace(/\\/g, "/").replace(/(.)\/+$/, "$1");
+  return n(a) === n(b);
+}
+
 export const MISSING_ROOT_ITEM = "font-medium text-primary focus:text-primary";
 
 type Props = {
   path: string;
   workspaceRoot: string | null;
   onSetAsRoot: (path: string) => void;
-  disabled?: boolean;
-  label?: string;
   place: "top" | "end";
 };
 
@@ -20,16 +23,15 @@ export function SetWorkspaceRootItem({
   path,
   workspaceRoot,
   onSetAsRoot,
-  disabled,
-  label = "Set as Workspace Root",
   place,
 }: Props) {
   const missing = workspaceRoot === null;
   if ((place === "top") !== missing) return null;
+  const isCurrent = workspaceRoot !== null && samePath(path, workspaceRoot);
   return (
     <ContextMenuItem
       className={cn(COMPACT_ITEM, missing && MISSING_ROOT_ITEM)}
-      disabled={disabled}
+      disabled={isCurrent}
       onSelect={() => onSetAsRoot(path)}
     >
       <HugeiconsIcon
@@ -38,7 +40,7 @@ export function SetWorkspaceRootItem({
         strokeWidth={2}
         className={cn(missing && "text-primary")}
       />
-      {label}
+      {isCurrent ? "This is the Workspace Root" : "Set as Workspace Root"}
     </ContextMenuItem>
   );
 }

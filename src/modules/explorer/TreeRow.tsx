@@ -5,7 +5,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
+import { SetWorkspaceRootItem, samePath } from "./SetWorkspaceRootItem";
 import { pathDirname } from "@/lib/pathUtils";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
@@ -30,6 +30,7 @@ import {
   FolderOpenIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
+  PinIcon,
   Refresh01Icon,
   Scissor01Icon,
   ViewOffSlashIcon,
@@ -299,6 +300,14 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
+            {isDir && workspaceRoot !== null && samePath(path, workspaceRoot) && (
+              <HugeiconsIcon
+                icon={PinIcon}
+                size={11}
+                strokeWidth={2}
+                className="shrink-0 text-primary"
+              />
+            )}
             {isDir && onEnterFolder && (
               <span
                 role="button"
@@ -560,6 +569,7 @@ export type FsRootRowProps = {
   workspaceRoot: string | null;
   flashToken: number;
   onSetAsRoot?: (path: string) => void;
+  onOpenInExplorer?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onBeginCreate?: (parentPath: string, kind: "file" | "dir") => void;
@@ -568,11 +578,22 @@ export type FsRootRowProps = {
   canPaste?: boolean;
 };
 
-export function FsRootRow({
+export type FolderMenuItemsProps = Pick<
+  FsRootRowProps,
+  | "workspaceRoot"
+  | "onSetAsRoot"
+  | "onNewWorkspaceFromFolder"
+  | "onRevealInTerminal"
+  | "onBeginCreate"
+  | "onRefresh"
+  | "onPaste"
+  | "canPaste"
+> & { path: string };
+
+// The context menu every folder shares; the explorer root header prepends its own entry.
+export function FolderMenuItems({
   path,
-  isWorkspaceRoot,
   workspaceRoot,
-  flashToken,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -580,54 +601,15 @@ export function FsRootRow({
   onRefresh,
   onPaste,
   canPaste,
-}: FsRootRowProps) {
-  // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
-  // explorer move. The workspace dnd treats it like a folder; the explorer
-  // move logic ignores it (paneOnly).
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `dir-pane:${path}`,
-    data: { path },
-  });
+}: FolderMenuItemsProps) {
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={setNodeRef}
-          {...listeners}
-          {...attributes}
-          onMouseDown={keepScratchpadFocus}
-          className={cn(
-            "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
-            isDragging && "opacity-50",
-          )}
-          style={{ paddingLeft: 6 }}
-          title={path}
-        >
-          <FlashOverlay token={flashToken} />
-          <img
-            src={folderIconUrl("", true)}
-            alt=""
-            draggable={false}
-            className="size-4 shrink-0"
-          />
-          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
-            {"‎" + path}
-          </span>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className={COMPACT_CONTENT}>
+    <>
         {onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
             place="top"
-            disabled={isWorkspaceRoot}
-            label={
-              isWorkspaceRoot
-                ? "This is the Workspace Root"
-                : "Set as Workspace Root"
-            }
           />
         )}
         <RowActionsMenu kind="folder" path={path} />
@@ -670,12 +652,6 @@ export function FsRootRow({
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
             place="end"
-            disabled={isWorkspaceRoot}
-            label={
-              isWorkspaceRoot
-                ? "This is the Workspace Root"
-                : "Set as Workspace Root"
-            }
           />
         )}
         <ContextMenuSeparator />
@@ -712,6 +688,86 @@ export function FsRootRow({
           <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
           Refresh
         </ContextMenuItem>
+    </>
+  );
+}
+
+export function FsRootRow({
+  path,
+  isWorkspaceRoot,
+  workspaceRoot,
+  flashToken,
+  onSetAsRoot,
+  onOpenInExplorer,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onBeginCreate,
+  onRefresh,
+  onPaste,
+  canPaste,
+}: FsRootRowProps) {
+  // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
+  // explorer move. The workspace dnd treats it like a folder; the explorer
+  // move logic ignores it (paneOnly).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `dir-pane:${path}`,
+    data: { path },
+  });
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          {...listeners}
+          {...attributes}
+          onMouseDown={keepScratchpadFocus}
+          className={cn(
+            "group/fsroot relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
+            isDragging && "opacity-50",
+          )}
+          style={{ paddingLeft: 6 }}
+          title={path}
+        >
+          <FlashOverlay token={flashToken} />
+          <img
+            src={folderIconUrl("", true)}
+            alt=""
+            draggable={false}
+            className="size-4 shrink-0"
+          />
+          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
+            {"‎" + path}
+          </span>
+          {isWorkspaceRoot && onOpenInExplorer && (
+            <span
+              role="button"
+              title="Open the workspace root in the file system explorer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenInExplorer(path);
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover/fsroot:inline"
+            >
+              Open
+            </span>
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className={COMPACT_CONTENT}>
+        <FolderMenuItems
+          path={path}
+          workspaceRoot={workspaceRoot}
+          onSetAsRoot={onSetAsRoot}
+          onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+          onRevealInTerminal={onRevealInTerminal}
+          onBeginCreate={onBeginCreate}
+          onRefresh={onRefresh}
+          onPaste={onPaste}
+          canPaste={canPaste}
+        />
       </ContextMenuContent>
     </ContextMenu>
   );

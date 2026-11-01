@@ -17,6 +17,7 @@ import {
   FolderOpenIcon,
   Home01Icon,
   PencilEdit02Icon,
+  PinIcon,
   PinOffIcon,
   Refresh01Icon,
   Search01Icon,
@@ -40,6 +41,7 @@ import { DeleteEntryModal } from "./DeleteEntryModal";
 import { ExplorerSearch, type ExplorerSearchHandle } from "./ExplorerSearch";
 import {
   EntryRow,
+  FolderMenuItems,
   FsRootRow,
   FsUpRow,
   PendingRow,
@@ -66,7 +68,7 @@ import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
 import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
 import { RootPathInput } from "./RootPathInput";
-import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
+import { SetWorkspaceRootItem, samePath } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -80,7 +82,9 @@ import {
 import { dispatchRevealAction } from "./lib/pendingAction";
 import {
   initialConsumedNonce,
+  replayKey,
   shouldConsumeReveal,
+  shouldReplayReveal,
   type RevealRequest,
 } from "./lib/revealRequest";
 
@@ -104,6 +108,7 @@ type Props = {
   onFocusActiveTab?: () => void;
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
+  onOpenInExplorer?: (path: string) => void;
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
   onSubmitRootPath?: (typed: string) => void | Promise<boolean>;
@@ -331,6 +336,7 @@ export const FileExplorer = memo(
       onFocusActiveTab,
       onSetAsRoot,
       onEnterFolder,
+      onOpenInExplorer,
       onNavigateUp,
       onFsRootMissing,
       onSubmitRootPath,
@@ -737,7 +743,7 @@ export const FileExplorer = memo(
     // asynchronously, so callers re-run as nodes/expanded settle: "pending" means
     // ancestors are still loading and the caller should retry on the next settle.
     const applyRevealTarget = useCallback(
-      (file: string): "pending" | "done" => {
+      (file: string, forceFlash = false): "pending" | "done" => {
         // Hold the reveal until the explorer is the visible tab: selecting and
         // scrolling while hidden lands off-screen, so the highlight would only
         // show after a second request. Re-runs once `active` flips true.
@@ -792,7 +798,7 @@ export const FileExplorer = memo(
         // Skip the flash when the target is already selected: opening a file
         // from the sidebar selects it on click, and the autofocus tab would
         // otherwise re-reveal that same file in a circular flash.
-        const alreadySelected = selectedPath === file;
+        const alreadySelected = !forceFlash && selectedPath === file;
         pendingScrollRef.current = 0;
         setSelectedPath(file);
         requestAnimationFrame(() => {
@@ -821,10 +827,20 @@ export const FileExplorer = memo(
     // Focus on Explorer: reveal a file or folder requested by the app (without
     // stealing focus).
     const revealConsumedRef = useRef(initialConsumedNonce(revealRequest));
+    const revealDoneRef = useRef(new Set<string>());
+    const revealRootRef = useRef(rootPath);
+    useEffect(() => {
+      if (revealRootRef.current === rootPath) return;
+      revealRootRef.current = rootPath;
+      if (shouldReplayReveal(revealRequest, rootPath, revealDoneRef.current, isUnder)) {
+        revealConsumedRef.current = null;
+      }
+    }, [rootPath, revealRequest]);
     useEffect(() => {
       if (!revealRequest || !shouldConsumeReveal(revealRequest, revealConsumedRef.current)) return;
-      if (applyRevealTarget(revealRequest.path) === "pending") return;
+      if (applyRevealTarget(revealRequest.path, revealRequest.forceFlash) === "pending") return;
       revealConsumedRef.current = revealRequest.nonce;
+      if (rootPath) revealDoneRef.current.add(replayKey(revealRequest, rootPath));
       if (revealRequest.pendingAction && entryIndexByPath.has(revealRequest.path)) {
         dispatchRevealAction(
           revealRequest.pendingAction,
@@ -1116,6 +1132,7 @@ export const FileExplorer = memo(
               workspaceRoot={workspaceRootPath}
               flashToken={flash.path === row.path ? flash.token : 0}
               onSetAsRoot={onSetAsRoot}
+              onOpenInExplorer={onOpenInExplorer}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onRevealInTerminal={onRevealInTerminal}
               onBeginCreate={tree.beginCreate}
@@ -1212,40 +1229,69 @@ export const FileExplorer = memo(
           ) : (
             <ContextMenu>
               <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="group/root flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-medium text-foreground/90"
-                  title={rootPath ?? undefined}
-                  onClick={startEditRoot}
-                >
-                  <img
-                    src={folderIconUrl("", true)}
-                    alt=""
-                    draggable={false}
-                    className="size-4 shrink-0"
-                  />
-                  <span className="min-w-0 truncate text-left [direction:rtl]">
-                    {LRM + rootPath}
-                  </span>
-                  <HugeiconsIcon
-                    icon={PencilEdit02Icon}
-                    size={16}
-                    strokeWidth={2}
-                    className="pointer-events-none hidden shrink-0 text-muted-foreground group-hover/root:block"
-                  />
-                  <span className="flex-1" />
-                </button>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <button
+                    type="button"
+                    title="Change explorer root"
+                    onClick={startEditRoot}
+                    className="flex size-3.5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <HugeiconsIcon
+                      icon={PencilEdit02Icon}
+                      size={12}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-medium text-foreground/90"
+                    title={rootPath ?? undefined}
+                    onClick={startEditRoot}
+                  >
+                    <img
+                      src={folderIconUrl("", true)}
+                      alt=""
+                      draggable={false}
+                      className="size-4 shrink-0"
+                    />
+                    <span className="min-w-0 truncate text-left [direction:rtl]">
+                      {LRM + rootPath}
+                    </span>
+                    {workspaceRootPath !== null &&
+                      samePath(rootPath, workspaceRootPath) && (
+                        <HugeiconsIcon
+                          icon={PinIcon}
+                          size={11}
+                          strokeWidth={2}
+                          className="shrink-0 text-primary"
+                        />
+                      )}
+                    <span className="flex-1" />
+                  </button>
+                </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="min-w-44">
-                <ContextMenuItem onSelect={startEditRoot}>
+              <ContextMenuContent className={COMPACT_CONTENT}>
+                <ContextMenuItem className={COMPACT_ITEM} onSelect={startEditRoot}>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
-                    size={13}
+                    size={14}
                     strokeWidth={2}
                   />
                   Change Explorer Root
                   <ShortcutHint id="sidebar.editRoot" />
                 </ContextMenuItem>
+                <ContextMenuSeparator />
+                <FolderMenuItems
+                  path={rootPath}
+                  workspaceRoot={workspaceRootPath}
+                  onSetAsRoot={onSetAsRoot}
+                  onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+                  onRevealInTerminal={onRevealInTerminal}
+                  onBeginCreate={tree.beginCreate}
+                  onRefresh={tree.refresh}
+                  onPaste={tree.pasteEntry}
+                  canPaste={tree.clipboard !== null}
+                />
               </ContextMenuContent>
             </ContextMenu>
           )}
@@ -1387,12 +1433,6 @@ export const FileExplorer = memo(
                       workspaceRoot={workspaceRootPath}
                       onSetAsRoot={onSetAsRoot}
                       place="top"
-                      disabled={rootMode === "workspace"}
-                      label={
-                        rootMode === "workspace"
-                          ? "This is the Workspace Root"
-                          : "Set as Workspace Root"
-                      }
                     />
                   )}
                   {onRevealInTerminal && (
@@ -1438,12 +1478,6 @@ export const FileExplorer = memo(
                       workspaceRoot={workspaceRootPath}
                       onSetAsRoot={onSetAsRoot}
                       place="end"
-                      disabled={rootMode === "workspace"}
-                      label={
-                        rootMode === "workspace"
-                          ? "This is the Workspace Root"
-                          : "Set as Workspace Root"
-                      }
                     />
                   )}
                   <ContextMenuSeparator />
