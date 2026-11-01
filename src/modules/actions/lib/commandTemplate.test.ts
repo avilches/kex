@@ -146,8 +146,8 @@ describe("expandCommandShell", () => {
     expect(expandCommandShell("code {cwd}", { cwd: "C:\\a b\\c" }, "powershell")).toBe("code 'C:\\a b\\c'");
   });
 
-  it("strips control characters from values for PowerShell too", () => {
-    expect(expandCommandShell("code {cwd}", { cwd: "C:\\a\r\nb\x1b" }, "powershell")).toBe("code 'C:\\ab'");
+  it("refuses a PowerShell value with control characters instead of cleaning it", () => {
+    expect(() => expandCommandShell("code {cwd}", { cwd: "C:\\a\r\nb\x1b" }, "powershell")).toThrow(/control character/);
   });
 
   it("refuses a variable inside the command's own quotes, for either shell", () => {
@@ -201,10 +201,10 @@ for (const shell of ["bash", "zsh"]) {
       });
     }
 
-    it("drops control characters from a value, a newline included, so it cannot end the line", () => {
-      const line = expandCommandShell(`printf '%s\\0' {cwd} tail`, { cwd: "/tmp/a\nb\tc\x1b[31m\x7fd\0e" }, "posix");
-      const res = spawnSync(shell, ["-c", line]);
-      expect(res.stdout.toString().split("\0").slice(0, -1)).toEqual(["/tmp/ab" + "c[31mde", "tail"]);
+    it("refuses a value with a control character, a newline or tab included, instead of running on another path", () => {
+      for (const cwd of ["/tmp/a\nb", "/tmp/a\tb", "/tmp/a\x1b[31mb", "/tmp/a\x7fb"]) {
+        expect(() => expandCommandShell("printf '%s' {cwd} tail", { cwd }, "posix")).toThrow(/control character/);
+      }
     });
 
     it("refuses a $(...) value even when the command is a plain bare argument", () => {
@@ -426,9 +426,10 @@ describe("unsafe values are refused whatever the command looks like", () => {
     expect(expandCommandShell("ls {cwd}", { cwd: "C:\\a b" }, "powershell")).toBe("ls 'C:\\a b'");
   });
 
-  it("strips C1 controls and the Unicode line separators from values", () => {
-    expect(expandCommandShell("ls {cwd}", { cwd: "a\u0085b\u009fc\u2028d\u2029e" }, "posix")).toBe("ls 'abcde'");
-    expect(expandCommandShell("ls {cwd}", { cwd: "a\u2028b" }, "powershell")).toBe("ls 'ab'");
+  it("refuses C1 controls and the Unicode line separators in values", () => {
+    expect(() => expandCommandShell("ls {cwd}", { cwd: "a\u0085b" }, "posix")).toThrow(/control character/);
+    expect(() => expandCommandShell("ls {cwd}", { cwd: "a\u2028b" }, "posix")).toThrow(/control character/);
+    expect(() => expandCommandShell("ls {cwd}", { cwd: "a\u2029b" }, "powershell")).toThrow(/control character/);
   });
 });
 
