@@ -45,11 +45,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
     const agent = isAgent(action);
     if (agent && !agentFolder) continue;
     const name = action.name.trim() || "Action";
-    // An agent has no folder of its own: here it starts in the folder of the row, so that is
-    // what its line says, and it only needs a command that is safe to type.
-    const subtitle = agent
-      ? { text: agentFolder ?? null, startTrim: true, lead: "tab" as const }
-      : scriptSubtitle({ ...action, name }, ctx);
+    const subtitle = agent ? { text: null, startTrim: false, lead: undefined } : scriptSubtitle({ ...action, name }, ctx);
     const reason = agent ? agentReason(action, agentFolder ?? "") : (acceptsReason(action, rowKind) ?? actionAvailability(action, ctx));
     rows.push({
       action,
