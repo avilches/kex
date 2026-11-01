@@ -481,8 +481,6 @@ export function acquireSlot(params: AcquireParams): Slot {
 function bindSlot(slot: Slot, p: AcquireParams): void {
   const stale =
     !slot.webglAddon || performance.now() - slot.lastUsedAt > SLOT_STALE_MS;
-  const idleMs = Math.round(performance.now() - slot.lastUsedAt);
-  const before = inspectTerminal(slot.term);
   slot.currentLeafId = p.leafId;
   slot.lastUsedAt = performance.now();
 
@@ -573,19 +571,6 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
 
   scheduleUnhide(slot, stale);
   notifyPool();
-
-  poolLog("info", "bind", {
-    ...slotFields(slot),
-    idleMs,
-    stale,
-    wasHealthy: before.ok,
-    reqCols: p.cols,
-    reqRows: p.rows,
-    snapshotLen: p.snapshot?.length ?? 0,
-    alt: p.altScreen,
-    exited: p.shellExited,
-    free: slots.filter((s) => s.currentLeafId === null).length,
-  });
 
   p.onSearchReady(slot.searchAddon);
 }
@@ -706,7 +691,6 @@ function serializeSlot(slot: Slot): SerializeOutput {
 }
 
 function detachSlotFromLeaf(slot: Slot): void {
-  poolLog("info", "detach", slotFields(slot));
   for (const d of slot.oscDisposers) {
     try {
       d();

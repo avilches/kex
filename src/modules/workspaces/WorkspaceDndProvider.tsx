@@ -291,15 +291,15 @@ export function WorkspaceDndProvider({
   const nativeDragIsDir = draggingItem?.kind === "file" && draggingItem.isDir;
   useEffect(() => {
     if (nativeDragPath === null) return;
-    const icon = renderDragIcon(nativeDragPath, nativeDragIsDir);
-    icon.catch(() => {});
+    // Drawn when the pointer is about to leave the window, not at every drag start: most drags never do.
+    const icon = () => renderDragIcon(nativeDragPath, nativeDragIsDir);
     let handedOff = false;
     const onMove = (e: PointerEvent) => {
       if (handedOff || e.buttons !== 1) return;
       if (!pointerLeftWindow(e.clientX, e.clientY, window.innerWidth, window.innerHeight)) return;
       handedOff = true;
       document.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape", key: "Escape", bubbles: true }));
-      void startNativeFileDrag(nativeDragPath, icon).catch((err) => console.error("native drag failed", err));
+      void startNativeFileDrag(nativeDragPath, icon()).catch((err) => console.error("native drag failed", err));
     };
     document.addEventListener("pointermove", onMove, true);
     return () => document.removeEventListener("pointermove", onMove, true);
