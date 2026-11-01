@@ -117,6 +117,7 @@ import {
 } from "@/modules/settings/store";
 import {
   SHORTCUTS_BY_ID,
+  eventDigit,
   useGlobalShortcuts,
   type ShortcutHandlers,
   type ShortcutId,
@@ -3091,7 +3092,10 @@ export default function App() {
       "palette.folderMain": () => void runPaletteShortcut("folderMain", 2),
       "palette.folderHome": () => void runPaletteShortcut("folderHome", 3),
       "palette.worktrees": () => void runPaletteShortcut("worktrees"),
-      "palette.menuAction": (e) => void runPaletteShortcut("menuAction", parseInt(e.key, 10)),
+      "palette.menuAction": (e) => {
+        const digit = eventDigit(e);
+        if (digit) void runPaletteShortcut("menuAction", digit);
+      },
       "tab.new": () => {
         if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;
@@ -3230,7 +3234,8 @@ export default function App() {
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length === 0) return;
-        const digit = parseInt(e.key, 10);
+        const digit = eventDigit(e);
+        if (digit === null) return;
         const idx = digit === 0 ? tabs.length - 1 : digit - 1;
         if (idx >= 0 && idx < tabs.length)
           onActivateTabStable(activeWorkspace.id, tabs[idx].id);
@@ -3283,7 +3288,9 @@ export default function App() {
       },
       "workspace.selectByIndex": (e) => {
         dismissPalettes();
-        const idx = parseInt(e.key, 10) - 1;
+        const digit = eventDigit(e);
+        if (!digit) return;
+        const idx = digit - 1;
         const visible = visibleWorkspaceOrder(
           workspaces,
           groups,

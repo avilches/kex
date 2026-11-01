@@ -5,6 +5,7 @@ import {
   isPaletteGroup,
   getBindingTokens,
   getShortcutLabel,
+  eventDigit,
   matchesShortcut,
   SHORTCUTS,
   matchBinding,
@@ -229,16 +230,21 @@ test("bare Delete keydown matches file.delete", () => {
   expect(matchesShortcut(ev, "file.delete")).toBe(true);
 });
 
+// What a keyboard reports for a digit key: with Alt or Shift held `key` is a symbol, only `code` names the key.
+const SYMBOL_WITH_ALT: Record<string, string> = { "1": "¡", "2": "™", "3": "£", "4": "¢", "5": "∞", "6": "§", "7": "¶", "8": "•", "9": "ª", "0": "º" };
+const SYMBOL_WITH_SHIFT: Record<string, string> = { "1": "!", "2": "@", "3": "#", "4": "$", "5": "%", "6": "^", "7": "&", "8": "*", "9": "(", "0": ")" };
+
 function digitEvent(
   key: string,
-  mods: { meta?: boolean; ctrl?: boolean; alt?: boolean },
+  mods: { meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean },
 ): KeyboardEvent {
+  const typed = mods.alt ? SYMBOL_WITH_ALT[key] : mods.shift ? SYMBOL_WITH_SHIFT[key] : key;
   return {
-    key,
+    key: typed ?? key,
     code: `Digit${key}`,
     ctrlKey: !!mods.ctrl,
     metaKey: !!mods.meta,
-    shiftKey: false,
+    shiftKey: !!mods.shift,
     altKey: !!mods.alt,
     repeat: false,
   } as unknown as KeyboardEvent;
@@ -309,6 +315,29 @@ describe("index shortcut digit families", () => {
     expect(matchesShortcut(digitEvent("1", { ctrl: true }), "tab.selectByIndex")).toBe(true);
     expect(matchesShortcut(digitEvent("9", { ctrl: true }), "tab.selectByIndex")).toBe(true);
     expect(matchesShortcut(digitEvent("0", { ctrl: true }), "tab.selectByIndex")).toBe(true);
+  });
+
+  test("the index shortcuts read the physical key, so Alt and Shift presets match", () => {
+    const user = (id: string, mods: object) => ({ [id]: [{ key: "1", ...mods }] });
+    const withUser = (id: ShortcutId, mods: object, ev: KeyboardEvent) =>
+      matchesShortcut(ev, id, user(id, mods) as never);
+    expect(withUser("workspace.selectByIndex", { alt: true }, digitEvent("3", { alt: true }))).toBe(true);
+    expect(withUser("tab.selectByIndex", { meta: true, alt: true }, digitEvent("0", { meta: true, alt: true }))).toBe(true);
+    expect(withUser("workspace.selectByIndex", { meta: true, shift: true }, digitEvent("2", { meta: true, shift: true }))).toBe(true);
+    expect(withUser("palette.menuAction", { alt: true }, digitEvent("9", { alt: true }))).toBe(true);
+  });
+
+  test("the number pad counts and a non-digit key does not", () => {
+    const pad = { ...digitEvent("4", { meta: true }), code: "Numpad4" } as KeyboardEvent;
+    expect(matchesShortcut(pad, "workspace.selectByIndex")).toBe(true);
+    const letter = { ...digitEvent("4", { meta: true }), key: "4", code: "KeyR" } as KeyboardEvent;
+    expect(matchesShortcut(letter, "workspace.selectByIndex")).toBe(false);
+  });
+
+  test("eventDigit reads code", () => {
+    expect(eventDigit({ code: "Digit7" })).toBe(7);
+    expect(eventDigit({ code: "Numpad0" })).toBe(0);
+    expect(eventDigit({ code: "KeyA" })).toBeNull();
   });
 
   test("digit families do not cross modifiers", () => {

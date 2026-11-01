@@ -2,6 +2,7 @@ export {
   SHORTCUTS,
   SHORTCUTS_BY_ID,
   SHORTCUT_GROUPS,
+  eventDigit,
   getBindingTokens,
   getShortcutLabel,
   type Shortcut,
