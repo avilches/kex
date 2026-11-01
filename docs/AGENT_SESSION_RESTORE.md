@@ -26,7 +26,8 @@ Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifi
 switch, but it has no control of its own in Settings: it is set to `true` by installing the Claude Code integration
 (Settings > General > Agents, the bell, or the install toast) and to `false` by uninstalling it, and the install and
 uninstall commands (`agent_enable_claude_hooks`, `agent_disable_claude_hooks`) are idempotent. At startup,
-`main.tsx` acts only when Claude Code is detected and its hooks are already installed: it calls
+`main.tsx` acts only when Claude Code is detected and Kex hooks are already present in settings.json, current or
+outdated (`agent_claude_hooks_present`): it calls
 `agent_enable_claude_hooks` when the preference is `true` (refreshing outdated hooks) and `agent_disable_claude_hooks`
 when it is `false`. It never installs the hooks on its own (see "Startup sync" in `docs/NOTIFICATIONS.md`). With it `false` no toast, operating system
 notification or bell row is produced either (`route.ts`).
@@ -137,7 +138,8 @@ user's own install (Settings, the bell, the install toast) passes `refresh: true
 a fresh Kex start always runs `claude --version` again; the only case it misses is a Claude update less than a minute
 before opening a new window of an already running Kex, which the next start or a manual Reinstall picks up.
 
-Because the startup reinstall calls the same command, updating Claude Code adds the new events on the next Kex start;
+Because the startup refresh calls the same command whenever Kex hooks are present in settings.json
+(`agent_claude_hooks_present`, which counts outdated hooks too), updating Claude Code adds the new events on the next Kex start;
 a downgrade to a version Kex can read removes Kex's hook from the events the older Claude does not know. Uninstalling
 removes Kex's hook from every known event whatever the installed version. `agent_claude_hooks_status` expects the
 events of the installed version (the six baseline ones when it is unknown, which is all the install guarantees then),
@@ -166,8 +168,8 @@ hook events the same way:
    `hook_event_name`, only to pick the handler. For `codex` only, a snake_case name (`session_start`,
    `user_prompt_submit`, `stop`, `permission_request`, `subagent_start`, `subagent_stop`) is turned into its PascalCase
    form, in the variable and in the payload it sends; Claude Code's names are matched exactly. The marker conditions
-   the reinstall check in `agent_claude_hooks_status`: users with an older `kex-session-v` file see the install button
-   again.
+   the currency check in `agent_claude_hooks_status`: users with an older `kex-session-v` file see the install button
+   again until the startup refresh (which decides on presence, not on this marker) rewrites the script on the next start.
    The script no longer writes the payload to disk: an earlier
    version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
    which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew

@@ -215,7 +215,7 @@ Hooks can be installed from the notification bell popover. `agent_enable_claude_
   `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`,
   `SubagentStart`, `SubagentStop`, `PostCompact`; see `docs/AGENT_SESSION_RESTORE.md`) without touching unrelated settings
 - Is idempotent, safe to run on an already-configured installation
-- Is not run blindly at startup: `main.tsx` refreshes the hooks only when Claude Code is detected and its hooks are already installed (see "Startup sync" below)
+- Is not run blindly at startup: `main.tsx` refreshes the hooks only when Claude Code is detected and Kex hooks are already present in settings.json, outdated ones included (see "Startup sync" below)
 
 See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).
 
@@ -301,13 +301,16 @@ calls `agent_enable_claude_hooks` directly and records nothing; the next `starte
 
 ### Startup sync
 
-`main.tsx` keeps the installed integrations up to date after an app update, and never creates a new one. The decision is
-the pure `syncPlan` (`modules/agents/lib/startupSync.ts`), which needs both conditions per agent: the integration is
-already installed AND the agent is detected, using the persisted `detectedEditors` (`detectedAgentIds`). Before the first
-scan `detectedEditors` is empty, so nothing is refreshed. For Claude Code, the hooks status (`agent_claude_hooks_status`)
-is queried only when it is detected; with the hooks installed, `agentNotifications` on means refresh
-(`agent_enable_claude_hooks`) and off means remove (`agent_disable_claude_hooks`); a failed status query counts as not
-installed and does nothing. OpenCode, OMP, Pi and Codex rewrite their script only if they are in
+`main.tsx` keeps the installed integrations up to date after an app update, and never creates a new one. It calls
+`runStartupSync` (`modules/agents/lib/startupSync.ts`). The
+decision is the pure `syncPlan`, which needs both conditions per agent: the integration is already installed AND the
+agent is detected, using the persisted `detectedEditors` (`detectedAgentIds`). Before the first scan `detectedEditors` is
+empty, so nothing is refreshed. For Claude Code the rule is presence, not currency: `agent_claude_hooks_present` is
+queried only when it is detected, and it is true when settings.json holds any Kex session hook, outdated ones included
+(an old script version or events a newer Claude knows that the hooks do not cover). It reads the file only and never
+runs `claude --version`. With hooks present, `agentNotifications` on means refresh (`agent_enable_claude_hooks`) and
+off means remove (`agent_disable_claude_hooks`); a failed query counts as absent and does nothing. The UI keeps
+`agent_claude_hooks_status`, which says "installed" only for current hooks. OpenCode, OMP, Pi and Codex rewrite their script only if they are in
 `installedIntegrations` and detected.
 
 ### Where it lives
@@ -318,7 +321,7 @@ installed and does nothing. OpenCode, OMP, Pi and Codex rewrite their script onl
 | Flow: once per run, status check, ask policy (injected dependencies, tested) | `modules/agents/lib/integrationSuggestionFlow.ts` |
 | Toast, real dependencies, `suggestIntegration` | `modules/agents/components/IntegrationSuggestionToast.tsx` |
 | Single install path, detection guard (`AgentNotDetectedError`), records `installedOnce` | `modules/agents/lib/agentIntegration.ts` |
-| Startup sync plan (`syncPlan`) | `modules/agents/lib/startupSync.ts` |
+| Startup sync plan (`syncPlan`) and its runner (`runStartupSync`) | `modules/agents/lib/startupSync.ts` |
 | Suppression while the onboarding is unfinished | `modules/onboarding/lib/onboardingState.ts` (`suppressIntegrationToast`) |
 
 The record is `integrationSuggestions` in `settings-general.json`, per agent:
