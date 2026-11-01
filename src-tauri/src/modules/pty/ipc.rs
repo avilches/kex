@@ -978,9 +978,6 @@ fn dispatch_with(
                     })
                 })
                 .collect();
-            if let Some(message) = p.last_message.as_deref() {
-                session_store::set_last_message(tab_id, &p.session_id, message);
-            }
             let mut sig = agent_signal(pty_id, "Stop", p.agent.as_deref());
             sig["message"] = last.into();
             sig["backgroundSubagents"] = subagents.into();
@@ -2053,31 +2050,24 @@ mod tests {
     }
 
     #[test]
-    fn a_stop_with_a_message_reaches_the_session_record() {
+    fn a_stop_message_is_never_written_to_the_session_store() {
         let dir = tempfile::tempdir().unwrap();
         let store = dir.path().join("agent-sessions.json");
         let tab = "tab-stop-wiring";
-        let preview = || session_store::session_previews(&[tab.to_string()]);
         session_store::with_store_path(&store, || {
             dispatch_events(
                 r#"{"hook_event_name":"SessionStart","session_id":"s1","transcript_path":"","cwd":"/w","source":"startup"}"#,
                 tab,
             );
             dispatch_events(
-                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"All\n tests pass"}"#,
+                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"export API_KEY=hunter2hunter2"}"#,
                 tab,
             );
-            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
-            dispatch_events(
-                r#"{"hook_event_name":"Stop","session_id":"s1","transcript_path":"","cwd":"/w","last_assistant_message":"  "}"#,
-                tab,
-            );
-            dispatch_events(
-                r#"{"hook_event_name":"Stop","session_id":"other","transcript_path":"","cwd":"/w","last_assistant_message":"stale"}"#,
-                tab,
-            );
-            assert_eq!(preview()[0].last_message.as_deref(), Some("All tests pass"));
         });
+        let raw = std::fs::read_to_string(&store).unwrap();
+        assert!(!raw.contains("hunter2"), "{raw}");
+        let bak = std::fs::read_to_string(store.with_extension("json.bak")).unwrap_or_default();
+        assert!(!bak.contains("hunter2"), "{bak}");
     }
 
     #[test]

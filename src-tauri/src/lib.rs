@@ -702,13 +702,6 @@ fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::Res
     agent::session_store::preview_resume_cmd(&tab_id)
 }
 
-/// Last assistant message, launch folder and time of the recorded sessions among `tab_ids`, for
-/// a hibernated tab. Read-only, and never opens a transcript.
-#[tauri::command(async)]
-fn agent_session_previews(tab_ids: Vec<String>) -> Vec<agent::session_store::SessionPreview> {
-    agent::session_store::session_previews(&tab_ids)
-}
-
 /// Why `path` cannot host a restored terminal (missing, not a folder, unreadable), or `None`.
 #[tauri::command]
 async fn check_launch_dir(path: String) -> Option<String> {
@@ -1313,7 +1306,6 @@ pub fn run() {
             agent::os_notify::agent_os_notify,
             agent_session_restore_plan,
             agent_session_preview_cmd,
-            agent_session_previews,
             hibernate_lines::hibernate_lines_save,
             hibernate_lines::hibernate_lines_read,
             hibernate_lines::hibernate_lines_delete,
