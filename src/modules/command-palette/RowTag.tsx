@@ -35,10 +35,12 @@ export function RowTag({
       {closed ? (
         <span className="text-[8.5px] font-medium opacity-80">Closed</span>
       ) : null}
-      <HighlightText
-        text={kind}
-        indices={hit ? Array.from({ length: hit }, (_, i) => i) : undefined}
-      />
+      <span className="whitespace-nowrap">
+        <HighlightText
+          text={kind}
+          indices={hit ? Array.from({ length: hit }, (_, i) => i) : undefined}
+        />
+      </span>
     </span>
   );
 }
