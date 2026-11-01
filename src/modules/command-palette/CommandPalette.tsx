@@ -815,14 +815,18 @@ export function CommandPalette({
         if (target && row) run(target.id, row, target);
         return true;
       }
+      // An open row menu is anchored to its own row: the pointer may have moved the highlight to
+      // another one, and the shortcuts must keep acting where the menu is.
+      const value = menu ? menu.rowKey : valueRef.current;
       if (action === "closeWorkspace") {
-        const workspace = highlightedWorkspaceOf(valueRef.current, mergedRef.current);
-        if (workspace) closeWs(workspace.workspaceId, valueRef.current);
+        const workspace = highlightedWorkspaceOf(value, mergedRef.current);
+        if (workspace) closeWs(workspace.workspaceId, value);
         return true;
       }
-      if (action === "tabItem" && item && entry) {
-        const runnable = runnableTabItem(entry, item);
-        if (runnable) run(runnable.id, entry);
+      const target = menu ? highlightedTabOf(menu.rowKey, mergedRef.current) : entry;
+      if (action === "tabItem" && item && target) {
+        const runnable = runnableTabItem(target, item);
+        if (runnable) run(runnable.id, target);
       }
       return true;
     });
