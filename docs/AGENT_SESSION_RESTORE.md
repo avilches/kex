@@ -942,7 +942,11 @@ was: xterm serializes the normal buffer first and then switches with `ESC[?1049h
 only what follows that switch is kept (`altScreenOf`), padded to the rows of the terminal with its blank rows
 (`prepareAltScreenLines`). The secret filter runs on the plain text of each line (so a colour change cannot split a token
 into two) and replaces GitHub tokens, `sk-` keys, AWS access keys, Slack tokens, JWTs, `Bearer` values and the value of any
-`*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*API_KEY*` or `*PRIVATE_KEY*` assignment with `[redacted]`. It is a best effort and
+`*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*API_KEY*` or `*PRIVATE_KEY*` assignment (also a quoted key as in JSON) with
+`[redacted]`. It also replaces the value of a `--password`, `--token`, `--secret` or `--api-key` flag, the password of a
+`scheme://user:password@host` URL, a password glued to `-p` in a `mysql` command, a long value after the word `token`
+or `password` with no separator, and any base64 run of 64 characters or more with upper case, lower case and a digit
+(the body of a PEM key; a hex hash is left alone). It is a best effort and
 does not catch everything (a password typed at a prompt that does not echo is not on screen, but one echoed anywhere is), so
 the file is private (folder 0700, file 0600), unencrypted like `agent-sessions.json`, read only by the placeholder of the same
 tab id, and the setting turns the whole thing off. Failing to save never stops the tab from sleeping.

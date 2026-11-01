@@ -170,7 +170,13 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   /\b(xox[abprs]-[A-Za-z0-9-]{10,})/g,
   /\b(eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/g,
   /(\bBearer\s+)([A-Za-z0-9._~+/=-]{16,})/gi,
-  /(\b[A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY)[A-Za-z0-9_]*\s*[=:]\s*["']?)([^\s"']{4,})/gi,
+  /(\b[A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY)[A-Za-z0-9_]*["']?\s*[=:]\s*["']?)([^\s"']{4,})/gi,
+  /(--[A-Za-z0-9-]*(?:token|secret|password|passwd|api-?key|private-?key)[A-Za-z0-9-]*(?:=|\s+)["']?)(?!-)([^\s"']{4,})/gi,
+  /(:\/\/[^\s:@/]+:)([^\s@/]{3,})(?=@)/g,
+  /(\bmysql(?:dump|admin)?\b[^\n]*?\s-p)([^\s-]\S{3,})/g,
+  /(\b(?:token|secret|password|passwd|api[_-]?key)\s+)(?=\S*\d)([A-Za-z0-9._~+/=-]{20,})/gi,
+  // The body of a PEM key is plain base64 on lines of their own; mixed case and a digit keep a hex hash out.
+  /\b(?=[A-Za-z0-9+/]*[A-Z])(?=[A-Za-z0-9+/]*[a-z])(?=[A-Za-z0-9+/]*\d)([A-Za-z0-9+/]{64,}={0,2})/g,
 ];
 
 export function secretRanges(text: string): [number, number][] {
