@@ -17,6 +17,11 @@ export function closeOnboarding(): void {
   useOnboardingUi.setState({ open: false });
 }
 
+// A live read for the shortcut and menu gates, which run outside React.
+export function isOnboardingOpen(): boolean {
+  return useOnboardingUi.getState().open;
+}
+
 // Settings is its own webview and the dialog lives in the main windows, so the request travels as an event.
 export function requestOnboardingRestart(): void {
   persistOnboarding(restart);
