@@ -1107,11 +1107,13 @@ export default function App() {
 
   const handleEnterFolder = useCallback(
     (path: string) => {
-      if (activeWorkspace && activeRootMode === "filesystem") {
-        setFsRoot(activeWorkspace.id, path);
+      if (!activeWorkspace) return;
+      if (activeRootMode !== "filesystem") {
+        setExplorerRootMode(activeWorkspace.id, "filesystem");
       }
+      setFsRoot(activeWorkspace.id, path);
     },
-    [activeWorkspace, activeRootMode, setFsRoot],
+    [activeWorkspace, activeRootMode, setFsRoot, setExplorerRootMode],
   );
 
   const handleNavigateToWorktree = useCallback(

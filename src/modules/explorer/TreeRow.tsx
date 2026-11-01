@@ -310,7 +310,7 @@ function EntryRowImpl(props: EntryRowProps) {
                   onEnterFolder(path);
                 }}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+                className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
               >
                 Open
               </span>
