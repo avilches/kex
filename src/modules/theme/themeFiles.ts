@@ -1,7 +1,7 @@
 import { newThemeId } from "@/lib/ids";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
-import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import type { Theme } from "./types";
 import { validateTheme, type ValidationResult } from "./validateTheme";
@@ -110,7 +110,7 @@ export function starterTheme(): Theme {
 }
 
 export function emitThemeEdit(req: ThemeEditRequest): Promise<void> {
-  return emit(THEME_EDIT_EVENT, req);
+  return invoke("request_theme_edit", { req });
 }
 
 export function onThemeEdit(

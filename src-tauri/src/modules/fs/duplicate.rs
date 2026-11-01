@@ -317,7 +317,7 @@ pub async fn fs_duplicate(
         .pending
         .load(Ordering::SeqCst)
     {
-        let _ = app.emit("kex:before-quit", ());
+        crate::emit_before_quit(&app);
     }
 
     match result {

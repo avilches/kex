@@ -3,12 +3,14 @@ mod panic_log;
 mod window_log;
 
 use modules::{
-    actions, agent, editors, float_browser, fs, git, hibernate_lines, history, menu_route, pty,
-    shell, tab_history, window_state, workspace,
+    actions, agent, custom_themes, editors, float_browser, fs, git, hibernate_lines, history,
+    menu_route, pty, shell, tab_history, update_guard, window_state, workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashSet;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const LOG_ARCHIVES_KEPT: usize = 20;
@@ -28,16 +30,61 @@ pub(crate) struct QuitGuard {
     /// Set by the frontend before it voluntarily destroys the last window (last workspace
     /// removed). Signals ExitRequested to stay alive without windows rather than quitting.
     pub(crate) windowless_mode: AtomicBool,
+    /// Main windows that were told to flush and have not yet acknowledged.
+    pub(crate) flushing: FlushTracker,
 }
 
-/// Called by the frontend once it has flushed editors and workspace state in
-/// response to `kex:before-quit`, to let the deferred quit proceed.
-#[tauri::command]
-fn confirm_quit(app: tauri::AppHandle) {
+/// Upper bound on how long a quit waits for windows that never acknowledge.
+const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Labels of the windows still flushing for a quit. The app may only exit once it is empty,
+/// otherwise the first window to finish would kill the others mid-save.
+#[derive(Default)]
+pub(crate) struct FlushTracker(Mutex<HashSet<String>>);
+
+impl FlushTracker {
+    /// Replaces the waiting set with `labels`.
+    pub(crate) fn begin(&self, labels: impl IntoIterator<Item = String>) {
+        *self.0.lock().unwrap() = labels.into_iter().collect();
+    }
+
+    /// Marks `label` as done. True when no window is left waiting.
+    pub(crate) fn ack(&self, label: &str) -> bool {
+        let mut waiting = self.0.lock().unwrap();
+        waiting.remove(label);
+        waiting.is_empty()
+    }
+}
+
+fn main_window_labels(app: &tauri::AppHandle) -> Vec<String> {
+    app.webview_windows()
+        .into_keys()
+        .filter(|l| l.starts_with("w-"))
+        .collect()
+}
+
+/// Asks every live main window to flush, and force-exits after `QUIT_FLUSH_TIMEOUT` if one hangs.
+pub(crate) fn emit_before_quit(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
-        .confirmed
-        .store(true, Ordering::SeqCst);
-    app.exit(0);
+        .flushing
+        .begin(main_window_labels(app));
+    let _ = app.emit("kex:before-quit", ());
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(QUIT_FLUSH_TIMEOUT);
+        handle.exit(0);
+    });
+}
+
+/// Called by each main window once it has flushed editors and workspace state in
+/// response to `kex:before-quit`; the quit proceeds when the last one reports.
+#[tauri::command]
+fn confirm_quit(app: tauri::AppHandle, window: tauri::WebviewWindow) {
+    let guard = app.state::<QuitGuard>();
+    guard.confirmed.store(true, Ordering::SeqCst);
+    if guard.flushing.ack(window.label()) {
+        app.exit(0);
+    }
 }
 
 /// Dismisses a quit that was deferred because a duplication was in progress
@@ -80,9 +127,8 @@ fn signal_quit_request(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
         .confirmed
         .store(true, Ordering::SeqCst);
-    let has_main = app.webview_windows().keys().any(|l| l.starts_with("w-"));
-    if has_main {
-        let _ = app.emit("kex:before-quit", ());
+    if !main_window_labels(app).is_empty() {
+        emit_before_quit(app);
     } else {
         // No windows to flush - exit immediately.
         app.exit(0);
@@ -182,7 +228,11 @@ fn get_build_info() -> BuildInfo {
 }
 
 fn parse_launch_dir() -> Option<String> {
-    for arg in std::env::args().skip(1) {
+    launch_dir_from_args(std::env::args().skip(1))
+}
+
+fn launch_dir_from_args(args: impl IntoIterator<Item = String>) -> Option<String> {
+    for arg in args {
         if arg.starts_with('-') {
             continue;
         }
@@ -492,26 +542,42 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
     }
 }
 
+/// Computed by the first window that asks. Building the plans prunes records (a Claude session
+/// with no transcript, an agent with no provider), so doing it per window would let the first
+/// window delete the record of a tab that lives in another one.
+static RESTORE_PLANS: std::sync::OnceLock<Vec<agent::session_store::RestorePlan>> =
+    std::sync::OnceLock::new();
+
 #[tauri::command]
-fn agent_session_restore_plan(app: tauri::AppHandle) -> Vec<agent::session_store::RestorePlan> {
+fn agent_session_restore_plan(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Vec<agent::session_store::RestorePlan> {
     log::debug!("[agent-session] agent_session_restore_plan invoked");
-    let plans = agent::session_store::load_restore_plan();
-    let known = app
-        .state::<window_state::WindowStateManager>()
-        .terminal_tab_ids();
-    let (plans, orphans) = agent::session_store::split_orphans(plans, &known);
-    for orphan in &orphans {
-        log::info!(
-            "[agent-session] restore: tab {} is in no window, dropping its session",
-            orphan.tab_id
-        );
-        let _ = agent::session_store::detach_session(&orphan.tab_id);
-    }
-    log::info!(
-        "[agent-session] restore: {} plan(s) ready for frontend",
-        plans.len()
+    let mgr = app.state::<window_state::WindowStateManager>();
+    let all = RESTORE_PLANS.get_or_init(|| {
+        let plans = agent::session_store::load_restore_plan();
+        let (plans, orphans) =
+            agent::session_store::split_orphans(plans, &mgr.terminal_tab_ids());
+        for orphan in &orphans {
+            log::info!(
+                "[agent-session] restore: tab {} is in no window, dropping its session",
+                orphan.tab_id
+            );
+            let _ = agent::session_store::detach_session(&orphan.tab_id);
+        }
+        plans
+    });
+    let mine = agent::session_store::plans_for_tabs(
+        all,
+        &mgr.window_terminal_tab_ids(window.label()),
     );
-    plans
+    log::info!(
+        "[agent-session] restore: {} plan(s) ready for window {}",
+        mine.len(),
+        window.label()
+    );
+    mine
 }
 
 /// Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
@@ -539,13 +605,63 @@ async fn check_launch_dir(path: String) -> Option<String> {
         .flatten()
 }
 
+/// A second `kex` process was started (Windows "Open in" verb, CLI): it exits right after
+/// calling this in the live instance, which opens the folder as a workspace in the focused
+/// window or, when no window exists, in a new one.
+#[cfg(desktop)]
+fn handle_second_launch(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) {
+    let dir = launch_dir_from_args(
+        argv.into_iter()
+            .skip(1)
+            .map(|a| resolve_against(&a, &cwd)),
+    );
+    if let Some(dir) = &dir {
+        let _ = app
+            .state::<workspace::WorkspaceRegistry>()
+            .authorize(dir);
+    }
+    let live = app
+        .state::<window_state::WindowStateManager>()
+        .get_focused_window()
+        .filter(|l| app.get_webview_window(l).is_some())
+        .or_else(|| main_window_labels(app).into_iter().min());
+    match (live, dir) {
+        (Some(label), dir) => {
+            if let Some(w) = app.get_webview_window(&label) {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            if let Some(dir) = dir {
+                let _ = app.emit_to(label.as_str(), "kex:open-folder", dir);
+            }
+        }
+        (None, dir) => {
+            *app.state::<LaunchDir>().0.lock().unwrap() = dir;
+            let _ = create_new_window(app);
+        }
+    }
+}
+
+/// The second process may have been started from another working directory.
+fn resolve_against(arg: &str, cwd: &str) -> String {
+    if arg.starts_with('-') || std::path::Path::new(arg).is_absolute() {
+        return arg.to_string();
+    }
+    std::path::Path::new(cwd).join(arg).to_string_lossy().into_owned()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     panic_log::install();
     let cli_dir = parse_launch_dir();
     workspace::init_launch_cwd(cli_dir.as_deref());
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        handle_second_launch(app, argv, cwd);
+    }));
+    builder
         .on_window_event(window_log::record)
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -964,6 +1080,9 @@ pub fn run() {
             shell::shell_bg_list,
             editors::editor_scan,
             editors::claim_startup_scan,
+            update_guard::claim_update_check,
+            update_guard::claim_update_install,
+            update_guard::release_update_install,
             actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,
@@ -973,6 +1092,9 @@ pub fn run() {
             get_launch_dir,
             get_build_info,
             confirm_quit,
+            custom_themes::custom_theme_save,
+            custom_themes::custom_theme_delete,
+            custom_themes::request_theme_edit,
             cancel_quit,
             enter_windowless_mode,
             sync_menu,
@@ -1072,4 +1194,65 @@ pub fn run() {
                 signal_quit_request(app_handle);
             }
         });
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use super::{launch_dir_from_args, resolve_against};
+
+    #[test]
+    fn picks_first_existing_directory_and_skips_flags() {
+        let tmp = std::env::temp_dir();
+        let args = vec![
+            "--flag".to_string(),
+            "/definitely/not/here".to_string(),
+            tmp.to_string_lossy().into_owned(),
+        ];
+        assert!(launch_dir_from_args(args).is_some());
+    }
+
+    #[test]
+    fn no_directory_gives_none() {
+        assert!(launch_dir_from_args(vec!["--x".to_string()]).is_none());
+    }
+
+    #[test]
+    fn relative_arg_resolves_against_caller_cwd() {
+        let out = resolve_against("proj", "/home/u");
+        assert!(out.ends_with("proj") && out.starts_with("/home/u"));
+        assert_eq!(resolve_against("--flag", "/home/u"), "--flag");
+    }
+}
+
+#[cfg(test)]
+mod quit_tests {
+    use super::FlushTracker;
+
+    fn labels(l: &[&str]) -> Vec<String> {
+        l.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn quit_waits_for_every_window() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        assert!(!t.ack("w-a"));
+        assert!(t.ack("w-b"));
+    }
+
+    #[test]
+    fn repeated_ack_does_not_release_early() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        assert!(!t.ack("w-a"));
+        assert!(!t.ack("w-a"));
+    }
+
+    #[test]
+    fn begin_replaces_previous_set() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        t.begin(labels(&["w-c"]));
+        assert!(t.ack("w-c"));
+    }
 }

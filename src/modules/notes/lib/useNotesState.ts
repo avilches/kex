@@ -1,15 +1,17 @@
 import { native } from "@/lib/native";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applyOpsToRaw,
   DEFAULT_NOTES_CONFIG,
   deletePathInConfig,
   type NoteSortMode,
   type NotesConfig,
+  type NotesOp,
   parseNotesConfig,
   pathsToCheck,
   pruneNotesConfig,
   renamePathInConfig,
-  serializeNotesConfig,
   withAncestors,
 } from "./notesConfig";
 import { notesPathsExist } from "./notesDir";
@@ -38,10 +40,11 @@ export function useNotesState(root: string | null, active: boolean) {
   rootRef.current = root;
   const configRef = useRef(config);
   configRef.current = config;
-  // Target root + payload for the write still waiting out its debounce, so an
-  // unmount can flush it immediately instead of dropping it. Both are captured
-  // at schedule time, unambiguous regardless of what root/config do afterwards.
-  const pendingWriteRef = useRef<{ root: string; config: NotesConfig } | null>(null);
+  // Edits (not state) waiting out the debounce, with the root they were made on, so an
+  // unmount can flush them instead of dropping them. Each write replays them over the
+  // file as it is on disk, which keeps another window's changes to the same kex.json.
+  const pendingWriteRef = useRef<{ root: string; ops: NotesOp[] } | null>(null);
+  const inFlightRef = useRef(0);
 
   useEffect(() => {
     // Reset must happen in the same effect as the load trigger: if root changes
@@ -65,16 +68,43 @@ export function useNotesState(root: string | null, active: boolean) {
     };
   }, [root, active]);
 
-  const writeNow = useCallback((r: string, next: NotesConfig) => {
+  const writeNow = useCallback((r: string, ops: NotesOp[]) => {
+    inFlightRef.current += 1;
     void (async () => {
-      const raw = await readRaw(r);
       try {
-        await native.writeFile(kexJsonPath(r), serializeNotesConfig(raw, next));
+        const raw = await readRaw(r);
+        await native.writeFile(kexJsonPath(r), applyOpsToRaw(raw, ops));
       } catch (e) {
         console.error("[notes] kex.json write failed:", e);
+      } finally {
+        inFlightRef.current -= 1;
       }
     })();
   }, []);
+
+  // Another window wrote kex.json: adopt it unless this window has edits of its own
+  // waiting or in flight, which are replayed over the new content when they are written.
+  useEffect(() => {
+    if (!root || !active) return;
+    const target = kexJsonPath(root);
+    const busy = () => pendingWriteRef.current !== null || inFlightRef.current > 0;
+    const written = getCurrentWebviewWindow().listen<{ path: string }>(
+      "fs:file-written",
+      (e) => {
+        if (e.payload.path.replace(/\\/g, "/") !== target || busy()) return;
+        void readRaw(root).then((raw) => {
+          if (busy()) return;
+          const next = parseNotesConfig(raw);
+          if (JSON.stringify(next) === JSON.stringify(configRef.current)) return;
+          configRef.current = next;
+          setConfig(next);
+        });
+      },
+    );
+    return () => {
+      void written.then((un) => un());
+    };
+  }, [root, active]);
 
   useEffect(() => {
     return () => {
@@ -82,36 +112,32 @@ export function useNotesState(root: string | null, active: boolean) {
       const pending = pendingWriteRef.current;
       if (pending) {
         pendingWriteRef.current = null;
-        writeNow(pending.root, pending.config);
+        writeNow(pending.root, pending.ops);
       }
     };
   }, [writeNow]);
 
-  const scheduleWrite = useCallback(
-    (next: NotesConfig) => {
+  const update = useCallback(
+    (fn: NotesOp) => {
       const r = rootRef.current;
       if (!r) return;
+      const prev = configRef.current;
+      const next = fn(prev);
+      if (next === prev) return;
+      configRef.current = next;
+      setConfig(next);
       if (timerRef.current !== null) clearTimeout(timerRef.current);
-      pendingWriteRef.current = { root: r, config: next };
+      const pending = pendingWriteRef.current;
+      if (pending && pending.root !== r) writeNow(pending.root, pending.ops);
+      const ops = pending && pending.root === r ? [...pending.ops, fn] : [fn];
+      pendingWriteRef.current = { root: r, ops };
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         pendingWriteRef.current = null;
-        writeNow(r, next);
+        writeNow(r, ops);
       }, WRITE_DEBOUNCE_MS);
     },
     [writeNow],
-  );
-
-  const update = useCallback(
-    (fn: (c: NotesConfig) => NotesConfig) => {
-      setConfig((prev) => {
-        const next = fn(prev);
-        if (next === prev) return prev;
-        scheduleWrite(next);
-        return next;
-      });
-    },
-    [scheduleWrite],
   );
 
   // Repairing kex.json belongs to whoever owns the file. Runs once per load, not

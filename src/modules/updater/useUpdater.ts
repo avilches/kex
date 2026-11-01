@@ -1,4 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useState } from "react";
@@ -116,6 +117,16 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
   const install = useCallback(async () => {
     if (status.kind !== "available") return;
     const { update } = status;
+    const claimed = await invoke<boolean>("claim_update_install").catch(
+      () => false,
+    );
+    if (!claimed) {
+      setStatus({
+        kind: "error",
+        message: "An update is already being installed in another window.",
+      });
+      return;
+    }
     let total: number | null = null;
     let downloaded = 0;
     setStatus({ kind: "downloading", downloaded: 0, contentLength: null });
@@ -137,6 +148,7 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
       });
       await relaunch();
     } catch (err) {
+      void invoke("release_update_install").catch(() => {});
       setStatus({ kind: "error", message: String(err) });
     }
   }, [status]);
@@ -147,7 +159,14 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
 
   useEffect(() => {
     if (!autoCheck) return;
-    void runCheck();
+    let cancelled = false;
+    void (async () => {
+      const won = await invoke<boolean>("claim_update_check").catch(() => false);
+      if (won && !cancelled) await runCheck();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [autoCheck, runCheck]);
 
   return { status, check: runCheck, install, dismiss };

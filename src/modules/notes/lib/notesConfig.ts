@@ -97,6 +97,15 @@ export function serializeNotesConfig(raw: string | null, config: NotesConfig): s
   return `${JSON.stringify(root, null, 2)}\n`;
 }
 
+export type NotesOp = (c: NotesConfig) => NotesConfig;
+
+// Replays this window's edits over the file as it is on disk now, so a stale in-memory
+// copy never overwrites what another window wrote to the same kex.json.
+export function applyOpsToRaw(raw: string | null, ops: NotesOp[]): string {
+  const next = ops.reduce((c, op) => op(c), parseNotesConfig(raw));
+  return serializeNotesConfig(raw, next);
+}
+
 export function renamePathInConfig(config: NotesConfig, from: string, to: string): NotesConfig {
   const map = (p: string): string =>
     p === from ? to : p.startsWith(`${from}/`) ? `${to}${p.slice(from.length)}` : p;

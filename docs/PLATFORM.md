@@ -50,6 +50,23 @@ hidden via `invisible pointer-events-none` so PTYs and dev servers keep streamin
   GNOME/Mutter CSD.
 - Windows: same as Linux via `tauri.windows.conf.json`. React renders custom `WindowControls`.
 
+## Several windows and processes
+
+- **One process.** `tauri-plugin-single-instance` is the first plugin. A second launch (the Windows "Open in Kex"
+  verb from `installer-hooks.nsh`, or the CLI) never starts a second app: it passes `argv` and its cwd to the live
+  instance and exits. `handle_second_launch` resolves the folder (`launch_dir_from_args`), authorizes it, focuses the
+  focused main window and emits `kex:open-folder` to it only, which opens the folder as a workspace
+  (`newWorkspaceFromFolder`). With no window alive it creates one that reads the folder through `get_launch_dir`.
+- **Which window acts.** Global `emit` reaches every window, so a request that must happen once goes through
+  `emit_to` the focused window: `kex:menu`, `kex://theme-edit` (`request_theme_edit`) and `kex:open-folder`.
+- **Quit.** `kex:before-quit` goes to every main window; the app exits when the last one calls `confirm_quit`
+  (`QuitGuard.flushing`), or after a 3 s timeout.
+- **Once per launch.** The startup editor scan (`claim_startup_scan`) and the automatic update check
+  (`claim_update_check`) are claimed through a process-wide flag, so only the first window does them; an update
+  install is guarded the same way (`claim_update_install`).
+- **Lists written whole.** JS queues only order writes inside one webview. A store key that holds a list shared by
+  windows is updated in Rust under a lock (`custom_theme_save` / `custom_theme_delete`).
+
 ## Tauri capabilities
 
 `src-tauri/capabilities/default.json` is the allowlist for plugin APIs available to the webview. New plugins (dialog,
