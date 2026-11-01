@@ -256,7 +256,7 @@ Comportamiento:
 - Modify: `docs/NOTIFICATIONS.md` (seccion "Install reminder": relacion con el onboarding y la dependencia `suppressed`), `docs/ARCHITECTURE.md` (modulos `onboarding` y `permissions`), `docs/SETTINGS_UI.md` (filas de agentes con estados y Install all), `docs/FORK.md` (divergencias respecto al upstream: onboarding, permisos, camara y microfono fuera)
 
 - [ ] **Step 1: Actualizar los cuatro documentos** con lo realmente construido, sin tablas de pruebas manuales nuevas.
-- [ ] **Step 2: Comprobar** `grep -rn "—" docs/superpowers docs/NOTIFICATIONS.md docs/ARCHITECTURE.md docs/SETTINGS_UI.md docs/FORK.md` -> sin em-dash nuevos.
+- [ ] **Step 2: Comprobar** `grep -rnP "\x{2014}" docs/superpowers docs/NOTIFICATIONS.md docs/ARCHITECTURE.md docs/SETTINGS_UI.md docs/FORK.md` -> sin em-dash nuevos.
 - [ ] **Step 3: Verificacion final completa**: `pnpm lint && pnpm check-types && pnpm test` y `cd src-tauri && cargo clippy && cargo test --locked`, todo en verde.
 - [ ] **Step 4: Commit**: `git add docs && git commit -m "Document onboarding, permissions and agent states"`
 
