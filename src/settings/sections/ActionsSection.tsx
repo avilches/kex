@@ -11,7 +11,6 @@ import {
   removeAction,
   reorderActions,
   suggestionsFromDetected,
-  unlinkRemovedActions,
   updateAction,
   type Action,
 } from "@/modules/actions";
@@ -32,7 +31,7 @@ function report(err: unknown) {
 function edit(fn: (list: Action[]) => Action[]): Promise<void> {
   return globalActions
     .change(fn)
-    .then(({ before, after }) => unlinkRemovedActions(before, after))
+    .then(() => undefined)
     .catch((err: unknown) => {
       report(err);
       throw err;

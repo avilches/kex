@@ -110,6 +110,7 @@ import {
   openWorkspaceActionsSettings,
 } from "@/modules/settings/openSettingsWindow";
 import { useWorkspaceActionsBroadcast } from "@/modules/actions/lib/actionsBroadcast";
+import { useUnlinkRemovedGlobalActions } from "@/modules/actions/lib/useUnlinkRemovedGlobalActions";
 import type { Action } from "@/modules/actions/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -4053,6 +4054,7 @@ export default function App() {
     [addWorkspaceAction, updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, promoteWorkspaceAction, demoteGlobalAction],
   );
   useWorkspaceActionsBroadcast({ workspace: activeWorkspace ?? null, mutators: workspaceActionsMutators });
+  useUnlinkRemovedGlobalActions(workspacesRef);
 
   const onOpenActionsSettings = useCallback(() => {
     void openWorkspaceActionsSettings();
