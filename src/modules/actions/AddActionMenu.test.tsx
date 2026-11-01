@@ -126,7 +126,7 @@ describe("AddActionMenu", () => {
     const agents = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Agents")!;
     expect([...agents.querySelectorAll("[cmdk-item]")].map((o) => o.textContent)).toEqual([
       "Custom agentyour own command",
-      "Claude CodeWorkspace root",
+      "Claude Code",
     ]);
     const apps = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Applications")!;
     expect(apps.textContent).not.toContain("Claude");
@@ -142,7 +142,7 @@ describe("AddActionMenu", () => {
     expect(view.options().map((o) => o.textContent)).toEqual([
       "Add scriptruns in a terminal",
       "Custom agentyour own command",
-      "Claude CodeWorkspace root",
+      "Claude Code",
       "Custom",
       "BBEditFiles",
       "PyCharmFolders",
