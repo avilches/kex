@@ -3203,7 +3203,6 @@ export default function App() {
         if (handle) void handle.save();
       },
       "tab.next": () => {
-        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length < 2) return;
@@ -3212,7 +3211,6 @@ export default function App() {
         onActivateTabStable(activeWorkspace.id, next.id);
       },
       "tab.prev": () => {
-        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length < 2) return;
@@ -3222,16 +3220,13 @@ export default function App() {
       },
       "tab.switcher": (e) => {
         if (switcherActive()) return stepSwitcher(1);
-        dismissPalettes();
         openTabSwitcher(e, 1);
       },
       "tab.switcherBack": (e) => {
         if (switcherActive()) return stepSwitcher(-1);
-        dismissPalettes();
         openTabSwitcher(e, -1);
       },
       "tab.selectByIndex": (e) => {
-        dismissPalettes();
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length === 0) return;

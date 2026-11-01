@@ -18,12 +18,14 @@ const wait = (ms: number) =>
 
 let setOpen: (v: boolean) => void = () => {};
 
-function Page({ guarded }: { guarded: boolean }) {
+function Page({ guarded, paletteState = "open" }: { guarded: boolean; paletteState?: "open" | "closed" }) {
   const [open, set] = useState(false);
   setOpen = set;
   return (
     <>
-      <input cmdk-input="" data-palette="command" data-testid="palette-input" />
+      <div data-slot="dialog-content" data-state={paletteState}>
+        <input cmdk-input="" data-palette="command" data-testid="palette-input" />
+      </div>
       <AlertDialog open={open}>
         <AlertDialogContent onCloseAutoFocus={guarded ? keepPaletteFocus : undefined}>
           <AlertDialogTitle>Hibernate tab?</AlertDialogTitle>
@@ -34,8 +36,8 @@ function Page({ guarded }: { guarded: boolean }) {
   );
 }
 
-async function openThenClose(guarded: boolean) {
-  const { getByTestId } = render(<Page guarded={guarded} />);
+async function openThenClose(guarded: boolean, paletteState: "open" | "closed" = "open") {
+  const { getByTestId } = render(<Page guarded={guarded} paletteState={paletteState} />);
   const input = getByTestId("palette-input") as HTMLInputElement;
   input.focus();
   await act(async () => setOpen(true));
@@ -54,6 +56,11 @@ describe("focus after the hibernate review dialog closes over the palette", () =
 
   it("is lost to the page without the close handler, which is what the dialog does on its own", async () => {
     const input = await openThenClose(false);
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it("does not take the focus for a palette that is only playing its exit animation", async () => {
+    const input = await openThenClose(true, "closed");
     expect(document.activeElement).not.toBe(input);
   });
 });

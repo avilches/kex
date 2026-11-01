@@ -77,6 +77,13 @@ describe("shortcutBlockedByPalette", () => {
     expect(open).toEqual(["palette.menuAction"]);
   });
 
+  it("keeps every tab-switching shortcut, Ctrl+Tab included, blocked behind either palette: they do not close it", () => {
+    for (const id of ["tab.switcher", "tab.switcherBack", "tab.next", "tab.prev", "tab.selectByIndex"] as const) {
+      expect(shortcutBlockedByPalette(id, "commands"), id).toBe(true);
+      expect(shortcutBlockedByPalette(id, "folder"), id).toBe(true);
+    }
+  });
+
   it("keeps Jump to Workspace and Select Tab by digit blocked behind the command palette", () => {
     expect(shortcutBlockedByPalette("workspace.selectByIndex", "commands")).toBe(true);
     expect(shortcutBlockedByPalette("tab.selectByIndex", "commands")).toBe(true);

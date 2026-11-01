@@ -1,9 +1,12 @@
+import { OPEN_PALETTE_INPUT } from "@/modules/terminal/lib/paletteHoldsFocus";
+
 export const PALETTE_INPUT_SELECTOR = '[cmdk-input=""][data-palette="command"]';
 
 // A dialog opened over the command palette drops the focus on the page when it closes; as its
-// close handler this gives it back to the palette input, if the palette is still there.
+// close handler this gives it back to the palette input, if the palette is still open: one playing its
+// exit animation stays in the DOM marked closed and must not get the focus (see paletteHoldsFocus).
 export function keepPaletteFocus(event: Event): void {
-  const input = document.querySelector<HTMLInputElement>(PALETTE_INPUT_SELECTOR);
+  const input = document.querySelector<HTMLInputElement>(OPEN_PALETTE_INPUT);
   if (!input) return;
   event.preventDefault();
   input.focus();

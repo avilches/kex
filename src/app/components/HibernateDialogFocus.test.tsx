@@ -30,7 +30,9 @@ const wait = (ms: number) =>
 function Dialog({ open }: { open: boolean }) {
   return (
     <>
-      <input cmdk-input="" data-palette="command" data-testid="palette-input" />
+      <div data-slot="dialog-content" data-state="open">
+        <input cmdk-input="" data-palette="command" data-testid="palette-input" />
+      </div>
       <HibernateDialog
         workspace={open ? workspace : null}
         tabIds={["tab-1"]}
