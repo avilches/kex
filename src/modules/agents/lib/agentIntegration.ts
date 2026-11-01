@@ -4,6 +4,8 @@ import {
   updateInstalledIntegrations,
   updateIntegrationSuggestions,
 } from "@/modules/settings/store";
+import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
+import { detectedAgentIds } from "./agentRows";
 import { installIntegration, integrationStatus, removeIntegration } from "./integrationActions";
 import { withInstalled } from "./integrationSuggestion";
 import {
@@ -21,7 +23,21 @@ export async function agentStatus(agent: AgentId): Promise<IntegrationStatus> {
   return fromInstalledFlag(await invoke<boolean>("agent_claude_hooks_status"));
 }
 
+export class AgentNotDetectedError extends Error {
+  constructor(agent: AgentId) {
+    super(`${agent} is not detected on this machine`);
+    this.name = "AgentNotDetectedError";
+  }
+}
+
+export function assertDetected(agent: AgentId, detected: ReadonlySet<string>): void {
+  if (!detected.has(agent)) throw new AgentNotDetectedError(agent);
+}
+
 export async function installAgent(agent: AgentId): Promise<void> {
+  // The Settings webview hydrates preferences asynchronously; reading earlier sees no agents.
+  await whenHydrated();
+  assertDetected(agent, detectedAgentIds(usePreferencesStore.getState().detectedEditors));
   if (isIntegrationAgent(agent)) {
     await installIntegration(agent, updateInstalledIntegrations);
   } else {

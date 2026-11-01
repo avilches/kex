@@ -10,7 +10,9 @@ import { flushEditors } from "./app/lib/editorFlush";
 import { installGlobalErrorLogging, reactRootErrorOptions } from "./lib/errorLog";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
+import { detectedAgentIds } from "./modules/agents/lib/agentRows";
 import { syncIntegrations } from "./modules/agents/lib/integrationActions";
+import { syncPlan } from "./modules/agents/lib/startupSync";
 import { loadPreferences, updateInstalledIntegrations } from "./modules/settings/store";
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
@@ -49,14 +51,24 @@ await initWorkspaceState();
 // - integration ON:  install/update script and settings.json entries (no-op if up to date)
 // - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
 if (startupPrefs) {
-  if (startupPrefs.agentNotifications) {
+  const detected = detectedAgentIds(startupPrefs.detectedEditors);
+  const claudeHooksInstalled = detected.has("claude")
+    ? await invoke<boolean>("agent_claude_hooks_status").catch(() => false)
+    : false;
+  const plan = syncPlan({
+    detected,
+    installed: startupPrefs.installedIntegrations,
+    claudeHooksInstalled,
+    agentNotifications: startupPrefs.agentNotifications,
+  });
+  if (plan.claude === "refresh") {
     invoke("agent_enable_claude_hooks", { refresh: false }).catch(() => {});
-  } else {
+  } else if (plan.claude === "disable") {
     invoke("agent_disable_claude_hooks").catch(() => {});
   }
   // OpenCode, OMP and Pi read their script from their own config folder, so an app update
   // rewrites the ones the user installed instead of leaving them on an old version.
-  syncIntegrations(startupPrefs.installedIntegrations, updateInstalledIntegrations).catch(() => {});
+  syncIntegrations(plan.others, updateInstalledIntegrations).catch(() => {});
 }
 
 ReactDOM.createRoot(

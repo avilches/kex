@@ -15,6 +15,14 @@ vi.mock("@/modules/settings/store", async (orig) => ({
   },
 }));
 
+vi.mock("@/modules/settings/preferences", async (orig) => {
+  const real = await orig<typeof import("@/modules/settings/preferences")>();
+  real.usePreferencesStore.setState({
+    detectedEditors: ["omp", "codex"].map((id) => ({ id, kind: "agent" })) as never,
+  });
+  return { ...real, whenHydrated: () => Promise.resolve() };
+});
+
 let windows = false;
 vi.mock("@/lib/platform", async (orig) => ({
   ...(await orig<typeof import("@/lib/platform")>()),

@@ -99,8 +99,8 @@ Cursor Agent). Estos últimos solo dicen "Detectado" o "No detectado", porque no
 
 Corrige además un comportamiento actual inconsistente: hoy Claude Code, OpenCode, OMP y Pi crean su
 carpeta de configuración aunque el agente no exista, y solo Codex se niega. Con el diseño nuevo, el
-botón no existe para un agente no detectado, y el comando de instalación de cada uno rechaza
-instalar si el agente no está detectado.
+botón no existe para un agente no detectado, y la guarda vive en `installAgent`, el único camino
+de instalación, que rechaza instalar si el agente no está detectado.
 
 ### Install all y Uninstall all
 
