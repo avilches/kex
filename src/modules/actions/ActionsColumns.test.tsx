@@ -236,27 +236,38 @@ describe("ActionsColumns", () => {
   });
 
   describe("what an app opens", () => {
-    const accepts = (value: string) => document.querySelector(`#accepts-${value}`) as HTMLElement | null;
+    const accepts = (value: "files" | "folders") => document.querySelector(`#accepts-${value}`) as HTMLElement | null;
     const note = () => document.querySelector("[role='dialog']")?.textContent ?? "";
+    const preview = () => document.querySelector("[data-own-button-preview]") as HTMLElement | null;
 
-    it("is asked of an app, with the three choices, and the saved one is checked", () => {
+    it("is asked of an app as Edit files and Open folders, with the saved ones checked", () => {
       const { container, unmount } = mount([{ ...savedApp, accepts: "file" }]);
       click(pencil(container));
       expect(document.querySelector("[aria-label='What it opens']")).not.toBeNull();
-      expect(accepts("file")?.getAttribute("aria-checked")).toBe("true");
-      expect(accepts("folder")?.getAttribute("aria-checked")).toBe("false");
-      expect(accepts("both")?.getAttribute("aria-checked")).toBe("false");
-      expect(note()).toContain("Files and folders");
+      expect(accepts("files")?.getAttribute("aria-checked")).toBe("true");
+      expect(accepts("folders")?.getAttribute("aria-checked")).toBe("false");
+      expect(note()).toContain("Edit files");
+      expect(note()).toContain("Open folders");
       unmount();
     });
 
     it("saves the choice at once", () => {
       const { container, g, unmount } = mount([savedApp]);
       click(pencil(container));
-      click(accepts("folder"));
+      click(accepts("files"));
       const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
       expect(id).toBe(savedApp.id);
       expect(next.accepts).toBe("folder");
+      unmount();
+    });
+
+    it("does not let the last switch go off, so an app always opens something", () => {
+      const { container, g, unmount } = mount([{ ...savedApp, accepts: "folder" }]);
+      click(pencil(container));
+      click(accepts("folders"));
+      const saved = g.onUpdate.mock.calls.map(([, next]) => (next as Action).accepts);
+      expect(saved.every((a) => a === "folder")).toBe(true);
+      expect(accepts("folders")?.getAttribute("aria-checked")).toBe("true");
       unmount();
     });
 
@@ -271,16 +282,27 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("offers an own button to an app that takes folders, which lives in the bar, and not to one that takes only files", () => {
-      const { container, unmount } = mount([{ ...savedApp, accepts: "folder" }]);
-      click(pencil(container));
+    it("draws the File combo only when the app edits files, and the Actions combo only when it opens folders", () => {
+      const folders = mount([{ ...savedApp, accepts: "folder" }]);
+      click(pencil(folders.container));
       expect(note()).toContain("Own button");
-      expect(note()).not.toContain("never as a button of its own");
-      unmount();
+      expect(preview()?.hasAttribute("data-preview-file")).toBe(false);
+      expect(preview()?.querySelector("[data-preview-combo]")).not.toBeNull();
+      folders.unmount();
+      const both = mount([{ ...savedApp, accepts: "both" }]);
+      click(pencil(both.container));
+      expect(preview()?.hasAttribute("data-preview-file")).toBe(true);
+      expect(preview()?.querySelector("[data-preview-file-combo]")).not.toBeNull();
+      expect(preview()?.querySelector("[data-preview-combo]")).not.toBeNull();
+      both.unmount();
+    });
+
+    it("draws only the File combo, and offers no own button, for an app that opens no folder", () => {
       const files = mount([{ ...savedApp, accepts: "file" }]);
       click(pencil(files.container));
-      expect(note()).toContain("never as a button of its own");
-      expect(note()).toContain("focused file");
+      expect(preview()?.querySelector("[data-preview-file-combo]")).not.toBeNull();
+      expect(preview()?.querySelector("[data-preview-combo]")).toBeNull();
+      expect(note()).not.toContain("Own button");
       files.unmount();
     });
 

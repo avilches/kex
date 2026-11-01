@@ -32,6 +32,21 @@ export const ACCEPTS_LABELS: Record<AppAccepts, string> = {
 export const acceptsFolder = (a: AppAccepts): boolean => a !== "file";
 export const acceptsFile = (a: AppAccepts): boolean => a !== "folder";
 
+/** Which combos of the Header an app shows up in, for the preview of the edit modal: the Actions
+ * menu when it opens folders, the File combo when it edits files. Neither means it is not offered. */
+export function appCombos(accepts: AppAccepts): { actions: boolean; file: boolean } {
+  return { actions: acceptsFolder(accepts), file: acceptsFile(accepts) };
+}
+
+/** The two switches of the edit modal as one value. With neither on there is nothing to open, so
+ * it returns the current value: the last switch cannot be turned off. */
+export function acceptsFromSwitches(files: boolean, folders: boolean, current: AppAccepts): AppAccepts {
+  if (files && folders) return "both";
+  if (files) return "file";
+  if (folders) return "folder";
+  return current;
+}
+
 /** Where the focused tab is: a terminal gives a folder, a tab with a path gives a file. */
 export type FocusPlace = { file: boolean; folder: boolean };
 

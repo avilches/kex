@@ -71,7 +71,10 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   solo la lista de variables de una app lo muestra; un script que lo usa queda rechazado por
   `commandProblem` ("{target} is only for apps"). Una app se anade una sola vez, ya no una
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
-  carpetas), y el modal pregunta "What it opens" (Files, Folders, Files and folders).
+  carpetas), y el modal pregunta "What it opens" con dos casillas, Edit files y Open folders, de las que
+  siempre queda una marcada (la ultima no se deja desmarcar). La preview del modal dibuja el
+  combo File cuando edita ficheros, y solo ese combo (sin el Actions ni el radio de Own button)
+  cuando no abre carpetas.
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
