@@ -132,16 +132,20 @@ fn remove_hooks(mut root: Value) -> Value {
 /// installed Claude does not (after a downgrade) loses Kex's hook, and its key goes when nothing
 /// else is left in it, because an unknown key makes old releases discard the whole file. Without
 /// it (the version could not be read) the hooks Kex wrote in other events stay as they are.
-fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Value {
-    if !root.is_object() {
-        root = json!({});
-    }
-    let obj = root.as_object_mut().unwrap();
+fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Result<Value, String> {
+    let wrong = |what: &str| format!("{what} is not the expected JSON type; refusing to overwrite it");
+    let Some(obj) = root.as_object_mut() else {
+        return Err(wrong("The settings file"));
+    };
     let hooks = obj.entry("hooks").or_insert_with(|| json!({}));
-    if !hooks.is_object() {
-        *hooks = json!({});
+    let Some(hooks) = hooks.as_object_mut() else {
+        return Err(wrong("\"hooks\""));
+    };
+    for &event in events {
+        if hooks.get(event).is_some_and(|v| !v.is_array()) {
+            return Err(wrong(&format!("hooks.{event}")));
+        }
     }
-    let hooks = hooks.as_object_mut().unwrap();
 
     for event in claude_version::known_events().filter(|e| prune && !events.contains(e)) {
         let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) else {
@@ -155,9 +159,6 @@ fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Value {
 
     for &event in events {
         let arr = hooks.entry(event).or_insert_with(|| json!([]));
-        if !arr.is_array() {
-            *arr = json!([]);
-        }
         let arr = arr.as_array_mut().unwrap();
         // Remove old-style notify hooks and any prior session hook before adding v4.
         arr.retain(|group| {
@@ -167,7 +168,7 @@ fn merge_hooks(mut root: Value, events: &[&str], prune: bool) -> Value {
             "hooks": [ { "type": "command", "command": session_hook_cmd(), "timeout": 10 } ]
         }));
     }
-    root
+    Ok(root)
 }
 
 fn existing_config(contents: Option<&str>, path: &std::path::Path) -> Result<Value, String> {
@@ -280,7 +281,7 @@ fn plan_settings(
             existing.clone(),
             &claude_version::hook_events_for(version),
             claude_version::is_known(version),
-        )
+        )?
     } else {
         remove_hooks(existing.clone())
     };
@@ -1161,7 +1162,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input.clone(), &all(), true);
+        let out = merge_hooks(input.clone(), &all(), true).unwrap();
         assert_eq!(out["permissions"], input["permissions"]);
         let arr = out["hooks"]["UserPromptSubmit"].as_array().unwrap();
         assert!(arr.len() >= 2);
@@ -1192,13 +1193,13 @@ mod tests {
 
     #[test]
     fn presence_is_true_for_current_hooks() {
-        let current = merge_hooks(json!({}), &all(), true).to_string();
+        let current = merge_hooks(json!({}), &all(), true).unwrap().to_string();
         assert!(settings_have_session_hook(Some(&current)));
     }
 
     #[test]
     fn presence_is_true_for_outdated_hooks_that_miss_events() {
-        let outdated = merge_hooks(json!({}), &["Stop"], true).to_string();
+        let outdated = merge_hooks(json!({}), &["Stop"], true).unwrap().to_string();
         assert!(settings_have_session_hook(Some(&outdated)));
     }
 
@@ -1225,7 +1226,7 @@ mod tests {
 
     #[test]
     fn adds_session_hooks_to_empty_config() {
-        let out = merge_hooks(json!({}), &all(), true);
+        let out = merge_hooks(json!({}), &all(), true).unwrap();
         // Every subscribed event must have the session hook.
         for event in all() {
             let arr = out["hooks"][event].as_array().unwrap();
@@ -1251,9 +1252,30 @@ mod tests {
     }
 
     #[test]
+    fn a_settings_file_of_an_unexpected_shape_is_refused_not_rewritten() {
+        for input in [
+            json!([1, 2]),
+            json!("text"),
+            json!({ "hooks": "nope" }),
+            json!({ "hooks": [] }),
+            json!({ "hooks": { "Stop": { "not": "an array" } } }),
+        ] {
+            let err = merge_hooks(input.clone(), &all(), true).unwrap_err();
+            assert!(err.contains("refusing to overwrite"), "{input}: {err}");
+        }
+    }
+
+    #[test]
+    fn planning_over_an_unexpected_shape_returns_the_error_and_no_text() {
+        let path = std::path::Path::new("/tmp/settings.json");
+        let err = plan_settings(r#"{"hooks": "nope"}"#, path, true, None).unwrap_err();
+        assert!(err.contains("refusing to overwrite"));
+    }
+
+    #[test]
     fn session_hooks_are_idempotent() {
-        let once = merge_hooks(json!({}), &all(), true);
-        let twice = merge_hooks(once.clone(), &all(), true);
+        let once = merge_hooks(json!({}), &all(), true).unwrap();
+        let twice = merge_hooks(once.clone(), &all(), true).unwrap();
         for event in all() {
             assert_eq!(
                 twice["hooks"][event].as_array().unwrap().len(),
@@ -1281,7 +1303,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input, &all(), true);
+        let out = merge_hooks(input, &all(), true).unwrap();
         // Each event: foreign hook preserved at index 0, session hook appended.
         assert_eq!(out["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
         assert_eq!(
@@ -1334,7 +1356,7 @@ mod tests {
                 ]
             }
         });
-        let out = merge_hooks(input, &all(), true);
+        let out = merge_hooks(input, &all(), true).unwrap();
         // Old notify hooks must be gone; only session hook remains.
         for event in ["UserPromptSubmit", "Notification", "Stop"] {
             let arr = out["hooks"][event].as_array().unwrap();
@@ -1726,7 +1748,7 @@ mod tests {
     #[test]
     fn an_unknown_version_adds_the_baseline_and_keeps_the_rest() {
         let path = std::path::Path::new("/x/s.json");
-        let partial = merge_hooks(json!({}), &["PermissionRequest", "PostCompact"], true);
+        let partial = merge_hooks(json!({}), &["PermissionRequest", "PostCompact"], true).unwrap();
         let text = serde_json::to_string_pretty(&partial).unwrap();
         let out: Value =
             serde_json::from_str(&plan_settings(&text, path, true, None).unwrap().unwrap())
@@ -1758,7 +1780,7 @@ mod tests {
 
     #[test]
     fn uninstall_removes_kex_from_every_known_event() {
-        let full = merge_hooks(json!({}), &all(), true);
+        let full = merge_hooks(json!({}), &all(), true).unwrap();
         let out = remove_hooks(full);
         for event in all() {
             assert!(!hooked(&out, event), "{event} still hooked");

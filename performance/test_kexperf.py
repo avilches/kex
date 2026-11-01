@@ -1,7 +1,12 @@
 import json
 import os
 import tempfile
+import argparse
+import contextlib
+import io
+import subprocess
 import unittest
+from unittest import mock
 
 import kexperf
 
@@ -129,6 +134,37 @@ class ProfilerReports(unittest.TestCase):
             f.write(self.line("2026-10-20", "10:00:00", '[profiler] {"rafShare": 0.2}') + "\n")
         found = kexperf.read_profiler_reports(directory, "2026-10-01 00:00:00")
         self.assertEqual(len(found), 2)
+
+
+class ToleratesWhatItCannotRead(unittest.TestCase):
+    def test_a_failed_sample_exits_with_the_reason_instead_of_a_traceback(self):
+        failure = subprocess.CalledProcessError(1, "sample", stderr="process does not exist")
+        with mock.patch("kexperf.subprocess.run", side_effect=failure), tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(SystemExit) as raised:
+                kexperf.take_sample({}, {"pid": 4242}, 1, d)
+        self.assertIn("process does not exist", str(raised.exception))
+
+    def test_a_main_thread_with_no_call_tree_exits_with_a_message(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("  Thread_1  DispatchQueue_1: com.apple.main-thread  (serial)\n")
+            path = f.name
+        try:
+            with self.assertRaises(SystemExit) as raised:
+                kexperf.main_thread_shares(path)
+            self.assertIn("no call tree", str(raised.exception))
+        finally:
+            os.unlink(path)
+
+    def test_a_report_that_lacks_keys_does_not_stop_the_summary(self):
+        directory = tempfile.mkdtemp()
+        line = "[2026-10-21][09:00:00][webview:f@tauri://x:1:2][INFO] [profiler] " + json.dumps({"rafShare": 0.1})
+        with open(os.path.join(directory, "Kex.log"), "w") as f:
+            f.write(line + "\n")
+        args = argparse.Namespace(hours=24 * 3650, out=directory, dev=False, top=3)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            kexperf.cmd_profiler(args)
+        self.assertIn("1 reports", out.getvalue())
 
 
 if __name__ == "__main__":

@@ -133,7 +133,10 @@ def pick_instance(instances, pid):
 def take_sample(instance, webview, seconds, out_dir, prefix="sample"):
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{prefix}-{time.strftime('%Y%m%d-%H%M%S')}-{webview['pid']}.txt")
-    subprocess.run(["/usr/bin/sample", str(webview["pid"]), str(seconds), "-file", path], capture_output=True, check=True)
+    try:
+        subprocess.run(["/usr/bin/sample", str(webview["pid"]), str(seconds), "-file", path], capture_output=True, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"sample of {webview['pid']} failed ({e.returncode}): {(e.stderr or '').strip() or 'no output'}")
     return path
 
 
@@ -203,6 +206,8 @@ def main_thread_shares(path):
         m = TREE_LINE.match(line)
         if m:
             counts.append((int(m.group(2)), m.group(3)))
+    if not counts:
+        sys.exit(f"{path}: the main thread has no call tree, was the sample cut short?")
     total = counts[0][0]
     shares = {}
     for key, needle in MAIN_THREAD_KEYS.items():
@@ -262,27 +267,27 @@ def cmd_profiler(args):
     reports = read_profiler_reports(directory, since)
     if not reports:
         sys.exit(f"no [profiler] lines in {directory} for the last {args.hours} hours; is the profiler on (Settings > General > Diagnostics)?")
-    shares = sorted(r["rafShare"] for _, r in reports)
+    shares = sorted(r.get("rafShare", 0) for _, r in reports)
     print(f"{len(reports)} reports from {reports[0][0]} to {reports[-1][0]}, windows: {sorted({r.get('window', '?') for _, r in reports})}")
     print(f"rafShare  median {statistics.median(shares)}  p90 {shares[int(len(shares) * 0.9)]}  max {shares[-1]}")
-    print(f"jank frames (>=100 ms): {sum(r['jankFrames'] for _, r in reports)} in {sum(1 for _, r in reports if r['jankFrames'])} reports, worst gap {max(r['worstGapMs'] for _, r in reports)} ms")
-    census = [r["census"] for _, r in reports]
+    print(f"jank frames (>=100 ms): {sum(r.get('jankFrames', 0) for _, r in reports)} in {sum(1 for _, r in reports if r.get('jankFrames'))} reports, worst gap {max(r.get('worstGapMs', 0) for _, r in reports)} ms")
+    census = [r.get("census", {}) for _, r in reports]
     for key in ("nodes", "xterms", "domRendererTerminals", "webglTerminals", "domRows"):
-        values = [c[key] for c in census]
+        values = [c.get(key, 0) for c in census]
         print(f"census {key:<22} min {min(values):>6}  last {values[-1]:>6}  max {max(values):>6}")
     print("\nworst windows (by jank frames, then rafShare):")
-    worst = sorted(reports, key=lambda r: (r[1]["jankFrames"], r[1]["rafShare"]), reverse=True)[: args.top]
+    worst = sorted(reports, key=lambda r: (r[1].get("jankFrames", 0), r[1].get("rafShare", 0)), reverse=True)[: args.top]
     for stamp, r in worst:
-        print(f"  {stamp}  window {r.get('window', '?')}  rafShare {r['rafShare']}  jank {r['jankFrames']}  worst gap {r['worstGapMs']} ms")
+        print(f"  {stamp}  window {r.get('window', '?')}  rafShare {r.get('rafShare', '?')}  jank {r.get('jankFrames', '?')}  worst gap {r.get('worstGapMs', '?')} ms")
     origins = {}
     for _, r in reports:
-        for t in r["top"]:
-            agg = origins.setdefault(t["origin"], [0, 0])
-            agg[0] += t["ms"]
-            agg[1] += t["calls"]
+        for t in r.get("top", []):
+            agg = origins.setdefault(t.get("origin", "?"), [0, 0])
+            agg[0] += t.get("ms", 0)
+            agg[1] += t.get("calls", 0)
     print("\ncallbacks that took the most time overall:")
     for origin, (ms, calls) in sorted(origins.items(), key=lambda kv: -kv[1][0])[: args.top]:
-        print(f"  {ms:>8} ms  {calls:>7} calls  avg {ms / calls:5.1f}  {origin[:170]}")
+        print(f"  {ms:>8} ms  {calls:>7} calls  avg {ms / max(calls, 1):5.1f}  {origin[:170]}")
 
 
 def build_parser():

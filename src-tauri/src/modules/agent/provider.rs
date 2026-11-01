@@ -174,15 +174,22 @@ fn claude_projects_root() -> PathBuf {
         .join("projects")
 }
 
+/// The transcript file name of a session id, or None when the id could point outside a folder: it
+/// comes from the hook payload and is joined into a path.
+fn claude_transcript_name(session_id: &str) -> Option<String> {
+    crate::modules::pty::hook_router::is_safe_tab_id(session_id).then(|| format!("{session_id}.jsonl"))
+}
+
 fn find_in_claude_projects(session_id: &str, transcript_path: &str) -> Option<PathBuf> {
     let tp = PathBuf::from(transcript_path);
     if tp.exists() {
         return Some(tp);
     }
+    let name = claude_transcript_name(session_id)?;
     let root = claude_projects_root();
     if let Ok(entries) = std::fs::read_dir(&root) {
         for entry in entries.flatten() {
-            let candidate = entry.path().join(format!("{session_id}.jsonl"));
+            let candidate = entry.path().join(&name);
             if candidate.exists() {
                 return Some(candidate);
             }
@@ -669,6 +676,17 @@ const CLAUDE_KEEP_WITH_VALUE: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_session_id_that_could_leave_the_folder_names_no_transcript() {
+        assert_eq!(
+            super::claude_transcript_name("0a1b2c3d-4e5f-6789-abcd-ef0123456789").as_deref(),
+            Some("0a1b2c3d-4e5f-6789-abcd-ef0123456789.jsonl")
+        );
+        for bad in ["", "../x", "a/b", "..", "a\\b", "/etc/passwd", "a.b", "x\0y"] {
+            assert_eq!(super::claude_transcript_name(bad), None, "{bad:?}");
+        }
+    }
+
     use super::super::launch_cmd::DEFAULT_AGENTS;
     use super::*;
 
