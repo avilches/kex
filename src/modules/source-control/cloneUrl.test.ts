@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafeGitCloneUrl } from "./cloneUrl";
+import { cloneCommand, isSafeGitCloneUrl } from "./cloneUrl";
 
 describe("isSafeGitCloneUrl", () => {
   it("accepts valid https, ssh and scp-like URLs", () => {
@@ -36,5 +36,12 @@ describe("isSafeGitCloneUrl", () => {
   it("rejects empty input", () => {
     expect(isSafeGitCloneUrl("")).toBe(false);
     expect(isSafeGitCloneUrl("   ")).toBe(false);
+  });
+});
+
+describe("cloneCommand", () => {
+  it("quotes the URL so shell metacharacters the whitelist lets through stay literal", () => {
+    expect(cloneCommand("https://x/repo.git")).toBe("git clone 'https://x/repo.git' .");
+    expect(cloneCommand(" https://x/a*b?c[d]!e~f#g ")).toBe("git clone 'https://x/a*b?c[d]!e~f#g' .");
   });
 });
