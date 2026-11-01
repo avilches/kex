@@ -125,6 +125,14 @@ export function adoptActionAt(
   return { list: next, stored, merged: false };
 }
 
+// Puts an action back at the place it had, clamped to the list: -1 or a missing place goes last.
+export function insertActionAt(list: readonly Action[], action: Action, index: number): Action[] {
+  if (list.some((a) => a.id === action.id)) return [...list];
+  const next = [...list];
+  next.splice(index < 0 || index > next.length ? next.length : index, 0, action);
+  return next;
+}
+
 // Moves, never copies: the action leaves the workspace and joins the global list.
 export function promoteToGlobal(
   workspace: readonly Action[],

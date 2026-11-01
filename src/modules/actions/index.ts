@@ -2,6 +2,7 @@ export {
   addAction,
   adoptAction,
   adoptActionAt,
+  insertActionAt,
   normalizeAction,
   normalizeActions,
   promoteToGlobal,
