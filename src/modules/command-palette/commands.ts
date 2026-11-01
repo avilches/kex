@@ -107,6 +107,7 @@ export type CommandPaletteActionContext = {
   toggleZenMode: () => void;
   hasActiveTerminal: boolean;
   hibernated: boolean;
+  onboardingOpen: boolean;
   activePaneTabCount: number;
   hasActiveTab: boolean;
   hasActiveTabTitle: boolean;
@@ -126,6 +127,17 @@ export type CommandPaletteActionContext = {
 };
 
 const noop = () => {};
+
+const OPENS_SETTINGS = ["settings.open", "shortcuts.open", "workspace.runScripts"];
+
+// While an onboarding dialog is open no window may start a second one, and Settings stays closed.
+export function commandBlockedByOnboarding(commandId: string): boolean {
+  return (
+    commandId === "window.new" ||
+    OPENS_SETTINGS.includes(commandId) ||
+    commandId.startsWith("settings.section.")
+  );
+}
 
 export function createCommandItems(
   ctx: CommandPaletteActionContext,
@@ -441,9 +453,13 @@ export function createCommandItems(
     icon: section.icon,
     run: () => ctx.openSettingsSection(section.id),
   }));
-  const all = [...base, ...generated, ...settings];
-  if (!ctx.hibernated) return all;
-  return all.map((item) =>
-    commandBlockedWhileHibernated(item.id) ? { ...item, disabledReason: "Tab hibernated" } : item,
-  );
+  return [...base, ...generated, ...settings].map((item) => {
+    if (ctx.onboardingOpen && commandBlockedByOnboarding(item.id)) {
+      return { ...item, disabledReason: "Setup in progress" };
+    }
+    if (ctx.hibernated && commandBlockedWhileHibernated(item.id)) {
+      return { ...item, disabledReason: "Tab hibernated" };
+    }
+    return item;
+  });
 }

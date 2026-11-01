@@ -39,7 +39,7 @@
 
 - Create `src-tauri/src/modules/permissions.rs`: sondeo de acceso a carpetas y apertura del panel de Privacidad.
 - Modify `src-tauri/src/modules/mod.rs`, `src-tauri/src/lib.rs`: registrar modulo y comandos.
-- Modify `src-tauri/Info.plist`, `src-tauri/entitlements.plist`: quitar camara y microfono, anadir textos de carpetas.
+- Modify `src-tauri/Info.plist`, `src-tauri/entitlements.plist`: anadir textos de carpetas. (Esta tarea quitaba tambien camara y microfono; se restauraron despues, porque macOS atribuye a Kex lo que pide un programa lanzado en sus terminales y sin ellos se lo deniega sin avisar.)
 - Create `src/modules/agents/lib/agentRows.ts` (+ test): catalogo de agentes conocidos y estado de fila.
 - Create `src/modules/agents/lib/bulkIntegration.ts` (+ test): plan y ejecucion de Install all / Uninstall all.
 - Create `src/modules/agents/lib/startupSync.ts` (+ test): que sincroniza el arranque.
@@ -87,6 +87,8 @@
 - Modify: `src-tauri/Info.plist`, `src-tauri/entitlements.plist`
 
 **Interfaces:** ninguna.
+
+> Revertido en parte despues: camara y microfono se restauraron en los dos ficheros, con texto de Kex (ver el punto 5 del alcance de la spec). Los pasos de abajo describen lo que se hizo entonces.
 
 - [ ] **Step 1: Editar `Info.plist`**: quitar `NSCameraUsageDescription` y `NSMicrophoneUsageDescription`; anadir `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` y `NSDownloadsFolderUsageDescription` con un texto de una frase que diga que los terminales y agentes de Kex necesitan leer esa carpeta. Sin la palabra Terax.
 - [ ] **Step 2: Editar `entitlements.plist`**: quitar las claves de camara y microfono; si el diccionario queda vacio dejar `<dict/>` (el fichero lo referencia `tauri.conf.json`).
@@ -236,7 +238,7 @@
 
 Comportamiento:
 - `OnboardingHost`, una vez hidratadas las preferencias, evalua `startupAction`: `openModal` abre el modal y guarda `shown: true`; `remind` muestra un unico toast "Finish setting up Kex" con accion "Continue" que abre el modal, y guarda `reminded: true`; `none` no hace nada.
-- El modal tiene barra de progreso (`@/components/ui/progress`), botones Back / Next / Skip y siempre "Continue later". "Continue later" cierra sin cambiar `step` (queda en el paso actual, que se guarda en cada cambio con `updateOnboarding`). Terminar en `done`, o descartar desde la chip, llama a `finish`.
+- El modal tiene barra de progreso (`@/components/ui/progress`), botones Back / Next y siempre "Continue later" (tuvo tambien un Skip, que hacia lo mismo que Next y se quito). "Continue later" cierra sin cambiar `step` (queda en el paso actual, que se guarda en cada cambio con `updateOnboarding`). Terminar en `done`, o descartar desde la chip, llama a `finish`.
 - Paso Style: dos opciones (JetBrains, VS Code) que aplican `STYLE_PRESETS` con los dos setters; la opcion marcada sale de los valores actuales.
 - Paso Permissions solo si `IS_MAC`; paso Agents: filas de agentes (mismos componentes que Settings) y "Install all".
 - `OnboardingChip`: visible si `showChip`; texto `chipLabel`; clic abre el modal en `state.step`; un menu pequeno ofrece "Dismiss setup" (`finish`).

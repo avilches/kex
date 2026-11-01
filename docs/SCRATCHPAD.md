@@ -120,7 +120,7 @@ cautionary examples above.
 | Notification/agent jump | `src/app/App.tsx` : `notifications.jumpToLast` shortcut handler and `onActivateAgent` (used by the notification bell and agent list) both call `requestLeafFocus` explicitly after `onActivateTabStable`, wrapped in a `setTimeout(..., 50)` to run after the tab has mounted |
 | Workspace switch | `src/app/App.tsx`: the `prevWorkspaceIdRef` effect (`requestAnimationFrame(() => requestLeafFocus(tabId))`) |
 | OS window regains focus (Cmd+Tab back, modal window closing) | `src/app/App.tsx`: the `getCurrentWindow().onFocusChanged` effect |
-| Chrome (dropdown/dialog/context menu) closes | `src/app/App.tsx` : `restoreLeafFocus`, wired as `onRestoreFocus` into `ActionsBar.tsx` (its Scripts and Apps menus) and `WorkspaceBar.tsx`'s workspace context menu (`onCloseAutoFocus`) |
+| Chrome (dropdown/dialog/context menu) closes | `src/app/App.tsx` : `restoreLeafFocus`, wired as `onRestoreFocus` into `ActionsBar.tsx` (its Scripts and Apps menus), `WorkspaceBar.tsx`'s workspace context menu (`onCloseAutoFocus`), and the onboarding dialog (`onCloseAutoFocus` of `OnboardingDialog`, passed through `OnboardingHost`, on every way it closes) |
 | Tab-close confirmation queue finishes (dirty editor / running-process dialog, or no dialog at all) | `src/app/App.tsx` : `focusActiveTab`, passed as `focusActiveTab` into `useTabCloseGuards` (`src/app/hooks/useTabCloseGuards.ts`), called in the `finally` block of its close queue |
 | Notification bell closes | `src/app/App.tsx`: the `bellOpen`/`bellWasOpen` effect |
 | Click the already-active workspace in the WorkspaceBar | `src/app/components/WorkspaceBar.tsx`: `onClick={() => { if (active) onRestoreFocus(); ... }}` |

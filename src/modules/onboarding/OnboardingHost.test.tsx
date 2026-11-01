@@ -21,21 +21,24 @@ vi.mock("@/modules/settings/store", async (orig) => {
     },
   };
 });
-const claim = vi.hoisted(() => ({ won: true, calls: 0 }));
+const claim = vi.hoisted(() => ({ won: true, calls: 0, granted: true }));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (cmd: string) => {
+    if (cmd === "set_onboarding_open") return Promise.resolve(claim.granted);
     if (cmd !== "claim_onboarding_startup") return Promise.resolve(undefined);
     claim.calls += 1;
     return Promise.resolve(claim.won);
   },
 }));
-const restartListener = vi.hoisted(() => ({ fire: () => {} }));
-vi.mock("@tauri-apps/api/event", () => ({
-  emit: () => Promise.resolve(),
-  listen: (_: string, cb: () => void) => {
-    restartListener.fire = cb;
-    return Promise.resolve(() => {});
-  },
+const restartListener = vi.hoisted(() => ({ event: "", fire: () => {} }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    listen: (event: string, cb: () => void) => {
+      restartListener.event = event;
+      restartListener.fire = cb;
+      return Promise.resolve(() => {});
+    },
+  }),
 }));
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -66,6 +69,7 @@ async function mountHydrated() {
 beforeEach(() => {
   claim.won = true;
   claim.calls = 0;
+  claim.granted = true;
   toast.mockClear();
   closeOnboarding();
 });
@@ -101,7 +105,7 @@ describe("OnboardingHost", () => {
 
     const options = toast.mock.calls[0][1] as { action: { label: string; onClick: () => void } };
     expect(options.action.label).toBe("Continue");
-    act(() => options.action.onClick());
+    await act(async () => options.action.onClick());
     expect(useOnboardingUi.getState().open).toBe(true);
 
     cleanup();
@@ -142,7 +146,16 @@ describe("OnboardingHost", () => {
     setOnboarding({ finished: true, shown: true });
     await mountHydrated();
     expect(useOnboardingUi.getState().open).toBe(false);
-    act(() => restartListener.fire());
+    expect(restartListener.event).toBe("kex:onboarding-restart");
+    await act(async () => restartListener.fire());
     expect(useOnboardingUi.getState().open).toBe(true);
+  });
+
+  it("a restart request in a window that does not get the block opens no dialog", async () => {
+    setOnboarding({ finished: true, shown: true });
+    await mountHydrated();
+    claim.granted = false;
+    await act(async () => restartListener.fire());
+    expect(useOnboardingUi.getState().open).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ import { type BulkKind, type BulkResult, planBulk, runBulk } from "@/modules/age
 import {
   AGENT_LABELS,
   type AgentId,
+  INTEGRATION_BUSY_JITTER_MS,
   INTEGRATION_MIN_BUSY_MS,
   type IntegrationStatus,
 } from "@/modules/agents/lib/integrations";
@@ -26,7 +27,8 @@ import { Notification03Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { AgentIntegrationRow } from "./AgentIntegrationRow";
 import { AgentStatusRow } from "./AgentStatusRow";
 
-const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS };
+const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS, busyJitterMs: INTEGRATION_BUSY_JITTER_MS };
+const STAGGERED = { staggered: true };
 
 const FILES: Record<AgentId, string[]> = {
   codex: ["~/.codex/hooks.json", "~/.codex/config.toml"],
@@ -87,7 +89,7 @@ export function AgentIntegrations() {
     setBulkBusy(true);
     try {
       const result = await runBulk(kind, rowStates, async (a) => {
-        const ok = await (kind === "install" ? stateOf[a].install() : stateOf[a].remove());
+        const ok = await (kind === "install" ? stateOf[a].install(STAGGERED) : stateOf[a].remove(STAGGERED));
         if (!ok) throw new Error(`${a} failed`);
       });
       const text = bulkSummary(kind, result);
@@ -114,15 +116,7 @@ export function AgentIntegrations() {
           text="Undo a closed tab or hibernate one without losing your session transcript."
         />
       </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          className="h-8 px-2.5 text-[11px]"
-          disabled={installPlan.length === 0 || bulkBusy}
-          onClick={() => void installAll()}
-        >
-          Install all
-        </Button>
+      <div className="flex justify-end gap-2">
         <Button
           size="sm"
           variant="destructive"
@@ -131,6 +125,14 @@ export function AgentIntegrations() {
           onClick={() => setConfirmingRemove(true)}
         >
           Uninstall all
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 px-2.5 text-[11px]"
+          disabled={installPlan.length === 0 || bulkBusy}
+          onClick={() => void installAll()}
+        >
+          Install all
         </Button>
       </div>
       <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border/60 bg-card/60">

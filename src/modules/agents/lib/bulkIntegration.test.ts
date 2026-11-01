@@ -43,4 +43,41 @@ describe("runBulk", () => {
     const r = await runBulk("install", states, async () => {});
     expect(r.skipped).toEqual(["codex", "omp", "pi"]);
   });
+  it("starts every run before the first one finishes", async () => {
+    const all: Partial<Record<AgentId, RowState>> = {
+      claude: { kind: "missing" },
+      codex: { kind: "missing" },
+      opencode: { kind: "missing" },
+    };
+    const started: AgentId[] = [];
+    const finish: Partial<Record<AgentId, (ok: boolean) => void>> = {};
+    const run = (a: AgentId) =>
+      new Promise<void>((resolve, reject) => {
+        started.push(a);
+        finish[a] = (ok) => (ok ? resolve() : reject(new Error(a)));
+      });
+    const pending = runBulk("install", all, run);
+    await Promise.resolve();
+    expect(started).toEqual(["claude", "codex", "opencode"]);
+    finish.opencode?.(true);
+    finish.claude?.(false);
+    finish.codex?.(true);
+    const r = await pending;
+    expect(r).toEqual({ done: ["codex", "opencode"], failed: ["claude"], skipped: [] });
+  });
+  it("a rejection does not stop the others and failures keep the agent order", async () => {
+    const all: Partial<Record<AgentId, RowState>> = {
+      claude: { kind: "installed" },
+      codex: { kind: "installed" },
+      opencode: { kind: "installed" },
+      pi: { kind: "missing" },
+    };
+    const ran: AgentId[] = [];
+    const r = await runBulk("remove", all, async (a) => {
+      ran.push(a);
+      if (a !== "codex") throw new Error(a);
+    });
+    expect(ran).toEqual(["claude", "codex", "opencode"]);
+    expect(r).toEqual({ done: ["codex"], failed: ["claude", "opencode"], skipped: ["pi"] });
+  });
 });

@@ -63,6 +63,11 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("claim_seed_lease", "process-wide lease, one mutex"),
     ("release_seed_lease", "process-wide lease, one mutex"),
     ("claim_onboarding_startup", "process-wide flag"),
+    (
+        "set_onboarding_open",
+        "a value in memory, and the menu and window APIs when the block changes",
+    ),
+    ("request_onboarding_restart", "emits an event"),
     ("claim_update_check", "process-wide flag"),
     ("claim_update_install", "process-wide flag"),
     ("release_update_install", "process-wide flag"),

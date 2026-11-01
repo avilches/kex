@@ -178,6 +178,8 @@ export const native = {
       workspace: currentWorkspaceEnv(),
     }),
   openMainWindow: () => invoke<void>("open_main_window"),
+  setOnboardingOpen: (open: boolean) => invoke<boolean>("set_onboarding_open", { open }),
+  requestOnboardingRestart: () => invoke<void>("request_onboarding_restart"),
   readFile: (path: string) =>
     invoke<ReadResult>("fs_read_file", {
       path,

@@ -56,6 +56,13 @@ export function fromCodexStatus(status: CodexStatus): IntegrationStatus {
 /** How long Install and Uninstall show their busy state at least, so a fast write is still seen. */
 export const INTEGRATION_MIN_BUSY_MS = 500;
 
+/** Extra busy time each row draws once, so the rows of an Install all do not all finish together. */
+export const INTEGRATION_BUSY_JITTER_MS = 400;
+
+export function busyMsFor(base: number, jitter: number, rand: () => number): number {
+  return base + Math.floor(rand() * jitter);
+}
+
 export function isIntegrationAgent(value: unknown): value is IntegrationAgent {
   return typeof value === "string" && (INTEGRATION_AGENTS as readonly string[]).includes(value);
 }

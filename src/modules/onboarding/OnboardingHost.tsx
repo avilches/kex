@@ -1,6 +1,6 @@
 import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { startupAction, withReminded, withShown } from "./lib/onboardingState";
@@ -12,7 +12,7 @@ function remind(): void {
   toast("Finish setting up Kex", {
     id: "onboarding-reminder",
     description: "Only a few steps left. Pick up right where you stopped.",
-    action: { label: "Continue", onClick: openOnboarding },
+    action: { label: "Continue", onClick: () => void openOnboarding() },
     duration: 15_000,
     closeButton: true,
   });
@@ -21,7 +21,7 @@ function remind(): void {
 // Until hydration the stored state is the default, which says finished, so deciding earlier
 // would never show anything. Only the window that wins the per-process claim decides, so
 // restored or new windows never repeat the modal or eat the reminder of the next launch.
-export function OnboardingHost() {
+export function OnboardingHost({ onRestoreFocus }: { onRestoreFocus?: () => void }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -31,7 +31,7 @@ export function OnboardingHost() {
       if (!won || cancelled) return;
       const action = startupAction(usePreferencesStore.getState().onboarding);
       if (action === "openModal") {
-        openOnboarding();
+        void openOnboarding();
         persistOnboarding(withShown);
       } else if (action === "remind") {
         remind();
@@ -46,17 +46,17 @@ export function OnboardingHost() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let alive = true;
-    void listen(ONBOARDING_RESTART_EVENT, () => {
-      if (document.visibilityState === "visible") openOnboarding();
-    }).then((fn) => {
-      if (alive) unlisten = fn;
-      else fn();
-    });
+    void getCurrentWindow()
+      .listen(ONBOARDING_RESTART_EVENT, () => void openOnboarding())
+      .then((fn) => {
+        if (alive) unlisten = fn;
+        else fn();
+      });
     return () => {
       alive = false;
       unlisten?.();
     };
   }, []);
 
-  return <OnboardingDialog />;
+  return <OnboardingDialog onRestoreFocus={onRestoreFocus} />;
 }
