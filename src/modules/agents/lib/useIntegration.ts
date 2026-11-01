@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { agentStatus, installAgent, removeAgent } from "./agentIntegration";
+import { AgentNotDetectedError, agentStatus, installAgent, removeAgent } from "./agentIntegration";
 import { type AgentId, blockOf, type IntegrationBlock, type IntegrationStatus } from "./integrations";
 
 export type IntegrationState = {
@@ -9,6 +9,8 @@ export type IntegrationState = {
   blocked: IntegrationBlock | null;
   busy: boolean;
   failed: boolean;
+  /** Set when the last action failed because the agent is not on this machine. */
+  notFound: string | null;
   /** Resolve to whether the write worked; a failure also sets `failed`. */
   install: () => Promise<boolean>;
   remove: () => Promise<boolean>;
@@ -26,6 +28,7 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [notFound, setNotFound] = useState<string | null>(null);
   const agentRef = useRef(agent);
   agentRef.current = agent;
 
@@ -40,6 +43,7 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
   const run = async (action: (agent: AgentId) => Promise<void>, expected: IntegrationStatus): Promise<boolean> => {
     setBusy(true);
     setFailed(false);
+    setNotFound(null);
     try {
       await Promise.all([action(agentRef.current), wait(minBusyMs)]);
       setStatus(expected);
@@ -47,6 +51,7 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
     } catch (e) {
       console.error(`[kex] integration ${agentRef.current} failed:`, e);
       setFailed(true);
+      setNotFound(e instanceof AgentNotDetectedError ? e.message : null);
       refresh();
       return false;
     } finally {
@@ -59,6 +64,7 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
     blocked: blockOf(status),
     busy,
     failed,
+    notFound,
     install: () => run(installAgent, "installed"),
     remove: () => run(removeAgent, "missing"),
     refresh,

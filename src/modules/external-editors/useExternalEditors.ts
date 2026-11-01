@@ -66,9 +66,20 @@ async function seedActions(merged: DetectedEditor[]): Promise<void> {
   }
 }
 
-/** Run a full editor scan and persist results, preserving user-set enabled flags. */
-export async function runEditorScan(): Promise<void> {
-  if (scanning) return;
+let inflight: Promise<DetectedEditor[] | null> | null = null;
+
+/**
+ * Run a full editor scan and persist results, preserving user-set enabled flags. Resolves to the
+ * detected list, or null when the scan failed; a call during a scan joins it.
+ */
+export function runEditorScan(): Promise<DetectedEditor[] | null> {
+  inflight ??= scanOnce().finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
+
+async function scanOnce(): Promise<DetectedEditor[] | null> {
   scanning = true;
   notifyScanning();
   try {
@@ -78,8 +89,10 @@ export async function runEditorScan(): Promise<void> {
     const merged = mergeEnabled(result, existing);
     await setDetectedEditors(merged);
     await seedActions(merged);
+    return merged;
   } catch (e) {
     console.error("editor_scan failed:", e);
+    return null;
   } finally {
     scanning = false;
     notifyScanning();

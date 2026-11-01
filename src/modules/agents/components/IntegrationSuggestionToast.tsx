@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { suppressIntegrationToast } from "@/modules/onboarding/lib/onboardingState";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { readIntegrationSuggestions, updateIntegrationSuggestions } from "@/modules/settings/store";
-import { agentStatus, installAgent } from "../lib/agentIntegration";
+import { agentStatus, installAgent, installErrorText } from "@/modules/agents/lib/agentIntegration";
 import { AgentIcon } from "../lib/agentIcon";
 import { createIntegrationSuggester } from "../lib/integrationSuggestionFlow";
 import { AGENT_LABELS, type AgentId } from "../lib/integrations";
@@ -19,7 +19,7 @@ export async function installWithToast(agent: AgentId): Promise<void> {
     toast.success(`${name} integration installed`);
   } catch (e) {
     console.error(`[kex] installing the ${agent} integration failed:`, e);
-    toast.error(`Could not install the ${name} integration`);
+    toast.error(installErrorText(e, `Could not install the ${name} integration`));
   }
 }
 

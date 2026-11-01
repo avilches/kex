@@ -26,7 +26,7 @@ import {
   getSnapshot as getOscTitlesSnapshot,
   subscribe as subscribeOscTitles,
 } from "@/modules/terminal/lib/oscTitleStore";
-import { installAgent } from "@/modules/agents/lib/agentIntegration";
+import { installAgent, installErrorText } from "@/modules/agents/lib/agentIntegration";
 import { type AgentEntry, buildAgentEntries } from "../lib/notificationList";
 import { AgentIcon } from "../lib/agentIcon";
 import { useAgentStore } from "../store/agentStore";
@@ -37,6 +37,7 @@ type Props = {
 };
 
 const RELATIVE_TIME_TICK_MS = 30_000;
+const CLAUDE_INSTALL_ERROR = "Could not update Claude Code config.";
 
 function relativeTime(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -97,6 +98,7 @@ export function NotificationBell({ onActivate }: Props) {
   const setOpen = useBellStore((s) => s.setOpen);
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState<"claude" | null>(null);
+  const [claudeError, setClaudeError] = useState<string | null>(null);
   const opencode = useIntegration("opencode");
   const omp = useIntegration("omp");
   const pi = useIntegration("pi");
@@ -158,11 +160,13 @@ export function NotificationBell({ onActivate }: Props) {
 
   const enableClaudeHooks = async () => {
     setInstalling("claude");
+    setClaudeError(null);
     try {
       await installAgent("claude");
       setHooksReady(true);
     } catch (e) {
       console.error("[kex] agent_enable_claude_hooks failed:", e);
+      setClaudeError(installErrorText(e, CLAUDE_INSTALL_ERROR));
       setHooksReady(false);
     } finally {
       setInstalling(null);
@@ -269,7 +273,7 @@ export function NotificationBell({ onActivate }: Props) {
             </button>
             {hooksReady === false && installing === null ? (
               <p className="px-2 pt-1 text-[11px] text-destructive">
-                Could not update Claude Code config.
+                {claudeError ?? CLAUDE_INSTALL_ERROR}
               </p>
             ) : null}
           </div>
@@ -336,7 +340,7 @@ export function BellIntegrationRow({
       </button>
       {state.failed && !state.busy ? (
         <p className="px-2 pt-1 text-[11px] text-destructive">
-          Could not write the {name} integration.
+          {state.notFound ?? `Could not write the ${name} integration.`}
         </p>
       ) : null}
     </div>

@@ -41,7 +41,7 @@ type Props = {
 };
 
 export function AgentIntegrationRow({ agent, name, files, state, detected }: Props) {
-  const { ready, blocked, busy, failed, install, remove, refresh } = state;
+  const { ready, blocked, busy, failed, notFound, install, remove, refresh } = state;
   const [previewing, setPreviewing] = useState(false);
   const [justChanged, setJustChanged] = useState(false);
   const previous = useRef(ready);
@@ -159,7 +159,7 @@ export function AgentIntegrationRow({ agent, name, files, state, detected }: Pro
       )}
       {failed && (
         <p className="px-3 pb-2 text-[11px] text-destructive">
-          Could not change the {name} integration. Check the permissions of {files.join(", ")}.
+          {notFound ?? `Could not change the ${name} integration. Check the permissions of ${files.join(", ")}.`}
         </p>
       )}
       <IntegrationDiffDialog

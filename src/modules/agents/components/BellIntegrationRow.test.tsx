@@ -16,6 +16,7 @@ function state(over: Partial<IntegrationState> = {}): IntegrationState {
     blocked: null,
     busy: false,
     failed: false,
+    notFound: null,
     install: vi.fn(() => Promise.resolve(true)),
     remove: vi.fn(() => Promise.resolve(true)),
     refresh: vi.fn(),
@@ -52,6 +53,18 @@ describe("BellIntegrationRow", () => {
   it("explains a failed install", () => {
     render(<BellIntegrationRow agent="opencode" name="OpenCode" state={state({ failed: true })} />);
     expect(screen.getByText(/Could not write the OpenCode integration/)).toBeTruthy();
+  });
+
+  it("says the agent was not found instead of a write failure", () => {
+    render(
+      <BellIntegrationRow
+        agent="pi"
+        name="Pi"
+        state={state({ failed: true, notFound: "Pi was not found on this machine" })}
+      />,
+    );
+    expect(screen.getByText("Pi was not found on this machine")).toBeTruthy();
+    expect(screen.queryByText(/Could not write/)).toBeNull();
   });
 
   it("offers Codex like the other agents while its hooks are missing", () => {

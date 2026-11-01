@@ -295,7 +295,11 @@ Cuanto molesta, en cifras. Por agente, y solo si su integracion falta:
 
 "Installed at any moment" means any path: the toast, Settings, the bell. They all go through `installAgent`
 (`lib/agentIntegration.ts`), the single install path, which records `installedOnce` after the write succeeded (a failure
-to record it is only logged, since the install itself worked). The startup repair of Claude Code hooks in `main.tsx`
+to record it is only logged, since the install itself worked). It refuses an agent that is not detected, but the scan
+runs once per launch, so an agent installed after Kex started would be refused while the toast says it is running:
+on a miss `installAgent` runs `runEditorScan` once (joining a scan already in flight) and checks its result. Only if
+the agent is still missing does it throw `AgentNotDetectedError`, before writing anything, and the toast, the bell
+and Settings show its message ("Pi was not found on this machine") instead of a write failure. The startup repair of Claude Code hooks in `main.tsx`
 calls `agent_enable_claude_hooks` directly and records nothing; the next `started` signal then finds the status
 `installed` and records it.
 
