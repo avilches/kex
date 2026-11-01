@@ -721,16 +721,13 @@ export function FsUpRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <button
+        <div
           ref={setNodeRef}
           {...listeners}
           {...attributes}
           onMouseDown={keepScratchpadFocus}
-          type="button"
-          onClick={() => onNavigateUp?.()}
-          title="Go up one folder"
           className={cn(
-            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
+            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85",
             isDragging && "opacity-50",
           )}
           style={{ paddingLeft: 6 }}
@@ -745,11 +742,17 @@ export function FsUpRow({
             className="shrink-0 text-muted-foreground"
           />
           <span className="min-w-0 truncate">..</span>
-          <span className="pointer-events-none hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground group-hover:inline">
+          <button
+            type="button"
+            title="Go up one folder"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onNavigateUp?.()}
+            className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+          >
             Go to parent
-          </span>
+          </button>
           <span className="flex-1" />
-        </button>
+        </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
         {onRevealInTerminal && (
