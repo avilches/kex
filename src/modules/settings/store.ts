@@ -19,6 +19,7 @@ import {
   type IntegrationAgent,
 } from "@/modules/agents/lib/integrations";
 import { parseSuggestions, type SuggestionMap } from "@/modules/agents/lib/integrationSuggestion";
+import { parseOnboarding, type OnboardingState } from "@/modules/onboarding/lib/onboardingState";
 import {
   parseAutoHibernate,
   type AutoHibernate,
@@ -208,6 +209,7 @@ export type Preferences = {
   agentNotifications: boolean;
   installedIntegrations: IntegrationAgent[];
   integrationSuggestions: SuggestionMap;
+  onboarding: OnboardingState;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
@@ -285,6 +287,7 @@ const KEY_PALETTE_WIDTH = "paletteWidth";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
 const KEY_INTEGRATION_SUGGESTIONS = "integrationSuggestions";
+const KEY_ONBOARDING = "onboarding";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -484,6 +487,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   agentNotifications: true,
   installedIntegrations: [],
   integrationSuggestions: {},
+  onboarding: { finished: true, step: "welcome", shown: true, reminded: true },
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
@@ -594,6 +598,7 @@ export async function loadPreferences(): Promise<Preferences> {
   // share unprefixed key names (fontFamily, fontSize, letterSpacing, lineHeight,
   // cursorBlink, cursorStyle) and general vs editor both use "theme", so a single
   // merged map would let one store's value silently overwrite another's.
+  const hadStoredPrefs = entries.length > 0;
   const generalMap = new Map<string, unknown>(entries);
   const terminalMap = new Map<string, unknown>(terminalEntries);
   const editorMap = new Map<string, unknown>(editorEntries);
@@ -721,6 +726,7 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.agentNotifications,
     installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
     integrationSuggestions: parseSuggestions(getGeneral<unknown>(KEY_INTEGRATION_SUGGESTIONS)),
+    onboarding: parseOnboarding(getGeneral<unknown>(KEY_ONBOARDING), hadStoredPrefs),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -849,6 +855,8 @@ export async function loadPreferences(): Promise<Preferences> {
   const configDefaults: [string, unknown][] = [];
   if (!generalMap.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!generalMap.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
+  // Persisted on first load: the defaults above make the next launch look like it had prior prefs.
+  if (!generalMap.has(KEY_ONBOARDING)) configDefaults.push([KEY_ONBOARDING, result.onboarding]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
@@ -1346,6 +1354,21 @@ export function updateIntegrationSuggestions(
   return run;
 }
 
+// Read-change-write for the onboarding state: the dialog and the chip may write it from different windows.
+let onboardingQueue: Promise<unknown> = Promise.resolve();
+
+export function updateOnboarding(
+  change: (current: OnboardingState) => OnboardingState,
+): Promise<void> {
+  const run = onboardingQueue.then(async () => {
+    const stored = await store.get<unknown>(KEY_ONBOARDING);
+    const current = parseOnboarding(stored, true);
+    await writePref(KEY_ONBOARDING, change(current));
+  });
+  onboardingQueue = run.catch(() => undefined);
+  return run;
+}
+
 export async function readIntegrationSuggestions(): Promise<SuggestionMap> {
   return parseSuggestions(await store.get<unknown>(KEY_INTEGRATION_SUGGESTIONS));
 }
@@ -1389,6 +1412,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
   [KEY_INTEGRATION_SUGGESTIONS]: "integrationSuggestions",
+  [KEY_ONBOARDING]: "onboarding",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
