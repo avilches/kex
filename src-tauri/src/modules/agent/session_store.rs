@@ -594,6 +594,15 @@ fn record_session_at_path_with(
             valid_existing = Some(s);
         }
     }
+    // A main file that exists but does not parse must not make the store start empty: the write
+    // below would leave one tab and the next write would back that file up over the good .bak.
+    // Start from the .bak; nothing is backed up this round.
+    if valid_existing.is_none() && existing_content.is_some() {
+        if let Some(recovered) = read_backup_store(path) {
+            log::warn!("[agent-session] record: main store unreadable, starting from backup");
+            store = recovered;
+        }
+    }
     // A child agent launched inside the tab (by the agent working there or by a script)
     // inherits KEX_TAB_ID through the environment, so its SessionStart names this tab but
     // brings no launch line and, with a different session id, must not take the record from
@@ -2245,6 +2254,51 @@ mod tests {
         let after: SessionStore =
             serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(after.tabs.contains_key("tab-2"));
+    }
+
+    #[test]
+    fn record_session_at_path_starts_from_backup_when_main_file_is_corrupt() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("session.jsonl");
+        let cwd_launch = dir.path().join("project");
+        let store_path = dir.path().join("agent-sessions.json");
+        let valid = SessionStore {
+            version: 1,
+            tabs: sample_tabs(&cwd_launch, &jsonl),
+        };
+        let valid_tabs = valid.tabs.len();
+        assert!(valid_tabs >= 1);
+        std::fs::write(
+            store_path.with_extension("json.bak"),
+            serde_json::to_string_pretty(&valid).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(&store_path, "{ not valid json").unwrap();
+
+        record_session_at_path(
+            &store_path,
+            "tab-new",
+            "claude",
+            "n-1",
+            "/tmp/n.jsonl",
+            "/tmp/p",
+        );
+        assert_eq!(read_store(&store_path).tabs.len(), valid_tabs + 1);
+
+        record_session_at_path(
+            &store_path,
+            "tab-new2",
+            "claude",
+            "n-2",
+            "/tmp/n2.jsonl",
+            "/tmp/p",
+        );
+        let bak = read_store(&store_path.with_extension("json.bak"));
+        assert_eq!(
+            bak.tabs.len(),
+            valid_tabs + 1,
+            "the backup must keep every recovered tab"
+        );
     }
 
     fn plan(tab: &str) -> RestorePlan {
