@@ -144,4 +144,17 @@ Solo con `pnpm tauri dev` (el modulo se carga detras de `import.meta.env.DEV`, u
 
 ## Settings > Permissions (solo macOS)
 
-Seccion `permissions`, justo despues de `agents`, con `PermissionsList` de `src/modules/permissions/` (la misma lista que usa el onboarding). Su entrada en `SETTINGS_SECTIONS` lleva `macOnly: true`: `SettingsApp` la quita de la barra lateral fuera de macOS y `parseSectionParam` cae a `general` si se pide `permissions` alli. El lado Rust de `open_settings_window` no valida el nombre de la seccion, asi que no hay lista que tocar.
+Seccion `permissions`, justo despues de `agents`, con `PermissionsList` de `src/modules/permissions/` (la misma lista que usa el onboarding). Su entrada en `SETTINGS_SECTIONS` lleva `macOnly: true`; `availableSections()` (`modules/settings/sections.ts`) filtra esas entradas fuera de macOS y es lo que usan `SettingsApp` (barra lateral y `parseSectionParam`, que cae a `general` si se pide `permissions` alli) y la paleta de comandos (`commands.ts`), asi que tampoco sale una fila "Permissions settings" fuera de macOS. El lado Rust de `open_settings_window` no valida el nombre de la seccion, asi que no hay lista que tocar.
+
+## Settings > General > Agents: filas con estado
+
+`AgentIntegrations.tsx` recorre `KNOWN_AGENTS` (`modules/agents/lib/agentRows.ts`): primero los cinco con integracion (Codex, Claude Code, OpenCode, OMP, Pi) y luego los que solo se detectan (Antigravity, OpenClaude, Grok, Aider, Goose, Cursor Agent). La deteccion sale de `detectedEditors` (hook `useDetectedAgentIds`), no de consultar el PATH al abrir Settings. Cada fila muestra uno de estos estados (`RowState`, `rowStateOf`):
+
+- **Not detected**: el agente no esta en la maquina. Lleva una pista y ningun boton (ni Install ni Preview), porque `installAgent` lo rechazaria (`AgentNotDetectedError`).
+- **Detected**: el agente esta pero Kex no tiene integracion para el (los de solo deteccion). Sin botones.
+- **Missing** (detectado, integracion no instalada): boton Install y Preview.
+- **Installed**: boton Uninstall.
+- **Blocked**: la integracion no se puede escribir (por ejemplo un Codex cuya config Kex no puede leer o editar, o sin carpeta de Codex); se explica en la fila y no hay boton.
+- Mientras llega el estado de la integracion la fila esta en `checking`.
+
+Encima de la lista hay dos botones. **Install all** instala la integracion de todos los agentes detectados a los que les falta, y **Uninstall all** quita las instaladas, esta ultima tras un `AlertDialog` que lista los agentes afectados. Ambos usan `planBulk`/`runBulk` (`lib/bulkIntegration.ts`): siguen adelante si un agente falla, saltan los no detectados o bloqueados, y terminan con un unico toast que nombra los agentes instalados (o quitados), los que fallaron y los saltados (`toast.error` si hubo algun fallo). El mismo componente se reutiliza en el paso Agents del onboarding.
