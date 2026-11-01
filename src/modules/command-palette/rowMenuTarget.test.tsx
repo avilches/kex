@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { CommandPalette } from "./CommandPalette";
 import { runPaletteTabItem } from "./lib/paletteControl";
