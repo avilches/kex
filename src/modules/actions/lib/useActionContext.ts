@@ -2,12 +2,9 @@ import { useMemo } from "react";
 import { IS_WINDOWS } from "@/lib/platform";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { tabWorktree } from "@/modules/workspaces/lib/hibernate";
-import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { tabFilePath, tabFolder } from "@/modules/workspaces/lib/tabPath";
-import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
-import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { buildCommandVars, focusPlace, inWorktree } from "./commandVars";
 import type { Workspace } from "@/modules/workspaces/lib/types";
@@ -18,6 +15,7 @@ export type ActionContext = {
   vars: Record<string, string>;
   shell: CommandShell;
   place: FocusPlace;
+  focus: NonNullable<BarContext["focus"]>;
   folders: NonNullable<BarContext["folders"]>;
 };
 
@@ -26,24 +24,18 @@ export type ActionContext = {
 export function useActionContext(
   ws: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot"> | null,
 ): ActionContext | null {
-  const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
   const tab = ws ? focusedTab(ws.paneTree, ws.activePaneId) : null;
   const liveWorktree = useAgentStore((s) => (tab ? (s.sessions[tab.id]?.meta?.worktreeCwd ?? null) : null));
   const worktree = tabWorktree(tab, liveWorktree);
   const focused = useMemo(() => inWorktree(tab, worktree), [tab, worktree]);
-  const dir = ws ? workspaceDir(ws, focused) : undefined;
-  // The focused tab owns the folder: a command that ends in it can have changed the branch.
-  const info = useDirGit(dir, focused?.id);
-  const vars = ws ? buildCommandVars(focused, ws, info, sys.host) : null;
+  const vars = ws ? buildCommandVars(ws) : null;
+  const focus = { folder: focused?.kind === "terminal" ? (tabFolder(focused) ?? "") : "", file: (focused && tabFilePath(focused)) || "" };
   const folders = {
-    focusFolder: tabFolder(focused),
     workspaceRoot: ws?.workspaceRoot ?? null,
     workspaceCwd: ws?.cwd ?? null,
   };
-  const key = vars
-    ? JSON.stringify([vars, envKind, focused?.kind, focused && tabFilePath(focused), folders])
-    : null;
+  const key = vars ? JSON.stringify([vars, envKind, focused?.kind, focus, folders]) : null;
   return useMemo(
     () =>
       vars
@@ -51,6 +43,7 @@ export function useActionContext(
             vars,
             shell: scriptShellFor(IS_WINDOWS, envKind),
             place: focusPlace(focused),
+            focus,
             folders,
           }
         : null,

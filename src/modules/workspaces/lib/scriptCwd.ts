@@ -1,37 +1,6 @@
 import { IS_WINDOWS } from "@/lib/platform";
-import type { ScriptCwdMode } from "./types";
 
 export type ScriptShell = "posix" | "powershell";
-
-export type ScriptCwdInput = {
-  mode: ScriptCwdMode | undefined;
-  fixedFolder?: string;
-  /** Folder of the focused tab, with the agent worktree already applied. */
-  focusFolder?: string | null;
-  workspaceRoot?: string | null;
-  workspaceCwd?: string | null;
-  /** The user's home folder; absent until it is known, and the terminal then starts where it always does. */
-  home?: string | null;
-};
-
-function present(value: string | null | undefined): string | undefined {
-  return value?.trim() || undefined;
-}
-
-export function resolveScriptCwd(input: ScriptCwdInput): string | undefined {
-  const workspaceFolder =
-    present(input.workspaceRoot) ?? present(input.workspaceCwd);
-  switch (input.mode) {
-    case "context":
-      return present(input.focusFolder) ?? workspaceFolder;
-    case "fixed":
-      return present(input.fixedFolder) ?? workspaceFolder;
-    case "workspace":
-      return workspaceFolder;
-    default:
-      return present(input.home);
-  }
-}
 
 // Two folders are the same when the canonical strings match: no trailing separator and, for
 // Windows paths (any path on Windows, or one that looks like a drive or UNC path), separators

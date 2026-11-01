@@ -1,13 +1,12 @@
 import { DEFAULT_ACCEPTS, type AppAccepts } from "@/modules/external-editors/catalog";
-import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { parseIcon } from "./actionIconRefs";
-import { isApp, type Action, type ActionKind } from "./types";
+import { isApp, type Action, type ActionKind, type ScriptRuns } from "./types";
 
 const KINDS: readonly ActionKind[] = ["app", "script", "agent"];
 
 const ACCEPTS: readonly AppAccepts[] = ["file", "folder", "both"];
 
-const CWD_MODES: readonly ScriptCwdMode[] = ["home", "workspace", "context", "fixed"];
+const RUNS: readonly ScriptRuns[] = ["folder", "file", "workspace", "fixed"];
 
 // Add and update keep memory equal to what normalizeActions would persist: an action that
 // would end up invalid (an empty command) is refused and the list keeps its previous value.
@@ -36,6 +35,19 @@ export function updateAction(
 // "" as no folder.
 export function withFixedCwd(action: Action, raw: string): Action {
   return { ...action, cwd: raw.trim() };
+}
+
+// Changing where a script runs. The fixed folder only means something for "fixed", so it is cleared
+// for any other place; the patch carries `cwd` either way because the receiver merges it over the
+// old Action. "fixed" is not a change the store can take until it has a folder: the modal asks for
+// the path first (see `needsFolder`), and this is only called once there is one.
+export function withRuns(action: Action, runs: ScriptRuns): Action {
+  return { ...action, runs, cwd: runs === "fixed" ? (action.cwd ?? "") : "" };
+}
+
+/** Whether picking this place still needs a folder from the user before it can be saved. */
+export function needsFolder(runs: ScriptRuns, cwd: string | undefined): boolean {
+  return runs === "fixed" && !(cwd ?? "").trim();
 }
 
 export function removeAction(list: readonly Action[], id: string): Action[] {
@@ -81,9 +93,14 @@ export function normalizeAction(raw: unknown): Action | null {
   };
   if (typeof r.icon === "string" && parseIcon(r.icon)) action.icon = r.icon;
   if (kind === "app") action.accepts = ACCEPTS.includes(r.accepts as AppAccepts) ? (r.accepts as AppAccepts) : DEFAULT_ACCEPTS;
-  if (kind === "script" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
-    action.cwdMode = r.cwdMode as ScriptCwdMode;
-    if (action.cwdMode === "fixed" && typeof r.cwd === "string" && r.cwd) action.cwd = r.cwd;
+  if (kind === "script") {
+    if (!RUNS.includes(r.runs as ScriptRuns)) return null;
+    action.runs = r.runs as ScriptRuns;
+    if (action.runs === "fixed") {
+      const cwd = typeof r.cwd === "string" ? r.cwd.trim() : "";
+      if (!cwd) return null;
+      action.cwd = cwd;
+    }
   }
   return action;
 }

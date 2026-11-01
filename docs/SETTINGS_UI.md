@@ -63,17 +63,20 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   `container={host}` manteniendo `pointer-events-auto` en el `PopoverContent`; referencias
   vivas `AddActionMenu.tsx` (combo Add) en la ventana de Settings.
   Aplicarla (con su provider, `DialogScrollHost`) a todo popover que abra dentro de un modal.
-- **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,
-  `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}`, `{host}` y
-  `{target}`. Los nombres canonico son `{filepath}` y `{filename}` (los antiguos
-  `{path}`/`{file}` ya no existen). `{target}` es de las apps: lo que la app abre en el sitio
-  donde se ofrece (la raiz del workspace en el Header, el fichero enfocado en el combo, la carpeta o el fichero de una fila en un menu contextual), sin linea con la ruta bajo el nombre, y
-  solo la lista de variables de una app lo muestra; un script que lo usa queda rechazado por
-  `commandProblem` ("{target} is only for apps"). Una app se anade una sola vez, ya no una
+- **Variable de comando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): solo `{target}`.
+  Las ocho anteriores (`{cwd}`, `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`,
+  `{filepath}`, `{host}`) ya no existen y `commandProblem` las rechaza por su nombre, porque el
+  motor deja un nombre desconocido como texto literal y un comando viejo escribiria `{cwd}` en
+  la terminal. `{target}` es lo que la Action abre o sobre lo que actua en el sitio donde se
+  ofrece (la raiz del workspace en el Header, la carpeta o el fichero de una fila en un menu
+  contextual). Lo llevan las apps y los scripts "Any folder" (opcional) y "Any file"
+  (obligatorio, `commandProblem` dice "a file script must use {target}"); un script "Workspace
+  root only" o "One fixed folder" lo tiene prohibido, y un agente no lee plantillas. Solo la lista de
+  variables de esos casos lo muestra (`commandVariableDocs`). Una app se anade una sola vez, ya no una
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
   carpetas), y el modal pregunta "What it opens" con dos casillas, Edit files y Open folders, de las que
-  siempre queda una marcada (la ultima no se deja desmarcar). La preview del modal dibuja el
-  una nota con dónde vive la app (el menu Actions, el submenu del fichero enfocado, o los dos) y que
+  siempre queda una marcada (la ultima no se deja desmarcar). El modal de una app lleva
+  una nota con donde vive (el menu Actions, el submenu del fichero enfocado, o los dos) y que
   nunca tiene boton propio: no lleva radio de Own button ni vista previa.
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
@@ -92,8 +95,10 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   los que ya tiene alguna app del ambito (se reconocen solo por el comando, sin contar espacios a los lados; el nombre y el icono no importan). La fila es asa, icono,
   nombre con subtitulo, lapiz grande y la X de borrar a la derecha del todo (sin casilla
   Button); el lapiz, o un doble click en la fila, abre `ActionEditDialog`: radio Global / This
-  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons, ), Run in folder primero en los scripts (Home por defecto, Workspace root con la
-  chincheta del explorer, Current folder, Absolute path), nombre, comando y variables, y
+  workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons), nombre, "Where it runs" en los scripts (radio de
+  `SCRIPT_RUNS_OPTIONS`: Workspace root only por defecto, Any folder, Any file y One fixed folder, con su
+  campo de ruta, Browse y el boton de la carpeta personal; la eleccion de One fixed folder vive en el modal
+  hasta que hay ruta), comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
   para agentes y scripts de workspace; una app, y un script de carpeta o de fichero, llevan en su lugar una nota,
   porque viven en el menu Actions (la carpeta o el fichero enfocados, en un submenu con su nombre) y nunca tienen boton propio);
@@ -110,14 +115,12 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   (`ActionIcon fill`, el mismo en todos los sitios, centrado sobre las dos lineas de `ActionNameLines`; slider de 14 a 32px, 20 por defecto, en Settings > Appearance > Action icon size) y el play/stop de un script ocupa
   toda la altura de su fila, igual que el hover del nombre. El selector de ambito del modal son dos botones pequenos arriba a la
   derecha (This workspace, Global), sin radio.
-- **Nombres en dos lineas**: un nombre de Action con `{variable}` muestra debajo, en mono
-  pequeno, lo que el lugar actual da a esa variable via `ActionNameLines.tsx` y
-  `actionSubtitle`: `{workspace}` dice "Workspace" (sin raiz configurada, "Set a root to
-  this workspace"), `{filepath}` solo el nombre del fichero y `{cwd}` la ruta con el
-  principio recortado (el mismo truco de la fila "Copy absolute path", ahora compartido en
-  `src/components/StartTrimmed.tsx`). Un script sin variable en el nombre dice donde corre
-  (`scriptSubtitle`, segun su Run in): "Workspace", "Current folder" (la ruta real fuera de
-  Settings) o la carpeta fija. Las superficies donde se pinta el nombre: boton propio
+- **Nombres en dos lineas**: un script que corre siempre en el mismo sitio muestra debajo, en mono
+  pequeno, donde corre via `ActionNameLines.tsx` y `scriptSubtitle`: "Workspace root" en Settings
+  (la ruta real fuera, "A workspace root is needed" si falta) o la carpeta fija con el principio
+  recortado (el mismo truco de la fila "Copy absolute path", compartido en
+  `src/components/StartTrimmed.tsx`). Un script "Any folder" o "Any file", un agente y una app no
+  llevan segunda linea: el menu ya dice donde estan. Las superficies donde se pinta el nombre: boton propio
   del header, menu Unico del header, submenu contextual, combo Add y fila de Settings. El hover de una fila dice donde abre via `actionRowTitle`: `Open <nombre> in <ruta>`
   para workspace y carpeta, `Open <fichero> with <nombre>` para fichero. El ancho del boton
   propio se mide solo con el nombre principal.

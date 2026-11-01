@@ -17,7 +17,7 @@ import { DEFAULT_ACCEPTS } from "@/modules/external-editors/catalog";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { ACCEPTS_LABELS } from "./lib/actionTargets";
-import { agentTitle, scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
+import { agentTitle } from "./lib/actionsBar";
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionKind } from "./lib/types";
 
@@ -116,7 +116,7 @@ function presetItems(
       const app = s.kind === "app";
       const sub = app
         ? { text: ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS], startTrim: false, lead: undefined }
-        : scriptSubtitle({ name: s.name, kind: s.kind }, SETTINGS_LABELS);
+        : { text: null, startTrim: false, lead: undefined };
       return (
         <CommandItem
           key={s.key}

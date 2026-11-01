@@ -64,7 +64,7 @@ describe("splitArgv", () => {
 
 describe("commandProblem", () => {
   it("is null for a command that can be launched", () => {
-    expect(commandProblem("pycharm {cwd}")).toBeNull();
+    expect(commandProblem("pycharm {target}")).toBeNull();
   });
 
   it("explains an empty command and an unterminated quote", () => {
@@ -73,21 +73,21 @@ describe("commandProblem", () => {
   });
 
   it("for a script, refuses a variable inside the user's own quotes and names it", () => {
-    expect(commandProblem(`printf "{cwd}"`, "posix")).toMatch(/\{cwd\} sits inside quotes/);
-    expect(commandProblem(`echo '{filename}' {cwd}`, "posix")).toMatch(/\{filename\}/);
-    expect(commandProblem("echo x\n  cd \"a {dir? {dir}}\"", "powershell")).toMatch(/\{dir\}/);
+    expect(commandProblem(`printf "{target}"`, "posix")).toMatch(/\{target\} sits inside quotes/);
+    expect(commandProblem(`echo '{target}' {target}`, "posix")).toMatch(/\{target\}/);
+    expect(commandProblem("echo x\n  cd \"a {dir? {target}}\"", "powershell")).toMatch(/\{target\}/);
   });
 
   it("for a script, accepts bare variables and quotes that hold no variable or a literal brace", () => {
-    expect(commandProblem(`printf "%s" {cwd} 'a b' "{{cwd}}"`, "posix")).toBeNull();
-    expect(commandProblem(`echo "\${HOME}" "{ x; }" {cwd}`, "posix")).toBeNull();
-    expect(commandProblem(`echo \\"{cwd}`, "posix")).toBeNull();
-    expect(commandProblem("echo `\"{cwd}", "powershell")).toBeNull();
+    expect(commandProblem(`printf "%s" {target} 'a b' "{{target}}"`, "posix")).toBeNull();
+    expect(commandProblem(`echo "\${HOME}" "{ x; }" {target}`, "posix")).toBeNull();
+    expect(commandProblem(`echo \\"{target}`, "posix")).toBeNull();
+    expect(commandProblem("echo `\"{target}", "powershell")).toBeNull();
   });
 
-  it("for a script, refuses {target}, which only an app can use", () => {
-    expect(commandProblem("code {target}", "posix")).toMatch(/\{target\} is only for apps/);
-    expect(commandProblem("code {target}")).toBeNull();
+  it("refuses a variable that no longer exists, and says {target} is the only one", () => {
+    expect(commandProblem("code {cwd}", "posix")).toMatch(/\{cwd\} no longer exists/);
+    expect(commandProblem("code {branch} {repo}")).toMatch(/\{branch\}, \{repo\} no longer exist/);
   });
 
   it("for a script, an apostrophe in a comment is not an unterminated quote", () => {
@@ -293,22 +293,22 @@ describe("quote detector: cases that used to slip through", () => {
   }
 
   it("lets a variable stand bare inside a substitution that has its own quotes", () => {
-    expect(commandProblem(`echo "$(echo {cwd})"`, "posix")).toBeNull();
+    expect(commandProblem(`echo "$(echo {target})"`, "posix")).toBeNull();
   });
 
   it("does not flag braces that are not known variables", () => {
-    expect(commandProblem(`awk '{print}' {cwd}`, "posix")).toBeNull();
-    expect(commandProblem(`jq '{a}' {cwd}`, "posix")).toBeNull();
+    expect(commandProblem(`awk '{print}' {target}`, "posix")).toBeNull();
+    expect(commandProblem(`jq '{a}' {target}`, "posix")).toBeNull();
     expect(expandCommandShell(`awk '{print}' {cwd}`, { cwd: "/x" }, "posix")).toBe(`awk '{print}' '/x'`);
   });
 
   it("is not thrown off by apostrophes in comments and heredoc bodies", () => {
-    expect(commandProblem("# don't\necho {cwd}", "posix")).toBeNull();
-    expect(commandProblem("echo hi # don't\necho {cwd}", "posix")).toBeNull();
-    expect(commandProblem("cat <<EOF\nit's here\nEOF\necho {cwd}", "posix")).toBeNull();
-    expect(commandProblem("cat <<'EOF'\ndon't\nEOF\necho {cwd}", "posix")).toBeNull();
-    expect(commandProblem("# it's\nls {cwd}", "powershell")).toBeNull();
-    expect(commandProblem("<# it's #> ls {cwd}", "powershell")).toBeNull();
+    expect(commandProblem("# don't\necho {target}", "posix")).toBeNull();
+    expect(commandProblem("echo hi # don't\necho {target}", "posix")).toBeNull();
+    expect(commandProblem("cat <<EOF\nit's here\nEOF\necho {target}", "posix")).toBeNull();
+    expect(commandProblem("cat <<'EOF'\ndon't\nEOF\necho {target}", "posix")).toBeNull();
+    expect(commandProblem("# it's\nls {target}", "powershell")).toBeNull();
+    expect(commandProblem("<# it's #> ls {target}", "powershell")).toBeNull();
   });
 });
 
@@ -327,22 +327,22 @@ describe("heredoc delimiters are full shell words", () => {
   ];
   for (const [name, command] of tricky) {
     it(`flags a variable in the body of a heredoc with ${name}`, () => {
-      expect(commandProblem(command, "posix")).toMatch(/\{cwd\}/);
+      expect(commandProblem(command, "posix")).toMatch(/\{target\}/);
     });
   }
 
   it("is conservative when the delimiter cannot be known: the rest is body", () => {
     for (const d of ["$x", "`id`", '"unterminated', "'unterminated"]) {
-      expect(commandProblem(`cat <<${d}\nx\n{cwd}\n`, "posix")).toMatch(/\{cwd\}/);
+      expect(commandProblem(`cat <<${d}\nx\n{target}\n`, "posix")).toMatch(/\{target\}/);
     }
   });
 
   it("lets a variable stand outside the body", () => {
-    expect(commandProblem("cat <<A-B\nx\nA-B\necho {cwd}\n", "posix")).toBeNull();
-    expect(commandProblem("cat <<'EOF'\nit's\nEOF\nls {cwd}", "posix")).toBeNull();
-    expect(commandProblem("cat <<-EOF\n\tx\n\tEOF\nls {cwd}", "posix")).toBeNull();
-    expect(commandProblem("cat {cwd} <<A.B\nx\nA.B\n", "posix")).toBeNull();
-    expect(commandProblem('cat <<A"B"C\nx\nABC\nls {cwd}\n', "posix")).toBeNull();
+    expect(commandProblem("cat <<A-B\nx\nA-B\necho {target}\n", "posix")).toBeNull();
+    expect(commandProblem("cat <<'EOF'\nit's\nEOF\nls {target}", "posix")).toBeNull();
+    expect(commandProblem("cat <<-EOF\n\tx\n\tEOF\nls {target}", "posix")).toBeNull();
+    expect(commandProblem("cat {target} <<A.B\nx\nA.B\n", "posix")).toBeNull();
+    expect(commandProblem('cat <<A"B"C\nx\nABC\nls {target}\n', "posix")).toBeNull();
   });
 });
 
@@ -399,12 +399,11 @@ describe("unsafe values are refused whatever the command looks like", () => {
     );
   });
 
-  it("names every offending variable and lets the UI ask beforehand", () => {
-    const vars = { cwd: "/ok", filepath: "/a'b", dir: "x$y" };
-    expect(unsafeVariables("e {cwd} {filepath} {dir}", vars, "posix")).toEqual(["filepath", "dir"]);
-    expect(commandProblem("e {cwd} {filepath}", "posix", vars)).toMatch(/\{filepath\} cannot be used in a script/);
-    expect(commandProblem("e {cwd}", "posix", vars)).toBeNull();
-    expect(commandProblem("e {filepath}", "posix")).toBeNull();
+  it("names the offending variable and lets the UI ask beforehand", () => {
+    expect(unsafeVariables("e {target}", { target: "/a'b" }, "posix")).toEqual(["target"]);
+    expect(commandProblem("e {target}", "posix", { target: "/a'b" })).toMatch(/\{target\} cannot be used in a script/);
+    expect(commandProblem("e {target}", "posix", { target: "/ok" })).toBeNull();
+    expect(commandProblem("e {target}", "posix")).toBeNull();
   });
 
   it("an unsafe value that is not written (a fallback not taken) is not reported", () => {

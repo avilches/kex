@@ -40,7 +40,7 @@ type ViewProps = {
 // everything else about the Action lives.
 export function ActionRowView({ action, overlay, handleProps, onEdit, remove }: ViewProps) {
   const display = action.name.trim() || "Name";
-  const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
+  const subtitle = scriptSubtitle(action, SETTINGS_LABELS);
   return (
     <div
       data-action-row={action.id}

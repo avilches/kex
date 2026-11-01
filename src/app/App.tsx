@@ -896,7 +896,6 @@ export default function App() {
     wakeTab: (workspaceId, tabId) => wakeTabs(workspaceId, [tabId]),
     terminalHandles,
     scriptCommandSeen,
-    focusFolder: scriptFocusFolderRef,
   });
 
   const handleCloseWorkspace = useCallback(

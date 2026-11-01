@@ -13,16 +13,16 @@ const script = (o: Partial<Action> = {}): Action => ({
   name: "Dev",
   kind: "script",
   command: "npm run dev",
-  cwdMode: "workspace",
+  runs: "workspace",
   ownButton: true,
   ...o,
 });
-const app = (o: Partial<Action> = {}): Action => script({ kind: "app", command: "code {workspace}", name: "VS Code", ...o });
+const app = (o: Partial<Action> = {}): Action => script({ kind: "app", runs: undefined, command: "code {target}", name: "VS Code", ...o });
 
 const ctx = (o: Partial<RunContext> = {}): RunContext => ({
   shell: "posix",
-  vars: { cwd: "/w/src", dir: "src", filename: "", filepath: "", workspace: "/w", branch: "main", repo: "w", target: "/w" },
-  folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w" },
+  vars: { target: "/w" },
+  folders: { workspaceRoot: "/w", workspaceCwd: "/w" },
   link: null,
   scriptPaneExists: false,
   atPaneLimit: false,
@@ -41,10 +41,11 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
 });
 
 describe("planActionRun, scripts", () => {
-  it("blocks a plain script while the workspace has no root, with the same words the bar uses", () => {
-    const rootless = ctx({ vars: { ...ctx().vars, workspace: "" }, folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
+  it("blocks a root-only or folder script while the workspace has no root, with the same words the bar uses", () => {
+    const rootless = ctx({ vars: { target: "" }, folders: { workspaceRoot: null, workspaceCwd: "/w" } });
     expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: A workspace root is needed" });
-    expect(planActionRun(script({ command: "ls {cwd}" }), rootless).kind).toBe("new-tab");
+    expect(planActionRun(script({ runs: "folder" }), rootless)).toMatchObject({ kind: "blocked" });
+    expect(planActionRun(script({ runs: "folder" }), { ...rootless, startFolder: "/row" }).kind).toBe("new-tab");
     expect(planActionRun(script(), ctx())).toMatchObject({ kind: "new-tab" });
   });
 
@@ -128,90 +129,68 @@ describe("planActionRun, scripts", () => {
     });
   });
 
-  it("is blocked by a variable with no value", () => {
-    const plan = planActionRun(script({ command: "open {filepath}" }), ctx());
-    expect(plan).toEqual({ kind: "blocked", reason: "Dev not run: {filepath} has no value here" });
-  });
-
-  it("names every missing variable", () => {
-    const plan = planActionRun(script({ command: "x {filepath} {filename}" }), ctx());
-    expect(plan).toMatchObject({ reason: "Dev not run: {filepath}, {filename} have no value here" });
+  it("is blocked when the folder or file it needs has no value", () => {
+    const plan = planActionRun(script({ runs: "file", command: "open {target}" }), ctx({ vars: { target: "" } }));
+    expect(plan.kind).toBe("blocked");
   });
 
   it("is blocked by a value that is unsafe in a script", () => {
-    const plan = planActionRun(script({ command: "ls {cwd}" }), ctx({ vars: { ...ctx().vars, cwd: "/w/$(id)" } }));
+    const plan = planActionRun(script({ runs: "folder", command: "ls {target}" }), ctx({ vars: { target: "/w/$(id)" }, startFolder: "/w" }));
     expect(plan.kind).toBe("blocked");
-    expect(plan.kind === "blocked" && plan.reason).toContain("{cwd} cannot be used in a script right now");
+    expect(plan.kind === "blocked" && plan.reason).toContain("{target} cannot be used in a script right now");
   });
 
   it("is blocked by a variable inside the user's own quotes", () => {
-    const plan = planActionRun(script({ command: 'echo "{cwd}"' }), ctx());
+    const plan = planActionRun(script({ runs: "folder", command: 'echo "{target}"' }), ctx());
     expect(plan.kind).toBe("blocked");
   });
 
   it("quotes a value with spaces in the typed line", () => {
-    const plan = planActionRun(
-      script({ command: "ls {cwd}" }),
-      ctx({ vars: { ...ctx().vars, cwd: "/w/my src" } }),
-    );
+    const plan = planActionRun(script({ runs: "folder", command: "ls {target}" }), ctx({ vars: { target: "/w/my src" }, startFolder: "/w/my src" }));
     expect(plan.kind === "new-tab" && plan.input).toContain("ls '/w/my src'");
   });
 
   it("quotes a PowerShell value but keeps the line the shell types", () => {
-    const plan = planActionRun(script({ command: "agent {cwd}" }), ctx({ shell: "powershell" }));
-    expect(plan.kind === "new-tab" && plan.input).toBe("agent '/w/src'\r");
+    const plan = planActionRun(script({ runs: "folder", command: "agent {target}" }), ctx({ shell: "powershell", startFolder: "/w" }));
+    expect(plan.kind === "new-tab" && plan.input).toBe("agent '/w'\r");
   });
 });
 
 describe("planActionRun, script folder", () => {
-  it("runs from the workspace root in workspace mode", () => {
+  it("runs from the workspace root when it runs only there", () => {
     expect(planActionRun(script(), ctx())).toMatchObject({ cwd: "/w" });
   });
 
-  it("defaults to home, which needs no workspace root", () => {
-    const home = ctx({ folders: { workspaceRoot: "/w", home: "/Users/me" } });
-    expect(planActionRun(script({ cwdMode: undefined }), home)).toMatchObject({ kind: "new-tab", cwd: "/Users/me" });
-    expect(planActionRun(script({ cwdMode: "home" }), home)).toMatchObject({ cwd: "/Users/me" });
-    const rootless = ctx({ vars: { workspace: "" }, folders: { home: "/Users/me" } });
-    expect(planActionRun(script({ cwdMode: "home" }), rootless)).toMatchObject({ kind: "new-tab", cwd: "/Users/me" });
-    expect(planActionRun(script({ cwdMode: "workspace" }), rootless)).toMatchObject({ kind: "blocked" });
+  it("runs from the folder it was offered at, else from the root", () => {
+    expect(planActionRun(script({ runs: "folder" }), ctx({ startFolder: "/w/src" }))).toMatchObject({ cwd: "/w/src" });
+    expect(planActionRun(script({ runs: "folder" }), ctx())).toMatchObject({ cwd: "/w" });
   });
 
-  it("lets the terminal start where it always does while home is not known yet", () => {
-    expect(planActionRun(script({ cwdMode: "home" }), ctx({ folders: { workspaceRoot: "/w" } }))).toMatchObject({ kind: "new-tab", cwd: undefined });
+  it("runs a file script from the folder that holds the file", () => {
+    const plan = planActionRun(script({ runs: "file", command: "wc {target}" }), ctx({ vars: { target: "/w/src/a.ts" }, startFolder: "/w/src" }));
+    expect(plan).toMatchObject({ cwd: "/w/src" });
   });
 
-  it("follows the last folder in context mode", () => {
-    expect(planActionRun(script({ cwdMode: "context" }), ctx())).toMatchObject({ cwd: "/w/src" });
-  });
-
-  it("falls back to the workspace in context mode without a last folder", () => {
-    const plan = planActionRun(script({ cwdMode: "context" }), ctx({ folders: { workspaceRoot: "/w" } }));
-    expect(plan).toMatchObject({ cwd: "/w" });
-  });
-
-  it("uses the fixed folder", () => {
-    expect(planActionRun(script({ cwdMode: "fixed", cwd: "/elsewhere" }), ctx())).toMatchObject({ cwd: "/elsewhere" });
-  });
-
-  it("falls back to the workspace when the fixed folder is blank", () => {
-    expect(planActionRun(script({ cwdMode: "fixed", cwd: " " }), ctx())).toMatchObject({ cwd: "/w" });
+  it("uses the fixed folder, and needs no workspace root for it", () => {
+    expect(planActionRun(script({ runs: "fixed", cwd: "/elsewhere" }), ctx())).toMatchObject({ cwd: "/elsewhere" });
+    const rootless = ctx({ vars: { target: "" }, folders: { workspaceRoot: null } });
+    expect(planActionRun(script({ runs: "fixed", cwd: "/elsewhere" }), rootless)).toMatchObject({ kind: "new-tab", cwd: "/elsewhere" });
   });
 
   it("refuses a relative fixed folder", () => {
-    const plan = planActionRun(script({ cwdMode: "fixed", cwd: "~/code" }), ctx());
+    const plan = planActionRun(script({ runs: "fixed", cwd: "~/code" }), ctx());
     expect(plan.kind === "blocked" && plan.reason).toMatch(/^Dev not run: the folder must be an absolute path/);
   });
 
   it("opens a new tab when the folder differs from the reused tab's, without a cd line", () => {
-    const plan = planActionRun(script({ cwdMode: "fixed", cwd: "/elsewhere" }), ctx({ link: link() }));
+    const plan = planActionRun(script({ runs: "fixed", cwd: "/elsewhere" }), ctx({ link: link() }));
     expect(plan).toMatchObject({ kind: "new-tab", cwd: "/elsewhere", input: "npm run dev\r" });
   });
 
   it("reuses the tab only when its folder is the folder the command would get", () => {
-    const elsewhere = planActionRun(script({ command: "agent {cwd}" }), ctx({ link: link({ cwd: "/elsewhere" }) }));
+    const elsewhere = planActionRun(script({ runs: "folder", command: "agent {target}" }), ctx({ link: link({ cwd: "/elsewhere" }) }));
     expect(elsewhere.kind).toBe("new-tab");
-    const same = planActionRun(script({ command: "agent {cwd}" }), ctx({ link: link() }));
+    const same = planActionRun(script({ runs: "folder", command: "agent {target}" }), ctx({ link: link() }));
     expect(same.kind).toBe("reuse-tab");
   });
 });
@@ -225,30 +204,30 @@ describe("planActionRun, apps", () => {
   });
 
   it("keeps a value with spaces as one argument", () => {
-    const plan = planActionRun(app({ command: "code {filepath}" }), ctx({ vars: { ...ctx().vars, filepath: "/w/my file.ts" } }));
+    const plan = planActionRun(app(), ctx({ vars: { target: "/w/my file.ts" } }));
     expect(plan).toEqual({ kind: "spawn-app", argv: ["code", "/w/my file.ts"] });
   });
 
   it("allows characters a script would refuse, as there is no shell", () => {
-    const plan = planActionRun(app({ command: "code {filepath}" }), ctx({ vars: { ...ctx().vars, filepath: "/w/a$b'c.ts" } }));
+    const plan = planActionRun(app(), ctx({ vars: { target: "/w/a$b'c.ts" } }));
     expect(plan).toEqual({ kind: "spawn-app", argv: ["code", "/w/a$b'c.ts"] });
   });
 
-  it("is blocked by a variable with no value", () => {
-    expect(planActionRun(app({ command: "code {filepath}" }), ctx())).toEqual({
+  it("is blocked when its target has no value", () => {
+    expect(planActionRun(app(), ctx({ vars: { target: "" } }))).toEqual({
       kind: "blocked",
-      reason: "VS Code not run: {filepath} has no value here",
+      reason: "VS Code not run: A workspace root is needed",
     });
   });
 
   it("is blocked by an unterminated quote", () => {
-    const plan = planActionRun(app({ command: 'code "{workspace}' }), ctx());
+    const plan = planActionRun(app({ command: 'code "{target}' }), ctx());
     expect(plan.kind).toBe("blocked");
   });
 
   describe("{target}, which is whatever the place it is offered at stands for", () => {
     const zed = app({ name: "Zed", command: "zed {target}", accepts: "both" });
-    const withTarget = (target: string) => ctx({ vars: { ...ctx().vars, target } });
+    const withTarget = (target: string) => ctx({ vars: { target } });
 
     it("opens the workspace root from the Header, where the base value is the root", () => {
       expect(planActionRun(zed, ctx())).toEqual({ kind: "spawn-app", argv: ["zed", "/w"] });
@@ -268,19 +247,13 @@ describe("planActionRun, apps", () => {
     });
 
     it("says a root is needed, as the bar does, when it is the Header and there is none", () => {
-      const rootless = ctx({ vars: { ...ctx().vars, workspace: "", target: "" } });
+      const rootless = ctx({ vars: { target: "" }, folders: { workspaceRoot: null } });
       expect(planActionRun(zed, rootless)).toEqual({ kind: "blocked", reason: "Zed not run: A workspace root is needed" });
     });
 
     it("still runs from a row folder when the workspace has no root: the row is the target", () => {
-      const rootless = ctx({ vars: { ...ctx().vars, workspace: "", target: "/elsewhere" } });
+      const rootless = ctx({ vars: { target: "/elsewhere" }, folders: { workspaceRoot: null } });
       expect(planActionRun(zed, rootless)).toEqual({ kind: "spawn-app", argv: ["zed", "/elsewhere"] });
-    });
-
-    it("is refused in a script, which names its place with its own variables", () => {
-      const plan = planActionRun(script({ command: "echo {target}" }), withTarget("/w/api"));
-      expect(plan).toMatchObject({ kind: "blocked" });
-      expect(plan.kind === "blocked" && plan.reason).toContain("{target} is only for apps");
     });
   });
 });
@@ -344,7 +317,7 @@ describe("planActionRun, agents", () => {
 
   it("starts in the workspace root, whatever tab is focused: an agent has no folder of its own", () => {
     expect(planActionRun(agent(), ctx())).toMatchObject({ cwd: "/w" });
-    const elsewhere = ctx({ folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w/other" } });
+    const elsewhere = ctx({ folders: { workspaceRoot: "/w", workspaceCwd: "/w/other" } });
     expect(planActionRun(agent(), elsewhere)).toMatchObject({ cwd: "/w" });
   });
 
@@ -353,17 +326,17 @@ describe("planActionRun, agents", () => {
     expect(planActionRun(agent(), ctx({ startFolder: "  " }))).toMatchObject({ cwd: "/w" });
   });
 
-  it("ignores any leftover cwdMode, so a stale value cannot move it", () => {
-    expect(planActionRun(agent({ cwdMode: "home", cwd: "/fixed" }), ctx({ folders: { home: "/h", workspaceRoot: "/w" } }))).toMatchObject({ cwd: "/w" });
+  it("ignores any leftover place or folder, so a stale value cannot move it", () => {
+    expect(planActionRun(agent({ runs: "fixed", cwd: "/fixed" }), ctx({ folders: { workspaceRoot: "/w" } }))).toMatchObject({ cwd: "/w" });
   });
 
   it("blocks when there is neither a row folder nor a workspace root", () => {
-    const rootless = ctx({ folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
+    const rootless = ctx({ folders: { workspaceRoot: null, workspaceCwd: "/w" } });
     expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "blocked", reason: "Claude not run: A workspace root is needed" });
   });
 
   it("runs from a row folder even when the workspace has no root", () => {
-    const rootless = ctx({ startFolder: "/row", folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
+    const rootless = ctx({ startFolder: "/row", folders: { workspaceRoot: null, workspaceCwd: "/w" } });
     expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "new-agent-tab", cwd: "/row" });
   });
 

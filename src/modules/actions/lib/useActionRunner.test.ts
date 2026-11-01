@@ -37,8 +37,8 @@ vi.mock("@/modules/workspace", () => ({
   useWorkspaceEnvStore: { getState: () => ({ env: { kind: "local" } }) },
 }));
 
-const script: Action = { id: "ac-s", name: "Dev", kind: "script", command: "npm run dev", cwdMode: "workspace", ownButton: true };
-const app: Action = { id: "ac-a", name: "Code", kind: "app", command: "code {workspace}", ownButton: true };
+const script: Action = { id: "ac-s", name: "Dev", kind: "script", command: "npm run dev", runs: "workspace", ownButton: true };
+const app: Action = { id: "ac-a", name: "Code", kind: "app", command: "code {target}", ownButton: true };
 
 const termTab = (id: string, cwd?: string): Tab => ({ id, kind: "terminal", cwd });
 const ws = (o: Partial<Workspace> = {}): Workspace => ({
@@ -71,7 +71,6 @@ function setup(workspace: Workspace, found: Record<string, Tab> = {}, others: Wo
     wakeTab: vi.fn(async () => {}),
     terminalHandles: { current: new Map([["any", { write }]]) },
     scriptCommandSeen: { current: new Set<string>() },
-    focusFolder: { current: null as string | null },
   } satisfies ActionRunnerDeps;
   const hook = renderHook(() => useActionRunner(deps));
   return { deps, write, ...hook };
@@ -202,28 +201,18 @@ describe("useActionRunner", () => {
     expect(getActionTab(app.id)).toBeUndefined();
   });
 
-  it("runs an Action on the worktree a sleeping focused tab kept, not on its shell folder", () => {
-    const asleep: Tab = { id: "tab-user", kind: "terminal", cwd: "/w", hibernation: { at: 1, worktreeCwd: "/w/.claude/worktrees/x" } };
-    const { result } = setup(ws({ paneTree: { kind: "pane", id: "p1", tabs: [asleep], activeTabId: "tab-user" } }));
-    const here: Action = { id: "ac-c", name: "Code here", kind: "app", command: "code {cwd}", ownButton: true };
-    act(() => result.current.runAction(here));
-    expect(spawn).toHaveBeenCalledWith(["code", "/w/.claude/worktrees/x"], "/w");
-  });
-
   it("tells the user why an Action did not run", () => {
     const { result } = setup(ws({ workspaceRoot: undefined }));
     act(() => result.current.runAction(app));
     expect(spawn).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith("Code not run: {workspace} has no value here", { duration: 4000 });
+    expect(toastError).toHaveBeenCalledWith("Code not run: A workspace root is needed", { duration: 4000 });
   });
 
-  it("runs an Action that reads the folder of a sleeping focused tab", () => {
-    const here: Action = { ...script, id: "ac-here", command: "ls {cwd}" };
+  it("runs a folder script from the folder it was offered at, even with a sleeping tab focused", () => {
+    const here: Action = { ...script, id: "ac-here", command: "ls {target}", runs: "folder" };
     const asleep: Tab = { id: "tab-user", kind: "terminal", hibernation: { at: 1 } };
-    const { result } = setup(
-      ws({ paneTree: { kind: "pane", id: "p1", tabs: [asleep], activeTabId: "tab-user" } }),
-    );
-    act(() => result.current.runAction(here));
+    const { result } = setup(ws({ paneTree: { kind: "pane", id: "p1", tabs: [asleep], activeTabId: "tab-user" } }));
+    act(() => result.current.runAction(here, { vars: { target: "/w/src" }, spawnCwd: "/w/src" }));
     expect(toastError).not.toHaveBeenCalled();
     expect(getActionTab(here.id)).toBeDefined();
   });
@@ -253,7 +242,7 @@ describe("useActionRunner", () => {
     const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const other = ws({ id: "w2", workspaceRoot: "/o", cwd: "/o", paneTree: { kind: "pane", id: "p9", tabs: [], activeTabId: null }, activePaneId: "p9" });
     const { deps, result } = setup(ws(), {}, [other]);
-    act(() => result.current.runAction(agent, { focusFolder: "/o/src", spawnCwd: "/o/src", workspaceId: "w2" }));
+    act(() => result.current.runAction(agent, { spawnCwd: "/o/src", workspaceId: "w2" }));
     expect(deps.setActiveWorkspaceId).toHaveBeenCalledWith("w2");
     expect(deps.openTab).toHaveBeenCalledTimes(1);
     expect(deps.openTab).toHaveBeenCalledWith("w2", "p9", expect.objectContaining({ kind: "terminal", cwd: "/o/src" }));
@@ -263,7 +252,7 @@ describe("useActionRunner", () => {
     const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const other = ws({ id: "w2", workspaceRoot: "/o", cwd: "/o", paneTree: { kind: "pane", id: "p9", tabs: [], activeTabId: null }, activePaneId: "p9" });
     const { deps, result } = setup(ws(), {}, [other]);
-    act(() => result.current.runAction(agent, { focusFolder: "/o/src", workspaceId: "w2" }));
+    act(() => result.current.runAction(agent, { workspaceId: "w2" }));
     expect(deps.openTab).toHaveBeenCalledWith("w2", "p9", expect.objectContaining({ kind: "terminal", cwd: "/o" }));
   });
 

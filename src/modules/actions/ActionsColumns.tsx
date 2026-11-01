@@ -61,7 +61,7 @@ type Props = {
 
 // The kind is chosen once, on creation, and a saved Action cannot switch it afterwards.
 function blankScript(): Action {
-  return { id: newActionId(), name: "", kind: "script", command: "", cwdMode: "home", ownButton: false };
+  return { id: newActionId(), name: "", kind: "script", command: "", runs: "workspace", ownButton: false };
 }
 
 function blankApp(): Action {

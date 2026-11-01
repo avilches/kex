@@ -5,8 +5,6 @@ import type { Action } from "@/modules/actions";
 import type { AutofocusMode } from "@/modules/settings/store";
 import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
-export type ScriptCwdMode = "home" | "workspace" | "context" | "fixed";
-
 // A terminal tab that is asleep: no PTY, no render slot, same id. Its presence is the flag.
 // What the placeholder shows besides the title (the agent and the restore command) is gone with the
 // PTY, so it is captured when the tab goes to sleep. `title` is the name the tab showed then, kept

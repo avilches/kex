@@ -1,16 +1,14 @@
-import { useCallback, useEffect, type MutableRefObject } from "react";
+import { useCallback, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import { IS_WINDOWS } from "@/lib/platform";
 import { newTabId } from "@/lib/ids";
-import { cachedHomeDir, primeHomeDir } from "@/lib/homeDir";
 import { native } from "@/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { requestLeafFocus } from "@/modules/terminal/lib/useTerminalSession";
-import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptFolderMissingMessage, scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
 import { planDelayedWrite, SCRIPT_WRITE_MAX_ATTEMPTS } from "@/modules/workspaces/lib/scriptRunState";
-import { allPanes, findPane, focusedTab, focusedTabId } from "@/modules/workspaces/lib/splitNode";
+import { allPanes, findPane, focusedTabId } from "@/modules/workspaces/lib/splitNode";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
   getScriptRunningSnapshot,
@@ -18,11 +16,8 @@ import {
   setScriptName,
   setScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { getSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
-import { workspaceDir } from "@/modules/workspaces/lib/titleVars";
-import { buildCommandVars, inWorktree } from "./commandVars";
-import { isHibernatedTab, tabWorktree } from "@/modules/workspaces/lib/hibernate";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { buildCommandVars } from "./commandVars";
+import { isHibernatedTab } from "@/modules/workspaces/lib/hibernate";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import {
   label,
@@ -64,8 +59,6 @@ export type ActionRunnerDeps = {
   wakeTab: (workspaceId: string, tabId: string) => Promise<void>;
   terminalHandles: MutableRefObject<Map<string, TerminalHandle>>;
   scriptCommandSeen: MutableRefObject<Set<string>>;
-  /** Folder of the focused tab, with the agent worktree already applied. */
-  focusFolder: MutableRefObject<string | null>;
 };
 
 const WRITE_DELAY_NEW_MS = 150;
@@ -105,24 +98,12 @@ function linkFor(actionId: string, deps: ActionRunnerDeps): LinkedTab | null {
   };
 }
 
-function focusedOf(ws: Workspace): Tab | null {
-  const tab = focusedTab(ws.paneTree, ws.activePaneId);
-  return inWorktree(tab, tabWorktree(tab, tab ? useAgentStore.getState().sessions[tab.id]?.meta?.worktreeCwd : null));
-}
-
 function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps, overlay?: RunOverlay): RunContext {
-  const focused = focusedOf(ws);
-  const info = getDirGit(workspaceDir(ws, focused));
   const { workspacePaneLimit } = usePreferencesStore.getState();
   return {
     shell: scriptShellFor(IS_WINDOWS, useWorkspaceEnvStore.getState().env.kind),
-    vars: { ...buildCommandVars(focused, ws, info, getSystemInfo().host), ...overlay?.vars },
-    folders: {
-      focusFolder: overlay?.focusFolder ?? deps.focusFolder.current,
-      workspaceRoot: ws.workspaceRoot,
-      workspaceCwd: ws.cwd,
-      home: cachedHomeDir(),
-    },
+    vars: { ...buildCommandVars(ws), ...overlay?.vars },
+    folders: { workspaceRoot: ws.workspaceRoot, workspaceCwd: ws.cwd },
     startFolder: overlay?.spawnCwd,
     link: action && isScript(action) ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
@@ -146,10 +127,6 @@ export function useActionRunner(deps: ActionRunnerDeps) {
     terminalHandles,
     scriptCommandSeen,
   } = deps;
-
-  useEffect(() => {
-    void primeHomeDir();
-  }, []);
 
   const scheduleAgentWrite = useCallback(
     (tabId: string, input: string, delay: number) => {
@@ -296,7 +273,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeWorkspace, activeWorkspaceId, findWorkspace, setActiveWorkspaceId, openAgentTab, openScriptTab, revealActionTab, scheduleAgentWrite, scheduleWrite, deps.focusFolder, findTabGlobal],
+    [activeWorkspace, activeWorkspaceId, findWorkspace, setActiveWorkspaceId, openAgentTab, openScriptTab, revealActionTab, scheduleAgentWrite, scheduleWrite, findTabGlobal],
   );
 
   const stopAction = useCallback(

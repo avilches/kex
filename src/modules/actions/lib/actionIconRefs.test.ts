@@ -71,7 +71,7 @@ describe("filterIcons", () => {
 });
 
 describe("the icon field of an Action", () => {
-  const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", ownButton: false };
+  const script: Action = { id: "s1", name: "dev", kind: "script", command: "pnpm dev", runs: "workspace", ownButton: false };
 
   it("survives normalization when valid and is dropped when it points at nothing", () => {
     const [kept] = normalizeActions([{ ...script, icon: "glyph:rocket" }]);

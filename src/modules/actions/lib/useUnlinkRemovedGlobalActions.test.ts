@@ -9,7 +9,7 @@ import { getActionTab, linkActionTab, unlinkActionTab } from "./actionStateStore
 import type { Action } from "./types";
 import { useUnlinkRemovedGlobalActions } from "./useUnlinkRemovedGlobalActions";
 
-const script = (id: string): Action => ({ id, name: id, kind: "script", command: `run ${id}`, ownButton: false, cwdMode: "workspace" });
+const script = (id: string): Action => ({ id, name: id, kind: "script", command: `run ${id}`, ownButton: false, runs: "workspace" });
 
 describe("useUnlinkRemovedGlobalActions", () => {
   beforeEach(() => {

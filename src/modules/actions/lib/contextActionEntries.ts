@@ -46,9 +46,9 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
     if (agent && !agentFolder) continue;
     // The target rules: a folder row offers the scripts that work on a folder, a file row the ones that
     // work on a file, and a script of the workspace is only ever in the Header.
-    if (rowKind && isScript(action) && actionTarget(action.command) !== rowKind) continue;
+    if (rowKind && isScript(action) && actionTarget(action) !== rowKind) continue;
     const name = action.name.trim() || "Action";
-    const subtitle = agent ? { text: null, startTrim: false, lead: undefined } : scriptSubtitle({ ...action, name }, ctx);
+    const subtitle = agent ? { text: null, startTrim: false, lead: undefined } : scriptSubtitle(action, ctx);
     const reason = agent ? agentReason(action, agentFolder ?? "") : (acceptsReason(action, rowKind) ?? actionAvailability(action, ctx));
     rows.push({
       action,
@@ -57,7 +57,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: agent ? agentTitle(name, null) : isApp(action) ? appTitle(name, null, ctx) : actionRowTitle(name, isScript(action), null, ctx),
+      title: agent ? agentTitle(name, null) : isApp(action) ? appTitle(name, null, ctx) : actionRowTitle(name, action, null, ctx),
     });
   }
   return rows;
@@ -89,7 +89,7 @@ export function newTabActionEntries(
   global: readonly Action[],
   ctx: BarContext,
 ): ContextActionGroups {
-  const folder = ctx.folders?.focusFolder?.trim() ?? "";
+  const folder = ctx.focus?.folder?.trim() ?? "";
   if (!folder) return { workspace: [], global: [] };
   const agents = (actions: readonly Action[]) =>
     entriesOf(actions.filter(isAgent), ctx, { agentFolder: folder }).filter((e) => e.enabled);

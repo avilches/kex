@@ -10,7 +10,7 @@ import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { Action } from "./lib/types";
 
 type Props = {
-  action: Pick<Action, "id" | "name" | "icon" | "kind" | "ownButton" | "cwdMode" | "cwd">;
+  action: Pick<Action, "id" | "name" | "icon" | "kind" | "ownButton" | "runs" | "cwd">;
   scope: Scope;
   onChange: (own: boolean) => void;
 };
@@ -25,7 +25,7 @@ const OPTIONS = [
 export function OwnButtonChoice({ action, scope, onChange }: Props) {
   const value = action.ownButton ? "button" : "combo";
   const display = action.name.trim() || "Action";
-  const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
+  const subtitle = scriptSubtitle(action, SETTINGS_LABELS);
   const item = (
     <span className="flex min-w-0 flex-1 items-center gap-2">
       <ActionIcon action={action} size={14} fill />

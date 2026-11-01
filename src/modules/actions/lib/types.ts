@@ -1,7 +1,9 @@
 import type { AppAccepts } from "@/modules/external-editors/catalog";
-import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 
 export type ActionKind = "app" | "script" | "agent";
+
+/** Where a script acts: any folder it is offered at, any file, the workspace root only, or one fixed folder. */
+export type ScriptRuns = "folder" | "file" | "workspace" | "fixed";
 
 export type Action = {
   id: string;
@@ -13,9 +15,9 @@ export type Action = {
   /** The one identity of how it looks (`app:<id>`, `agent:<id>` or `glyph:<name>`): set when it is
    * created from a preset, changed only when the user picks another. Editing the command never touches it. */
   icon?: string;
-  /** Scripts only; absent means home. An agent has no folder of its own. */
-  cwdMode?: ScriptCwdMode;
-  /** Only used when cwdMode is "fixed". */
+  /** Scripts only: the one place it acts, which decides where it is offered and where it runs. */
+  runs?: ScriptRuns;
+  /** Only with `runs: "fixed"`: the absolute folder it always runs in. */
   cwd?: string;
   /** Apps only: what the command's {target} may be, a file, a folder or either. */
   accepts?: AppAccepts;
