@@ -17,7 +17,6 @@ import { useWorkspaceDnd } from "@/modules/workspaces";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ArrowRight01Icon,
-  ArrowUp01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
   Copy01Icon,
@@ -28,9 +27,9 @@ import {
   FileAddIcon,
   FolderAddIcon,
   FolderOpenIcon,
+  FolderUploadIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
-  PencilEdit02Icon,
   Refresh01Icon,
   Scissor01Icon,
   ViewOffSlashIcon,
@@ -539,7 +538,6 @@ export function PendingRow({
 }
 
 export type FsRootRowProps = {
-  onEditRoot?: () => void;
   path: string;
   isWorkspaceRoot: boolean;
   workspaceRoot: string | null;
@@ -554,7 +552,6 @@ export type FsRootRowProps = {
 };
 
 export function FsRootRow({
-  onEditRoot,
   path,
   isWorkspaceRoot,
   workspaceRoot,
@@ -582,12 +579,11 @@ export function FsRootRow({
           {...listeners}
           {...attributes}
           onMouseDown={keepScratchpadFocus}
-          onClick={onEditRoot}
           className={cn(
-            "group/root relative flex h-6 w-full min-w-0 items-center gap-2 pl-1.5 pr-9 text-[13px]",
-            onEditRoot && "cursor-pointer",
+            "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
             isDragging && "opacity-50",
           )}
+          style={{ paddingLeft: 6 }}
           title={path}
         >
           <FlashOverlay token={flashToken} />
@@ -600,27 +596,9 @@ export function FsRootRow({
           <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
             {"‎" + path}
           </span>
-          {onEditRoot && (
-            <HugeiconsIcon
-              icon={PencilEdit02Icon}
-              size={13}
-              strokeWidth={2}
-              className="pointer-events-none hidden shrink-0 text-muted-foreground group-hover/root:block"
-            />
-          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
-        {onEditRoot && (
-          <>
-            <ContextMenuItem className={COMPACT_ITEM} onSelect={onEditRoot}>
-              <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={2} />
-              Change Explorer Root
-              <ShortcutHint id="sidebar.editRoot" />
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-          </>
-        )}
         {onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
@@ -757,20 +735,12 @@ export function FsUpRow({
           <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
             <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2.25} />
           </span>
-          <span className="relative size-4 shrink-0">
-            <img
-              src={folderIconUrl("", false)}
-              alt=""
-              draggable={false}
-              className="size-4"
-            />
-            <HugeiconsIcon
-              icon={ArrowUp01Icon}
-              size={9}
-              strokeWidth={3}
-              className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-sm"
-            />
-          </span>
+          <HugeiconsIcon
+            icon={FolderUploadIcon}
+            size={16}
+            strokeWidth={1.75}
+            className="shrink-0 text-muted-foreground"
+          />
           <span className="min-w-0 truncate">..</span>
           <button
             type="button"
