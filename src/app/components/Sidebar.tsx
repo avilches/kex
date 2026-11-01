@@ -267,6 +267,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onFocusActiveTab={props.onFocusActiveTab}
               onSetAsRoot={props.onSetAsRoot}
               onEnterFolder={props.onEnterFolder}
+              onOpenInExplorer={props.onNavigateToWorktree}
               onNavigateUp={props.onNavigateUp}
               onFsRootMissing={props.onFsRootMissing}
               onSubmitRootPath={props.onSubmitRootPath}
