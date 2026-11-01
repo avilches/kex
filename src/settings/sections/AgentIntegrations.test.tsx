@@ -85,7 +85,33 @@ describe("AgentIntegrations", () => {
     expect(called).toContain("agent_setup_omp");
     expect(called).not.toContain("agent_setup_codex");
     expect(called).not.toContain("agent_setup_pi");
-    expect(toast.success.mock.calls[0][0]).toMatch(/2 installed/);
+    const text = toast.success.mock.calls[0][0] as string;
+    expect(text).toContain("Installed: Claude Code, OMP");
+    expect(text).toContain("Skipped:");
+    expect(text).toContain("Codex");
+    expect(text).not.toContain("Failed");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("Install all keeps going after a write fails and names the failed agent", async () => {
+    detect(["claude", "omp", "pi"]);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "agent_setup_omp") return Promise.reject(new Error("read-only folder"));
+      if (cmd in status) return Promise.resolve(status[cmd]);
+      return Promise.resolve(undefined);
+    });
+    render(<AgentIntegrations />);
+    await screen.findAllByText("Not installed");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Install all" }));
+    });
+    await waitFor(() => expect(toast.error).toHaveBeenCalled(), { timeout: 4000 });
+    const text = toast.error.mock.calls[0][0] as string;
+    expect(text).toContain("Installed: Claude Code, Pi");
+    expect(text).toContain("Failed: OMP");
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("agent_setup_pi");
   });
 
   it("Uninstall all asks for confirmation listing the agents before removing", async () => {

@@ -9,8 +9,9 @@ export type IntegrationState = {
   blocked: IntegrationBlock | null;
   busy: boolean;
   failed: boolean;
-  install: () => Promise<void>;
-  remove: () => Promise<void>;
+  /** Resolve to whether the write worked; a failure also sets `failed`. */
+  install: () => Promise<boolean>;
+  remove: () => Promise<boolean>;
   refresh: () => void;
 };
 
@@ -36,16 +37,18 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
 
   useEffect(refresh, [refresh]);
 
-  const run = async (action: (agent: AgentId) => Promise<void>, expected: IntegrationStatus) => {
+  const run = async (action: (agent: AgentId) => Promise<void>, expected: IntegrationStatus): Promise<boolean> => {
     setBusy(true);
     setFailed(false);
     try {
       await Promise.all([action(agentRef.current), wait(minBusyMs)]);
       setStatus(expected);
+      return true;
     } catch (e) {
       console.error(`[kex] integration ${agentRef.current} failed:`, e);
       setFailed(true);
       refresh();
+      return false;
     } finally {
       setBusy(false);
     }

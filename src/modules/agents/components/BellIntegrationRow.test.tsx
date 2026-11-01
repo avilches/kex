@@ -16,8 +16,8 @@ function state(over: Partial<IntegrationState> = {}): IntegrationState {
     blocked: null,
     busy: false,
     failed: false,
-    install: vi.fn(() => Promise.resolve()),
-    remove: vi.fn(() => Promise.resolve()),
+    install: vi.fn(() => Promise.resolve(true)),
+    remove: vi.fn(() => Promise.resolve(true)),
     refresh: vi.fn(),
     ...over,
   };

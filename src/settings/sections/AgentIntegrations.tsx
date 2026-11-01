@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { KNOWN_AGENTS, type KnownAgent, type RowState, rowStateOf } from "@/modules/agents/lib/agentRows";
-import { type BulkKind, planBulk, runBulk } from "@/modules/agents/lib/bulkIntegration";
+import { type BulkKind, type BulkResult, planBulk, runBulk } from "@/modules/agents/lib/bulkIntegration";
 import {
   AGENT_LABELS,
   type AgentId,
@@ -43,6 +43,19 @@ const rank = (a: KnownAgent) => {
 };
 const rows = [...KNOWN_AGENTS].sort((a, b) => rank(a) - rank(b));
 
+function bulkSummary(kind: BulkKind, result: BulkResult): string {
+  const names = (ids: AgentId[]) => ids.map((a) => AGENT_LABELS[a]).join(", ");
+  const parts = [
+    [kind === "install" ? "Installed" : "Uninstalled", result.done],
+    ["Failed", result.failed],
+    ["Skipped", result.skipped],
+  ] as const;
+  return parts
+    .filter(([, ids]) => ids.length > 0)
+    .map(([label, ids]) => `${label}: ${names(ids)}`)
+    .join(". ");
+}
+
 export function AgentIntegrations() {
   const claude = useIntegration("claude", OPTIONS);
   const opencode = useIntegration("opencode", OPTIONS);
@@ -73,11 +86,11 @@ export function AgentIntegrations() {
   const bulk = async (kind: BulkKind) => {
     setBulkBusy(true);
     try {
-      const result = await runBulk(kind, rowStates, (a) =>
-        kind === "install" ? stateOf[a].install() : stateOf[a].remove(),
-      );
-      const verb = kind === "install" ? "installed" : "uninstalled";
-      const text = `${result.done.length} ${verb}, ${result.failed.length} failed, ${result.skipped.length} skipped`;
+      const result = await runBulk(kind, rowStates, async (a) => {
+        const ok = await (kind === "install" ? stateOf[a].install() : stateOf[a].remove());
+        if (!ok) throw new Error(`${a} failed`);
+      });
+      const text = bulkSummary(kind, result);
       if (result.failed.length > 0) toast.error(text);
       else toast.success(text);
     } finally {
@@ -167,7 +180,7 @@ export function AgentIntegrations() {
       </AlertDialog>
       <p className="text-[10.5px] text-muted-foreground">
         Preview shows what Install would write, or what Uninstall would remove. Nothing is
-        touched until you press the button.
+        touched until you press a button; Install all and Uninstall all act on every detected agent.
       </p>
     </div>
   );
