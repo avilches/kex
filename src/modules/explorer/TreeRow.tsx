@@ -6,7 +6,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
-import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { pathDirname } from "@/lib/pathUtils";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { cn } from "@/lib/utils";
@@ -593,8 +593,8 @@ export function FsRootRow({
             draggable={false}
             className="size-4 shrink-0"
           />
-          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90">
-            {pathBasename(path, { tolerateTrailingSlash: true }) || path}
+          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
+            {"‎" + path}
           </span>
         </div>
       </ContextMenuTrigger>
