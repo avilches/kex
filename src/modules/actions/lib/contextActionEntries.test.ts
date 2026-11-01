@@ -150,16 +150,16 @@ describe("contextActionEntries", () => {
       expect(groups.global).toEqual([]);
     });
 
-    it("are offered on a folder row, started in that folder, which the line under the name says", () => {
+    it("are offered on a folder row, started in that folder, with no line under the name", () => {
       const groups = contextActionEntries([agent, zed("both")], [agent], rowCtx("folder"), { agentFolder: "/w/src", rowKind: "folder" });
       expect(groups.workspace.map((e) => e.action.kind)).toEqual(["agent", "app"]);
-      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/w/src", subtitleTrim: true, subtitleLead: "tab" });
+      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: null, subtitleLead: null });
       expect(groups.global.map((e) => e.action.kind)).toEqual(["agent"]);
     });
 
     it("are not blocked by a workspace with no root: the row brings its own folder", () => {
       const groups = contextActionEntries([agent], [], ctx({ workspace: "" }), { agentFolder: "/elsewhere" });
-      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/elsewhere" });
+      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: null });
     });
 
     it("are muted with why when the command cannot be typed", () => {
@@ -191,7 +191,7 @@ describe("newTabActionEntries", () => {
       const groups = newTabActionEntries([agent("claude"), agent("codex")], [agent("aider")], at(folder));
       expect(commands(groups.workspace)).toEqual(["claude", "codex"]);
       expect(commands(groups.global)).toEqual(["aider"]);
-      expect(groups.workspace[0]).toMatchObject({ subtitle: folder, subtitleLead: "tab" });
+      expect(groups.workspace[0]).toMatchObject({ subtitle: null, subtitleLead: null });
     }
   });
 
