@@ -277,7 +277,7 @@ Navigation is a left vertical sidebar. The window is 900 x 840 and not resizable
 Kex finds the editors, IDEs and tools installed on the machine so that app Actions (see 3.12) can start from them. It is made of a Rust detection backend and a frontend catalog; the launch itself is `action_spawn` (see IPC.md), driven by an Action, not by this module.
 
 **Catalog.** Both the Rust backend (`src-tauri/src/modules/editors/catalog.rs`) and the TypeScript frontend (`src/modules/external-editors/catalog.ts`) maintain a parallel list of known tools. Each entry carries:
-- A stable `id` (used as the icon filename key and as `Action.appId`)
+- A stable `id` (used as the icon filename key and, as `app:<id>`, in `Action.icon`)
 - A macOS bundle ID for `mdfind` detection
 - A CLI binary name for `which`/`where` PATH lookup
 - `args_before_path`: arguments injected between the binary and the target path at launch time
