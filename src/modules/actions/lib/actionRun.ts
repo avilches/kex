@@ -82,6 +82,8 @@ function planApp(action: Action, ctx: RunContext): RunPlan {
   if (problem) return blocked(action, problem);
   if (commandVariablesUsed(action.command).size === 0 && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
   const missing = missingVariables(action.command, ctx.vars);
+  // An app's {target} is the workspace root from the Header, so its absence says the same.
+  if (missing.includes("target") && !ctx.vars.workspace) return blocked(action, WORKSPACE_UNSET);
   if (missing.length > 0) return blocked(action, missingMessage(missing));
   try {
     return { kind: "spawn-app", argv: expandCommandArgv(action.command, ctx.vars) };

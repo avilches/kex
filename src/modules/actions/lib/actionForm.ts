@@ -8,7 +8,7 @@ import {
   type CommandVariable,
 } from "./commandTemplate";
 import { agentCommandProblem } from "./actionsBar";
-import { isAgent, isScript, usesTerminal, type Action } from "./types";
+import { isAgent, isScript, usesTerminal, type Action, type ActionKind } from "./types";
 
 export { COMMAND_VARIABLES } from "./commandTemplate";
 
@@ -30,8 +30,15 @@ const VARIABLE_DOCS: readonly CommandVariableDoc[] = [
   { name: "host", description: "Name of this computer" },
 ];
 
-export function commandVariableDocs(): readonly CommandVariableDoc[] {
-  return VARIABLE_DOCS;
+const TARGET_DOC: CommandVariableDoc = {
+  name: "target",
+  description: "What the app is opened on: the workspace root from the Header, the folder or the file from a menu",
+};
+
+/** The variables a form lists. {target} belongs to apps alone, which are offered in several
+ * places; a script has one place and reads it from the variables above. */
+export function commandVariableDocs(kind: ActionKind = "script"): readonly CommandVariableDoc[] {
+  return kind === "app" ? [TARGET_DOC, ...VARIABLE_DOCS] : VARIABLE_DOCS;
 }
 
 // A script row is a terminal command pointed at a folder; an app row is a background

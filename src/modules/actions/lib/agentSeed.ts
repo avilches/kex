@@ -56,12 +56,12 @@ type AppArgs = {
   existing: readonly Action[];
 };
 
-/** The Actions to add the first time apps are detected: the current-directory preset of each
- * enabled app, inside the combo, skipping any command the list already has. Null and empty mean
- * the same as in `planAgentSeed`. */
+/** The Actions to add the first time apps are detected: the one preset of each enabled app,
+ * inside the combo, skipping any command the list already has. Null and empty mean the same as
+ * in `planAgentSeed`. */
 export function planAppSeed({ seeded, editors, existing }: AppArgs): Action[] | null {
   if (seeded) return null;
-  const presets = suggestionsFromDetected(editors).filter((s) => s.key === `${s.appId}:cwd`);
+  const presets = suggestionsFromDetected(editors);
   if (presets.length === 0) return null;
   return presets
     .filter((s) => !hasCommandOf(existing, s.defaultCommand))

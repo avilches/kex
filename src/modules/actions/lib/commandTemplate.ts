@@ -13,7 +13,7 @@ import {
 
 // A command runs against a place (folder, file, workspace), never against a running
 // program or a browser page, so only these variables exist for it.
-export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host"] as const;
+export const COMMAND_VARIABLES = ["cwd", "dir", "branch", "repo", "workspace", "filename", "filepath", "host", "target"] as const;
 
 export type CommandVariable = (typeof COMMAND_VARIABLES)[number];
 

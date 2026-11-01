@@ -51,6 +51,7 @@ import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { splitActionName } from "./lib/actionName";
+import { runOverlayFor } from "./lib/runOverlay";
 import {
   DROP_MENU,
   DROP_MENU_PREFIX,
@@ -114,6 +115,8 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
 function nameClick(item: BarItem, { run, focus, fixRoot }: Handlers) {
   if (item.needsRoot) return fixRoot();
   if (item.state !== "idle" && focus(item.action)) return;
+  // An app of the context combo opens the folder or file the combo is on, not the workspace root.
+  if (item.runTarget !== undefined) return run(item.action, runOverlayFor(item.runTarget, item.runTargetKind));
   run(item.action);
 }
 

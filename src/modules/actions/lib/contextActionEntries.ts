@@ -1,6 +1,7 @@
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
 import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
-import { isAgent, isScript, type Action } from "./types";
+import { acceptsFile, acceptsFolder, appAccepts } from "./actionTargets";
+import { isAgent, isApp, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -24,9 +25,20 @@ export type ContextActionGroups = { workspace: ContextActionEntry[]; global: Con
 type Options = {
   /** The folder an agent is started in: the row's own. Without one agents are left out. */
   agentFolder?: string;
+  /** What the row is, which an app is judged against: it is muted when it does not take it. */
+  rowKind?: "file" | "folder";
 };
 
-function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder }: Options = {}): ContextActionEntry[] {
+// Why an app cannot open this kind of row, or null when it can.
+function acceptsReason(action: Action, rowKind: "file" | "folder" | undefined): string | null {
+  if (!isApp(action) || !rowKind) return null;
+  const accepts = appAccepts(action);
+  if (rowKind === "file" && !acceptsFile(accepts)) return "takes folders only";
+  if (rowKind === "folder" && !acceptsFolder(accepts)) return "takes files only";
+  return null;
+}
+
+function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, rowKind }: Options = {}): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
   for (const action of byKind(actions)) {
     if (action.command.trim() === "") continue;
@@ -38,7 +50,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder }:
     const subtitle = agent
       ? { text: agentFolder ?? null, startTrim: true, lead: "tab" as const }
       : scriptSubtitle({ ...action, name }, ctx);
-    const reason = agent ? agentReason(action, agentFolder ?? "") : actionAvailability(action, ctx);
+    const reason = agent ? agentReason(action, agentFolder ?? "") : (acceptsReason(action, rowKind) ?? actionAvailability(action, ctx));
     rows.push({
       action,
       enabled: reason === null,

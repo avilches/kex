@@ -141,7 +141,40 @@ describe("normalizeActions", () => {
 
   it("drops malformed entries", () => {
     const out = normalizeActions([null, 3, { id: "a" }, { id: 7, command: "x" }, { id: "b", kind: "app", command: "x" }]);
-    expect(out).toEqual([{ id: "b", name: "x", kind: "app", command: "x", ownButton: false }]);
+    expect(out).toEqual([{ id: "b", name: "x", kind: "app", command: "x", accepts: "folder", ownButton: false }]);
+  });
+
+  describe("what an app accepts", () => {
+    const app = (accepts: unknown) => ({ id: "a", kind: "app", command: "zed {target}", accepts });
+
+    it("keeps file, folder and both", () => {
+      for (const accepts of ["file", "folder", "both"] as const) {
+        expect(normalizeActions([app(accepts)])[0]).toMatchObject({ accepts });
+      }
+    });
+
+    it("falls back to a folder when it is missing or means nothing", () => {
+      for (const accepts of [undefined, "", "files", 3, null, {}]) {
+        expect(normalizeActions([app(accepts)])[0]).toMatchObject({ accepts: "folder" });
+      }
+    });
+
+    it("belongs to apps only: a script or an agent never carries it", () => {
+      for (const kind of ["script", "agent"] as const) {
+        const [x] = normalizeActions([{ id: "a", kind, command: "claude", accepts: "both" }]);
+        expect(x).not.toHaveProperty("accepts");
+      }
+    });
+
+    it("is stable: normalizing twice changes nothing", () => {
+      const once = normalizeActions([app("both")]);
+      expect(normalizeActions(once)).toEqual(once);
+    });
+
+    it("is set through updateAction", () => {
+      const list = normalizeActions([app("folder")]);
+      expect(updateAction(list, "a", { accepts: "both" })[0]).toMatchObject({ accepts: "both" });
+    });
   });
 });
 

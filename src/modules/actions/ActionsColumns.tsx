@@ -261,7 +261,7 @@ export function ActionsColumns({ global, workspace, workspaceName, suggestions, 
 
       <p className="text-[11px] text-muted-foreground">
         Examples: <span className="font-mono">pnpm dev</span> for a script,{" "}
-        <span className="font-mono">pycharm {"{workspace}"}</span> for an app. Drag an Action to the other column to move
+        <span className="font-mono">pycharm {"{target}"}</span> for an app. Drag an Action to the other column to move
         it between global and this workspace.
       </p>
 

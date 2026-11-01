@@ -3,13 +3,14 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { byKind, buildActionsBarModel, CONTEXT_RESERVE, hasContextActions, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
 import type { Action } from "./types";
+import type { RunOverlay } from "./useActionRunner";
 import { useActionContext } from "./useActionContext";
 import { useActionStates } from "./useActionStates";
 
 export type BarScope = "workspace" | "global";
 
 export type BarController = {
-  run: (action: Action) => void;
+  run: (action: Action, overlay?: RunOverlay) => void;
   stop: (action: Action) => void;
   /** Brings the tab of a running script into view; false when it has none. */
   focus: (action: Action) => boolean;

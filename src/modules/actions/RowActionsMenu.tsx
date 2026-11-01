@@ -58,15 +58,24 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
   const vars = useMemo(
     () =>
       tab && ws
-        ? buildCommandVars(tab, { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, { branch: info.branch, repoRoot: info.repoRoot }, sys.host)
+        ? {
+            ...buildCommandVars(tab, { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, { branch: info.branch, repoRoot: info.repoRoot }, sys.host),
+            // An app opened from a row opens that row: its folder, or its file.
+            target: path,
+          }
         : null,
-    [tab, ws, info.branch, info.repoRoot, sys.host],
+    [tab, ws, info.branch, info.repoRoot, sys.host, path],
   );
   const shell = scriptShellFor(IS_WINDOWS, envKind);
   const groups = useMemo(
     () =>
       vars
-        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell }, kind === "folder" ? { agentFolder: vars.cwd } : {})
+        ? contextActionEntries(
+            ws?.actions ?? NONE,
+            global,
+            { vars, shell, targetKind: kind },
+            kind === "folder" ? { agentFolder: vars.cwd, rowKind: kind } : { rowKind: kind },
+          )
         : EMPTY_GROUPS,
     [vars, global, shell, ws?.actions, kind],
   );

@@ -64,10 +64,13 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   vivas `AddActionMenu.tsx` (combo Add) en la ventana de Settings.
   Aplicarla (con su provider, `DialogScrollHost`) a todo popover que abra dentro de un modal.
 - **Variables de commando de Action** (`commandTemplate.ts`, `COMMAND_VARIABLES`): `{cwd}`,
-  `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}` y `{host}`. Los
-  nombres canonico son `{filepath}` y `{filename}` (los antiguos `{path}`/`{file}` ya no
-  existen); los presets de JetBrains solo ofrecen las variantes de workspace y cwd porque sus
-  editores no abren ficheros sueltos.
+  `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}`, `{host}` y
+  `{target}`. Los nombres canonico son `{filepath}` y `{filename}` (los antiguos
+  `{path}`/`{file}` ya no existen). `{target}` es de las apps: lo que la app abre en el sitio
+  donde se ofrece (la raiz del workspace en el Header, la carpeta o el fichero en un menu), y
+  solo la lista de variables de una app lo muestra. Una app se anade una sola vez, ya no una
+  por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
+  carpetas), y el modal pregunta "What it opens" (Files, Folders, Files and folders).
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.

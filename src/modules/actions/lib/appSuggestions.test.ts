@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import { CUSTOM_APP_SUGGESTION, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
+import { CUSTOM_APP_SUGGESTION, actionFromSuggestion, agentSuggestionsFromDetected, suggestionsFromDetected } from "./appSuggestions";
 
 const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?: boolean): DetectedEditor => ({
   id,
@@ -12,54 +12,62 @@ const ed = (id: string, binary: string, argsBeforePath: string[] = [], enabled?:
 });
 
 describe("suggestionsFromDetected", () => {
-  it("offers one entry per app and preset variable, alphabetically", () => {
+  it("offers one entry per app, alphabetically, ending in {target}", () => {
     const list = suggestionsFromDetected([ed("pycharm", "pycharm"), ed("bbedit", "bbedit")]);
-    expect(list.map((s) => s.key)).toEqual([
-      "bbedit:filepath",
-      "bbedit:workspace",
-      "bbedit:cwd",
-      "pycharm:workspace",
-      "pycharm:cwd",
-    ]);
+    expect(list.map((s) => s.key)).toEqual(["bbedit:app", "pycharm:app"]);
     expect(list[0]).toMatchObject({
       appId: "bbedit",
-      name: "BBEdit {filepath}",
+      name: "BBEdit",
       iconId: "bbedit",
-      defaultCommand: "bbedit {filepath}",
+      defaultCommand: "bbedit {target}",
+      kind: "app",
     });
-    expect(list[1]!.defaultCommand).toBe("bbedit {workspace}");
-    expect(list[2]!.defaultCommand).toBe("bbedit {cwd}");
+    expect(list[1]!.defaultCommand).toBe("pycharm {target}");
+  });
+
+  it("never offers the same app twice, whatever it accepts: no variable in the name or the command but {target}", () => {
+    const list = suggestionsFromDetected([ed("zed", "zed"), ed("pycharm", "pycharm"), ed("vscode", "code")]);
+    expect(list).toHaveLength(3);
+    for (const s of list) {
+      expect(s.name).not.toMatch(/[{}]/);
+      expect(s.defaultCommand.match(/\{[a-z]+\}/g)).toEqual(["{target}"]);
+    }
+  });
+
+  it("says what each app accepts from the catalog: JetBrains folders, the rest either, an unknown one either", () => {
+    const by = Object.fromEntries(suggestionsFromDetected([ed("pycharm", "pycharm"), ed("zed", "zed"), ed("vscode", "code"), ed("mystery", "mystery")]).map((s) => [s.appId, s.accepts]));
+    expect(by).toEqual({ pycharm: "folder", zed: "both", vscode: "both", mystery: "both" });
   });
 
   it("quotes binaries and arguments that hold spaces", () => {
-    const list = suggestionsFromDetected([ed("pycharm", "open", ["-na", "PyCharm CE.app", "--args"])]);
-    expect(list.find((s) => s.key === "pycharm:workspace")!.defaultCommand).toBe(
-      "open -na 'PyCharm CE.app' --args {workspace}",
-    );
+    const [p] = suggestionsFromDetected([ed("pycharm", "open", ["-na", "PyCharm CE.app", "--args"])]);
+    expect(p!.defaultCommand).toBe("open -na 'PyCharm CE.app' --args {target}");
     const [v] = suggestionsFromDetected([ed("vscode", "/Applications/Visual Studio Code.app/bin/code")]);
-    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {filepath}");  });
+    expect(v!.defaultCommand).toBe("'/Applications/Visual Studio Code.app/bin/code' {target}");
+  });
 
   it("keeps braces and quotes in a path literal", () => {
     const [a] = suggestionsFromDetected([ed("vscode", "/a/{x}/code")]);
-    expect(a!.defaultCommand).toBe("/a/{{x}}/code {filepath}");
+    expect(a!.defaultCommand).toBe("/a/{{x}}/code {target}");
     const [b] = suggestionsFromDetected([ed("vscode", "/it's here/code")]);
-    expect(b!.defaultCommand).toBe(`"/it's here/code" {filepath}`);
+    expect(b!.defaultCommand).toBe(`"/it's here/code" {target}`);
   });
 
   it("skips disabled apps and keeps enabled ones", () => {
     const list = suggestionsFromDetected([ed("vscode", "code", [], false), ed("cursor", "cursor"), ed("zed", "zed", [], false)]);
-    expect(list.map((s) => s.key)).toEqual(["cursor:filepath", "cursor:workspace", "cursor:cwd"]);
-  });
-
-  it("lets two actions share one app with different templates", () => {
-    const variants = suggestionsFromDetected([ed("zed", "zed")]).filter((s) => s.appId === "zed");
-    expect(variants[0]!.appId).toBe("zed");
-    expect(new Set(variants.map((v) => v.defaultCommand)).size).toBe(variants.length);
+    expect(list.map((s) => s.key)).toEqual(["cursor:app"]);
   });
 
   it("falls back to the detected name for an app outside the catalog", () => {
     const [s] = suggestionsFromDetected([ed("mystery", "mystery")]);
-    expect(s).toMatchObject({ name: "mystery {filepath}", defaultCommand: "mystery {filepath}" });
+    expect(s).toMatchObject({ name: "mystery", defaultCommand: "mystery {target}", accepts: "both" });
+  });
+
+  it("builds an Action that carries what the app accepts and no variable in its name", () => {
+    const [s] = suggestionsFromDetected([ed("pycharm", "pycharm")]);
+    expect(actionFromSuggestion(s!)).toMatchObject({ kind: "app", name: "PyCharm", command: "pycharm {target}", appId: "pycharm", accepts: "folder", ownButton: false });
+    const [z] = suggestionsFromDetected([ed("zed", "zed")]);
+    expect(actionFromSuggestion(z!).accepts).toBe("both");
   });
 });
 
