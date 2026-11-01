@@ -259,6 +259,10 @@ const TERMINAL_STORE_PATH = "settings-terminal.json";
 const EDITOR_STORE_PATH = "settings-editor.json";
 const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const TOOLS_STORE_PATH = "settings-tools.json";
+const ONBOARDING_STORE_PATH = "settings-onboarding.json";
+
+// Onboarding store key
+const KEY_ONBOARDING = "onboarding";
 
 // General store keys
 const KEY_THEME = "theme";
@@ -287,7 +291,6 @@ const KEY_PALETTE_WIDTH = "paletteWidth";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_INSTALLED_INTEGRATIONS = "installedIntegrations";
 const KEY_INTEGRATION_SUGGESTIONS = "integrationSuggestions";
-const KEY_ONBOARDING = "onboarding";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -539,6 +542,7 @@ const terminalStore = new LazyStore(TERMINAL_STORE_PATH, { defaults: {}, autoSav
 const editorStore = new LazyStore(EDITOR_STORE_PATH, { defaults: {}, autoSave: 200 });
 const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoSave: 200 });
 const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200 });
+const onboardingStore = new LazyStore(ONBOARDING_STORE_PATH, { defaults: {}, autoSave: 200 });
 
 // LazyStore.onChange only fires within the writing process. The settings
 // page lives in a separate webview, so writes there never reach the main
@@ -546,7 +550,7 @@ const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200
 // window can listen.
 const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
-type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts";
+type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts" | "onboarding";
 type PrefsChangedPayload = { store: StoreId; key: string; value: unknown };
 
 export function parseSpinnerStyle(value: unknown): SpinnerStyle {
@@ -578,6 +582,7 @@ const writeTerminalPref = makeWriter(terminalStore, "terminal");
 const writeEditorPref = makeWriter(editorStore, "editor");
 const writeToolsPref = makeWriter(toolsStore, "tools");
 const writeShortcutsStorePref = makeWriter(shortcutsStore, "shortcuts");
+const writeOnboardingPref = makeWriter(onboardingStore, "onboarding");
 
 async function writeShortcutsPref(
   value: Partial<Record<ShortcutId, KeyBinding[]>>,
@@ -587,18 +592,19 @@ async function writeShortcutsPref(
 
 export async function loadPreferences(): Promise<Preferences> {
   // Fetch all stores in parallel - one IPC roundtrip per store.
-  const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue] = await Promise.all([
-    store.entries(),
-    terminalStore.entries(),
-    editorStore.entries(),
-    toolsStore.entries(),
-    shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
-  ]);
+  const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue, onboardingValue] =
+    await Promise.all([
+      store.entries(),
+      terminalStore.entries(),
+      editorStore.entries(),
+      toolsStore.entries(),
+      shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
+      onboardingStore.get<unknown>(KEY_ONBOARDING),
+    ]);
   // Kept as separate per-store maps, never merged into one: terminal and editor
   // share unprefixed key names (fontFamily, fontSize, letterSpacing, lineHeight,
   // cursorBlink, cursorStyle) and general vs editor both use "theme", so a single
   // merged map would let one store's value silently overwrite another's.
-  const hadStoredPrefs = entries.length > 0;
   const generalMap = new Map<string, unknown>(entries);
   const terminalMap = new Map<string, unknown>(terminalEntries);
   const editorMap = new Map<string, unknown>(editorEntries);
@@ -726,7 +732,7 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.agentNotifications,
     installedIntegrations: parseInstalledIntegrations(getGeneral<unknown>(KEY_INSTALLED_INTEGRATIONS)),
     integrationSuggestions: parseSuggestions(getGeneral<unknown>(KEY_INTEGRATION_SUGGESTIONS)),
-    onboarding: parseOnboarding(getGeneral<unknown>(KEY_ONBOARDING), hadStoredPrefs),
+    onboarding: parseOnboarding(onboardingValue),
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
@@ -855,8 +861,6 @@ export async function loadPreferences(): Promise<Preferences> {
   const configDefaults: [string, unknown][] = [];
   if (!generalMap.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!generalMap.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
-  // Persisted on first load: the defaults above make the next launch look like it had prior prefs.
-  if (!generalMap.has(KEY_ONBOARDING)) configDefaults.push([KEY_ONBOARDING, result.onboarding]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
@@ -1361,9 +1365,8 @@ export function updateOnboarding(
   change: (current: OnboardingState) => OnboardingState,
 ): Promise<void> {
   const run = onboardingQueue.then(async () => {
-    const stored = await store.get<unknown>(KEY_ONBOARDING);
-    const current = parseOnboarding(stored, true);
-    await writePref(KEY_ONBOARDING, change(current));
+    const current = parseOnboarding(await onboardingStore.get<unknown>(KEY_ONBOARDING));
+    await writeOnboardingPref(KEY_ONBOARDING, change(current));
   });
   onboardingQueue = run.catch(() => undefined);
   return run;
@@ -1412,7 +1415,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_INSTALLED_INTEGRATIONS]: "installedIntegrations",
   [KEY_INTEGRATION_SUGGESTIONS]: "integrationSuggestions",
-  [KEY_ONBOARDING]: "onboarding",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
@@ -1482,6 +1484,10 @@ const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SHORTCUTS]: "shortcuts",
 };
 
+const ONBOARDING_PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_ONBOARDING]: "onboarding",
+};
+
 // Backwards-compat export used by tests - maps store keys from all stores
 // except where terminal/editor keys collide. Non-colliding entries are correct.
 // Do NOT use this map inside onPreferencesChange; use the per-store maps instead.
@@ -1491,6 +1497,7 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   ...EDITOR_PREF_KEY_MAP,
   ...TOOLS_PREF_KEY_MAP,
   ...SHORTCUTS_PREF_KEY_MAP,
+  ...ONBOARDING_PREF_KEY_MAP,
 };
 
 const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
@@ -1499,6 +1506,7 @@ const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
   editor: EDITOR_PREF_KEY_MAP,
   tools: TOOLS_PREF_KEY_MAP,
   shortcuts: SHORTCUTS_PREF_KEY_MAP,
+  onboarding: ONBOARDING_PREF_KEY_MAP,
 };
 
 // Every LazyStore paired with the key map that decodes its raw keys into a
@@ -1509,6 +1517,7 @@ const STORES_WITH_MAPS: ReadonlyArray<[LazyStore, Record<string, PrefKey>]> = [
   [editorStore, EDITOR_PREF_KEY_MAP],
   [toolsStore, TOOLS_PREF_KEY_MAP],
   [shortcutsStore, SHORTCUTS_PREF_KEY_MAP],
+  [onboardingStore, ONBOARDING_PREF_KEY_MAP],
 ];
 
 /** Subscribe to changes from any window (settings -> main). */

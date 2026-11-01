@@ -49,9 +49,12 @@ perder el hilo. Además, los mismos controles viven en Settings para poder revis
 
 ## Cuándo sale el onboarding
 
-Solo en una instalación nueva. Al arrancar, si ya existía configuración guardada de Kex, el
-onboarding se marca como hecho sin mostrarse. Es una comprobación de primer arranque, no una
-migración. Los usuarios que se actualizan no ven nada nuevo salvo las secciones de Settings.
+Sale siempre que no exista `settings-onboarding.json`, el fichero propio donde se guarda su estado.
+Esto sustituye a la regla inicial (mirar si ya había configuración guardada en `settings-general.json`):
+cuando se decidió, nadie había usado Kex todavía, así que no hay usuarios previos que proteger.
+Un fichero que existe pero está corrupto cuenta como onboarding terminado, para no molestar. Borrar
+el fichero es la forma de volver a ver el onboarding. Un `onboarding` que quede en
+`settings-general.json` de un desarrollador se ignora.
 
 ## El onboarding
 
@@ -146,14 +149,14 @@ delgados:
   ficheros) y comando para abrir el panel de Privacidad. Se documentan en `docs/IPC.md`.
 - Los componentes de fila de agente y de lista de permisos se reutilizan tanto en el modal como en
   Settings, que es otra ventana con su propio webview. El estado del onboarding se guarda en
-  `settings-general.json` y las dos ventanas lo leen y lo escriben con el patrón que ya usa
+  `settings-onboarding.json` y las dos ventanas lo leen y lo escriben con el patrón que ya usa
   `integrationSuggestions`.
 - El modal es una versión reducida de Settings, no una segunda implementación: mismos componentes,
   distinto marco.
 
 ## Invariantes con prueba
 
-- Un usuario con configuración previa nunca ve el onboarding.
+- Sin `settings-onboarding.json` el onboarding sale, y cargar las preferencias no crea ese fichero.
 - Un agente no detectado nunca recibe una instalación, ni por botón ni por Install all, y no deja
   carpetas creadas.
 - Install all no toca agentes en estado de aviso.
@@ -169,7 +172,8 @@ de permisos y filas de agentes), `docs/ARCHITECTURE.md` (módulo del onboarding)
 
 ## Decisiones del diseño (mías, no del usuario)
 
-- Detección de primer arranque por la existencia previa de configuración guardada.
+- Primer arranque por la ausencia de `settings-onboarding.json` (decisión del usuario, que
+  sustituyó a la detección por configuración previa).
 - El toast actual se suprime mientras el onboarding esté sin terminar y vuelve cuando se descarta o
   se termina.
 - Un solo recordatorio suave (toast) al arrancar de nuevo, además de la chip.
@@ -186,8 +190,6 @@ de permisos y filas de agentes), `docs/ARCHITECTURE.md` (módulo del onboarding)
   agente que no se detecta (decisión del usuario): si el agente se desinstaló y su integración
   quedó puesta, no se toca, y su fila solo dice "No detectado". Así, la sincronización exige las dos
   cosas: agente detectado e integración instalada.
-- La comprobación de primer arranque se hace antes de que nada escriba `settings-general.json` en
-  esa ejecución; mira si ese fichero ya existía.
 - "Uninstall all" pide confirmación con la lista de agentes afectados; "Install all" no, porque
   tiene Preview y es reversible.
 - Un agente instalado fuera del PATH que el escaneo no encuentra se considera no detectado. Es una

@@ -19,28 +19,29 @@ import {
 const fresh: OnboardingState = { finished: false, step: "welcome", shown: false, reminded: false };
 
 describe("parseOnboarding", () => {
-  it("is not finished on a fresh install", () => {
-    expect(parseOnboarding(undefined, false)).toEqual(fresh);
+  it("is fresh when there is no value", () => {
+    expect(parseOnboarding(undefined)).toEqual(fresh);
+    expect(parseOnboarding(null)).toEqual(fresh);
   });
 
-  it("is finished when there is no value but prior preferences exist", () => {
-    expect(parseOnboarding(undefined, true).finished).toBe(true);
-  });
-
-  it("is finished when the value is malformed and prior preferences exist", () => {
-    expect(parseOnboarding("junk", true).finished).toBe(true);
-    expect(parseOnboarding([], true).finished).toBe(true);
-    expect(parseOnboarding({ finished: "no" }, true).finished).toBe(true);
+  it("is finished when the value is malformed", () => {
+    expect(parseOnboarding("junk").finished).toBe(true);
+    expect(parseOnboarding([]).finished).toBe(true);
+    expect(parseOnboarding({ finished: "no" }).finished).toBe(true);
   });
 
   it("keeps what a valid value says", () => {
     const raw = { finished: false, step: "agents", shown: true, reminded: true };
-    expect(parseOnboarding(raw, true)).toEqual(raw);
+    expect(parseOnboarding(raw)).toEqual(raw);
   });
 
   it("falls back to welcome on an unknown step", () => {
     const raw = { finished: false, step: "nope", shown: true, reminded: false };
-    expect(parseOnboarding(raw, true).step).toBe("welcome");
+    expect(parseOnboarding(raw).step).toBe("welcome");
+  });
+
+  it("coerces partially valid fields", () => {
+    expect(parseOnboarding({ finished: false, shown: "yes", reminded: 1 })).toEqual(fresh);
   });
 });
 

@@ -15,12 +15,9 @@ function isStep(value: unknown): value is OnboardingStep {
   return typeof value === "string" && (ONBOARDING_STEPS as readonly string[]).includes(value);
 }
 
-// hadStoredPrefs separates a fresh install from an existing user who predates the onboarding.
-export function parseOnboarding(raw: unknown, hadStoredPrefs: boolean): OnboardingState {
+export function parseOnboarding(raw: unknown): OnboardingState {
   if (raw === undefined || raw === null) {
-    return hadStoredPrefs
-      ? { ...FINISHED }
-      : { finished: false, step: "welcome", shown: false, reminded: false };
+    return { finished: false, step: "welcome", shown: false, reminded: false };
   }
   if (typeof raw !== "object" || Array.isArray(raw)) return { ...FINISHED };
   const { finished, step, shown, reminded } = raw as Record<string, unknown>;

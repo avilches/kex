@@ -7,7 +7,7 @@ Yottacast y el software de Hub, y lo recrea `user-data/create-links.sh`, que es 
 | Enlace | A dónde | Qué hay dentro |
 |---|---|---|
 | `user-data/logs` | `~/Library/Logs/app.betauer.kex` | `Kex.log`, el log de la aplicación |
-| `user-data/support` | `~/Library/Application Support/app.betauer.kex` | los `settings-*.json`, los temas, `workspaces.json` y `agent-sessions.json` del restore de sesiones |
+| `user-data/support` | `~/Library/Application Support/app.betauer.kex` | los `settings-*.json` (incluido `settings-onboarding.json`, cuya ausencia hace que salga el onboarding), los temas, `workspaces.json` y `agent-sessions.json` del restore de sesiones |
 | `user-data/config` | `~/.config/kex` | `hooks/`, con los ganchos de sesión que instala el agente |
 | `user-data/cache` | `~/.cache/kex` | `shell-integration/`, lo que se inyecta en bash y zsh |
 | `user-data/logs-dev` | `~/Library/Logs/app.betauer.kex.dev` | el `Kex.log` del build de desarrollo |

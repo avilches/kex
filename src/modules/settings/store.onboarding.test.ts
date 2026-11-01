@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const backing = vi.hoisted(() => ({
-  general: [] as [string, unknown][],
-  generalSets: [] as [string, unknown][],
+  onboarding: undefined as unknown,
+  sets: [] as [string, string, unknown][],
+  emitted: [] as unknown[],
 }));
 
 vi.mock("@tauri-apps/plugin-store", () => {
@@ -12,13 +13,14 @@ vi.mock("@tauri-apps/plugin-store", () => {
       this.path = path;
     }
     async entries() {
-      return this.path.includes("general") ? backing.general : [];
+      return [];
     }
-    async get() {
+    async get(key: string) {
+      if (this.path === "settings-onboarding.json" && key === "onboarding") return backing.onboarding;
       return undefined;
     }
     async set(key: string, value: unknown) {
-      if (this.path.includes("general")) backing.generalSets.push([key, value]);
+      backing.sets.push([this.path, key, value]);
     }
     async save() {}
     async onChange() {
@@ -28,53 +30,65 @@ vi.mock("@tauri-apps/plugin-store", () => {
   return { LazyStore };
 });
 vi.mock("@tauri-apps/api/event", () => ({
-  emit: vi.fn(async () => {}),
+  emit: vi.fn(async (_name: string, payload: unknown) => {
+    backing.emitted.push(payload);
+  }),
   listen: vi.fn(async () => () => {}),
 }));
 
-import { DEFAULT_PREFERENCES, loadPreferences } from "./store";
+import { DEFAULT_PREFERENCES, loadPreferences, updateOnboarding } from "./store";
+
+const FRESH = { finished: false, step: "welcome", shown: false, reminded: false };
 
 describe("onboarding persistence", () => {
   beforeEach(() => {
-    backing.general = [];
-    backing.generalSets = [];
+    backing.onboarding = undefined;
+    backing.sets = [];
+    backing.emitted = [];
   });
-
-  const writtenOnboarding = () => backing.generalSets.filter(([k]) => k === "onboarding").map(([, v]) => v);
 
   it("defaults to finished so nothing flashes before the load", () => {
     expect(DEFAULT_PREFERENCES.onboarding.finished).toBe(true);
   });
 
-  it("a fresh store loads onboarding as not finished", async () => {
+  it("an absent onboarding store loads as not finished and writes nothing", async () => {
     const prefs = await loadPreferences();
-    expect(prefs.onboarding).toEqual({ finished: false, step: "welcome", shown: false, reminded: false });
+    expect(prefs.onboarding).toEqual(FRESH);
+    expect(backing.sets.filter(([, k]) => k === "onboarding")).toEqual([]);
   });
 
-  it("a store with prior keys loads it as finished", async () => {
-    backing.general = [["zoomLevel", 1]];
+  it("a stored valid value loads as stored", async () => {
+    backing.onboarding = { finished: false, step: "agents", shown: true, reminded: false };
+    const prefs = await loadPreferences();
+    expect(prefs.onboarding).toEqual({ finished: false, step: "agents", shown: true, reminded: false });
+  });
+
+  it("a malformed stored value loads as finished", async () => {
+    backing.onboarding = "junk";
     const prefs = await loadPreferences();
     expect(prefs.onboarding.finished).toBe(true);
   });
 
-  it("a fresh store writes onboarding as not finished on the first load", async () => {
-    await loadPreferences();
-    expect(writtenOnboarding()).toEqual([
-      { finished: false, step: "welcome", shown: false, reminded: false },
+  it("updateOnboarding reads a missing value as fresh and writes to the onboarding store with its change event", async () => {
+    const seen: unknown[] = [];
+    await updateOnboarding((current) => {
+      seen.push(current);
+      return { ...current, shown: true };
+    });
+    expect(seen).toEqual([FRESH]);
+    expect(backing.sets).toEqual([
+      ["settings-onboarding.json", "onboarding", { ...FRESH, shown: true }],
+    ]);
+    expect(backing.emitted).toEqual([
+      { store: "onboarding", key: "onboarding", value: { ...FRESH, shown: true } },
     ]);
   });
 
-  it("a store with prior keys and no onboarding writes it as finished", async () => {
-    backing.general = [["zoomLevel", 1]];
+  it("the general store never receives an onboarding key", async () => {
     await loadPreferences();
-    expect(writtenOnboarding()).toHaveLength(1);
-    expect(writtenOnboarding()[0]).toMatchObject({ finished: true });
-  });
-
-  it("never overwrites an onboarding state that is already stored", async () => {
-    backing.general = [["onboarding", { finished: false, step: "agents", shown: true, reminded: false }]];
-    const prefs = await loadPreferences();
-    expect(writtenOnboarding()).toEqual([]);
-    expect(prefs.onboarding).toEqual({ finished: false, step: "agents", shown: true, reminded: false });
+    await updateOnboarding((c) => c);
+    expect(
+      backing.sets.filter(([path, k]) => path === "settings-general.json" && k === "onboarding"),
+    ).toEqual([]);
   });
 });
