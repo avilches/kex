@@ -29,6 +29,14 @@ vi.mock("@tauri-apps/api/core", () => ({
     return Promise.resolve(claim.won);
   },
 }));
+const restartListener = vi.hoisted(() => ({ fire: () => {} }));
+vi.mock("@tauri-apps/api/event", () => ({
+  emit: () => Promise.resolve(),
+  listen: (_: string, cb: () => void) => {
+    restartListener.fire = cb;
+    return Promise.resolve(() => {});
+  },
+}));
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("./OnboardingDialog", () => ({ OnboardingDialog: () => null }));
@@ -128,5 +136,13 @@ describe("OnboardingHost", () => {
       shown: true,
       reminded: false,
     });
+  });
+
+  it("opens the dialog when Settings asks to run the onboarding again", async () => {
+    setOnboarding({ finished: true, shown: true });
+    await mountHydrated();
+    expect(useOnboardingUi.getState().open).toBe(false);
+    act(() => restartListener.fire());
+    expect(useOnboardingUi.getState().open).toBe(true);
   });
 });

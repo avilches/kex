@@ -125,7 +125,7 @@ export function AgentIntegrations() {
         </Button>
         <Button
           size="sm"
-          variant="outline"
+          variant="destructive"
           className="h-8 px-2.5 text-[11px]"
           disabled={removePlan.length === 0 || bulkBusy}
           onClick={() => setConfirmingRemove(true)}
