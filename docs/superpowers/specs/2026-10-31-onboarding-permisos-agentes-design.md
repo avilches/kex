@@ -24,8 +24,10 @@ perder el hilo. Además, los mismos controles viven en Settings para poder revis
    "Install all" y "Uninstall all" para las integraciones.
 4. Settings, sección nueva de permisos (solo macOS): estado de cada acceso a disco, con un botón para
    volver a comprobarlo y, si está denegado, para abrir el panel exacto de Privacidad.
-5. Quitar cámara y micrófono del `Info.plist` y de `entitlements.plist` (heredados del upstream,
-   Kex no los usa).
+5. Mantener cámara y micrófono en el `Info.plist` y en `entitlements.plist`, con el texto de Kex:
+   macOS atribuye a Kex lo que pide un programa lanzado en uno de sus terminales (ffmpeg con
+   avfoundation, sox, la entrada de voz de un agente), y sin ellos se lo deniega sin avisar. Una
+   primera versión los quitó y se restauraron.
 
 ## Fuera de alcance
 
@@ -132,8 +134,8 @@ profundo. El botón dice "Abrir Ajustes del Sistema", no "Pedir de nuevo".
 
 Para que el aviso de macOS use un texto propio de Kex, se añaden las claves
 `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` y
-`NSDownloadsFolderUsageDescription` al `Info.plist`, en lugar de las de cámara y micrófono que se
-quitan.
+`NSDownloadsFolderUsageDescription` al `Info.plist`, junto a las de cámara y micrófono, que se
+quedan (ver el punto 5 del alcance).
 
 ## Arquitectura
 

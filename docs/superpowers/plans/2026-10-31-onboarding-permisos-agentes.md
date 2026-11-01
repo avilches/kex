@@ -39,7 +39,7 @@
 
 - Create `src-tauri/src/modules/permissions.rs`: sondeo de acceso a carpetas y apertura del panel de Privacidad.
 - Modify `src-tauri/src/modules/mod.rs`, `src-tauri/src/lib.rs`: registrar modulo y comandos.
-- Modify `src-tauri/Info.plist`, `src-tauri/entitlements.plist`: quitar camara y microfono, anadir textos de carpetas.
+- Modify `src-tauri/Info.plist`, `src-tauri/entitlements.plist`: anadir textos de carpetas. (Esta tarea quitaba tambien camara y microfono; se restauraron despues, porque macOS atribuye a Kex lo que pide un programa lanzado en sus terminales y sin ellos se lo deniega sin avisar.)
 - Create `src/modules/agents/lib/agentRows.ts` (+ test): catalogo de agentes conocidos y estado de fila.
 - Create `src/modules/agents/lib/bulkIntegration.ts` (+ test): plan y ejecucion de Install all / Uninstall all.
 - Create `src/modules/agents/lib/startupSync.ts` (+ test): que sincroniza el arranque.
@@ -87,6 +87,8 @@
 - Modify: `src-tauri/Info.plist`, `src-tauri/entitlements.plist`
 
 **Interfaces:** ninguna.
+
+> Revertido en parte despues: camara y microfono se restauraron en los dos ficheros, con texto de Kex (ver el punto 5 del alcance de la spec). Los pasos de abajo describen lo que se hizo entonces.
 
 - [ ] **Step 1: Editar `Info.plist`**: quitar `NSCameraUsageDescription` y `NSMicrophoneUsageDescription`; anadir `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` y `NSDownloadsFolderUsageDescription` con un texto de una frase que diga que los terminales y agentes de Kex necesitan leer esa carpeta. Sin la palabra Terax.
 - [ ] **Step 2: Editar `entitlements.plist`**: quitar las claves de camara y microfono; si el diccionario queda vacio dejar `<dict/>` (el fichero lo referencia `tauri.conf.json`).
