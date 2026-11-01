@@ -1172,6 +1172,7 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {rootMode !== "workspace" && (
         <div className="flex h-8 shrink-0 items-center gap-1 pl-1.5 pr-9">
           {!canEditRoot ? (
             <div
@@ -1234,6 +1235,7 @@ export const FileExplorer = memo(
           )}
 
         </div>
+        )}
 
         {rootMode === "workspace" &&
         (workspaceRootPath === null || root?.status === "error") ? (
