@@ -1,3 +1,4 @@
+import { typedLine } from "./typedLine";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -1064,10 +1065,10 @@ async function startLeaf(leafId: string, s: Session): Promise<void> {
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
   if (decision.inject === "resume" && plan) {
     stageRestoredSnapshot(leafId, plan);
-    void writeWhenShellReady(s, leafId, pty, ` ${plan.resumeCmd}\r`);
+    void writeWhenShellReady(s, leafId, pty, typedLine(plan.resumeCmd));
     watchResume(leafId, plan);
   } else if (decision.inject === "command" && s.persistentCommand) {
-    void writeWhenShellReady(s, leafId, pty, `${s.persistentCommand}\r`);
+    void writeWhenShellReady(s, leafId, pty, typedLine(s.persistentCommand));
   }
 }
 
