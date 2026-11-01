@@ -34,25 +34,45 @@ pub(crate) struct QuitGuard {
     pub(crate) flushing: FlushTracker,
 }
 
-/// Upper bound on how long a quit waits for windows that never acknowledge.
-const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
+/// Upper bound on how long a quit waits for windows that never acknowledge. Generous on purpose:
+/// it only matters when a window is stuck, and a slow disk must not cut a real save short.
+const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Labels of the windows still flushing for a quit. The app may only exit once it is empty,
 /// otherwise the first window to finish would kill the others mid-save.
 #[derive(Default)]
-pub(crate) struct FlushTracker(Mutex<HashSet<String>>);
+pub(crate) struct FlushTracker {
+    waiting: Mutex<HashSet<String>>,
+    /// Bumped by every quit, so a timer from an earlier quit can tell it is stale.
+    epoch: std::sync::atomic::AtomicU64,
+}
 
 impl FlushTracker {
-    /// Replaces the waiting set with `labels`.
-    pub(crate) fn begin(&self, labels: impl IntoIterator<Item = String>) {
-        *self.0.lock().unwrap() = labels.into_iter().collect();
+    /// Replaces the waiting set with `labels` and returns the id of this quit.
+    pub(crate) fn begin(&self, labels: impl IntoIterator<Item = String>) -> u64 {
+        *self.waiting.lock().unwrap_or_else(|e| e.into_inner()) = labels.into_iter().collect();
+        self.epoch.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     /// Marks `label` as done. True when no window is left waiting.
     pub(crate) fn ack(&self, label: &str) -> bool {
-        let mut waiting = self.0.lock().unwrap();
+        let mut waiting = self.waiting.lock().unwrap_or_else(|e| e.into_inner());
         waiting.remove(label);
         waiting.is_empty()
+    }
+
+    /// Drops the windows that no longer exist, since they will never ack.
+    /// True when nothing is left to wait for.
+    pub(crate) fn retain_alive(&self, alive: &HashSet<String>) -> bool {
+        let mut waiting = self.waiting.lock().unwrap_or_else(|e| e.into_inner());
+        waiting.retain(|l| alive.contains(l));
+        waiting.is_empty()
+    }
+
+    /// True while the quit numbered `epoch` is still the latest one and still has windows waiting.
+    pub(crate) fn is_pending(&self, epoch: u64) -> bool {
+        self.epoch.load(Ordering::SeqCst) == epoch
+            && !self.waiting.lock().unwrap_or_else(|e| e.into_inner()).is_empty()
     }
 }
 
@@ -64,16 +84,29 @@ fn main_window_labels(app: &tauri::AppHandle) -> Vec<String> {
 }
 
 /// Asks every live main window to flush, and force-exits after `QUIT_FLUSH_TIMEOUT` if one hangs.
+/// The timer does nothing once every window has acked, or when a newer quit has replaced it.
 pub(crate) fn emit_before_quit(app: &tauri::AppHandle) {
-    app.state::<QuitGuard>()
+    let epoch = app
+        .state::<QuitGuard>()
         .flushing
         .begin(main_window_labels(app));
     let _ = app.emit("kex:before-quit", ());
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(QUIT_FLUSH_TIMEOUT);
-        handle.exit(0);
+        if handle.state::<QuitGuard>().flushing.is_pending(epoch) {
+            handle.exit(0);
+        }
     });
+}
+
+/// A window that is destroyed while a quit is flushing will never call `confirm_quit`.
+fn forget_destroyed_window(app: &tauri::AppHandle) {
+    let alive: HashSet<String> = main_window_labels(app).into_iter().collect();
+    let guard = app.state::<QuitGuard>();
+    if guard.confirmed.load(Ordering::SeqCst) && guard.flushing.retain_alive(&alive) {
+        app.exit(0);
+    }
 }
 
 /// Called by each main window once it has flushed editors and workspace state in
@@ -321,6 +354,7 @@ fn create_app_window(
             }
         }
         WindowEvent::Destroyed => {
+            forget_destroyed_window(&app_handle);
             // Count live main windows after this one is gone.
             let live = app_handle
                 .webview_windows()
@@ -545,8 +579,10 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
 /// Computed by the first window that asks. Building the plans prunes records (a Claude session
 /// with no transcript, an agent with no provider), so doing it per window would let the first
 /// window delete the record of a tab that lives in another one.
-static RESTORE_PLANS: std::sync::OnceLock<Vec<agent::session_store::RestorePlan>> =
-    std::sync::OnceLock::new();
+///
+/// A plan is handed out once: after a window takes its tabs' plans they are gone, so a reloaded or
+/// late window can never resume a session that is already running.
+static RESTORE_PLANS: Mutex<Option<Vec<agent::session_store::RestorePlan>>> = Mutex::new(None);
 
 #[tauri::command]
 fn agent_session_restore_plan(
@@ -555,7 +591,8 @@ fn agent_session_restore_plan(
 ) -> Vec<agent::session_store::RestorePlan> {
     log::debug!("[agent-session] agent_session_restore_plan invoked");
     let mgr = app.state::<window_state::WindowStateManager>();
-    let all = RESTORE_PLANS.get_or_init(|| {
+    let mut slot = RESTORE_PLANS.lock().unwrap_or_else(|e| e.into_inner());
+    let all = slot.get_or_insert_with(|| {
         let plans = agent::session_store::load_restore_plan();
         let (plans, orphans) =
             agent::session_store::split_orphans(plans, &mgr.terminal_tab_ids());
@@ -568,7 +605,7 @@ fn agent_session_restore_plan(
         }
         plans
     });
-    let mine = agent::session_store::plans_for_tabs(
+    let mine = agent::session_store::take_plans_for_tabs(
         all,
         &mgr.window_terminal_tab_ids(window.label()),
     );
@@ -605,6 +642,39 @@ async fn check_launch_dir(path: String) -> Option<String> {
         .flatten()
 }
 
+/// Folders handed to a window by a second launch that it has not picked up yet. The event only
+/// says "look", because a window that is still starting has no listener to receive a payload.
+#[derive(Default)]
+struct PendingOpenFolders(Mutex<std::collections::HashMap<String, Vec<String>>>);
+
+impl PendingOpenFolders {
+    fn push(&self, label: &str, dir: String) {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(label.to_string())
+            .or_default()
+            .push(dir);
+    }
+
+    fn take(&self, label: &str) -> Vec<String> {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(label)
+            .unwrap_or_default()
+    }
+}
+
+/// The folders a second launch left for the calling window, oldest first.
+#[tauri::command]
+fn take_pending_open_folders(
+    pending: State<'_, PendingOpenFolders>,
+    window: tauri::WebviewWindow,
+) -> Vec<String> {
+    pending.take(window.label())
+}
+
 /// A second `kex` process was started (Windows "Open in" verb, CLI): it exits right after
 /// calling this in the live instance, which opens the folder as a workspace in the focused
 /// window or, when no window exists, in a new one.
@@ -632,7 +702,8 @@ fn handle_second_launch(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) 
                 let _ = w.set_focus();
             }
             if let Some(dir) = dir {
-                let _ = app.emit_to(label.as_str(), "kex:open-folder", dir);
+                app.state::<PendingOpenFolders>().push(&label, dir);
+                let _ = app.emit_to(label.as_str(), "kex:open-folder", ());
             }
         }
         (None, dir) => {
@@ -1004,6 +1075,7 @@ pub fn run() {
             registry
         })
         .manage(QuitGuard::default())
+        .manage(PendingOpenFolders::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
         .manage(float_browser::FloatBrowserState::new())
         .invoke_handler(tauri::generate_handler![
@@ -1090,6 +1162,7 @@ pub fn run() {
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
             get_launch_dir,
+            take_pending_open_folders,
             get_build_info,
             confirm_quit,
             custom_themes::custom_theme_save,
@@ -1198,7 +1271,18 @@ pub fn run() {
 
 #[cfg(test)]
 mod launch_tests {
-    use super::{launch_dir_from_args, resolve_against};
+    use super::{launch_dir_from_args, resolve_against, PendingOpenFolders};
+
+    #[test]
+    fn a_folder_left_before_the_window_listens_is_not_lost() {
+        let p = PendingOpenFolders::default();
+        p.push("w-a", "/one".to_string());
+        p.push("w-a", "/two".to_string());
+        p.push("w-b", "/other".to_string());
+        assert_eq!(p.take("w-a"), vec!["/one", "/two"]);
+        assert!(p.take("w-a").is_empty());
+        assert_eq!(p.take("w-b"), vec!["/other"]);
+    }
 
     #[test]
     fn picks_first_existing_directory_and_skips_flags() {
@@ -1254,5 +1338,32 @@ mod quit_tests {
         t.begin(labels(&["w-a", "w-b"]));
         t.begin(labels(&["w-c"]));
         assert!(t.ack("w-c"));
+    }
+
+    #[test]
+    fn the_timer_of_a_finished_quit_does_nothing() {
+        let t = FlushTracker::default();
+        let epoch = t.begin(labels(&["w-a"]));
+        assert!(t.is_pending(epoch));
+        t.ack("w-a");
+        assert!(!t.is_pending(epoch));
+    }
+
+    #[test]
+    fn the_timer_of_an_older_quit_does_nothing() {
+        let t = FlushTracker::default();
+        let first = t.begin(labels(&["w-a"]));
+        let second = t.begin(labels(&["w-a"]));
+        assert!(!t.is_pending(first));
+        assert!(t.is_pending(second));
+    }
+
+    #[test]
+    fn a_destroyed_window_stops_being_waited_for() {
+        let t = FlushTracker::default();
+        t.begin(labels(&["w-a", "w-b"]));
+        let alive = std::collections::HashSet::from(["w-a".to_string()]);
+        assert!(!t.retain_alive(&alive));
+        assert!(t.ack("w-a"));
     }
 }

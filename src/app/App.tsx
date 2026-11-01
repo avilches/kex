@@ -3557,13 +3557,22 @@ export default function App() {
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
+    const drain = () => {
+      void invoke<string[]>("take_pending_open_folders")
+        .then((dirs) => {
+          if (disposed) return;
+          for (const dir of dirs) openFolderRef.current(dir.replace(/\\/g, "/"));
+        })
+        .catch((e) => console.error("[kex] take_pending_open_folders failed:", e));
+    };
     getCurrentWindow()
-      .listen<string>("kex:open-folder", (e) =>
-        openFolderRef.current(e.payload.replace(/\\/g, "/")),
-      )
+      .listen("kex:open-folder", drain)
       .then((u) => {
         if (disposed) u();
-        else unlisten = u;
+        else {
+          unlisten = u;
+          drain();
+        }
       })
       .catch((e) => console.error("[kex] kex:open-folder listen failed:", e));
     return () => {
