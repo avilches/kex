@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
+import { refuseWrite } from "./devGuard";
 import {
   type TextEntry,
   type TextKind,
@@ -47,6 +48,8 @@ export function settingsTextsPlugin(): Plugin {
           try {
             if (req.method === "GET") return send(200, { entries: load() });
             if (req.method !== "POST") return send(405, { error: "GET or POST only" });
+            const refused = refuseWrite(req);
+            if (refused) return send(403, { error: refused });
             const body = JSON.parse(await readBody(req)) as {
               op?: string;
               entry?: unknown;
