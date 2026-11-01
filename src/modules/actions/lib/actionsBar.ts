@@ -496,9 +496,19 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       .slice(0, limit)
       .map((a) => a.id),
   );
-  // What the combo offers acts on what the combo is on, so each is judged against its own {target}.
+  // What the combo offers acts on what the combo is on, not on the workspace root: each item is judged
+  // against its own {target}, and the folder it starts in is that folder (the one that holds the file),
+  // so a workspace without a root does not grey what a focused folder or file can perfectly well run.
+  const comboFolder = kind === "file" ? comboPath.replace(/[\\/][^\\/]*$/, "") || comboPath : comboPath;
   const comboContext: BarContext | null =
-    context && comboPath && kind ? { ...context, vars: { ...context.vars, target: comboPath }, targetKind: kind } : context;
+    context && comboPath && kind
+      ? {
+          ...context,
+          vars: { ...context.vars, target: comboPath },
+          targetKind: kind,
+          folders: { ...context.folders, workspaceRoot: comboFolder },
+        }
+      : context;
   for (const [action, isGlobal] of ordered) {
     const state = stateOf(action, states);
     let barItem: BarItem | undefined;
