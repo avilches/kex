@@ -1167,10 +1167,11 @@ export const FileExplorer = memo(
       <div
         ref={containerRef}
         data-file-explorer
-        className="flex h-full flex-col outline-none"
+        className="flex h-full flex-row outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
           {!canEditRoot ? (
             <div
@@ -1232,65 +1233,6 @@ export const FileExplorer = memo(
             </ContextMenu>
           )}
 
-          {rootMode === "filesystem" && homePath && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={() => onEnterFolder?.(homePath)}
-              title="Go to home"
-              aria-label="Go to home"
-            >
-              <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsSearchOpen((v) => !v)}
-            title="Search files"
-            aria-label="Search files"
-          >
-            <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
-          </Button>
-          {autofocusMode !== "always" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={onFocusActiveTab}
-              disabled={!onFocusActiveTab}
-              title="Focus the active tab's file or folder in the explorer"
-              aria-label="Focus active tab in explorer"
-            >
-              <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onToggleShowHidden}
-            title={showHidden ? "Hide hidden files" : "Show hidden files"}
-            aria-label="Toggle hidden files"
-          >
-            <HugeiconsIcon
-              icon={showHidden ? ViewIcon : ViewOffSlashIcon}
-              size={13}
-              strokeWidth={2}
-            />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.refresh(rootPath)}
-            title="Refresh"
-          >
-            <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
-          </Button>
         </div>
 
         {rootMode === "workspace" &&
@@ -1552,6 +1494,68 @@ export const FileExplorer = memo(
             }}
           />
         )}
+        </div>
+        <div className="flex shrink-0 flex-col items-center gap-1 px-1 py-1.5">
+          {rootMode === "filesystem" && homePath && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onEnterFolder?.(homePath)}
+              title="Go to home"
+              aria-label="Go to home"
+            >
+              <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsSearchOpen((v) => !v)}
+            title="Search files"
+            aria-label="Search files"
+          >
+            <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+          </Button>
+          {autofocusMode !== "always" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={onFocusActiveTab}
+              disabled={!onFocusActiveTab}
+              title="Focus the active tab's file or folder in the explorer"
+              aria-label="Focus active tab in explorer"
+            >
+              <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={onToggleShowHidden}
+            title={showHidden ? "Hide hidden files" : "Show hidden files"}
+            aria-label="Toggle hidden files"
+          >
+            <HugeiconsIcon
+              icon={showHidden ? ViewIcon : ViewOffSlashIcon}
+              size={13}
+              strokeWidth={2}
+            />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => tree.refresh(rootPath)}
+            title="Refresh"
+          >
+            <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+          </Button>
+        </div>
       </div>
     );
   }),
