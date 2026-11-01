@@ -201,11 +201,12 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
     }));
 
     return (
-      <div className="flex h-full flex-col bg-sidebar">
+      <div className="flex h-full flex-row bg-sidebar">
         {/* View strip */}
         <div
-          className="flex h-8 shrink-0 items-center border-b border-border/60"
+          className="order-last flex w-9 shrink-0 flex-col items-center gap-1 border-l border-border/60 py-1.5"
           role="tablist"
+          aria-orientation="vertical"
           aria-label="Sidebar views"
         >
           {strip.map((tab) => (
@@ -223,30 +224,28 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
                     : STRIP_LABELS[tab]
               }
               className={cn(
-                "relative flex h-full items-center gap-1.5 px-3 text-[11px] font-medium transition-colors",
+                "relative flex size-7 items-center justify-center rounded-md transition-colors",
                 tab === "root" && !hasRoot && selected !== tab && "border-[1.5px] border-dashed border-muted-foreground/40",
                 selected === tab
                   ? "bg-card text-foreground"
-                  : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
+                  : "text-muted-foreground hover:bg-card hover:text-foreground",
               )}
             >
               {selected === tab && (
-                <div className="absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator" />
+                <div className="absolute inset-y-1 -right-[3px] w-[1.5px] bg-tab-focus-indicator" />
               )}
               <HugeiconsIcon
                 icon={tab === "root" && !hasRoot ? PinOffIcon : STRIP_ICONS[tab]}
-                size={12}
+                size={14}
                 strokeWidth={2}
+                className={cn(tab === "root" && !hasRoot && selected !== tab && "opacity-50")}
               />
-              <span className={cn(tab === "root" && !hasRoot && selected !== tab && "opacity-50")}>
-                {STRIP_LABELS[tab]}
-              </span>
             </button>
           ))}
         </div>
 
         {/* Content -- four panes; Notes is only mounted when notesRoot is set, the others always are */}
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           <div
             className={cn(
               "absolute inset-0 overflow-auto",
