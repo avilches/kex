@@ -31,6 +31,17 @@ async function readRaw(root: string): Promise<string | null> {
   }
 }
 
+/** The file as it is on disk, or "absent" when the folder is readable and holds no kex.json.
+ * A failed read of a file that is there throws, so a write never starts from defaults over a
+ * kex.json it could not read. */
+async function readForWrite(root: string): Promise<string | "absent"> {
+  const entries = await native.readDir(root);
+  if (!entries.some((e) => e.name === "kex.json")) return "absent";
+  const res = await native.readFile(kexJsonPath(root));
+  if (res.kind !== "text") throw new Error("kex.json is not readable text");
+  return res.content;
+}
+
 export function useNotesState(root: string | null, active: boolean) {
   const [config, setConfig] = useState<NotesConfig>({ ...DEFAULT_NOTES_CONFIG });
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -72,8 +83,11 @@ export function useNotesState(root: string | null, active: boolean) {
     inFlightRef.current += 1;
     void (async () => {
       try {
-        const raw = await readRaw(r);
-        await native.writeFile(kexJsonPath(r), applyOpsToRaw(raw, ops));
+        const raw = await readForWrite(r);
+        await native.writeFile(
+          kexJsonPath(r),
+          applyOpsToRaw(raw === "absent" ? null : raw, ops),
+        );
       } catch (e) {
         console.error("[notes] kex.json write failed:", e);
       } finally {
