@@ -140,6 +140,15 @@ export function remapPrevTabId(entries: ClosedEntry[], oldId: string, newId: str
   return entries.map((e) => (e.kind === "tab" && e.prevTabId === oldId ? { ...e, prevTabId: newId } : e));
 }
 
+// Reviving a workspace renames all its tabs at once; the entries still on the stack that named
+// one of them as their predecessor follow the new ids.
+export function remapPrevTabIds(entries: ClosedEntry[], idMap: ReadonlyMap<string, string>): ClosedEntry[] {
+  return entries.map((e) => {
+    const next = e.kind === "tab" && e.prevTabId ? idMap.get(e.prevTabId) : undefined;
+    return next ? { ...e, prevTabId: next } : e;
+  });
+}
+
 function reviveTab(tab: Tab, id: string): Tab {
   const base = { ...tab, id };
   if (base.kind === "editor" || base.kind === "markdown") return { ...base, dirty: false };

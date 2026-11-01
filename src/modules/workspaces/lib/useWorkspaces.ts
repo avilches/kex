@@ -54,6 +54,7 @@ import {
   buildReopenedTab,
   captureClosedEntry,
   remapPrevTabId,
+  remapPrevTabIds,
   resolveReopenSlot,
   captureClosedWorkspace,
   clearStaleFolds,
@@ -869,6 +870,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       // A sleeping tab keeps its id, and its plan is seeded when it wakes.
       const renamed = terminalTabs(picked.entry.workspace).filter((t) => !t.hibernation);
       await Promise.all(renamed.map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)));
+      setClosedStack(remapPrevTabIds(closedTabsRef.current, idMap), false);
       setWorkspaces((prev) => insertRestoredWorkspace(prev, workspace, picked.entry.index));
       // The ref follows right away so the next entry of a batch finds the workspace.
       workspacesRef.current = insertRestoredWorkspace(workspacesRef.current, workspace, picked.entry.index);
@@ -884,6 +886,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const asleep = isHibernatedTab(entry.tab);
     const newId = asleep ? entry.tab.id : newTabId();
     if (!asleep) await seedPlan(entry.tab, newId);
+    // The workspace may have been closed while the plan was being fetched: the entry goes back
+    // just below that workspace's own entry, so undoing the workspace and then this tab brings
+    // both back. With no such entry the workspace is gone for good and so is the tab.
+    if (!workspacesRef.current.some((w) => w.id === picked.workspaceId)) {
+      const stack = closedTabsRef.current;
+      const at = stack.findIndex((e) => e.kind === "workspace" && e.workspace.id === picked.workspaceId);
+      if (at !== -1) setClosedStack([...stack.slice(0, at + 1), entry, ...stack.slice(at + 1)], false);
+      return null;
+    }
     const newTab = buildReopenedTab(entry.tab, newId);
     setClosedStack(remapPrevTabId(closedTabsRef.current, entry.tab.id, newId), false);
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);

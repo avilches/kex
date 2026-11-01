@@ -241,6 +241,57 @@ describe("undo close workspace", () => {
     expect((second as { hibernation?: unknown }).hibernation).toBeUndefined();
   });
 
+  it("reopens a tab closed before the workspace next to its neighbour once the workspace is revived", async () => {
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [editor("b1"), editor("b2"), editor("b3")])]);
+
+    act(() => view!.h.closeTab("b", "b2"));
+    act(() => view!.h.closeWorkspace("b"));
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a"]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    const [first, third] = tabIds(view.h.workspaces[1]);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    const ids = tabIds(view.h.workspaces[1]);
+    expect(ids).toHaveLength(3);
+    expect(ids[0]).toBe(first);
+    expect(ids[2]).toBe(third);
+  });
+
+  it("puts the entry back on the stack when the workspace goes away while the plan is being fetched", async () => {
+    let release!: (plan: null) => void;
+    vi.mocked(previewResumeCmd).mockImplementation(() => new Promise((resolve) => (release = resolve)));
+    view = mount([makeWs("a", [term("a1")]), makeWs("b", [term("b1"), term("b2")])]);
+
+    act(() => view!.h.closeTab("b", "b1"));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = view!.h.reopenClosed();
+    });
+    act(() => view!.h.closeWorkspace("b"));
+    await act(async () => {
+      release(null);
+      await pending;
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a"]);
+
+    vi.mocked(previewResumeCmd).mockResolvedValue(null);
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(view.h.workspaces.map((w) => w.id)).toEqual(["a", "b"]);
+    expect(tabIds(view.h.workspaces[1])).toHaveLength(1);
+
+    await act(async () => {
+      await view!.h.reopenClosed();
+    });
+    expect(tabIds(view.h.workspaces[1])).toHaveLength(2);
+  });
+
   it("moves the agent session and its resume plan to the reopened tab's new id", async () => {
     const plan = planFor("b1");
     vi.mocked(previewResumeCmd).mockResolvedValue(plan);
