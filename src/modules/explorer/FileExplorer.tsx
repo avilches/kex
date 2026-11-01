@@ -16,7 +16,6 @@ import {
   FolderAddIcon,
   FolderOpenIcon,
   Home01Icon,
-  PencilEdit02Icon,
   PinOffIcon,
   Refresh01Icon,
   Search01Icon,
@@ -63,7 +62,6 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
-import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
 import { RootPathInput } from "./RootPathInput";
 import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
@@ -125,10 +123,6 @@ type Props = {
   onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
 };
 
-// A left-to-right mark anchors the leading "/" so the rtl-based left-truncation
-// does not reorder it (otherwise "/Users/foo" renders as "Users/foo/").
-const LRM = "‎";
-
 export type Row =
   | {
       kind: "entry";
@@ -179,9 +173,7 @@ function buildRows(
   const rows: Row[] = [];
   const entryIndexByPath = new Map<string, number>();
 
-  if (!fsNav.filesystem) {
-    rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
-  }
+  rows.push({ kind: "fs-root", key: "fs-root", path: rootPath });
   if (fsNav.filesystem && fsNav.canNavigateUp) {
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
@@ -428,6 +420,7 @@ export const FileExplorer = memo(
       rootMode === "filesystem" && !!rootPath && !!onSubmitRootPath;
     const startEditRoot = useCallback(() => {
       editOriginRef.current = rootPath;
+      scrollRef.current?.scrollTo({ top: 0 });
       setIsEditingRoot(true);
     }, [rootPath]);
     const rootNode = rootPath ? tree.nodes[rootPath] : undefined;
@@ -1108,8 +1101,30 @@ export const FileExplorer = memo(
           );
         }
         case "fs-root":
+          if (canEditRoot && isEditingRoot && rootPath) {
+            return (
+              <div className="flex h-6 items-center pl-1.5 pr-9">
+                <RootPathInput
+                  origin={editOriginRef.current ?? rootPath}
+                  rootPath={rootPath}
+                  dirNames={rootDirNames}
+                  home={homePath}
+                  onNavigate={(path) => onEnterFolder?.(path)}
+                  resolvePath={(typed) =>
+                    onResolveRootPath?.(typed) ?? Promise.resolve(null)
+                  }
+                  onSubmit={(value) => {
+                    setIsEditingRoot(false);
+                    onSubmitRootPath?.(value);
+                  }}
+                  onCancel={() => setIsEditingRoot(false)}
+                />
+              </div>
+            );
+          }
           return (
             <FsRootRow
+              onEditRoot={canEditRoot ? startEditRoot : undefined}
               path={row.path}
               isWorkspaceRoot={rootMode === "workspace"}
               workspaceRoot={workspaceRootPath}
@@ -1172,69 +1187,6 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-8 shrink-0 items-center gap-1 pl-1.5 pr-9">
-          {!canEditRoot ? (
-            <div
-              className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
-              title={rootPath ?? undefined}
-            >
-              <span className="min-w-0 flex-1 truncate text-left [direction:rtl]">
-                {LRM + rootPath}
-              </span>
-            </div>
-          ) : isEditingRoot && rootPath ? (
-            <RootPathInput
-              origin={editOriginRef.current ?? rootPath}
-              rootPath={rootPath}
-              dirNames={rootDirNames}
-              home={homePath}
-              onNavigate={(path) => onEnterFolder?.(path)}
-              resolvePath={(typed) =>
-                onResolveRootPath?.(typed) ?? Promise.resolve(null)
-              }
-              onSubmit={(value) => {
-                setIsEditingRoot(false);
-                onSubmitRootPath?.(value);
-              }}
-              onCancel={() => setIsEditingRoot(false)}
-            />
-          ) : (
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="group/root flex min-w-0 flex-1 cursor-pointer items-center rounded px-1.5 py-1 text-xs font-medium text-muted-foreground"
-                  title={rootPath ?? undefined}
-                  onClick={startEditRoot}
-                >
-                  <span className="min-w-0 truncate text-left [direction:rtl]">
-                    {LRM + rootPath}
-                  </span>
-                  <HugeiconsIcon
-                    icon={PencilEdit02Icon}
-                    size={15}
-                    strokeWidth={2}
-                    className="pointer-events-none ml-1.5 hidden shrink-0 group-hover/root:block"
-                  />
-                  <span className="flex-1" />
-                </button>
-              </ContextMenuTrigger>
-              <ContextMenuContent className="min-w-44">
-                <ContextMenuItem onSelect={startEditRoot}>
-                  <HugeiconsIcon
-                    icon={PencilEdit02Icon}
-                    size={13}
-                    strokeWidth={2}
-                  />
-                  Change Explorer Root
-                  <ShortcutHint id="sidebar.editRoot" />
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          )}
-
-        </div>
-
         {rootMode === "workspace" &&
         (workspaceRootPath === null || root?.status === "error") ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
