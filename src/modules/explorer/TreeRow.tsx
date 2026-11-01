@@ -30,7 +30,6 @@ import {
   FolderOpenIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
-  PencilEdit02Icon,
   Refresh01Icon,
   Scissor01Icon,
   ViewOffSlashIcon,
@@ -300,6 +299,22 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
+            {isDir && onEnterFolder && (
+              <span
+                role="button"
+                title="Open this folder as the explorer root"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEnterFolder(path);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+              >
+                Open
+              </span>
+            )}
             {isOpenInTab && (
               <span
                 role="button"
@@ -539,7 +554,6 @@ export function PendingRow({
 }
 
 export type FsRootRowProps = {
-  onEditRoot?: () => void;
   path: string;
   isWorkspaceRoot: boolean;
   workspaceRoot: string | null;
@@ -554,7 +568,6 @@ export type FsRootRowProps = {
 };
 
 export function FsRootRow({
-  onEditRoot,
   path,
   isWorkspaceRoot,
   workspaceRoot,
@@ -582,12 +595,11 @@ export function FsRootRow({
           {...listeners}
           {...attributes}
           onMouseDown={keepScratchpadFocus}
-          onClick={onEditRoot}
           className={cn(
-            "group/root relative flex h-6 w-full min-w-0 items-center gap-2 pl-1.5 pr-9 text-[13px]",
-            onEditRoot && "cursor-pointer",
+            "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
             isDragging && "opacity-50",
           )}
+          style={{ paddingLeft: 6 }}
           title={path}
         >
           <FlashOverlay token={flashToken} />
@@ -600,27 +612,9 @@ export function FsRootRow({
           <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
             {"‎" + path}
           </span>
-          {onEditRoot && (
-            <HugeiconsIcon
-              icon={PencilEdit02Icon}
-              size={13}
-              strokeWidth={2}
-              className="pointer-events-none hidden shrink-0 text-muted-foreground group-hover/root:block"
-            />
-          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
-        {onEditRoot && (
-          <>
-            <ContextMenuItem className={COMPACT_ITEM} onSelect={onEditRoot}>
-              <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={2} />
-              Change Explorer Root
-              <ShortcutHint id="sidebar.editRoot" />
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-          </>
-        )}
         {onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
