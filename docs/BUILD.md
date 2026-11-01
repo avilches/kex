@@ -213,7 +213,7 @@ regression on every cold start; keep the anchored form so a future `*/react/*` d
 
 ## Rust release profile
 
-`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary. `[profile.release.build-override]` sets `strip="none"` so build scripts and proc macros are not stripped: with Rust 1.96 `pnpm tauri build` failed from a clean `target` (`can't find crate for tauri_macros`) without it, while the final binary stays stripped.
+`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=unwind`, `strip=true`. Result: ~7-8 MB binary (stale figure; measured 2026-11-01 with `strip="debuginfo"`: 13.90 MB with `panic=unwind`, 10.42 MB with `abort`). `panic` must stay `unwind`: with `abort`, an Objective-C exception from AppKit crossing tao's `extern "C-unwind"` `sendEvent` aborts the app (`panic in a function that cannot unwind`, TASK-914.1); a test in `panic_log.rs` locks it. `[profile.release.build-override]` sets `strip="none"` so build scripts and proc macros are not stripped: with Rust 1.96 `pnpm tauri build` failed from a clean `target` (`can't find crate for tauri_macros`) without it, while the final binary stays stripped.
 
 ## Platform targets
 
