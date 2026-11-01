@@ -171,6 +171,20 @@ describe("mergeRows", () => {
     expect(keys(rows)).toEqual(["tab:fail", "tab:ping", "tab:busy", "tab:recent", "tab:old"]);
   });
 
+  it("lists a terminal running a command after the busy agents and before the rest, and not an idle agent", () => {
+    const rows = mergeRows(
+      input({
+        tabs: [
+          tab("recent", { lastUsedAt: 9 }),
+          tab("idle-agent", { lastUsedAt: 8, running: true, agent: "claude" }),
+          tab("dev", { lastUsedAt: 1, running: true }),
+          tab("busy", { lastUsedAt: 0, indicator: "working" }),
+        ],
+      }),
+    );
+    expect(keys(rows)).toEqual(["tab:busy", "tab:dev", "tab:recent", "tab:idle-agent"]);
+  });
+
   it("keeps a workspace row even when one of its tabs is already in the results, after the tabs", () => {
     const rows = mergeRows(
       input({
@@ -351,11 +365,11 @@ describe("mergeRows", () => {
     ];
     expect(keys(mergeRows(input({ term: "kex", tabs })))).toEqual([
       "tab:alert",
+      "tab:busy",
       "tab:branch",
       "tab:workspace",
       "tab:title",
       "tab:process",
-      "tab:busy",
     ]);
   });
 
@@ -697,9 +711,9 @@ describe("idle list workspaces", () => {
       );
       expect(keys(rows)).toEqual([
         "tab:cur",
+        "tab:busy",
         "tab:exact",
         "tab:old",
-        "tab:busy",
         "cmd:c",
       ]);
     });

@@ -24,7 +24,7 @@ describe("liveTabSources after a wake", () => {
     const src = liveTabSources();
     expect(src.agentOf("t1")).toBe("claude");
     expect(src.visualOf("t1")).toBe("attention");
-    expect(tabSection({ indicator: src.visualOf("t1") })).toBe("attention");
+    expect(tabSection({ indicator: src.visualOf("t1"), running: false, agent: "" })).toBe("attention");
   });
 
   it("gives a tab that never slept with a dot nothing extra", () => {

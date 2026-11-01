@@ -119,7 +119,7 @@ function Row({ row, p }: { row: MergedRow; p: Props }) {
 
 // Typing: the current tab, then the other matching tabs in the order of the empty list, then the rest
 // ranked by score, all in one flat list.
-// Empty box: the tabs by section (need attention, busy agents, recent), then the actions under their fixed groups.
+// Empty box: the tabs by section (need attention, busy agents, running commands, recent), then the actions under their fixed groups.
 export function MergedList(p: Props) {
   const isCurrent = (r: MergedRow) => r.kind === "tab" && r.current === true;
   const currentRows = p.rows.filter(isCurrent);
@@ -148,9 +148,14 @@ export function MergedList(p: Props) {
   }
   const tabs = p.rows.filter((r) => r.kind === "tab" && !r.current);
   const tabGroups: [string, MergedRow[]][] = (
-    ["attention", "busy", "recent"] as const
+    ["attention", "busy", "running", "recent"] as const
   ).map((section) => [
-    { attention: "Need attention", busy: "Busy agents", recent: "Recent" }[section],
+    {
+      attention: "Need attention",
+      busy: "Busy agents",
+      running: "Running commands",
+      recent: "Recent",
+    }[section],
     tabs.filter((r) => r.kind === "tab" && tabSection(r.entry) === section),
   ]);
   const closed = p.rows.filter((r) => r.kind === "closed");

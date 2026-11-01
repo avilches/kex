@@ -16,16 +16,23 @@ export function byRecency(a: TabEntry, b: TabEntry): number {
 // The red dot (error) first, then the orange one (attention), then the spinner (working), then the rest.
 const INDICATOR_RANK = { error: 0, attention: 1, working: 2 } as const;
 
-export type TabSection = "attention" | "busy" | "recent";
+export type TabSection = "attention" | "busy" | "running" | "recent";
 
-// Where an empty-box tab row sits: what asks for the user (orange or red dot), what is working, the rest.
-export function tabSection({ indicator }: Pick<TabEntry, "indicator">): TabSection {
+// Where an empty-box tab row sits: what asks for the user (orange or red dot), what is working, a terminal
+// running a command of its own (an idle agent does not count), the rest.
+export function tabSection({
+  indicator,
+  running,
+  agent,
+}: Pick<TabEntry, "indicator" | "running" | "agent">): TabSection {
   if (indicator === "working") return "busy";
-  return indicator ? "attention" : "recent";
+  if (indicator) return "attention";
+  return running && !agent ? "running" : "recent";
 }
 
 // The order of the palette's tab list, empty or filtered: what asks for the user first, each group by recency.
 export function byPriority(a: TabEntry, b: TabEntry): number {
-  const rank = (e: TabEntry) => (e.indicator ? INDICATOR_RANK[e.indicator] : 3);
+  const rank = (e: TabEntry) =>
+    e.indicator ? INDICATOR_RANK[e.indicator] : tabSection(e) === "running" ? 3 : 4;
   return rank(a) - rank(b) || byRecency(a, b);
 }

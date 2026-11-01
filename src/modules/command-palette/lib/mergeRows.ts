@@ -279,7 +279,7 @@ export function mergeRows(input: MergeInput): MergedRow[] {
         ]
       : [];
     const others = tabs.filter((t) => t.tabId !== activeTabId).sort(byPriority);
-    // Attention and busy agents are all listed; only the plain recents are capped.
+    // Attention, busy agents and running commands are all listed; only the plain recents are capped.
     const recents = [
       ...others.filter((t) => tabSection(t) !== "recent"),
       ...others.filter((t) => tabSection(t) === "recent").slice(0, RECENT_LIMIT),
