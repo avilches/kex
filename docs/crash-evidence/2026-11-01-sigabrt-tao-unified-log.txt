@@ -1,0 +1,148 @@
+2026-11-01 09:12:51.029276-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:51.029496-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:51.530363-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:51.530583-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:52.061042-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:52.061289-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:52.628284-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:52.628501-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:53.200310-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:53.200564-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:53.769561-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:53.769831-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:54.345640-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:54.345946-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:54.919140-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:54.919393-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:55.456918-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:55.462902-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:56.038092-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:56.038348-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:56.612837-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:56.613160-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:57.187050-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:57.187337-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:57.732150-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:57.732417-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:58.299764-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:58.299980-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:58.836186-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:58.836428-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:59.381375-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:59.381713-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:59.951800-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:12:59.952081-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:00.520509-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:00.522399-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:01.089898-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:01.090315-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:01.648380-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:01.648581-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:02.206718-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:02.206941-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:02.748974-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:02.749170-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.193401-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.193556-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x753a5f8818 - [pageProxyID=10158, webPageID=10159, PID=65446] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:03.193617-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x1047eae88 - [pageProxyID=8, webPageID=9, PID=93241] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:03.223404-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.223580-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.223831-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.299579-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.299961-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.330557-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.330934-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.331311-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.684215-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.692967-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.699475-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.838536-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:03.838732-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:04.410155-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:04.410332-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:04.968443-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:04.968707-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:05.502065-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:05.502318-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.069011-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.069226-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.386138-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.386393-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.386588-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.590438-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:06.590659-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.160462-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.161462-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.288855-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.289055-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.289308-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.686353-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:07.686594-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:08.194161-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:08.203258-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:08.778407-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:08.785732-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:08.936520-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 09:13:08.936527-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tearing down remote view connection if it existed.
+2026-11-01 09:13:08.936801-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Selection Tracking Area set up YES; rect is <private>, positioningView is <private>
+2026-11-01 09:13:08.936804-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse exited.
+2026-11-01 09:13:08.936820-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tracking areas setup complete.
+2026-11-01 09:13:09.196124-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.196300-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x1047eae88 - [pageProxyID=8, webPageID=9, PID=93241] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:09.201484-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x753a5f8818 - [pageProxyID=10158, webPageID=10159, PID=65446] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:09.228738-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.228956-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.231579-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.354095-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.354314-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.920835-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:09.921093-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:10.460630-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:10.460817-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:10.996690-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:11.008862-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:11.579803-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:11.579995-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:12.080586-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:12.087114-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:12.621372-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:12.621630-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:13.139020-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:13.139271-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:13.653955-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:13.654154-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:14.227461-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:14.227667-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:14.796937-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:14.797194-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:15.361364-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:15.361657-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:15.878990-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:15.879251-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:16.388789-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:16.389005-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:16.957731-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:16.958031-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:17.458886-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:17.459124-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.012835-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.013082-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.521656-0500 0x16bf16c  Default     0x0                  93141  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x753a5f8818 - [pageProxyID=10158, webPageID=10159, PID=65446] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:18.522335-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:ActivityState] 0x79a1491018 - [pageProxyID=8, webPageID=9, PID=22238] WebPageProxy::activityStateDidChange: mayHaveChanged=1
+2026-11-01 09:13:18.544203-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.557595-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.568179-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.589161-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:18.589339-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:19.037047-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 09:13:19.037347-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Selection Tracking Area set up YES; rect is <private>, positioningView is <private>
+2026-11-01 09:13:19.037349-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse exited.
+2026-11-01 09:13:19.037369-0500 0x16bf16c  Default     0x0                  93141  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tracking areas setup complete.
+2026-11-01 09:13:19.157812-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:19.158151-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:19.525447-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Dwelling completed, show affordance
+2026-11-01 09:13:19.731991-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:19.732263-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (WebKit) [com.apple.WebKit:Process] WebProcessPool::initializeAccessibility
+2026-11-01 09:13:19.984871-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Tearing down remote view connection if it existed.
+2026-11-01 09:13:20.000879-0500 0x13ab2a8  Default     0x0                  22210  0    kex: (AppKit) [com.apple.AppKit:CampoLightweightUI] Mouse entered.
+2026-11-01 09:13:20.000929-0500 0x13ab2a8  Error       0x0                  22210  0    kex: (Foundation) [com.apple.Foundation:general] *** Assertion failure in <private>, NSCampoLightweightUIController.m:1429
