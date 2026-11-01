@@ -28,6 +28,7 @@ import { AgentIntegrationRow } from "./AgentIntegrationRow";
 import { AgentStatusRow } from "./AgentStatusRow";
 
 const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS, busyJitterMs: INTEGRATION_BUSY_JITTER_MS };
+const STAGGERED = { staggered: true };
 
 const FILES: Record<AgentId, string[]> = {
   codex: ["~/.codex/hooks.json", "~/.codex/config.toml"],
@@ -88,7 +89,7 @@ export function AgentIntegrations() {
     setBulkBusy(true);
     try {
       const result = await runBulk(kind, rowStates, async (a) => {
-        const ok = await (kind === "install" ? stateOf[a].install() : stateOf[a].remove());
+        const ok = await (kind === "install" ? stateOf[a].install(STAGGERED) : stateOf[a].remove(STAGGERED));
         if (!ok) throw new Error(`${a} failed`);
       });
       const text = bulkSummary(kind, result);

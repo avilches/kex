@@ -12,17 +12,20 @@ export type IntegrationState = {
   /** Set when the last action failed because the agent is not on this machine. */
   notFound: string | null;
   /** Resolve to whether the write worked; a failure also sets `failed`. */
-  install: () => Promise<boolean>;
-  remove: () => Promise<boolean>;
+  install: (opts?: RunOptions) => Promise<boolean>;
+  remove: (opts?: RunOptions) => Promise<boolean>;
   refresh: () => void;
 };
 
 type Options = {
   /** The busy state lasts at least this long, so a write that finishes at once is still seen. */
   minBusyMs?: number;
-  /** Up to this much more, drawn once per mount. */
+  /** Up to this much more for a staggered run, drawn once per mount. */
   busyJitterMs?: number;
 };
+
+/** `staggered` is for a run started together with other rows (Install all), which adds this row's extra. */
+export type RunOptions = { staggered?: boolean };
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -30,7 +33,7 @@ export function useIntegration(
   agent: AgentId,
   { minBusyMs = 0, busyJitterMs = 0 }: Options = {},
 ): IntegrationState {
-  const [busyMs] = useState(() => busyMsFor(minBusyMs, busyJitterMs, Math.random));
+  const [staggeredBusyMs] = useState(() => busyMsFor(minBusyMs, busyJitterMs, Math.random));
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -46,7 +49,12 @@ export function useIntegration(
 
   useEffect(refresh, [refresh]);
 
-  const run = async (action: (agent: AgentId) => Promise<void>, expected: IntegrationStatus): Promise<boolean> => {
+  const run = async (
+    action: (agent: AgentId) => Promise<void>,
+    expected: IntegrationStatus,
+    { staggered = false }: RunOptions = {},
+  ): Promise<boolean> => {
+    const busyMs = staggered ? staggeredBusyMs : minBusyMs;
     setBusy(true);
     setFailed(false);
     setNotFound(null);
@@ -71,8 +79,8 @@ export function useIntegration(
     busy,
     failed,
     notFound,
-    install: () => run(installAgent, "installed"),
-    remove: () => run(removeAgent, "missing"),
+    install: (opts) => run(installAgent, "installed", opts),
+    remove: (opts) => run(removeAgent, "missing", opts),
     refresh,
   };
 }
