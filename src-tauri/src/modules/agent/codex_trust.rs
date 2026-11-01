@@ -5,9 +5,6 @@
 //! is preserved byte for byte, because the file belongs to the user and to other tools.
 
 use std::collections::BTreeMap;
-use std::fs;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -259,38 +256,6 @@ pub fn hook_state_tables(content: &str) -> Vec<(String, Option<String>)> {
 /// The source path, event, group and handler index a trust key names.
 pub fn parse_trust_key(key: &str) -> Option<(String, CodexHookEvent, usize, usize)> {
     split_key(key).map(|(path, event, group, handler)| (path.to_string(), event, group, handler))
-}
-
-/// Replaces `path` through a temp file in the same directory and a rename. A symlinked
-/// config is written through to its target so dotfiles links stay links.
-pub fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {
-    let target = resolve_write_path(path)?;
-    let dir = match target.parent() {
-        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
-        _ => PathBuf::from("."),
-    };
-    fs::create_dir_all(&dir)?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".kex-")
-        .suffix(".tmp")
-        .tempfile_in(&dir)?;
-    tmp.write_all(contents.as_bytes())?;
-    #[cfg(unix)]
-    if let Ok(meta) = fs::metadata(&target) {
-        tmp.as_file().set_permissions(meta.permissions())?;
-    }
-    tmp.as_file().sync_all()?;
-    tmp.persist(&target).map_err(|e| e.error)?;
-    Ok(())
-}
-
-fn resolve_write_path(path: &Path) -> io::Result<PathBuf> {
-    match fs::symlink_metadata(path) {
-        Ok(meta) if meta.file_type().is_symlink() => fs::canonicalize(path),
-        Ok(_) => Ok(path.to_path_buf()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(path.to_path_buf()),
-        Err(e) => Err(e),
-    }
 }
 
 fn upsert_one(content: &str, entry: &TrustEntry, force_disabled: bool) -> String {

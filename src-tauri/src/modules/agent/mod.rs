@@ -1,3 +1,4 @@
+pub mod atomic_write;
 pub mod claude_version;
 pub mod codex_hooks;
 pub mod codex_integration;
@@ -194,24 +195,8 @@ fn install_session_hook_script(script_path: &std::path::Path) -> Result<(), Stri
     if current == SESSION_HOOK_SCRIPT {
         return Ok(());
     }
-    let script_dir = script_path
-        .parent()
-        .ok_or_else(|| "session hook script path has no parent".to_string())?;
-    std::fs::create_dir_all(script_dir)
-        .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
-    let script_tmp = script_path.with_extension("sh.kex-tmp");
-    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
-        .map_err(|e| format!("write session hook tmp: {e}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| format!("chmod session hook: {e}"))?;
-    }
-    std::fs::rename(&script_tmp, script_path).map_err(|e| {
-        let _ = std::fs::remove_file(&script_tmp);
-        format!("rename session hook: {e}")
-    })
+    atomic_write::write_atomically_executable(script_path, SESSION_HOOK_SCRIPT)
+        .map_err(|e| format!("write {}: {e}", script_path.display()))
 }
 
 /// `claude --version` runs on the blocking pool so the UI thread and the async runtime stay free.
@@ -246,22 +231,31 @@ fn apply_settings(
     install: bool,
     version: Option<&str>,
 ) -> Result<(), String> {
-    let existing_str = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound && !install => return Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("read {}: {e}", path.display())),
-    };
-    let Some(out) = plan_settings(&existing_str, path, install, version)? else {
-        return Ok(());
-    };
-    // Atomic write via temp file so a crash mid-write never truncates the file.
-    let tmp = path.with_extension("json.kex-tmp");
-    std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("rename into {}: {e}", path.display())
-    })
+    // Every window runs this at startup: one at a time, so a second run reads what the first wrote.
+    static SETTINGS_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = SETTINGS_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+    // The file belongs to the user and to Claude Code: if it changes between the read and the
+    // write, plan again on the new text instead of overwriting their edit.
+    for _ in 0..3 {
+        let existing_str = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && !install => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(e) => return Err(format!("read {}: {e}", path.display())),
+        };
+        let Some(out) = plan_settings(&existing_str, path, install, version)? else {
+            return Ok(());
+        };
+        if std::fs::read_to_string(path).unwrap_or_default() != existing_str {
+            continue;
+        }
+        return atomic_write::write_atomically(path, &out)
+            .map_err(|e| format!("write {}: {e}", path.display()));
+    }
+    Err(format!(
+        "{} kept changing while it was being updated",
+        path.display()
+    ))
 }
 
 /// The text the settings file would hold after installing or removing the hooks, or `None`
@@ -307,29 +301,13 @@ pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
     session_store::detach_session(&tab_id)
 }
 
-fn write_agent_file(
-    path: std::path::PathBuf,
-    script: &str,
-    label: &str,
-    tmp_ext: &str,
-) -> Result<(), String> {
+fn write_agent_file(path: std::path::PathBuf, script: &str, label: &str) -> Result<(), String> {
     // Same content already there: leave the file alone so repeated installs never touch it.
     if std::fs::read_to_string(&path).is_ok_and(|current| current == script) {
         return Ok(());
     }
-    // A link (a dotfiles repo is the usual reason) is written through, not replaced by a
-    // regular file that would leave the repo's copy stale.
-    let path = std::fs::canonicalize(&path).unwrap_or(path);
-    let dir = path
-        .parent()
-        .ok_or_else(|| format!("{label} path has no parent"))?;
-    std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
-    let tmp = path.with_extension(tmp_ext);
-    std::fs::write(&tmp, script).map_err(|e| format!("write {label} tmp: {e}"))?;
-    std::fs::rename(&tmp, &path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("rename into {}: {e}", path.display())
-    })
+    atomic_write::write_atomically(&path, script)
+        .map_err(|e| format!("write {label} {}: {e}", path.display()))
 }
 
 fn agent_file_matches(path: std::path::PathBuf, script: &str) -> bool {
@@ -375,7 +353,6 @@ struct IntegrationTarget {
     path: std::path::PathBuf,
     script: String,
     label: &'static str,
-    tmp_ext: &'static str,
     owned_marker: &'static str,
 }
 
@@ -386,21 +363,18 @@ fn integration_target(agent: &str) -> Result<IntegrationTarget, String> {
             path: opencode_plugin_path()?,
             script: OPENCODE_PLUGIN_SCRIPT.to_string(),
             label: "opencode plugin",
-            tmp_ext: "js.kex-tmp",
             owned_marker: "// kex-opencode-v",
         }),
         "omp" => Ok(IntegrationTarget {
             path: omp_extension_path()?,
             script: agent_extension_script("omp"),
             label: "omp extension",
-            tmp_ext: "ts.kex-tmp",
             owned_marker: "// kex-agent-status-v",
         }),
         "pi" => Ok(IntegrationTarget {
             path: pi_extension_path()?,
             script: agent_extension_script("pi"),
             label: "pi extension",
-            tmp_ext: "ts.kex-tmp",
             owned_marker: "// kex-agent-status-v",
         }),
         other => Err(format!("unknown integration: {other}")),
@@ -471,12 +445,7 @@ fn sync_integration(target: &IntegrationTarget) -> Result<SyncOutcome, String> {
             return Ok(SyncOutcome::Updated);
         }
     }
-    write_agent_file(
-        target.path.clone(),
-        &target.script,
-        target.label,
-        target.tmp_ext,
-    )?;
+    write_agent_file(target.path.clone(), &target.script, target.label)?;
     Ok(SyncOutcome::Updated)
 }
 
@@ -544,7 +513,6 @@ pub fn agent_setup_opencode() -> Result<(), String> {
         opencode_plugin_path()?,
         OPENCODE_PLUGIN_SCRIPT,
         "opencode plugin",
-        "js.kex-tmp",
     )
 }
 
@@ -561,7 +529,6 @@ pub fn agent_setup_omp() -> Result<(), String> {
         omp_extension_path()?,
         &agent_extension_script("omp"),
         "omp extension",
-        "ts.kex-tmp",
     )
 }
 
@@ -578,7 +545,6 @@ pub fn agent_setup_pi() -> Result<(), String> {
         pi_extension_path()?,
         &agent_extension_script("pi"),
         "pi extension",
-        "ts.kex-tmp",
     )
 }
 
@@ -1394,7 +1360,6 @@ mod tests {
             path: dir.join("kex-agent-status.ts"),
             script: script.to_string(),
             label: "test extension",
-            tmp_ext: "ts.kex-tmp",
             owned_marker: "// kex-agent-status-v",
         }
     }
@@ -1509,6 +1474,66 @@ mod tests {
     }
 
     #[test]
+    fn windows_installing_at_the_same_time_leave_one_valid_settings_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = dir.path().join("settings.json");
+        std::fs::write(&settings, "{\n  \"theme\": \"dark\"\n}\n").unwrap();
+        std::thread::scope(|s| {
+            for _ in 0..8 {
+                s.spawn(|| {
+                    for _ in 0..5 {
+                        apply_settings(&settings, true, LATEST).unwrap();
+                    }
+                });
+            }
+        });
+        let text = std::fs::read_to_string(&settings).unwrap();
+        let value: Value = serde_json::from_str(&text).expect("settings.json stays valid JSON");
+        assert_eq!(value["theme"], "dark");
+        let single = {
+            let again = dir.path().join("single.json");
+            std::fs::write(&again, "{\n  \"theme\": \"dark\"\n}\n").unwrap();
+            apply_settings(&again, true, LATEST).unwrap();
+            std::fs::read_to_string(&again).unwrap()
+        };
+        assert_eq!(
+            text, single,
+            "eight windows end up with what one window writes"
+        );
+        let strays: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n != "settings.json" && n != "single.json")
+            .collect();
+        assert!(strays.is_empty(), "stray files: {strays:?}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn installing_through_a_symlinked_settings_file_keeps_the_link_and_the_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let dotfiles = dir.path().join("dotfiles-settings.json");
+        std::fs::write(&dotfiles, "{\n  \"env\": { \"KEY\": \"secret\" }\n}\n").unwrap();
+        std::fs::set_permissions(&dotfiles, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let link = dir.path().join("settings.json");
+        std::os::unix::fs::symlink(&dotfiles, &link).unwrap();
+
+        apply_settings(&link, true, LATEST).unwrap();
+
+        assert!(std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        let written = std::fs::read_to_string(&dotfiles).unwrap();
+        assert!(written.contains("\"KEY\""));
+        assert!(written.contains("kex-session-hook"));
+        let mode = std::fs::metadata(&dotfiles).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+
+    #[test]
     fn claude_preview_of_an_up_to_date_install_is_empty() {
         let dir = tempfile::tempdir().unwrap();
         let settings = dir.path().join("settings.json");
@@ -1548,7 +1573,6 @@ mod tests {
             path: link.clone(),
             script: "// kex-agent-status-v2\nnew".to_string(),
             label: "test",
-            tmp_ext: "ts.kex-tmp",
             owned_marker: "// kex-agent-status-v",
         };
         assert_eq!(sync_integration(&target).unwrap(), SyncOutcome::Updated);
@@ -1579,10 +1603,10 @@ mod tests {
         let script = agent_extension_script("pi");
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(&file, "// kex-agent-status-v1\nold").unwrap();
-        write_agent_file(file.clone(), &script, "pi extension", "ts.kex-tmp").unwrap();
+        write_agent_file(file.clone(), &script, "pi extension").unwrap();
         assert!(agent_file_matches(file.clone(), &script));
         let before = std::fs::metadata(&file).unwrap().modified().unwrap();
-        write_agent_file(file.clone(), &script, "pi extension", "ts.kex-tmp").unwrap();
+        write_agent_file(file.clone(), &script, "pi extension").unwrap();
         assert_eq!(
             std::fs::metadata(&file).unwrap().modified().unwrap(),
             before
