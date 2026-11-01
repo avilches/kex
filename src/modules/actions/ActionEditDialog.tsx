@@ -23,7 +23,8 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import { acceptsFile, acceptsFolder, acceptsFromSwitches, acceptsOnlyFile, appAccepts, inBar } from "./lib/actionTargets";
+import type { AppAccepts } from "@/modules/external-editors/catalog";
+import { acceptsFile, acceptsFolder, acceptsFromSwitches, acceptsOnlyFile, appAccepts, appCombos, inBar } from "./lib/actionTargets";
 import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
 import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
@@ -65,6 +66,12 @@ const CWD_MODE_ICONS = {
 // command when the field loses focus, the rest at once), so Close only leaves; closing with
 // Escape or the backdrop flushes what is still being typed. A preset is edited like any other
 // Action: the host decides when a change makes it the user's own.
+function appPlace(accepts: AppAccepts): string {
+  const { actions, file } = appCombos(accepts);
+  if (actions && file) return "It lives in the Actions menu, and in the submenu of the focused file.";
+  return file ? "It lives in the submenu of the Actions menu named after the focused file." : "It lives in the Actions menu.";
+}
+
 export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, workspaceName, onScopeChange, onChange, onClose }: Props) {
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
@@ -385,12 +392,16 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           </div>
         )}
 
-        {app || inBar(action) ? (
+        {app ? (
+          <div className="text-[11px] text-muted-foreground">
+            {appPlace(appAccepts(action))} It never gets a button of its own.
+          </div>
+        ) : inBar(action) ? (
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
         ) : (
           <div className="text-[11px] text-muted-foreground">
-            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the combo of the header,
-            never as a button of its own.
+            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the submenu of the Actions
+            menu named after it, never as a button of its own.
           </div>
         )}
 

@@ -282,27 +282,22 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("draws the File combo only when the app edits files, and the Actions combo only when it opens folders", () => {
+    it("says where an app lives and never offers it an own button", () => {
       const folders = mount([{ ...savedApp, accepts: "folder" }]);
       click(pencil(folders.container));
-      expect(note()).toContain("Own button");
-      expect(preview()?.hasAttribute("data-preview-file")).toBe(false);
-      expect(preview()?.querySelector("[data-preview-combo]")).not.toBeNull();
+      expect(note()).toContain("It lives in the Actions menu.");
+      expect(note()).toContain("never gets a button of its own");
+      expect(preview()).toBeNull();
       folders.unmount();
       const both = mount([{ ...savedApp, accepts: "both" }]);
       click(pencil(both.container));
-      expect(preview()?.hasAttribute("data-preview-file")).toBe(true);
-      expect(preview()?.querySelector("[data-preview-file-combo]")).not.toBeNull();
-      expect(preview()?.querySelector("[data-preview-combo]")).not.toBeNull();
+      expect(note()).toContain("and in the submenu of the focused file");
+      expect(preview()).toBeNull();
       both.unmount();
-    });
-
-    it("draws only the File combo, and offers no own button, for an app that opens no folder", () => {
       const files = mount([{ ...savedApp, accepts: "file" }]);
       click(pencil(files.container));
-      expect(preview()?.querySelector("[data-preview-file-combo]")).not.toBeNull();
-      expect(preview()?.querySelector("[data-preview-combo]")).toBeNull();
-      expect(note()).not.toContain("Own button");
+      expect(note()).toContain("submenu of the Actions menu named after the focused file");
+      expect(preview()).toBeNull();
       files.unmount();
     });
 

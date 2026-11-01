@@ -73,8 +73,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
   carpetas), y el modal pregunta "What it opens" con dos casillas, Edit files y Open folders, de las que
   siempre queda una marcada (la ultima no se deja desmarcar). La preview del modal dibuja el
-  combo File cuando edita ficheros, y solo ese combo (sin el Actions ni el radio de Own button)
-  cuando no abre carpetas.
+  una nota con dónde vive la app (el menu Actions, el submenu del fichero enfocado, o los dos) y que
+  nunca tiene boton propio: no lleva radio de Own button ni vista previa.
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
@@ -95,8 +95,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   workspace (dos cajas como las cabeceras de columna, con el nombre del workspace), el boton de icono a la izquierda del titulo (`IconPicker`: rejilla con buscador de los iconos de apps, logos de agentes y un conjunto fijo de hugeicons, y "Default icon" para volver al de siempre), Run in folder primero en los scripts (Home por defecto, Workspace root con la
   chincheta del explorer, Current folder, Absolute path), nombre, comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
-  para agentes y Actions de workspace; una de carpeta o de fichero lleva en su lugar una nota,
-  porque vive en el combo contextual del Header y nunca tiene boton propio);
+  para agentes y scripts de workspace; una app, y un script de carpeta o de fichero, llevan en su lugar una nota,
+  porque viven en el menu Actions (la carpeta o el fichero enfocados, en un submenu con su nombre) y nunca tienen boton propio);
   guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la
   mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
   exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega
