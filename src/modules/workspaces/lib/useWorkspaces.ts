@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   addAction,
   adoptActionAt,
+  insertActionAt,
   removeAction,
   reorderActions,
   reorderBefore,
@@ -54,6 +55,7 @@ import {
   buildReopenedTab,
   captureClosedEntry,
   remapPrevTabId,
+  remapPrevTabIds,
   resolveReopenSlot,
   captureClosedWorkspace,
   clearStaleFolds,
@@ -843,6 +845,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       return null;
     }
     if (onlyBatch && picked.entry.batchId !== onlyBatch) return null;
+    // Entries pickReopen dropped (their workspace is gone) leave the stack for good: their
+    // sleepers' files and agent records go with them. The picked entry is kept in the first step
+    // so it is not mistaken for one of them; its own sleeper reopens with the same id.
+    setClosedStack([picked.entry, ...remaining]);
     setClosedStack(remaining, false);
 
     // A reopened terminal tab that used to run an agent gets the same live,
@@ -869,6 +875,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       // A sleeping tab keeps its id, and its plan is seeded when it wakes.
       const renamed = terminalTabs(picked.entry.workspace).filter((t) => !t.hibernation);
       await Promise.all(renamed.map((t) => seedPlan(t, idMap.get(t.id) ?? t.id)));
+      setClosedStack(remapPrevTabIds(closedTabsRef.current, idMap), false);
       setWorkspaces((prev) => insertRestoredWorkspace(prev, workspace, picked.entry.index));
       // The ref follows right away so the next entry of a batch finds the workspace.
       workspacesRef.current = insertRestoredWorkspace(workspacesRef.current, workspace, picked.entry.index);
@@ -884,6 +891,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const asleep = isHibernatedTab(entry.tab);
     const newId = asleep ? entry.tab.id : newTabId();
     if (!asleep) await seedPlan(entry.tab, newId);
+    // The workspace may have been closed while the plan was being fetched: the entry goes back
+    // just below that workspace's own entry, so undoing the workspace and then this tab brings
+    // both back. With no such entry the workspace is gone for good and so is the tab.
+    if (!workspacesRef.current.some((w) => w.id === picked.workspaceId)) {
+      const stack = closedTabsRef.current;
+      const at = stack.findIndex((e) => e.kind === "workspace" && e.workspace.id === picked.workspaceId);
+      if (at !== -1) setClosedStack([...stack.slice(0, at + 1), entry, ...stack.slice(at + 1)], false);
+      return null;
+    }
     const newTab = buildReopenedTab(entry.tab, newId);
     setClosedStack(remapPrevTabId(closedTabsRef.current, entry.tab.id, newId), false);
     const ws = workspacesRef.current.find((w) => w.id === picked.workspaceId);
@@ -1093,11 +1109,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // Two steps so an action added in the same tick can still be promoted: the updater only
   // takes the action out and queues it (a Map keyed by workspace and action, so a repeated
   // updater run is harmless), and the effect below writes the global list outside any updater.
-  const promotionsRef = useRef(new Map<string, { workspaceId: string; action: Action; beforeId?: string }>());
+  const promotionsRef = useRef(
+    new Map<string, { workspaceId: string; action: Action; beforeId?: string; index: number }>(),
+  );
   const promoteWorkspaceAction = useCallback((workspaceId: string, actionId: string, beforeId?: string) => {
     setWorkspaces((prev) => {
       const taken = takeWorkspaceAction(prev, workspaceId, actionId);
-      if (taken.action) promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action, beforeId });
+      if (taken.action) {
+        const index = workspaceActions(prev, workspaceId).findIndex((a) => a.id === actionId);
+        promotionsRef.current.set(`${workspaceId}/${actionId}`, { workspaceId, action: taken.action, beforeId, index });
+      }
       return taken.workspaces;
     });
   }, []);
@@ -1106,31 +1127,45 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (promotionsRef.current.size === 0) return;
     const queue = [...promotionsRef.current.values()];
     promotionsRef.current.clear();
-    for (const { workspaceId, action, beforeId } of queue) {
+    for (const { workspaceId, action, beforeId, index } of queue) {
       globalActions.add(action, beforeId).catch((err: unknown) => {
         console.error("Could not save the global action", err);
         toast.error(`Could not make "${action.name}" global; it stays in the workspace`);
-        setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => addAction(list, action)));
+        setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => insertActionAt(list, action, index)));
       });
     }
   }, [workspaces]);
 
   // The inverse of the promotion: the Action leaves the global list and joins the workspace,
-  // keeping its id. The global write goes first, so a failed move leaves the actions alone.
+  // keeping its id. It joins the workspace first and leaves the global list after, so at no moment
+  // is it in neither; a failed global write takes it back out of the workspace. A window that does
+  // not hold the workspace ignores the move: the edit is broadcast to every window, and the one
+  // that does not have the workspace would otherwise only remove the Action from the global list.
   const demoteGlobalAction = useCallback(
     (workspaceId: string, actionId: string, beforeId?: string) => {
+      if (!workspacesRef.current.some((w) => w.id === workspaceId)) return;
       const action = globalActions.get().find((a) => a.id === actionId);
       if (!action) return;
+      const before = workspaceActions(workspacesRef.current, workspaceId);
       // Adoption can mint a fresh id and leave the old one behind: its link is dropped,
       // while a kept id keeps running and stays stoppable as a workspace Action.
-      const clash = workspaceActions(workspacesRef.current, workspaceId).some((a) => a.id === actionId);
+      const clash = before.some((a) => a.id === actionId);
+      // The id is minted here, once: the updater below may run more than once and must be pure.
+      const freshId = newActionId();
+      const { stored, merged } = adoptActionAt(before, action, () => freshId, beforeId);
+      const twin = merged ? before.find((a) => a.id === stored.id) : undefined;
       if (clash) unlinkRemovedActions([action], []);
-      void globalActions
+      setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptActionAt(list, action, () => freshId, beforeId).list));
+      globalActions
         .change((list) => removeAction(list, actionId))
-        .then(() => setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => adoptActionAt(list, action, newActionId, beforeId).list)))
         .catch((err: unknown) => {
           console.error("Could not move the global action back", err);
           toast.error(`Could not move "${action.name}" to the workspace`);
+          setWorkspaces((prev) =>
+            applyWorkspaceActions(prev, workspaceId, (list) =>
+              twin ? list.map((a) => (a.id === twin.id ? twin : a)) : removeAction(list, stored.id),
+            ),
+          );
         });
     },
     [],

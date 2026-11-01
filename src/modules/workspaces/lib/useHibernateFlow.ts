@@ -6,7 +6,7 @@ import { liveHeldBlock } from "@/modules/terminal/lib/pendingRestore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { awakeTerminalTabs, restoreCommandFor, worktreeToKeep } from "./hibernate";
 import { HIBERNATE_LINES_MAX, prepareHibernateScreen, type LeafScreen } from "./hibernateLines";
-import { saveHibernateLines } from "./hibernateLinesIo";
+import { deleteHibernateLines, saveHibernateLines } from "./hibernateLinesIo";
 import { indicatorToKeep } from "./hibernateIndicator";
 import { flushAgentTitles } from "./agentTitleSync";
 import { tabDisplayTitleNow } from "./tabTitleNow";
@@ -45,6 +45,8 @@ export type HibernateFlowDeps = {
   snapshotTabs: (tabs: TerminalTab[]) => Promise<Record<string, TabHibernation>>;
   hibernate: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
   setPending: (pending: PendingHibernate | null) => void;
+  // Drops the stored lines of tabs that were saved for a hibernation that did not happen.
+  discardLines?: (tabIds: readonly string[]) => void;
 };
 
 export function createHibernateFlow(d: HibernateFlowDeps) {
@@ -89,10 +91,17 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
       const kept = tabs.map((t) => d.withRestoreCommand(t) as TerminalTab);
       const snapshots = await d.snapshotTabs(kept);
       const current = d.getWorkspace(workspaceId);
-      if (!current) return false;
+      if (!current) {
+        d.discardLines?.(ids);
+        return false;
+      }
       const still = stillValid ? await stillValid(current, ids) : awake(current, ids);
-      if (still.length === 0) return false;
       const stillIds = still.map((t) => t.id);
+      // The lines were written while the snapshot was taken; the tabs that stay awake must not
+      // keep a file that a later hibernation would show as if it were its own.
+      const stayAwake = ids.filter((id) => !stillIds.includes(id));
+      if (stayAwake.length > 0) d.discardLines?.(stayAwake);
+      if (still.length === 0) return false;
       const sleeping = Object.fromEntries(Object.entries(snapshots).filter(([id]) => stillIds.includes(id)));
       markHibernating(stillIds);
       try {
@@ -138,13 +147,19 @@ export type ReadLeafAnsi = (tabId: string, scrollback: number) => LeafScreen | n
 
 // A failure here must not stop the tab from sleeping: the placeholder just shows no lines.
 export async function keepLastLines(tabs: TerminalTab[], readAnsi: ReadLeafAnsi): Promise<void> {
-  if (!usePreferencesStore.getState().hibernateSaveLines) return;
+  if (!usePreferencesStore.getState().hibernateSaveLines) {
+    // Turning the setting off also forgets what was kept.
+    if (tabs.length > 0) await deleteHibernateLines(tabs.map((t) => t.id)).catch(() => {});
+    return;
+  }
   await Promise.all(
     tabs.map(async (tab) => {
       try {
         const raw = readAnsi(tab.id, HIBERNATE_LINES_MAX);
         const text = raw ? prepareHibernateScreen(raw) : "";
+        // An empty screen must not leave the lines of an earlier hibernation behind.
         if (text) await saveHibernateLines(tab.id, text);
+        else await deleteHibernateLines([tab.id]);
       } catch (e) {
         console.warn("[kex] could not keep the last lines of", tab.id, e);
       }
@@ -205,6 +220,9 @@ export function useHibernateFlow(deps: HookDeps) {
           );
         },
         withRestoreCommand: withLiveRestoreCommand,
+        discardLines: (ids) => {
+          deleteHibernateLines(ids).catch((e) => console.warn("[kex] could not delete hibernate lines:", e));
+        },
         updateTab: (workspaceId, saved) =>
           depsRef.current.updateTabData(workspaceId, saved.id, (t) =>
             t.kind === "terminal" && saved.kind === "terminal"

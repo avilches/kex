@@ -216,8 +216,9 @@ export function FolderPalette({
   };
 
   const menuOpen = rowMenu.menu !== null;
-  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen });
-  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen };
+  const menuRowKey = rowMenu.menu?.rowKey;
+  const latest = useRef({ toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen, menuRowKey });
+  latest.current = { toggleWorktrees, copyPath, rowOf, groups, onPick, runDigit, menuOpen, menuRowKey };
   // The global shortcut listener runs first: Cmd+T, Cmd+K and Cmd+Shift+C reach the palette from there.
   useEffect(() => {
     if (!open) return;
@@ -242,7 +243,8 @@ export function FolderPalette({
         if (current) latest.current.onPick(current);
         return true;
       }
-      const row = find(selectedRowEl()?.dataset.folderRow);
+      // An open row menu is anchored to its own row, which the pointer may have left.
+      const row = find(latest.current.menuRowKey ?? selectedRowEl()?.dataset.folderRow);
       if (action === "worktrees") toggle(row);
       else copy(row);
       return true;

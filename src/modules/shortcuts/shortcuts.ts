@@ -587,6 +587,13 @@ const DIGIT_WILDCARDS: Partial<Record<ShortcutId, RegExp>> = {
   "tab.selectByIndex": /^[0-9]$/,
 };
 
+// The digit a keydown stands for, read from the physical key (`code`, number pad included): with Alt
+// or Shift held `key` is a symbol instead (Option+1 types an inverted exclamation mark on a Mac).
+export function eventDigit(e: Pick<KeyboardEvent, "code">): number | null {
+  const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
+  return m ? Number(m[1]) : null;
+}
+
 export function isDigitWildcard(id: ShortcutId): boolean {
   return id in DIGIT_WILDCARDS;
 }
@@ -643,10 +650,11 @@ export function matchBinding(
   const bindingKey = binding.key.toLowerCase();
 
   // The index shortcuts only own their modifiers: ANY digit of their range is a
-  // hit (the handler reads e.key for the actual index) and the binding key is ignored.
+  // hit (the handler reads eventDigit for the actual index) and the binding key is ignored.
   const range = id && DIGIT_WILDCARDS[id];
   if (range) {
-    if (!range.test(e.key)) return false;
+    const digit = eventDigit(e);
+    if (digit === null || !range.test(String(digit))) return false;
   } else if (eventKey !== bindingKey) {
     return false;
   }

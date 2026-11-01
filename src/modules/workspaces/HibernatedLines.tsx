@@ -24,10 +24,14 @@ export function HibernatedLines({
   const fontSize = usePreferencesStore((s) => s.terminalFontSize);
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const lineHeight = usePreferencesStore((s) => s.terminalLineHeight);
+  const keepLines = usePreferencesStore((s) => s.hibernateSaveLines);
   const letterSpacing = usePreferencesStore((s) => s.terminalLetterSpacing);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !keepLines) {
+      setLines(null);
+      return;
+    }
     let cancelled = false;
     readHibernateLines(tabId)
       .then((text) => {
@@ -39,7 +43,7 @@ export function HibernatedLines({
     return () => {
       cancelled = true;
     };
-  }, [tabId, visible]);
+  }, [tabId, visible, keepLines]);
 
   // The lines start at the bottom, where the terminal left them; the wheel (see HibernatedTab) moves up from there.
   useLayoutEffect(() => {

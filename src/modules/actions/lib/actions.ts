@@ -30,6 +30,14 @@ export function updateAction(
   });
 }
 
+// The edit that sets or clears the fixed folder of a script. A cleared folder travels as "" and not as
+// undefined: an edit of a workspace Action crosses windows as JSON, which drops undefined keys, and the
+// receiver merges the patch over the old Action, so the old folder would survive. normalizeAction reads
+// "" as no folder.
+export function withFixedCwd(action: Action, raw: string): Action {
+  return { ...action, cwd: raw.trim() };
+}
+
 export function removeAction(list: readonly Action[], id: string): Action[] {
   return list.filter((a) => a.id !== id);
 }
@@ -123,6 +131,14 @@ export function adoptActionAt(
   const at = beforeId ? next.findIndex((a) => a.id === beforeId) : -1;
   next.splice(at === -1 ? next.length : at, 0, stored);
   return { list: next, stored, merged: false };
+}
+
+// Puts an action back at the place it had, clamped to the list: -1 or a missing place goes last.
+export function insertActionAt(list: readonly Action[], action: Action, index: number): Action[] {
+  if (list.some((a) => a.id === action.id)) return [...list];
+  const next = [...list];
+  next.splice(index < 0 || index > next.length ? next.length : index, 0, action);
+  return next;
 }
 
 // Moves, never copies: the action leaves the workspace and joins the global list.

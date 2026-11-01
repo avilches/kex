@@ -525,6 +525,29 @@ describe("FolderPalette", () => {
       expect(onToggle).not.toHaveBeenCalled();
     });
 
+    it("Cmd+K with a row menu open acts on the row of the menu, not on the one the pointer moved to", async () => {
+      const onToggle = vi.fn();
+      mountGroups(clustered, onToggle);
+      await settle();
+      await act(async () => {
+        fireEvent.keyDown(inputEl(), { key: "Tab" });
+      });
+      expect(document.querySelector('[role="menu"]')).not.toBeNull();
+      const elsewhere = itemEls()[2]!;
+      for (const x of [10, 20]) {
+        await act(async () => {
+          fireEvent.pointerMove(elsewhere, { clientX: x, clientY: x });
+        });
+      }
+      await settle();
+      expect(document.querySelector('[cmdk-item][aria-selected="true"]')).toBe(elsewhere);
+      await act(async () => {
+        runPaletteShortcut("worktrees");
+      });
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(onToggle.mock.calls[0][0]).toMatchObject({ path: "/repo", repoKey: "/repo" });
+    });
+
     it("Enter on the menu picks the folder and Escape closes only the menu", async () => {
       const onPick = vi.fn();
       mountGroups(clustered, vi.fn(), onPick);

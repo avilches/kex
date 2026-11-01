@@ -72,6 +72,7 @@ import {
   stepSwitcher,
   switcherActive,
   letterOf,
+  menuItemBlockedBySwitcher,
   shortcutBlockedBySwitcher,
   carriedAgent,
   carriedIndicator,
@@ -109,6 +110,7 @@ import {
   openWorkspaceActionsSettings,
 } from "@/modules/settings/openSettingsWindow";
 import { useWorkspaceActionsBroadcast } from "@/modules/actions/lib/actionsBroadcast";
+import { useUnlinkRemovedGlobalActions } from "@/modules/actions/lib/useUnlinkRemovedGlobalActions";
 import type { Action } from "@/modules/actions/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -117,6 +119,7 @@ import {
 } from "@/modules/settings/store";
 import {
   SHORTCUTS_BY_ID,
+  eventDigit,
   useGlobalShortcuts,
   type ShortcutHandlers,
   type ShortcutId,
@@ -3091,7 +3094,10 @@ export default function App() {
       "palette.folderMain": () => void runPaletteShortcut("folderMain", 2),
       "palette.folderHome": () => void runPaletteShortcut("folderHome", 3),
       "palette.worktrees": () => void runPaletteShortcut("worktrees"),
-      "palette.menuAction": (e) => void runPaletteShortcut("menuAction", parseInt(e.key, 10)),
+      "palette.menuAction": (e) => {
+        const digit = eventDigit(e);
+        if (digit) void runPaletteShortcut("menuAction", digit);
+      },
       "tab.new": () => {
         if (runPaletteShortcut("newTab")) return;
         const target = paletteTerminalTargetRef.current;
@@ -3230,7 +3236,8 @@ export default function App() {
         if (!activeWorkspace || !activePane) return;
         const tabs = activePane.tabs;
         if (tabs.length === 0) return;
-        const digit = parseInt(e.key, 10);
+        const digit = eventDigit(e);
+        if (digit === null) return;
         const idx = digit === 0 ? tabs.length - 1 : digit - 1;
         if (idx >= 0 && idx < tabs.length)
           onActivateTabStable(activeWorkspace.id, tabs[idx].id);
@@ -3283,7 +3290,9 @@ export default function App() {
       },
       "workspace.selectByIndex": (e) => {
         dismissPalettes();
-        const idx = parseInt(e.key, 10) - 1;
+        const digit = eventDigit(e);
+        if (!digit) return;
+        const idx = digit - 1;
         const visible = visibleWorkspaceOrder(
           workspaces,
           groups,
@@ -3497,6 +3506,7 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
+    if (menuItemBlockedBySwitcher(switcherActive())) return;
     // The menu acts on the workspace behind the onboarding modal just as the shortcuts would.
     if (isOnboardingOpen()) return;
     if (
@@ -4049,6 +4059,7 @@ export default function App() {
     [addWorkspaceAction, updateWorkspaceAction, removeWorkspaceAction, reorderWorkspaceActions, promoteWorkspaceAction, demoteGlobalAction],
   );
   useWorkspaceActionsBroadcast({ workspace: activeWorkspace ?? null, mutators: workspaceActionsMutators });
+  useUnlinkRemovedGlobalActions(workspacesRef);
 
   const onOpenActionsSettings = useCallback(() => {
     void openWorkspaceActionsSettings();

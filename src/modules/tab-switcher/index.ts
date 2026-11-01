@@ -6,4 +6,4 @@ export {
   switcherActive,
 } from "./lib/switcherController";
 export { carriedAgent, carriedIndicator, letterOf, settledSleepState, sleepOutcome, switcherOrder } from "./lib/switcherModel";
-export { shortcutBlockedBySwitcher } from "./lib/switcherGate";
+export { menuItemBlockedBySwitcher, shortcutBlockedBySwitcher } from "./lib/switcherGate";

@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { TabEntry } from "@/modules/command-palette";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import {
   REVEAL_DELAY_MS,
   afterRemoval,
@@ -52,6 +54,10 @@ type Session = {
   // A close is waiting on the host, which may be asking the user to confirm it: the keys belong to that
   // dialog meanwhile, and letting go of the modifier must not commit a jump behind it.
   busy: boolean;
+  // The busy is a close or a sleep waiting on the host (not a tile menu), and the modifier was let go
+  // meanwhile: when the host answers, the switcher settles with a commit, as the release asked.
+  awaiting: boolean;
+  releasedWhileAwaiting: boolean;
   // The menu is closing because of an Escape pressed with the modifier held: the overlay stays.
   escapeKeeps: boolean;
 };
@@ -115,17 +121,30 @@ async function closeSelected(): Promise<void> {
   const entry = entries[index];
   if (!entry) return;
   current.busy = true;
+  current.awaiting = true;
   let closed = false;
   try {
     closed = (await close(entry)) === true;
+  } catch (e) {
+    console.warn("[kex] could not close the tab from the switcher:", e);
   } finally {
     current.busy = false;
+    current.awaiting = false;
   }
-  if (session !== current || !closed) return;
-  const left = useSwitcherStore.getState();
-  const next = afterRemoval(left.entries, left.index, entry.tabId);
-  if (!next) return end();
-  useSwitcherStore.setState(next);
+  if (session !== current) return;
+  if (closed) {
+    const left = useSwitcherStore.getState();
+    const next = afterRemoval(left.entries, left.index, entry.tabId);
+    if (!next) return end();
+    useSwitcherStore.setState(next);
+  }
+  settleRelease(current);
+}
+
+// The modifier was let go while a close or a sleep was being answered: now that the host is done the
+// switcher goes where the highlight is, which is what the release would have done.
+function settleRelease(current: Session) {
+  if (session === current && current.releasedWhileAwaiting) commitSwitcher();
 }
 
 // Hibernates or restores the highlighted tab through the app, which does what the shortcut does everywhere
@@ -140,20 +159,28 @@ async function sleepSelected(): Promise<void> {
   const entry = entries[index];
   if (!entry) return;
   current.busy = true;
+  current.awaiting = true;
   let fresh: TabEntry | "dismiss" | null = null;
   try {
     fresh = (await sleep(entry)) ?? null;
+  } catch (e) {
+    console.warn("[kex] could not hibernate the tab from the switcher:", e);
   } finally {
     current.busy = false;
+    current.awaiting = false;
   }
-  if (session !== current || !fresh) return;
+  if (session !== current) return;
   if (fresh === "dismiss") return end();
-  const now = useSwitcherStore.getState();
-  const at = now.entries.findIndex((e) => e.tabId === entry.tabId);
-  if (at < 0) return;
-  const next = [...now.entries];
-  next[at] = fresh;
-  useSwitcherStore.setState({ entries: next });
+  if (fresh) {
+    const now = useSwitcherStore.getState();
+    const at = now.entries.findIndex((e) => e.tabId === entry.tabId);
+    if (at >= 0) {
+      const next = [...now.entries];
+      next[at] = fresh;
+      useSwitcherStore.setState({ entries: next });
+    }
+  }
+  settleRelease(current);
 }
 
 // Fed by the tiles on every pointer move. The reference point only advances when the pointer really
@@ -206,13 +233,33 @@ function moveRow(direction: 1 | -1) {
 
 const jumpTarget = (e: KeyboardEvent) => digitIndex(e.code, useSwitcherStore.getState().entries.length);
 
-// Tab itself is not handled here: it is the shortcut that opened the switcher and the global listener
-// owns it. W closes the highlighted tab on its own, with whatever modifier is held, as Q quits an app in
+// With Alt held a Mac types a symbol for a letter, so the physical key decides then, as the shortcut matcher does.
+const isLetter = (e: KeyboardEvent, letter: string) =>
+  e.altKey && /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() === letter : e.key.toLowerCase() === letter;
+
+// A key that goes to a dialog or a menu opened by a close or a sleep waiting on the host keeps its default.
+const belongsToHostUi = (e: KeyboardEvent) =>
+  e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]') !== null;
+
+const isSwitcherShortcut = (e: KeyboardEvent) => {
+  const user = usePreferencesStore.getState().shortcuts;
+  return matchesShortcut(e, "tab.switcher", user) || matchesShortcut(e, "tab.switcherBack", user);
+};
+
+// Tab that is the registered shortcut is not handled here: it is the shortcut that opened the switcher and the
+// global listener owns it. Any other Tab is swallowed like the rest, or xterm would send it to the shell. W closes the highlighted tab on its own, with whatever modifier is held, as Q quits an app in
 // the macOS switcher, and the letter of the hibernate shortcut puts it to sleep or wakes it the same way;
 // every shortcut is blocked meanwhile, so Cmd+W and Cmd+Alt+Z have no other meaning here. Everything else
 // is swallowed so no key reaches the terminal behind the overlay.
 function onKeyDown(e: KeyboardEvent) {
-  if (!session || session.busy || e.key === "Tab") return;
+  if (!session) return;
+  if (session.busy) {
+    if (belongsToHostUi(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  if (e.key === "Tab" && isSwitcherShortcut(e)) return;
   e.preventDefault();
   e.stopPropagation();
   const jump = jumpTarget(e);
@@ -223,8 +270,9 @@ function onKeyDown(e: KeyboardEvent) {
   else if (e.key === "ArrowLeft") stepSwitcher(-1);
   else if (e.key === "ArrowDown") moveRow(1);
   else if (e.key === "ArrowUp") moveRow(-1);
-  else if (e.key.toLowerCase() === "w") void closeSelected();
-  else if (session.hooks.sleepKey && e.key.toLowerCase() === session.hooks.sleepKey) void sleepSelected();
+  else if (e.repeat) return;
+  else if (isLetter(e, "w")) void closeSelected();
+  else if (session.hooks.sleepKey && isLetter(e, session.hooks.sleepKey)) void sleepSelected();
 }
 
 // The system menu (Reload, Inspect) never belongs over the overlay, with Ctrl held or not. It listens in the
@@ -237,6 +285,10 @@ function onContextMenu(e: MouseEvent) {
 const holdsModifier = (h: Held) => h.ctrl || h.alt || h.meta;
 
 function onKeyUp(e: KeyboardEvent) {
+  if (session?.awaiting && holdsModifier(session.held) && modifiersReleased(session.held, e)) {
+    session.releasedWhileAwaiting = true;
+    return;
+  }
   if (session && !session.busy && holdsModifier(session.held) && modifiersReleased(session.held, e)) {
     commitSwitcher();
   }
@@ -251,7 +303,7 @@ export function openSwitcher(
 ) {
   if (session || entries.length < 2) return;
   const held = heldModifiers(e);
-  session = { held, onCommit, hooks, timer: null, pointer: null, busy: false, escapeKeeps: false };
+  session = { held, onCommit, hooks, timer: null, pointer: null, busy: false, awaiting: false, releasedWhileAwaiting: false, escapeKeeps: false };
   useSwitcherStore.setState({
     keys: { close: !!hooks.onClose, sleep: hooks.onSleep ? (hooks.sleepKey ?? null) : null },
     revealed: false,

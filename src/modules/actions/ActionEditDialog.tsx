@@ -21,6 +21,7 @@ import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { IconPicker } from "./IconPicker";
 import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
+import { withFixedCwd } from "./lib/actions";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
 import type { AppAccepts } from "@/modules/external-editors/catalog";
@@ -238,7 +239,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
                   spellCheck={false}
                   defaultValue={action.cwd ?? ""}
                   key={action.cwd ?? ""}
-                  onBlur={(e) => onChange({ ...action, cwd: e.target.value.trim() || undefined })}
+                  onBlur={(e) => onChange(withFixedCwd(action, e.target.value))}
                 />
                 <button
                   type="button"

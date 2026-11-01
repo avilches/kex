@@ -44,26 +44,31 @@ const rowCtx = (kind: "file" | "folder", over: Record<string, string> = {}) => {
 };
 
 describe("contextActionEntries", () => {
-  it("lists every Action of any target, grouped by scope", () => {
-    const groups = contextActionEntries(
-      [zed("both"), action("agent {cwd}", true)],
-      [action("lint {filepath}", true), action("pnpm dev", true)],
-      rowCtx("folder"),
-      { rowKind: "folder" },
-    );
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["agent {cwd}", "zed {target}"]);
-    expect(groups.global.map((e) => e.action.command)).toEqual(["lint {filepath}", "pnpm dev"]);
+  it("offers a row only the scripts of its target: folder scripts on a folder, file scripts on a file, workspace ones never", () => {
+    const local = [action("agent {cwd}", true), action("lint {filepath}", true), action("pnpm dev", true), zed("both")];
+    const global = [action("make -C {dir}", true), action("cat {filename}", true), action("echo {host}", true)];
+    const folder = contextActionEntries(local, global, rowCtx("folder"), { rowKind: "folder" });
+    expect(folder.workspace.map((e) => e.action.command)).toEqual(["agent {cwd}", "zed {target}"]);
+    expect(folder.global.map((e) => e.action.command)).toEqual(["make -C {dir}"]);
+    const file = contextActionEntries(local, global, rowCtx("file"), { rowKind: "file" });
+    expect(file.workspace.map((e) => e.action.command)).toEqual(["lint {filepath}", "zed {target}"]);
+    expect(file.global.map((e) => e.action.command)).toEqual(["cat {filename}"]);
+  });
+
+  it("applies no target filter when it is not told what the row is", () => {
+    const groups = contextActionEntries([action("pnpm dev", true), action("lint {filepath}", true)], [], ctx());
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["pnpm dev", "lint {filepath}"]);
   });
 
   it("puts scripts before apps inside a scope, each keeping its order", () => {
     const groups = contextActionEntries(
-      [action("make", true), zed("both", "Code"), action("pnpm test", true), zed("both", "Zed")],
+      [action("make {cwd}", true), zed("both", "Code"), action("pnpm test {dir}", true), zed("both", "Zed")],
       [],
       rowCtx("folder"),
       { rowKind: "folder" },
     );
     expect(groups.workspace.map((e) => e.action.kind)).toEqual(["script", "script", "app", "app"]);
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make", "pnpm test", "zed {target}", "zed {target}"]);
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make {cwd}", "pnpm test {dir}", "zed {target}", "zed {target}"]);
     expect(groups.workspace.slice(2).map((e) => e.action.name)).toEqual(["Code", "Zed"]);
   });
 
