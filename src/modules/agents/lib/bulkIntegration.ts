@@ -9,24 +9,19 @@ export function planBulk(kind: BulkKind, states: Partial<Record<AgentId, RowStat
   return (Object.keys(states) as AgentId[]).filter((a) => states[a]?.kind === wanted);
 }
 
+// Every run starts at once and none waits for another: each agent writes its own files, and the
+// shared hook script and stored lists are written atomically or through a queue. The groups keep
+// the plan's agent order, whatever order the runs finish in.
 export async function runBulk(
   kind: BulkKind,
   states: Partial<Record<AgentId, RowState>>,
   run: (agent: AgentId) => Promise<void>,
 ): Promise<BulkResult> {
   const plan = planBulk(kind, states);
-  const result: BulkResult = {
-    done: [],
-    failed: [],
+  const outcomes = await Promise.allSettled(plan.map((agent) => run(agent)));
+  return {
+    done: plan.filter((_, i) => outcomes[i].status === "fulfilled"),
+    failed: plan.filter((_, i) => outcomes[i].status === "rejected"),
     skipped: (Object.keys(states) as AgentId[]).filter((a) => !plan.includes(a)),
   };
-  for (const agent of plan) {
-    try {
-      await run(agent);
-      result.done.push(agent);
-    } catch {
-      result.failed.push(agent);
-    }
-  }
-  return result;
 }
