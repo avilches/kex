@@ -117,27 +117,25 @@ describe("AddActionMenu", () => {
     view.unmount();
   });
 
-  it("offers the agent presets in their own section, with the folder they start in under the name", () => {
-    const claude: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
-    const ctxVariant: AppSuggestion = { ...claude, key: "claude:context", cwdMode: "context" };
-    const view = mount([...suggestions, ctxVariant, claude]);
+  it("offers one entry per detected agent in its own section, after Custom agent", () => {
+    const claude: AppSuggestion = { key: "claude:agent", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent" };
+    const view = mount([...suggestions, claude]);
     click(view.trigger);
     const groups = [...document.querySelectorAll("[cmdk-group]")];
     const agents = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Agents")!;
     expect([...agents.querySelectorAll("[cmdk-item]")].map((o) => o.textContent)).toEqual([
       "Custom agentyour own command",
       "Claude CodeWorkspace root",
-      "Claude CodeCurrent folder",
     ]);
     const apps = groups.find((g) => g.querySelector("[cmdk-group-heading]")?.textContent === "Applications")!;
     expect(apps.textContent).not.toContain("Claude");
-    click(agents.querySelectorAll("[cmdk-item]")[2]!);
-    expect(view.onPickApp).toHaveBeenCalledWith(ctxVariant);
+    click(agents.querySelectorAll("[cmdk-item]")[1]!);
+    expect(view.onPickApp).toHaveBeenCalledWith(claude);
     view.unmount();
   });
 
   it("orders the combo as Add script, then the Agents group, then the Applications", () => {
-    const claude: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
+    const claude: AppSuggestion = { key: "claude:agent", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent" };
     const view = mount([...suggestions, claude]);
     click(view.trigger);
     expect(view.options().map((o) => o.textContent)).toEqual([

@@ -80,19 +80,17 @@ describe("agentSuggestionsFromDetected", () => {
     enabled,
   });
 
-  it("offers workspace then context per enabled agent, with the binary and its bypass switch as command", () => {
+  it("offers one preset per enabled agent, with the binary and its bypass switch as command", () => {
     const list = agentSuggestionsFromDetected([ag("claude", "/usr/local/bin/claude")]);
-    expect(list.map((s) => [s.key, s.cwdMode])).toEqual([
-      ["claude:workspace", "workspace"],
-      ["claude:context", "context"],
-    ]);
+    expect(list.map((s) => s.key)).toEqual(["claude:agent"]);
+    expect(list.every((s) => !("cwdMode" in s))).toBe(true);
     expect(list[0]).toMatchObject({ kind: "agent", appId: "claude", iconId: "claude", name: "Claude Code", defaultCommand: "claude --dangerously-skip-permissions" });
     expect(list.every((s) => !/[{}]/.test(s.defaultCommand + s.name))).toBe(true);
   });
 
   it("uses the agent id as the command, so a Windows binary gives no .exe", () => {
     const list = agentSuggestionsFromDetected([ag("claude", "C:\\Users\\me\\bin\\claude.exe")]);
-    expect(list.map((s) => s.defaultCommand)).toEqual(Array(2).fill("claude --dangerously-skip-permissions"));
+    expect(list.map((s) => s.defaultCommand)).toEqual(["claude --dangerously-skip-permissions"]);
   });
 
   it("skips disabled agents", () => {

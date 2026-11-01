@@ -43,7 +43,7 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
 describe("planActionRun, scripts", () => {
   it("blocks a plain script while the workspace has no root, with the same words the bar uses", () => {
     const rootless = ctx({ vars: { ...ctx().vars, workspace: "" }, folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
-    expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: Set a root to this workspace" });
+    expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: A workspace root is needed" });
     expect(planActionRun(script({ command: "ls {cwd}" }), rootless).kind).toBe("new-tab");
     expect(planActionRun(script(), ctx())).toMatchObject({ kind: "new-tab" });
   });
@@ -304,17 +304,29 @@ describe("planActionRun, agents", () => {
     expect(plan).toEqual({ kind: "new-agent-tab", input: "claude {x}\r", cwd: "/w", title: "Claude" });
   });
 
-  it("resolves the folder like a script", () => {
-    expect(planActionRun(agent({ cwdMode: "context" }), ctx())).toMatchObject({ cwd: "/w/src" });
-    const noFocus = ctx({ folders: { focusFolder: null, workspaceRoot: "/w", workspaceCwd: "/w" } });
-    expect(planActionRun(agent({ cwdMode: "context" }), noFocus)).toMatchObject({ cwd: "/w" });
-    expect(planActionRun(agent({ cwdMode: "home" }), ctx({ folders: { home: "/h" } }))).toMatchObject({ cwd: "/h" });
-    expect(planActionRun(agent({ cwdMode: "fixed", cwd: "/fixed" }), ctx())).toMatchObject({ cwd: "/fixed" });
+  it("starts in the workspace root, whatever tab is focused: an agent has no folder of its own", () => {
+    expect(planActionRun(agent(), ctx())).toMatchObject({ cwd: "/w" });
+    const elsewhere = ctx({ folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w/other" } });
+    expect(planActionRun(agent(), elsewhere)).toMatchObject({ cwd: "/w" });
   });
 
-  it("blocks a workspace folder when the workspace has no root", () => {
+  it("starts in the folder of the row it was launched from, over the workspace root", () => {
+    expect(planActionRun(agent(), ctx({ startFolder: "/elsewhere/repo" }))).toMatchObject({ cwd: "/elsewhere/repo" });
+    expect(planActionRun(agent(), ctx({ startFolder: "  " }))).toMatchObject({ cwd: "/w" });
+  });
+
+  it("ignores any leftover cwdMode, so a stale value cannot move it", () => {
+    expect(planActionRun(agent({ cwdMode: "home", cwd: "/fixed" }), ctx({ folders: { home: "/h", workspaceRoot: "/w" } }))).toMatchObject({ cwd: "/w" });
+  });
+
+  it("blocks when there is neither a row folder nor a workspace root", () => {
     const rootless = ctx({ folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
-    expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "blocked", reason: "Claude not run: Set a root to this workspace" });
+    expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "blocked", reason: "Claude not run: A workspace root is needed" });
+  });
+
+  it("runs from a row folder even when the workspace has no root", () => {
+    const rootless = ctx({ startFolder: "/row", folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
+    expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "new-agent-tab", cwd: "/row" });
   });
 
   it("blocks an empty command and one with a newline", () => {

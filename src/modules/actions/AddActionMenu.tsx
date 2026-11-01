@@ -110,7 +110,7 @@ function presetItems(
     .filter((s) => s.kind === kind)
     .sort(compareByName)
     .map((s) => {
-      const sub = scriptSubtitle({ name: s.name, kind: s.kind, cwdMode: s.cwdMode }, SETTINGS_LABELS);
+      const sub = scriptSubtitle({ name: s.name, kind: s.kind }, SETTINGS_LABELS);
       return (
         <CommandItem
           key={s.key}

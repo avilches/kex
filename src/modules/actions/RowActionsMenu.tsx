@@ -66,9 +66,9 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
   const groups = useMemo(
     () =>
       vars
-        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell })
+        ? contextActionEntries(ws?.actions ?? NONE, global, { vars, shell }, kind === "folder" ? { agentFolder: vars.cwd } : {})
         : EMPTY_GROUPS,
-    [vars, global, shell, ws?.actions],
+    [vars, global, shell, ws?.actions, kind],
   );
   const overlay = useMemo<RunOverlay | null>(
     () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),

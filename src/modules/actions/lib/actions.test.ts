@@ -94,11 +94,16 @@ describe("normalizeActions", () => {
     expect(normalizeActions([act("b", { kind: "bogus" as never })])).toEqual([]);
   });
 
-  it("scripts and agents keep their cwd mode and folder", () => {
-    for (const kind of ["script", "agent"] as const) {
-      const [x] = normalizeActions([act("a", { kind, cwdMode: "fixed", cwd: "/x" })]);
-      expect(x).toMatchObject({ cwdMode: "fixed", cwd: "/x" });
-    }
+  it("scripts keep their cwd mode and folder", () => {
+    const [x] = normalizeActions([act("a", { kind: "script", cwdMode: "fixed", cwd: "/x" })]);
+    expect(x).toMatchObject({ cwdMode: "fixed", cwd: "/x" });
+  });
+
+  it("agents never carry a cwd mode or folder: they have none of their own", () => {
+    const [agent] = normalizeActions([act("a", { kind: "agent", cwdMode: "fixed", cwd: "/x" })]);
+    expect(agent).toMatchObject({ kind: "agent" });
+    expect(agent).not.toHaveProperty("cwdMode");
+    expect(agent).not.toHaveProperty("cwd");
   });
 
   it("apps never carry a cwd mode or folder", () => {

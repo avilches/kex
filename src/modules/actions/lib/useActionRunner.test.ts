@@ -229,7 +229,7 @@ describe("useActionRunner", () => {
   });
 
   it("opens a new tab per click of an agent, with no link and no running mark", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result, write } = setup(ws());
     act(() => result.current.runAction(agent));
     act(() => result.current.runAction(agent));
@@ -250,24 +250,32 @@ describe("useActionRunner", () => {
   });
 
   it("runs an agent in the workspace its overlay names, and makes it the active one", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "context", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const other = ws({ id: "w2", workspaceRoot: "/o", cwd: "/o", paneTree: { kind: "pane", id: "p9", tabs: [], activeTabId: null }, activePaneId: "p9" });
     const { deps, result } = setup(ws(), {}, [other]);
-    act(() => result.current.runAction(agent, { focusFolder: "/o/src", workspaceId: "w2" }));
+    act(() => result.current.runAction(agent, { focusFolder: "/o/src", spawnCwd: "/o/src", workspaceId: "w2" }));
     expect(deps.setActiveWorkspaceId).toHaveBeenCalledWith("w2");
     expect(deps.openTab).toHaveBeenCalledTimes(1);
     expect(deps.openTab).toHaveBeenCalledWith("w2", "p9", expect.objectContaining({ kind: "terminal", cwd: "/o/src" }));
   });
 
+  it("starts an agent in the workspace root, not in the focused folder, when no row folder is given", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
+    const other = ws({ id: "w2", workspaceRoot: "/o", cwd: "/o", paneTree: { kind: "pane", id: "p9", tabs: [], activeTabId: null }, activePaneId: "p9" });
+    const { deps, result } = setup(ws(), {}, [other]);
+    act(() => result.current.runAction(agent, { focusFolder: "/o/src", workspaceId: "w2" }));
+    expect(deps.openTab).toHaveBeenCalledWith("w2", "p9", expect.objectContaining({ kind: "terminal", cwd: "/o" }));
+  });
+
   it("does not change the active workspace for a run in the active one", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result } = setup(ws());
     act(() => result.current.runAction(agent, { workspaceId: "w1" }));
     expect(deps.setActiveWorkspaceId).not.toHaveBeenCalled();
   });
 
   it("types an agent's line when its terminal handle only appears on a later retry", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result, write } = setup(ws());
     act(() => result.current.runAction(agent));
     const tab = (deps.openTab.mock.calls[0] as unknown[])[2] as Tab;
@@ -282,7 +290,7 @@ describe("useActionRunner", () => {
   });
 
   it("gives up on an agent's line in silence when its terminal never shows up", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result, write } = setup(ws());
     act(() => result.current.runAction(agent));
     const tab = (deps.openTab.mock.calls[0] as unknown[])[2] as Tab;
@@ -296,7 +304,7 @@ describe("useActionRunner", () => {
   });
 
   it("never records a script command for an agent's tab, while a script's tab gets one", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "workspace", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result } = setup(ws());
     act(() => result.current.runAction(agent));
     expect(scriptCommand).not.toHaveBeenCalled();
@@ -308,9 +316,9 @@ describe("useActionRunner", () => {
 
   it("tells the user when the folder an agent starts in is gone", async () => {
     fsStat.mockImplementationOnce(() => Promise.reject(new Error("missing")));
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", cwdMode: "fixed", cwd: "/gone", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { result } = setup(ws());
-    act(() => result.current.runAction(agent));
+    act(() => result.current.runAction(agent, { spawnCwd: "/gone" }));
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

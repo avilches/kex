@@ -8,7 +8,7 @@ import {
   type CommandVariable,
 } from "./commandTemplate";
 import { agentCommandProblem } from "./actionsBar";
-import { isAgent, usesTerminal, type Action } from "./types";
+import { isAgent, isScript, usesTerminal, type Action } from "./types";
 
 export { COMMAND_VARIABLES } from "./commandTemplate";
 
@@ -63,7 +63,7 @@ export function actionProblems(
   const check = agent ? agentCommandProblem : (command: string) => commandProblem(command, shell);
   const problem = action.command.trim() ? check(action.command) : null;
   if (problem) out.push({ kind: "command", message: problem });
-  if (usesTerminal(action) && action.cwdMode === "fixed" && action.cwd) {
+  if (isScript(action) && action.cwdMode === "fixed" && action.cwd) {
     const cwd = scriptCwdProblem(action.cwd);
     if (cwd) out.push({ kind: "cwd", message: cwd });
   }

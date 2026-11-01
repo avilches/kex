@@ -4,7 +4,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import { getDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { scriptShellFor } from "@/modules/workspaces/lib/scriptCwd";
-import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import type { CommandShell } from "./commandTemplate";
@@ -13,7 +12,6 @@ import { newTabActionEntries, type ContextActionGroups } from "./contextActionEn
 import { rowTabAt } from "./rowTab";
 import type { Action } from "./types";
 import type { RunOverlay } from "./useActionRunner";
-import { useActionStates } from "./useActionStates";
 
 const NONE: readonly Action[] = [];
 const EMPTY: ContextActionGroups = { workspace: [], global: [] };
@@ -29,12 +27,11 @@ type Inputs = {
   host: string;
   shell: CommandShell;
   global: readonly Action[];
-  states: ReadonlyMap<string, ScriptState>;
 };
 
 // The Actions a new-tab surface offers for a folder, seen from the terminal that would open
 // there, and the values to run them with, aimed at the workspace the folder belongs to.
-function newTabActionsFor({ ws, folder, git, host, shell, global, states }: Inputs): NewTabActions {
+function newTabActionsFor({ ws, folder, git, host, shell, global }: Inputs): NewTabActions {
   if (!folder) return { groups: EMPTY, overlay: null };
   const vars = buildCommandVars(rowTabAt(folder), { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, git, host);
   const groups = newTabActionEntries(
@@ -45,7 +42,6 @@ function newTabActionsFor({ ws, folder, git, host, shell, global, states }: Inpu
       shell,
       folders: { focusFolder: folder, workspaceRoot: ws.workspaceRoot ?? null, workspaceCwd: ws.cwd ?? null },
     },
-    states,
   );
   return { groups, overlay: { vars, focusFolder: folder, spawnCwd: folder, workspaceId: ws.id } };
 }
@@ -56,7 +52,6 @@ export function useFolderRowActions(): (ws: MenuWorkspace | undefined, folder: s
   const sys = useSystemInfo();
   const envKind = useWorkspaceEnvStore((s) => s.env.kind);
   const global = usePreferencesStore((s) => s.actions) ?? NONE;
-  const states = useActionStates();
   return useCallback(
     (ws, folder, branch) => {
       if (!ws) return { groups: EMPTY, overlay: null };
@@ -68,9 +63,8 @@ export function useFolderRowActions(): (ws: MenuWorkspace | undefined, folder: s
         host: sys.host,
         shell: scriptShellFor(IS_WINDOWS, envKind),
         global,
-        states,
       });
     },
-    [sys.host, envKind, global, states],
+    [sys.host, envKind, global],
   );
 }

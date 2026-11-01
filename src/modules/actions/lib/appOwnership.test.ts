@@ -81,45 +81,34 @@ describe("presetOf", () => {
 });
 
 describe("agent presets", () => {
-  const agentWs: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
-  const agentCtx: AppSuggestion = { ...agentWs, key: "claude:context", cwdMode: "context" };
-  const agents = [agentWs, agentCtx];
-  const installed: Action = { id: "g", name: "Claude Code", command: "claude", kind: "agent", appId: "claude", cwdMode: "context", ownButton: false };
+  const agent: AppSuggestion = { key: "claude:agent", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent" };
+  const agents = [agent];
+  const installed: Action = { id: "g", name: "Claude Code", command: "claude", kind: "agent", appId: "claude", ownButton: false };
 
-  it("offers the other variant while one is installed", () => {
-    expect(uninstalledSuggestions(agents, [installed])).toEqual([agentWs]);
+  it("is hidden from the Add combo while one is installed", () => {
+    expect(uninstalledSuggestions(agents, [installed])).toEqual([]);
+    expect(uninstalledSuggestions(agents, [])).toEqual(agents);
   });
 
   it("never matches across kinds", () => {
-    const app: Action = { ...installed, kind: "app", cwdMode: undefined };
+    const app: Action = { ...installed, kind: "app" };
     expect(uninstalledSuggestions(agents, [app])).toEqual(agents);
     expect(uninstalledSuggestions([sublime], [{ ...preset, kind: "agent" }])).toEqual([sublime]);
-    expect(presetOf(installed, agents)).toBe(agentCtx);
+    expect(presetOf(installed, agents)).toBe(agent);
     expect(presetOf({ kind: "app", command: "claude" }, agents)).toBeUndefined();
   });
 
-  it("owns an edited command or start folder, and gives the link back on restore", () => {
+  it("owns an edited command, and gives the link back on restore", () => {
     const edited = ownedAfterEdit(installed, { ...installed, command: "claude --model opus" }, agents);
     expect(edited).toMatchObject({ appId: "", iconId: "claude" });
     const own = apply([installed], edited)[0]!;
     expect(uninstalledSuggestions(agents, [own])).toEqual(agents);
     const back = ownedAfterEdit(own, { ...own, command: "claude" }, agents);
     expect(back).toMatchObject({ appId: "claude", iconId: "" });
-    expect(ownedAfterEdit(installed, { ...installed, cwdMode: "workspace" }, agents)).toMatchObject({ appId: "claude" });
   });
 
-  it("relinks by start folder and keeps the user's name and own-button choice", () => {
-    const mine: Action = { ...installed, name: "My Claude", ownButton: true, appId: "", iconId: "claude", cwdMode: "fixed", cwd: "/x" };
-    const relinked = ownedAfterEdit(mine, { ...mine, cwdMode: "workspace", cwd: undefined }, agents);
-    expect(relinked).toMatchObject({ appId: "claude", iconId: "", name: "My Claude", ownButton: true, cwdMode: "workspace" });
-    expect(presetOf(relinked, agents)).toBe(agentWs);
-    const moved = ownedAfterEdit(installed, { ...installed, name: "Mine", ownButton: true, cwdMode: "workspace" }, agents);
-    expect(moved).toMatchObject({ appId: "claude", name: "Mine", ownButton: true, cwdMode: "workspace" });
-  });
-
-  it("an agent preset cannot be built without its start folder", () => {
-    // @ts-expect-error an agent suggestion must carry cwdMode
-    const missing: AppSuggestion = { key: "k", appId: "claude", name: "C", iconId: "claude", defaultCommand: "claude", kind: "agent" };
-    expect(missing.kind).toBe("agent");
+  it("keeps the user's name and own-button choice, which never count", () => {
+    const moved = ownedAfterEdit(installed, { ...installed, name: "Mine", ownButton: true }, agents);
+    expect(moved).toMatchObject({ appId: "claude", name: "Mine", ownButton: true });
   });
 });

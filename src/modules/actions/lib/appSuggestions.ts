@@ -3,7 +3,6 @@ import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
 import { yoloCommand } from "./agentYolo";
-import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import type { Action, ActionKind } from "./types";
 
 type SuggestionBase = {
@@ -18,9 +17,8 @@ type SuggestionBase = {
   defaultCommand: string;
 };
 
-// An agent preset always says where it starts, so creating one never falls back to Home.
-export type AppSuggestion = SuggestionBase &
-  ({ kind: "app"; cwdMode?: undefined } | { kind: "agent"; cwdMode: ScriptCwdMode });
+// An agent has no folder of its own, so a preset is its kind, its command and nothing else.
+export type AppSuggestion = SuggestionBase & { kind: "app" | "agent" };
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   key: "custom",
@@ -34,22 +32,16 @@ const KNOWN = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 
 const sameCommand = (a: string, b: string): boolean => a.trim() === b.trim();
 
-type Identity = { kind: ActionKind; command: string; cwdMode?: ScriptCwdMode };
+type Identity = { kind: ActionKind; command: string };
 
-/** An app is defined by its command alone: the name, the icon and the appId do not matter. An
- * agent is defined by its command and where it starts, so one binary backs two presets. */
+/** An app or an agent is defined by its kind and its command alone: the name, the icon and the
+ * appId do not matter, and neither does a folder, because an agent has none of its own. */
 export function sameIdentity(a: Identity, b: Identity): boolean {
-  if (a.kind !== b.kind || !sameCommand(a.command, b.command)) return false;
-  return a.kind !== "agent" || a.cwdMode === b.cwdMode;
+  return a.kind === b.kind && sameCommand(a.command, b.command);
 }
 
-export function hasCommandOf(
-  actions: readonly Action[],
-  command: string,
-  kind: ActionKind = "app",
-  cwdMode?: ScriptCwdMode,
-): boolean {
-  return !!command.trim() && actions.some((a) => sameIdentity(a, { kind, command, cwdMode }));
+export function hasCommandOf(actions: readonly Action[], command: string, kind: ActionKind = "app"): boolean {
+  return !!command.trim() && actions.some((a) => sameIdentity(a, { kind, command }));
 }
 
 /** The presets still to install: a preset whose identity some Action already has is installed,
@@ -59,22 +51,17 @@ export function uninstalledSuggestions(
   suggestions: readonly AppSuggestion[],
   actions: readonly Action[],
 ): AppSuggestion[] {
-  return suggestions.filter((s) => !(s.appId && hasCommandOf(actions, s.defaultCommand, s.kind, s.cwdMode)));
+  return suggestions.filter((s) => !(s.appId && hasCommandOf(actions, s.defaultCommand, s.kind)));
 }
 
 /** The detected preset an Action is, by its identity, or undefined when it is the user's own. */
 export function presetOf(
-  action: Pick<Action, "kind" | "command" | "cwdMode">,
+  action: Pick<Action, "kind" | "command">,
   suggestions: readonly AppSuggestion[],
 ): AppSuggestion | undefined {
   if (action.kind === "script") return undefined;
   return suggestions.find(
-    (s) =>
-      s.appId &&
-      sameIdentity(
-        { kind: s.kind, command: s.defaultCommand, cwdMode: s.cwdMode },
-        { kind: action.kind, command: action.command, cwdMode: action.cwdMode },
-      ),
+    (s) => s.appId && sameIdentity({ kind: s.kind, command: s.defaultCommand }, { kind: action.kind, command: action.command }),
   );
 }
 
@@ -133,26 +120,21 @@ export function suggestionsFromDetected(detected: readonly DetectedEditor[]): Ap
     .sort(compareByName);
 }
 
-const AGENT_VARIANTS = ["workspace", "context"] as const satisfies readonly ScriptCwdMode[];
-
-/** Two presets per enabled agent, starting in the workspace root or in the current directory.
- * The command is the bare binary name the scan looked up plus its bypass-permissions switch, so
- * the Action stays portable across machines and never carries a resolved path or a Windows
- * `.exe`. */
+/** One preset per enabled agent. It has no folder of its own: the Header starts it in the
+ * workspace root, and a folder menu or a New terminal row starts it in that folder. The command
+ * is the bare binary name the scan looked up plus its bypass-permissions switch, so the Action
+ * stays portable across machines and never carries a resolved path or a Windows `.exe`. */
 export function agentSuggestionsFromDetected(agents: readonly DetectedEditor[]): AppSuggestion[] {
   return agents
     .filter((a) => a.enabled !== false)
-    .flatMap((agent) =>
-      AGENT_VARIANTS.map((cwdMode) => ({
-        key: `${agent.id}:${cwdMode}`,
-        appId: agent.id,
-        name: agent.name,
-        iconId: agent.id,
-        defaultCommand: yoloCommand(agent.id),
-        kind: "agent" as const,
-        cwdMode,
-      })),
-    )
+    .map((agent) => ({
+      key: `${agent.id}:agent`,
+      appId: agent.id,
+      name: agent.name,
+      iconId: agent.id,
+      defaultCommand: yoloCommand(agent.id),
+      kind: "agent" as const,
+    }))
     .sort(compareByName);
 }
 
@@ -163,7 +145,6 @@ export function actionFromSuggestion(s: AppSuggestion, ownButton = false): Actio
     kind: s.kind,
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
-    ...(s.kind === "agent" ? { cwdMode: s.cwdMode } : {}),
     ownButton,
   };
 }

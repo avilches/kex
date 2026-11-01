@@ -25,7 +25,7 @@ import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, com
 import type { Scope } from "./lib/actionDrop";
 import { actionTarget } from "./lib/actionsBar";
 import type { ActionContext } from "./lib/useActionContext";
-import { isAgent, usesTerminal, type Action, type ActionKind } from "./lib/types";
+import { isAgent, isScript, type Action, type ActionKind } from "./lib/types";
 
 const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
 
@@ -80,7 +80,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const blocking = problems.filter((p) => p.kind !== "context");
   const notes = problems.filter((p) => p.kind === "context");
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
-  const terminal = usesTerminal(action);
+  const script = isScript(action);
   const agent = isAgent(action);
   const yolo = agent ? yoloSwitch(command.shown) : null;
 
@@ -193,7 +193,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
                 }}
               />
             </label>
-            {terminal && (
+            {script && (
               <div className="flex w-[200px] shrink-0 flex-col gap-1.5">
                 <span className="text-[11px] text-muted-foreground">Run in folder</span>
                 <Select value={cwdMode} onOpenChange={onSelectOpenChange} onValueChange={(v) => onChange({ ...action, cwdMode: v as ScriptCwdMode })}>
@@ -214,7 +214,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
               </div>
             )}
           </div>
-          {terminal && cwdMode === "fixed" && (
+          {script && cwdMode === "fixed" && (
             <>
               <div className="flex items-center gap-1">
                 <input

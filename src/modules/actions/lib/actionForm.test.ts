@@ -67,10 +67,10 @@ describe("actionProblems", () => {
     expect(actionProblems({ ...app, command: "  " }, ctx)).toEqual([]);
   });
 
-  it("reads an agent command as literal text: no variables, no quotes, only its folder", () => {
-    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude {workspace} 'x", cwdMode: "fixed", cwd: "/w", ownButton: true };
+  it("reads an agent command as literal text: no variables, no quotes, and no folder to check", () => {
+    const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude {workspace} 'x", ownButton: true };
     expect(actionProblems(agent, ctx)).toEqual([]);
-    expect(actionProblems({ ...agent, cwd: "rel" }, ctx).map((p) => p.kind)).toEqual(["cwd"]);
+    expect(actionProblems({ ...agent, cwdMode: "fixed", cwd: "rel" }, ctx)).toEqual([]);
   });
 });
 

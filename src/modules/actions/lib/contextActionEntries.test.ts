@@ -77,62 +77,84 @@ describe("contextActionEntries", () => {
       [],
       ctx({ workspace: "" }),
     );
-    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "Set a root to this workspace"]);
+    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "A workspace root is needed"]);
   });
 
-  it("never offers an agent, whatever its command reads like", () => {
-    const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude {cwd}", cwdMode: "context", ownButton: false };
-    const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx());
-    expect(groups.workspace.map((e) => e.action.kind)).toEqual(["app"]);
-    expect(groups.global).toEqual([]);
+  describe("agents", () => {
+    const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude {cwd}", ownButton: false };
+
+    it("are left out without a folder, which is every file row", () => {
+      const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx());
+      expect(groups.workspace.map((e) => e.action.kind)).toEqual(["app"]);
+      expect(groups.global).toEqual([]);
+    });
+
+    it("are offered on a folder row, started in that folder, which the line under the name says", () => {
+      const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx(), { agentFolder: "/w/src" });
+      expect(groups.workspace.map((e) => e.action.kind)).toEqual(["agent", "app"]);
+      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/w/src", subtitleTrim: true, subtitleLead: "tab" });
+      expect(groups.global.map((e) => e.action.kind)).toEqual(["agent"]);
+    });
+
+    it("are not blocked by a workspace with no root: the row brings its own folder", () => {
+      const groups = contextActionEntries([agent], [], ctx({ workspace: "" }), { agentFolder: "/elsewhere" });
+      expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/elsewhere" });
+    });
+
+    it("are muted with why when the command cannot be typed", () => {
+      const bad: Action = { ...agent, command: "claude\nrm -rf" };
+      const groups = contextActionEntries([bad], [], ctx(), { agentFolder: "/w" });
+      expect(groups.workspace[0]).toMatchObject({ enabled: false });
+      expect(groups.workspace[0]?.reason).toContain("control character");
+    });
   });
 });
 
 describe("newTabActionEntries", () => {
-  const agent = (command: string, cwdMode: "context" | "workspace", name = "Agent"): Action => ({
+  const agent = (command: string, name = "Agent"): Action => ({
     id: `g${n++}`,
     name,
     kind: "agent",
     command,
-    cwdMode,
     ownButton: false,
   });
-  const at = (folder: string) => ({
+  const at = (folder: string, root = "/w") => ({
     ...ctx({ cwd: folder }),
-    folders: { focusFolder: folder, workspaceRoot: "/w", workspaceCwd: "/w" },
+    folders: { focusFolder: folder, workspaceRoot: root, workspaceCwd: root },
   });
   const script = (command: string): Action => action(command, true);
-  const none = new Map();
   const commands = (entries: { action: Action }[]) => entries.map((e) => e.action.command);
 
-  it("in a subfolder offers the current-directory agents, not the workspace ones", () => {
-    const groups = newTabActionEntries(
-      [script("echo {cwd}"), script("pnpm dev"), script("echo {filepath}"), agent("claude", "context"), agent("codex", "workspace")],
-      [{ ...script("make"), cwdMode: "context" }, script("pnpm test")],
-      at("/w/src"),
-      none,
-    );
-    expect(commands(groups.workspace)).toEqual(["claude"]);
-    expect(groups.global).toEqual([]);
+  it("offers every agent on any folder, started there, whatever the workspace root is", () => {
+    for (const folder of ["/w", "/w/src", "/elsewhere"]) {
+      const groups = newTabActionEntries([agent("claude"), agent("codex")], [agent("aider")], at(folder));
+      expect(commands(groups.workspace)).toEqual(["claude", "codex"]);
+      expect(commands(groups.global)).toEqual(["aider"]);
+      expect(groups.workspace[0]).toMatchObject({ subtitle: folder, subtitleLead: "tab" });
+    }
+  });
+
+  it("offers two agents of the same binary as two entries: nothing is a twin any more", () => {
+    const groups = newTabActionEntries([agent("claude"), agent("claude --resume")], [], at("/w"));
+    expect(commands(groups.workspace)).toEqual(["claude", "claude --resume"]);
   });
 
   it("never offers an app or a script", () => {
-    const groups = newTabActionEntries([action("code {cwd}"), action("code {workspace}"), script("echo {cwd}")], [action("zed {cwd}"), script("make")], at("/w"), none);
+    const groups = newTabActionEntries([action("code {cwd}"), action("code {workspace}"), script("echo {cwd}")], [action("zed {cwd}"), script("make")], at("/w"));
     expect(groups).toEqual({ workspace: [], global: [] });
   });
 
-  it("at the workspace folder adds the workspace Actions and hides the twin that does the same", () => {
-    const groups = newTabActionEntries(
-      [script("echo {cwd}"), agent("claude", "context"), agent("claude", "workspace")],
-      [],
-      at("/w"),
-      none,
-    );
+  it("still offers an agent when the workspace has no root", () => {
+    const groups = newTabActionEntries([agent("claude")], [], at("/w/src", ""));
     expect(commands(groups.workspace)).toEqual(["claude"]);
   });
 
-  it("leaves out the ones that cannot run here", () => {
-    const groups = newTabActionEntries([agent("claude", "workspace")], [], at("/w/src"), none);
-    expect(groups.workspace).toEqual([]);
+  it("leaves out an agent whose command cannot be typed, and an Action with no command", () => {
+    const groups = newTabActionEntries([agent("claude\nrm -rf"), agent("  "), agent("codex")], [], at("/w"));
+    expect(commands(groups.workspace)).toEqual(["codex"]);
+  });
+
+  it("offers nothing without a folder", () => {
+    expect(newTabActionEntries([agent("claude")], [], ctx())).toEqual({ workspace: [], global: [] });
   });
 });

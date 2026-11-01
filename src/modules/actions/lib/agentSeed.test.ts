@@ -12,21 +12,21 @@ const ag = (id: string, enabled?: boolean): DetectedEditor => ({
   enabled,
 });
 
-const agentAction = (command: string, cwdMode: Action["cwdMode"]): Action => ({
+const agentAction = (command: string): Action => ({
   id: "a-1",
   name: command,
   kind: "agent",
   command,
-  cwdMode,
   ownButton: false,
 });
 
 describe("planAgentSeed", () => {
-  it("seeds one current-directory Action per new enabled agent", () => {
+  it("seeds one Action per new enabled agent, with its own button and no folder", () => {
     const plan = planAgentSeed({ seen: [], agents: [ag("opencode"), ag("pi")], existing: [] });
     expect(plan?.add.map((a) => a.command).sort()).toEqual(["opencode", "pi"]);
     for (const a of plan?.add ?? []) {
-      expect(a).toMatchObject({ kind: "agent", cwdMode: "context", ownButton: true });
+      expect(a).toMatchObject({ kind: "agent", ownButton: true });
+      expect(a).not.toHaveProperty("cwdMode");
       expect(a.appId).toBe(a.command);
       expect(a.iconId).toBe(a.command);
     }
@@ -50,7 +50,7 @@ describe("planAgentSeed", () => {
   });
 
   it("adds nothing but still marks the agent seen when its Action is already there", () => {
-    const plan = planAgentSeed({ seen: [], agents: [ag("opencode")], existing: [agentAction("opencode", "context")] });
+    const plan = planAgentSeed({ seen: [], agents: [ag("opencode")], existing: [agentAction("opencode")] });
     expect(plan).toEqual({ add: [], seen: ["opencode"] });
   });
 
@@ -58,18 +58,15 @@ describe("planAgentSeed", () => {
     const plan = planAgentSeed({
       seen: [],
       agents: [ag("opencode"), ag("pi"), ag("claude")],
-      existing: [agentAction("opencode --model x", "context"), agentAction("claude --dangerously-skip-permissions", "context")],
+      existing: [agentAction("opencode --model x"), agentAction("claude --dangerously-skip-permissions")],
     });
     expect(plan?.add.map((a) => a.command)).toEqual(["pi"]);
   });
 
-  it("still seeds when the existing one starts elsewhere", () => {
-    const plan = planAgentSeed({
-      seen: [],
-      agents: [ag("opencode")],
-      existing: [agentAction("opencode", "workspace")],
-    });
-    expect(plan?.add.map((a) => a.command)).toEqual(["opencode"]);
+  it("does not seed over a leftover Action that still carries an old folder mode", () => {
+    const old = { ...agentAction("opencode"), cwdMode: "workspace" as const };
+    const plan = planAgentSeed({ seen: [], agents: [ag("opencode")], existing: [old] });
+    expect(plan).toEqual({ add: [], seen: ["opencode"] });
   });
 
   it("has nothing to seed when every agent is disabled, and does not mark a disabled one", () => {

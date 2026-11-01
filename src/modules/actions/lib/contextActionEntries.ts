@@ -1,7 +1,6 @@
-import { folderKey } from "@/modules/workspaces/lib/scriptCwd";
-import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { actionAvailability, actionTarget, agentTitle, actionRowTitle, byKind, scriptSubtitle, twinIds, type BarContext, type SubtitleLead } from "./actionsBar";
-import { isAgent, isApp, isScript, type Action } from "./types";
+import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
+import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
+import { isAgent, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -22,13 +21,24 @@ export type ContextActionEntry = {
 
 export type ContextActionGroups = { workspace: ContextActionEntry[]; global: ContextActionEntry[] };
 
-function entriesOf(actions: readonly Action[], ctx: BarContext, withAgents = false): ContextActionEntry[] {
+type Options = {
+  /** The folder an agent is started in: the row's own. Without one agents are left out. */
+  agentFolder?: string;
+};
+
+function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder }: Options = {}): ContextActionEntry[] {
   const rows: ContextActionEntry[] = [];
   for (const action of byKind(actions)) {
-    if (action.command.trim() === "" || (isAgent(action) && !withAgents)) continue;
+    if (action.command.trim() === "") continue;
+    const agent = isAgent(action);
+    if (agent && !agentFolder) continue;
     const name = action.name.trim() || "Action";
-    const subtitle = scriptSubtitle({ ...action, name }, ctx);
-    const reason = actionAvailability(action, ctx);
+    // An agent has no folder of its own: here it starts in the folder of the row, so that is
+    // what its line says, and it only needs a command that is safe to type.
+    const subtitle = agent
+      ? { text: agentFolder ?? null, startTrim: true, lead: "tab" as const }
+      : scriptSubtitle({ ...action, name }, ctx);
+    const reason = agent ? agentReason(action, agentFolder ?? "") : actionAvailability(action, ctx);
     rows.push({
       action,
       enabled: reason === null,
@@ -36,51 +46,41 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, withAgents = fal
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: isAgent(action) ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
+      title: agent ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }
   return rows;
 }
 
-/** Every Action but the agents (their target is the workspace, so they live in the Header
- * only), grouped and ordered as the Header combo does (workspace first, global after, apps
- * before scripts), including the ones that have their own button there. The ones whose
- * variables cannot be filled from the row are muted entries with why. */
+// An agent started from a row needs a command that is safe to type and a folder the runner would
+// accept; the workspace root does not matter, because the row brings its own folder.
+function agentReason(action: Action, folder: string): string | null {
+  return agentCommandProblem(action.command) ?? scriptCwdProblem(folder);
+}
+
+/** Every Action a folder or file row offers, grouped and ordered as the Header combo does
+ * (workspace first, global after, agents, then scripts, then apps), including the ones that have
+ * their own button there. The ones whose variables cannot be filled from the row are muted
+ * entries with why. Agents appear only on a folder row, started in that folder. */
 export function contextActionEntries(
   local: readonly Action[],
   global: readonly Action[],
   ctx: BarContext,
+  options: Options = {},
 ): ContextActionGroups {
-  return { workspace: entriesOf(local, ctx), global: entriesOf(global, ctx) };
+  return { workspace: entriesOf(local, ctx, options), global: entriesOf(global, ctx, options) };
 }
 
-function runsInFolder(action: Action, atWorkspace: boolean): boolean {
-  const target = actionTarget(action.command);
-  if (target === "file") return false;
-  if (target === "folder") return true;
-  if (!isApp(action) && action.cwdMode === "context") return true;
-  return atWorkspace;
-}
-
-/** What the new-tab surfaces (the + menu of a pane, the new terminal palette) offer: the agents
- * that run in the folder (a folder command, or one starting in the current directory), and the
- * workspace ones only while that folder is the workspace's. Scripts and apps are never here. Only the runnable ones, with the twins the
- * Header hides left out (an agent in the current directory and in the workspace are one entry
- * at the workspace root). */
+/** What the New terminal palette offers on a folder row: only the agents, started in that
+ * folder. Scripts and apps are never here, and only the ones that can run are listed. */
 export function newTabActionEntries(
   local: readonly Action[],
   global: readonly Action[],
   ctx: BarContext,
-  states: ReadonlyMap<string, ScriptState>,
 ): ContextActionGroups {
-  const folders = ctx.folders ?? {};
-  const workspaceFolder = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
-  const atWorkspace = workspaceFolder !== "" && folderKey(folders.focusFolder) === workspaceFolder;
-  const pick = (actions: readonly Action[]) =>
-    actions.filter((a) => a.command.trim() !== "" && isAgent(a) && runsInFolder(a, atWorkspace) && actionAvailability(a, ctx) === null);
-  const l = pick(local);
-  const g = pick(global);
-  const hidden = twinIds([...l, ...g], ctx, states);
-  const keep = (actions: Action[]) => entriesOf(actions.filter((a) => !hidden.has(a.id)), ctx, true);
-  return { workspace: keep(l), global: keep(g) };
+  const folder = ctx.folders?.focusFolder?.trim() ?? "";
+  if (!folder) return { workspace: [], global: [] };
+  const agents = (actions: readonly Action[]) =>
+    entriesOf(actions.filter(isAgent), ctx, { agentFolder: folder }).filter((e) => e.enabled);
+  return { workspace: agents(local), global: agents(global) };
 }

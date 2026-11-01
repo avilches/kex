@@ -38,6 +38,8 @@ export type RunContext = {
     workspaceCwd?: string | null;
     home?: string | null;
   };
+  /** The folder of the place the run came from (a folder menu, a New terminal palette row); an agent starts there. */
+  startFolder?: string | null;
   link: LinkedTab | null;
   scriptPaneExists: boolean;
   atPaneLimit: boolean;
@@ -130,21 +132,22 @@ function planScript(action: Action, ctx: RunContext): RunPlan {
   return { kind: "new-tab", placement: newTabPlacement(ctx), input, cwd, title: label(action) };
 }
 
+// An agent has no folder of its own: it starts where it is launched from, which is the folder of
+// the menu or palette row that offered it, and the workspace root from the Header.
+// Without a row's folder only the root counts, which is also what the bar checks before it lets
+// the button be pressed, so the two never disagree about a workspace that has a cwd but no root.
+export function agentStartFolder(ctx: Pick<RunContext, "startFolder" | "folders">): string | undefined {
+  return ctx.startFolder?.trim() || ctx.folders.workspaceRoot?.trim() || undefined;
+}
+
 // An agent is typed verbatim: braces are literal, so no template is read. Every click is a
 // new tab, so no link, running mark or earlier tab is looked at either.
 function planAgent(action: Action, ctx: RunContext): RunPlan {
   const problem = agentCommandProblem(action.command);
   if (problem) return blocked(action, problem);
-  if (action.cwdMode === "workspace" && !ctx.folders.workspaceRoot?.trim()) return blocked(action, WORKSPACE_UNSET);
-  const cwd = resolveScriptCwd({
-    mode: action.cwdMode,
-    fixedFolder: action.cwd,
-    focusFolder: ctx.folders.focusFolder,
-    workspaceRoot: ctx.folders.workspaceRoot,
-    workspaceCwd: ctx.folders.workspaceCwd,
-    home: ctx.folders.home,
-  });
-  const cwdIssue = cwd ? scriptCwdProblem(cwd) : null;
+  const cwd = agentStartFolder(ctx);
+  if (!cwd) return blocked(action, WORKSPACE_UNSET);
+  const cwdIssue = scriptCwdProblem(cwd);
   if (cwdIssue) return blocked(action, cwdIssue);
   return { kind: "new-agent-tab", input: `${action.command}\r`, cwd, title: label(action) };
 }

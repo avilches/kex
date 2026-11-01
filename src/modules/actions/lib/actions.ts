@@ -71,7 +71,7 @@ export function normalizeAction(raw: unknown): Action | null {
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
   if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;
   if (typeof r.icon === "string" && parseIcon(r.icon)) action.icon = r.icon;
-  if (kind !== "app" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
+  if (kind === "script" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
     action.cwdMode = r.cwdMode as ScriptCwdMode;
     if (action.cwdMode === "fixed" && typeof r.cwd === "string" && r.cwd) action.cwd = r.cwd;
   }
