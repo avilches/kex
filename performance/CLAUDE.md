@@ -35,7 +35,10 @@ crash?" ni pidas lo que puedes sacar tú. Orden:
    (compáralo con `date`). Léelo con `json.JSONDecoder().raw_decode` (una línea de cabecera y luego el cuerpo) y mira
    `exception.signal`, `procLaunch`, `captureTime` y los frames del `faultingThread`. Distingue el tipo antes de nada:
    `SIGSEGV` con `ScrollingTree::takePendingScrollUpdates` arriba es el de WebKit (TASK-910); `SIGABRT` con
-   `tao::...::send_event` es el de `tao` (TASK-917); cualquier otro es nuevo y hay que describirlo desde cero.
+   `tao::...::send_event` es el de `tao` (TASK-917 y TASK-914.1; ya reapareció con `tao` 0.37.2, así que su pila
+  idéntica no significa "bug ya arreglado"); cualquier otro es nuevo y hay que describirlo desde cero. En el
+  `SIGABRT` de `tao`, comprueba además la versión de `tao` del binario instalado (`strings /Applications/Kex.app/Contents/MacOS/kex
+  | grep -o 'tao-0\.[0-9]*\.[0-9]*'`) y busca en el registro unificado `Assertion failure` y `CampoLightweightUI`.
 2. **Registro unificado de macOS, exportado YA.** Es la única fuente que dice qué hacía WebKit los últimos segundos y la
    única que caduca. Usa `/usr/bin/log`, no `log` a secas (en zsh es un builtin y falla con "too many arguments").
    Ventana: desde 30 s antes hasta 3 s después de la hora del informe, en hora local, formato `'YYYY-MM-DD HH:MM:SS'`
@@ -221,12 +224,40 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   abierto sin arreglo. `tauri-runtime-wry` 2.11.3 exige `tao ^0.35`, así que el arreglo requiere subir Tauri a 2.12 (con
   `cargo update` arrastra también casi todos los plugins). TASK-912 (hook) y TASK-914. Aplicado el 2026-10-29: Tauri 2.12.5, `tao` 0.37.2 (confirmado `extern "C-unwind"` en `send_event`), wry 0.57.1, TASK-917. El usuario pulsaba Cmd derecha al crashear. Pendiente: reinstalar y vigilar varios dias.
 
+  **El arreglo de `tao` 0.37.2 NO bastó** (medido el 2026-11-01). Informe de las 09:13:21 local (14:13:20 UTC en
+  `Kex.log`, línea `[panic] ... panic in a function that cannot unwind`), pila idéntica (`send_event` →
+  `panic_cannot_unwind`), con la build instalada el 31/10 a las 17:01, cuyo binario contiene `tao-0.37.2` y cuyo
+  `Cargo.lock` lo fija. Webview holgada (`rafShare` 0,013, 2 fotogramas lentos), sin ventana secundaria ni cierre de
+  páginas (la única línea `[window]` previa es `focused=true` 2 s antes), así que no es el de WebKit. El registro
+  unificado de macOS da por primera vez la excepción de Objective-C que desaparecía al desenrollarse: 0,7 s antes del
+  abort, AppKit loguea `[AppKit:CampoLightweightUI] Dwelling completed, show affordance`, luego `Tearing down remote view
+  connection`, `Mouse entered` y, a las 09:13:20.0009, `Assertion failure in NSCampoLightweightUIController.m:1429`. Es
+  el afordance de Siri/Look Up de AppKit sobre el texto bajo el ratón (confirma la hipótesis del disparador; no sabemos
+  si había texto seleccionado ni si se pulsaba Cmd derecha). Extracto en
+  `docs/crash-evidence/2026-11-01-sigabrt-tao-unified-log.txt`. El volcado `sample-auto-20261101-091241` es 40 s anterior
+  y no describe los segundos previos (`busy`, hilo principal dormido el 46,5 %).
+
+  **Por qué sigue abortando (hipótesis, no probada):** `send_event` es `extern "C-unwind"` en `tao` 0.37.2 (medido
+  leyendo `src/platform_impl/macos/app.rs` del registro de cargo), pero el perfil release de Kex tiene `panic = "abort"`
+  (`src-tauri/Cargo.toml`, `[profile.release]`). Con `panic = "abort"` rustc compila los frames como `nounwind` aunque el
+  ABI sea `C-unwind`, y una excepción de Objective-C que los atraviesa llega a `panic_cannot_unwind`. Encaja con la pila
+  (el `[panic]` aparece sin panic de Rust previo), pero no se ha probado con una compilación sin `panic = "abort"` ni se
+  ha podido reproducir la excepción. Tres posibles arreglos, de más barato a más caro: quitar `panic = "abort"` del
+  release (coste: tamaño y rendimiento, sin medir); parchear `tao` para capturar la excepción en `send_event`; evitar el
+  afordance. Seguimiento en TASK-914.1 (hija de TASK-914); TASK-917 queda en Done con su criterio 3 sin cumplir.
+
 Las horas de `Kex.log` están en UTC y las de los informes de macOS en hora local: 16:12 en el log es 12:12 en UTC-4.
 `scripts/run-performance.sh` abre la app con `open`, así que no se ve stderr. `useFTLJIT=false` y los topes del JIT no
 tienen relación conocida con estos crashes (el `SIGSEGV` es del código de scroll de WebKit, no del JIT, y el `SIGABRT`
 es de Kex); si se usan, anota desde qué fecha, porque confunden la comparación.
 
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
+
+-1. **`panic = "abort"` impide que `send_event` de `tao` 0.37.2 desenrolle la excepción del afordance de AppKit.**
+   Ver "Crashes de Kex". Prueba barata: compilar un release con `panic = "unwind"` (o un `tao` parcheado) y usarlo con
+   el ratón quieto sobre texto hasta que salga "show affordance" en el registro unificado; sin `[panic]` ni
+   `SIGABRT` y con la `Assertion failure` en el registro, la hipótesis queda confirmada. Medir el coste en tamaño
+   (hoy 13,4 MB) y rendimiento antes de dejarlo. TASK-914.1.
 
 0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
    Prueba: ningún método nombra la función (el registro del JIT mata la webview). Se prueba por efecto con `scripts/run-performance.sh`.
