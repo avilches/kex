@@ -34,9 +34,9 @@ describe("suggestionsFromDetected", () => {
     }
   });
 
-  it("says what each app accepts from the catalog: JetBrains folders, the rest either, an unknown one either", () => {
+  it("says what each app accepts from the catalog: JetBrains folders, the rest either, an unknown one a folder", () => {
     const by = Object.fromEntries(suggestionsFromDetected([ed("pycharm", "pycharm"), ed("zed", "zed"), ed("vscode", "code"), ed("mystery", "mystery")]).map((s) => [s.appId, s.accepts]));
-    expect(by).toEqual({ pycharm: "folder", zed: "both", vscode: "both", mystery: "both" });
+    expect(by).toEqual({ pycharm: "folder", zed: "both", vscode: "both", mystery: "folder" });
   });
 
   it("quotes binaries and arguments that hold spaces", () => {
@@ -60,7 +60,7 @@ describe("suggestionsFromDetected", () => {
 
   it("falls back to the detected name for an app outside the catalog", () => {
     const [s] = suggestionsFromDetected([ed("mystery", "mystery")]);
-    expect(s).toMatchObject({ name: "mystery", defaultCommand: "mystery {target}", accepts: "both" });
+    expect(s).toMatchObject({ name: "mystery", defaultCommand: "mystery {target}", accepts: "folder" });
   });
 
   it("builds an Action that carries what the app accepts and no variable in its name", () => {

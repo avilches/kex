@@ -68,7 +68,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   `{target}`. Los nombres canonico son `{filepath}` y `{filename}` (los antiguos
   `{path}`/`{file}` ya no existen). `{target}` es de las apps: lo que la app abre en el sitio
   donde se ofrece (la raiz del workspace en el Header, la carpeta o el fichero en un menu), y
-  solo la lista de variables de una app lo muestra. Una app se anade una sola vez, ya no una
+  solo la lista de variables de una app lo muestra; un script que lo usa queda rechazado por
+  `commandProblem` ("{target} is only for apps"). Una app se anade una sola vez, ya no una
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
   carpetas), y el modal pregunta "What it opens" (Files, Folders, Files and folders).
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el

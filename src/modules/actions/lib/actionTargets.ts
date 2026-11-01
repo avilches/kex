@@ -1,4 +1,4 @@
-import type { AppAccepts } from "@/modules/external-editors/catalog";
+import { DEFAULT_ACCEPTS, type AppAccepts } from "@/modules/external-editors/catalog";
 import { commandVariablesUsed } from "./commandTemplate";
 import { isAgent, isApp, type Action } from "./types";
 
@@ -28,7 +28,7 @@ export function usesTarget(action: Pick<Action, "kind"> & Partial<Pick<Action, "
 
 /** What an app takes, a folder when it never said. */
 export function appAccepts(action: Pick<Action, "accepts">): AppAccepts {
-  return action.accepts ?? "folder";
+  return action.accepts ?? DEFAULT_ACCEPTS;
 }
 
 /** The words for what an app takes, for the Add combo and the edit modal. */

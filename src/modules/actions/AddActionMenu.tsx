@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDialogScrollHost } from "@/components/dialogScrollHost";
+import { DEFAULT_ACCEPTS } from "@/modules/external-editors/catalog";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { ACCEPTS_LABELS } from "./lib/actionTargets";
@@ -115,7 +116,7 @@ function presetItems(
       // says what it takes rather than a place.
       const app = s.kind === "app";
       const sub = app
-        ? { text: ACCEPTS_LABELS[s.accepts ?? "folder"], startTrim: false, lead: undefined }
+        ? { text: ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS], startTrim: false, lead: undefined }
         : scriptSubtitle({ name: s.name, kind: s.kind }, SETTINGS_LABELS);
       return (
         <CommandItem
@@ -123,7 +124,7 @@ function presetItems(
           value={s.key}
           keywords={[s.name, s.defaultCommand]}
           onSelect={() => onPickApp(s)}
-          title={app ? `Open ${s.name} on ${ACCEPTS_LABELS[s.accepts ?? "folder"].toLowerCase()}` : agentTitle(s.name, null)}
+          title={app ? `Open ${s.name} on ${ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS].toLowerCase()}` : agentTitle(s.name, null)}
           className="text-[12px]"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">

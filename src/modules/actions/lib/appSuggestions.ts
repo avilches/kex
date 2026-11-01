@@ -1,5 +1,5 @@
 import { newActionId } from "@/lib/ids";
-import { EDITOR_CATALOG, getEditorAccepts, type AppAccepts } from "@/modules/external-editors/catalog";
+import { DEFAULT_ACCEPTS, EDITOR_CATALOG, getEditorAccepts, type AppAccepts } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
 import { yoloCommand } from "./agentYolo";
@@ -134,7 +134,7 @@ export function actionFromSuggestion(s: AppSuggestion, ownButton = false): Actio
     kind: s.kind,
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
-    ...(s.kind === "app" ? { accepts: s.accepts ?? "folder" } : {}),
+    ...(s.kind === "app" ? { accepts: s.accepts ?? DEFAULT_ACCEPTS } : {}),
     ownButton,
   };
 }

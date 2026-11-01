@@ -277,9 +277,10 @@ describe("planActionRun, apps", () => {
       expect(planActionRun(zed, rootless)).toEqual({ kind: "spawn-app", argv: ["zed", "/elsewhere"] });
     });
 
-    it("expands in a script too, to the same value, though only the apps list it as a variable", () => {
+    it("is refused in a script, which names its place with its own variables", () => {
       const plan = planActionRun(script({ command: "echo {target}" }), withTarget("/w/api"));
-      expect(plan).toMatchObject({ kind: "new-tab", input: "echo '/w/api'\r" });
+      expect(plan).toMatchObject({ kind: "blocked" });
+      expect(plan.kind === "blocked" && plan.reason).toContain("{target} is only for apps");
     });
   });
 });

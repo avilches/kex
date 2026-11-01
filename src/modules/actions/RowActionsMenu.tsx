@@ -21,6 +21,7 @@ import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
 import { buildCommandVars } from "@/modules/actions/lib/commandVars";
+import { runOverlayFor } from "@/modules/actions/lib/runOverlay";
 import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
 import { contextActionEntries, type ContextActionEntry, type ContextActionGroups, type ContextActionKind } from "@/modules/actions/lib/contextActionEntries";
 import { WORKSPACE_UNSET } from "@/modules/actions/lib/actionsBar";
@@ -80,8 +81,8 @@ export function useContextActions(ws: MenuWorkspace, kind: ContextActionKind, pa
     [vars, global, shell, ws?.actions, kind],
   );
   const overlay = useMemo<RunOverlay | null>(
-    () => (vars ? { vars, focusFolder: vars.cwd || undefined, spawnCwd: vars.cwd || undefined } : null),
-    [vars],
+    () => (vars ? { ...runOverlayFor(path, kind), vars } : null),
+    [vars, path, kind],
   );
   return { groups, overlay };
 }

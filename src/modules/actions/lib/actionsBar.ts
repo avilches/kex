@@ -190,6 +190,8 @@ export function scriptSubtitle(
 // What an app opens where it is offered: the workspace root in the bar, the folder or the file
 // the context combo is on, or the words for it in Settings, where no place has a value.
 function appSubtitle(ctx: BarContext | null): ActionSubtitle {
+  if (ctx?.labels && ctx.targetKind === "file") return { text: "Current file", startTrim: false, lead: "file" };
+  if (ctx?.labels && ctx.targetKind === "folder") return { text: "Current folder", startTrim: false, lead: "tab" };
   if (!ctx || ctx.labels) return { text: "Workspace root", startTrim: false, lead: "root" };
   if (ctx.targetKind === "file") {
     const file = ctx.vars.target ?? "";
@@ -221,6 +223,8 @@ export function agentTitle(label: string, disabledReason: string | null): string
 export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null): string {
   const { main } = splitActionName(name);
   if (disabledReason) return `${main}: ${disabledReason}`;
+  if (ctx?.labels && ctx.targetKind === "file") return `Open the current file with ${main}`;
+  if (ctx?.labels && ctx.targetKind === "folder") return `Open ${main} in the current folder`;
   if (!ctx || ctx.labels) return `Open ${main} in the workspace root`;
   const target = ctx.vars.target ?? "";
   if (ctx.targetKind === "file") {
@@ -524,7 +528,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const state = stateOf(action, states);
     const running = state === "running";
     const label = action.name.trim() || "Action";
-    const words = arranging ? SETTINGS_LABELS : ctx;
+    const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
     const subtitle = scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
@@ -577,15 +581,17 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
   const comboContext: BarContext | null =
     context && comboPath && kind ? { ...context, vars: { ...context.vars, target: comboPath }, targetKind: kind } : context;
   for (const [action, isGlobal] of ordered) {
-    const item = toItem(action, isGlobal);
-    if (kind && !(isScript(action) && item.state !== "idle") && inCombo(action, { folder: kind === "folder", file: kind === "file" })) {
-      const comboItem = usesTarget(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item;
+    const state = stateOf(action, states);
+    let barItem: BarItem | undefined;
+    const item = () => (barItem ??= toItem(action, isGlobal));
+    if (kind && !(isScript(action) && state !== "idle") && inCombo(action, { folder: kind === "folder", file: kind === "file" })) {
+      const comboItem = usesTarget(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item();
       (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(comboItem);
     }
-    if (!onBar(action, item.state)) continue;
-    if (buttonIds.has(action.id)) model.buttons.push(item);
-    else if (isGlobal) model.menu.global.push(item);
-    else model.menu.workspace.push(item);
+    if (!onBar(action, state)) continue;
+    if (buttonIds.has(action.id)) model.buttons.push(item());
+    else if (isGlobal) model.menu.global.push(item());
+    else model.menu.workspace.push(item());
   }
   const sole = soleIconButtons(model.buttons.map((b) => b.action));
   for (const b of model.buttons) b.iconOnly = sole.has(b.action.id);

@@ -981,11 +981,11 @@ describe("buildActionsBarModel arranging", () => {
     ]);
     expect(lines(m.contextCombo.workspace)).toEqual([
       ["Current folder", "tab"],
-      ["Workspace root", "root"],
+      ["Current folder", "tab"],
     ]);
-    expect(lines(build(true, ctx, { file: true, folder: false }).contextCombo.workspace)).toEqual([
+    expect(lines(build(true, onFile, { file: true, folder: false }).contextCombo.workspace)).toEqual([
       ["Current file", "file"],
-      ["Workspace root", "root"],
+      ["Current file", "file"],
     ]);
     expect(m.buttons[0]?.title).toBe("Run Build in Workspace root");
   });
