@@ -377,8 +377,8 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
         ) : (
           <div className="text-[11px] text-muted-foreground">
-            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the folder and file combo
-            of the header, never as a button of its own.
+            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the combo of the header,
+            never as a button of its own.
           </div>
         )}
 

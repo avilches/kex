@@ -413,34 +413,12 @@ describe("scriptSubtitle", () => {
     expect(scriptSubtitle(script({ name: "Agent {cwd}", cwdMode: "fixed", cwd: "/x" }), ctx).text).toBe("/p");
   });
 
-  describe("of an app, which says what it opens", () => {
+  it("gives an app no line under its name, wherever it is offered", () => {
     const zed = { name: "Zed", kind: "app" as const, command: "zed {target}" };
-
-    it("says file in Settings when it takes files only, since it never opens the root", () => {
-      expect(scriptSubtitle({ ...zed, accepts: "file" }, SETTINGS_LABELS)).toEqual({ text: "Current file", startTrim: false, lead: "file" });
-    });
-
-    it("is the workspace root in the bar, the words for it in Settings, and the warning without a root", () => {
-      expect(scriptSubtitle(zed, ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
-      expect(scriptSubtitle(zed, SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
-      expect(scriptSubtitle(zed, null)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
-      expect(scriptSubtitle(zed, { ...ctx, vars: { ...vars, workspace: "" } }).text).toBe(WORKSPACE_UNSET);
-    });
-
-    it("is the folder the combo is on, with its start cut", () => {
-      const c = { ...ctx, vars: { ...vars, target: "/p/api" }, targetKind: "folder" as const };
-      expect(scriptSubtitle(zed, c)).toEqual({ text: "/p/api", startTrim: true, lead: "tab" });
-    });
-
-    it("is only the name of the file the combo is on", () => {
-      const c = { ...ctx, vars: { ...vars, target: "/p/src/a.ts" }, targetKind: "file" as const };
-      expect(scriptSubtitle(zed, c)).toEqual({ text: "a.ts", startTrim: false, lead: "file" });
-    });
-
-    it("says nothing when the combo has no folder or file", () => {
-      expect(scriptSubtitle(zed, { ...ctx, vars: { ...vars, target: "" }, targetKind: "folder" }).text).toBeNull();
-      expect(scriptSubtitle(zed, { ...ctx, vars: { ...vars, target: "" }, targetKind: "file" }).text).toBeNull();
-    });
+    const onFile = { ...ctx, vars: { ...vars, target: "/p/src/a.ts" }, targetKind: "file" as const };
+    for (const where of [ctx, SETTINGS_LABELS, null, onFile]) {
+      expect(scriptSubtitle(zed, where)).toEqual({ text: null, startTrim: false });
+    }
   });
 });
 
@@ -497,9 +475,9 @@ describe("where an Action is offered", () => {
     expect(barIds(build(ctx, undefined))).toEqual(onFolder);
   });
 
-  it("lists in the combo, on a terminal, the apps that take a folder and the folder scripts", () => {
+  it("lists in the combo, on a terminal, only the folder scripts and no app", () => {
     const m = build(ctx, { file: false, folder: true });
-    expect(comboIds(m)).toEqual(["both", "folder", "sc"]);
+    expect(comboIds(m)).toEqual(["sc"]);
     expect(m.contextCombo).toMatchObject({ exists: true, kind: "folder", path: "/p", reason: null });
   });
 
@@ -509,12 +487,14 @@ describe("where an Action is offered", () => {
     expect(m.contextCombo).toMatchObject({ exists: true, kind: "file", label: "a.ts", path: "/p/a.ts", reason: null });
   });
 
-  it("lists an app that takes both in the bar and in the combo, but never an agent or a plain script in the combo", () => {
-    const m = build(ctx, { file: false, folder: true });
-    expect(barIds(m)).toContain("both");
-    expect(comboIds(m)).toContain("both");
-    expect(comboIds(m)).not.toContain("ag");
-    expect(comboIds(m)).not.toContain("sp");
+  it("lists an app that takes both once on a terminal (the bar) and once on a file (the combo), never twice", () => {
+    const onFolder = build(ctx, { file: false, folder: true });
+    expect(barIds(onFolder)).toContain("both");
+    expect(comboIds(onFolder)).not.toContain("both");
+    const onFile = build(onFileCtx, { file: true, folder: false });
+    expect(comboIds(onFile)).toContain("both");
+    expect(comboIds(onFile)).not.toContain("ag");
+    expect(comboIds(onFile)).not.toContain("sp");
   });
 
   it("leaves the combo empty, with its reason, when the focused tab gives neither a folder nor a file", () => {
@@ -523,12 +503,10 @@ describe("where an Action is offered", () => {
     expect(m.contextCombo).toMatchObject({ exists: true, kind: null, reason: NO_CONTEXT_REASON });
   });
 
-  it("opens the workspace root from the bar and the focused folder or file from the combo", () => {
+  it("opens the workspace root from the bar and the focused file from the combo", () => {
     const folder = build(ctx, { file: false, folder: true });
     const inBar = [...folder.buttons, ...folder.menu.workspace].find((i) => i.id === "both")!;
-    const inCombo = folder.contextCombo.workspace.find((i) => i.id === "both")!;
     expect(inBar.runTarget).toBeUndefined();
-    expect(inCombo).toMatchObject({ runTarget: "/p", runTargetKind: "folder" });
     const file = build(onFileCtx, { file: true, folder: false });
     expect(file.contextCombo.workspace.find((i) => i.id === "both")).toMatchObject({ runTarget: "/p/a.ts", runTargetKind: "file" });
   });
@@ -558,11 +536,11 @@ describe("where an Action is offered", () => {
     expect(onBar(folderScript, "running")).toBe(true);
   });
 
-  it("treats an app that never said what it accepts as a folder app", () => {
+  it("treats an app that never said what it accepts as a folder app: in the bar, never in the combo", () => {
     const bare = app({ id: "b", command: "zed {target}" });
     expect(onBar(bare, "idle")).toBe(true);
     expect(inCombo(bare, { file: true, folder: false })).toBe(false);
-    expect(inCombo(bare, { file: false, folder: true })).toBe(true);
+    expect(inCombo(bare, { file: false, folder: true })).toBe(false);
   });
 
   it("resolves the second line to what the place says and adds an Open row title", () => {
@@ -881,10 +859,10 @@ describe("paletteActions", () => {
     const both = app({ id: "both", name: "Zed", command: "zed {target}", accepts: "both" });
     const model = buildActionsBarModel({
       local: [both, script({ id: "s1" })],
-      context: { ...ctx, vars: { ...vars, cwd: "/p/api" } },
+      context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
       states: new Map(),
       activeId: undefined,
-      place: { file: false, folder: true },
+      place: { file: true, folder: false },
     });
     expect(model.contextCombo.workspace.map((i) => i.id)).toContain("both");
     expect([...model.buttons, ...model.menu.workspace].map((i) => i.id)).toContain("both");
@@ -949,15 +927,12 @@ describe("buildActionsBarModel arranging", () => {
     const m = build(true, ctx, { file: false, folder: true });
     expect(lines(m.buttons)).toEqual([
       ["Workspace root", "root"],
-      ["Workspace root", "root"],
+      [null, null],
     ]);
-    expect(lines(m.contextCombo.workspace)).toEqual([
-      ["Current folder", "tab"],
-      ["Current folder", "tab"],
-    ]);
+    expect(lines(m.contextCombo.workspace)).toEqual([["Current folder", "tab"]]);
     expect(lines(build(true, onFile, { file: true, folder: false }).contextCombo.workspace)).toEqual([
       ["Current file", "file"],
-      ["Current file", "file"],
+      [null, null],
     ]);
     expect(m.buttons[0]?.title).toBe("Run Build in Workspace root");
   });
@@ -966,25 +941,23 @@ describe("buildActionsBarModel arranging", () => {
     const m = build(false, ctx, { file: false, folder: true });
     expect(lines(m.buttons)).toEqual([
       [vars.workspace, "root"],
-      [vars.workspace, "root"],
+      [null, null],
     ]);
-    expect(lines(m.contextCombo.workspace)).toEqual([
-      ["/p", "tab"],
-      ["/p", "tab"],
-    ]);
+    expect(lines(m.contextCombo.workspace)).toEqual([["/p", "tab"]]);
     const file = build(false, onFile, { file: true, folder: false });
     expect(lines(file.contextCombo.workspace)).toEqual([
       ["a.ts", "file"],
-      ["a.ts", "file"],
+      [null, null],
     ]);
   });
 
-  it("says in the combo what an app opens, and in the bar the root, for the same app", () => {
+  it("gives an app no line under its name, in the bar or in the combo, and opens a different thing in each", () => {
     const m = build(false, onFile, { file: true, folder: false });
     const inBar = [...m.buttons, ...m.menu.workspace].find((i) => i.id === "a1")!;
     const inCombo = m.contextCombo.workspace.find((i) => i.id === "a1")!;
-    expect([inBar.subtitle, inBar.subtitleLead]).toEqual(["/p", "root"]);
-    expect([inCombo.subtitle, inCombo.subtitleLead]).toEqual(["a.ts", "file"]);
+    expect([inBar.subtitle, inCombo.subtitle]).toEqual([null, null]);
+    expect(inBar.title).toBe("Open Zed in the workspace root");
+    expect(inCombo.title).toBe("Open a.ts with Zed");
   });
 
   it("keeps the real availability while arranging", () => {

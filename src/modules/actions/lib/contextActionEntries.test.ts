@@ -87,9 +87,14 @@ describe("contextActionEntries", () => {
       expect(entry("file", "folder")).toMatchObject({ enabled: false, reason: "takes files only" });
     });
 
-    it("says what it opens: the folder of the row, or only the name of its file", () => {
-      expect(entry("both", "folder")).toMatchObject({ subtitle: "/w/src", subtitleTrim: true, subtitleLead: "tab" });
-      expect(entry("both", "file")).toMatchObject({ subtitle: "a.ts", subtitleTrim: false, subtitleLead: "file" });
+    it("has no line under its name, the row already says where it is", () => {
+      expect(entry("both", "folder")).toMatchObject({ subtitle: null, subtitleLead: null });
+      expect(entry("both", "file")).toMatchObject({ subtitle: null, subtitleLead: null });
+    });
+
+    it("says on its hover what it opens: the folder of the row, or its file", () => {
+      expect(entry("both", "folder").title).toBe("Open Zed in /w/src");
+      expect(entry("both", "file").title).toBe("Open a.ts with Zed");
     });
 
     it("treats an app that never said what it accepts as one that takes folders", () => {

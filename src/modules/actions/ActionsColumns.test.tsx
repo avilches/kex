@@ -106,7 +106,7 @@ describe("ActionsColumns", () => {
     expect(text).toContain("Scripts");
     expect(text).toContain("Applications");
     expect(text).toContain("/srv/app");
-    expect(column(container, "workspace").textContent).toContain("Workspace");
+    expect(column(container, "workspace").textContent).toContain("This workspace");
     expect(container.querySelector("[aria-label='Expand action']")).toBeNull();
     expect(commandField()).toBeNull();
     unmount();

@@ -67,7 +67,7 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}`, `{host}` y
   `{target}`. Los nombres canonico son `{filepath}` y `{filename}` (los antiguos
   `{path}`/`{file}` ya no existen). `{target}` es de las apps: lo que la app abre en el sitio
-  donde se ofrece (la raiz del workspace en el Header, la carpeta o el fichero en un menu), y
+  donde se ofrece (la raiz del workspace en el Header, el fichero enfocado en el combo, la carpeta o el fichero de una fila en un menu contextual), sin linea con la ruta bajo el nombre, y
   solo la lista de variables de una app lo muestra; un script que lo usa queda rechazado por
   `commandProblem` ("{target} is only for apps"). Una app se anade una sola vez, ya no una
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
