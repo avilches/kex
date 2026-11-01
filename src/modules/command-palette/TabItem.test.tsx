@@ -74,6 +74,15 @@ describe("TabItem marks", () => {
     expect(container).toBeTruthy();
   });
 
+  it("shows the spinner on a terminal running a command, but not on an idle agent or a plain shell", () => {
+    const spinner = (e: TabEntry) => mount(e).container.querySelector("[data-slot=spinner], .animate-spin");
+    expect(spinner(entry({ running: true }))).not.toBeNull();
+    cleanup();
+    expect(spinner(entry({ running: true, agent: "claude" }))).toBeNull();
+    cleanup();
+    expect(spinner(entry())).toBeNull();
+  });
+
   it("shows the dot alone on a tab that is awake", () => {
     const { queryByLabelText, getByLabelText } = mount(entry({ indicator: "error" }));
     expect(queryByLabelText("Tab is hibernated")).toBeNull();

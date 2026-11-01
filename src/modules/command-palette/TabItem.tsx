@@ -13,6 +13,7 @@ import { foldText, highlightIndices, substringIndices } from "./lib/fuzzy";
 import type { RowHighlight } from "./lib/mergeRows";
 import { tabDetailLines } from "./lib/rowDetail";
 import type { TabEntry } from "./lib/tabEntries";
+import { tabSection } from "./lib/tabRank";
 import { RowTag, tabTagKind } from "./RowTag";
 
 const KIND_LABEL: Record<TabEntry["kind"], string> = {
@@ -101,7 +102,7 @@ export function TabItem({
       {entry.hibernated ? (
         <SleepingBadge size={12} indicator={entry.indicator} />
       ) : (
-        <TabIndicatorMark indicator={entry.indicator} />
+        <TabIndicatorMark indicator={tabSection(entry) === "running" ? "working" : entry.indicator} />
       )}
       {entry.tab.locked ? (
         <span role="img" aria-label="Tab is locked" className="shrink-0">
