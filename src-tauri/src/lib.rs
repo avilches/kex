@@ -1022,7 +1022,11 @@ pub fn run() {
             let state_path = data_dir.join("workspaces.json");
             let mgr = window_state::WindowStateManager::new(state_path);
             mgr.load();
-            hibernate_lines::sweep(&mgr.terminal_tab_ids());
+            if mgr.load_was_complete() {
+                hibernate_lines::sweep(&mgr.terminal_tab_ids());
+            } else {
+                log::warn!("[hibernate-lines] state not fully loaded, skipping the sweep");
+            }
             let order = mgr.window_order();
             app.manage(mgr);
 

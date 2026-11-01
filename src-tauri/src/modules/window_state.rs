@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -189,6 +190,10 @@ pub struct WindowStateManager {
     /// Path of the index file (`workspaces.json`).
     path: PathBuf,
     disk: Mutex<DiskCache>,
+    /// False once `load` skipped something it could not read (the index, or a workspace body):
+    /// the tab ids it reports are then a subset of the real ones, and anything that deletes
+    /// files by "not in the set" must not run.
+    load_complete: AtomicBool,
 }
 
 impl WindowStateManager {
@@ -197,7 +202,13 @@ impl WindowStateManager {
             inner: RwLock::new(WindowStateFile::default()),
             path,
             disk: Mutex::new(DiskCache::default()),
+            load_complete: AtomicBool::new(true),
         }
+    }
+
+    /// True when the last `load` read every workspace the index lists.
+    pub fn load_was_complete(&self) -> bool {
+        self.load_complete.load(Ordering::SeqCst)
     }
 
     /// Directory holding the per-workspace bodies, alongside the index file.
@@ -272,6 +283,7 @@ impl WindowStateManager {
                 }
             }
         }
+        self.copy_hibernate_lines_to(&dest);
         log::warn!("[window-state] backed up the previous state to {} ({reason})", dest.display());
         let Ok(rd) = std::fs::read_dir(&root) else {
             return;
@@ -284,6 +296,33 @@ impl WindowStateManager {
         }
     }
 
+    /// The lines a sleeping tab shows live in `hibernate-lines/`, next to the index, and a
+    /// recovered workspace is worth little without them.
+    fn copy_hibernate_lines_to(&self, dest: &Path) {
+        let src = self
+            .path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
+            .join("hibernate-lines");
+        let Ok(rd) = std::fs::read_dir(&src) else {
+            return;
+        };
+        let lines_dest = dest.join("hibernate-lines");
+        if std::fs::create_dir_all(&lines_dest).is_err() {
+            return;
+        }
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("ans") {
+                continue;
+            }
+            if let Some(name) = path.file_name() {
+                let _ = std::fs::copy(&path, lines_dest.join(name));
+            }
+        }
+    }
+
     /// Returns true if the index was loaded successfully. Reconstructs each
     /// window's full workspace array from `workspaces/<id>.json`, and deletes
     /// any orphan body files no longer referenced.
@@ -292,11 +331,15 @@ impl WindowStateManager {
         let ws_dir = self.workspaces_dir();
         let Ok(content) = std::fs::read_to_string(&self.path) else {
             log::debug!("[window-state] index not found or unreadable - starting fresh");
+            if self.path.exists() {
+                self.load_complete.store(false, Ordering::SeqCst);
+            }
             Self::gc_orphans(&ws_dir, &HashSet::new());
             return false;
         };
         let Ok(index) = serde_json::from_str::<IndexFile>(&content) else {
             log::warn!("[window-state] index corrupt or wrong schema - starting fresh");
+            self.load_complete.store(false, Ordering::SeqCst);
             self.snapshot_to_backup("index corrupt or wrong schema");
             Self::gc_orphans(&ws_dir, &HashSet::new());
             return false;
@@ -310,15 +353,18 @@ impl WindowStateManager {
             for id in &ie.workspace_ids {
                 if !is_safe_id(id) {
                     log::warn!("[window-state] skipping unsafe workspace id: {id:?}");
+                    self.load_complete.store(false, Ordering::SeqCst);
                     continue;
                 }
                 let file = ws_dir.join(format!("{id}.json"));
                 let Ok(raw) = std::fs::read_to_string(&file) else {
                     log::warn!("[window-state] workspace body missing for id {id}");
+                    self.load_complete.store(false, Ordering::SeqCst);
                     continue;
                 };
                 let Ok(body) = serde_json::from_str::<Value>(&raw) else {
                     log::warn!("[window-state] workspace body corrupt for id {id}");
+                    self.load_complete.store(false, Ordering::SeqCst);
                     continue;
                 };
                 referenced.insert(id.clone());
@@ -1132,5 +1178,65 @@ mod tests {
             known,
             HashSet::from(["tab-a".to_string(), "tab-b".to_string()])
         );
+    }
+
+    #[test]
+    fn load_is_incomplete_when_a_workspace_body_is_corrupt() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b"]);
+        drop(mgr);
+        std::fs::write(dir.path().join("workspaces/ws-b.json"), "{ not json").unwrap();
+
+        let fresh = WindowStateManager::new(dir.path().join("workspaces.json"));
+        fresh.load();
+        assert!(!fresh.load_was_complete());
+    }
+
+    #[test]
+    fn load_is_complete_when_every_body_reads() {
+        let dir = TempDir::new().unwrap();
+        drop(mgr_with_workspaces(&dir, &["ws-a", "ws-b"]));
+
+        let fresh = WindowStateManager::new(dir.path().join("workspaces.json"));
+        assert!(fresh.load());
+        assert!(fresh.load_was_complete());
+    }
+
+    #[test]
+    fn load_with_no_index_at_all_is_a_complete_fresh_start() {
+        let dir = TempDir::new().unwrap();
+        let fresh = WindowStateManager::new(dir.path().join("workspaces.json"));
+        assert!(!fresh.load());
+        assert!(fresh.load_was_complete());
+    }
+
+    #[test]
+    fn load_is_incomplete_when_the_index_is_corrupt() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("workspaces.json"), "garbage").unwrap();
+        let fresh = WindowStateManager::new(dir.path().join("workspaces.json"));
+        assert!(!fresh.load());
+        assert!(!fresh.load_was_complete());
+    }
+
+    #[test]
+    fn backup_also_copies_the_hibernate_lines() {
+        let dir = TempDir::new().unwrap();
+        let mgr = mgr_with_workspaces(&dir, &["ws-a", "ws-b", "ws-c", "ws-d"]);
+        let lines = dir.path().join("hibernate-lines");
+        std::fs::create_dir_all(&lines).unwrap();
+        std::fs::write(lines.join("tab-1.ans"), "hello").unwrap();
+        std::fs::write(lines.join(".kex-x.tmp"), "partial").unwrap();
+
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-fresh"}]), 0);
+        mgr.save();
+
+        let b = backups(dir.path());
+        assert_eq!(b.len(), 1);
+        assert_eq!(
+            std::fs::read_to_string(b[0].join("hibernate-lines/tab-1.ans")).unwrap(),
+            "hello"
+        );
+        assert!(!b[0].join("hibernate-lines/.kex-x.tmp").exists());
     }
 }
