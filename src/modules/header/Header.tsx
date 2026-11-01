@@ -4,10 +4,9 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import { ActionsBar, type BarController } from "@/modules/actions";
 import { isCompactBar } from "@/modules/actions/lib/actionsBar";
-import { OnboardingChip } from "@/modules/onboarding";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import { DevBranchBadge } from "./DevBranchBadge";
-import { WorkspaceTitle } from "./WorkspaceTitle";
+import { HeaderLead } from "./HeaderLead";
 import {
   CommandIcon,
   Settings01Icon,
@@ -129,11 +128,9 @@ export function Header({
 
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border/70" />}
 
-      <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} groups={groups} />
+      <HeaderLead workspace={activeWorkspace} tab={activeTab} groups={groups} />
 
       <DevBranchBadge />
-
-      <OnboardingChip />
 
       <ActionsBar
         workspace={activeWorkspace}
