@@ -1096,11 +1096,11 @@ export default function App() {
 
   const handleSubmitRootPath = useCallback(
     async (typed: string) => {
-      if (!activeWorkspace) return;
+      if (!activeWorkspace) return false;
       const path = await resolveRootPath(typed);
-      if (!path) return;
-      if (activeRootMode !== "filesystem") return;
+      if (!path || activeRootMode !== "filesystem") return false;
       setFsRoot(activeWorkspace.id, path);
+      return true;
     },
     [activeWorkspace, activeRootMode, resolveRootPath, setFsRoot],
   );
