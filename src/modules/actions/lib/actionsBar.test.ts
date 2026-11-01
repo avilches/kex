@@ -173,6 +173,20 @@ describe("menuEntries", () => {
   });
 });
 
+describe("ownButtonWidth and the icon size", () => {
+  it("grows with a bigger icon and shrinks with a smaller one", () => {
+    const base = ownButtonWidth(app({ name: "Zed" }));
+    expect(ownButtonWidth(app({ name: "Zed" }), false, 32)).toBe(base + 12);
+    expect(ownButtonWidth(app({ name: "Zed" }), false, 14)).toBe(base - 6);
+    expect(ownButtonWidth(app({ name: "Zed" }), true, 32)).toBeGreaterThan(ownButtonWidth(app({ name: "Zed" }), true));
+  });
+
+  it("fits fewer buttons when the icons are big", () => {
+    const list = Array.from({ length: 6 }, (_, i) => app({ id: `a${i}`, name: "Zed" }));
+    expect(ownButtonsThatFit(list, 420, 32)).toBeLessThan(ownButtonsThatFit(list, 420, 14));
+  });
+});
+
 describe("ownButtonWidth", () => {
   it("grows with the name up to the label cap and adds the run zone of a script", () => {
     const short = ownButtonWidth(app({ name: "Zed" }));

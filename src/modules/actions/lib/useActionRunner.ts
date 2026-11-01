@@ -64,6 +64,7 @@ export type ActionRunnerDeps = {
 const WRITE_DELAY_NEW_MS = 150;
 const WRITE_DELAY_REUSED_MS = 50;
 const WRITE_RETRY_MS = 100;
+const WRITE_GAVE_UP = "The terminal did not start in time, so the command was not typed";
 
 function warnMissingFolder(cwd: string | undefined, title: string) {
   if (!cwd) return;
@@ -133,6 +134,7 @@ export function useActionRunner(deps: ActionRunnerDeps) {
       const attempt = (n: number) => {
         if (terminalHandles.current.has(tabId)) terminalHandles.current.get(tabId)?.write(input);
         else if (n < SCRIPT_WRITE_MAX_ATTEMPTS) setTimeout(() => attempt(n + 1), WRITE_RETRY_MS);
+        else toast.error(WRITE_GAVE_UP, { duration: 6000 });
       };
       setTimeout(() => attempt(0), delay);
     },
@@ -145,7 +147,11 @@ export function useActionRunner(deps: ActionRunnerDeps) {
         const step = planDelayedWrite(getScriptRunningSnapshot().get(tabId), terminalHandles.current.has(tabId), n);
         if (step === "write") terminalHandles.current.get(tabId)?.write(input);
         else if (step === "retry") setTimeout(() => attempt(n + 1), WRITE_RETRY_MS);
-        else setScriptRunning(tabId, false);
+        else {
+          // A Stop that landed first is the user's own doing; only a terminal that never came up is news.
+          if (getScriptRunningSnapshot().get(tabId) === "running") toast.error(WRITE_GAVE_UP, { duration: 6000 });
+          setScriptRunning(tabId, false);
+        }
       };
       setTimeout(() => attempt(0), delay);
     },

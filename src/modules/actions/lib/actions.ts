@@ -83,7 +83,9 @@ export function normalizeAction(raw: unknown): Action | null {
   const name = typeof r.name === "string" ? r.name.trim() : "";
   if (!KINDS.includes(r.kind as ActionKind)) return null;
   const kind = r.kind as ActionKind;
-  const command = r.command.trim();
+  // An agent command is typed into a terminal, where a tab would ask the shell to complete: a pasted
+  // one is spaces.
+  const command = kind === "agent" ? r.command.trim().replace(/\t/g, " ") : r.command.trim();
   const action: Action = {
     id: r.id,
     name: name || command,

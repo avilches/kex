@@ -1,3 +1,4 @@
+import { DEFAULT_ACTION_ICON_SIZE } from "@/lib/actionIconSizes";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
 import { inHeader, offeredAt, type FocusPlace } from "./actionTargets";
@@ -22,14 +23,20 @@ const CHAR_WIDTH = 6;
 const LABEL_CAP = 120;
 const RUN_ZONE = 24;
 const ICON = 18;
+// ICON is the icon at the default size; a bigger or smaller one moves the width by the difference.
+const iconWidth = (iconSize: number): number => Math.max(0, ICON + iconSize - DEFAULT_ACTION_ICON_SIZE);
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
 
-export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly = false): number {
-  if (iconOnly) return PADDING + ICON;
+export function ownButtonWidth(
+  action: Pick<Action, "name" | "kind">,
+  iconOnly = false,
+  iconSize: number = DEFAULT_ACTION_ICON_SIZE,
+): number {
+  if (iconOnly) return PADDING + iconWidth(iconSize);
   const { main } = splitActionName(action.name.trim() || "Action");
   const label = Math.min(LABEL_CAP, main.length * CHAR_WIDTH);
-  return PADDING + label + (isScript(action) ? RUN_ZONE : ICON);
+  return PADDING + label + (isScript(action) ? RUN_ZONE : iconWidth(iconSize));
 }
 
 // Only a script has a running state: an agent opens a new tab per click and keeps no link.
@@ -47,12 +54,16 @@ export function onBar(action: Action, state: ScriptState | "idle"): boolean {
 // How many of the own buttons, taken in the user's order, fit in the room the bar has once the
 // menus have taken theirs. The rest fold into the menu, so the bar never pushes the search box
 // and the window controls out.
-export function ownButtonsThatFit(actions: readonly Action[], room: number): number {
+export function ownButtonsThatFit(
+  actions: readonly Action[],
+  room: number,
+  iconSize: number = DEFAULT_ACTION_ICON_SIZE,
+): number {
   let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   const sole = soleIconButtons(actions);
   for (const action of actions) {
-    left -= ownButtonWidth(action, sole.has(action.id)) + BAR_GAP;
+    left -= ownButtonWidth(action, sole.has(action.id), iconSize) + BAR_GAP;
     if (left < 0) break;
     shown += 1;
   }

@@ -277,7 +277,7 @@ describe("useActionRunner", () => {
     expect(write).toHaveBeenCalledTimes(1);
   });
 
-  it("gives up on an agent's line in silence when its terminal never shows up", () => {
+  it("tells the user when it gives up on an agent's line because its terminal never showed up", () => {
     const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
     const { deps, result, write } = setup(ws());
     act(() => result.current.runAction(agent));
@@ -287,7 +287,7 @@ describe("useActionRunner", () => {
     deps.terminalHandles.current.set(tab.id, { write });
     act(() => void vi.advanceTimersByTime(1000));
     expect(write).not.toHaveBeenCalled();
-    expect(toastError).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(expect.stringContaining("did not start in time"), { duration: 6000 });
     expect(getScriptRunningSnapshot().has(tab.id)).toBe(false);
   });
 

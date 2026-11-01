@@ -45,12 +45,13 @@ export function useActionsBarModel({ workspace, room, arranging }: Input): BarMo
   const context = useActionContext(workspace);
   const states = useActionStates();
   const local = workspace?.actions ?? NONE;
+  const iconSize = usePreferencesStore((s) => s.actionIconSize);
   const ownButtonsShown = useMemo(
     () =>
       room === undefined
         ? undefined
-        : ownButtonsThatFit(ownButtonCandidates(byKind(local), byKind(global), states), room),
-    [local, global, room, states],
+        : ownButtonsThatFit(ownButtonCandidates(byKind(local), byKind(global), states), room, iconSize),
+    [local, global, room, states, iconSize],
   );
   return useMemo(
     () =>

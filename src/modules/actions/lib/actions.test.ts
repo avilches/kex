@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addAction,
   adoptActionAt,
+  normalizeAction,
   normalizeActions,
   removeAction,
   reorderActions,
@@ -266,5 +267,12 @@ describe("clearing the fixed folder of a script", () => {
   it("keeps a folder that was typed, trimmed", () => {
     const [updated] = updateAction([fixed], "a", JSON.parse(JSON.stringify(withFixedCwd(fixed, " /new "))) as Action);
     expect(updated?.cwd).toBe("/new");
+  });
+});
+
+describe("an agent command pasted with a tab", () => {
+  it("turns the tab into a space so it is not typed as a completion request", () => {
+    const out = normalizeAction({ id: "g", name: "G", kind: "agent", command: "claude\t--model\tx", ownButton: true });
+    expect(out?.command).toBe("claude --model x");
   });
 });
