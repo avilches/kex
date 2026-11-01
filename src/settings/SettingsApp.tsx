@@ -5,7 +5,7 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { availableSections } from "@/modules/settings/sections";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -18,8 +18,8 @@ import { ActionsSection, type ActionsRequest } from "./sections/ActionsSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
-import { PermissionsSection } from "./sections/PermissionsSection";
 import { GeneralSection } from "./sections/GeneralSection";
+import { PermissionsSection } from "./sections/PermissionsSection";
 import { ShortcutsSection, type ShortcutsSearchRequest } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
@@ -44,12 +44,9 @@ const SettingsTextEditor = import.meta.env.DEV
   ? lazy(() => import("./devTextEditor/SettingsTextEditor"))
   : null;
 
-const SECTIONS = SETTINGS_SECTIONS.filter((s) => IS_MAC || !s.macOnly).map((s) => ({
-  ...s,
-  component: COMPONENTS[s.id],
-}));
+const SECTIONS = availableSections().map((s) => ({ ...s, component: COMPONENTS[s.id] }));
 
-const isAvailable = (id: string) => SETTINGS_SECTIONS.some((s) => s.id === id && (IS_MAC || !s.macOnly));
+const isAvailable = (id: string) => availableSections().some((s) => s.id === id);
 
 export function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
   if (!raw) return { section: "general" };

@@ -11,6 +11,7 @@ import {
   SourceCodeIcon,
   SquareLock01Icon,
 } from "@hugeicons/core-free-icons";
+import { IS_MAC } from "@/lib/platform";
 import type { SettingsSection } from "./openSettingsWindow";
 
 export type SettingsSectionMeta = {
@@ -35,3 +36,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon },
   { id: "about", label: "About", icon: InformationCircleIcon },
 ];
+
+export function availableSections(): SettingsSectionMeta[] {
+  return SETTINGS_SECTIONS.filter((s) => IS_MAC || !s.macOnly);
+}
