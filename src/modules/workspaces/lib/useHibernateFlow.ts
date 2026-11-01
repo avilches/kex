@@ -93,11 +93,12 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
       const still = stillValid ? await stillValid(current, ids) : awake(current, ids);
       if (still.length === 0) return false;
       const stillIds = still.map((t) => t.id);
+      const sleeping = Object.fromEntries(Object.entries(snapshots).filter(([id]) => stillIds.includes(id)));
       markHibernating(stillIds);
       try {
         for (const tab of kept) if (stillIds.includes(tab.id)) d.updateTab(workspaceId, tab);
         for (const id of stillIds) d.finishAgent(id);
-        d.hibernate(workspaceId, snapshots);
+        d.hibernate(workspaceId, sleeping);
       } catch (e) {
         unmarkHibernating(stillIds);
         throw e;

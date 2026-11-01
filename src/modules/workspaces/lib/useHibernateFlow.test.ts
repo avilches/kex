@@ -224,6 +224,23 @@ describe("createHibernateFlow", () => {
       expect(calls.some((c) => c.startsWith("finish") || c.startsWith("hibernate"))).toBe(false);
     });
 
+    it("puts to sleep only the tabs that are still valid after the snapshot await", async () => {
+      let active: string | null = null;
+      const { flow, calls } = setup(ws([term("t1"), term("t2")], "t1"), {
+        activeWorkspaceId: () => active,
+        snapshotTabs: async (tabs) => {
+          active = "w1";
+          return Object.fromEntries(tabs.map((t) => [t.id, { at: 1 }]));
+        },
+      });
+      expect(await flow.requestAuto("w1", ["t1", "t2"])).toBe(true);
+      expect(calls).toContain("hibernate:t2");
+      expect(calls).not.toContain("hibernate:t1,t2");
+      expect(calls).not.toContain("finish:t1");
+      expect(isHibernating("t1")).toBe(false);
+      expect(isHibernating("t2")).toBe(true);
+    });
+
     it("does nothing when an agent is waiting for the user", async () => {
       const { flow, calls } = setup(ws([term("t1")]), {
         live: () => ({ ...idle, agentOf: () => ({ agent: "claude", status: "attention", resumable: true }) }),
