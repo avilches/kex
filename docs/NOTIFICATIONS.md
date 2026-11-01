@@ -246,6 +246,9 @@ dependency (`IntegrationSuggestionToast.tsx` passes `suppressIntegrationToast(on
 records anything. A suppressed call does not add the agent to the per-run `seen` set and does not record an ask, so when
 the user finishes or dismisses the onboarding in the same run, the next `started` signal of that agent shows the toast
 normally. The onboarding already offers the same installs, which is why the two would otherwise say the same thing twice.
+The check may be async and the toast's waits for `whenHydrated()` first: before hydration the store holds the default
+onboarding state, which says finished, so an agent started in the first moments of a first run would otherwise get the
+toast and record an ask. After the wait the flow checks `seen` again, so two calls that waited together look once.
 
 ### Detection guard
 

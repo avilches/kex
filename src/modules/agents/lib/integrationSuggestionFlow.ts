@@ -3,7 +3,7 @@ import type { AgentId, IntegrationStatus } from "./integrations";
 
 export type SuggestDeps = {
   now: () => number;
-  suppressed: () => boolean;
+  suppressed: () => boolean | Promise<boolean>;
   status: (agent: AgentId) => Promise<IntegrationStatus>;
   read: () => Promise<SuggestionMap>;
   update: (change: (map: SuggestionMap) => SuggestionMap) => Promise<void>;
@@ -19,7 +19,9 @@ export function createIntegrationSuggester(deps: SuggestDeps) {
   return async (agent: unknown): Promise<void> => {
     if (!isAgentId(agent) || seen.has(agent)) return;
     // Not marked as seen, so finishing the onboarding restores the safety net in this run.
-    if (deps.suppressed()) return;
+    if (await deps.suppressed()) return;
+    // Re-checked: another call for the same agent may have passed while this one waited.
+    if (seen.has(agent)) return;
     seen.add(agent);
     try {
       const status = await deps.status(agent);

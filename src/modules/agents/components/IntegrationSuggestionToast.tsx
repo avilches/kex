@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { suppressIntegrationToast } from "@/modules/onboarding/lib/onboardingState";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
 import { readIntegrationSuggestions, updateIntegrationSuggestions } from "@/modules/settings/store";
 import { agentStatus, installAgent, installErrorText } from "@/modules/agents/lib/agentIntegration";
 import { AgentIcon } from "../lib/agentIcon";
@@ -40,7 +40,11 @@ export function showIntegrationSuggestion(agent: AgentId): void {
 // Called when Kex detects an agent starting in a terminal.
 export const suggestIntegration = createIntegrationSuggester({
   now: Date.now,
-  suppressed: () => suppressIntegrationToast(usePreferencesStore.getState().onboarding),
+  // Before hydration the store holds the default onboarding state, which says finished.
+  suppressed: async () => {
+    await whenHydrated();
+    return suppressIntegrationToast(usePreferencesStore.getState().onboarding);
+  },
   status: agentStatus,
   read: readIntegrationSuggestions,
   update: updateIntegrationSuggestions,

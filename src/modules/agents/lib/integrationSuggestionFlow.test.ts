@@ -37,6 +37,28 @@ describe("integration suggester", () => {
     expect(state.map.claude).toEqual({ asks: 1, lastAskedAt: T0, installedOnce: false });
   });
 
+  it("looks at an agent once when two calls wait on an async suppression check together", async () => {
+    let release: (v: boolean) => void = () => {};
+    const gate = new Promise<boolean>((r) => {
+      release = r;
+    });
+    const show = vi.fn();
+    const status = vi.fn(async (): Promise<IntegrationStatus> => "missing");
+    const suggest = createIntegrationSuggester({
+      now: () => T0,
+      suppressed: () => gate,
+      status,
+      read: async () => ({}),
+      update: async () => {},
+      show,
+    });
+    const both = Promise.all([suggest("pi"), suggest("pi")]);
+    release(false);
+    await both;
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores agents that have no integration", async () => {
     const { suggest, show } = setup();
     await suggest("gemini");
