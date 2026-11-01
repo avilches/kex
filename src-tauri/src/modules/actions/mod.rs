@@ -57,6 +57,12 @@ pub fn validate_spawn(argv: &[String], cwd: Option<&str>) -> Result<SpawnPlan, S
 
 fn spawn_detached(plan: &SpawnPlan) -> Result<u32, String> {
     let mut cmd = Command::new(&plan.program);
+    // A bare name resolves against the user's PATH, not the minimal one a Dock launch inherits.
+    if !is_absolute(&plan.program) {
+        if let Some(path) = crate::modules::editors::agents::spawn_path() {
+            cmd.env("PATH", path);
+        }
+    }
     cmd.args(&plan.args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     if let Some(dir) = &plan.cwd {
         cmd.current_dir(dir);
