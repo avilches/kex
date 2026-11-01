@@ -1162,6 +1162,21 @@ export async function setGlobalActions(value: Action[]): Promise<void> {
   await writeToolsPref(KEY_ACTIONS, normalizeActions(value));
 }
 
+/** What the Actions seeding decides on, read from the store itself and not from this window's copy,
+ * which follows the other windows' writes only when their echo arrives. */
+export async function readSeedState(): Promise<{ actions: Action[]; seededAgents: string[]; appActionsSeeded: boolean }> {
+  const [actions, agents, seeded] = await Promise.all([
+    toolsStore.get<unknown>(KEY_ACTIONS),
+    toolsStore.get<unknown>(KEY_SEEDED_AGENTS),
+    toolsStore.get<boolean>(KEY_APP_ACTIONS_SEEDED),
+  ]);
+  return {
+    actions: normalizeActions(actions),
+    seededAgents: Array.isArray(agents) ? agents.filter((id): id is string => typeof id === "string") : [],
+    appActionsSeeded: seeded === true,
+  };
+}
+
 export async function setSeededAgents(value: string[]): Promise<void> {
   await writeToolsPref(KEY_SEEDED_AGENTS, [...new Set(value)]);
 }

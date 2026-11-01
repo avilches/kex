@@ -3,7 +3,7 @@ import { native } from "@/lib/native";
 import { usePreferencesStore, whenHydrated } from "@/modules/settings/preferences";
 import { planAgentSeed, planAppSeed } from "@/modules/actions/lib/agentSeed";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
-import { setAppActionsSeeded, setDetectedEditors, setSeededAgents } from "@/modules/settings/store";
+import { readSeedState, setAppActionsSeeded, setDetectedEditors, setSeededAgents } from "@/modules/settings/store";
 import type { DetectedEditor } from "./types";
 
 // Module-level scanning state - not persisted; each webview tracks its own spinner.
@@ -50,7 +50,26 @@ export function mergeEnabled(
 // others never seed in parallel; they get the Actions and the flag through the preferences echo.
 // Agents first, then apps, each marked only after its own writes. If the agents write throws,
 // the apps are not attempted and nothing is marked; the next scan retries both.
-async function seedActions(merged: DetectedEditor[]): Promise<void> {
+export async function seedActions(merged: DetectedEditor[]): Promise<void> {
+  // One window seeds at a time, and the one that does starts from what the store holds: a scan from
+  // the Settings button, or one in another window, would otherwise plan from a copy that has not
+  // seen the other's writes yet and add the same agents again.
+  let leased = false;
+  try {
+    leased = await native.claimSeedLease();
+  } catch (e) {
+    console.error("claim_seed_lease failed:", e);
+  }
+  if (!leased) return;
+  try {
+    usePreferencesStore.setState(await readSeedState());
+    await seedFrom(merged);
+  } finally {
+    native.releaseSeedLease().catch((e) => console.error("release_seed_lease failed:", e));
+  }
+}
+
+async function seedFrom(merged: DetectedEditor[]): Promise<void> {
   const agents = merged.filter((e) => e.kind === "agent");
   const editors = merged.filter((e) => e.kind === "editor");
   const prefs = () => usePreferencesStore.getState();

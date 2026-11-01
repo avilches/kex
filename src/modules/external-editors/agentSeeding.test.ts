@@ -5,6 +5,10 @@ import type { DetectedEditor } from "./types";
 const h = vi.hoisted(() => ({
   scan: vi.fn(),
   claim: vi.fn(),
+  lease: vi.fn(),
+  release: vi.fn(),
+  /** What the store file holds, which another window may have changed behind this one's back. */
+  disk: null as null | { actions: Action[]; seededAgents: string[]; appActionsSeeded: boolean },
   writes: [] as Action[][],
   failActions: false,
   failFlag: false,
@@ -12,7 +16,9 @@ const h = vi.hoisted(() => ({
   hydration: Promise.resolve() as Promise<void>,
 }));
 
-vi.mock("@/lib/native", () => ({ native: { editorScan: h.scan, claimStartupScan: h.claim } }));
+vi.mock("@/lib/native", () => ({
+  native: { editorScan: h.scan, claimStartupScan: h.claim, claimSeedLease: h.lease, releaseSeedLease: h.release },
+}));
 
 vi.mock("@/modules/settings/preferences", async () => {
   const { create } = await import("zustand");
@@ -30,6 +36,10 @@ vi.mock("@/modules/settings/preferences", async () => {
 vi.mock("@/modules/settings/store", async () => {
   const { usePreferencesStore } = await import("@/modules/settings/preferences");
   return {
+    readSeedState: async () => {
+      const { actions, seededAgents, appActionsSeeded } = usePreferencesStore.getState();
+      return h.disk ?? { actions, seededAgents, appActionsSeeded };
+    },
     setDetectedEditors: async (v: DetectedEditor[]) => usePreferencesStore.setState({ detectedEditors: v }),
     setGlobalActions: async (v: Action[]) => {
       await Promise.resolve();
@@ -66,6 +76,11 @@ const seededCommands = () => usePreferencesStore.getState().actions.map((a) => a
 beforeEach(() => {
   h.scan.mockReset();
   h.claim.mockReset();
+  h.lease.mockReset();
+  h.lease.mockResolvedValue(true);
+  h.release.mockReset();
+  h.release.mockResolvedValue(undefined);
+  h.disk = null;
   h.writes.length = 0;
   h.failActions = false;
   h.failFlag = false;
@@ -336,5 +351,45 @@ describe("scan result", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await runEditorScan()).toBeNull();
     error.mockRestore();
+  });
+});
+
+describe("seeding from two windows", () => {
+  it("does not seed while another window holds the lease", async () => {
+    h.lease.mockResolvedValue(false);
+    h.scan.mockResolvedValue([agent("opencode")]);
+    await runEditorScan();
+    expect(seededCommands()).toEqual([]);
+    expect(h.writes).toEqual([]);
+    expect(h.release).not.toHaveBeenCalled();
+  });
+
+  it("releases the lease after seeding, and also when the seeding fails", async () => {
+    h.scan.mockResolvedValue([agent("opencode")]);
+    await runEditorScan();
+    expect(h.release).toHaveBeenCalledTimes(1);
+    h.failActions = true;
+    usePreferencesStore.setState({ seededAgents: [] });
+    await runEditorScan();
+    expect(h.release).toHaveBeenCalledTimes(2);
+  });
+
+  it("plans from what the store holds, so an agent another window just seeded is not added again", async () => {
+    const other: Action = { id: "from-other-window", name: "opencode", kind: "agent", command: "opencode", appId: "opencode", ownButton: true };
+    h.disk = { actions: [other], seededAgents: ["opencode"], appActionsSeeded: false };
+    h.scan.mockResolvedValue([agent("opencode")]);
+    await runEditorScan();
+    expect(h.writes).toEqual([]);
+    expect(seededCommands()).toEqual(["opencode"]);
+    expect(usePreferencesStore.getState().actions.map((a) => a.id)).toEqual(["from-other-window"]);
+  });
+
+  it("does not seed when the lease cannot be asked for", async () => {
+    h.lease.mockRejectedValue(new Error("ipc"));
+    h.scan.mockResolvedValue([agent("opencode")]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await runEditorScan();
+    expect(seededCommands()).toEqual([]);
+    err.mockRestore();
   });
 });

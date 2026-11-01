@@ -408,6 +408,8 @@ export const native = {
   permissionOpenSettings: (kind: PermissionKind): Promise<void> =>
     invoke<void>("permission_open_settings", { kind }),
   claimStartupScan: (): Promise<boolean> => invoke<boolean>("claim_startup_scan"),
+  claimSeedLease: (): Promise<boolean> => invoke<boolean>("claim_seed_lease"),
+  releaseSeedLease: (): Promise<void> => invoke<void>("release_seed_lease"),
   claimOnboardingStartup: (): Promise<boolean> => invoke<boolean>("claim_onboarding_startup"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),

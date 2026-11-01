@@ -5,6 +5,7 @@ pub mod detect;
 use detect::DetectedEditor;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 static STARTUP_SCAN_CLAIMED: AtomicBool = AtomicBool::new(false);
 // Two windows scanning at once would each start a login shell for the agent PATH probe.
@@ -19,6 +20,38 @@ fn claim_once(flag: &AtomicBool) -> bool {
 #[tauri::command]
 pub fn claim_startup_scan() -> bool {
     claim_once(&STARTUP_SCAN_CLAIMED)
+}
+
+// Seeding writes the Actions and the seen lists from a plan made on what the window knows, so two
+// windows seeding at once would each add the same agents. One holds this lease at a time. It
+// expires, so a window that dies in the middle cannot block the seeding for the rest of the launch.
+static SEED_LEASE: Mutex<Option<Instant>> = Mutex::new(None);
+const SEED_LEASE_TTL: Duration = Duration::from_secs(60);
+
+fn lease_take(lease: &Mutex<Option<Instant>>, now: Instant, ttl: Duration) -> bool {
+    let mut held = lease.lock().unwrap_or_else(|e| e.into_inner());
+    match *held {
+        Some(since) if now.saturating_duration_since(since) < ttl => false,
+        _ => {
+            *held = Some(now);
+            true
+        }
+    }
+}
+
+fn lease_release(lease: &Mutex<Option<Instant>>) {
+    *lease.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
+/// True when the caller may seed the Actions now; false while another window does.
+#[tauri::command]
+pub fn claim_seed_lease() -> bool {
+    lease_take(&SEED_LEASE, Instant::now(), SEED_LEASE_TTL)
+}
+
+#[tauri::command]
+pub fn release_seed_lease() {
+    lease_release(&SEED_LEASE);
 }
 
 fn detect_serialized() -> Vec<DetectedEditor> {
@@ -38,6 +71,19 @@ pub async fn editor_scan() -> Result<Vec<DetectedEditor>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_seed_lease_is_held_by_one_caller_until_released_or_expired() {
+        let lease = Mutex::new(None);
+        let start = Instant::now();
+        let ttl = Duration::from_secs(60);
+        assert!(lease_take(&lease, start, ttl));
+        assert!(!lease_take(&lease, start + Duration::from_secs(1), ttl));
+        lease_release(&lease);
+        assert!(lease_take(&lease, start + Duration::from_secs(2), ttl));
+        assert!(!lease_take(&lease, start + Duration::from_secs(30), ttl));
+        assert!(lease_take(&lease, start + Duration::from_secs(63), ttl));
+    }
 
     #[test]
     fn the_startup_scan_is_claimed_only_once() {

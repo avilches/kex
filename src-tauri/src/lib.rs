@@ -1163,6 +1163,8 @@ pub fn run() {
             shell::shell_bg_list,
             editors::editor_scan,
             editors::claim_startup_scan,
+            editors::claim_seed_lease,
+            editors::release_seed_lease,
             permissions::permission_probe,
             permissions::permission_open_settings,
             update_guard::claim_update_check,

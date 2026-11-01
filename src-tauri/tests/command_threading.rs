@@ -60,6 +60,8 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("fs_grep_cancel", "flips an atomic"),
     ("fs_duplicate_cancel", "flips an atomic"),
     ("claim_startup_scan", "process-wide flag"),
+    ("claim_seed_lease", "process-wide lease, one mutex"),
+    ("release_seed_lease", "process-wide lease, one mutex"),
     ("claim_onboarding_startup", "process-wide flag"),
     ("claim_update_check", "process-wide flag"),
     ("claim_update_install", "process-wide flag"),
