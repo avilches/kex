@@ -45,13 +45,29 @@ function CodexRow() {
       name="Codex"
       files={["~/.codex/hooks.json", "~/.codex/config.toml"]}
       state={state}
+      detected
     />
   );
 }
 
 function Row() {
   const state = useIntegration("omp");
-  return <AgentIntegrationRow agent="omp" name="OMP" files={["~/.omp/x.ts"]} state={state} />;
+  return (
+    <AgentIntegrationRow agent="omp" name="OMP" files={["~/.omp/x.ts"]} state={state} detected />
+  );
+}
+
+function UndetectedRow() {
+  const state = useIntegration("omp");
+  return (
+    <AgentIntegrationRow
+      agent="omp"
+      name="OMP"
+      files={["~/.omp/x.ts"]}
+      state={state}
+      detected={false}
+    />
+  );
 }
 
 beforeEach(() => {
@@ -98,6 +114,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("AgentIntegrationRow", () => {
+  it("a not detected agent shows no Install, Uninstall or Preview even with its file present", async () => {
+    installed = true;
+    render(<UndetectedRow />);
+    expect(await screen.findByText("Not detected")).toBeTruthy();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
   it("offers Install and no Uninstall while the integration is missing", async () => {
     render(<Row />);
     expect(await screen.findByText("Not installed")).toBeTruthy();
