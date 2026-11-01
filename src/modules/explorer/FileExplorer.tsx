@@ -1167,12 +1167,12 @@ export const FileExplorer = memo(
       <div
         ref={containerRef}
         data-file-explorer
-        className="flex h-full flex-row outline-none"
+        className="relative flex h-full flex-col outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
+        <div className="flex h-8 shrink-0 items-center gap-1 pl-1.5 pr-9">
           {!canEditRoot ? (
             <div
               className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-xs font-medium text-muted-foreground"
@@ -1495,7 +1495,7 @@ export const FileExplorer = memo(
           />
         )}
         </div>
-        <div className="flex shrink-0 flex-col items-center gap-1 px-1 py-1.5">
+        <div className="absolute right-1.5 top-1 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 backdrop-blur-sm">
           {rootMode === "filesystem" && homePath && (
             <Button
               variant="ghost"
