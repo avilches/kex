@@ -8,6 +8,7 @@ pub mod git;
 pub mod hibernate_lines;
 pub mod history;
 pub mod menu_route;
+pub mod permissions;
 pub mod proc;
 pub mod pty;
 pub mod shell;

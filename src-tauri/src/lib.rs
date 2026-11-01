@@ -4,7 +4,7 @@ mod window_log;
 
 use modules::{
     actions, agent, custom_themes, editors, float_browser, fs, git, hibernate_lines, history,
-    menu_route, pty, shell, tab_history, update_guard, window_state, workspace,
+    menu_route, permissions, pty, shell, tab_history, update_guard, window_state, workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1152,6 +1152,8 @@ pub fn run() {
             shell::shell_bg_list,
             editors::editor_scan,
             editors::claim_startup_scan,
+            permissions::permission_probe,
+            permissions::permission_open_settings,
             update_guard::claim_update_check,
             update_guard::claim_update_install,
             update_guard::release_update_install,
