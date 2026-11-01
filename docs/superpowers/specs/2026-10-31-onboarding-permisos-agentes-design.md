@@ -177,10 +177,14 @@ de permisos y filas de agentes), `docs/ARCHITECTURE.md` (módulo del onboarding)
 - Se ofrece "Acceso total al disco" como atajo.
 - Las notificaciones del sistema quedan fuera de este trabajo.
 - Los textos de uso de carpetas en el `Info.plist`.
-- La sincronización de integraciones del arranque (`main.tsx`: `agent_enable_claude_hooks` y
-  `syncIntegrations`) solo actúa sobre agentes detectados. Hoy reinstala los hooks de Claude Code en
-  cada arranque aunque Claude no exista, lo que crea `~/.claude/` y contradice el anti-objetivo de
-  no dejar carpetas huérfanas.
+- La sincronización automática del arranque (`main.tsx`: `agent_enable_claude_hooks` y
+  `syncIntegrations`) solo refresca las integraciones que ya están instaladas y nunca instala una
+  nueva (decisión del usuario). Hoy, con el ajuste de notificaciones activo, reinstala los hooks de
+  Claude Code en cada arranque aunque no estén puestos ni Claude exista, lo que crea `~/.claude/` y
+  contradice el anti-objetivo de no dejar carpetas huérfanas. Con la regla nueva, ese camino
+  comprueba primero el estado de los hooks y solo actúa si están instalados. Una integración que
+  quedó instalada de un agente que ya no se detecta sigue sincronizándose en silencio, pero su fila
+  solo dice "No detectado".
 - La comprobación de primer arranque se hace antes de que nada escriba `settings-general.json` en
   esa ejecución; mira si ese fichero ya existía.
 - "Uninstall all" pide confirmación con la lista de agentes afectados; "Install all" no, porque
