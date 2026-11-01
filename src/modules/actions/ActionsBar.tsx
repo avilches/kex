@@ -52,7 +52,6 @@ import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { splitActionName } from "./lib/actionName";
 import { runOverlayFor } from "./lib/runOverlay";
 import {
   DROP_MENU,
@@ -124,7 +123,7 @@ function nameClick(item: BarItem, { run, focus, fixRoot }: Handlers) {
 
 // The hover words spell the variable out ("Open RustRover in /p/root"), never the raw template.
 function ownButtonTitle(item: BarItem): string {
-  const { main } = splitActionName(item.name);
+  const main = item.name;
   if (item.needsRoot) return `${main}: ${item.disabledReason}. Click to set it`;
   if (item.disabledReason) return `${main}: ${item.disabledReason}`;
   if (isScript(item.action) && item.state !== "idle") return `Show ${main}`;
@@ -553,7 +552,7 @@ export function ActionsMenu({
       >
         {context?.exists && (
           <>
-            <ContextSubmenu combo={context} {...row} />
+            <ContextSubmenu combo={context} {...row} reorderMode={false} />
             {(items.length > 0 || globalItems.length > 0 || dragging) && <DropdownMenuSeparator />}
           </>
         )}
@@ -878,7 +877,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
           {dragged && (
             <div className="flex h-8 items-center gap-1.5 rounded-md bg-popover px-2 text-[11px] shadow-lg ring-1 ring-foreground/10">
               <ActionIcon action={dragged.action} size={14} fill />
-              <span className="max-w-[120px] truncate">{splitActionName(dragged.name).main}</span>
+              <span className="max-w-[120px] truncate">{dragged.name}</span>
             </div>
           )}
         </DragOverlay>
