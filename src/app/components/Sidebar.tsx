@@ -79,7 +79,7 @@ export type SidebarProps = {
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
   onFsRootMissing?: (path: string) => void;
-  onSubmitRootPath?: (typed: string) => void;
+  onSubmitRootPath?: (typed: string) => void | Promise<boolean>;
   onResolveRootPath?: (typed: string) => Promise<string | null>;
   canNavigateUp: boolean;
   homePath: string | null;
