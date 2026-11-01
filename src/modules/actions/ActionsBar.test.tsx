@@ -77,14 +77,21 @@ describe("OwnButton", () => {
     unmount();
   });
 
-  it("spells the variable out on the hover title, never the raw template", () => {
-    const named: Action = { ...app, name: "RustRover {cwd}" };
-    const open = mount(item(named, { title: "Open RustRover in /p/Kex" }));
-    expect(open.container.querySelector("button")?.getAttribute("title")).toBe("Open RustRover in /p/Kex");
+  it("says on the hover title where it opens, and falls back to Open plus the name", () => {
+    const open = mount(item(app, { title: "Open PyCharm in /p/Kex" }));
+    expect(open.container.querySelector("button")?.getAttribute("title")).toBe("Open PyCharm in /p/Kex");
     open.unmount();
-    const bare = mount(item(named));
-    expect(bare.container.querySelector("button")?.getAttribute("title")).toBe("Open RustRover");
+    const bare = mount(item(app));
+    expect(bare.container.querySelector("button")?.getAttribute("title")).toBe("Open PyCharm");
     bare.unmount();
+  });
+
+  it("shows a name exactly as typed, braces included: a name is text, not a template", () => {
+    const named: Action = { ...app, name: "Deploy {x}" };
+    const view = mount(item(named));
+    expect(view.container.textContent).toContain("Deploy {x}");
+    expect(view.container.querySelector("button")?.getAttribute("title")).toBe("Open Deploy {x}");
+    view.unmount();
   });
 
   it("disables an Action that cannot run and says why in its title", () => {
@@ -287,6 +294,21 @@ describe("ActionsMenu", () => {
       const view = mountMenu([item(app)], [], undefined, { context: base });
       view.open();
       expect(submenu()?.title).toBe("No folder Actions yet");
+      view.unmount();
+    });
+
+    it("never takes part in the reorder drag: its rows run on a click even with the modifier held", () => {
+      const act1 = item({ ...script, id: "inner", name: "Inner", command: "make", runs: "folder" });
+      const view = mountMenu([item(app)], [], vi.fn(() => false), { reorderMode: true, context: { ...base, workspace: [act1] } });
+      view.open();
+      const trigger = submenu()!;
+      act(() => {
+        trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      });
+      const row = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "Inner") as HTMLElement | undefined;
+      expect(row, "the submenu opened").toBeDefined();
+      act(() => void row!.click());
+      expect(view.handlers.run).toHaveBeenCalled();
       view.unmount();
     });
 

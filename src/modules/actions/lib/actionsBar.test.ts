@@ -867,6 +867,21 @@ describe("paletteActions", () => {
     expect(paletteActions(model)[0]?.runTarget).toBeUndefined();
   });
 
+  it("lists an agent and a folder script once, with the Header's copy that acts on the root", () => {
+    const agentAction: Action = { id: "ag", name: "Claude", kind: "agent", command: "claude", ownButton: false };
+    const folderScript = script({ id: "sc", name: "Make", command: "make", runs: "folder" });
+    const model = buildActionsBarModel({
+      local: [agentAction, folderScript],
+      context: { ...ctx, focus: { folder: "/p/src", file: "" } },
+      states: new Map(),
+      place: { file: false, folder: true },
+    });
+    expect(model.contextCombo.workspace.map((i) => i.id)).toEqual(["ag", "sc"]);
+    const listed = paletteActions(model);
+    expect(listed.map((i) => i.id)).toEqual(["ag", "sc"]);
+    for (const item of listed) expect(item.runTarget, item.id).toBeUndefined();
+  });
+
   it("leaves out the ones that cannot run now", () => {
     expect(paletteActions(build()).map((i) => i.id)).not.toContain("a1");
   });

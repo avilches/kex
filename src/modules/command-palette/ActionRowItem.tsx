@@ -1,6 +1,5 @@
 import { CommandItem } from "@/components/ui/command";
 import { ActionIcon } from "@/modules/actions/ActionIcon";
-import { splitActionName } from "@/modules/actions/lib/actionName";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import { HighlightText } from "./HighlightText";
 import type { RowHighlight } from "./lib/mergeRows";
@@ -34,7 +33,7 @@ export function ActionRowItem({
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate">
           <HighlightText
-            text={splitActionName(item.name).main}
+            text={item.name}
             indices={highlight?.field === "title" ? highlight.indices : undefined}
           />
         </span>

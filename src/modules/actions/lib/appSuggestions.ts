@@ -1,7 +1,6 @@
 import { newActionId } from "@/lib/ids";
 import { DEFAULT_ACCEPTS, EDITOR_CATALOG, getEditorAccepts, type AppAccepts } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import { splitActionName } from "./actionName";
 import { yoloCommand } from "./agentYolo";
 import type { Action, ActionKind } from "./types";
 
@@ -89,8 +88,7 @@ export const APP_TARGET = "{target}";
 
 // Alphabetical by name, the way the combo reads.
 export function compareByName(a: AppSuggestion, b: AppSuggestion): number {
-  const main = (s: AppSuggestion) => splitActionName(s.name).main;
-  return main(a).localeCompare(main(b));
+  return a.name.localeCompare(b.name);
 }
 
 /** One preset per enabled detected app. */
