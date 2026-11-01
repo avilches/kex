@@ -28,6 +28,7 @@ import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { unlinkRemovedActions, unlinkTab } from "@/modules/actions/lib/actionStateStore";
+import { runOverlayFor } from "@/modules/actions/lib/runOverlay";
 import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
 import { createBarOps } from "@/modules/actions/lib/barOps";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
@@ -4343,7 +4344,7 @@ export default function App() {
             actionsWorkspace={activeWorkspace ?? null}
             onRunAction={(item) => {
               if (item.state !== "idle" && focusActionTab(item.action)) return;
-              runAction(item.action);
+              runAction(item.action, item.runTarget !== undefined ? runOverlayFor(item.runTarget, item.runTargetKind) : undefined);
             }}
             onStopAction={(item) => stopAction(item.action)}
             onEditAction={(item) =>

@@ -8,9 +8,9 @@ import { uninstalledSuggestions, type AppSuggestion } from "./lib/appSuggestions
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const suggestions: AppSuggestion[] = [
-  { key: "zed:path", appId: "zed", name: "Zed {filepath}", iconId: "zed", defaultCommand: "zed {filepath}", kind: "app" },
-  { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" },
-  { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" },
+  { key: "zed:app", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {target}", kind: "app", accepts: "both" },
+  { key: "pycharm:app", appId: "pycharm", name: "PyCharm", iconId: "pycharm", defaultCommand: "pycharm {target}", kind: "app", accepts: "folder" },
+  { key: "bbedit:app", appId: "bbedit", name: "BBEdit", iconId: "bbedit", defaultCommand: "bbedit {target}", kind: "app", accepts: "file" },
 ];
 
 function mount(actions: readonly AppSuggestion[] = suggestions) {
@@ -52,28 +52,29 @@ describe("AddActionMenu", () => {
       "Add scriptruns in a terminal",
       "Custom agentyour own command",
       "Custom",
-      "BBEditCurrent file",
-      "ZedCurrent file",
-      "ZedWorkspace root",
+      "BBEditFiles",
+      "PyCharmFolders",
+      "ZedFiles and folders",
     ]);
     view.unmount();
   });
 
-  it("tells the place of each preset on its hover title", () => {
+  it("offers each app once, whatever it takes, and says on its hover what it opens", () => {
     const view = mount();
     click(view.trigger);
-    const row = view.options().find((o) => o.textContent?.includes("ZedWorkspace root")) as HTMLElement;
-    expect(row.getAttribute("title")).toBe("Open Zed in Workspace root");
-    const fileRow = view.options().find((o) => o.textContent?.includes("ZedCurrent file")) as HTMLElement;
-    expect(fileRow.getAttribute("title")).toBe("Open Current file with Zed");
+    const titleOf = (text: string) => (view.options().find((o) => o.textContent === text) as HTMLElement).getAttribute("title");
+    expect(titleOf("ZedFiles and folders")).toBe("Open files and folders with Zed");
+    expect(titleOf("PyCharmFolders")).toBe("Open folders with PyCharm");
+    expect(titleOf("BBEditFiles")).toBe("Open files with BBEdit");
+    expect(view.options().filter((o) => o.textContent?.startsWith("Zed"))).toHaveLength(1);
     view.unmount();
   });
 
   it("filters the entries from the search box, Add script included", () => {
     const view = mount();
     click(view.trigger);
-    search("workspace");
-    expect(view.options().map((o) => o.textContent)).toEqual(["ZedWorkspace root"]);
+    search("pycharm");
+    expect(view.options().map((o) => o.textContent)).toEqual(["PyCharmFolders"]);
     search("script");
     expect(view.options().map((o) => o.textContent)).toEqual(["Add scriptruns in a terminal"]);
     view.unmount();
@@ -110,9 +111,9 @@ describe("AddActionMenu", () => {
   it("picking a preset hands it over and stays open for the next one", () => {
     const view = mount();
     click(view.trigger);
-    click(view.options().find((o) => o.textContent?.includes("ZedWorkspace root"))!);
+    click(view.options().find((o) => o.textContent === "ZedFiles and folders")!);
     expect(view.onPickApp).toHaveBeenCalledTimes(1);
-    expect(view.onPickApp).toHaveBeenCalledWith(suggestions[1]);
+    expect(view.onPickApp).toHaveBeenCalledWith(suggestions[0]);
     expect(view.options()).toHaveLength(6);
     view.unmount();
   });
@@ -143,9 +144,9 @@ describe("AddActionMenu", () => {
       "Custom agentyour own command",
       "Claude CodeWorkspace root",
       "Custom",
-      "BBEditCurrent file",
-      "ZedCurrent file",
-      "ZedWorkspace root",
+      "BBEditFiles",
+      "PyCharmFolders",
+      "ZedFiles and folders",
     ]);
     view.unmount();
   });
@@ -165,15 +166,15 @@ describe("uninstalledSuggestions", () => {
   });
 
   it("hides a preset an app already has by its command, whatever its name, icon or appId", () => {
-    const installed = [{ id: "ac-1", name: "Zed {workspace}", kind: "app" as const, command: "zed {workspace}", appId: "zed", ownButton: false }];
-    expect(uninstalledSuggestions(suggestions, installed).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], appId: undefined, name: "Mine" }]).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: " zed {workspace}  " }]).map((s) => s.key)).toEqual(["zed:path", "bbedit:path"]);
+    const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed {target}", appId: "zed", ownButton: false }];
+    expect(uninstalledSuggestions(suggestions, installed).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], appId: undefined, name: "Mine" }]).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: " zed {target}  " }]).map((s) => s.key)).toEqual(["pycharm:app", "bbedit:app"]);
   });
 
   it("hides nothing for a different command, nor for a script that has the command", () => {
-    const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed -n {workspace}", appId: "zed", ownButton: false }];
+    const installed = [{ id: "ac-1", name: "Zed", kind: "app" as const, command: "zed -n {target}", appId: "zed", ownButton: false }];
     expect(uninstalledSuggestions(suggestions, installed)).toEqual(suggestions);
-    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {workspace}", kind: "script" }])).toEqual(suggestions);
+    expect(uninstalledSuggestions(suggestions, [{ ...installed[0], command: "zed {target}", kind: "script" }])).toEqual(suggestions);
   });
 });

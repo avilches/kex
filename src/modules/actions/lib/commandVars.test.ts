@@ -56,7 +56,7 @@ describe("every offered variable is substituted when an Action runs", () => {
     expect(plan.argv.join(" ")).not.toContain("{");
   });
 
-  it.each(COMMAND_VARIABLES.filter((n) => !["host"].includes(n)))("{%s} is typed into a script", (name) => {
+  it.each(COMMAND_VARIABLES.filter((n) => !["host", "target"].includes(n)))("{%s} is typed into a script", (name) => {
     const plan = planActionRun(script(`echo {${name}}`), runCtx());
     expect(plan.kind).toBe("new-tab");
     if (plan.kind !== "new-tab") return;

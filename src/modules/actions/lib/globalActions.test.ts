@@ -9,6 +9,7 @@ const act = (id: string, name = id): Action => ({
   name,
   kind: "app",
   command: `open ${id}`,
+  accepts: "folder",
   ownButton: false,
 });
 
@@ -191,6 +192,15 @@ describe("createGlobalActions.change", () => {
     const result = await h.store.change((list) => list);
     expect(h.writes).toEqual([]);
     expect(ids(result.after)).toEqual(["a"]);
+  });
+
+  it("treats two lists with the same fields in another key order as the same list", async () => {
+    const h = harness();
+    const reordered = { ownButton: false, command: "open a", kind: "app" as const, name: "a", id: "a", accepts: "folder" as const };
+    h.echo([reordered]);
+    const result = await h.store.change((list) => list);
+    expect(h.writes).toEqual([]);
+    expect(result.after).toEqual(result.before);
   });
 
   it("normalizes what the function returns, so an invalid action never reaches the disk", async () => {

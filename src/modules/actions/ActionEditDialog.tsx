@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -23,9 +24,11 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import { actionTarget } from "./lib/actionsBar";
+import { ACCEPTS_LABELS, acceptsOnlyFile, appAccepts, inBar } from "./lib/actionTargets";
+import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
-import { isAgent, isScript, type Action, type ActionKind } from "./lib/types";
+import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
+import type { AppAccepts } from "@/modules/external-editors/catalog";
 
 const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
 
@@ -82,6 +85,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
   const script = isScript(action);
   const agent = isAgent(action);
+  const app = isApp(action);
   const yolo = agent ? yoloSwitch(command.shown) : null;
 
   // The latest values for the unmount flush, which closes over nothing else.
@@ -308,7 +312,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           )}
           {!agent && variablesOpen && (
             <div className="flex min-w-0 flex-col text-[11px] leading-snug">
-              {commandVariableDocs().map((v) => (
+              {commandVariableDocs(action.kind).map((v) => (
                 <button
                   key={v.name}
                   type="button"
@@ -350,12 +354,31 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           ))}
         </div>
 
-        {agent || actionTarget(action.command) === "workspace" ? (
+        {app && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">What it opens</span>
+            <RadioGroup
+              value={appAccepts(action)}
+              onValueChange={(v) => onChange({ ...action, accepts: v as AppAccepts })}
+              aria-label="What it opens"
+              className="grid grid-cols-3 gap-2"
+            >
+              {(Object.keys(ACCEPTS_LABELS) as AppAccepts[]).map((value) => (
+                <label key={value} htmlFor={`accepts-${value}`} className={cn(BOXED_RADIO, "items-center text-[12px]")}>
+                  <RadioGroupItem id={`accepts-${value}`} value={value} />
+                  {ACCEPTS_LABELS[value]}
+                </label>
+              ))}
+            </RadioGroup>
+          </div>
+        )}
+
+        {inBar(action) ? (
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
         ) : (
           <div className="text-[11px] text-muted-foreground">
-            It acts on the focused {actionTarget(action.command) === "file" ? "file" : "folder"}, so it lives in the
-            folder and file combo of the header, never as a button of its own.
+            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the folder and file combo
+            of the header, never as a button of its own.
           </div>
         )}
 

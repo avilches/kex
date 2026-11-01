@@ -100,14 +100,14 @@ const appAction = (command: string, name = command): Action => ({
 });
 
 describe("planAppSeed", () => {
-  it("seeds one cwd Action per enabled app, inside the combo", () => {
+  it("seeds one Action per enabled app, inside the combo, ending in {target}", () => {
     const plan = planAppSeed({ seeded: false, editors: [ed("zed"), ed("vscode")], existing: [] });
     expect(plan).toHaveLength(2);
     for (const a of plan ?? []) {
-      expect(a).toMatchObject({ kind: "app", ownButton: false });
-      expect(a.command).toMatch(/\{cwd\}/);
-      expect(a.name).toMatch(/\{cwd\}/);
-      expect(a.command).not.toMatch(/filepath|workspace/);
+      expect(a).toMatchObject({ kind: "app", ownButton: false, accepts: "both" });
+      expect(a.command).toMatch(/\{target\}$/);
+      expect(a.name).not.toMatch(/[{}]/);
+      expect(a.command).not.toMatch(/filepath|workspace|cwd/);
     }
     expect(plan?.map((a) => a.appId).sort()).toEqual(["vscode", "zed"]);
     expect(new Set(plan?.map((a) => a.id)).size).toBe(2);
@@ -142,9 +142,15 @@ describe("planAppSeed", () => {
     expect(plan?.map((a) => a.appId)).toEqual(["vscode"]);
   });
 
-  it("seeds a JetBrains-style editor, which has no file variant", () => {
-    const plan = planAppSeed({ seeded: false, editors: [ed("idea")], existing: [] });
+  it("seeds a JetBrains-style editor once, and says it takes folders only", () => {
+    const plan = planAppSeed({ seeded: false, editors: [ed("pycharm")], existing: [] });
     expect(plan).toHaveLength(1);
-    expect(plan?.[0].command).toMatch(/\{cwd\}/);
+    expect(plan?.[0]).toMatchObject({ accepts: "folder" });
+    expect(plan?.[0].command).toMatch(/\{target\}$/);
+  });
+
+  it("seeds an app once however many places it fits", () => {
+    const plan = planAppSeed({ seeded: false, editors: [ed("zed")], existing: [] });
+    expect(plan).toHaveLength(1);
   });
 });

@@ -85,6 +85,11 @@ describe("commandProblem", () => {
     expect(commandProblem("echo `\"{cwd}", "powershell")).toBeNull();
   });
 
+  it("for a script, refuses {target}, which only an app can use", () => {
+    expect(commandProblem("code {target}", "posix")).toMatch(/\{target\} is only for apps/);
+    expect(commandProblem("code {target}")).toBeNull();
+  });
+
   it("for a script, an apostrophe in a comment is not an unterminated quote", () => {
     expect(commandProblem("echo hi # don't\n", "posix")).toBeNull();
   });

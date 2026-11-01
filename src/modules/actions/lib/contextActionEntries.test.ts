@@ -9,7 +9,16 @@ const action = (command: string, script = false, name = "A"): Action => ({
   kind: script ? "script" : "app",
   command,
   ownButton: false,
-  ...(script ? { cwdMode: "workspace" as const } : {}),
+  ...(script ? { cwdMode: "workspace" as const } : { accepts: "folder" as const }),
+});
+
+const zed = (accepts: "file" | "folder" | "both", name = "Zed"): Action => ({
+  id: `a${n++}`,
+  name,
+  kind: "app",
+  command: "zed {target}",
+  accepts,
+  ownButton: false,
 });
 
 const vars = (over: Record<string, string> = {}) => ({
@@ -21,59 +30,106 @@ const vars = (over: Record<string, string> = {}) => ({
   filepath: "",
   filename: "",
   host: "mac",
+  target: "/w",
   ...over,
 });
 
 const ctx = (over: Record<string, string> = {}) => ({ vars: vars(over), shell: "posix" as const });
 
+// What a menu on a row builds: {target} is the row itself, and the context says what kind it is.
+const rowCtx = (kind: "file" | "folder", over: Record<string, string> = {}) => {
+  const path = kind === "file" ? "/w/a.ts" : "/w/src";
+  const base = ctx(kind === "file" ? { filepath: path, filename: "a.ts", ...over } : { cwd: path, ...over });
+  return { ...base, vars: { ...base.vars, target: path }, targetKind: kind };
+};
+
 describe("contextActionEntries", () => {
   it("lists every Action of any target, grouped by scope", () => {
     const groups = contextActionEntries(
-      [action("pycharm {workspace}"), action("agent {cwd}")],
-      [action("code {filepath}"), action("pnpm dev", true)],
-      ctx(),
+      [zed("both"), action("agent {cwd}", true)],
+      [action("lint {filepath}", true), action("pnpm dev", true)],
+      rowCtx("folder"),
+      { rowKind: "folder" },
     );
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["pycharm {workspace}", "agent {cwd}"]);
-    expect(groups.global.map((e) => e.action.command)).toEqual(["pnpm dev", "code {filepath}"]);
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["agent {cwd}", "zed {target}"]);
+    expect(groups.global.map((e) => e.action.command)).toEqual(["lint {filepath}", "pnpm dev"]);
   });
 
   it("puts scripts before apps inside a scope, each keeping its order", () => {
     const groups = contextActionEntries(
-      [action("make", true), action("code {cwd}"), action("pnpm test", true), action("zed {cwd}")],
+      [action("make", true), zed("both", "Code"), action("pnpm test", true), zed("both", "Zed")],
       [],
-      ctx(),
+      rowCtx("folder"),
+      { rowKind: "folder" },
     );
-    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make", "pnpm test", "code {cwd}", "zed {cwd}"]);
+    expect(groups.workspace.map((e) => e.action.kind)).toEqual(["script", "script", "app", "app"]);
+    expect(groups.workspace.map((e) => e.action.command)).toEqual(["make", "pnpm test", "zed {target}", "zed {target}"]);
+    expect(groups.workspace.slice(2).map((e) => e.action.name)).toEqual(["Code", "Zed"]);
   });
 
-  it("an Action that needs a file the row lacks is muted with why, not hidden", () => {
-    const groups = contextActionEntries([action("code {filepath}", false, "Code {filepath}")], [], ctx());
+  describe("an app by what it accepts", () => {
+    const entry = (accepts: "file" | "folder" | "both", kind: "file" | "folder") =>
+      contextActionEntries([zed(accepts)], [], rowCtx(kind), { rowKind: kind }).workspace[0]!;
+
+    it("is enabled on a row of a kind it takes", () => {
+      for (const [accepts, kind] of [
+        ["folder", "folder"],
+        ["file", "file"],
+        ["both", "folder"],
+        ["both", "file"],
+      ] as const) {
+        expect(entry(accepts, kind), `${accepts} on ${kind}`).toMatchObject({ enabled: true, reason: null });
+      }
+    });
+
+    it("is muted with why on a row of a kind it does not take, never hidden", () => {
+      expect(entry("folder", "file")).toMatchObject({ enabled: false, reason: "takes folders only" });
+      expect(entry("file", "folder")).toMatchObject({ enabled: false, reason: "takes files only" });
+    });
+
+    it("says what it opens: the folder of the row, or only the name of its file", () => {
+      expect(entry("both", "folder")).toMatchObject({ subtitle: "/w/src", subtitleTrim: true, subtitleLead: "tab" });
+      expect(entry("both", "file")).toMatchObject({ subtitle: "a.ts", subtitleTrim: false, subtitleLead: "file" });
+    });
+
+    it("treats an app that never said what it accepts as one that takes folders", () => {
+      const bare: Action = { id: "b", name: "Zed", kind: "app", command: "zed {target}", ownButton: false };
+      expect(contextActionEntries([bare], [], rowCtx("folder"), { rowKind: "folder" }).workspace[0]).toMatchObject({ enabled: true });
+      expect(contextActionEntries([bare], [], rowCtx("file"), { rowKind: "file" }).workspace[0]).toMatchObject({
+        enabled: false,
+        reason: "takes folders only",
+      });
+    });
+  });
+
+  it("a script that needs a file the row lacks is muted with why, not hidden", () => {
+    const groups = contextActionEntries([action("lint {filepath}", true, "Lint {filepath}")], [], ctx());
     expect(groups.workspace).toHaveLength(1);
     expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "needs an open file" });
   });
 
-  it("a file row fills the file Actions", () => {
+  it("a file row fills the file scripts", () => {
     const groups = contextActionEntries(
-      [action("code {filepath}", false, "Code {filepath}")],
+      [action("lint {filepath}", true, "Lint {filepath}")],
       [],
       ctx({ filepath: "/w/a.ts", filename: "a.ts" }),
     );
     expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "a.ts" });
   });
 
-  it("a folder whose git info is missing mutes the branch Actions instead of hiding them", () => {
-    const groups = contextActionEntries([action("gh pr d {branch}")], [], ctx({ branch: "", repo: "" }));
+  it("a folder without repository information mutes the branch scripts instead of hiding them", () => {
+    const groups = contextActionEntries([action("gh pr d {branch}", true)], [], ctx({ branch: "", repo: "" }));
     expect(groups.workspace[0]).toMatchObject({ enabled: false, reason: "needs a git branch" });
   });
 
   it("Actions with no command are skipped", () => {
-    const groups = contextActionEntries([action("  "), action("agent {cwd}")], [], ctx());
+    const groups = contextActionEntries([action("  ", true), action("agent {cwd}", true)], [], ctx());
     expect(groups.workspace).toHaveLength(1);
   });
 
-  it("the subtitle resolves the name variable and falls back to the workspace message", () => {
+  it("the subtitle of a script resolves the name variable and falls back to the workspace message", () => {
     const groups = contextActionEntries(
-      [action("agent {cwd}", false, "Agent {cwd}"), action("deploy {workspace} {cwd}", false, "Deploy {workspace}")],
+      [action("agent {cwd}", true, "Agent {cwd}"), action("deploy {workspace} {cwd}", true, "Deploy {workspace}")],
       [],
       ctx({ workspace: "" }),
     );
@@ -84,13 +140,13 @@ describe("contextActionEntries", () => {
     const agent: Action = { id: "g1", name: "Claude", kind: "agent", command: "claude {cwd}", ownButton: false };
 
     it("are left out without a folder, which is every file row", () => {
-      const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx());
+      const groups = contextActionEntries([agent, zed("both")], [agent], rowCtx("file"), { rowKind: "file" });
       expect(groups.workspace.map((e) => e.action.kind)).toEqual(["app"]);
       expect(groups.global).toEqual([]);
     });
 
     it("are offered on a folder row, started in that folder, which the line under the name says", () => {
-      const groups = contextActionEntries([agent, action("code {cwd}")], [agent], ctx(), { agentFolder: "/w/src" });
+      const groups = contextActionEntries([agent, zed("both")], [agent], rowCtx("folder"), { agentFolder: "/w/src", rowKind: "folder" });
       expect(groups.workspace.map((e) => e.action.kind)).toEqual(["agent", "app"]);
       expect(groups.workspace[0]).toMatchObject({ enabled: true, reason: null, subtitle: "/w/src", subtitleTrim: true, subtitleLead: "tab" });
       expect(groups.global.map((e) => e.action.kind)).toEqual(["agent"]);
@@ -140,7 +196,7 @@ describe("newTabActionEntries", () => {
   });
 
   it("never offers an app or a script", () => {
-    const groups = newTabActionEntries([action("code {cwd}"), action("code {workspace}"), script("echo {cwd}")], [action("zed {cwd}"), script("make")], at("/w"));
+    const groups = newTabActionEntries([zed("both"), zed("folder"), script("echo {cwd}")], [zed("both"), script("make")], at("/w"));
     expect(groups).toEqual({ workspace: [], global: [] });
   });
 

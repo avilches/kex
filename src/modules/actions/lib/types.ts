@@ -1,3 +1,4 @@
+import type { AppAccepts } from "@/modules/external-editors/catalog";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 
 export type ActionKind = "app" | "script" | "agent";
@@ -19,6 +20,8 @@ export type Action = {
   cwdMode?: ScriptCwdMode;
   /** Only used when cwdMode is "fixed". */
   cwd?: string;
+  /** Apps only: what the command's {target} may be, a file, a folder or either. */
+  accepts?: AppAccepts;
   /** Own button in the Header, or grouped in a shared menu. */
   ownButton: boolean;
 };
