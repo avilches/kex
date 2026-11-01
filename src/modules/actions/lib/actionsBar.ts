@@ -506,7 +506,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
-    const subtitle = isApp(action) ? { text: null, startTrim: false } : scriptSubtitle({ ...action, name: label }, words);
+    const subtitle = isApp(action) || isAgent(action) ? { text: null, startTrim: false } : scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
       id: action.id,
