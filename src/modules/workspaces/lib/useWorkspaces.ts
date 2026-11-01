@@ -208,26 +208,12 @@ export function applyWorkspaceActions(
 ): Workspace[] {
   return workspaces.map((w) => {
     if (w.id !== workspaceId) return w;
-    const actions = change(w.actions ?? []);
-    const keepActive = actions.some((a) => a.id === w.activeAction);
-    return { ...w, actions, activeAction: keepActive ? w.activeAction : undefined };
+    return { ...w, actions: change(w.actions ?? []) };
   });
 }
 
 function workspaceActions(workspaces: readonly Workspace[], workspaceId: string): Action[] {
   return workspaces.find((w) => w.id === workspaceId)?.actions ?? [];
-}
-
-export function applySetActiveAction(
-  workspaces: Workspace[],
-  workspaceId: string,
-  actionId: string | null,
-): Workspace[] {
-  return workspaces.map((w) => {
-    if (w.id !== workspaceId) return w;
-    const exists = actionId !== null && (w.actions ?? []).some((a) => a.id === actionId);
-    return { ...w, activeAction: exists ? actionId : undefined };
-  });
 }
 
 // Removes an action from its workspace and hands it back, for a promotion to the global list.
@@ -1102,10 +1088,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyWorkspaceActions(prev, workspaceId, (list) => reorderBefore(list, id, beforeId)));
   }, []);
 
-  const setActiveWorkspaceAction = useCallback((workspaceId: string, actionId: string | null) => {
-    setWorkspaces((prev) => applySetActiveAction(prev, workspaceId, actionId));
-  }, []);
-
   // Two steps so an action added in the same tick can still be promoted: the updater only
   // takes the action out and queues it (a Map keyed by workspace and action, so a repeated
   // updater run is harmless), and the effect below writes the global list outside any updater.
@@ -1290,7 +1272,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     removeWorkspaceAction,
     reorderWorkspaceActions,
     placeWorkspaceAction,
-    setActiveWorkspaceAction,
     promoteWorkspaceAction,
     demoteGlobalAction,
     setTerminalRunningCommand,

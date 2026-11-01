@@ -53,14 +53,17 @@ function lastMatch(
   return last;
 }
 
-function goToMatch(view: EditorView, q: string, forward: boolean) {
+// `fromStart`: typing in the search box. The match under the cursor is the one the query had so far,
+// and a longer query must keep it when it still matches, so the search starts at its start.
+function goToMatch(view: EditorView, q: string, forward: boolean, fromStart = false) {
   if (!q) return;
   applyQuery(view, q);
   const query = new SearchQuery({ search: q, caseSensitive: false });
   const { from, to } = view.state.selection.main;
+  const origin = fromStart ? from : to;
   const match = forward
-    ? firstMatch(query, view, to, view.state.doc.length) ??
-      firstMatch(query, view, 0, to)
+    ? firstMatch(query, view, origin, view.state.doc.length) ??
+      firstMatch(query, view, 0, origin)
     : lastMatch(query, view, 0, from) ??
       lastMatch(query, view, from, view.state.doc.length);
   if (!match) return;
@@ -78,7 +81,7 @@ export function viewSearchHandle(
     setQuery: (q) => {
       const v = getView();
       if (!v) return;
-      if (q) goToMatch(v, q, true);
+      if (q) goToMatch(v, q, true, true);
       else applyQuery(v, "");
     },
     findNext: (q) => {

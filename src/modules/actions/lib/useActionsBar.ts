@@ -30,7 +30,7 @@ export type BarController = {
 };
 
 type Input = {
-  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
+  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions"> | null;
   /** Pixels the bar has; absent until measured, which shows every own button. */
   room?: number;
   /** The reorder modifier is held or a drag is in flight: each Action says what its variable
@@ -59,11 +59,10 @@ export function useActionsBarModel({ workspace, room, arranging }: Input): BarMo
         global,
         context,
         states,
-        activeId: workspace?.activeAction,
         ownButtonsShown,
         place: context?.place,
         arranging,
       }),
-    [local, global, context, states, workspace?.activeAction, ownButtonsShown, arranging],
+    [local, global, context, states, ownButtonsShown, arranging],
   );
 }

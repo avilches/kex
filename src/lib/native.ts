@@ -178,6 +178,8 @@ export const native = {
       workspace: currentWorkspaceEnv(),
     }),
   openMainWindow: () => invoke<void>("open_main_window"),
+  setOnboardingOpen: (open: boolean) => invoke<boolean>("set_onboarding_open", { open }),
+  requestOnboardingRestart: () => invoke<void>("request_onboarding_restart"),
   readFile: (path: string) =>
     invoke<ReadResult>("fs_read_file", {
       path,
@@ -408,6 +410,8 @@ export const native = {
   permissionOpenSettings: (kind: PermissionKind): Promise<void> =>
     invoke<void>("permission_open_settings", { kind }),
   claimStartupScan: (): Promise<boolean> => invoke<boolean>("claim_startup_scan"),
+  claimSeedLease: (): Promise<boolean> => invoke<boolean>("claim_seed_lease"),
+  releaseSeedLease: (): Promise<void> => invoke<void>("release_seed_lease"),
   claimOnboardingStartup: (): Promise<boolean> => invoke<boolean>("claim_onboarding_startup"),
   actionSpawn: (argv: string[], cwd?: string): Promise<void> =>
     invoke<void>("action_spawn", { argv, cwd: cwd ?? null }),

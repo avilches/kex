@@ -29,8 +29,8 @@ const runCtx = (over: Partial<RunContext>): RunContext => ({
 const clickOverlay = (target: string, kind: "file" | "folder") => runOverlayFor(target, kind);
 
 describe("running from the focused-tab submenu", () => {
-  const onFolder = buildActionsBarModel({ local: [agent, folderScript], context: ctx, states: new Map(), activeId: undefined, place: { folder: true, file: false } });
-  const onFile = buildActionsBarModel({ local: [fileScript], context: ctx, states: new Map(), activeId: undefined, place: { folder: false, file: true } });
+  const onFolder = buildActionsBarModel({ local: [agent, folderScript], context: ctx, states: new Map(), place: { folder: true, file: false } });
+  const onFile = buildActionsBarModel({ local: [fileScript], context: ctx, states: new Map(), place: { folder: false, file: true } });
 
   it("starts an agent in the focused folder, not in the root", () => {
     const item = onFolder.contextCombo.workspace.find((i) => i.id === "g")!;

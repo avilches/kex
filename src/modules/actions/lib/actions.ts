@@ -123,13 +123,8 @@ export function normalizeActions(raw: unknown): Action[] {
 // Adds an action to a list it does not belong to. When its id is already taken there, it gets
 // a fresh one, so neither version is lost. An app whose command a list app already has is that
 // app: the incoming one overwrites it in place (the name is all that can differ), keeping the
-// id the list knows.
-export function adoptAction(list: readonly Action[], action: Action, makeId: () => string): Action[] {
-  return adoptActionAt(list, action, makeId).list;
-}
-
-// The same, placed before the Action `beforeId` when the list has it, last otherwise; a merged
-// app keeps the place of the one it overwrote.
+// id the list knows. It goes before the Action `beforeId` when the list has it, last otherwise; a
+// merged app keeps the place of the one it overwrote.
 export function adoptActionAt(
   list: readonly Action[],
   action: Action,
@@ -154,16 +149,4 @@ export function insertActionAt(list: readonly Action[], action: Action, index: n
   const next = [...list];
   next.splice(index < 0 || index > next.length ? next.length : index, 0, action);
   return next;
-}
-
-// Moves, never copies: the action leaves the workspace and joins the global list.
-export function promoteToGlobal(
-  workspace: readonly Action[],
-  global: readonly Action[],
-  id: string,
-  makeId: () => string,
-): { workspace: Action[]; global: Action[] } {
-  const action = workspace.find((a) => a.id === id);
-  if (!action) return { workspace: workspace as Action[], global: global as Action[] };
-  return { workspace: removeAction(workspace, id), global: adoptAction(global, action, makeId) };
 }

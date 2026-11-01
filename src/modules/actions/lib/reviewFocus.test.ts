@@ -64,7 +64,6 @@ describe("review focus 4: no workspace root", () => {
       local: [agent, app, script({ id: "w", runs: "workspace" }), script({ id: "f", runs: "folder", command: "ls" }), fixed],
       context: rootless,
       states: new Map(),
-      activeId: undefined,
     });
     const items = [...m.buttons, ...m.menu.workspace];
     for (const id of ["g", "a", "w", "f"]) {

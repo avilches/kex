@@ -137,6 +137,21 @@ describe("createGlobalActions", () => {
     expect(h.store.get().map((a) => a.id)).toEqual(["a", "other-window"]);
   });
 
+  it("the echo of an earlier write does not end the copy while a later one is the truth", async () => {
+    const h = harness();
+    const first = h.store.add(act("a"));
+    const second = h.store.add(act("b"));
+    await h.finish(0);
+    await h.finish(1);
+    await Promise.all([first, second]);
+    h.echo([act("a")]);
+    expect(h.store.get().map((a) => a.id)).toEqual(["a", "b"]);
+    const third = h.store.add(act("c"));
+    await h.finish(2);
+    await third;
+    expect(h.writes[2]!.map((a) => a.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("another window's change that differs from what was written is not overwritten by the next add", async () => {
     const h = harness();
     const first = h.store.add(act("a"));

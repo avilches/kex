@@ -45,7 +45,7 @@ import { isMarkdownPath } from "@/lib/utils";
 import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
 import { findReplaceableFilePreview, isFilePreviewTab } from "@/modules/workspaces/lib/fileTabPreview";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
-import { OnboardingHost } from "@/modules/onboarding";
+import { isOnboardingOpen, OnboardingHost, useOnboardingUi } from "@/modules/onboarding";
 import { buildAgentEntries, entriesByWorkspace } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -3412,7 +3412,7 @@ export default function App() {
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
-      if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id)) return true;
+      if (workspaceDialogPending(hibernateFlow.pending, closeFlow.pending?.id) || isOnboardingOpen()) return true;
       // Open, the switcher owns its own keys and blocks every other shortcut; closed, its close key is off so
       // that Cmd+W reaches tab.close, which shares it.
       if (shortcutBlockedBySwitcher(id, switcherActive())) return true;
@@ -3506,6 +3506,8 @@ export default function App() {
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
     if (menuItemBlockedBySwitcher(switcherActive())) return;
+    // The menu acts on the workspace behind the onboarding modal just as the shortcuts would.
+    if (isOnboardingOpen()) return;
     if (
       menuItemBlockedByPalette(
         id,
@@ -3897,6 +3899,7 @@ export default function App() {
     [setActiveWorkspaceId],
   );
 
+  const onboardingOpen = useOnboardingUi((s) => s.open);
   const commandPaletteItems = useMemo(
     () =>
       commandPaletteOpen
@@ -3966,10 +3969,12 @@ export default function App() {
             },
             profilerRunning: performanceProfiler,
             toggleProfiler: () => void setPerformanceProfiler(!performanceProfiler),
+            onboardingOpen,
           })
         : [],
     [
       commandPaletteOpen,
+      onboardingOpen,
       activeWorkspace,
       workspacePaneLimit,
       performanceProfiler,
@@ -4352,7 +4357,7 @@ export default function App() {
             activeWorkspaceId={activeWorkspaceId}
             onActivate={onActivateAgent}
           />
-          <OnboardingHost />
+          <OnboardingHost onRestoreFocus={restoreLeafFocus} />
           <Toaster position="bottom-right" />
           <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>

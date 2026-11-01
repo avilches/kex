@@ -1,3 +1,4 @@
+import { appendCloneLog, cloneFailureMessage } from "./cloneLog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CLONE_URL_LABEL, isSafeGitCloneUrl } from "@/modules/source-control/cloneUrl";
+import { CLONE_URL_LABEL, cloneCommand, isSafeGitCloneUrl } from "@/modules/source-control/cloneUrl";
 import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -741,6 +742,7 @@ export const SourceControlPanel = memo(
   const clonePollRef = useRef<number | null>(null);
   const clonePollBusyRef = useRef(false);
   const cloneLogOffsetRef = useRef(0);
+  const cloneLogRef = useRef("");
   const cloneCancelledRef = useRef(false);
 
   const stopClonePolling = useCallback(() => {
@@ -811,11 +813,12 @@ export const SourceControlPanel = memo(
     setCloneRunning(true);
     cloneCancelledRef.current = false;
     cloneLogOffsetRef.current = 0;
+    cloneLogRef.current = "";
 
     let handle: number;
     try {
       handle = await invoke<number>("shell_bg_spawn", {
-        command: `git clone ${url} .`,
+        command: cloneCommand(url),
         cwd: workspaceCwd,
         workspace: currentWorkspaceEnv(),
       });
@@ -843,8 +846,7 @@ export const SourceControlPanel = memo(
         setCloneUrl("");
         void scm.refresh();
       } else {
-        const lines = bytes.trim().split("\n").filter(Boolean);
-        setCloneError(lines.slice(-3).join("\n") || `Clone failed (exit ${exitCode ?? "?"})`);
+        setCloneError(cloneFailureMessage(bytes, exitCode));
       }
     };
     const tick = async () => {
@@ -856,12 +858,13 @@ export const SourceControlPanel = memo(
           sinceOffset: cloneLogOffsetRef.current,
         });
         if (cloneCancelledRef.current) return;
-        cloneLogOffsetRef.current = result.dropped > 0 ? 0 : result.next_offset;
+        cloneLogOffsetRef.current = result.next_offset;
+        cloneLogRef.current = appendCloneLog(cloneLogRef.current, result.bytes, result.dropped > 0);
         if (!result.exited) return;
-        finishClone(result.bytes, result.exit_code, result.exit_code !== 0);
+        finishClone(cloneLogRef.current, result.exit_code, result.exit_code !== 0);
       } catch (e) {
         if (cloneCancelledRef.current) return;
-        finishClone(typeof e === "string" ? e : "Clone failed", null, true);
+        finishClone(cloneLogRef.current || (typeof e === "string" ? e : "Clone failed"), null, true);
       } finally {
         clonePollBusyRef.current = false;
       }

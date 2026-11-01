@@ -36,6 +36,19 @@ fn is_plain_name(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
+/// The PATH a program launched from Kex should resolve against: the login shell's on Unix, where a
+/// Dock-launched app has launchd's minimal one; nothing to override elsewhere.
+pub fn spawn_path() -> Option<std::ffi::OsString> {
+    #[cfg(unix)]
+    {
+        Some(unix_lookup::login_path())
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
 pub fn detect_agents() -> Vec<DetectedEditor> {
     #[cfg(unix)]
     {
@@ -84,19 +97,42 @@ mod unix_lookup {
     use std::os::unix::process::CommandExt;
     use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
-    use std::sync::mpsc;
+    use std::sync::{mpsc, Mutex};
     use std::time::{Duration, Instant};
 
     const LOGIN_SHELL_TIMEOUT: Duration = Duration::from_secs(3);
 
-    // A Dock-launched app inherits launchd's minimal PATH, so the user's PATH is read once from
-    // the login shell the PTY spawns; printenv keeps it shell-agnostic and no name reaches it.
+    static LOGIN_PATH: Mutex<Option<OsString>> = Mutex::new(None);
+
+    // A Dock-launched app inherits launchd's minimal PATH, so the user's PATH is read from the
+    // login shell the PTY spawns; printenv keeps it shell-agnostic and no name reaches it. A good
+    // answer is kept for the rest of the launch; a failed or timed-out probe is not, so the next
+    // caller tries again instead of living on launchd's PATH.
     pub fn login_path() -> OsString {
+        cached_or_probe(&LOGIN_PATH, probe_login_path)
+    }
+
+    fn probe_login_path() -> Option<OsString> {
         let own = std::env::var_os("PATH").unwrap_or_default();
         let shell = crate::modules::pty::shell_init::login_shell_path();
-        match read_login_path(&shell, LOGIN_SHELL_TIMEOUT) {
-            Some(login) => merge_paths(&login, &own),
-            None => own,
+        read_login_path(&shell, LOGIN_SHELL_TIMEOUT).map(|login| merge_paths(&login, &own))
+    }
+
+    pub(super) fn cached_or_probe(
+        cache: &Mutex<Option<OsString>>,
+        probe: impl FnOnce() -> Option<OsString>,
+    ) -> OsString {
+        // Held across the probe on purpose: concurrent callers wait for one login shell, not start several.
+        let mut held = cache.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(path) = held.as_ref() {
+            return path.clone();
+        }
+        match probe() {
+            Some(path) => {
+                *held = Some(path.clone());
+                path
+            }
+            None => std::env::var_os("PATH").unwrap_or_default(),
         }
     }
 
@@ -332,7 +368,8 @@ mod tests {
     #[cfg(unix)]
     mod unix {
         use super::super::unix_lookup::*;
-        use std::ffi::OsStr;
+        use std::ffi::{OsStr, OsString};
+        use std::sync::Mutex;
         use std::os::unix::fs::PermissionsExt;
         use std::os::unix::process::CommandExt;
         use std::path::Path;
@@ -394,6 +431,26 @@ mod tests {
                 parse_marked_path("__KEX_PATH_BEGIN__\n\n__KEX_PATH_END__"),
                 None
             );
+        }
+
+        #[test]
+        fn a_good_login_path_is_probed_once_and_a_failed_probe_is_retried() {
+            let cache = Mutex::new(None);
+            let calls = std::cell::Cell::new(0);
+            let failing = || {
+                calls.set(calls.get() + 1);
+                None
+            };
+            cached_or_probe(&cache, failing);
+            cached_or_probe(&cache, failing);
+            assert_eq!(calls.get(), 2, "a failure is not cached");
+            let good = || {
+                calls.set(calls.get() + 1);
+                Some(OsString::from("/x/bin"))
+            };
+            assert_eq!(cached_or_probe(&cache, good), "/x/bin");
+            assert_eq!(cached_or_probe(&cache, failing), "/x/bin");
+            assert_eq!(calls.get(), 3, "a good answer is kept");
         }
 
         #[test]

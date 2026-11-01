@@ -214,7 +214,6 @@ export type BarItem = {
   name: string;
   action: Action;
   state: ScriptState | "idle";
-  active: boolean;
   /** The zone can stop it: running, or already stopping by the first Ctrl+C. */
   stoppable: boolean;
   disabledReason: string | null;
@@ -412,7 +411,6 @@ type BuildInput = {
   global?: readonly Action[];
   context: BarContext | null;
   states: ReadonlyMap<string, ScriptState>;
-  activeId: string | undefined;
   /** How many own buttons are shown; the rest fold into the menus. Absent: all of them. */
   ownButtonsShown?: number;
   /** What the focused tab is: a folder on a terminal, a file on an editor. It feeds the context
@@ -437,7 +435,7 @@ const lastSegment = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() 
 // tab. The folder and file Actions go to the context combo, which acts on the focused tab. A
 // running script is never disabled whatever its variables are now: it has to stay stoppable,
 // and it stays visible whatever the focused tab is, so its Stop keeps a place to live.
-export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, arranging }: BuildInput): BarModel {
+export function buildActionsBarModel({ local, global = [], context, states, ownButtonsShown, place, arranging }: BuildInput): BarModel {
   const toItem = (
     action: Action,
     isGlobal: boolean,
@@ -457,7 +455,6 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       name: label,
       action,
       state,
-      active: action.id === activeId,
       stoppable: state !== "idle",
       disabledReason,
       needsRoot: needsRootFix(disabledReason),

@@ -180,6 +180,8 @@ struct DynMenuItems {
     sidebar_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
+    new_window: tauri::menu::MenuItem<tauri::Wry>,
+    settings: tauri::menu::MenuItem<tauri::Wry>,
 }
 
 #[cfg(target_os = "macos")]
@@ -241,6 +243,52 @@ pub fn refresh_dock_menu(app: &tauri::AppHandle) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn refresh_dock_menu(_app: &tauri::AppHandle) {}
+
+/// Applies the onboarding block after it turned on or off: New Window and Settings are greyed
+/// out in the native menu while an onboarding dialog is open, and a Settings window already open
+/// is closed (it saves every change as it is made, like when the user closes it).
+pub(crate) fn onboarding_block_changed(app: &tauri::AppHandle) {
+    let blocked = app.state::<onboarding::OnboardingBlock>().active();
+    #[cfg(target_os = "macos")]
+    {
+        let handles = app.state::<MenuHandles>();
+        let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
+        if let Some(items) = guard.as_ref() {
+            let _ = items.new_window.set_enabled(!blocked);
+            let _ = items.settings.set_enabled(!blocked);
+        }
+    }
+    if blocked {
+        close_settings_window(app);
+    }
+}
+
+/// Unminimizes and focuses the main window whose onboarding dialog is open, if any.
+pub(crate) fn focus_onboarding_holder(app: &tauri::AppHandle) {
+    let holder = app.state::<onboarding::OnboardingBlock>().holder();
+    if let Some(w) = holder.and_then(|l| app.get_webview_window(&l)) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// "Run onboarding again" in Settings: only one main window is asked to open the dialog.
+#[tauri::command]
+fn request_onboarding_restart(app: tauri::AppHandle) {
+    let last = app
+        .state::<window_state::WindowStateManager>()
+        .get_focused_window();
+    if let Some(label) = onboarding::restart_target(last, &main_window_labels(&app)) {
+        let _ = app.emit_to(label.as_str(), "kex:onboarding-restart", ());
+    }
+}
+
+fn close_settings_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.close();
+    }
+}
 
 #[tauri::command]
 fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
@@ -356,6 +404,12 @@ fn create_app_window(
         }
         WindowEvent::Destroyed => {
             forget_destroyed_window(&app_handle);
+            if app_handle
+                .state::<onboarding::OnboardingBlock>()
+                .release(&win_label)
+            {
+                onboarding_block_changed(&app_handle);
+            }
             // Count live main windows after this one is gone.
             let live = app_handle
                 .webview_windows()
@@ -393,6 +447,11 @@ async fn open_settings_window(
     app: tauri::AppHandle,
     section: Option<String>,
 ) -> Result<(), String> {
+    // A no-op while an onboarding dialog is open, so no caller shows an error for it.
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        log::info!("[window] settings refused: the onboarding dialog is open");
+        return Ok(());
+    }
     let url_path = match section.as_deref() {
         Some(t) if !t.is_empty() => format!("settings.html?section={}", t),
         _ => "settings.html".to_string(),
@@ -443,6 +502,11 @@ async fn open_settings_window(
         "{}",
         window_log::describe_created("settings", "settings", None)
     );
+    // The onboarding may have opened while the window was being built, after the check above.
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        close_settings_window(&app);
+        return Ok(());
+    }
 
     #[cfg(target_os = "linux")]
     {
@@ -482,7 +546,14 @@ async fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
     create_new_window(&app)
 }
 
+/// Refused while an onboarding dialog is open, so two onboardings never run at once: the window
+/// that holds it comes to the front instead (a Dock click with that window minimized lands here).
 fn create_new_window(app: &tauri::AppHandle) -> Result<(), String> {
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        log::info!("[window] new window refused: the onboarding dialog is open");
+        focus_onboarding_holder(app);
+        return Ok(());
+    }
     let id = window_state::generate_window_id();
     {
         let mgr = app.state::<window_state::WindowStateManager>();
@@ -938,6 +1009,8 @@ pub fn run() {
                     sidebar_side,
                     dock_browser,
                     dock_all_browsers,
+                    new_window,
+                    settings,
                 }))));
 
                 app.on_menu_event(|app, event| {
@@ -1086,6 +1159,7 @@ pub fn run() {
             registry
         })
         .manage(QuitGuard::default())
+        .manage(onboarding::OnboardingBlock::default())
         .manage(PendingOpenFolders::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
         .manage(float_browser::FloatBrowserState::new())
@@ -1163,12 +1237,16 @@ pub fn run() {
             shell::shell_bg_list,
             editors::editor_scan,
             editors::claim_startup_scan,
+            editors::claim_seed_lease,
+            editors::release_seed_lease,
             permissions::permission_probe,
             permissions::permission_open_settings,
             update_guard::claim_update_check,
             update_guard::claim_update_install,
             update_guard::release_update_install,
             onboarding::claim_onboarding_startup,
+            onboarding::set_onboarding_open,
+            request_onboarding_restart,
             actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,

@@ -12,11 +12,15 @@ function fetch(root: string): { entry: MdIndexEntry; promise: Promise<string[]> 
   const promise = native
     .glob({ pattern: "**/*.md", root, maxResults: 2000 })
     .then((res) => {
-      entry.files = res.hits.map((h) => h.path);
+      // A note created while the glob ran was added to the entry first: it stays.
+      const found = res.hits.map((h) => h.path);
+      entry.files = [...found, ...entry.files.filter((p) => !found.includes(p))];
       return entry.files;
     })
     .catch((err) => {
       console.error("wiki link index failed", err);
+      // A failure is not kept for the rest of the session: the next surface asks again.
+      if (INDEXES.get(root)?.entry === entry) INDEXES.delete(root);
       return entry.files;
     });
   return { entry, promise };
@@ -32,7 +36,8 @@ export function markdownIndex(root: string): Promise<string[]> {
       if (oldest !== undefined) INDEXES.delete(oldest);
     }
   }
-  return cached.promise;
+  const entry = cached.entry;
+  return cached.promise.then(() => entry.files);
 }
 
 export function reloadMarkdownIndex(root: string): Promise<string[]> {
@@ -43,5 +48,7 @@ export function reloadMarkdownIndex(root: string): Promise<string[]> {
 
 export function markdownIndexAdd(root: string, path: string): void {
   const cached = INDEXES.get(root);
-  if (cached) cached.entry.files.push(path);
+  // A new array, not a push: the hosts keep the list they were given in their state, and the same
+  // reference would make their update a no-op.
+  if (cached && !cached.entry.files.includes(path)) cached.entry.files = [...cached.entry.files, path];
 }

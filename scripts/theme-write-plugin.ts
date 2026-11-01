@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
+import { isColorValue, refuseWrite } from "./devGuard";
 
 // Dev-only bridge so the theme preview can write a theme back to its source
 // file. The preview runs in a plain browser (no Tauri), so the write has to go
@@ -138,7 +139,7 @@ function setKey(body: string, childIndent: string, key: string, value: string, r
   const re = new RegExp(`((?:^|[\\s,{])${key}\\s*:\\s*)"[^"]*"`);
   if (re.test(body)) {
     result.replaced.push(key);
-    return body.replace(re, `$1"${value}"`);
+    return body.replace(re, (_m, head: string) => `${head}"${value}"`);
   }
   result.inserted.push(key);
   return body.replace(/\n(\s*)$/, (_m, closeIndent) => `\n${childIndent}${key}: "${value}",\n${closeIndent}`);
@@ -254,12 +255,15 @@ export function themeWritePlugin(): Plugin {
             res.end(JSON.stringify(payload));
           };
           if (req.method !== "POST") return send(405, { error: "POST only" });
+          const refused = refuseWrite(req);
+          if (refused) return send(403, { error: refused });
           try {
             const raw = await readBody(req);
             const { id, mode, tokens } = JSON.parse(raw) as { id: string; mode: string; tokens: Record<string, string> };
             if (!/^[a-z0-9-]+$/.test(id ?? "")) return send(400, { error: "bad theme id" });
             if (mode !== "dark" && mode !== "light") return send(400, { error: "bad mode" });
             if (!tokens || typeof tokens !== "object" || Object.keys(tokens).length === 0) return send(400, { error: "no changes" });
+            if (!Object.values(tokens).every(isColorValue)) return send(400, { error: "token values must be colors" });
             const file = path.resolve(themesDir, `${id}.ts`);
             if (path.dirname(file) !== themesDir) return send(400, { error: "bad theme id" });
             if (!fs.existsSync(file)) return send(404, { error: `src/modules/theme/themes/${id}.ts does not exist` });

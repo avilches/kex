@@ -9,6 +9,7 @@ import { useWorkspaceActionsBroadcast } from "./actionsBroadcast";
 const hoisted = vi.hoisted(() => ({
   handlers: {} as Record<string, () => void>,
   emit: vi.fn(),
+  windows: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(undefined)) }));
@@ -20,12 +21,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
-  getAllWebviewWindows: () => Promise.resolve([{ label: "settings" }]),
+  getAllWebviewWindows: () => hoisted.windows(),
   getCurrentWebviewWindow: () => ({ label: "w-test" }),
 }));
 
 afterEach(() => {
   cleanup();
+  hoisted.windows.mockImplementation(() => Promise.resolve([{ label: "settings" }]));
   vi.restoreAllMocks();
 });
 
@@ -37,6 +39,8 @@ const workspace = (title: string): Workspace => ({
   activePaneId: "p1",
   actions: [],
 });
+
+hoisted.windows.mockImplementation(() => Promise.resolve([{ label: "settings" }]));
 
 const mutators = { add: vi.fn(), update: vi.fn(), remove: vi.fn(), reorder: vi.fn(), toGlobal: vi.fn(), toWorkspace: vi.fn() };
 
@@ -82,5 +86,27 @@ describe("the workspace name pushed to Settings", () => {
 
   it("is the plain title when it has no template", async () => {
     expect(await pushedName("Plain")).toBe("Plain");
+  });
+});
+
+describe("the cost of staying attached", () => {
+  it("asks the window list only when the payload changed, not on every render", async () => {
+    hoisted.emit.mockClear();
+    hoisted.windows.mockClear();
+    const view = renderHook((p: { title: string }) => useWorkspaceActionsBroadcast({ workspace: workspace(p.title), mutators }), {
+      initialProps: { title: "Same" },
+    });
+    await waitFor(() => expect(hoisted.handlers[ACTIONS_ATTACH_EVENT]).toBeDefined());
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    act(() => hoisted.handlers[ACTIONS_ATTACH_EVENT]!());
+    await waitFor(() => expect(hoisted.emit.mock.calls.some((c) => c[0] === ACTIONS_PUSH_EVENT)).toBe(true));
+    const asked = hoisted.windows.mock.calls.length;
+    for (let i = 0; i < 5; i++) view.rerender({ title: "Same" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(hoisted.windows.mock.calls.length).toBe(asked);
+    view.rerender({ title: "Other" });
+    await waitFor(() => expect(hoisted.windows.mock.calls.length).toBe(asked + 1));
   });
 });

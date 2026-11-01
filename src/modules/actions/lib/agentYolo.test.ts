@@ -87,3 +87,36 @@ describe("setYolo", () => {
     expect(setYolo("opencode", true)).toBe("opencode");
   });
 });
+
+describe("compound commands and quotes", () => {
+  it("puts the switch on the agent, not after `&&`, `;` or a pipe", () => {
+    expect(setYolo("claude && echo hecho", true)).toBe("claude --dangerously-skip-permissions && echo hecho");
+    expect(setYolo("claude -c; echo hecho", true)).toBe("claude -c --dangerously-skip-permissions; echo hecho");
+    expect(setYolo("claude | tee log", true)).toBe("claude --dangerously-skip-permissions | tee log");
+  });
+  it("does not count a switch that belongs to another command or sits in quotes", () => {
+    expect(isYolo("claude && echo --dangerously-skip-permissions")).toBe(false);
+    expect(isYolo('cursor-agent -p "arregla esto --yolo ahora"')).toBe(false);
+    expect(isYolo("cursor-agent -p 'a --yolo b'")).toBe(false);
+  });
+  it("turning it off leaves the prompt text alone", () => {
+    expect(setYolo('cursor-agent -p "arregla esto --yolo ahora"', false)).toBe('cursor-agent -p "arregla esto --yolo ahora"');
+    expect(setYolo('cursor-agent --yolo -p "a --yolo b"', false)).toBe('cursor-agent -p "a --yolo b"');
+  });
+  it("turning it on after a prompt in quotes adds it outside them", () => {
+    expect(setYolo('cursor-agent -p "do it --yolo"', true)).toBe('cursor-agent -p "do it --yolo" --yolo');
+  });
+  it("replaces another --permission-mode instead of passing it twice", () => {
+    expect(setYolo("grok --permission-mode plan", true)).toBe("grok --permission-mode bypassPermissions");
+    expect(setYolo("grok -p --permission-mode=plan -c", true)).toBe("grok -p --permission-mode bypassPermissions -c");
+  });
+  it("round-trips a compound command", () => {
+    const on = setYolo("claude -c && echo hecho", true);
+    expect(isYolo(on)).toBe(true);
+    expect(setYolo(on, false)).toBe("claude -c && echo hecho");
+  });
+  it("only reads the goose assignment before the binary", () => {
+    expect(isYolo("goose && echo GOOSE_MODE=auto")).toBe(false);
+    expect(setYolo("goose && echo hi", true)).toBe("GOOSE_MODE=auto goose && echo hi");
+  });
+});

@@ -17,8 +17,8 @@ const folderScript: Action = { id: "s", name: "Make", kind: "script", command: "
 const fileScript: Action = { id: "f", name: "Count", kind: "script", command: "wc -l {target}", runs: "file", ownButton: false };
 
 describe("the submenu of a workspace with no root", () => {
-  const onFolder = buildActionsBarModel({ local: [agent, app, folderScript], context: rootless, states: new Map(), activeId: undefined, place: { folder: true, file: false } });
-  const onFile = buildActionsBarModel({ local: [app, fileScript], context: rootless, states: new Map(), activeId: undefined, place: { folder: false, file: true } });
+  const onFolder = buildActionsBarModel({ local: [agent, app, folderScript], context: rootless, states: new Map(), place: { folder: true, file: false } });
+  const onFile = buildActionsBarModel({ local: [app, fileScript], context: rootless, states: new Map(), place: { folder: false, file: true } });
 
   it("is not greyed by the missing root: it acts on the focused folder", () => {
     for (const item of onFolder.contextCombo.workspace) {

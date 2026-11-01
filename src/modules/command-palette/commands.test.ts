@@ -72,6 +72,7 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     toggleProfiler: fn(),
     hasActiveTerminal: true,
     hibernated: false,
+    onboardingOpen: false,
     activePaneTabCount: 2,
     hasActiveTab: true,
     hasActiveTabTitle: true,
@@ -257,5 +258,28 @@ describe("createCommandItems while the focused tab is hibernated", () => {
 
   it("changes nothing for an awake tab", () => {
     expect(byId(false).get("tab.new")?.disabledReason).toBeUndefined();
+  });
+});
+
+describe("createCommandItems while the onboarding dialog is open", () => {
+  const byId = (onboardingOpen: boolean) =>
+    new Map(createCommandItems(ctx({ onboardingOpen })).map((i) => [i.id, i]));
+
+  it("disables New window, and enables it again once the dialog is closed", () => {
+    expect(byId(true).get("window.new")?.disabledReason).toBe("Setup in progress");
+    expect(byId(false).get("window.new")?.disabledReason).toBeUndefined();
+  });
+
+  it("disables every row that opens Settings, and nothing else", () => {
+    const open = byId(true);
+    const closed = byId(false);
+    const settingsRows = [...open.keys()].filter((id) => id.startsWith("settings.section."));
+    expect(settingsRows.length).toBeGreaterThan(3);
+    for (const id of ["settings.open", "shortcuts.open", "workspace.runScripts", ...settingsRows]) {
+      expect(open.get(id)?.disabledReason, id).toBe("Setup in progress");
+      expect(closed.get(id)?.disabledReason, id).toBeUndefined();
+    }
+    const blocked = [...open.values()].filter((i) => i.disabledReason === "Setup in progress").map((i) => i.id);
+    expect(blocked.sort()).toEqual(["settings.open", "shortcuts.open", "window.new", "workspace.runScripts", ...settingsRows].sort());
   });
 });

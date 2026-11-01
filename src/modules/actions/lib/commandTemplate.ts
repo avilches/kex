@@ -116,15 +116,14 @@ const POWERSHELL_QUOTES = /['‘’‚‛]/g;
 // The line is typed into a terminal, where a control character (a newline would end the
 // command, ESC or ^C act on the terminal) is never part of a name worth keeping. C0, DEL, C1
 // (some terminals read them as escape sequences) and the Unicode line and paragraph
-// separators (which PowerShell reads as line breaks) go.
-function stripControl(value: string): string {
-  let out = "";
+// separators (which PowerShell reads as line breaks). A value with one is refused, not
+// cleaned: deleting it would run the command on a different path than the one it names.
+function hasControl(value: string): boolean {
   for (const ch of value) {
     const code = ch.charCodeAt(0);
-    const control = code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
-    if (!control) out += ch;
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) return true;
   }
-  return out;
+  return false;
 }
 
 // What a value written into a script must not hold, whatever the command looks like.
@@ -139,7 +138,7 @@ const UNSAFE_VALUE = {
 };
 
 const unsafeMessage = (names: string[]) =>
-  `${names.map((n) => `{${n}}`).join(", ")} cannot be used in a script right now: its value contains $, a backtick, a quote or a backslash`;
+  `${names.map((n) => `{${n}}`).join(", ")} cannot be used in a script right now: its value contains $, a backtick, a quote, a backslash or a control character`;
 
 // The variables the command would write whose current value is unsafe for a script. Lets
 // the UI say why an Action cannot run in this context (the value, not the command, is the
@@ -147,7 +146,7 @@ const unsafeMessage = (names: string[]) =>
 export function unsafeVariables(command: string, vars: TemplateVars, shell: CommandShell): string[] {
   const bad = new Set<string>();
   renderTemplate(command, vars, (v) => {
-    if (UNSAFE_VALUE[shell].test(stripControl(v))) bad.add(v);
+    if (hasControl(v) || UNSAFE_VALUE[shell].test(v)) bad.add(v);
     return "";
   });
   if (bad.size === 0) return [];
@@ -156,8 +155,8 @@ export function unsafeVariables(command: string, vars: TemplateVars, shell: Comm
 
 function quoteFor(shell: CommandShell): (value: string) => string {
   return shell === "powershell"
-    ? (v) => `'${stripControl(v).replace(POWERSHELL_QUOTES, (q) => q + q)}'`
-    : (v) => quoteShellArg(stripControl(v), false);
+    ? (v) => `'${v.replace(POWERSHELL_QUOTES, (q) => q + q)}'`
+    : (v) => quoteShellArg(v, false);
 }
 
 // For a script typed into a terminal: the text is kept exactly as written (line breaks and

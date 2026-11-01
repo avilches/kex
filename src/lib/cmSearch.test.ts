@@ -38,6 +38,16 @@ describe("viewSearchHandle", () => {
     expect(parent.querySelector(".cm-search")).toBeNull();
   });
 
+  it("keeps the match under the cursor when typing makes the query longer", () => {
+    const { view, handle } = mount("foob xx foob");
+    handle.setQuery("foo");
+    expect(sel(view)).toBe(0);
+    handle.findNext("foo");
+    expect(sel(view)).toBe(8);
+    handle.setQuery("foob");
+    expect(sel(view)).toBe(8);
+  });
+
   it("keeps navigating after the query was cleared and re-supplied by the caller", () => {
     const { view, handle, parent } = mount("a b a b a");
     handle.setQuery("a");

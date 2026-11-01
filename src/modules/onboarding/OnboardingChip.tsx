@@ -19,13 +19,13 @@ export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
   const label = chipLabel(state, isMac);
 
   return (
-    <div className="flex h-7 shrink-0 items-center rounded-md border border-border/70 bg-background/40">
+    <div className="flex h-8 shrink-0 items-stretch self-center overflow-hidden rounded-md border border-border/70 bg-background/40">
       <Button
         variant="ghost"
         size="sm"
-        className="h-full gap-1.5 rounded-r-none px-2 text-[11px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="h-full gap-1.5 rounded-none border-0 px-2 focus-visible:ring-0 focus-visible:inset-ring-2 focus-visible:inset-ring-ring/50 text-[11px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground"
         title="Pick up the setup where you left it"
-        onClick={openOnboarding}
+        onClick={() => void openOnboarding()}
       >
         <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} className="text-primary" />
         {label}
@@ -37,7 +37,7 @@ export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
             size="icon-sm"
             aria-label="Setup options"
             title="Setup options"
-            className="h-full w-6 rounded-l-none border-l border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="h-full w-6 rounded-none border-0 border-l border-border/70 focus-visible:ring-0 focus-visible:inset-ring-2 focus-visible:inset-ring-ring/50 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <HugeiconsIcon icon={MoreHorizontalIcon} size={13} strokeWidth={1.75} />
           </Button>
