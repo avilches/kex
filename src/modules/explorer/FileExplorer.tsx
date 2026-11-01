@@ -66,6 +66,7 @@ import {
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { FlashOverlay } from "@/components/FlashOverlay";
 import { ShortcutHint } from "@/modules/shortcuts/ShortcutHint";
 import { RootPathInput } from "./RootPathInput";
 import { SetWorkspaceRootItem, samePath } from "./SetWorkspaceRootItem";
@@ -448,6 +449,7 @@ export const FileExplorer = memo(
     useEffect(() => {
       if (!canEditRoot) setIsEditingRoot(false);
     }, [canEditRoot]);
+    const editRootFromMenuRef = useRef(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const closeSearch = useCallback(() => {
@@ -1191,7 +1193,8 @@ export const FileExplorer = memo(
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {rootMode !== "workspace" && (
-        <div className="flex h-6 shrink-0 items-center gap-1 pl-1.5 pr-9">
+        <div className="relative flex h-6 shrink-0 items-center gap-1 pl-1.5 pr-12">
+          <FlashOverlay token={rootPath && flash.path === rootPath ? flash.token : 0} />
           {!canEditRoot ? (
             <div
               className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium text-foreground/90"
@@ -1232,18 +1235,6 @@ export const FileExplorer = memo(
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   <button
                     type="button"
-                    title="Change explorer root"
-                    onClick={startEditRoot}
-                    className="flex size-3.5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <HugeiconsIcon
-                      icon={PencilEdit02Icon}
-                      size={12}
-                      strokeWidth={2}
-                    />
-                  </button>
-                  <button
-                    type="button"
                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[13px] font-medium text-foreground/90"
                     title={rootPath ?? undefined}
                     onClick={startEditRoot}
@@ -1254,9 +1245,6 @@ export const FileExplorer = memo(
                       draggable={false}
                       className="size-4 shrink-0"
                     />
-                    <span className="min-w-0 truncate text-left [direction:rtl]">
-                      {LRM + rootPath}
-                    </span>
                     {workspaceRootPath !== null &&
                       samePath(rootPath, workspaceRootPath) && (
                         <HugeiconsIcon
@@ -1266,12 +1254,29 @@ export const FileExplorer = memo(
                           className="shrink-0 text-primary"
                         />
                       )}
+                    <span className="min-w-0 truncate text-left [direction:rtl]">
+                      {LRM + rootPath}
+                    </span>
                     <span className="flex-1" />
                   </button>
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className={COMPACT_CONTENT}>
-                <ContextMenuItem className={COMPACT_ITEM} onSelect={startEditRoot}>
+              <ContextMenuContent
+                className={COMPACT_CONTENT}
+                onCloseAutoFocus={(e) => {
+                  if (editRootFromMenuRef.current) {
+                    editRootFromMenuRef.current = false;
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => {
+                    editRootFromMenuRef.current = true;
+                    startEditRoot();
+                  }}
+                >
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
                     size={14}
@@ -1547,7 +1552,24 @@ export const FileExplorer = memo(
           />
         )}
         </div>
-        <div className="absolute right-1.5 top-1 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 opacity-0 backdrop-blur-sm transition-opacity focus-within:opacity-100 group-hover/explorer:opacity-100">
+        <div
+          className={cn(
+            "absolute right-3.5 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 backdrop-blur-sm transition-opacity focus-within:opacity-100 group-hover/explorer:opacity-100",
+            isSearchOpen ? "top-12 opacity-100" : "top-1 opacity-0",
+          )}
+        >
+          {canEditRoot && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={startEditRoot}
+              title="Change explorer root"
+              aria-label="Change explorer root"
+            >
+              <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={2} />
+            </Button>
+          )}
           {rootMode === "filesystem" && homePath && (
             <Button
               variant="ghost"
