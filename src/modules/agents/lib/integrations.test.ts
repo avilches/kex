@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AGENT_LABELS,
   blockOf,
+  busyMsFor,
   fromCodexStatus,
   fromInstalledFlag,
   isIntegrationAgent,
@@ -86,5 +87,20 @@ describe("integration status", () => {
     expect(blockOf("installed")).toBeNull();
     expect(blockOf("missing")).toBeNull();
     expect(blockOf(null)).toBeNull();
+  });
+});
+
+describe("busyMsFor", () => {
+  it("adds up to the jitter on top of the base, never reaching it", () => {
+    expect(busyMsFor(500, 400, () => 0)).toBe(500);
+    expect(busyMsFor(500, 400, () => 0.5)).toBe(700);
+    expect(busyMsFor(500, 400, () => 0.999999)).toBe(899);
+  });
+  it("is the base alone without jitter", () => {
+    expect(busyMsFor(500, 0, () => 0.7)).toBe(500);
+  });
+  it("is deterministic for a given random source", () => {
+    const rand = () => 0.25;
+    expect(busyMsFor(500, 400, rand)).toBe(busyMsFor(500, 400, rand));
   });
 });

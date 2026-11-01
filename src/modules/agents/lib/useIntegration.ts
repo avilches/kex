@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentNotDetectedError, agentStatus, installAgent, removeAgent } from "./agentIntegration";
-import { type AgentId, blockOf, type IntegrationBlock, type IntegrationStatus } from "./integrations";
+import { type AgentId, blockOf, busyMsFor, type IntegrationBlock, type IntegrationStatus } from "./integrations";
 
 export type IntegrationState = {
   /** null while the first check is pending or when it failed. */
@@ -20,11 +20,17 @@ export type IntegrationState = {
 type Options = {
   /** The busy state lasts at least this long, so a write that finishes at once is still seen. */
   minBusyMs?: number;
+  /** Up to this much more, drawn once per mount. */
+  busyJitterMs?: number;
 };
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}): IntegrationState {
+export function useIntegration(
+  agent: AgentId,
+  { minBusyMs = 0, busyJitterMs = 0 }: Options = {},
+): IntegrationState {
+  const [busyMs] = useState(() => busyMsFor(minBusyMs, busyJitterMs, Math.random));
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -45,7 +51,7 @@ export function useIntegration(agent: AgentId, { minBusyMs = 0 }: Options = {}):
     setFailed(false);
     setNotFound(null);
     try {
-      await Promise.all([action(agentRef.current), wait(minBusyMs)]);
+      await Promise.all([action(agentRef.current), wait(busyMs)]);
       setStatus(expected);
       return true;
     } catch (e) {

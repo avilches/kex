@@ -14,6 +14,7 @@ import { type BulkKind, type BulkResult, planBulk, runBulk } from "@/modules/age
 import {
   AGENT_LABELS,
   type AgentId,
+  INTEGRATION_BUSY_JITTER_MS,
   INTEGRATION_MIN_BUSY_MS,
   type IntegrationStatus,
 } from "@/modules/agents/lib/integrations";
@@ -26,7 +27,7 @@ import { Notification03Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { AgentIntegrationRow } from "./AgentIntegrationRow";
 import { AgentStatusRow } from "./AgentStatusRow";
 
-const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS };
+const OPTIONS = { minBusyMs: INTEGRATION_MIN_BUSY_MS, busyJitterMs: INTEGRATION_BUSY_JITTER_MS };
 
 const FILES: Record<AgentId, string[]> = {
   codex: ["~/.codex/hooks.json", "~/.codex/config.toml"],
