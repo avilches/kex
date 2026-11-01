@@ -12,7 +12,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -24,13 +23,17 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import { ACCEPTS_LABELS, acceptsOnlyFile, appAccepts, inBar } from "./lib/actionTargets";
+import { acceptsFile, acceptsFolder, acceptsFromSwitches, acceptsOnlyFile, appAccepts, inBar } from "./lib/actionTargets";
 import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
 import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
-import type { AppAccepts } from "@/modules/external-editors/catalog";
 
 const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
+
+const ACCEPTS_SWITCHES = [
+  { key: "files", label: "Edit files" },
+  { key: "folders", label: "Open folders" },
+] as const;
 
 const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
@@ -357,23 +360,32 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
         {app && (
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-muted-foreground">What it opens</span>
-            <RadioGroup
-              value={appAccepts(action)}
-              onValueChange={(v) => onChange({ ...action, accepts: v as AppAccepts })}
-              aria-label="What it opens"
-              className="grid grid-cols-3 gap-2"
-            >
-              {(Object.keys(ACCEPTS_LABELS) as AppAccepts[]).map((value) => (
-                <label key={value} htmlFor={`accepts-${value}`} className={cn(BOXED_RADIO, "items-center text-[12px]")}>
-                  <RadioGroupItem id={`accepts-${value}`} value={value} />
-                  {ACCEPTS_LABELS[value]}
-                </label>
-              ))}
-            </RadioGroup>
+            <fieldset className="grid grid-cols-2 gap-2" aria-label="What it opens">
+              {ACCEPTS_SWITCHES.map(({ key, label }) => {
+                const accepts = appAccepts(action);
+                const on = key === "files" ? acceptsFile(accepts) : acceptsFolder(accepts);
+                const other = key === "files" ? acceptsFolder(accepts) : acceptsFile(accepts);
+                return (
+                  <label key={key} htmlFor={`accepts-${key}`} className={cn(BOXED_RADIO, "items-center text-[12px]")}>
+                    <Checkbox
+                      id={`accepts-${key}`}
+                      checked={on}
+                      onCheckedChange={(next) => {
+                        const value = next === true;
+                        const files = key === "files" ? value : other;
+                        const folders = key === "folders" ? value : other;
+                        onChange({ ...action, accepts: acceptsFromSwitches(files, folders, accepts) });
+                      }}
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </fieldset>
           </div>
         )}
 
-        {inBar(action) ? (
+        {app || inBar(action) ? (
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
         ) : (
           <div className="text-[11px] text-muted-foreground">

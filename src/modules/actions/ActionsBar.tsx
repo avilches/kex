@@ -562,7 +562,7 @@ export function ContextCombo({
         className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground opacity-50"
       >
         <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />
-        <span>Folder or file</span>
+        <span>File</span>
         <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
       </button>
     );
