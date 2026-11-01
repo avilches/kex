@@ -3,7 +3,6 @@ import {
   addAction,
   adoptActionAt,
   normalizeActions,
-  promoteToGlobal,
   removeAction,
   reorderActions,
   reorderBefore,
@@ -179,31 +178,6 @@ describe("normalizeActions", () => {
   });
 });
 
-describe("promoteToGlobal", () => {
-  it("moves the action and keeps its id", () => {
-    const r = promoteToGlobal([act("a"), act("b")], [act("g")], "a", () => "unused");
-    expect(r.workspace.map((a) => a.id)).toEqual(["b"]);
-    expect(r.global.map((a) => a.id)).toEqual(["g", "a"]);
-  });
-
-  it("an id already taken in the global list gets a fresh id, so neither version is lost", () => {
-    const r = promoteToGlobal([act("a", { name: "mine", command: "other" })], [act("a", { name: "old" })], "a", () => "fresh");
-    expect(r.workspace).toEqual([]);
-    expect(r.global.map((a) => [a.id, a.name])).toEqual([
-      ["a", "old"],
-      ["fresh", "mine"],
-    ]);
-  });
-
-  it("is a no-op for an unknown id", () => {
-    const w = [act("a")];
-    const g = [act("g")];
-    const r = promoteToGlobal(w, g, "zz", () => "unused");
-    expect(r.workspace).toBe(w);
-    expect(r.global).toBe(g);
-  });
-});
-
 describe("updateAction appId", () => {
   it("an empty appId clears the preset link, which a missing key cannot do", () => {
     const preset: Action = { id: "a1", name: "Zed", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
@@ -242,11 +216,6 @@ describe("adoptActionAt, apps with the same command", () => {
     expect(adoptActionAt([script], { ...script, id: "t" }, () => "fresh").list).toHaveLength(2);
   });
 
-  it("moving an app across scopes leaves one in the destination and none in the source", () => {
-    const r = promoteToGlobal([app("w", "code .", { name: "Code (workspace)" })], [app("g", "code .", { name: "Code" })], "w", () => "fresh");
-    expect(r.workspace).toEqual([]);
-    expect(r.global.map((x) => [x.id, x.name])).toEqual([["g", "Code (workspace)"]]);
-  });
 });
 
 describe("adoptActionAt", () => {

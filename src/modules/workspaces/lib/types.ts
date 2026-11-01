@@ -111,9 +111,8 @@ export type Workspace = {
   icon?: string;
   groupId?: string;
   scriptPaneId?: string;
-  // Workspace-scoped Actions (the global ones live in settings-tools.json) and the one F12 runs.
+  // Workspace-scoped Actions (the global ones live in settings-tools.json).
   actions?: Action[];
-  activeAction?: string;
   // The nested tab list under this workspace in the WorkspaceBar is open.
   detailExpanded?: boolean;
 };

@@ -39,20 +39,13 @@ function sanitizeTree(node: SplitNode): SplitNode {
   return { ...node, first: sanitizeTree(node.first), second: sanitizeTree(node.second) };
 }
 
-function sanitizeActions(w: Workspace): Pick<Workspace, "actions" | "activeAction"> {
+function sanitizeActions(w: Workspace): Pick<Workspace, "actions"> {
   if (w.actions === undefined) return {};
-  const actions = normalizeActions(w.actions);
-  const active = actions.some((a) => a.id === w.activeAction) ? w.activeAction : undefined;
-  return { actions, activeAction: active };
+  return { actions: normalizeActions(w.actions) };
 }
 
-// `scripts` and `activeScript` belong to the former Script model: a saved workspace may still
-// carry them, and they are dropped here so they are neither kept in memory nor written back.
-const OLD_SCRIPT_FIELDS = ["scripts", "activeScript"] as const;
-
 export function sanitizeWorkspace(w: Workspace): Workspace {
-  const { actions: _actions, activeAction: _activeAction, ...rest } = w;
-  for (const field of OLD_SCRIPT_FIELDS) delete (rest as Record<string, unknown>)[field];
+  const { actions: _actions, ...rest } = w;
   return {
     ...rest,
     ...sanitizeActions(w),

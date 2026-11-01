@@ -61,13 +61,11 @@ describe("sanitizeWorkspace", () => {
         { id: "ac-1", name: " Dev ", kind: "script", command: " npm run dev ", ownButton: true },
         { id: "ac-2", name: "Empty", kind: "script", command: " ", ownButton: false },
       ],
-      activeAction: "ac-2",
     } as Workspace;
     const out = sanitizeWorkspace(w);
     expect(out.actions).toEqual([
       { id: "ac-1", name: "Dev", kind: "script", command: "npm run dev", ownButton: true },
     ]);
-    expect(out.activeAction).toBeUndefined();
   });
 
   it("leaves a workspace without actions untouched", () => {
@@ -79,25 +77,8 @@ describe("sanitizeWorkspace", () => {
     };
     const out = sanitizeWorkspace(w);
     expect(out).not.toHaveProperty("actions");
-    expect(out).not.toHaveProperty("activeAction");
   });
 
-  it("drops the scripts and the active script of an old saved workspace, with no migration", () => {
-    const w = {
-      id: "w1",
-      title: "W",
-      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
-      activePaneId: "p1",
-      scripts: [{ id: "sc-1", name: "dev", command: "pnpm dev", tabId: "tab-1" }],
-      activeScript: "sc-1",
-      scriptPaneId: "p1",
-    } as unknown as Workspace;
-    const out = sanitizeWorkspace(w);
-    expect(out).not.toHaveProperty("scripts");
-    expect(out).not.toHaveProperty("activeScript");
-    expect(out).not.toHaveProperty("actions");
-    expect(out.scriptPaneId).toBe("p1");
-  });
 
   it("keeps two markdown tabs open on the same path", () => {
     const w: Workspace = {

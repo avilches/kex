@@ -146,7 +146,6 @@ describe("menuEntries", () => {
     name: a.name,
     action: a,
     state: "idle",
-    active: false,
     stoppable: false,
     disabledReason: null,
     needsRoot: false,
@@ -227,7 +226,6 @@ describe("ownButtonsThatFit", () => {
       local: [folder, workspace],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
       ownButtonsShown: 1,
       place: { file: false, folder: true },
     });
@@ -247,34 +245,33 @@ describe("buildActionsBarModel", () => {
 
 
   it("puts scripts before apps, each kind in user order, and never makes an app a button", () => {
-    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map() });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3"]);
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a1", "a2"]);
     expect(m.empty).toBe(false);
   });
 
   it("moves every own button into its menu when none fits", () => {
-    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 0 });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), ownButtonsShown: 0 });
     expect(m.buttons).toEqual([]);
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "s2", "s3", "a1", "a2"]);
   });
 
   it("folds only the own buttons beyond the count that fits, keeping user order in the menus", () => {
-    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: 2 });
+    const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), ownButtonsShown: 2 });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3"]);
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a1", "a2"]);
   });
 
-  it("carries the run state, the active mark and the disabled reason", () => {
+  it("carries the run state and the disabled reason", () => {
     const m = buildActionsBarModel({
       local: [script({ id: "s1", ownButton: true }), script({ id: "a1", command: "code {workspace}", ownButton: true })],
       context: { ...ctx, vars: { ...vars, workspace: "" } },
       states: new Map([["s1", "running"]]),
-      activeId: "s1",
     });
     const [s, a] = m.buttons;
-    expect(s).toMatchObject({ state: "running", active: true, disabledReason: null, stoppable: true });
-    expect(a).toMatchObject({ state: "idle", active: false, disabledReason: WORKSPACE_UNSET, stoppable: false });
+    expect(s).toMatchObject({ state: "running", disabledReason: null, stoppable: true });
+    expect(a).toMatchObject({ state: "idle", disabledReason: WORKSPACE_UNSET, stoppable: false });
   });
 
   it("never lets a running script be disabled: it must stay stoppable", () => {
@@ -282,13 +279,12 @@ describe("buildActionsBarModel", () => {
       local: [script({ id: "s1", command: "make {branch}", ownButton: true })],
       context: ctx,
       states: new Map([["s1", "running"]]),
-      activeId: undefined,
     });
     expect(m.buttons[0]).toMatchObject({ state: "running", disabledReason: null, stoppable: true });
   });
 
   it("reports empty only when there are no Actions at all", () => {
-    expect(buildActionsBarModel({ local: [], context: ctx, states: new Map(), activeId: undefined }).empty).toBe(true);
+    expect(buildActionsBarModel({ local: [], context: ctx, states: new Map() }).empty).toBe(true);
   });
 
   it("pools non-own Actions into one menu, workspace scope first and then global", () => {
@@ -297,7 +293,6 @@ describe("buildActionsBarModel", () => {
       global: [script({ id: "s2", name: "top", command: "pnpm top" }), app({ id: "a1", name: "Code", command: "code {workspace}" })],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
     });
     expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "a0"]);
     expect(m.menu.global.map((b) => b.id)).toEqual(["s2", "a1"]);
@@ -310,7 +305,7 @@ describe("buildActionsBarModel", () => {
     const code = claude({ id: "c1", appId: "code", name: "Code {workspace}" });
     const custom = claude({ id: "u1", appId: undefined, name: "Mine" });
     const dev = script({ id: "s1", ownButton: true });
-    const m = buildActionsBarModel({ local: [zedWs, zedFile, code], global: [custom, dev], context: ctx, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: [zedWs, zedFile, code], global: [custom, dev], context: ctx, states: new Map() });
     expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
       ["z1", false],
       ["z2", false],
@@ -336,7 +331,6 @@ describe("buildActionsBarModel", () => {
       global: [claude({ id: "a1" })],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
       ownButtonsShown: 1,
     });
     expect(m.buttons.map((b) => b.id)).toEqual(["s1"]);
@@ -348,7 +342,6 @@ describe("buildActionsBarModel", () => {
       local: [script({ name: "  ", ownButton: true })],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
     });
     expect(m.buttons[0]?.name).toBe("Action");
   });
@@ -468,7 +461,7 @@ describe("where an Action is offered", () => {
   ];
   const onFileCtx = { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } };
   const build = (context: BarContext, place: { file: boolean; folder: boolean } | undefined, states = new Map<string, "running">()) =>
-    buildActionsBarModel({ local: all, context, states, activeId: undefined, place });
+    buildActionsBarModel({ local: all, context, states, place });
   const barIds = (m: ReturnType<typeof build>) => [...m.buttons, ...m.menu.workspace].map((i) => i.id).sort();
   const comboIds = (m: ReturnType<typeof build>) => m.contextCombo.workspace.map((i) => i.id).sort();
 
@@ -520,7 +513,7 @@ describe("where an Action is offered", () => {
   });
 
   it("has no combo at all while nothing could ever be listed in it", () => {
-    const m = buildActionsBarModel({ local: [plainScript, claude], context: ctx, states: new Map(), activeId: undefined, place: { file: false, folder: true } });
+    const m = buildActionsBarModel({ local: [plainScript, claude], context: ctx, states: new Map(), place: { file: false, folder: true } });
     expect(m.contextCombo.exists).toBe(false);
     expect(hasContextActions([plainScript, claude], [])).toBe(false);
     expect(hasContextActions([plainScript], [withAccepts("a", "file")])).toBe(true);
@@ -588,7 +581,6 @@ describe("buildActionsBarModel without a limit", () => {
       global: ["g1", "g2", "g3", "g4"].map(own),
       context: ctx,
       states: new Map(),
-      activeId: undefined,
     });
     expect(m.buttons).toHaveLength(9);
     expect(m.menu.workspace).toEqual([]);
@@ -739,7 +731,7 @@ describe("agents", () => {
       agent({ id: "g1" }),
       app({ id: "a2", ownButton: true }),
     ];
-    const at = (n: number) => buildActionsBarModel({ local: mixed, context: ctx, states: new Map(), activeId: undefined, ownButtonsShown: n });
+    const at = (n: number) => buildActionsBarModel({ local: mixed, context: ctx, states: new Map(), ownButtonsShown: n });
     expect(at(2).buttons.map((b) => b.id)).toEqual(["g1", "s1"]);
     expect(at(2).menu.workspace.map((b) => b.id)).toEqual(["a1", "a2"]);
     expect(at(1).buttons.map((b) => b.id)).toEqual(["g1"]);
@@ -747,7 +739,7 @@ describe("agents", () => {
   });
 
   it("never reports a state other than idle, even with a mark under its id", () => {
-    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map([["g1", "running"]]), activeId: undefined });
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map([["g1", "running"]]) });
     expect(m.buttons[0]).toMatchObject({ state: "idle", stoppable: false });
   });
 
@@ -756,7 +748,6 @@ describe("agents", () => {
       local: [agent({ command: "claude {filepath}" })],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
       place: { file: false, folder: false },
     });
     expect(m.buttons.map((b) => b.id)).toEqual(["g1"]);
@@ -772,7 +763,7 @@ describe("agents", () => {
 
   it("is grey with the root message when the workspace has no root, whatever else it says", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
-    const m = buildActionsBarModel({ local: [agent()], context: rootless, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: [agent()], context: rootless, states: new Map() });
     expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: null });
     expect(actionAvailability(agent(), rootless)).toBe(WORKSPACE_UNSET);
   });
@@ -787,7 +778,6 @@ describe("agents", () => {
       local: [agent(), agent({ id: "g2", command: "claude\nrm" }), app({ id: "a1", command: "code {filepath}", ownButton: true })],
       context: rootless,
       states: new Map(),
-      activeId: undefined,
     });
     const byId = (id: string) =>
       [...m.buttons, ...m.menu.workspace, ...m.contextCombo.workspace].find((b) => b.id === id);
@@ -799,7 +789,7 @@ describe("agents", () => {
   });
 
   it("is not fixable once the workspace has a root", () => {
-    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map() });
     expect(m.buttons[0]).toMatchObject({ disabledReason: null, needsRoot: false });
   });
 
@@ -819,7 +809,7 @@ describe("agents", () => {
   });
 
   it("is titled Run with its name", () => {
-    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map() });
     expect(m.buttons[0]?.title).toBe("Run Claude Code");
   });
 
@@ -829,7 +819,6 @@ describe("agents", () => {
       global: [agent({ id: "c1", appId: "gemini", command: "gemini" })],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
     });
     expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
       ["g1", true],
@@ -866,7 +855,6 @@ describe("paletteActions", () => {
       global: [script({ id: "g1", name: "lint" })],
       context: ctx,
       states,
-      activeId: undefined,
     });
 
   it("lists the Actions that can run, workspace ones before global ones", () => {
@@ -879,7 +867,6 @@ describe("paletteActions", () => {
       local: [both, script({ id: "s1" })],
       context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
       states: new Map(),
-      activeId: undefined,
       place: { file: true, folder: false },
     });
     expect(model.contextCombo.workspace.map((i) => i.id)).toContain("both");
@@ -895,7 +882,6 @@ describe("paletteActions", () => {
       local: [sublime],
       context: { ...ctx, vars: { ...vars, filepath: "/p/src/a.ts", filename: "a.ts" } },
       states: new Map(),
-      activeId: undefined,
       place: { file: true, folder: false },
     });
     const [item] = paletteActions(model);
@@ -908,7 +894,6 @@ describe("paletteActions", () => {
       local: [both],
       context: ctx,
       states: new Map(),
-      activeId: undefined,
       place: { file: false, folder: true },
     });
     expect(paletteActions(model)[0]?.runTarget).toBeUndefined();
@@ -923,7 +908,6 @@ describe("paletteActions", () => {
       local: [script({ id: "s1", command: "pnpm dev {filepath}" })],
       context: ctx,
       states: new Map([["s1", "running" as const]]),
-      activeId: undefined,
     });
     expect(paletteActions(model).map((i) => i.id)).toEqual(["s1"]);
   });
@@ -937,7 +921,7 @@ describe("buildActionsBarModel arranging", () => {
     app({ id: "a1", name: "Zed", command: "zed {target}", accepts: "both", ownButton: true }),
   ];
   const build = (arranging: boolean, context = ctx, place?: { file: boolean; folder: boolean }) =>
-    buildActionsBarModel({ local: rows, context, states: new Map(), activeId: undefined, arranging, place });
+    buildActionsBarModel({ local: rows, context, states: new Map(), arranging, place });
   const lines = (items: BarItem[]) => items.map((b) => [b.subtitle, b.subtitleLead]);
   const onFile = { ...ctx, vars: { ...vars, filepath: "/p/src/a.ts", filename: "a.ts" } };
 

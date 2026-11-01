@@ -17,7 +17,6 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   name: action.name,
   action,
   state: "idle",
-  active: false,
   stoppable: false,
   disabledReason: null,
   needsRoot: false,
@@ -124,7 +123,7 @@ describe("OwnButton", () => {
     const focus = vi.fn(() => true);
     const context: BarContext = { vars: { workspace: "/p", cwd: "/p" }, shell: "posix", folders: { focusFolder: "/p", workspaceRoot: "/p" } };
     const twin: Action = { ...agent, id: "g2", cwdMode: "fixed", cwd: "/elsewhere" };
-    const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map(), activeId: undefined }).buttons[0]!;
+    const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map() }).buttons[0]!;
     expect(built).toMatchObject({ id: "g1", iconOnly: false });
     expect(built.subtitle).toBeNull();
     const { container, handlers, unmount } = mount(built, focus);

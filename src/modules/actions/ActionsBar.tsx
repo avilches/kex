@@ -34,7 +34,6 @@ import {
   Rocket01Icon,
   Settings01Icon,
   StopIcon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -140,7 +139,6 @@ export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
     <div
       className={cn(
         "flex h-8 shrink-0 items-center rounded-md text-[11px]",
-        item.active && "ring-1 ring-border",
         item.needsRoot && "border border-dashed border-muted-foreground/50 opacity-70",
       )}
     >
@@ -366,7 +364,6 @@ function MenuRow({ item, reorderMode, onEdit, ...h }: RowProps) {
       {blocked && item.subtitle !== WORKSPACE_UNSET && (
         <span className="shrink-0 pr-1 text-[10px] text-muted-foreground/70">{item.disabledReason}</span>
       )}
-      {item.active && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="shrink-0 text-muted-foreground" />}
     </>
   );
   const common = {
@@ -595,7 +592,7 @@ function AddActionMenu({ onAdd, reveal, dragging }: { onAdd: () => void; reveal:
 }
 
 type BarProps = {
-  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions" | "activeAction"> | null;
+  workspace: Pick<Workspace, "paneTree" | "activePaneId" | "cwd" | "workspaceRoot" | "actions"> | null;
   controller: BarController;
   onConfigure: () => void;
   onAddAction: () => void;

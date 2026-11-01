@@ -47,7 +47,6 @@ const ws = (o: Partial<Workspace> = {}): Workspace => ({
   workspaceRoot: "/w",
   cwd: "/w",
   actions: [script, app],
-  activeAction: script.id,
   paneTree: { kind: "pane", id: "p1", tabs: [termTab("tab-user")], activeTabId: "tab-user" },
   activePaneId: "p1",
   ...o,
