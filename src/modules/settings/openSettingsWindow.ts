@@ -6,6 +6,7 @@ export type SettingsSection =
   | "workspaces"
   | "editor"
   | "agents"
+  | "permissions"
   | "terminal"
   | "appearance"
   | "themes"

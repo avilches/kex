@@ -1,4 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+let mac = true;
+vi.mock("@/lib/platform", async (orig) => ({
+  ...(await orig<typeof import("@/lib/platform")>()),
+  get IS_MAC() {
+    return mac;
+  },
+}));
 
 const { parseSectionParam } = await import("../SettingsApp");
 
@@ -12,5 +20,13 @@ describe("parseSectionParam", () => {
     expect(parseSectionParam(null)).toEqual({ section: "general" });
     expect(parseSectionParam("actions")).toEqual({ section: "actions" });
     expect(parseSectionParam("shortcuts:Scratchpad")).toEqual({ section: "shortcuts", ext: "Scratchpad" });
+  });
+
+  it("permissions falls back to general outside macOS", () => {
+    mac = true;
+    expect(parseSectionParam("permissions")).toEqual({ section: "permissions" });
+    mac = false;
+    expect(parseSectionParam("permissions")).toEqual({ section: "general" });
+    mac = true;
   });
 });

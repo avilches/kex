@@ -18,6 +18,7 @@ import { ActionsSection, type ActionsRequest } from "./sections/ActionsSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
+import { PermissionsSection } from "./sections/PermissionsSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection, type ShortcutsSearchRequest } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
@@ -29,6 +30,7 @@ const COMPONENTS: Record<SettingsSection, (props: never) => JSX.Element> = {
   workspaces: WorkspacesSection,
   terminal: TerminalSection,
   agents: AgentsSection,
+  permissions: PermissionsSection,
   actions: ActionsSection,
   editor: EditorSection,
   appearance: AppearanceSection,
@@ -42,14 +44,17 @@ const SettingsTextEditor = import.meta.env.DEV
   ? lazy(() => import("./devTextEditor/SettingsTextEditor"))
   : null;
 
-const SECTIONS = SETTINGS_SECTIONS.map((s) => ({ ...s, component: COMPONENTS[s.id] }));
+const SECTIONS = SETTINGS_SECTIONS.filter((s) => IS_MAC || !s.macOnly).map((s) => ({
+  ...s,
+  component: COMPONENTS[s.id],
+}));
 
-const VALID_SECTIONS: SettingsSection[] = SECTIONS.map((s) => s.id);
+const isAvailable = (id: string) => SETTINGS_SECTIONS.some((s) => s.id === id && (IS_MAC || !s.macOnly));
 
 export function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
   if (!raw) return { section: "general" };
   const [sectionId, ...rest] = raw.split(":");
-  const section = (VALID_SECTIONS as string[]).includes(sectionId) ? (sectionId as SettingsSection) : "general";
+  const section = isAvailable(sectionId) ? (sectionId as SettingsSection) : "general";
   return { section, ext: rest.length > 0 ? rest.join(":") : undefined };
 }
 

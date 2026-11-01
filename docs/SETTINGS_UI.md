@@ -141,3 +141,7 @@ Solo con `pnpm tauri dev` (el modulo se carga detras de `import.meta.env.DEV`, u
 - Cada entrada lleva la seccion, el texto original y el nuevo, como cadenas JSON. El fichero trae la instruccion para el agente en su cabecera.
 - Un cambio se identifica por el texto exacto que se ve, no por su sitio en el codigo: el mismo texto en dos sitios cambia en los dos. Un texto con valores interpolados se guarda como se ve.
 - Guardar un texto igual al original equivale a Restaurar.
+
+## Settings > Permissions (solo macOS)
+
+Seccion `permissions`, justo despues de `agents`, con `PermissionsList` de `src/modules/permissions/` (la misma lista que usa el onboarding). Su entrada en `SETTINGS_SECTIONS` lleva `macOnly: true`: `SettingsApp` la quita de la barra lateral fuera de macOS y `parseSectionParam` cae a `general` si se pide `permissions` alli. El lado Rust de `open_settings_window` no valida el nombre de la seccion, asi que no hay lista que tocar.
