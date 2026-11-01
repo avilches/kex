@@ -67,6 +67,9 @@ hidden via `invisible pointer-events-none` so PTYs and dev servers keep streamin
 - **Quit.** `kex:before-quit` goes to every main window; the app exits when the last one calls `confirm_quit`
   (`QuitGuard.flushing`). A window destroyed meanwhile stops being waited for. A safety timer of 10 s forces the
   exit, and does nothing once every window has confirmed or when a newer quit has replaced it (`epoch`).
+  On the webview side the window X, the last-workspace-removed effect and `kex:before-quit` share one claim
+  (`workspaces/lib/closeClaim.ts`). A failed flush releases it so the next close retries, and a second quit that
+  finds a flush already running waits for it before calling `confirm_quit`.
 - **Once per launch.** The startup editor scan (`claim_startup_scan`) and the automatic update check
   (`claim_update_check`) are claimed through a process-wide flag, so only the first window does them; an update
   install is guarded the same way (`claim_update_install`).

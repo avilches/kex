@@ -17,6 +17,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
 import { unlinkRemovedActions } from "@/modules/actions/lib/actionStateStore";
 import { toast } from "sonner";
+import { trackCloseFlush } from "./closeClaim";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { flushTabUses, recordTabClosed } from "./tabHistory";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -545,7 +546,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // when the user closes the last workspace and clicks X simultaneously.
   useEffect(() => {
     if (workspaces.length === 0 && claimClose()) {
-      void Promise.all([flushTabUses(), flushWorkspaceState()]).finally(async () => {
+      const flush = Promise.all([flushTabUses(), flushWorkspaceState()]).then(() => {});
+      void trackCloseFlush(flush).finally(async () => {
         // Signal Rust to stay alive after the window closes (macOS-style windowless mode).
         await invoke("enter_windowless_mode").catch(() => {});
         void getCurrentWindow().destroy();
