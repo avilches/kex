@@ -72,6 +72,7 @@ import {
   stepSwitcher,
   switcherActive,
   letterOf,
+  menuItemBlockedBySwitcher,
   shortcutBlockedBySwitcher,
   carriedAgent,
   carriedIndicator,
@@ -3504,6 +3505,7 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
+    if (menuItemBlockedBySwitcher(switcherActive())) return;
     if (
       menuItemBlockedByPalette(
         id,

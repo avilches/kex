@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SHORTCUTS, type ShortcutId } from "@/modules/shortcuts/shortcuts";
-import { SWITCHER_SHORTCUTS, shortcutBlockedBySwitcher } from "./switcherGate";
+import { SWITCHER_SHORTCUTS, menuItemBlockedBySwitcher, shortcutBlockedBySwitcher } from "./switcherGate";
 
 const ALL = SHORTCUTS.map((s) => s.id);
 
@@ -24,5 +24,12 @@ describe("shortcutBlockedBySwitcher", () => {
 
   it("blocks a shortcut added later by default while it is open", () => {
     expect(shortcutBlockedBySwitcher("some.future.shortcut" as ShortcutId, true)).toBe(true);
+  });
+});
+
+describe("menuItemBlockedBySwitcher", () => {
+  it("blocks the native menu while the switcher is open and only then", () => {
+    expect(menuItemBlockedBySwitcher(true)).toBe(true);
+    expect(menuItemBlockedBySwitcher(false)).toBe(false);
   });
 });

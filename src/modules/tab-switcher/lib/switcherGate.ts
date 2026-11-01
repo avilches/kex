@@ -7,3 +7,8 @@ export const SWITCHER_SHORTCUTS: readonly ShortcutId[] = ["tab.switcher", "tab.s
 export function shortcutBlockedBySwitcher(id: ShortcutId, open: boolean): boolean {
   return open && !SWITCHER_SHORTCUTS.includes(id);
 }
+
+// The native menu has no shortcut id to filter by, and each of its items would act on the tab behind the overlay.
+export function menuItemBlockedBySwitcher(open: boolean): boolean {
+  return open;
+}

@@ -16,6 +16,18 @@ import { REVEAL_DELAY_MS } from "./switcherModel";
 
 const entries = ["a", "b", "c", "d"].map((tabId) => ({ tabId }) as TabEntry);
 const chord = (o: KeyboardEventInit = {}) => new KeyboardEvent("keydown", { ctrlKey: true, ...o });
+// A key typed inside a dialog or a menu the host opened, which is where those keys are meant to go.
+const pressInHostUi = (role: "alertdialog" | "menu", init: KeyboardEventInit) => {
+  const host = document.createElement("div");
+  host.setAttribute("role", role);
+  const inner = document.createElement("button");
+  host.append(inner);
+  document.body.append(host);
+  const e = new KeyboardEvent("keydown", { cancelable: true, bubbles: true, ...init });
+  inner.dispatchEvent(e);
+  host.remove();
+  return e;
+};
 const key = (type: "keydown" | "keyup", init: KeyboardEventInit) =>
   window.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init }));
 
@@ -223,8 +235,9 @@ describe("switcher session", () => {
       let finish: (v: boolean) => void = () => {};
       open(4, () => new Promise<boolean>((r) => (finish = r)));
       press("w");
-      const enter = press("Enter");
+      const enter = pressInHostUi("alertdialog", { key: "Enter" });
       expect(enter.defaultPrevented).toBe(false);
+      expect(press("Enter").defaultPrevented).toBe(true);
       expect(onCommit).not.toHaveBeenCalled();
       finish(true);
       await settle();
@@ -354,7 +367,8 @@ describe("switcher session", () => {
       let finish: (v: TabEntry | null) => void = () => {};
       open(() => new Promise<TabEntry | null>((r) => (finish = r)));
       press("z");
-      expect(press("Enter").defaultPrevented).toBe(false);
+      expect(pressInHostUi("alertdialog", { key: "Enter" }).defaultPrevented).toBe(false);
+      expect(press("Enter").defaultPrevented).toBe(true);
       expect(onCommit).not.toHaveBeenCalled();
       finish(null);
       await settle();
@@ -394,6 +408,99 @@ describe("switcher session", () => {
     expect(e.defaultPrevented).toBe(true);
   });
 
+  describe("keys while the switcher is open", () => {
+    const press = (init: KeyboardEventInit, target: EventTarget = window) => {
+      const e = new KeyboardEvent("keydown", { cancelable: true, bubbles: true, ctrlKey: true, ...init });
+      target.dispatchEvent(e);
+      return e;
+    };
+    const settle = async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    };
+
+    it("swallows a Tab that is not the registered shortcut, and leaves the registered one to the global listener", () => {
+      openSwitcher(chord(), 1, entries, onCommit);
+      expect(press({ key: "Tab" }).defaultPrevented).toBe(false);
+      expect(press({ key: "Tab", shiftKey: true }).defaultPrevented).toBe(false);
+      expect(press({ key: "Tab", ctrlKey: false }).defaultPrevented).toBe(true);
+      expect(press({ key: "Tab", altKey: true }).defaultPrevented).toBe(true);
+    });
+
+    it("ignores a held W and a held sleep letter", async () => {
+      const onClose = vi.fn(() => Promise.resolve(false));
+      const onSleep = vi.fn(() => Promise.resolve(null));
+      openSwitcher(chord(), 1, entries, onCommit, { onClose, onSleep, sleepKey: "z" });
+      press({ key: "w", repeat: true });
+      press({ key: "z", repeat: true });
+      await settle();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onSleep).not.toHaveBeenCalled();
+      press({ key: "w" });
+      await settle();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads the physical key for W when Alt turns it into a symbol", async () => {
+      const onClose = vi.fn(() => Promise.resolve(true));
+      openSwitcher(new KeyboardEvent("keydown", { altKey: true }), 1, entries, onCommit, { onClose });
+      press({ key: "∑", code: "KeyW", ctrlKey: false, altKey: true });
+      await settle();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps keys away from the terminal while a close waits, except those meant for its dialog", async () => {
+      let answer: (v: boolean) => void = () => {};
+      const onClose = vi.fn(() => new Promise<boolean>((r) => (answer = r)));
+      openSwitcher(chord(), 1, entries, onCommit, { onClose });
+      press({ key: "w" });
+      expect(press({ key: "a" }).defaultPrevented).toBe(true);
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "alertdialog");
+      const button = document.createElement("button");
+      dialog.append(button);
+      document.body.append(dialog);
+      expect(press({ key: "Enter" }, button).defaultPrevented).toBe(false);
+      dialog.remove();
+      answer(false);
+      await settle();
+    });
+
+    it("commits where the highlight is when the modifier is let go during a close and the host answers", async () => {
+      let answer: (v: boolean) => void = () => {};
+      const onClose = vi.fn(() => new Promise<boolean>((r) => (answer = r)));
+      openSwitcher(chord(), 1, entries, onCommit, { onClose });
+      press({ key: "w" });
+      key("keyup", { key: "Control" });
+      expect(switcherActive()).toBe(true);
+      expect(onCommit).not.toHaveBeenCalled();
+      answer(true);
+      await settle();
+      expect(onCommit).toHaveBeenCalledWith(entries[2]);
+      expect(switcherActive()).toBe(false);
+    });
+
+    it("stays open after a close answered with the modifier still held", async () => {
+      const onClose = vi.fn(() => Promise.resolve(true));
+      openSwitcher(chord(), 1, entries, onCommit, { onClose });
+      press({ key: "w" });
+      await settle();
+      expect(switcherActive()).toBe(true);
+      expect(onCommit).not.toHaveBeenCalled();
+    });
+
+    it("survives a host that throws and frees the keys again", async () => {
+      const onClose = vi.fn(() => Promise.reject(new Error("boom")));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      openSwitcher(chord(), 1, entries, onCommit, { onClose });
+      press({ key: "w" });
+      await settle();
+      expect(warn).toHaveBeenCalled();
+      expect(press({ key: "ArrowRight" }).defaultPrevented).toBe(true);
+      expect(useSwitcherStore.getState().index).toBe(2);
+      warn.mockRestore();
+    });
+  });
+
   describe("jumping with a digit", () => {
     it("commits the tile at that position and ends the session, with the modifier still held", () => {
       openSwitcher(chord(), 1, entries, onCommit);
@@ -429,8 +536,7 @@ describe("switcher session", () => {
     it("leaves the keys to the menu and does not commit when the modifier is released", () => {
       openSwitcher(chord(), 1, entries, onCommit);
       menuSwitcher(true, 2);
-      const e = new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true });
-      window.dispatchEvent(e);
+      const e = pressInHostUi("menu", { key: "ArrowDown" });
       expect(e.defaultPrevented).toBe(false);
       key("keydown", { code: "Digit1", key: "1" });
       key("keyup", { key: "Control" });
