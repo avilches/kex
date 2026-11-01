@@ -66,6 +66,7 @@ const MAIN_THREAD: &[(&str, &str)] = &[
         "set_onboarding_open",
         "a value in memory, and the menu and window APIs when the block changes",
     ),
+    ("onboarding_block_holder", "reads a value in memory"),
     ("request_onboarding_restart", "emits an event"),
     ("claim_update_check", "process-wide flag"),
     ("claim_update_install", "process-wide flag"),

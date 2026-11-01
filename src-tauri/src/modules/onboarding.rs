@@ -54,6 +54,27 @@ impl OnboardingBlock {
     }
 }
 
+pub const BLOCK_EVENT: &str = "kex:onboarding-block";
+
+#[derive(Clone, serde::Serialize)]
+pub struct BlockPayload {
+    holder: Option<String>,
+}
+
+pub fn block_payload(block: &OnboardingBlock) -> BlockPayload {
+    BlockPayload {
+        holder: block.holder(),
+    }
+}
+
+/// Which window holds the onboarding dialog right now, for a window that opens or reloads while
+/// another already has it and so missed the event announcing it.
+#[tauri::command]
+pub fn onboarding_block_holder(app: tauri::AppHandle) -> BlockPayload {
+    use tauri::Manager;
+    block_payload(&app.state::<OnboardingBlock>())
+}
+
 /// The calling window asks to open its onboarding dialog (`open`) or says it closed. Opening
 /// answers whether the window got the block; when another window holds it, that window is
 /// brought to the front instead. Closing always answers true. A window that goes away with the
@@ -160,6 +181,25 @@ mod tests {
         assert_eq!(block.take("w-a"), Some(true));
         assert!(block.release("w-a"));
         assert_eq!(block.take("w-b"), Some(true));
+    }
+
+    #[test]
+    fn the_block_payload_names_the_holder_or_nothing() {
+        let block = OnboardingBlock::default();
+        assert_eq!(
+            serde_json::to_value(block_payload(&block)).unwrap(),
+            serde_json::json!({ "holder": null })
+        );
+        block.take("w-a");
+        assert_eq!(
+            serde_json::to_value(block_payload(&block)).unwrap(),
+            serde_json::json!({ "holder": "w-a" })
+        );
+        block.release("w-a");
+        assert_eq!(
+            serde_json::to_value(block_payload(&block)).unwrap(),
+            serde_json::json!({ "holder": null })
+        );
     }
 
     #[test]
