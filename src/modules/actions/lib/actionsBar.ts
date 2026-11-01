@@ -1,6 +1,5 @@
 import { DEFAULT_ACTION_ICON_SIZE } from "@/lib/actionIconSizes";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { splitActionName } from "./actionName";
 import { inHeader, offeredAt, type FocusPlace } from "./actionTargets";
 export { actionTarget, type ActionTarget, type FocusPlace } from "./actionTargets";
 import { commandProblem, unsafeVariables, type CommandShell } from "./commandTemplate";
@@ -34,8 +33,7 @@ export function ownButtonWidth(
   iconSize: number = DEFAULT_ACTION_ICON_SIZE,
 ): number {
   if (iconOnly) return PADDING + iconWidth(iconSize);
-  const { main } = splitActionName(action.name.trim() || "Action");
-  const label = Math.min(LABEL_CAP, main.length * CHAR_WIDTH);
+  const label = Math.min(LABEL_CAP, (action.name.trim() || "Action").length * CHAR_WIDTH);
   return PADDING + label + (isScript(action) ? RUN_ZONE : iconWidth(iconSize));
 }
 
@@ -120,7 +118,7 @@ export function agentCommandProblem(command: string): string | null {
 // is in words. The bar never uses this: it shows real values.
 export const SETTINGS_LABELS: BarContext = { vars: {}, shell: "posix", labels: true };
 
-export type SubtitleLead = "root" | "home" | "tab" | "file";
+export type SubtitleLead = "root";
 
 export type ActionSubtitle = {
   /** The line under the name; null leaves the name lineless. */
@@ -158,7 +156,7 @@ export function agentTitle(label: string, disabledReason: string | null): string
 
 // The hover of an app, which has no line under its name: it says what it opens, read from the context.
 export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null): string {
-  const { main } = splitActionName(name);
+  const main = name;
   if (disabledReason) return `${main}: ${disabledReason}`;
   const target = ctx?.vars.target ?? "";
   if (ctx?.targetKind === "file") return target ? `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}` : `Open the current file with ${main}`;
@@ -174,7 +172,7 @@ export function actionRowTitle(
   disabledReason: string | null,
   ctx: BarContext | null,
 ): string | null {
-  const { main } = splitActionName(name);
+  const main = name;
   if (disabledReason) return `${main}: ${disabledReason}`;
   if (action.runs === "fixed" && action.cwd) return `Run ${main} in ${action.cwd}`;
   if (action.runs !== "workspace") return null;
@@ -553,7 +551,8 @@ export function menuEntries(item: BarItem): MenuEntry[] {
 }
 
 // The Actions the Header offers here, runnable ones only (a running script stays so it can be
-// stopped). Listed once: an app in the bar and in the combo keeps its bar copy, which opens the root.
+// stopped). Listed once: whatever is in the Header and in the focused-tab submenu too (an agent, an app
+// that takes a folder, a folder script) keeps its Header copy, which acts on the workspace root.
 export function paletteActions(model: Pick<BarModel, "buttons" | "menu" | "contextCombo">): BarItem[] {
   const { workspace, global } = model.contextCombo;
   const seen = new Set<string>();

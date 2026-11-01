@@ -1,4 +1,3 @@
-import { splitActionName } from "@/modules/actions/lib/actionName";
 import type { BarItem } from "@/modules/actions/lib/actionsBar";
 import { type RowTagKind, tabTagKind } from "../RowTag";
 import type { PaletteItem } from "../types";
@@ -204,11 +203,10 @@ function commandHit(
   return top;
 }
 
-// An Action is found by the name it shows, by the value its template expands to or the folder a
-// script starts in (the line under the name), or by both read together ("pycharm hub").
+// An Action is found by the name it shows, by the line under it (where a script that always runs in
+// one place runs), or by both read together ("deploy srv").
 function actionPoints(item: BarItem, q: string): FieldScored | null {
-  const { main } = splitActionName(item.name);
-  const title = fuzzyHit(q, main);
+  const title = fuzzyHit(q, item.name);
   if (title !== null)
     return { points: title.points, highlight: asHighlight(title, "title") };
   const subtitle = item.subtitle ?? "";
@@ -218,7 +216,7 @@ function actionPoints(item: BarItem, q: string): FieldScored | null {
       points: SUBSTRING_BASE + detail.points,
       highlight: asHighlight(detail, "detail"),
     };
-  const expanded = subtitle ? fuzzyHit(q, `${main} ${subtitle}`) : null;
+  const expanded = subtitle ? fuzzyHit(q, `${item.name} ${subtitle}`) : null;
   if (expanded !== null)
     return { points: SUBSTRING_BASE - TIER_STEP + expanded.points };
   return null;

@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { HighlightText } from "@/modules/command-palette/HighlightText";
 import { registerPaletteControl } from "@/modules/command-palette/lib/paletteControl";
 import { ActionIcon } from "@/modules/actions/ActionIcon";
-import { splitActionName } from "@/modules/actions/lib/actionName";
 import type { Action } from "@/modules/actions/lib/types";
 import type { RunOverlay } from "@/modules/actions/lib/useActionRunner";
 import { useFolderRowActions } from "@/modules/actions/lib/useNewTabActions";
@@ -185,7 +184,7 @@ export function FolderPalette({
         worktrees: row.repoKey && row.repoHint ? row.repoHint : null,
         actions: scoped.map(({ entry: e, scope }) => ({
           id: e.action.id,
-          label: splitActionName(e.action.name).main,
+          label: e.action.name,
           title: e.title,
           scope,
         })),

@@ -612,16 +612,14 @@ describe("mergeRows with Actions", () => {
     expect(keys(rows)).toEqual(["act:s"]);
   });
 
-  it("finds an Action by its name and its value read together", () => {
-    const rows = mergeRows(
-      input({ term: "pycharm kex", actions: [expanded("a", "PyCharm {workspace}", "/work/Kex")] }),
-    );
+  it("finds an Action by its name and the line under it read together", () => {
+    const rows = mergeRows(input({ term: "deploy srv", actions: [expanded("a", "Deploy", "/srv/app")] }));
     expect(keys(rows)).toEqual(["act:a"]);
   });
 
-  it("does not match the raw template suffix of the name", () => {
-    const rows = mergeRows(input({ term: "workspace", actions: [expanded("a", "PyCharm {workspace}", "/work/x")] }));
-    expect(keys(rows)).toEqual([]);
+  it("matches a name as typed, braces included", () => {
+    const rows = mergeRows(input({ term: "{x}", actions: [expanded("a", "Deploy {x}", "/work/x")] }));
+    expect(keys(rows)).toEqual(["act:a"]);
   });
 });
 
