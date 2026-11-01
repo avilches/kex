@@ -586,7 +586,10 @@ For each session in the store:
    `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
    the first `cwd` field, and `cwd_launch` from the store when the transcript has none. omp and pi: the `cwd` of the
    `session` header, JSONL line 2 for omp and line 1 for pi; codex: `payload.cwd` of the `session_meta` entry on line 1). For claude the plan also carries `worktreeCwd`: the
-   `worktreePath` of the last `worktree-state` entry, only when that folder still exists. The resumed agent
+   `worktreePath` of the last `worktree-state` entry, only when that folder still exists. A claude transcript can
+   be hundreds of MB, so it is read as a stream with a 1 MiB cap per line (a longer line is skipped, bytes that are
+   not UTF-8 are replaced): the first 4 MiB for the launch cwd, and the first 1 MiB plus the last 8 MiB for the
+   worktree (a `worktree-state` only in the middle of a larger transcript is not seen). The resumed agent
    reports its folder after the first prompt (its resume `SessionStart` carries the launch folder, so that event
    is not forwarded as an agent cwd), so `applyStagedSnapshot` seeds `agentCwd`/`worktreeCwd` from the plan and
    New Terminal ("last folder") lands in the worktree from the start. The command is the row's
@@ -945,7 +948,11 @@ was: xterm serializes the normal buffer first and then switches with `ESC[?1049h
 only what follows that switch is kept (`altScreenOf`), padded to the rows of the terminal with its blank rows
 (`prepareAltScreenLines`). The secret filter runs on the plain text of each line (so a colour change cannot split a token
 into two) and replaces GitHub tokens, `sk-` keys, AWS access keys, Slack tokens, JWTs, `Bearer` values and the value of any
-`*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*API_KEY*` or `*PRIVATE_KEY*` assignment with `[redacted]`. It is a best effort and
+`*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*API_KEY*` or `*PRIVATE_KEY*` assignment (also a quoted key as in JSON) with
+`[redacted]`. It also replaces the value of a `--password`, `--token`, `--secret` or `--api-key` flag, the password of a
+`scheme://user:password@host` URL, a password glued to `-p` in a `mysql` command, a long value after the word `token`
+or `password` with no separator, and any base64 run of 64 characters or more with upper case, lower case and a digit
+(the body of a PEM key; a hex hash is left alone). It is a best effort and
 does not catch everything (a password typed at a prompt that does not echo is not on screen, but one echoed anywhere is), so
 the file is private (folder 0700, file 0600), unencrypted like `agent-sessions.json`, read only by the placeholder of the same
 tab id, and the setting turns the whole thing off. Failing to save never stops the tab from sleeping.

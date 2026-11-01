@@ -20,14 +20,18 @@ const OPTIONS = [
   { value: "combo", label: "Inside the combo" },
 ] as const;
 
-// Where the Action lives in the header bar, as two boxed radio options and, next to them, a
-// drawing of the bar for the one chosen. The Actions combo never moves: an own button sits to
-// its left, and without one the combo shows open, with the group title the real menu puts
-// above the Action and the line under its name.
+// Where an agent or a script lives in the header bar, and a drawing of the bar for it. The
+// Actions menu never moves: an own button sits to its left, and without one the menu shows open.
 export function OwnButtonChoice({ action, scope, onChange }: Props) {
   const value = action.ownButton ? "button" : "combo";
   const display = action.name.trim() || "Action";
   const subtitle = scriptSubtitle({ ...action, name: display }, SETTINGS_LABELS);
+  const item = (
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <ActionIcon action={action} size={14} fill />
+      <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} lead={subtitle.lead} />
+    </span>
+  );
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[11px] text-muted-foreground">Where it shows in the header</span>
@@ -48,7 +52,7 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
         <div
           aria-hidden
           data-own-button-preview={value}
-          className="relative h-[124px] min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-muted/30 p-2"
+          className="relative flex h-[124px] min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-muted/30 p-2"
         >
           <div className="flex items-center justify-end gap-1.5">
             {value === "button" && (
@@ -76,12 +80,7 @@ export function OwnButtonChoice({ action, scope, onChange }: Props) {
               <span className="block px-1.5 py-1 text-[10px] text-muted-foreground">
                 {scope === "global" ? "Global actions" : "Workspace actions"}
               </span>
-              <span className="flex min-h-9 items-center gap-2 rounded px-1.5 py-0.5 text-[12px] hover:bg-accent">
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <ActionIcon action={action} size={14} fill />
-                  <ActionNameLines name={display} value={subtitle.text ?? undefined} startTrim={subtitle.startTrim} lead={subtitle.lead} />
-                </span>
-              </span>
+              <span className="flex min-h-9 items-center gap-2 rounded px-1.5 py-0.5 text-[12px] hover:bg-accent">{item}</span>
             </div>
           )}
         </div>

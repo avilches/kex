@@ -70,7 +70,7 @@ describe("ActionsSection", () => {
     agents = [{ id: "claude", name: "Claude Code", binary: "/usr/local/bin/claude", argsBeforePath: [], kind: "agent" }];
     const { container, unmount } = mount();
     openAdd(container);
-    const item = options().find((o) => o.textContent === "Claude CodeWorkspace root");
+    const item = options().find((o) => o.textContent === "Claude Code");
     act(() => void (item as HTMLElement).click());
     const next = change.mock.calls[0]![0]([]);
     expect(next[0]).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude --dangerously-skip-permissions", appId: "claude" });
@@ -89,20 +89,20 @@ describe("ActionsSection", () => {
   it("adds a detected app from the combo through the serialized store", () => {
     const { container, unmount } = mount();
     openAdd(container);
-    const item = options().find((o) => o.textContent?.includes("PyCharmWorkspace root"));
+    const item = options().find((o) => o.textContent === "PyCharmFolders");
     act(() => void (item as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     const next = change.mock.calls[0]![0]([]);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ name: "PyCharm {workspace}", appId: "pycharm", kind: "app", ownButton: false });
+    expect(next[0]).toMatchObject({ name: "PyCharm", command: expect.stringMatching(/\{target\}$/), appId: "pycharm", kind: "app", accepts: "folder", ownButton: false });
     unmount();
   });
 
-  it("keeps offering every app, so two actions can share one", () => {
-    actions = [{ id: "ac-1", name: "PyCharm {filepath}", kind: "app", command: "pycharm {filepath}", appId: "pycharm", ownButton: false }];
+  it("offers each app once: an app that is already installed leaves the combo, the others stay", () => {
+    actions = [{ id: "ac-1", name: "PyCharm", kind: "app", command: "pycharm {target}", accepts: "folder", appId: "pycharm", ownButton: false }];
     const { container, unmount } = mount();
     openAdd(container);
-    expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(true);
+    expect(options().some((o) => o.textContent?.includes("PyCharm"))).toBe(false);
     expect(options().some((o) => o.textContent?.includes("Zed"))).toBe(true);
     unmount();
   });
@@ -150,10 +150,10 @@ describe("ActionsSection", () => {
   it("installs several presets in one combo session: a pick keeps the combo open", () => {
     const { container, unmount } = mount();
     openAdd(container);
-    act(() => void (options().find((o) => o.textContent?.includes("PyCharmWorkspace root")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent === "PyCharmFolders") as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(1);
     expect(options().length).toBeGreaterThan(1);
-    act(() => void (options().find((o) => o.textContent?.includes("ZedCurrent file")) as HTMLElement).click());
+    act(() => void (options().find((o) => o.textContent === "ZedFiles and folders") as HTMLElement).click());
     expect(change).toHaveBeenCalledTimes(2);
     unmount();
   });

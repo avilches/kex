@@ -83,7 +83,8 @@ incremental = true
 codegen-units = 1
 lto = "fat"
 opt-level = "s"
-panic = "abort"
+# Must stay "unwind": with "abort", an AppKit exception crossing tao's sendEvent aborts the app (TASK-914.1).
+panic = "unwind"
 strip = "debuginfo"
 
 [profile.release.build-override]

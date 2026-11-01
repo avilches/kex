@@ -27,15 +27,19 @@ export function buildCommandVars(
     fallbackDir: ws.cwd || ws.workspaceRoot || undefined,
     workspaceRoot: ws.workspaceRoot,
   });
+  const workspace = raw.workspace.trim();
   return {
     cwd: raw.cwd,
     dir: raw.dir,
     filename: raw.file,
     filepath: raw.path,
-    workspace: raw.workspace.trim(),
+    workspace,
     branch: git.branch,
     repo: git.repoRoot.split(/[\\/]/).filter(Boolean).pop() ?? "",
     host,
+    // What an app is opened on. The Header must not change with the focused tab, so the base is
+    // the workspace root; a menu or the context combo overrides it with its own folder or file.
+    target: workspace,
   };
 }
 

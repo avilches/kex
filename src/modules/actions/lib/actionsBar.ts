@@ -1,6 +1,8 @@
 import type { ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
+import { comboCandidate, inBar, inCombo, type FocusPlace } from "./actionTargets";
+export { actionTarget, type ActionTarget, type FocusPlace } from "./actionTargets";
 import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import { isAgent, isApp, isScript, usesTerminal, type Action, type ActionKind } from "./types";
 
@@ -22,8 +24,6 @@ const RUN_ZONE = 24;
 const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
-// The context combo: its icon, a name capped at about 100 px and the chevron.
-export const CONTEXT_RESERVE = 140;
 
 export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly = false): number {
   if (iconOnly) return PADDING + ICON;
@@ -42,14 +42,14 @@ export function stateOf(action: Action, states: ReadonlyMap<string, ScriptState>
 // (their target is the workspace) and workspace Actions. A folder or file Action lives in the
 // context combo instead, except a script that is not idle, which stays so it can be stopped.
 export function onBar(action: Action, state: ScriptState | "idle"): boolean {
-  return state !== "idle" || isAgent(action) || actionTarget(action.command) === "workspace";
+  return state !== "idle" || inBar(action);
 }
 
 // How many of the own buttons, taken in the user's order, fit in the room the bar has once the
-// menus have taken theirs; `reserve` is the room of the context combo. The rest fold into the
-// menu, so the bar never pushes the search box and the window controls out.
-export function ownButtonsThatFit(actions: readonly Action[], room: number, reserve = 0): number {
-  let left = Math.floor(room) - MENUS_RESERVE - reserve;
+// menus have taken theirs. The rest fold into the menu, so the bar never pushes the search box
+// and the window controls out.
+export function ownButtonsThatFit(actions: readonly Action[], room: number): number {
+  let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   const sole = soleIconButtons(actions);
   for (const action of actions) {
@@ -65,6 +65,9 @@ export type BarContext = {
   shell: CommandShell;
   /** The vars are words for what a variable stands for, not values (Settings has no tab). */
   labels?: boolean;
+  /** What an app's {target} is in this context, set for the context combo; absent in the bar,
+   * where it is the workspace root. */
+  targetKind?: "file" | "folder";
   /** The folders the runner picks a start folder from, so the bar names the same one. */
   folders?: Omit<ScriptCwdInput, "mode" | "fixedFolder">;
 };
@@ -73,35 +76,12 @@ const NEEDS: Record<string, string> = {
   filepath: "an open file",
   filename: "an open file",
   workspace: "a workspace root",
+  target: "a workspace root",
   cwd: "a folder",
   dir: "a folder",
   branch: "a git branch",
   repo: "a git repository",
 };
-
-// What an Action binds to, read from the variables its command uses: the file it opens,
-// the folder it runs in, or nothing local, so it is a matter of the workspace alone. One
-// Action has one target: a command using {filepath} and {workspace} is a file Action.
-export type ActionTarget = "file" | "folder" | "workspace";
-
-const FOLDER_VARS = new Set(["cwd", "dir", "branch", "repo"]);
-
-export function actionTarget(command: string): ActionTarget {
-  const used = commandVariablesUsed(command);
-  if (used.has("filepath") || used.has("filename")) return "file";
-  for (const name of used) if (FOLDER_VARS.has(name)) return "folder";
-  return "workspace";
-}
-
-// Where a command is offered: file Actions need a file (an editor or a file row), folder
-// Actions a terminal or a folder row, and workspace Actions are Header-only, never bound
-// to any row or tab.
-export type FocusPlace = { file: boolean; folder: boolean };
-
-export function actionShownAt(target: ActionTarget, place: FocusPlace | "all"): boolean {
-  if (place === "all") return true;
-  return target === "file" ? place.file : target === "folder" ? place.folder : true;
-}
 
 // The words for what an Action still lacks; a variable with no friendly name is quoted.
 export function describeMissing(names: readonly string[]): string {
@@ -183,10 +163,11 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // A script with no variable in its name says where it runs: the workspace, the last folder
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
-export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
-  // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
-  // the root itself, or the words for it in Settings.
-  if (isAgent(action)) return workspaceLine(ctx);
+export function scriptSubtitle(
+  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">,
+  ctx: BarContext | null,
+): ActionSubtitle {
+  if (isAgent(action) || isApp(action)) return { text: null, startTrim: false };
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -212,6 +193,16 @@ function workspaceLine(ctx: BarContext | null): ActionSubtitle {
 // An agent has nothing to open: its hover says it runs, or why it cannot.
 export function agentTitle(label: string, disabledReason: string | null): string {
   return disabledReason ? `${label}: ${disabledReason}` : `Run ${label}`;
+}
+
+// The hover of an app, which has no line under its name: it says what it opens, read from the context.
+export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null): string {
+  const { main } = splitActionName(name);
+  if (disabledReason) return `${main}: ${disabledReason}`;
+  const target = ctx?.vars.target ?? "";
+  if (ctx?.targetKind === "file") return target ? `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}` : `Open the current file with ${main}`;
+  if (ctx?.targetKind === "folder") return target ? `Open ${main} in ${target}` : `Open ${main} in the current folder`;
+  return `Open ${main} in the workspace root`;
 }
 
 // The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
@@ -259,7 +250,7 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
   const problem = commandProblem(action.command, usesTerminal(action) ? ctx.shell : undefined);
   if (problem) return problem;
   const missing = missingVariables(action.command, ctx.vars);
-  if (missing.includes("workspace")) return WORKSPACE_UNSET;
+  if (missing.includes("workspace") || (isApp(action) && missing.includes("target"))) return WORKSPACE_UNSET;
   if (missing.length > 0) return describeMissing(missing);
   if (usesTerminal(action)) {
     const unsafe = unsafeVariables(action.command, ctx.vars, ctx.shell);
@@ -282,6 +273,11 @@ export type BarItem = {
   /** The only thing missing is the workspace root: drawn grey with a dashed border, and a click
    * takes the user to where the root is set instead of running. */
   needsRoot: boolean;
+  /** What {target} stands for when this item runs, set on the items of the context combo (the
+   * focused folder or file). Absent on the bar, where an app opens the workspace root. */
+  runTarget?: string;
+  /** Whether that target is a file or a folder, which decides where the app is launched from. */
+  runTargetKind?: "file" | "folder";
   /** The line under the name: what the Action points at in this place. */
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
@@ -304,13 +300,13 @@ export function byKind<T extends Pick<Action, "kind">>(actions: readonly T[]): T
 }
 
 // The own buttons the bar may draw, in order: those flagged as buttons that the bar carries.
-// Each list comes already in bar order, the workspace one before the global one.
+// An app is never one, it lives in the menus whatever its flag says. Each list comes already in bar order, the workspace one before the global one.
 export function ownButtonCandidates(
   local: readonly Action[],
   global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
 ): Action[] {
-  return [...local, ...global].filter((action) => action.ownButton && onBar(action, stateOf(action, states)));
+  return [...local, ...global].filter((action) => action.ownButton && !isApp(action) && onBar(action, stateOf(action, states)));
 }
 
 // A button of a detected app or agent that is the only one of it in the bar needs no words:
@@ -336,12 +332,12 @@ export const DROP_MENU_GLOBAL = "mzone:global";
 
 type Scope = "workspace" | "global";
 
-// The bar has one zone per scope and kind: apps, agents and scripts of the workspace, and
-// the same of the global scope. Each one takes only its own kind.
+// The bar has one zone per scope and kind: agents and scripts of the workspace, and the same
+// of the global scope. Each one takes only its own kind. Apps have none: they stay in the menus.
 export const barZoneId = (scope: Scope, kind: ActionKind) => `zone:${scope}:${kind}s`;
 
 export function parseBarZone(id: string): { scope: Scope; kind: ActionKind } | null {
-  const m = /^zone:(workspace|global):(app|agent|script)s$/.exec(id);
+  const m = /^zone:(workspace|global):(agent|script)s$/.exec(id);
   return m ? { scope: m[1] as Scope, kind: m[2] as ActionKind } : null;
 }
 
@@ -413,6 +409,7 @@ export function resolveDrop(
     button = true;
     list = buttons;
   }
+  if (button && isApp(from.action)) return null;
   const wasButton = !fromMenu;
   let reorderOver: string | undefined;
   let placeBefore: string | null | undefined;
@@ -481,13 +478,8 @@ type BuildInput = {
   arranging?: boolean;
 };
 
-// Folder and file Actions: the ones the context combo holds, not the bar.
-function isContextual(action: Action): boolean {
-  return !isAgent(action) && actionTarget(action.command) !== "workspace";
-}
-
 export function hasContextActions(local: readonly Action[], global: readonly Action[]): boolean {
-  return local.some(isContextual) || global.some(isContextual);
+  return local.some(comboCandidate) || global.some(comboCandidate);
 }
 
 const lastSegment = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -499,13 +491,19 @@ const lastSegment = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() 
 // running script is never disabled whatever its variables are now: it has to stay stoppable,
 // and it stays visible whatever the focused tab is, so its Stop keeps a place to live.
 export function buildActionsBarModel({ local, global = [], context, states, activeId, ownButtonsShown, place, arranging }: BuildInput): BarModel {
-  const toItem = (action: Action, isGlobal: boolean): BarItem => {
+  const toItem = (
+    action: Action,
+    isGlobal: boolean,
+    ctx: BarContext | null = context,
+    runTarget?: string,
+    runTargetKind?: "file" | "folder",
+  ): BarItem => {
     const state = stateOf(action, states);
     const running = state === "running";
     const label = action.name.trim() || "Action";
-    const words = arranging ? SETTINGS_LABELS : context;
+    const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
     const subtitle = scriptSubtitle({ ...action, name: label }, words);
-    const disabledReason = running ? null : actionAvailability(action, context);
+    const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
       id: action.id,
       global: isGlobal,
@@ -516,10 +514,15 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       stoppable: state !== "idle",
       disabledReason,
       needsRoot: needsRootFix(disabledReason),
+      ...(runTarget !== undefined ? { runTarget, runTargetKind } : {}),
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, words),
+      title: isAgent(action)
+        ? agentTitle(label, disabledReason)
+        : isApp(action)
+          ? appTitle(label, disabledReason, words)
+          : actionRowTitle(label, isScript(action), disabledReason, words),
       iconOnly: false,
     };
   };
@@ -546,17 +549,21 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       .slice(0, limit)
       .map((a) => a.id),
   );
+  // An app in the combo opens what the combo is on, so it is judged against its own {target}.
+  const comboContext: BarContext | null =
+    context && comboPath && kind ? { ...context, vars: { ...context.vars, target: comboPath }, targetKind: kind } : context;
   for (const [action, isGlobal] of ordered) {
-    const item = toItem(action, isGlobal);
-    if (!onBar(action, item.state)) {
-      if (kind && actionShownAt(actionTarget(action.command), { folder: kind === "folder", file: kind === "file" }) && isContextual(action)) {
-        (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(item);
-      }
-      continue;
+    const state = stateOf(action, states);
+    let barItem: BarItem | undefined;
+    const item = () => (barItem ??= toItem(action, isGlobal));
+    if (kind && !(isScript(action) && state !== "idle") && inCombo(action, { folder: kind === "folder", file: kind === "file" })) {
+      const comboItem = isApp(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item();
+      (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(comboItem);
     }
-    if (buttonIds.has(action.id)) model.buttons.push(item);
-    else if (isGlobal) model.menu.global.push(item);
-    else model.menu.workspace.push(item);
+    if (!onBar(action, state)) continue;
+    if (buttonIds.has(action.id)) model.buttons.push(item());
+    else if (isGlobal) model.menu.global.push(item());
+    else model.menu.workspace.push(item());
   }
   const sole = soleIconButtons(model.buttons.map((b) => b.action));
   for (const b of model.buttons) b.iconOnly = sole.has(b.action.id);
@@ -580,12 +587,14 @@ export function menuEntries(item: BarItem): MenuEntry[] {
   return [main];
 }
 
-// What the command palette lists: the Actions the Header offers here, runnable ones only. A
-// blocked Action is left out instead of muted, and a script already running stays so it can
-// be shown or stopped.
+// The Actions the Header offers here, runnable ones only (a running script stays so it can be
+// stopped). Listed once: an app in the bar and in the combo keeps its bar copy, which opens the root.
 export function paletteActions(model: Pick<BarModel, "buttons" | "menu" | "contextCombo">): BarItem[] {
   const { workspace, global } = model.contextCombo;
-  return [...model.buttons, ...model.menu.workspace, ...model.menu.global, ...workspace, ...global].filter(
-    (i) => i.disabledReason === null || i.stoppable,
-  );
+  const seen = new Set<string>();
+  return [...model.buttons, ...model.menu.workspace, ...model.menu.global, ...workspace, ...global].filter((i) => {
+    if (seen.has(i.id)) return false;
+    seen.add(i.id);
+    return i.disabledReason === null || i.stoppable;
+  });
 }

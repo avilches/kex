@@ -1,8 +1,11 @@
+import { DEFAULT_ACCEPTS, type AppAccepts } from "@/modules/external-editors/catalog";
 import type { ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { parseIcon } from "./actionIconRefs";
 import { isApp, type Action, type ActionKind } from "./types";
 
 const KINDS: readonly ActionKind[] = ["app", "script", "agent"];
+
+const ACCEPTS: readonly AppAccepts[] = ["file", "folder", "both"];
 
 const CWD_MODES: readonly ScriptCwdMode[] = ["home", "workspace", "context", "fixed"];
 
@@ -66,11 +69,12 @@ export function normalizeAction(raw: unknown): Action | null {
     name: name || command,
     kind,
     command,
-    ownButton: r.ownButton === true,
+    ownButton: kind !== "app" && r.ownButton === true,
   };
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
   if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;
   if (typeof r.icon === "string" && parseIcon(r.icon)) action.icon = r.icon;
+  if (kind === "app") action.accepts = ACCEPTS.includes(r.accepts as AppAccepts) ? (r.accepts as AppAccepts) : DEFAULT_ACCEPTS;
   if (kind === "script" && CWD_MODES.includes(r.cwdMode as ScriptCwdMode)) {
     action.cwdMode = r.cwdMode as ScriptCwdMode;
     if (action.cwdMode === "fixed" && typeof r.cwd === "string" && r.cwd) action.cwd = r.cwd;

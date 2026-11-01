@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
+use kex_lib::modules::agent::atomic_write::write_atomically;
 use kex_lib::modules::agent::codex_trust::{
     read_trusted_hash, remove_hook_trust, trust_key, trusted_hash, upsert_hook_trust,
-    write_atomically, CodexHookEvent, TrustEntry,
+    CodexHookEvent, TrustEntry,
 };
 use serde_json::Value;
 

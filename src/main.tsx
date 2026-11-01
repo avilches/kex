@@ -15,7 +15,8 @@ import { loadPreferences, updateInstalledIntegrations } from "./modules/settings
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
 import { flushTabUses } from "./modules/workspaces/lib/tabHistory";
-import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
+import { claimClose, handleBeforeQuit, releaseClose, trackCloseFlush } from "./modules/workspaces/lib/closeClaim";
+import { flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
 installGlobalErrorLogging();
@@ -85,6 +86,15 @@ setTimeout(showWindow, 500);
 // while the window was hidden, GPU surface not yet ready at first scheduleUnhide).
 setTimeout(retryMissingWebgl, 350);
 
+// Everything that must reach disk before a window closes or the app quits.
+async function flushForClose(): Promise<void> {
+  await flushAgentTitles();
+  await flushSidebarSnapshots();
+  await flushEditors();
+  await flushTabUses();
+  await flushWorkspaceState();
+}
+
 // Flush pending workspace state before the window closes so the 800ms debounce
 // never loses changes. claimClose() is shared with the last-workspace-removed
 // effect in useWorkspaces to prevent a double flush when both paths fire.
@@ -92,27 +102,15 @@ getCurrentWindow().onCloseRequested(async (event) => {
   if (!claimClose()) return;
   event.preventDefault();
   try {
-    await flushAgentTitles();
-    await flushSidebarSnapshots();
-    await flushEditors();
-    await flushTabUses();
-    await flushWorkspaceState();
+    await trackCloseFlush(flushForClose());
     await getCurrentWindow().destroy();
-  } catch { /* nothing - window stays open; user can retry */ }
+  } catch {
+    releaseClose();
+  }
 });
 
 // Cmd+Q fires the custom Quit menu item in Rust (the predefined macOS quit can't
 // be intercepted), which emits this so we can flush before confirming exit.
-listen("kex:before-quit", async () => {
-  try {
-    if (claimClose()) {
-      await flushAgentTitles();
-      await flushSidebarSnapshots();
-      await flushEditors();
-      await flushTabUses();
-      await flushWorkspaceState();
-    }
-  } finally {
-    await invoke("confirm_quit").catch(() => {});
-  }
-});
+listen("kex:before-quit", () =>
+  handleBeforeQuit(flushForClose, () => invoke<void>("confirm_quit").catch(() => {})),
+);

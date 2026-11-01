@@ -1,12 +1,12 @@
 import { newActionId } from "@/lib/ids";
-import { EDITOR_CATALOG } from "@/modules/external-editors/catalog";
+import { DEFAULT_ACCEPTS, EDITOR_CATALOG, getEditorAccepts, type AppAccepts } from "@/modules/external-editors/catalog";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { splitActionName } from "./actionName";
 import { yoloCommand } from "./agentYolo";
 import type { Action, ActionKind } from "./types";
 
 type SuggestionBase = {
-  /** Unique within a list: the app id, plus the variable the preset points at. */
+  /** Unique within a list: the app id, or the agent id, plus its kind. */
   key: string;
   /** Detected app it comes from, absent for the custom app. */
   appId?: string;
@@ -17,8 +17,9 @@ type SuggestionBase = {
   defaultCommand: string;
 };
 
-// An agent has no folder of its own, so a preset is its kind, its command and nothing else.
-export type AppSuggestion = SuggestionBase & { kind: "app" | "agent" };
+// An agent has no folder of its own, so a preset is its kind, its command and nothing else. An
+// app also says what its {target} may be.
+export type AppSuggestion = SuggestionBase & { kind: "app" | "agent"; accepts?: AppAccepts };
 
 export const CUSTOM_APP_SUGGESTION: AppSuggestion = {
   key: "custom",
@@ -80,43 +81,31 @@ function commandFor(editor: DetectedEditor, target: string): string {
   return [editor.binary, ...editor.argsBeforePath].map(quoteArg).concat(target).join(" ");
 }
 
-// Every app gets the same three starting points, so one app can back several Actions
-// with different templates instead of the editor guessing which target fits.
-const VARIANTS = ["filepath", "workspace", "cwd"] as const;
 
-// Alphabetical by app, and within one app the three presets in their variant order, so
-// the combo reads like a list of names and the variants of one app stay together.
-const RANKS: readonly string[] = [...VARIANTS, "context"];
+// An app is offered once. Its command ends in {target}, which stands for the place it is opened
+// at (the workspace root in the Header, the folder of a folder menu, the file of a file menu),
+// and the catalog says what it accepts.
+export const APP_TARGET = "{target}";
 
+// Alphabetical by name, the way the combo reads.
 export function compareByName(a: AppSuggestion, b: AppSuggestion): number {
-  const rank = (s: AppSuggestion) => RANKS.indexOf(s.key.slice(s.key.lastIndexOf(":") + 1));
   const main = (s: AppSuggestion) => splitActionName(s.name).main;
-  return main(a).localeCompare(main(b)) || rank(a) - rank(b);
+  return main(a).localeCompare(main(b));
 }
 
-/** One entry per enabled detected app and preset variable, followed by nothing else. */
-// The three starting points, so one app can back several Actions with different templates.
-// Project-based IDEs (JetBrains) open workspace folders or the tab's folder, never a file.
-function variantsFor(editorId: string): readonly (typeof VARIANTS)[number][] {
-  return EDITOR_CATALOG.find((e) => e.id === editorId)?.group === "JetBrains"
-    ? VARIANTS.filter((v) => v !== "filepath")
-    : VARIANTS;
-}
-
+/** One preset per enabled detected app. */
 export function suggestionsFromDetected(detected: readonly DetectedEditor[]): AppSuggestion[] {
   return detected
     .filter((e) => e.enabled !== false)
-    .flatMap((editor) => {
-      const name = KNOWN.get(editor.id)?.name ?? editor.name;
-      return variantsFor(editor.id).map((target) => ({
-        key: `${editor.id}:${target}`,
-        appId: editor.id,
-        name: `${name} {${target}}`,
-        iconId: editor.id,
-        defaultCommand: commandFor(editor, `{${target}}`),
-        kind: "app" as const,
-      }));
-    })
+    .map((editor) => ({
+      key: `${editor.id}:app`,
+      appId: editor.id,
+      name: KNOWN.get(editor.id)?.name ?? editor.name,
+      iconId: editor.id,
+      defaultCommand: commandFor(editor, APP_TARGET),
+      kind: "app" as const,
+      accepts: getEditorAccepts(editor.id),
+    }))
     .sort(compareByName);
 }
 
@@ -145,6 +134,7 @@ export function actionFromSuggestion(s: AppSuggestion, ownButton = false): Actio
     kind: s.kind,
     command: s.defaultCommand,
     ...(s.appId ? { appId: s.appId } : {}),
+    ...(s.kind === "app" ? { accepts: s.accepts ?? DEFAULT_ACCEPTS } : {}),
     ownButton,
   };
 }

@@ -33,19 +33,10 @@ import {
   type RunContext,
 } from "./actionRun";
 import { getActionTab, linkActionTab } from "./actionStateStore";
+import type { RunOverlay } from "./runOverlay";
 import { isScript, type Action } from "./types";
 
-// Values a run takes from where it was launched instead of the focused tab: the context
-// menus (explorer rows, breadcrumbs, tabs) run an Action against their own folder or file.
-export type RunOverlay = {
-  /** The full map of values the row stands for; it replaces the focused tab's. */
-  vars?: RunContext["vars"];
-  focusFolder?: string;
-  /** Where a spawned app or an agent is launched from; the folder or file folder of the row. */
-  spawnCwd?: string;
-  /** The workspace to run in when it is not the active one (a row of the new terminal palette). */
-  workspaceId?: string;
-};
+export type { RunOverlay } from "./runOverlay";
 
 type TerminalHandle = { write: (data: string) => void };
 

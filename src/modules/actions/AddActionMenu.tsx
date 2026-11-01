@@ -13,9 +13,11 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDialogScrollHost } from "@/components/dialogScrollHost";
+import { DEFAULT_ACCEPTS } from "@/modules/external-editors/catalog";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
-import { actionRowTitle, scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
+import { ACCEPTS_LABELS } from "./lib/actionTargets";
+import { agentTitle, scriptSubtitle, SETTINGS_LABELS } from "./lib/actionsBar";
 import { CUSTOM_APP_SUGGESTION, compareByName, type AppSuggestion } from "./lib/appSuggestions";
 import type { ActionKind } from "./lib/types";
 
@@ -110,14 +112,18 @@ function presetItems(
     .filter((s) => s.kind === kind)
     .sort(compareByName)
     .map((s) => {
-      const sub = scriptSubtitle({ name: s.name, kind: s.kind }, SETTINGS_LABELS);
+      // An app is offered wherever it fits, so its line says what it takes rather than a place.
+      const app = s.kind === "app";
+      const sub = app
+        ? { text: ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS], startTrim: false, lead: undefined }
+        : scriptSubtitle({ name: s.name, kind: s.kind }, SETTINGS_LABELS);
       return (
         <CommandItem
           key={s.key}
           value={s.key}
           keywords={[s.name, s.defaultCommand]}
           onSelect={() => onPickApp(s)}
-          title={actionRowTitle(s.name, false, null, SETTINGS_LABELS) ?? undefined}
+          title={app ? `Open ${ACCEPTS_LABELS[s.accepts ?? DEFAULT_ACCEPTS].toLowerCase()} with ${s.name}` : agentTitle(s.name, null)}
           className="text-[12px]"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">

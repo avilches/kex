@@ -168,7 +168,7 @@ impl Default for ShellState {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_session_open(
     state: tauri::State<ShellState>,
     registry: tauri::State<WorkspaceRegistry>,
@@ -232,7 +232,7 @@ pub fn shell_session_close(state: tauri::State<ShellState>, id: u32) -> Result<(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_bg_spawn(
     state: tauri::State<ShellState>,
     registry: tauri::State<WorkspaceRegistry>,

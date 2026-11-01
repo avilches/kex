@@ -23,6 +23,8 @@ use tauri::ipc::{Channel, Response};
 use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegistry};
 use session::Session;
 
+#[cfg(unix)]
+use metrics::first_child_of;
 pub use metrics::ProcessMonitor;
 use metrics::{aggregate_tree, descendants_of, real_proc_table, ProcStat};
 
@@ -58,7 +60,7 @@ pub fn shutdown_hook_server() {
     ipc::shutdown();
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pty_list_shells() -> Vec<shell_init::ShellInfo> {
     shell_init::list_shells()
 }
@@ -83,20 +85,18 @@ pub async fn pty_open(
     let window_label = webview_window.label().to_string();
     let workspace = WorkspaceEnv::from_option(workspace);
     let blocks = blocks.unwrap_or(false);
-    // Validate before spawn; register only after spawn succeeds so a failed
-    // spawn never widens the authorization surface. A stale or cross-environment
-    // cwd falls back to home rather than failing the open.
-    let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
-    let report_workspace = workspace.clone();
-    let (session, spawned_dir) = tauri::async_runtime::spawn_blocking(move || {
-        // Same thread that stats the cwd for the spawn also answers the
-        // report: an is_dir on a slow mount stays off the async runtime.
-        let dir = shell_init::spawn_dir_report(cwd.clone(), &report_workspace);
+    let (session, spawned_dir, canonical_cwd) = tauri::async_runtime::spawn_blocking(move || {
+        // Validate before spawn; register only after spawn succeeds so a failed
+        // spawn never widens the authorization surface. A stale or cross-environment
+        // cwd falls back to home rather than failing the open. The stats of the cwd
+        // and its ancestors run here, so a slow mount stays off the async runtime.
+        let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
+        let dir = shell_init::spawn_dir_report(cwd.clone(), &workspace);
         session::spawn(
             id, app, cols, rows, cwd, workspace, blocks, tab_id, shell, on_data, on_exit,
         )
-        .map(|(s, _)| (s, dir))
+        .map(|(s, _)| (s, dir, canonical_cwd))
     })
     .await
     .map_err(|e| {
@@ -269,20 +269,20 @@ fn signal_tab_tree(state: &PtyState, tab_id: &str, sig: i32) -> Result<usize, St
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[cfg(unix)]
 pub fn pty_stop(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
     signal_tab_tree(&state, &tab_id, libc::SIGTERM)
 }
 
 /// Same tree as `pty_stop` but SIGKILL: for programs that ignore or swallow SIGTERM.
-#[tauri::command]
+#[tauri::command(async)]
 #[cfg(unix)]
 pub fn pty_kill(state: tauri::State<PtyState>, tab_id: String) -> Result<usize, String> {
     signal_tab_tree(&state, &tab_id, libc::SIGKILL)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[cfg(not(unix))]
 pub fn pty_stop(tab_id: String) -> Result<usize, String> {
     Err(format!(
@@ -290,7 +290,7 @@ pub fn pty_stop(tab_id: String) -> Result<usize, String> {
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[cfg(not(unix))]
 pub fn pty_kill(tab_id: String) -> Result<usize, String> {
     Err(format!(
@@ -333,7 +333,7 @@ pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pty_has_foreground_process(
     state: tauri::State<PtyState>,
     id: u32,
@@ -360,7 +360,7 @@ pub struct PtyProcessInfo {
 
 // Fresh per-tab process snapshot for UI surfaces that only run while open, like
 // the tab context menu: the path bar's sampler only covers visible tabs.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pty_process_info(
     state: tauri::State<PtyState>,
     monitor: tauri::State<ProcessMonitor>,
@@ -413,7 +413,7 @@ pub struct PtyMetrics {
 
 // Sample CPU% (normalized 0..=100) and RAM for each given pty's shell process
 // tree. Refreshes the shared System once per call so CPU% is a real delta.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pty_metrics(
     state: tauri::State<PtyState>,
     monitor: tauri::State<ProcessMonitor>,
@@ -463,12 +463,36 @@ pub fn pty_metrics(
             cpu_percent,
             mem_bytes,
             shell_name,
-            fg_name: shell_foreground_process(shell_pid)
-                .map(|(_, name)| name)
-                .unwrap_or_default(),
+            fg_name: foreground_name(&procs, &sys, shell_pid),
         });
     }
     out
+}
+
+// Name of the first child of the shell. Unix reads it from the process table the sample
+// already holds; a `pgrep` per terminal on every sample is a process spawn each.
+#[cfg(unix)]
+fn foreground_name(
+    procs: &HashMap<u32, ProcStat>,
+    sys: &sysinfo::System,
+    shell_pid: u32,
+) -> String {
+    first_child_of(procs, shell_pid)
+        .and_then(|pid| sys.process(sysinfo::Pid::from_u32(pid)))
+        .map(|p| p.name().to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+// The `ps` table is empty on Windows, so the Toolhelp snapshot stays the source there.
+#[cfg(windows)]
+fn foreground_name(
+    _procs: &HashMap<u32, ProcStat>,
+    _sys: &sysinfo::System,
+    shell_pid: u32,
+) -> String {
+    shell_foreground_process(shell_pid)
+        .map(|(_, name)| name)
+        .unwrap_or_default()
 }
 
 // Returns the first foreground child of the shell as (pid, name), or None if no child exists.
@@ -563,7 +587,7 @@ pub fn pty_close_all(
     Ok(count)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pty_shell_name() -> String {
     shell_init::detect_shell_name()
 }

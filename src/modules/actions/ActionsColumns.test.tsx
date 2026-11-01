@@ -9,11 +9,11 @@ import type { Action } from "./lib/types";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const saved: Action = { id: "ac-1", name: "Dev", kind: "script", command: "pnpm dev", cwdMode: "workspace", ownButton: false };
-const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {filepath}", ownButton: false };
-const preset: Action = { id: "ac-3", name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false };
+const savedApp: Action = { id: "ac-2", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", ownButton: false };
+const preset: Action = { id: "ac-3", name: "Zed", kind: "app", command: "zed {target}", accepts: "both", appId: "zed", ownButton: false };
 
-const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
-const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" };
+const zed: AppSuggestion = { key: "zed:app", appId: "zed", name: "Zed", iconId: "zed", defaultCommand: "zed {target}", kind: "app", accepts: "both" };
+const bbedit: AppSuggestion = { key: "bbedit:app", appId: "bbedit", name: "BBEdit", iconId: "bbedit", defaultCommand: "bbedit {target}", kind: "app", accepts: "file" };
 const claude: AppSuggestion = { key: "claude:agent", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent" };
 
 type Handlers = { onAdd: ReturnType<typeof vi.fn>; onUpdate: ReturnType<typeof vi.fn>; onRemove: ReturnType<typeof vi.fn>; onReorder: ReturnType<typeof vi.fn> };
@@ -106,7 +106,7 @@ describe("ActionsColumns", () => {
     expect(text).toContain("Scripts");
     expect(text).toContain("Applications");
     expect(text).toContain("/srv/app");
-    expect(column(container, "workspace").textContent).toContain("Workspace");
+    expect(column(container, "workspace").textContent).toContain("This workspace");
     expect(container.querySelector("[aria-label='Expand action']")).toBeNull();
     expect(commandField()).toBeNull();
     unmount();
@@ -125,7 +125,7 @@ describe("ActionsColumns", () => {
     const app = mount([savedApp]);
     click(pencil(app.container));
     expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
-    expect(commandField()!.value).toBe("zed {filepath}");
+    expect(commandField()!.value).toBe("zed {target}");
     click(dialogButton("Done"));
     app.unmount();
   });
@@ -177,9 +177,9 @@ describe("ActionsColumns", () => {
   it("an app preset goes straight to the store with its appId and opens no modal", () => {
     const { container, g, unmount } = mount([], []);
     click(addTrigger(container, "global"));
-    click(options().find((o) => o.textContent?.includes("ZedWorkspace root")));
+    click(options().find((o) => o.textContent === "ZedFiles and folders"));
     expect(g.onAdd).toHaveBeenCalledTimes(1);
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed" });
+    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ name: "Zed", kind: "app", command: "zed {target}", appId: "zed", accepts: "both" });
     expect(commandField()).toBeNull();
     unmount();
   });
@@ -212,7 +212,7 @@ describe("ActionsColumns", () => {
     const { container, g, unmount } = mount([], [], { suggestions: [claude] });
     click(addTrigger(container, "global"));
     const entries = options().filter((o) => o.textContent?.startsWith("Claude Code"));
-    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace root"]);
+    expect(entries.map((o) => o.textContent)).toEqual(["Claude Code"]);
     click(entries[0]);
     const added = g.onAdd.mock.calls[0]![0] as Action;
     expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude" });
@@ -233,6 +233,86 @@ describe("ActionsColumns", () => {
     expect(document.querySelector("[role='dialog']")?.textContent).not.toMatch(/has no value|Stop/);
     click(dialogButton("Done"));
     unmount();
+  });
+
+  describe("what an app opens", () => {
+    const accepts = (value: "files" | "folders") => document.querySelector(`#accepts-${value}`) as HTMLElement | null;
+    const note = () => document.querySelector("[role='dialog']")?.textContent ?? "";
+    const preview = () => document.querySelector("[data-own-button-preview]") as HTMLElement | null;
+
+    it("is asked of an app as Edit files and Open folders, with the saved ones checked", () => {
+      const { container, unmount } = mount([{ ...savedApp, accepts: "file" }]);
+      click(pencil(container));
+      expect(document.querySelector("[aria-label='What it opens']")).not.toBeNull();
+      expect(accepts("files")?.getAttribute("aria-checked")).toBe("true");
+      expect(accepts("folders")?.getAttribute("aria-checked")).toBe("false");
+      expect(note()).toContain("Edit files");
+      expect(note()).toContain("Open folders");
+      unmount();
+    });
+
+    it("saves the choice at once", () => {
+      const { container, g, unmount } = mount([savedApp]);
+      click(pencil(container));
+      click(accepts("files"));
+      const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
+      expect(id).toBe(savedApp.id);
+      expect(next.accepts).toBe("folder");
+      unmount();
+    });
+
+    it("does not let the last switch go off, so an app always opens something", () => {
+      const { container, g, unmount } = mount([{ ...savedApp, accepts: "folder" }]);
+      click(pencil(container));
+      click(accepts("folders"));
+      const saved = g.onUpdate.mock.calls.map(([, next]) => (next as Action).accepts);
+      expect(saved.every((a) => a === "folder")).toBe(true);
+      expect(accepts("folders")?.getAttribute("aria-checked")).toBe("true");
+      unmount();
+    });
+
+    it("is not asked of a script or an agent", () => {
+      const agent: Action = { id: "ac-g", name: "Claude", kind: "agent", command: "claude", ownButton: true };
+      const { container, unmount } = mount([saved, agent]);
+      click(pencil(container, 0));
+      expect(document.querySelector("[aria-label='What it opens']")).toBeNull();
+      click(dialogButton("Done"));
+      click(pencil(container, 1));
+      expect(document.querySelector("[aria-label='What it opens']")).toBeNull();
+      unmount();
+    });
+
+    it("says where an app lives and never offers it an own button", () => {
+      const folders = mount([{ ...savedApp, accepts: "folder" }]);
+      click(pencil(folders.container));
+      expect(note()).toContain("It lives in the Actions menu.");
+      expect(note()).toContain("never gets a button of its own");
+      expect(preview()).toBeNull();
+      folders.unmount();
+      const both = mount([{ ...savedApp, accepts: "both" }]);
+      click(pencil(both.container));
+      expect(note()).toContain("and in the submenu of the focused file");
+      expect(preview()).toBeNull();
+      both.unmount();
+      const files = mount([{ ...savedApp, accepts: "file" }]);
+      click(pencil(files.container));
+      expect(note()).toContain("submenu of the Actions menu named after the focused file");
+      expect(preview()).toBeNull();
+      files.unmount();
+    });
+
+    it("tells {target} apart from the script variables in the list a script shows", () => {
+      const app = mount([savedApp]);
+      click(pencil(app.container));
+      click(dialogButton("Show variables"));
+      expect(note()).toContain("{target}");
+      app.unmount();
+      const script = mount([saved]);
+      click(pencil(script.container));
+      click(dialogButton("Show variables"));
+      expect(note()).not.toContain("{target}");
+      script.unmount();
+    });
   });
 
   describe("a custom agent and a chosen icon", () => {
@@ -331,12 +411,12 @@ describe("ActionsColumns", () => {
     });
 
     it("keeps a chosen icon when a preset's command is edited and it becomes the user's own", () => {
-      const preset: Action = { id: "ac-z", name: "Zed {workspace}", kind: "app", command: "zed {workspace}", appId: "zed", ownButton: false, icon: "glyph:star" };
+      const preset: Action = { id: "ac-z", name: "Zed", kind: "app", command: "zed {target}", appId: "zed", ownButton: false, icon: "glyph:star" };
       const { container, g, unmount } = mount([preset], [], { suggestions: [zed] });
       click(pencil(container));
-      typeField(commandField()!, "zed -n {workspace}");
+      typeField(commandField()!, "zed -n {target}");
       const [, next] = g.onUpdate.mock.calls[g.onUpdate.mock.calls.length - 1]! as [string, Action];
-      expect(next).toMatchObject({ command: "zed -n {workspace}", appId: "", iconId: "zed", icon: "glyph:star" });
+      expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed", icon: "glyph:star" });
       unmount();
     });
   });
@@ -394,7 +474,7 @@ describe("ActionsColumns", () => {
   it("the combo never offers a preset that is already installed", () => {
     const { container, unmount } = mount([preset], [], { suggestions: [zed] });
     click(addTrigger(container, "global"));
-    expect(options().filter((o) => o.textContent?.includes("ZedWorkspace root"))).toHaveLength(0);
+    expect(options().filter((o) => o.textContent?.includes("ZedFiles and folders"))).toHaveLength(0);
     unmount();
   });
 
@@ -475,13 +555,13 @@ describe("ActionsColumns", () => {
   it("editing a preset is the same modal; a changed command makes it the user's own", () => {
     const { container, g, unmount } = mount([preset]);
     click(pencil(container));
-    expect(commandField()!.value).toBe("zed {workspace}");
+    expect(commandField()!.value).toBe("zed {target}");
     expect(commandField()!.readOnly).toBe(false);
-    typeField(commandField()!, "zed -n {workspace}");
+    typeField(commandField()!, "zed -n {target}");
     expect(g.onUpdate).toHaveBeenCalledTimes(1);
     const [id, next] = g.onUpdate.mock.calls[0]! as [string, Action];
     expect(id).toBe("ac-3");
-    expect(next).toMatchObject({ command: "zed -n {workspace}", appId: "", iconId: "zed" });
+    expect(next).toMatchObject({ command: "zed -n {target}", appId: "", iconId: "zed" });
     unmount();
   });
 
@@ -589,16 +669,16 @@ describe("ActionsColumns", () => {
   });
 
   it("editing the command back to the preset's gives the preset back, whatever the name", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {workspace}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed -n {target}", iconId: "zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(pencil(container));
-    typeField(commandField()!, "zed {workspace}");
-    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {workspace}", appId: "zed", iconId: "" }));
+    typeField(commandField()!, "zed {target}");
+    expect(g.onUpdate).toHaveBeenCalledWith("ac-4", expect.objectContaining({ command: "zed {target}", appId: "zed", iconId: "" }));
     unmount();
   });
 
   it("an app whose command is a detected preset's is deleted without asking, even with no appId", () => {
-    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {workspace}", iconId: "zed", ownButton: false };
+    const own: Action = { id: "ac-4", name: "My Zed", kind: "app", command: "zed {target}", iconId: "zed", ownButton: false };
     const { container, g, unmount } = mount([own]);
     click(container.querySelector("button[aria-label='Remove action']"));
     expect(g.onRemove).toHaveBeenCalledWith("ac-4");
@@ -616,7 +696,7 @@ describe("ActionsColumns", () => {
 
   it("opens the Action a focus request names, in its scope's modal", () => {
     const view = mount([saved], [savedApp], { focusRequest: { scope: "workspace", id: "ac-2", nonce: 1 } });
-    expect(commandField()!.value).toBe("zed {filepath}");
+    expect(commandField()!.value).toBe("zed {target}");
     expect(document.body.textContent).toContain("This workspace");
     click(dialogButton("Done"));
     expect(commandField()).toBeNull();
@@ -692,7 +772,7 @@ describe("ActionsColumns scope switch with lagging stores", () => {
     click(pencil(h.container));
     click(radio("workspace"));
     h.show([], [{ ...savedApp, id: "ac-9" }]);
-    expect(commandField()?.value).toBe("zed {filepath}");
+    expect(commandField()?.value).toBe("zed {target}");
     h.unmount();
   });
 });

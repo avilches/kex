@@ -215,7 +215,8 @@ fn after_text(current: Option<&str>, next: String, create: bool) -> Option<Strin
 }
 
 fn write(path: &std::path::Path, text: &str) -> Result<(), String> {
-    codex_trust::write_atomically(path, text).map_err(|e| format!("write {}: {e}", path.display()))
+    super::atomic_write::write_atomically(path, text)
+        .map_err(|e| format!("write {}: {e}", path.display()))
 }
 
 // Puts a file back as it was read: the same bytes, or no file when there was none.

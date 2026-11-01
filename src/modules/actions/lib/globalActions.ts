@@ -96,7 +96,13 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
   return { get, add, change };
 }
 
-// By content: normalizing rebuilds every object, so identity would never match.
+// By content, whatever order the keys were written in: normalizing rebuilds every object, so
+// identity would never match, and two objects with the same fields can serialize differently.
 function sameActions(a: readonly Action[], b: readonly Action[]): boolean {
-  return a.length === b.length && a.every((x, i) => JSON.stringify(x) === JSON.stringify(b[i]));
+  return a.length === b.length && a.every((x, i) => canonical(x) === canonical(b[i]));
+}
+
+function canonical(action: Action | undefined): string {
+  if (!action) return "";
+  return JSON.stringify(Object.entries(action).sort(([k], [l]) => (k < l ? -1 : k > l ? 1 : 0)));
 }

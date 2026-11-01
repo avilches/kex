@@ -98,6 +98,55 @@ describe("secrets", () => {
     expect(redacted("PASSWORD='hunter22'")).toBe(`PASSWORD='${REDACTED}'`);
   });
 
+  it("crosses out a quoted key, as in JSON", () => {
+    expect(redacted('{"password": "hunter2hunter2"}')).toBe(`{"password": "${REDACTED}"}`);
+    expect(redacted("'api_key':'abcd1234efgh'")).toBe(`'api_key':'${REDACTED}'`);
+  });
+
+  it("crosses out the value of a secret flag", () => {
+    expect(redacted("deploy --password hunter2hunter2 --force")).toBe(`deploy --password ${REDACTED} --force`);
+    expect(redacted("cli --api-key=abcd1234efgh run")).toBe(`cli --api-key=${REDACTED} run`);
+    expect(redacted("cli --token abcd1234efgh")).toBe(`cli --token ${REDACTED}`);
+  });
+
+  it("keeps a secret flag that is followed by another flag", () => {
+    expect(redacted("cli --password --verbose")).toBe("cli --password --verbose");
+  });
+
+  it("crosses out the password of a URL and keeps the user and the host", () => {
+    expect(redacted("git clone https://bob:ghs3cretpw@host.example/r.git")).toBe(
+      `git clone https://bob:${REDACTED}@host.example/r.git`,
+    );
+    expect(redacted("psql postgres://app:p4ssw0rdX@db:5432/main")).toBe(`psql postgres://app:${REDACTED}@db:5432/main`);
+  });
+
+  it("leaves a URL without credentials alone", () => {
+    const text = "see https://example.com:8443/path?a=b";
+    expect(redacted(text)).toBe(text);
+  });
+
+  it("crosses out a mysql password glued to -p", () => {
+    expect(redacted("mysql -u root -pSuperSecret1 db")).toBe(`mysql -u root -p${REDACTED} db`);
+    expect(redacted("mysqldump -pSuperSecret1 db")).toBe(`mysqldump -p${REDACTED} db`);
+  });
+
+  it("crosses out a long value that follows the word token with no separator", () => {
+    expect(redacted("token abcdefghijklmnop1234")).toBe(`token ${REDACTED}`);
+  });
+
+  it("keeps prose that mentions a token", () => {
+    const text = "the token refresh job failed";
+    expect(redacted(text)).toBe(text);
+  });
+
+  it("crosses out a body line of a PEM key but not a hash", () => {
+    const body = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj";
+    expect(body.length).toBeGreaterThanOrEqual(64);
+    expect(redacted(body)).toBe(REDACTED);
+    const sha256 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+    expect(redacted(sha256)).toBe(sha256);
+  });
+
   it("finds a token that a colour change cuts in two", () => {
     const out = redactLine(parseAnsi(`${E}[31mghp_abcdefghij${E}[0mklmnopqrstuvwxyz0123 tail`)[0]);
     expect(plain([out])[0]).toBe(`${REDACTED} tail`);

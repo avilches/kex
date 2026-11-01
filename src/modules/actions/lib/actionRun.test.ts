@@ -21,7 +21,7 @@ const app = (o: Partial<Action> = {}): Action => script({ kind: "app", command: 
 
 const ctx = (o: Partial<RunContext> = {}): RunContext => ({
   shell: "posix",
-  vars: { cwd: "/w/src", dir: "src", filename: "", filepath: "", workspace: "/w", branch: "main", repo: "w" },
+  vars: { cwd: "/w/src", dir: "src", filename: "", filepath: "", workspace: "/w", branch: "main", repo: "w", target: "/w" },
   folders: { focusFolder: "/w/src", workspaceRoot: "/w", workspaceCwd: "/w" },
   link: null,
   scriptPaneExists: false,
@@ -244,6 +244,44 @@ describe("planActionRun, apps", () => {
   it("is blocked by an unterminated quote", () => {
     const plan = planActionRun(app({ command: 'code "{workspace}' }), ctx());
     expect(plan.kind).toBe("blocked");
+  });
+
+  describe("{target}, which is whatever the place it is offered at stands for", () => {
+    const zed = app({ name: "Zed", command: "zed {target}", accepts: "both" });
+    const withTarget = (target: string) => ctx({ vars: { ...ctx().vars, target } });
+
+    it("opens the workspace root from the Header, where the base value is the root", () => {
+      expect(planActionRun(zed, ctx())).toEqual({ kind: "spawn-app", argv: ["zed", "/w"] });
+    });
+
+    it("opens the folder of a menu or the combo when that is what {target} is", () => {
+      expect(planActionRun(zed, withTarget("/w/src/api"))).toEqual({ kind: "spawn-app", argv: ["zed", "/w/src/api"] });
+    });
+
+    it("opens a file when {target} is a file, keeping a path with spaces as one argument", () => {
+      expect(planActionRun(zed, withTarget("/w/my file.ts"))).toEqual({ kind: "spawn-app", argv: ["zed", "/w/my file.ts"] });
+    });
+
+    it("runs the same app on a different thing each time, only by changing {target}", () => {
+      const run = (target: string) => (planActionRun(zed, withTarget(target)) as { argv: string[] }).argv[1];
+      expect([run("/a"), run("/b/c.ts"), run("/d")]).toEqual(["/a", "/b/c.ts", "/d"]);
+    });
+
+    it("says a root is needed, as the bar does, when it is the Header and there is none", () => {
+      const rootless = ctx({ vars: { ...ctx().vars, workspace: "", target: "" } });
+      expect(planActionRun(zed, rootless)).toEqual({ kind: "blocked", reason: "Zed not run: A workspace root is needed" });
+    });
+
+    it("still runs from a row folder when the workspace has no root: the row is the target", () => {
+      const rootless = ctx({ vars: { ...ctx().vars, workspace: "", target: "/elsewhere" } });
+      expect(planActionRun(zed, rootless)).toEqual({ kind: "spawn-app", argv: ["zed", "/elsewhere"] });
+    });
+
+    it("is refused in a script, which names its place with its own variables", () => {
+      const plan = planActionRun(script({ command: "echo {target}" }), withTarget("/w/api"));
+      expect(plan).toMatchObject({ kind: "blocked" });
+      expect(plan.kind === "blocked" && plan.reason).toContain("{target} is only for apps");
+    });
   });
 });
 

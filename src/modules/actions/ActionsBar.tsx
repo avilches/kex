@@ -36,13 +36,16 @@ import {
   StopIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -51,6 +54,7 @@ import { IS_MAC } from "@/lib/platform";
 import { ActionIcon } from "./ActionIcon";
 import { ActionNameLines } from "./ActionNameLines";
 import { splitActionName } from "./lib/actionName";
+import { runOverlayFor } from "./lib/runOverlay";
 import {
   DROP_MENU,
   DROP_MENU_PREFIX,
@@ -71,7 +75,7 @@ import { isScript, usesTerminal, type Action, type ActionKind } from "./lib/type
 import type { Workspace } from "@/modules/workspaces/lib/types";
 import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
-const ZONE_WORDS: Record<ActionKind, string> = { app: "apps", agent: "agents", script: "scripts" };
+const ZONE_WORDS: Partial<Record<ActionKind, string>> = { agent: "agents", script: "scripts" };
 
 type Handlers = Pick<BarController, "run" | "stop" | "focus" | "fixRoot">;
 
@@ -114,6 +118,8 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
 function nameClick(item: BarItem, { run, focus, fixRoot }: Handlers) {
   if (item.needsRoot) return fixRoot();
   if (item.state !== "idle" && focus(item.action)) return;
+  // An app of the context combo opens the folder or file the combo is on, not the workspace root.
+  if (item.runTarget !== undefined) return run(item.action, runOverlayFor(item.runTarget, item.runTargetKind));
   run(item.action);
 }
 
@@ -448,16 +454,42 @@ function MenuSection({
   );
 }
 
+// The entry of the menu for the focused folder or file, named after it: it opens to the Actions
+// that act on it. It stays in the menu, grey and saying why, when the focused tab offers nothing
+// or no Action is made for it, so the menu does not change shape with the tab.
+function ContextSubmenu({ combo, ...row }: { combo: ContextComboModel } & Omit<RowProps, "item">) {
+  const empty = combo.workspace.length + combo.global.length === 0;
+  const why = combo.reason ?? (empty ? `No ${combo.kind} Actions yet` : null);
+  const icon = combo.kind === "folder" ? Folder01Icon : File01Icon;
+  if (why !== null) {
+    return (
+      <DropdownMenuItem disabled title={why} className="text-muted-foreground">
+        <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />
+        <span>{combo.label || "File"}</span>
+      </DropdownMenuItem>
+    );
+  }
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger title={combo.path}>
+        <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />
+        <span className="max-w-[160px] truncate">{combo.label}</span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="w-auto min-w-64 max-w-96">
+        <MenuSection id="ctx:global" label="Global actions" items={combo.global} dragging={false} {...row} />
+        {combo.global.length > 0 && combo.workspace.length > 0 && <DropdownMenuSeparator />}
+        <MenuSection id="ctx:workspace" label="Workspace actions" items={combo.workspace} dragging={false} {...row} />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
 type MenuProps = {
   label: string;
-  /** The hover words of the trigger; absent: the label. */
-  hint?: string;
-  /** The icon before the label; absent: the rocket. */
-  icon?: IconSvgElement;
-  /** The label is a folder or file name that may be long, so it is cut. */
-  truncateLabel?: boolean;
   items: BarItem[];
   globalItems: BarItem[];
+  /** The Actions of the focused folder or file, a submenu named after it at the top of the menu. */
+  context?: ContextComboModel;
   /** The reorder modifier is held: rows can be dragged and a click does nothing. */
   reorderMode: boolean;
   /** Some drag is in flight. */
@@ -471,11 +503,9 @@ type MenuProps = {
 // one after, each in the user's order, with the Settings entry at the bottom.
 export function ActionsMenu({
   label,
-  hint,
-  icon = Rocket01Icon,
-  truncateLabel = false,
   items,
   globalItems,
+  context,
   reorderMode,
   dragging,
   onEdit,
@@ -487,7 +517,7 @@ export function ActionsMenu({
   // once that happened, the focus leaving the menu is not a reason to dismiss it. A click
   // outside, Escape or a pick still close it.
   const holdOpen = useRef(false);
-  if (items.length === 0 && globalItems.length === 0) return null;
+  if (items.length === 0 && globalItems.length === 0 && !context?.exists) return null;
   const h = {
     run: props.run,
     stop: props.stop,
@@ -505,11 +535,11 @@ export function ActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          title={hint ?? label}
+          title={label}
           className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <HugeiconsIcon icon={icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
-          <span className={cn(truncateLabel && "max-w-[100px] truncate")}>{label}</span>
+          <HugeiconsIcon icon={Rocket01Icon} size={13} strokeWidth={2} className={cn(busy && "text-green-500")} />
+          <span>{label}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
         </button>
       </DropdownMenuTrigger>
@@ -524,6 +554,12 @@ export function ActionsMenu({
           onRestoreFocus();
         }}
       >
+        {context?.exists && (
+          <>
+            <ContextSubmenu combo={context} {...row} />
+            {(items.length > 0 || globalItems.length > 0 || dragging) && <DropdownMenuSeparator />}
+          </>
+        )}
         <MenuSection id={DROP_MENU_GLOBAL} label="Global actions" items={globalItems} dragging={dragging} {...row} />
         {(globalItems.length > 0 || dragging) && (items.length > 0 || dragging) && <DropdownMenuSeparator />}
         <MenuSection id={DROP_MENU_WORKSPACE} label="Workspace actions" items={items} dragging={dragging} {...row} />
@@ -534,50 +570,6 @@ export function ActionsMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-// The one combo for the Actions that act on the focused tab, a folder for a terminal and a file
-// for an editor. It is drawn in the same place whatever tab is focused, once any such Action
-// exists; with nothing to act on it turns grey and says why instead of vanishing.
-export function ContextCombo({
-  combo,
-  onRestoreFocus,
-  onConfigure,
-  ...props
-}: { combo: ContextComboModel; onRestoreFocus: () => void; onConfigure: () => void } & ItemOps & Handlers) {
-  if (!combo.exists) return null;
-  const empty = combo.workspace.length + combo.global.length === 0;
-  const why = combo.reason ?? (empty ? `No ${combo.kind} Actions yet` : null);
-  const icon = combo.kind === "file" ? File01Icon : Folder01Icon;
-  if (why !== null) {
-    return (
-      <button
-        type="button"
-        disabled
-        title={why}
-        className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground opacity-50"
-      >
-        <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />
-        <span>Folder or file</span>
-        <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
-      </button>
-    );
-  }
-  return (
-    <ActionsMenu
-      label={combo.label}
-      hint={combo.path}
-      icon={icon}
-      truncateLabel
-      items={combo.workspace}
-      globalItems={combo.global}
-      reorderMode={false}
-      dragging={false}
-      onRestoreFocus={onRestoreFocus}
-      onConfigure={onConfigure}
-      {...props}
-    />
   );
 }
 
@@ -853,7 +845,7 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
               {i === 1 && !dragging && workspaceButtons.length > 0 && globalButtons.length > 0 && (
                 <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
               )}
-              {KIND_ORDER.map((kind) => {
+              {KIND_ORDER.filter((kind) => kind !== "app").map((kind) => {
                 const list = scoped.filter((b) => b.action.kind === kind);
                 return (
                   <BarZone
@@ -871,12 +863,12 @@ export function ActionsBar({ workspace, controller, onConfigure, onAddAction, on
             </Fragment>
           );
         })}
-        <ContextCombo combo={model.contextCombo} onRestoreFocus={onRestoreFocus} onConfigure={onConfigure} {...itemOps} {...controller} />
-        <MenuDrop dragging={dragging} fromMenu={fromMenu} hasMenu={menuItems.length > 0}>
+        <MenuDrop dragging={dragging} fromMenu={fromMenu} hasMenu={menuItems.length > 0 || model.contextCombo.exists}>
           <ActionsMenu
             label="Actions"
             items={model.menu.workspace}
             globalItems={model.menu.global}
+            context={model.contextCombo}
             reorderMode={held}
             dragging={dragging}
             onRestoreFocus={onRestoreFocus}

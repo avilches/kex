@@ -33,7 +33,7 @@ type Inputs = {
 // there, and the values to run them with, aimed at the workspace the folder belongs to.
 function newTabActionsFor({ ws, folder, git, host, shell, global }: Inputs): NewTabActions {
   if (!folder) return { groups: EMPTY, overlay: null };
-  const vars = buildCommandVars(rowTabAt(folder), { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, git, host);
+  const vars = { ...buildCommandVars(rowTabAt(folder), { cwd: ws.cwd, workspaceRoot: ws.workspaceRoot }, git, host), target: folder };
   const groups = newTabActionEntries(
     ws.actions ?? NONE,
     global,

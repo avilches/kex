@@ -4,6 +4,8 @@ All Tauri commands registered in `src-tauri/src/lib.rs` via `tauri::generate_han
 
 Adding a new command requires three steps: `Cargo.toml` dependency (if a new plugin), `.plugin(...)` call in `lib.rs` `run()`, and a capability entry in `src-tauri/capabilities/default.json`.
 
+**Threading.** A `#[tauri::command]` without `async` runs on the main thread, the one that paints and handles input, so a command that reads files, walks a tree, spawns a process or waits on a lock must be `#[tauri::command(async)]` or an `async fn` (then it runs on the async runtime; use `spawn_blocking` for work that can take long). The few commands that stay synchronous are listed with their reason in `MAIN_THREAD` in `src-tauri/tests/command_threading.rs`: window and webview APIs, writes whose order matters (`pty_write`, `window_save_*`, `fs_watch_*`), and single calls or flags. A new synchronous command fails that test until it is made async or added to the list with a reason.
+
 ---
 
 ## `pty::*` - PTY sessions

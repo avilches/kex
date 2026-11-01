@@ -23,11 +23,18 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import { actionTarget } from "./lib/actionsBar";
+import type { AppAccepts } from "@/modules/external-editors/catalog";
+import { acceptsFile, acceptsFolder, acceptsFromSwitches, acceptsOnlyFile, appAccepts, appCombos, inBar } from "./lib/actionTargets";
+import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
-import { isAgent, isScript, type Action, type ActionKind } from "./lib/types";
+import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
 
 const KIND_WORDS: Record<ActionKind, string> = { script: "script", app: "application", agent: "agent" };
+
+const ACCEPTS_SWITCHES = [
+  { key: "files", label: "Edit files" },
+  { key: "folders", label: "Open folders" },
+] as const;
 
 const SMALL_BUTTON =
   "flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
@@ -59,6 +66,12 @@ const CWD_MODE_ICONS = {
 // command when the field loses focus, the rest at once), so Close only leaves; closing with
 // Escape or the backdrop flushes what is still being typed. A preset is edited like any other
 // Action: the host decides when a change makes it the user's own.
+function appPlace(accepts: AppAccepts): string {
+  const { actions, file } = appCombos(accepts);
+  if (actions && file) return "It lives in the Actions menu, and in the submenu of the focused file.";
+  return file ? "It lives in the submenu of the Actions menu named after the focused file." : "It lives in the Actions menu.";
+}
+
 export function ActionEditDialog({ action, context, scope, saved, workspaceAvailable, workspaceName, onScopeChange, onChange, onClose }: Props) {
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
@@ -82,6 +95,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const cwdMode: ScriptCwdMode = action.cwdMode ?? "home";
   const script = isScript(action);
   const agent = isAgent(action);
+  const app = isApp(action);
   const yolo = agent ? yoloSwitch(command.shown) : null;
 
   // The latest values for the unmount flush, which closes over nothing else.
@@ -308,7 +322,7 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           )}
           {!agent && variablesOpen && (
             <div className="flex min-w-0 flex-col text-[11px] leading-snug">
-              {commandVariableDocs().map((v) => (
+              {commandVariableDocs(action.kind).map((v) => (
                 <button
                   key={v.name}
                   type="button"
@@ -350,12 +364,44 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
           ))}
         </div>
 
-        {agent || actionTarget(action.command) === "workspace" ? (
+        {app && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">What it opens</span>
+            <fieldset className="grid grid-cols-2 gap-2" aria-label="What it opens">
+              {ACCEPTS_SWITCHES.map(({ key, label }) => {
+                const accepts = appAccepts(action);
+                const on = key === "files" ? acceptsFile(accepts) : acceptsFolder(accepts);
+                const other = key === "files" ? acceptsFolder(accepts) : acceptsFile(accepts);
+                return (
+                  <label key={key} htmlFor={`accepts-${key}`} className={cn(BOXED_RADIO, "items-center text-[12px]")}>
+                    <Checkbox
+                      id={`accepts-${key}`}
+                      checked={on}
+                      onCheckedChange={(next) => {
+                        const value = next === true;
+                        const files = key === "files" ? value : other;
+                        const folders = key === "folders" ? value : other;
+                        onChange({ ...action, accepts: acceptsFromSwitches(files, folders, accepts) });
+                      }}
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </fieldset>
+          </div>
+        )}
+
+        {app ? (
+          <div className="text-[11px] text-muted-foreground">
+            {appPlace(appAccepts(action))} It never gets a button of its own.
+          </div>
+        ) : inBar(action) ? (
           <OwnButtonChoice action={action} scope={scope} onChange={(own) => onChange({ ...action, ownButton: own })} />
         ) : (
           <div className="text-[11px] text-muted-foreground">
-            It acts on the focused {actionTarget(action.command) === "file" ? "file" : "folder"}, so it lives in the
-            folder and file combo of the header, never as a button of its own.
+            It acts on the focused {acceptsOnlyFile(action) ? "file" : "folder"}, so it lives in the submenu of the Actions
+            menu named after it, never as a button of its own.
           </div>
         )}
 

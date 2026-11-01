@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { ActionsMenu, ContextCombo, OwnButton } from "./ActionsBar";
+import { ActionsMenu, OwnButton } from "./ActionsBar";
 import { buildActionsBarModel, NO_CONTEXT_REASON, WORKSPACE_UNSET, type BarContext, type BarItem, type ContextCombo as ContextComboModel } from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 
@@ -126,7 +126,7 @@ describe("OwnButton", () => {
     const twin: Action = { ...agent, id: "g2", cwdMode: "fixed", cwd: "/elsewhere" };
     const built = buildActionsBarModel({ local: [agent, twin], context, states: new Map(), activeId: undefined }).buttons[0]!;
     expect(built).toMatchObject({ id: "g1", iconOnly: false });
-    expect(built.subtitle).toBe("/p");
+    expect(built.subtitle).toBeNull();
     const { container, handlers, unmount } = mount(built, focus);
     expect(container.querySelectorAll("button")).toHaveLength(1);
     expect(byLabel(container, "Stop Claude Code")).toBeNull();
@@ -134,7 +134,7 @@ describe("OwnButton", () => {
     const button = container.querySelector("button")!;
     expect(button.title).toBe("Run Claude Code");
     expect(button.querySelector("img")).not.toBeNull();
-    expect(button.textContent).toContain("/p");
+    expect(button.textContent).not.toContain("/p");
     click(button);
     click(button);
     expect(handlers.run).toHaveBeenCalledTimes(2);
@@ -233,63 +233,8 @@ function mountMenuForRoot(items: BarItem[]) {
   return { run, fixRoot, open, unmount: () => act(() => root.unmount()) };
 }
 
-describe("ContextCombo", () => {
-  const base: ContextComboModel = { exists: true, kind: "folder", label: "api", path: "/p/api", workspace: [], global: [], reason: null };
-  function mountCombo(combo: ContextComboModel) {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    act(() =>
-      root.render(
-        createElement(ContextCombo, {
-          combo,
-          onEdit: vi.fn(),
-          onRestoreFocus: vi.fn(),
-          onConfigure: vi.fn(),
-          run: vi.fn(),
-          stop: vi.fn(),
-          fixRoot: vi.fn(),
-          focus: vi.fn(() => false),
-        }),
-      ),
-    );
-    return { container, unmount: () => act(() => root.unmount()) };
-  }
-
-  it("draws nothing while no Action depends on a folder or a file", () => {
-    const view = mountCombo({ ...base, exists: false });
-    expect(view.container.querySelector("button")).toBeNull();
-    view.unmount();
-  });
-
-  it("stays in place, grey, and says why when no tab offers a folder or a file", () => {
-    const view = mountCombo({ ...base, kind: null, label: "", path: "", reason: NO_CONTEXT_REASON });
-    const trigger = view.container.querySelector("button") as HTMLButtonElement;
-    expect(trigger.disabled).toBe(true);
-    expect(trigger.title).toBe(NO_CONTEXT_REASON);
-    view.unmount();
-  });
-
-  it("is grey too when the tab has a folder but no Action is made for folders", () => {
-    const view = mountCombo(base);
-    const trigger = view.container.querySelector("button") as HTMLButtonElement;
-    expect(trigger.disabled).toBe(true);
-    expect(trigger.title).toBe("No folder Actions yet");
-    view.unmount();
-  });
-
-  it("is named after the folder it acts on, with the full path on its hover", () => {
-    const view = mountCombo({ ...base, workspace: [item({ ...script, command: "pnpm dev {cwd}" })] });
-    const trigger = view.container.querySelector("button") as HTMLButtonElement;
-    expect(trigger.disabled).toBe(false);
-    expect(trigger.title).toBe("/p/api");
-    expect(trigger.textContent).toBe("api");
-    view.unmount();
-  });
-});
-
 describe("ActionsMenu", () => {
-  function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false), extra: { dragging?: boolean; reorderMode?: boolean } = {}) {
+  function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false), extra: { dragging?: boolean; reorderMode?: boolean; context?: ContextComboModel } = {}) {
     const handlers = { run: vi.fn(), stop: vi.fn(), focus, fixRoot: vi.fn() };
     const onEdit = vi.fn();
     const container = document.createElement("div");
@@ -301,6 +246,7 @@ describe("ActionsMenu", () => {
           label: "Actions",
           items,
           globalItems,
+          context: extra.context,
           reorderMode: extra.reorderMode ?? false,
           dragging: extra.dragging ?? false,
           onEdit,
@@ -318,6 +264,49 @@ describe("ActionsMenu", () => {
       });
     return { container, handlers, onEdit, open, unmount: () => act(() => root.unmount()) };
   }
+
+  describe("context submenu", () => {
+    const base: ContextComboModel = { exists: true, kind: "folder", label: "api", path: "/p/api", workspace: [], global: [], reason: null };
+    const submenu = () => [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "api" || r.textContent === "a.ts") as HTMLElement | undefined;
+
+    it("draws no menu at all while nothing depends on a folder or a file and the menu is empty", () => {
+      const view = mountMenu([], [], undefined, { context: { ...base, exists: false } });
+      expect(view.container.querySelector("button")).toBeNull();
+      view.unmount();
+    });
+
+    it("keeps the entry grey, saying why, when the focused tab offers no folder or file", () => {
+      const view = mountMenu([item(app)], [], undefined, { context: { ...base, kind: null, label: "", path: "", reason: NO_CONTEXT_REASON } });
+      view.open();
+      const entry = [...document.querySelectorAll("[role='menu'] [role='menuitem']")].find((r) => r.textContent === "File") as HTMLElement;
+      expect(entry.getAttribute("aria-disabled") ?? entry.getAttribute("data-disabled")).not.toBeNull();
+      expect(entry.title).toBe(NO_CONTEXT_REASON);
+      view.unmount();
+    });
+
+    it("is grey too when the tab has a folder but no Action is made for folders", () => {
+      const view = mountMenu([item(app)], [], undefined, { context: base });
+      view.open();
+      expect(submenu()?.title).toBe("No folder Actions yet");
+      view.unmount();
+    });
+
+    it("is named after the folder it acts on, with the full path on its hover", () => {
+      const view = mountMenu([item(app)], [], undefined, { context: { ...base, workspace: [item({ ...script, command: "pnpm dev {cwd}" })] } });
+      view.open();
+      const entry = submenu()!;
+      expect(entry.title).toBe("/p/api");
+      expect(entry.getAttribute("aria-haspopup")).toBe("menu");
+      view.unmount();
+    });
+
+    it("exists on its own when the menu has no other Action", () => {
+      const view = mountMenu([], [], undefined, { context: { ...base, workspace: [item({ ...script, command: "pnpm dev {cwd}" })] } });
+      view.open();
+      expect(submenu()).toBeDefined();
+      view.unmount();
+    });
+  });
 
   it("pools every non-own Action into one menu: global scope, then workspace", () => {
     const view = mountMenu([item(app)], [item({ ...script, id: "g1" })]);

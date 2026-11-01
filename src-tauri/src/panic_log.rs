@@ -76,6 +76,20 @@ mod tests {
     }
 
     #[test]
+    fn release_profile_keeps_unwinding_so_appkit_exceptions_do_not_abort() {
+        let manifest = include_str!("../Cargo.toml");
+        let release = manifest
+            .split("[profile.release]")
+            .nth(1)
+            .and_then(|rest| rest.split("\n[").next())
+            .expect("[profile.release] section");
+        assert!(
+            !release.contains("panic = \"abort\""),
+            "panic = \"abort\" makes tao's extern \"C-unwind\" sendEvent abort on any Objective-C exception"
+        );
+    }
+
+    #[test]
     fn names_thread_location_and_message() {
         let text = describe(
             "called `Option::unwrap()` on a `None` value",

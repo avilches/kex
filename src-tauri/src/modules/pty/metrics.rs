@@ -52,6 +52,17 @@ pub fn aggregate_tree(procs: &HashMap<u32, ProcStat>, root: u32, num_cpus: usize
     (norm, mem)
 }
 
+/// The direct child of `root` with the lowest pid, which is the one `pgrep -P` lists first.
+/// The metrics sample reads it from the table it already loaded instead of running `pgrep`
+/// once per terminal.
+pub fn first_child_of(procs: &HashMap<u32, ProcStat>, root: u32) -> Option<u32> {
+    procs
+        .iter()
+        .filter(|(pid, st)| st.parent == root && **pid != root)
+        .map(|(pid, _)| *pid)
+        .min()
+}
+
 /// The pids of every descendant of `root`, `root` itself not counted. A pid
 /// whose parent is itself (the init of a container) is skipped by the seen set.
 pub fn descendants_of(procs: &HashMap<u32, ProcStat>, root: u32) -> Vec<u32> {
@@ -142,6 +153,31 @@ mod tests {
         let (cpu, mem) = aggregate_tree(&procs, 100, 4);
         assert_eq!(cpu, 0.0);
         assert_eq!(mem, 0);
+    }
+
+    #[test]
+    fn first_child_is_the_lowest_pid_among_the_direct_children() {
+        let mut procs = HashMap::new();
+        procs.insert(100, st(1, 0.0, 0));
+        procs.insert(150, st(100, 0.0, 0));
+        procs.insert(120, st(100, 0.0, 0));
+        procs.insert(110, st(120, 0.0, 0)); // grandchild: not a direct child
+        assert_eq!(first_child_of(&procs, 100), Some(120));
+    }
+
+    #[test]
+    fn first_child_of_a_leaf_or_an_unknown_pid_is_none() {
+        let mut procs = HashMap::new();
+        procs.insert(100, st(1, 0.0, 0));
+        assert_eq!(first_child_of(&procs, 100), None);
+        assert_eq!(first_child_of(&procs, 4242), None);
+    }
+
+    #[test]
+    fn first_child_ignores_a_pid_that_is_its_own_parent() {
+        let mut procs = HashMap::new();
+        procs.insert(100, st(100, 0.0, 0));
+        assert_eq!(first_child_of(&procs, 100), None);
     }
 
     #[test]

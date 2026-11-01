@@ -28,6 +28,7 @@ import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { unlinkRemovedActions, unlinkTab } from "@/modules/actions/lib/actionStateStore";
+import { runOverlayFor } from "@/modules/actions/lib/runOverlay";
 import { useActionRunner } from "@/modules/actions/lib/useActionRunner";
 import { createBarOps } from "@/modules/actions/lib/barOps";
 import { globalActions } from "@/modules/actions/lib/globalActionsBinding";
@@ -1096,11 +1097,11 @@ export default function App() {
 
   const handleSubmitRootPath = useCallback(
     async (typed: string) => {
-      if (!activeWorkspace) return;
+      if (!activeWorkspace) return false;
       const path = await resolveRootPath(typed);
-      if (!path) return;
-      if (activeRootMode !== "filesystem") return;
+      if (!path || activeRootMode !== "filesystem") return false;
       setFsRoot(activeWorkspace.id, path);
+      return true;
     },
     [activeWorkspace, activeRootMode, resolveRootPath, setFsRoot],
   );
@@ -1170,12 +1171,25 @@ export default function App() {
           setExplorerRootMode(ws.id, target.mode);
           if (target.mode === "filesystem" && target.fsRoot) {
             setFsRoot(ws.id, target.fsRoot);
+          } else if (target.mode === "workspace") {
+            // Position the file system view too, so switching to it later
+            // lands on the same folder.
+            const other = resolveSidebarTarget({
+              folder: dir,
+              workspaceRoot: null,
+              workspaceGitRoot: null,
+              gitRoot: resolvedGitRoot,
+              currentFsRoot: fsFolderRoot,
+              home,
+            });
+            if (other.fsRoot) setFsRoot(ws.id, other.fsRoot);
           }
           setRevealRequest((r) => ({
             path: folder,
             nonce: (r?.nonce ?? 0) + 1,
             workspaceId: ws.id,
             pendingAction: opts.pendingAction,
+            forceFlash: opts.fromShortcut,
           }));
         });
 
@@ -4345,7 +4359,7 @@ export default function App() {
             actionsWorkspace={activeWorkspace ?? null}
             onRunAction={(item) => {
               if (item.state !== "idle" && focusActionTab(item.action)) return;
-              runAction(item.action);
+              runAction(item.action, item.runTarget !== undefined ? runOverlayFor(item.runTarget, item.runTargetKind) : undefined);
             }}
             onStopAction={(item) => stopAction(item.action)}
             onEditAction={(item) =>

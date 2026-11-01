@@ -5,8 +5,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { SetWorkspaceRootItem } from "./SetWorkspaceRootItem";
-import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { SetWorkspaceRootItem, samePath } from "./SetWorkspaceRootItem";
+import { pathDirname } from "@/lib/pathUtils";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { RowActionsMenu } from "@/modules/actions/RowActionsMenu";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ import { useWorkspaceDnd } from "@/modules/workspaces";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ArrowRight01Icon,
+  ArrowUp01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
   Copy01Icon,
@@ -27,9 +28,9 @@ import {
   FileAddIcon,
   FolderAddIcon,
   FolderOpenIcon,
-  FolderUploadIcon,
   LinkSquare02Icon,
   PencilEdit01Icon,
+  PinIcon,
   Refresh01Icon,
   Scissor01Icon,
   ViewOffSlashIcon,
@@ -100,6 +101,7 @@ export type EntryRowProps = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitRootPath?: string | null;
   onEnterFolder?: (path: string) => void;
+  searchOpen?: boolean;
   previewOnClick: boolean;
   hasClipboard: boolean;
   isCutSource: boolean;
@@ -133,6 +135,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onAddToGitignore,
     gitRootPath,
     onEnterFolder,
+    searchOpen = false,
     previewOnClick,
     hasClipboard,
     isCutSource,
@@ -283,8 +286,16 @@ function EntryRowImpl(props: EntryRowProps) {
             ) : (
               <span className="size-4 shrink-0" />
             )}
+            {isDir && workspaceRoot !== null && samePath(path, workspaceRoot) && (
+              <HugeiconsIcon
+                icon={PinIcon}
+                size={11}
+                strokeWidth={2}
+                className="shrink-0 text-primary"
+              />
+            )}
             <span
-              className="min-w-0 flex-1 truncate"
+              className={cn("min-w-0 truncate", !isDir && "flex-1")}
               style={
                 !gitignored && gitStatusCode
                   ? {
@@ -299,6 +310,26 @@ function EntryRowImpl(props: EntryRowProps) {
             >
               {name}
             </span>
+            {isDir && onEnterFolder && (
+              <span
+                role="button"
+                title="Open this folder as the explorer root"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEnterFolder(path);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+              >
+                Open
+              </span>
+            )}
+            {isDir && <span className="flex-1" />}
             {isOpenInTab && (
               <span
                 role="button"
@@ -399,6 +430,7 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() =>
             actions.beginCreate(createParent, "file", createAfterPath)
           }
@@ -408,6 +440,7 @@ function EntryRowImpl(props: EntryRowProps) {
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() =>
             actions.beginCreate(createParent, "dir", createAfterPath)
           }
@@ -543,19 +576,33 @@ export type FsRootRowProps = {
   workspaceRoot: string | null;
   flashToken: number;
   onSetAsRoot?: (path: string) => void;
+  onOpenInExplorer?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onBeginCreate?: (parentPath: string, kind: "file" | "dir") => void;
   onRefresh?: (path: string) => void;
   onPaste?: (targetPath: string, targetIsDir: boolean) => void | Promise<void>;
   canPaste?: boolean;
+  searchOpen?: boolean;
 };
 
-export function FsRootRow({
+export type FolderMenuItemsProps = Pick<
+  FsRootRowProps,
+  | "workspaceRoot"
+  | "onSetAsRoot"
+  | "onNewWorkspaceFromFolder"
+  | "onRevealInTerminal"
+  | "onBeginCreate"
+  | "onRefresh"
+  | "onPaste"
+  | "canPaste"
+  | "searchOpen"
+> & { path: string };
+
+// The context menu every folder shares; the explorer root header prepends its own entry.
+export function FolderMenuItems({
   path,
-  isWorkspaceRoot,
   workspaceRoot,
-  flashToken,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -563,54 +610,16 @@ export function FsRootRow({
   onRefresh,
   onPaste,
   canPaste,
-}: FsRootRowProps) {
-  // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
-  // explorer move. The workspace dnd treats it like a folder; the explorer
-  // move logic ignores it (paneOnly).
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `dir-pane:${path}`,
-    data: { path },
-  });
+  searchOpen,
+}: FolderMenuItemsProps) {
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={setNodeRef}
-          {...listeners}
-          {...attributes}
-          onMouseDown={keepScratchpadFocus}
-          className={cn(
-            "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
-            isDragging && "opacity-50",
-          )}
-          style={{ paddingLeft: 6 }}
-          title={path}
-        >
-          <FlashOverlay token={flashToken} />
-          <img
-            src={folderIconUrl("", true)}
-            alt=""
-            draggable={false}
-            className="size-4 shrink-0"
-          />
-          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90">
-            {pathBasename(path, { tolerateTrailingSlash: true }) || path}
-          </span>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className={COMPACT_CONTENT}>
+    <>
         {onSetAsRoot && (
           <SetWorkspaceRootItem
             path={path}
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
             place="top"
-            disabled={isWorkspaceRoot}
-            label={
-              isWorkspaceRoot
-                ? "This is the Workspace Root"
-                : "Set as Workspace Root"
-            }
           />
         )}
         <RowActionsMenu kind="folder" path={path} />
@@ -653,17 +662,12 @@ export function FsRootRow({
             workspaceRoot={workspaceRoot}
             onSetAsRoot={onSetAsRoot}
             place="end"
-            disabled={isWorkspaceRoot}
-            label={
-              isWorkspaceRoot
-                ? "This is the Workspace Root"
-                : "Set as Workspace Root"
-            }
           />
         )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onBeginCreate?.(path, "file")}
         >
           <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
@@ -671,6 +675,7 @@ export function FsRootRow({
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onBeginCreate?.(path, "dir")}
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
@@ -690,11 +695,97 @@ export function FsRootRow({
         <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         <ContextMenuItem
           className={COMPACT_ITEM}
+          disabled={searchOpen}
           onSelect={() => onRefresh?.(path)}
         >
           <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
           Refresh
         </ContextMenuItem>
+    </>
+  );
+}
+
+export function FsRootRow({
+  path,
+  isWorkspaceRoot,
+  workspaceRoot,
+  flashToken,
+  onSetAsRoot,
+  onOpenInExplorer,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onBeginCreate,
+  onRefresh,
+  onPaste,
+  canPaste,
+  searchOpen,
+}: FsRootRowProps) {
+  // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
+  // explorer move. The workspace dnd treats it like a folder; the explorer
+  // move logic ignores it (paneOnly).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `dir-pane:${path}`,
+    data: { path },
+  });
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          {...listeners}
+          {...attributes}
+          onMouseDown={keepScratchpadFocus}
+          className={cn(
+            "group/fsroot relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
+            isDragging && "opacity-50",
+          )}
+          style={{ paddingLeft: 6 }}
+          title={path}
+        >
+          <FlashOverlay token={flashToken} />
+          <img
+            src={folderIconUrl("", true)}
+            alt=""
+            draggable={false}
+            className="size-4 shrink-0"
+          />
+          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
+            {"‎" + path}
+          </span>
+          {isWorkspaceRoot && onOpenInExplorer && (
+            <span
+              role="button"
+              title="Open the workspace root in the file system explorer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenInExplorer(path);
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover/fsroot:inline"
+            >
+              Open
+            </span>
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className={COMPACT_CONTENT}>
+        <FolderMenuItems
+          path={path}
+          workspaceRoot={workspaceRoot}
+          onSetAsRoot={onSetAsRoot}
+          onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+          onRevealInTerminal={onRevealInTerminal}
+          onBeginCreate={onBeginCreate}
+          onRefresh={onRefresh}
+          onPaste={onPaste}
+          canPaste={canPaste}
+          searchOpen={searchOpen}
+        />
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -706,12 +797,14 @@ export function FsUpRow({
   onNavigateUp,
   onRevealInTerminal,
   onRefresh,
+  searchOpen,
 }: {
   path: string;
   workspaceRoot: string | null;
   onNavigateUp?: () => void;
   onRevealInTerminal?: (path: string) => void;
   onRefresh?: () => void;
+  searchOpen?: boolean;
 }) {
   // Same as FsRootRow: drag opens a terminal at the parent dir, no internal move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -721,33 +814,47 @@ export function FsUpRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <button
+        <div
           ref={setNodeRef}
           {...listeners}
           {...attributes}
           onMouseDown={keepScratchpadFocus}
-          type="button"
-          onClick={() => onNavigateUp?.()}
-          title="Go up one folder"
           className={cn(
-            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
+            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85",
             isDragging && "opacity-50",
           )}
           style={{ paddingLeft: 6 }}
         >
-          <span className="size-3.5 shrink-0" />
-          <HugeiconsIcon
-            icon={FolderUploadIcon}
-            size={16}
-            strokeWidth={1.75}
-            className="shrink-0 text-muted-foreground"
-          />
-          <span className="min-w-0 truncate">..</span>
-          <span className="pointer-events-none hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground group-hover:inline">
-            Go to parent
+          <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+            <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2.25} />
           </span>
+          <span className="relative size-4 shrink-0">
+            <img
+              src={folderIconUrl("", false)}
+              alt=""
+              draggable={false}
+              className="size-4"
+            />
+            <HugeiconsIcon
+              icon={ArrowUp01Icon}
+              size={9}
+              strokeWidth={3}
+              className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-sm"
+            />
+          </span>
+          <span className="min-w-0 truncate">..</span>
+          <button
+            type="button"
+            title="Go up one folder"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onNavigateUp?.()}
+            className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+          >
+            Go to parent
+          </button>
           <span className="flex-1" />
-        </button>
+        </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
         {onRevealInTerminal && (
@@ -773,7 +880,11 @@ export function FsUpRow({
         <ContextMenuSeparator />
         <CopyPathMenu path={path} isDir workspaceRoot={workspaceRoot} />
         {onRefresh && (
-          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRefresh()}>
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            disabled={searchOpen}
+            onSelect={() => onRefresh()}
+          >
             <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
             Refresh
           </ContextMenuItem>

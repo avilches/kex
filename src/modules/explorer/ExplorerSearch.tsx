@@ -113,7 +113,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   // Tracks the path of the currently selected item so phase-2 can restore selection.
   const selectedPathRef = useRef<string | null>(null);
 
-  const active = query.trim().length > 0;
+  const active = query.trim().length >= MIN_QUERY_LEN;
 
   // Keep selectedPathRef current whenever the selected item changes.
   useEffect(() => {
@@ -284,19 +284,22 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 }
               }
             }}
+            onBlur={() => {
+              if (!document.hasFocus()) return;
+              if (query.trim().length < MIN_QUERY_LEN) onRequestClose();
+            }}
             placeholder="Search files…"
             className="h-7 pr-7 pl-6.5 text-xs"
           />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="absolute top-1/2 right-3.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => (query ? setQuery("") : onRequestClose())}
+            className="absolute top-1/2 right-3.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label={query ? "Clear search" : "Close search"}
+            title={query ? "Clear search" : "Close search"}
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          </button>
         </div>
       ) : null}
 
