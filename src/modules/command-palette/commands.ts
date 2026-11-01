@@ -128,9 +128,15 @@ export type CommandPaletteActionContext = {
 
 const noop = () => {};
 
-// While an onboarding dialog is open, no other window may start a second one.
+const OPENS_SETTINGS = ["settings.open", "shortcuts.open", "workspace.runScripts"];
+
+// While an onboarding dialog is open no window may start a second one, and Settings stays closed.
 export function commandBlockedByOnboarding(commandId: string): boolean {
-  return commandId === "window.new";
+  return (
+    commandId === "window.new" ||
+    OPENS_SETTINGS.includes(commandId) ||
+    commandId.startsWith("settings.section.")
+  );
 }
 
 export function createCommandItems(

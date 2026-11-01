@@ -181,6 +181,7 @@ struct DynMenuItems {
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
     new_window: tauri::menu::MenuItem<tauri::Wry>,
+    settings: tauri::menu::MenuItem<tauri::Wry>,
 }
 
 #[cfg(target_os = "macos")]
@@ -243,20 +244,29 @@ pub fn refresh_dock_menu(app: &tauri::AppHandle) {
 #[cfg(not(target_os = "macos"))]
 pub fn refresh_dock_menu(_app: &tauri::AppHandle) {}
 
-/// Applies the onboarding block after it turned on or off: New Window is greyed out in the
-/// native menu while an onboarding dialog is open.
+/// Applies the onboarding block after it turned on or off: New Window and Settings are greyed
+/// out in the native menu while an onboarding dialog is open, and a Settings window already open
+/// is closed (it saves every change as it is made, like when the user closes it).
 pub(crate) fn onboarding_block_changed(app: &tauri::AppHandle) {
+    let blocked = app.state::<onboarding::OnboardingBlock>().active();
     #[cfg(target_os = "macos")]
     {
-        let blocked = app.state::<onboarding::OnboardingBlock>().active();
         let handles = app.state::<MenuHandles>();
         let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
         if let Some(items) = guard.as_ref() {
             let _ = items.new_window.set_enabled(!blocked);
+            let _ = items.settings.set_enabled(!blocked);
         }
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    if blocked {
+        close_settings_window(app);
+    }
+}
+
+fn close_settings_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.close();
+    }
 }
 
 #[tauri::command]
@@ -416,6 +426,11 @@ async fn open_settings_window(
     app: tauri::AppHandle,
     section: Option<String>,
 ) -> Result<(), String> {
+    // A no-op while an onboarding dialog is open, so no caller shows an error for it.
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        log::info!("[window] settings refused: the onboarding dialog is open");
+        return Ok(());
+    }
     let url_path = match section.as_deref() {
         Some(t) if !t.is_empty() => format!("settings.html?section={}", t),
         _ => "settings.html".to_string(),
@@ -466,6 +481,11 @@ async fn open_settings_window(
         "{}",
         window_log::describe_created("settings", "settings", None)
     );
+    // The onboarding may have opened while the window was being built, after the check above.
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        close_settings_window(&app);
+        return Ok(());
+    }
 
     #[cfg(target_os = "linux")]
     {
@@ -967,6 +987,7 @@ pub fn run() {
                     dock_browser,
                     dock_all_browsers,
                     new_window,
+                    settings,
                 }))));
 
                 app.on_menu_event(|app, event| {

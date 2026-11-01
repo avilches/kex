@@ -30,4 +30,27 @@ describe("isOnboardingOpen as a global shortcut gate", () => {
     pressCloseTab();
     expect(closeTab).toHaveBeenCalledTimes(1);
   });
+
+  it("blocks New Window and Open Settings while the onboarding is open", () => {
+    const newWindow = vi.fn();
+    const settings = vi.fn();
+    renderHook(() =>
+      useGlobalShortcuts({ "window.new": newWindow, "settings.open": settings }, { isDisabled: () => isOnboardingOpen() }),
+    );
+    const mod = { metaKey: MOD_PROP === "meta", ctrlKey: MOD_PROP === "ctrl" };
+    const press = () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "N", shiftKey: true, ...mod }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ...mod }));
+    };
+
+    act(() => openOnboarding());
+    press();
+    expect(newWindow).not.toHaveBeenCalled();
+    expect(settings).not.toHaveBeenCalled();
+
+    act(() => closeOnboarding());
+    press();
+    expect(newWindow).toHaveBeenCalledTimes(1);
+    expect(settings).toHaveBeenCalledTimes(1);
+  });
 });

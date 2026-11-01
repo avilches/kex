@@ -269,4 +269,17 @@ describe("createCommandItems while the onboarding dialog is open", () => {
     expect(byId(true).get("window.new")?.disabledReason).toBe("Setup in progress");
     expect(byId(false).get("window.new")?.disabledReason).toBeUndefined();
   });
+
+  it("disables every row that opens Settings, and nothing else", () => {
+    const open = byId(true);
+    const closed = byId(false);
+    const settingsRows = [...open.keys()].filter((id) => id.startsWith("settings.section."));
+    expect(settingsRows.length).toBeGreaterThan(3);
+    for (const id of ["settings.open", "shortcuts.open", "workspace.runScripts", ...settingsRows]) {
+      expect(open.get(id)?.disabledReason, id).toBe("Setup in progress");
+      expect(closed.get(id)?.disabledReason, id).toBeUndefined();
+    }
+    const blocked = [...open.values()].filter((i) => i.disabledReason === "Setup in progress").map((i) => i.id);
+    expect(blocked.sort()).toEqual(["settings.open", "shortcuts.open", "window.new", "workspace.runScripts", ...settingsRows].sort());
+  });
 });
