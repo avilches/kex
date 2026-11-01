@@ -45,11 +45,16 @@ const startupPrefs = await loadPreferences().catch((err) => {
 // Load saved workspace layout for session restore.
 await initWorkspaceState();
 
-// Sync Claude Code hooks on startup - idempotent in both directions:
-// - integration ON:  install/update script and settings.json entries (no-op if up to date)
-// - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
+// Refreshes (or, with notifications off, removes) the agent integrations already present. Not
+// awaited: a cold `claude --version` must never delay the first paint.
 if (startupPrefs) {
-  await runStartupSync(startupPrefs, updateInstalledIntegrations);
+  void (async () => {
+    try {
+      await runStartupSync(startupPrefs, updateInstalledIntegrations);
+    } catch (err) {
+      console.error("startup integration sync failed:", err);
+    }
+  })();
 }
 
 ReactDOM.createRoot(

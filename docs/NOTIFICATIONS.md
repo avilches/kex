@@ -302,7 +302,7 @@ calls `agent_enable_claude_hooks` directly and records nothing; the next `starte
 ### Startup sync
 
 `main.tsx` keeps the installed integrations up to date after an app update, and never creates a new one. It calls
-`runStartupSync` (`modules/agents/lib/startupSync.ts`). The
+`runStartupSync` (`modules/agents/lib/startupSync.ts`) without awaiting it, so the sync never delays the first paint. The
 decision is the pure `syncPlan`, which needs both conditions per agent: the integration is already installed AND the
 agent is detected, using the persisted `detectedEditors` (`detectedAgentIds`). Before the first scan `detectedEditors` is
 empty, so nothing is refreshed. For Claude Code the rule is presence, not currency: `agent_claude_hooks_present` is
