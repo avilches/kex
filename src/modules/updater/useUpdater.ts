@@ -117,9 +117,13 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
   const install = useCallback(async () => {
     if (status.kind !== "available") return;
     const { update } = status;
-    const claimed = await invoke<boolean>("claim_update_install").catch(
-      () => false,
-    );
+    let claimed: boolean;
+    try {
+      claimed = await invoke<boolean>("claim_update_install");
+    } catch (err) {
+      setStatus({ kind: "error", message: String(err) });
+      return;
+    }
     if (!claimed) {
       setStatus({
         kind: "error",
@@ -159,14 +163,12 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
 
   useEffect(() => {
     if (!autoCheck) return;
-    let cancelled = false;
+    // Not cancelled on unmount: the claim is spent once it is won, and a remount (StrictMode,
+    // or the window being replaced) must not leave the whole launch without a check.
     void (async () => {
       const won = await invoke<boolean>("claim_update_check").catch(() => false);
-      if (won && !cancelled) await runCheck();
+      if (won) await runCheck();
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [autoCheck, runCheck]);
 
   return { status, check: runCheck, install, dismiss };

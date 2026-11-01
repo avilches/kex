@@ -3,6 +3,11 @@
 ; NoWorkingDirectory keeps Explorer from overriding %V (System32 on Drive).
 
 !macro NSIS_HOOK_POSTINSTALL
+  ; Verbs registered by builds that still shipped terax.exe point at a binary that is gone.
+  DeleteRegKey HKCU "Software\Classes\Directory\shell\OpenInTerax"
+  DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\OpenInTerax"
+  DeleteRegKey HKCU "Software\Classes\Drive\shell\OpenInTerax"
+
   WriteRegStr HKCU "Software\Classes\Directory\shell\OpenInKex" "" "Open in Kex"
   WriteRegStr HKCU "Software\Classes\Directory\shell\OpenInKex" "Icon" '"$INSTDIR\kex.exe",0'
   WriteRegStr HKCU "Software\Classes\Directory\shell\OpenInKex" "NoWorkingDirectory" ""

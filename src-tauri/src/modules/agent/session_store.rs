@@ -131,17 +131,17 @@ pub fn split_orphans(
     plans.into_iter().partition(|p| known.contains(&p.tab_id))
 }
 
-/// Plans for the tabs in `mine`, cloned. Plans are computed once per process, because
-/// computing them prunes records; each window then takes only its own.
-pub fn plans_for_tabs(
-    plans: &[RestorePlan],
+/// Removes and returns the plans for the tabs in `mine`. Plans are computed once per process,
+/// because computing them prunes records; each window then takes only its own, once.
+pub fn take_plans_for_tabs(
+    plans: &mut Vec<RestorePlan>,
     mine: &std::collections::HashSet<String>,
 ) -> Vec<RestorePlan> {
-    plans
-        .iter()
-        .filter(|p| mine.contains(&p.tab_id))
-        .cloned()
-        .collect()
+    let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(plans)
+        .into_iter()
+        .partition(|p| mine.contains(&p.tab_id));
+    *plans = kept;
+    taken
 }
 
 #[cfg(test)]
@@ -1945,14 +1945,22 @@ mod tests {
 
     #[test]
     fn each_window_gets_only_the_plans_of_its_own_tabs() {
-        let plans = vec![plan_for("tab-a"), plan_for("tab-b"), plan_for("tab-c")];
+        let mut plans = vec![plan_for("tab-a"), plan_for("tab-b"), plan_for("tab-c")];
         let window_1 = std::collections::HashSet::from(["tab-a".to_string()]);
         let window_2 = std::collections::HashSet::from(["tab-b".to_string(), "tab-c".to_string()]);
 
         let ids = |p: Vec<RestorePlan>| p.into_iter().map(|p| p.tab_id).collect::<Vec<_>>();
-        assert_eq!(ids(plans_for_tabs(&plans, &window_1)), vec!["tab-a"]);
-        assert_eq!(ids(plans_for_tabs(&plans, &window_2)), vec!["tab-b", "tab-c"]);
-        assert!(plans_for_tabs(&plans, &Default::default()).is_empty());
+        assert!(take_plans_for_tabs(&mut plans, &Default::default()).is_empty());
+        assert_eq!(ids(take_plans_for_tabs(&mut plans, &window_1)), vec!["tab-a"]);
+        assert_eq!(ids(take_plans_for_tabs(&mut plans, &window_2)), vec!["tab-b", "tab-c"]);
+    }
+
+    #[test]
+    fn a_plan_is_handed_out_only_once() {
+        let mut plans = vec![plan_for("tab-a")];
+        let mine = std::collections::HashSet::from(["tab-a".to_string()]);
+        assert_eq!(take_plans_for_tabs(&mut plans, &mine).len(), 1);
+        assert!(take_plans_for_tabs(&mut plans, &mine).is_empty());
     }
 
     #[test]

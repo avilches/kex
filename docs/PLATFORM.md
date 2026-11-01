@@ -55,12 +55,18 @@ hidden via `invisible pointer-events-none` so PTYs and dev servers keep streamin
 - **One process.** `tauri-plugin-single-instance` is the first plugin. A second launch (the Windows "Open in Kex"
   verb from `installer-hooks.nsh`, or the CLI) never starts a second app: it passes `argv` and its cwd to the live
   instance and exits. `handle_second_launch` resolves the folder (`launch_dir_from_args`), authorizes it, focuses the
-  focused main window and emits `kex:open-folder` to it only, which opens the folder as a workspace
-  (`newWorkspaceFromFolder`). With no window alive it creates one that reads the folder through `get_launch_dir`.
+  focused main window, queues the folder for it (`PendingOpenFolders`) and emits `kex:open-folder` to it only. The
+  event carries no payload: the window drains its queue with `take_pending_open_folders` on mount and on every
+  event, because a window that is still starting has no listener yet and an event with a payload would be lost.
+  Each folder opens as a workspace (`newWorkspaceFromFolder`). With no window alive it creates one that reads the
+  folder through `get_launch_dir`.
 - **Which window acts.** Global `emit` reaches every window, so a request that must happen once goes through
   `emit_to` the focused window: `kex:menu`, `kex://theme-edit` (`request_theme_edit`) and `kex:open-folder`.
+  The receiving side must listen with `getCurrentWebviewWindow().listen`: the global `listen` has target Any and
+  also receives events that were sent with `emit_to` to another window.
 - **Quit.** `kex:before-quit` goes to every main window; the app exits when the last one calls `confirm_quit`
-  (`QuitGuard.flushing`), or after a 3 s timeout.
+  (`QuitGuard.flushing`). A window destroyed meanwhile stops being waited for. A safety timer of 10 s forces the
+  exit, and does nothing once every window has confirmed or when a newer quit has replaced it (`epoch`).
 - **Once per launch.** The startup editor scan (`claim_startup_scan`) and the automatic update check
   (`claim_update_check`) are claimed through a process-wide flag, so only the first window does them; an update
   install is guarded the same way (`claim_update_install`).
