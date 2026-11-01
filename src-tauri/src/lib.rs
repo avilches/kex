@@ -727,6 +727,12 @@ pub fn run() {
     let cli_dir = parse_launch_dir();
     workspace::init_launch_cwd(cli_dir.as_deref());
 
+    let mut context = tauri::generate_context!();
+    if let Err(e) = modules::profile::apply(context.config_mut()) {
+        eprintln!("{e}");
+        std::process::exit(2);
+    }
+
     let builder = tauri::Builder::default();
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
@@ -1217,7 +1223,7 @@ pub fn run() {
             float_browser::float_browser_dock,
             float_browser::float_browser_navigate,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {

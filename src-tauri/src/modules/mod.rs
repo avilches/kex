@@ -9,6 +9,7 @@ pub mod hibernate_lines;
 pub mod history;
 pub mod menu_route;
 pub mod proc;
+pub mod profile;
 pub mod pty;
 pub mod shell;
 pub mod tab_history;
