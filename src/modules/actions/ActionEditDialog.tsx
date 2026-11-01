@@ -24,7 +24,7 @@ import { OwnButtonChoice } from "./OwnButtonChoice";
 import { isYolo, setYolo, yoloSwitch } from "./lib/agentYolo";
 import { actionProblems, CWD_MODE_LABELS, commandDraft, commandVariableDocs, commitCommand } from "./lib/actionForm";
 import type { Scope } from "./lib/actionDrop";
-import { ACCEPTS_LABELS, acceptsOnlyFile, appAccepts, inBar } from "./lib/actionTargets";
+import { ACCEPTS_LABELS, acceptsOnlyFile, appAccepts, inBar, usesTarget } from "./lib/actionTargets";
 import { BOXED_RADIO } from "./lib/boxedRadio";
 import type { ActionContext } from "./lib/useActionContext";
 import { isAgent, isApp, isScript, type Action, type ActionKind } from "./lib/types";
@@ -86,6 +86,9 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
   const script = isScript(action);
   const agent = isAgent(action);
   const app = isApp(action);
+  // What it accepts only matters to an app that opens {target}; the form still asks it, so the
+  // choice is there to find, and says when the command does not use it.
+  const targetless = app && !usesTarget({ kind: action.kind, command: command.shown });
   const yolo = agent ? yoloSwitch(command.shown) : null;
 
   // The latest values for the unmount flush, which closes over nothing else.
@@ -370,6 +373,11 @@ export function ActionEditDialog({ action, context, scope, saved, workspaceAvail
                 </label>
               ))}
             </RadioGroup>
+            {targetless && command.shown.trim() !== "" && (
+              <span className="text-[11px] text-muted-foreground">
+                The command has no {"{target}"}, so this does not apply: it is placed by the variables it uses.
+              </span>
+            )}
           </div>
         )}
 

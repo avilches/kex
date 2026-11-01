@@ -1,7 +1,7 @@
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
-import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
-import { acceptsFile, acceptsFolder, appAccepts } from "./actionTargets";
-import { isAgent, isApp, isScript, type Action } from "./types";
+import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, appTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
+import { acceptsFile, acceptsFolder, appAccepts, usesTarget } from "./actionTargets";
+import { isAgent, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
 
@@ -31,7 +31,7 @@ type Options = {
 
 // Why an app cannot open this kind of row, or null when it can.
 function acceptsReason(action: Action, rowKind: "file" | "folder" | undefined): string | null {
-  if (!isApp(action) || !rowKind) return null;
+  if (!usesTarget(action) || !rowKind) return null;
   const accepts = appAccepts(action);
   if (rowKind === "file" && !acceptsFile(accepts)) return "takes folders only";
   if (rowKind === "folder" && !acceptsFolder(accepts)) return "takes files only";
@@ -58,7 +58,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder, r
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: agent ? agentTitle(name, null) : actionRowTitle(name, isScript(action), null, ctx),
+      title: agent ? agentTitle(name, null) : usesTarget(action) ? appTitle(name, null, ctx) : actionRowTitle(name, isScript(action), null, ctx),
     });
   }
   return rows;

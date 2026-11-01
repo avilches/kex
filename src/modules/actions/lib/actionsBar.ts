@@ -1,7 +1,7 @@
 import type { ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
-import { comboCandidate, inBar, inCombo, type FocusPlace } from "./actionTargets";
+import { comboCandidate, inBar, inCombo, usesTarget, type FocusPlace } from "./actionTargets";
 export { actionTarget, type ActionTarget, type FocusPlace } from "./actionTargets";
 import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import { isAgent, isApp, isScript, usesTerminal, type Action, type ActionKind } from "./types";
@@ -165,11 +165,14 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // A script with no variable in its name says where it runs: the workspace, the last folder
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
-export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
+export function scriptSubtitle(
+  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd"> & Partial<Pick<Action, "command" | "accepts">>,
+  ctx: BarContext | null,
+): ActionSubtitle {
   // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
   // the root itself, or the words for it in Settings.
   if (isAgent(action)) return workspaceLine(ctx);
-  if (isApp(action)) return appSubtitle(ctx);
+  if (usesTarget(action)) return appSubtitle(ctx);
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -210,6 +213,20 @@ function workspaceLine(ctx: BarContext | null): ActionSubtitle {
 // An agent has nothing to open: its hover says it runs, or why it cannot.
 export function agentTitle(label: string, disabledReason: string | null): string {
   return disabledReason ? `${label}: ${disabledReason}` : `Run ${label}`;
+}
+
+// The hover words of an app that opens {target}: what it opens, spelled out in full for a root or
+// a folder and by file name for a file. It has no variable in its name to read that from, so it
+// comes from the context, which the combo and the context menus point at their own place.
+export function appTitle(name: string, disabledReason: string | null, ctx: BarContext | null): string {
+  const { main } = splitActionName(name);
+  if (disabledReason) return `${main}: ${disabledReason}`;
+  if (!ctx || ctx.labels) return `Open ${main} in the workspace root`;
+  const target = ctx.vars.target ?? "";
+  if (ctx.targetKind === "file") {
+    return `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}`;
+  }
+  return target ? `Open ${main} in ${target}` : `Open ${main}`;
 }
 
 // The hover words of a row: the Open (or Run) and the place, with the root or folder spelled
@@ -524,7 +541,11 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
-      title: isAgent(action) ? agentTitle(label, disabledReason) : actionRowTitle(label, isScript(action), disabledReason, words),
+      title: isAgent(action)
+        ? agentTitle(label, disabledReason)
+        : usesTarget(action)
+          ? appTitle(label, disabledReason, words)
+          : actionRowTitle(label, isScript(action), disabledReason, words),
       iconOnly: false,
     };
   };
@@ -558,7 +579,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
   for (const [action, isGlobal] of ordered) {
     const item = toItem(action, isGlobal);
     if (kind && !(isScript(action) && item.state !== "idle") && inCombo(action, { folder: kind === "folder", file: kind === "file" })) {
-      const comboItem = isApp(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item;
+      const comboItem = usesTarget(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item;
       (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(comboItem);
     }
     if (!onBar(action, item.state)) continue;
@@ -590,10 +611,16 @@ export function menuEntries(item: BarItem): MenuEntry[] {
 
 // What the command palette lists: the Actions the Header offers here, runnable ones only. A
 // blocked Action is left out instead of muted, and a script already running stays so it can
-// be shown or stopped.
+// be shown or stopped. Each Action is listed once: an app that is in the bar and also in the
+// context combo opens the workspace root from the palette, as its bar item does, because a
+// palette row has no folder or file to point at; the combo's copy would repeat its id and
+// promise a destination the palette cannot pass on.
 export function paletteActions(model: Pick<BarModel, "buttons" | "menu" | "contextCombo">): BarItem[] {
   const { workspace, global } = model.contextCombo;
-  return [...model.buttons, ...model.menu.workspace, ...model.menu.global, ...workspace, ...global].filter(
-    (i) => i.disabledReason === null || i.stoppable,
-  );
+  const seen = new Set<string>();
+  return [...model.buttons, ...model.menu.workspace, ...model.menu.global, ...workspace, ...global].filter((i) => {
+    if (seen.has(i.id)) return false;
+    seen.add(i.id);
+    return i.disabledReason === null || i.stoppable;
+  });
 }

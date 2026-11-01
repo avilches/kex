@@ -414,7 +414,13 @@ describe("scriptSubtitle", () => {
   });
 
   describe("of an app, which says what it opens", () => {
-    const zed = { name: "Zed", kind: "app" as const };
+    const zed = { name: "Zed", kind: "app" as const, command: "zed {target}" };
+
+    it("is told apart from an app saved with a variable of its own, which reads like a script", () => {
+      const old = { name: "Zed {cwd}", kind: "app" as const, command: "zed {cwd}" };
+      expect(scriptSubtitle(old, ctx)).toEqual({ text: "/p", startTrim: true, lead: "tab" });
+      expect(scriptSubtitle(old, SETTINGS_LABELS).text).toBe("Current folder");
+    });
 
     it("is the workspace root in the bar, the words for it in Settings, and the warning without a root", () => {
       expect(scriptSubtitle(zed, ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
@@ -552,6 +558,45 @@ describe("where an Action is offered", () => {
     expect(onBar(folderScript, "idle")).toBe(false);
     expect(onBar(fileScript, "idle")).toBe(false);
     expect(onBar(folderScript, "running")).toBe(true);
+  });
+
+  describe("an app saved with a variable of its own in the command, from before {target}", () => {
+    const oldFile = app({ id: "of", name: "Code {filepath}", command: "code {filepath}" });
+    const oldFolder = app({ id: "od", name: "Zed {cwd}", command: "zed {cwd}" });
+    const oldRoot = app({ id: "or", name: "PyCharm {workspace}", command: "pycharm {workspace}" });
+
+    it("is placed by that variable, like a script, and not by a default accepts", () => {
+      expect(onBar(oldRoot, "idle")).toBe(true);
+      expect(onBar(oldFile, "idle")).toBe(false);
+      expect(onBar(oldFolder, "idle")).toBe(false);
+      expect(inCombo(oldFile, { file: true, folder: false })).toBe(true);
+      expect(inCombo(oldFile, { file: false, folder: true })).toBe(false);
+      expect(inCombo(oldFolder, { file: false, folder: true })).toBe(true);
+    });
+
+    it("never moves in the bar with the focused tab", () => {
+      const build = (place: { file: boolean; folder: boolean }, context: BarContext) =>
+        buildActionsBarModel({ local: [oldFile, oldFolder, oldRoot], context, states: new Map(), activeId: undefined, place });
+      const barIds = (m: ReturnType<typeof build>) => [...m.buttons, ...m.menu.workspace].map((i) => i.id).sort();
+      const onFile = build({ file: true, folder: false }, { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } });
+      const onFolder = build({ file: false, folder: true }, ctx);
+      expect(barIds(onFile)).toEqual(["or"]);
+      expect(barIds(onFolder)).toEqual(["or"]);
+      expect(onFile.contextCombo.workspace.map((i) => i.id)).toEqual(["of"]);
+      expect(onFolder.contextCombo.workspace.map((i) => i.id)).toEqual(["od"]);
+    });
+
+    it("keeps its own subtitle and runs against the focused tab, not a target", () => {
+      const m = buildActionsBarModel({
+        local: [oldFile],
+        context: { ...ctx, vars: { ...vars, filepath: "/p/a.ts", filename: "a.ts" } },
+        states: new Map(),
+        activeId: undefined,
+        place: { file: true, folder: false },
+      });
+      expect(m.contextCombo.workspace[0]).toMatchObject({ subtitle: "a.ts", subtitleLead: "file" });
+      expect(m.contextCombo.workspace[0]?.runTarget).toBeUndefined();
+    });
   });
 
   it("treats an app that never said what it accepts as a folder app", () => {
@@ -871,6 +916,34 @@ describe("paletteActions", () => {
 
   it("lists the Actions that can run, workspace ones before global ones", () => {
     expect(paletteActions(build()).map((i) => i.id)).toEqual(["s1", "g1"]);
+  });
+
+  it("lists an app that is in the bar and in the combo once, so its id is never repeated", () => {
+    const both = app({ id: "both", name: "Zed", command: "zed {target}", accepts: "both" });
+    const model = buildActionsBarModel({
+      local: [both, script({ id: "s1" })],
+      context: { ...ctx, vars: { ...vars, cwd: "/p/api" } },
+      states: new Map(),
+      activeId: undefined,
+      place: { file: false, folder: true },
+    });
+    expect(model.contextCombo.workspace.map((i) => i.id)).toContain("both");
+    expect([...model.buttons, ...model.menu.workspace].map((i) => i.id)).toContain("both");
+    const ids = paletteActions(model).map((i) => i.id);
+    expect(ids.filter((id) => id === "both")).toHaveLength(1);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("lists the bar's copy, which opens the workspace root, not the combo's", () => {
+    const both = app({ id: "both", name: "Zed", command: "zed {target}", accepts: "both" });
+    const model = buildActionsBarModel({
+      local: [both],
+      context: ctx,
+      states: new Map(),
+      activeId: undefined,
+      place: { file: false, folder: true },
+    });
+    expect(paletteActions(model)[0]?.runTarget).toBeUndefined();
   });
 
   it("leaves out the ones that cannot run now", () => {
