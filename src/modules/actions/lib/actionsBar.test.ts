@@ -960,6 +960,11 @@ describe("buildActionsBarModel arranging", () => {
     expect(inCombo.title).toBe("Open a.ts with Zed");
   });
 
+  it("words the hover of an app by place while arranging, never with an empty name", () => {
+    const file = build(true, onFile, { file: true, folder: false });
+    expect(file.contextCombo.workspace.find((i) => i.id === "a1")?.title).toBe("Open the current file with Zed");
+  });
+
   it("keeps the real availability while arranging", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
     expect(build(true, rootless).buttons[0]?.disabledReason).toBe(WORKSPACE_UNSET);

@@ -166,7 +166,7 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
 export function scriptSubtitle(
-  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd"> & Partial<Pick<Action, "command" | "accepts">>,
+  action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">,
   ctx: BarContext | null,
 ): ActionSubtitle {
   // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
@@ -205,8 +205,8 @@ export function appTitle(name: string, disabledReason: string | null, ctx: BarCo
   const { main } = splitActionName(name);
   if (disabledReason) return `${main}: ${disabledReason}`;
   const target = ctx?.vars.target ?? "";
-  if (ctx?.targetKind === "file") return `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}`;
-  if (ctx?.targetKind === "folder") return target ? `Open ${main} in ${target}` : `Open ${main}`;
+  if (ctx?.targetKind === "file") return target ? `Open ${target.split(/[\\/]/).filter(Boolean).pop() ?? target} with ${main}` : `Open the current file with ${main}`;
+  if (ctx?.targetKind === "folder") return target ? `Open ${main} in ${target}` : `Open ${main} in the current folder`;
   return `Open ${main} in the workspace root`;
 }
 
@@ -506,7 +506,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
     const running = state === "running";
     const label = action.name.trim() || "Action";
     const words = arranging ? { ...SETTINGS_LABELS, targetKind: ctx?.targetKind } : ctx;
-    const subtitle = scriptSubtitle({ ...action, name: label }, words);
+    const subtitle = isApp(action) ? { text: null, startTrim: false } : scriptSubtitle({ ...action, name: label }, words);
     const disabledReason = running ? null : actionAvailability(action, ctx);
     return {
       id: action.id,
