@@ -1,4 +1,5 @@
-use std::io::BufRead;
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
 use super::launch_cmd::CODEX_VALUE_OPTS;
@@ -434,37 +435,123 @@ impl CwdRead {
     }
 }
 
+// A transcript line is a whole message and can be megabytes (a pasted file, a tool result). A line
+// past the cap is skipped without being held in memory, and bytes that are not UTF-8 are replaced
+// instead of ending the scan.
+const TRANSCRIPT_LINE_CAP: usize = 1024 * 1024;
+// `worktree-state` is written before the first user message and again whenever the session enters
+// or leaves a worktree, so the last one is near the end; the head is read as well for a session
+// that opened inside a worktree and then ran long without another one.
+const WORKTREE_HEAD_BYTES: u64 = 1024 * 1024;
+const WORKTREE_TAIL_BYTES: u64 = 8 * 1024 * 1024;
+// The launch cwd is in the first entries.
+const CWD_SCAN_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Calls `visit` with each line of `source` (without its line ending) until it breaks. Memory is
+/// bounded by `line_cap` whatever the file holds.
+fn each_line<T>(
+    source: impl Read,
+    line_cap: usize,
+    mut visit: impl FnMut(&str) -> ControlFlow<T>,
+) -> Option<T> {
+    let mut reader = BufReader::new(source);
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        let mut too_long = false;
+        let mut read_any = false;
+        loop {
+            let chunk = reader.fill_buf().ok()?;
+            if chunk.is_empty() {
+                break;
+            }
+            read_any = true;
+            let (take, ended) = match chunk.iter().position(|&b| b == b'\n') {
+                Some(i) => (i + 1, true),
+                None => (chunk.len(), false),
+            };
+            if !too_long {
+                if line.len() + take > line_cap + 1 {
+                    too_long = true;
+                    line.clear();
+                } else {
+                    line.extend_from_slice(&chunk[..take]);
+                }
+            }
+            reader.consume(take);
+            if ended {
+                break;
+            }
+        }
+        if !read_any {
+            return None;
+        }
+        if too_long {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&line);
+        if let ControlFlow::Break(found) = visit(text.trim_end_matches(['\n', '\r'])) {
+            return Some(found);
+        }
+    }
+}
+
+fn note_worktree_state(line: &str, last: &mut Option<String>) {
+    if !line.contains("\"worktree-state\"") {
+        return;
+    }
+    let Ok(obj) = serde_json::from_str::<serde_json::Value>(line) else {
+        return;
+    };
+    if obj.get("type").and_then(|t| t.as_str()) != Some("worktree-state") {
+        return;
+    }
+    *last = obj
+        .get("worktreeSession")
+        .and_then(|w| w.get("worktreePath"))
+        .and_then(|v| v.as_str())
+        .filter(|c| !c.is_empty())
+        .map(str::to_string);
+}
+
 fn scan_last_worktree(jsonl: &Path) -> Option<String> {
-    let file = std::fs::File::open(jsonl).ok()?;
+    let mut file = std::fs::File::open(jsonl).ok()?;
+    let len = file.metadata().ok()?.len();
     let mut last = None;
-    for line in std::io::BufReader::new(file).lines() {
-        let line = line.ok()?;
-        if !line.contains("\"worktree-state\"") {
-            continue;
-        }
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else {
-            continue;
-        };
-        if obj.get("type").and_then(|t| t.as_str()) != Some("worktree-state") {
-            continue;
-        }
-        last = obj
-            .get("worktreeSession")
-            .and_then(|w| w.get("worktreePath"))
-            .and_then(|v| v.as_str())
-            .filter(|c| !c.is_empty())
-            .map(str::to_string);
+    let mut note = |line: &str| -> ControlFlow<()> {
+        note_worktree_state(line, &mut last);
+        ControlFlow::Continue(())
+    };
+    if len <= WORKTREE_HEAD_BYTES + WORKTREE_TAIL_BYTES {
+        each_line((&file).take(len), TRANSCRIPT_LINE_CAP, &mut note);
+    } else {
+        each_line(
+            (&file).take(WORKTREE_HEAD_BYTES),
+            TRANSCRIPT_LINE_CAP,
+            &mut note,
+        );
+        file.seek(SeekFrom::Start(len - WORKTREE_TAIL_BYTES)).ok()?;
+        // The tail starts in the middle of a line: that first piece is not a line.
+        let mut first = true;
+        each_line(
+            (&file).take(WORKTREE_TAIL_BYTES),
+            TRANSCRIPT_LINE_CAP,
+            |line| {
+                if std::mem::take(&mut first) {
+                    return ControlFlow::Continue(());
+                }
+                note(line)
+            },
+        );
     }
     last.filter(|p| Path::new(p).is_dir())
 }
 
 fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     let file = std::fs::File::open(jsonl).ok()?;
-    let reader = std::io::BufReader::new(file);
-    for line in reader.lines() {
-        let line = line.ok()?;
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else {
-            continue;
+    each_line(file.take(CWD_SCAN_BYTES), TRANSCRIPT_LINE_CAP, |line| {
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line) else {
+            return ControlFlow::Continue(());
         };
         // Claude Code writes `worktree-state` before the first user message whenever the
         // session is inside a worktree; the entries' own `cwd` is the worktree, which is the
@@ -476,15 +563,13 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
             .and_then(|v| v.as_str())
             .filter(|c| !c.is_empty())
         {
-            return Some(original.to_string());
+            return ControlFlow::Break(original.to_string());
         }
-        if let Some(cwd) = obj.get("cwd").and_then(|v| v.as_str()) {
-            if !cwd.is_empty() {
-                return Some(cwd.to_string());
-            }
+        match obj.get("cwd").and_then(|v| v.as_str()) {
+            Some(cwd) if !cwd.is_empty() => ControlFlow::Break(cwd.to_string()),
+            _ => ControlFlow::Continue(()),
         }
-    }
-    None
+    })
 }
 
 // Codex's session_meta embeds the instructions and can be tens of KB; the cap bounds what a
@@ -1054,6 +1139,187 @@ mod tests {
         assert_eq!(scan_header_line(&jsonl, 1), None);
         std::fs::write(&jsonl, line.trim_end()).unwrap();
         assert_eq!(scan_header_line(&jsonl, 1), None);
+    }
+
+    fn lines_of(bytes: &[u8], cap: usize) -> Vec<String> {
+        let mut seen = Vec::new();
+        each_line::<()>(bytes, cap, |line| {
+            seen.push(line.to_string());
+            ControlFlow::Continue(())
+        });
+        seen
+    }
+
+    #[test]
+    fn each_line_skips_a_line_over_the_cap_without_losing_the_next() {
+        let long = "x".repeat(20);
+        let input = format!("short\n{long}\nafter\n");
+        assert_eq!(lines_of(input.as_bytes(), 10), ["short", "after"]);
+    }
+
+    #[test]
+    fn each_line_keeps_a_line_exactly_at_the_cap() {
+        let input = format!("{}\nnext\n", "y".repeat(10));
+        assert_eq!(lines_of(input.as_bytes(), 11), ["yyyyyyyyyy", "next"]);
+    }
+
+    #[test]
+    fn each_line_replaces_invalid_utf8_instead_of_stopping() {
+        let mut input = b"first\n".to_vec();
+        input.extend_from_slice(b"bad \xff\xfe bytes\n");
+        input.extend_from_slice(b"last without newline");
+        let lines = lines_of(&input, 1024);
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0], "first");
+        assert!(lines[1].starts_with("bad ") && lines[1].ends_with(" bytes"));
+        assert_eq!(lines[2], "last without newline");
+    }
+
+    #[test]
+    fn each_line_trims_crlf_and_stops_on_break() {
+        let mut seen = 0;
+        let found = each_line(&b"a\r\nb\r\nc\r\n"[..], 1024, |line| {
+            seen += 1;
+            if line == "b" {
+                ControlFlow::Break(line.to_string())
+            } else {
+                ControlFlow::Continue(())
+            }
+        });
+        assert_eq!(found.as_deref(), Some("b"));
+        assert_eq!(seen, 2);
+    }
+
+    #[test]
+    fn the_launch_cwd_of_a_claude_transcript_survives_bad_bytes_and_a_huge_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("t.jsonl");
+        let mut bytes = b"{\"type\":\"summary\",\"note\":\"\xff\xfe\"}\n".to_vec();
+        bytes.extend_from_slice(
+            format!(
+                "{{\"type\":\"user\",\"blob\":\"{}\"}}\n",
+                "z".repeat(TRANSCRIPT_LINE_CAP + 10)
+            )
+            .as_bytes(),
+        );
+        bytes.extend_from_slice(b"{\"type\":\"user\",\"cwd\":\"/work/proj\"}\n");
+        std::fs::write(&jsonl, bytes).unwrap();
+        assert_eq!(scan_claude_entries(&jsonl), Some("/work/proj".to_string()));
+    }
+
+    #[test]
+    fn the_launch_cwd_prefers_the_original_cwd_of_a_worktree_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("t.jsonl");
+        std::fs::write(
+            &jsonl,
+            "{\"type\":\"worktree-state\",\"worktreeSession\":{\"originalCwd\":\"/work/main\"}}\n\
+             {\"type\":\"user\",\"cwd\":\"/work/main/.claude/worktrees/x\"}\n",
+        )
+        .unwrap();
+        assert_eq!(scan_claude_entries(&jsonl), Some("/work/main".to_string()));
+    }
+
+    fn worktree_state(path: Option<&Path>) -> String {
+        match path {
+            Some(p) => format!(
+                "{{\"type\":\"worktree-state\",\"worktreeSession\":{{\"worktreePath\":{:?}}}}}\n",
+                p.to_string_lossy()
+            ),
+            None => "{\"type\":\"worktree-state\",\"worktreeSession\":null}\n".to_string(),
+        }
+    }
+
+    fn filler(bytes: usize) -> String {
+        let line = format!(
+            "{{\"type\":\"assistant\",\"text\":\"{}\"}}\n",
+            "f".repeat(900)
+        );
+        line.repeat(bytes / line.len() + 1)
+    }
+
+    #[test]
+    fn the_last_worktree_state_of_a_small_transcript_wins_and_an_exit_clears_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = dir.path().join("wt-first");
+        let second = dir.path().join("wt-second");
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        let jsonl = dir.path().join("t.jsonl");
+
+        std::fs::write(
+            &jsonl,
+            worktree_state(Some(&first)) + &worktree_state(Some(&second)),
+        )
+        .unwrap();
+        assert_eq!(
+            scan_last_worktree(&jsonl),
+            Some(second.to_string_lossy().into_owned())
+        );
+
+        std::fs::write(
+            &jsonl,
+            worktree_state(Some(&first)) + &worktree_state(Some(&second)) + &worktree_state(None),
+        )
+        .unwrap();
+        assert_eq!(scan_last_worktree(&jsonl), None);
+    }
+
+    #[test]
+    fn a_worktree_that_no_longer_exists_is_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("t.jsonl");
+        std::fs::write(&jsonl, worktree_state(Some(&dir.path().join("gone")))).unwrap();
+        assert_eq!(scan_last_worktree(&jsonl), None);
+    }
+
+    #[test]
+    fn a_big_transcript_gives_the_worktree_of_its_tail_over_the_one_of_its_head() {
+        let dir = tempfile::tempdir().unwrap();
+        let head = dir.path().join("wt-head");
+        let tail = dir.path().join("wt-tail");
+        std::fs::create_dir_all(&head).unwrap();
+        std::fs::create_dir_all(&tail).unwrap();
+        let body = filler((WORKTREE_HEAD_BYTES + WORKTREE_TAIL_BYTES) as usize + 2_000_000);
+        let jsonl = dir.path().join("t.jsonl");
+        std::fs::write(
+            &jsonl,
+            worktree_state(Some(&head)) + &body + &worktree_state(Some(&tail)),
+        )
+        .unwrap();
+        assert!(
+            std::fs::metadata(&jsonl).unwrap().len() > WORKTREE_HEAD_BYTES + WORKTREE_TAIL_BYTES
+        );
+        assert_eq!(
+            scan_last_worktree(&jsonl),
+            Some(tail.to_string_lossy().into_owned())
+        );
+    }
+
+    #[test]
+    fn a_big_transcript_still_gives_the_worktree_it_opened_with() {
+        let dir = tempfile::tempdir().unwrap();
+        let head = dir.path().join("wt-head");
+        std::fs::create_dir_all(&head).unwrap();
+        let body = filler((WORKTREE_HEAD_BYTES + WORKTREE_TAIL_BYTES) as usize + 2_000_000);
+        let jsonl = dir.path().join("t.jsonl");
+        std::fs::write(&jsonl, worktree_state(Some(&head)) + &body).unwrap();
+        assert_eq!(
+            scan_last_worktree(&jsonl),
+            Some(head.to_string_lossy().into_owned())
+        );
+    }
+
+    #[test]
+    fn a_big_transcript_is_not_read_beyond_its_head_and_tail() {
+        let dir = tempfile::tempdir().unwrap();
+        let middle = dir.path().join("wt-middle");
+        std::fs::create_dir_all(&middle).unwrap();
+        let one = filler(WORKTREE_HEAD_BYTES as usize + 1_000_000);
+        let two = filler(WORKTREE_TAIL_BYTES as usize + 1_000_000);
+        let jsonl = dir.path().join("t.jsonl");
+        std::fs::write(&jsonl, one + &worktree_state(Some(&middle)) + &two).unwrap();
+        assert_eq!(scan_last_worktree(&jsonl), None);
     }
 
     #[test]

@@ -583,7 +583,10 @@ For each session in the store:
    `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
    the first `cwd` field, and `cwd_launch` from the store when the transcript has none. omp and pi: the `cwd` of the
    `session` header, JSONL line 2 for omp and line 1 for pi; codex: `payload.cwd` of the `session_meta` entry on line 1). For claude the plan also carries `worktreeCwd`: the
-   `worktreePath` of the last `worktree-state` entry, only when that folder still exists. The resumed agent
+   `worktreePath` of the last `worktree-state` entry, only when that folder still exists. A claude transcript can
+   be hundreds of MB, so it is read as a stream with a 1 MiB cap per line (a longer line is skipped, bytes that are
+   not UTF-8 are replaced): the first 4 MiB for the launch cwd, and the first 1 MiB plus the last 8 MiB for the
+   worktree (a `worktree-state` only in the middle of a larger transcript is not seen). The resumed agent
    reports its folder after the first prompt (its resume `SessionStart` carries the launch folder, so that event
    is not forwarded as an agent cwd), so `applyStagedSnapshot` seeds `agentCwd`/`worktreeCwd` from the plan and
    New Terminal ("last folder") lands in the worktree from the start. The command is the row's
