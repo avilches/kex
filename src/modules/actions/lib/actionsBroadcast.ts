@@ -86,6 +86,15 @@ export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): vo
   const push = useRef(() => {
     const ws = workspaceRef.current;
     if (!ws || attached.current === 0 || !isOwner.current) return;
+    const payload: ActionsPush = {
+      workspaceId: ws.id,
+      workspaceName: titleRef.current,
+      actions: ws.actions ?? [],
+      context: contextRef.current,
+    };
+    const key = pushKey(payload);
+    // Before the IPC: this runs on every render of the app while Settings is open.
+    if (key === lastKey.current) return;
     void getAllWebviewWindows().then((windows) => {
       // A destroyed window never reports detach, so the count alone cannot be trusted:
       // the Settings window must exist as long as it counts itself attached.
@@ -96,13 +105,6 @@ export function useWorkspaceActionsBroadcast({ workspace, mutators }: Props): vo
         }
         return;
       }
-      const payload: ActionsPush = {
-        workspaceId: ws.id,
-        workspaceName: titleRef.current,
-        actions: ws.actions ?? [],
-        context: contextRef.current,
-      };
-      const key = pushKey(payload);
       if (key === lastKey.current) return;
       lastKey.current = key;
       void emit(ACTIONS_PUSH_EVENT, payload);

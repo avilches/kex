@@ -21,9 +21,22 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
   let base: Action[] | null = null;
   let chain: Promise<void> = Promise.resolve();
 
-  // The copy only lives while writes are in flight and until the store reports anything new.
+  // Every list this burst of writes carried, by content. The echo of an early write reaches the
+  // store while a later one is already the truth: that echo is ours and must not end the copy.
+  let written = new Set<string>();
+  const keyOf = (list: readonly Action[]): string => JSON.stringify(list.map(canonical));
+
+  // The copy lives while writes are in flight and until the store shows what it holds (or something
+  // that is not ours: another window's edit is the truth then).
   function sync(): void {
-    if (pending === 0 && current && read() !== base) current = null;
+    if (pending !== 0 || !current) return;
+    const seen = read();
+    if (seen === base) return;
+    const key = keyOf(seen);
+    if (key === keyOf(current) || !written.has(key)) {
+      current = null;
+      written = new Set();
+    }
   }
 
   const get = (): Action[] => {
@@ -36,8 +49,12 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     if (!clean) return Promise.reject(new Error("Invalid action"));
     const prior = get();
     const { list: next, stored, merged } = adoptActionAt(prior, clean, makeId, beforeId);
-    if (pending === 0) base = read();
+    if (pending === 0) {
+      base = read();
+      written = new Set();
+    }
     current = next;
+    written.add(keyOf(next));
     pending++;
     const run = chain.then(() => write(current ?? next));
     chain = run.then(
@@ -71,8 +88,12 @@ export function createGlobalActions({ read, write, makeId }: Deps) {
     const before = get();
     const after = normalizeActions(fn(before));
     if (sameActions(before, after)) return Promise.resolve({ before, after: before });
-    if (pending === 0) base = read();
+    if (pending === 0) {
+      base = read();
+      written = new Set();
+    }
     current = after;
+    written.add(keyOf(after));
     pending++;
     const mine = after;
     const run = chain.then(() => write(current ?? mine));
