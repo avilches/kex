@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { ActionsMenu, ContextCombo, OwnButton } from "./ActionsBar";
-import { buildActionsBarModel, NO_CONTEXT_REASON, type BarContext, type BarItem, type ContextCombo as ContextComboModel } from "./lib/actionsBar";
+import { buildActionsBarModel, NO_CONTEXT_REASON, WORKSPACE_UNSET, type BarContext, type BarItem, type ContextCombo as ContextComboModel } from "./lib/actionsBar";
 import type { Action } from "./lib/types";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,6 +20,7 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
   active: false,
   stoppable: false,
   disabledReason: null,
+  needsRoot: false,
   subtitle: null,
   subtitleTrim: false,
   subtitleLead: null,
@@ -29,7 +30,7 @@ const item = (action: Action, over: Partial<BarItem> = {}): BarItem => ({
 });
 
 function mount(it: BarItem, focus = vi.fn(() => false)) {
-  const handlers = { run: vi.fn(), stop: vi.fn(), focus };
+  const handlers = { run: vi.fn(), stop: vi.fn(), focus, fixRoot: vi.fn() };
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -150,6 +151,88 @@ describe("OwnButton", () => {
   });
 });
 
+describe("an Action that only lacks the workspace root", () => {
+  const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", ownButton: true };
+  const rootless = (over: Partial<BarItem> = {}) =>
+    item(agent, { disabledReason: WORKSPACE_UNSET, needsRoot: true, subtitle: WORKSPACE_UNSET, ...over });
+
+  it("is a grey button with a dashed border that can still be clicked", () => {
+    const { container, unmount } = mount(rootless());
+    const button = container.querySelector("button") as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(container.firstElementChild?.className).toContain("border-dashed");
+    expect(container.firstElementChild?.className).toContain("opacity-70");
+    unmount();
+  });
+
+  it("does not run: a click sends the user to set the root", () => {
+    const { container, handlers, unmount } = mount(rootless());
+    click(container.querySelector("button"));
+    expect(handlers.fixRoot).toHaveBeenCalledTimes(1);
+    expect(handlers.run).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("says what is missing and what a click does on its hover", () => {
+    const { container, unmount } = mount(rootless());
+    expect((container.querySelector("button") as HTMLButtonElement).title).toBe("Claude Code: A workspace root is needed. Click to set it");
+    unmount();
+  });
+
+  it("stays dead for any other reason: no dashed border, disabled, no way to fix it by clicking", () => {
+    const { container, handlers, unmount } = mount(item(agent, { disabledReason: "the command has a control character" }));
+    expect((container.querySelector("button") as HTMLButtonElement).disabled).toBe(true);
+    expect(container.firstElementChild?.className).not.toContain("border-dashed");
+    click(container.querySelector("button"));
+    expect(handlers.fixRoot).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("is a row of the menu that closes it on a click and sends the user to set the root", () => {
+    const view = mountMenuForRoot([rootless()]);
+    view.open();
+    const row = document.querySelector("[role='menuitem']") as HTMLElement;
+    expect(row.getAttribute("data-disabled")).toBeNull();
+    click(row);
+    expect(view.fixRoot).toHaveBeenCalledTimes(1);
+    expect(view.run).not.toHaveBeenCalled();
+    view.unmount();
+  });
+});
+
+function mountMenuForRoot(items: BarItem[]) {
+  const run = vi.fn();
+  const fixRoot = vi.fn();
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      createElement(ActionsMenu, {
+        label: "Actions",
+        items,
+        globalItems: [],
+        reorderMode: false,
+        dragging: false,
+        onEdit: vi.fn(),
+        onRestoreFocus: vi.fn(),
+        onConfigure: vi.fn(),
+        run,
+        stop: vi.fn(),
+        focus: vi.fn(() => false),
+        fixRoot,
+      }),
+    ),
+  );
+  const open = () =>
+    act(() => {
+      const trigger = container.querySelector("button[title='Actions']") as HTMLElement;
+      trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" }));
+      trigger.click();
+    });
+  return { run, fixRoot, open, unmount: () => act(() => root.unmount()) };
+}
+
 describe("ContextCombo", () => {
   const base: ContextComboModel = { exists: true, kind: "folder", label: "api", path: "/p/api", workspace: [], global: [], reason: null };
   function mountCombo(combo: ContextComboModel) {
@@ -165,6 +248,7 @@ describe("ContextCombo", () => {
           onConfigure: vi.fn(),
           run: vi.fn(),
           stop: vi.fn(),
+          fixRoot: vi.fn(),
           focus: vi.fn(() => false),
         }),
       ),
@@ -206,7 +290,7 @@ describe("ContextCombo", () => {
 
 describe("ActionsMenu", () => {
   function mountMenu(items: BarItem[], globalItems: BarItem[], focus = vi.fn(() => false), extra: { dragging?: boolean; reorderMode?: boolean } = {}) {
-    const handlers = { run: vi.fn(), stop: vi.fn(), focus };
+    const handlers = { run: vi.fn(), stop: vi.fn(), focus, fixRoot: vi.fn() };
     const onEdit = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);

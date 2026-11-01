@@ -115,7 +115,13 @@ export function describeMissing(names: readonly string[]): string {
 
 const VARIABLE = /\{[?!]?[a-z]/;
 
-export const WORKSPACE_UNSET = "Set a root to this workspace";
+export const WORKSPACE_UNSET = "A workspace root is needed";
+
+/** A blocked Action whose only problem is the missing root. It stays clickable, because the way out
+ * is one click away: the shell opens the Sidebar where the root is chosen. */
+export function needsRootFix(disabledReason: string | null): boolean {
+  return disabledReason === WORKSPACE_UNSET;
+}
 
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
@@ -178,7 +184,9 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
 export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
-  if (isAgent(action)) return agentSubtitle(ctx);
+  // An agent has no folder of its own: the Header starts it in the workspace root, so its line is
+  // the root itself, or the words for it in Settings.
+  if (isAgent(action)) return workspaceLine(ctx);
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -199,12 +207,6 @@ function workspaceLine(ctx: BarContext | null): ActionSubtitle {
   if (ctx && !root) return { text: WORKSPACE_UNSET, startTrim: false };
   if (!ctx || ctx.labels) return { text: "Workspace root", startTrim: false, lead: "root" };
   return { text: root!, startTrim: true, lead: "root" };
-}
-
-// An agent has no template and no folder of its own: the Header starts it in the workspace root,
-// so its line is the root itself, or the words for it in Settings.
-function agentSubtitle(ctx: BarContext | null): ActionSubtitle {
-  return workspaceLine(ctx);
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.
@@ -237,7 +239,7 @@ export function actionRowTitle(
 // script only when it was told to run there. A script in Home, in the tab's folder or in a
 // fixed folder never needs the root.
 export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): boolean {
-  return isApp(action) || isAgent(action) || action.cwdMode === "workspace";
+  return isApp(action) || action.cwdMode === "workspace";
 }
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
@@ -277,6 +279,9 @@ export type BarItem = {
   /** The zone can stop it: running, or already stopping by the first Ctrl+C. */
   stoppable: boolean;
   disabledReason: string | null;
+  /** The only thing missing is the workspace root: drawn grey with a dashed border, and a click
+   * takes the user to where the root is set instead of running. */
+  needsRoot: boolean;
   /** The line under the name: what the Action points at in this place. */
   subtitle: string | null;
   /** The subtitle is a path a long value renders with its start cut. */
@@ -510,6 +515,7 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       active: action.id === activeId,
       stoppable: state !== "idle",
       disabledReason,
+      needsRoot: needsRootFix(disabledReason),
       subtitle: subtitle.text,
       subtitleTrim: subtitle.startTrim,
       subtitleLead: subtitle.lead ?? null,
@@ -563,10 +569,14 @@ export type MenuEntry = { kind: "main" | "stop"; enabled: boolean };
 // has a disabled row, but a running script never does, so it can be brought into view; a
 // waiting one stays enabled too, because the row click focuses its tab and does not
 // restart it. The start or stop control of the row is outside the item, so the row never
-// needs a second entry.
+// needs a second entry. A row that only lacks the workspace root stays enabled: clicking it
+// takes the user to where the root is set.
 export function menuEntries(item: BarItem): MenuEntry[] {
   const waiting = item.state === "waiting";
-  const main: MenuEntry = { kind: "main", enabled: waiting || item.state === "running" || item.disabledReason === null };
+  const main: MenuEntry = {
+    kind: "main",
+    enabled: waiting || item.state === "running" || item.disabledReason === null || item.needsRoot,
+  };
   return [main];
 }
 

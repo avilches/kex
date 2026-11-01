@@ -4005,10 +4005,11 @@ export default function App() {
       run: runAction,
       stop: stopAction,
       focus: focusActionTab,
+      fixRoot: () => showExplorerWithMode("workspace"),
       edit: (scope: "workspace" | "global", id: string) => void openActionSettings(scope, id),
       ...barOps,
     }),
-    [runAction, stopAction, focusActionTab, barOps],
+    [runAction, stopAction, focusActionTab, showExplorerWithMode, barOps],
   );
 
   // Settings owns the Actions editor now; the workspace scope flows to it through the

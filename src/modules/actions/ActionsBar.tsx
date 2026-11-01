@@ -73,7 +73,7 @@ import { useActionsBarModel, type BarController } from "./lib/useActionsBar";
 
 const ZONE_WORDS: Record<ActionKind, string> = { app: "apps", agent: "agents", script: "scripts" };
 
-type Handlers = Pick<BarController, "run" | "stop" | "focus">;
+type Handlers = Pick<BarController, "run" | "stop" | "focus" | "fixRoot">;
 
 // The play or stop zone of a script. It has its own hover, apart from the name next to it,
 // so it reads at a glance that pressing it starts or stops the script. While the script is
@@ -110,7 +110,9 @@ function ScriptControl({ item, run, stop, className }: { item: BarItem } & Handl
 
 // Clicking the name of a script that has a tab brings it into view; without one it runs.
 // A waiting script focuses like a running one: its own zone still stops.
-function nameClick(item: BarItem, { run, focus }: Handlers) {
+// An Action that only lacks the workspace root does not run: it takes the user to where the root is set.
+function nameClick(item: BarItem, { run, focus, fixRoot }: Handlers) {
+  if (item.needsRoot) return fixRoot();
   if (item.state !== "idle" && focus(item.action)) return;
   run(item.action);
 }
@@ -118,6 +120,7 @@ function nameClick(item: BarItem, { run, focus }: Handlers) {
 // The hover words spell the variable out ("Open RustRover in /p/root"), never the raw template.
 function ownButtonTitle(item: BarItem): string {
   const { main } = splitActionName(item.name);
+  if (item.needsRoot) return `${main}: ${item.disabledReason}. Click to set it`;
   if (item.disabledReason) return `${main}: ${item.disabledReason}`;
   if (isScript(item.action) && item.state !== "idle") return `Show ${main}`;
   return item.title ?? `${usesTerminal(item.action) ? "Run" : "Open"} ${main}`;
@@ -125,13 +128,14 @@ function ownButtonTitle(item: BarItem): string {
 
 export function OwnButton({ item, ...h }: { item: BarItem } & Handlers) {
   const script = isScript(item.action);
-  const disabled = item.disabledReason !== null;
+  const disabled = item.disabledReason !== null && !item.needsRoot;
   const iconOnly = item.iconOnly && !script;
   return (
     <div
       className={cn(
         "flex h-8 shrink-0 items-center rounded-md text-[11px]",
         item.active && "ring-1 ring-border",
+        item.needsRoot && "border border-dashed border-muted-foreground/50 opacity-70",
       )}
     >
       {script && <ScriptControl item={item} {...h} className="size-8" />}
@@ -236,7 +240,7 @@ function ReorderableButton({
         onClickCapture={reorderMode ? (e) => e.stopPropagation() : undefined}
         className={cn("relative shrink-0 rounded-md", reorderMode && "cursor-grab [&_*]:pointer-events-none", isDragging && "opacity-40")}
       >
-        <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} />
+        <OwnButton item={item} run={h.run} stop={h.stop} focus={h.focus} fixRoot={h.fixRoot} />
         <DropLine id={item.id} vertical={false} />
       </div>
     </ItemContextMenu>
@@ -487,6 +491,7 @@ export function ActionsMenu({
   const h = {
     run: props.run,
     stop: props.stop,
+    fixRoot: props.fixRoot,
     focus: (action: Action) => {
       const done = props.focus(action);
       if (done) holdOpen.current = true;

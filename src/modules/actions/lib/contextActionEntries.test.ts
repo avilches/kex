@@ -77,7 +77,7 @@ describe("contextActionEntries", () => {
       [],
       ctx({ workspace: "" }),
     );
-    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "Set a root to this workspace"]);
+    expect(groups.workspace.map((e) => e.subtitle)).toEqual(["/w/src", "A workspace root is needed"]);
   });
 
   describe("agents", () => {

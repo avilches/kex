@@ -13,6 +13,8 @@ export type BarController = {
   stop: (action: Action) => void;
   /** Brings the tab of a running script into view; false when it has none. */
   focus: (action: Action) => boolean;
+  /** Takes the user to where the workspace root is set: the Sidebar, on the explorer. */
+  fixRoot: () => void;
   /** Moves an Action of the given scope to the place of another one of the same scope. */
   reorder: (scope: BarScope, fromId: string, toId: string) => void;
   /** Puts an Action of the given scope right before `beforeId`, or last. */

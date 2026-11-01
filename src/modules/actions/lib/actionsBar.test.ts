@@ -23,6 +23,7 @@ import {
   isCompactBar,
   menuEntries,
   MENUS_RESERVE,
+  needsRootFix,
   ownButtonsThatFit,
   ownButtonWidth,
   paletteActions,
@@ -82,13 +83,13 @@ describe("actionAvailability", () => {
   it("explains the missing variable of an app", () => {
     expect(actionAvailability(app({ command: "code {filepath}" }), ctx)).toBe("needs an open file");
     expect(actionAvailability(app({ command: "code {workspace}" }), { ...ctx, vars: { ...vars, workspace: "" } })).toBe(
-      "Set a root to this workspace",
+      WORKSPACE_UNSET,
     );
   });
 
   it("blocks a command with no variables while the workspace has no root, never a folder-bound one", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
-    expect(actionAvailability(script({ command: "pnpm dev" }), rootless)).toBe("Set a root to this workspace");
+    expect(actionAvailability(script({ command: "pnpm dev" }), rootless)).toBe(WORKSPACE_UNSET);
     expect(actionAvailability(app({ command: "make {cwd}" }), rootless)).toBeNull();
     expect(actionAvailability(script({ command: "notify {host}" }), rootless)).toBeNull();
     expect(actionAvailability(script({ command: "pnpm dev" }), ctx)).toBeNull();
@@ -139,12 +140,17 @@ describe("menuEntries", () => {
     active: false,
     stoppable: false,
     disabledReason: null,
+    needsRoot: false,
     subtitle: null,
     subtitleTrim: false,
     subtitleLead: null,
     title: null,
     iconOnly: false,
     ...over,
+  });
+
+  it("keeps the row of an Action that only lacks the workspace root enabled, so the click can take the user to set it", () => {
+    expect(menuEntries(idle(app(), { disabledReason: WORKSPACE_UNSET, needsRoot: true }))).toEqual([{ kind: "main", enabled: true }]);
   });
 
   it("gives an idle script one row that runs it", () => {
@@ -725,6 +731,32 @@ describe("agents", () => {
     const m = buildActionsBarModel({ local: [agent()], context: rootless, states: new Map(), activeId: undefined });
     expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: WORKSPACE_UNSET });
     expect(actionAvailability(agent(), rootless)).toBe(WORKSPACE_UNSET);
+  });
+
+  it("says it in a short sentence", () => {
+    expect(WORKSPACE_UNSET).toBe("A workspace root is needed");
+  });
+
+  it("marks the lack of a root as fixable, and nothing else", () => {
+    const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
+    const m = buildActionsBarModel({
+      local: [agent(), agent({ id: "g2", command: "claude\nrm" }), app({ id: "a1", command: "code {filepath}", ownButton: true })],
+      context: rootless,
+      states: new Map(),
+      activeId: undefined,
+    });
+    const byId = (id: string) =>
+      [...m.buttons, ...m.menu.workspace, ...m.contextCombo.workspace].find((b) => b.id === id);
+    expect(byId("g1")).toMatchObject({ disabledReason: WORKSPACE_UNSET, needsRoot: true });
+    expect(byId("g2")?.needsRoot).toBe(false);
+    expect(byId("g2")?.disabledReason).toMatch(/control character/);
+    expect(needsRootFix(null)).toBe(false);
+    expect(needsRootFix("needs a git branch")).toBe(false);
+  });
+
+  it("is not fixable once the workspace has a root", () => {
+    const m = buildActionsBarModel({ local: [agent()], context: ctx, states: new Map(), activeId: undefined });
+    expect(m.buttons[0]).toMatchObject({ disabledReason: null, needsRoot: false });
   });
 
   it("reads braces and quotes literally, and refuses a control character", () => {

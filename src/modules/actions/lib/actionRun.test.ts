@@ -43,7 +43,7 @@ const link = (o: Partial<LinkedTab> = {}): LinkedTab => ({
 describe("planActionRun, scripts", () => {
   it("blocks a plain script while the workspace has no root, with the same words the bar uses", () => {
     const rootless = ctx({ vars: { ...ctx().vars, workspace: "" }, folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
-    expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: Set a root to this workspace" });
+    expect(planActionRun(script(), rootless)).toMatchObject({ kind: "blocked", reason: "Dev not run: A workspace root is needed" });
     expect(planActionRun(script({ command: "ls {cwd}" }), rootless).kind).toBe("new-tab");
     expect(planActionRun(script(), ctx())).toMatchObject({ kind: "new-tab" });
   });
@@ -321,7 +321,7 @@ describe("planActionRun, agents", () => {
 
   it("blocks when there is neither a row folder nor a workspace root", () => {
     const rootless = ctx({ folders: { focusFolder: "/w/src", workspaceRoot: null, workspaceCwd: "/w" } });
-    expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "blocked", reason: "Claude not run: Set a root to this workspace" });
+    expect(planActionRun(agent(), rootless)).toMatchObject({ kind: "blocked", reason: "Claude not run: A workspace root is needed" });
   });
 
   it("runs from a row folder even when the workspace has no root", () => {

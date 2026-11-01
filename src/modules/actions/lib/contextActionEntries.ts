@@ -1,4 +1,5 @@
-import { actionAvailability, agentTitle, actionRowTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
+import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
+import { actionAvailability, agentCommandProblem, agentTitle, actionRowTitle, byKind, scriptSubtitle, type BarContext, type SubtitleLead } from "./actionsBar";
 import { isAgent, isScript, type Action } from "./types";
 
 export type ContextActionKind = "folder" | "file";
@@ -37,7 +38,7 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder }:
     const subtitle = agent
       ? { text: agentFolder ?? null, startTrim: true, lead: "tab" as const }
       : scriptSubtitle({ ...action, name }, ctx);
-    const reason = agent ? agentCommandReason(action) : actionAvailability(action, ctx);
+    const reason = agent ? agentReason(action, agentFolder ?? "") : actionAvailability(action, ctx);
     rows.push({
       action,
       enabled: reason === null,
@@ -51,10 +52,10 @@ function entriesOf(actions: readonly Action[], ctx: BarContext, { agentFolder }:
   return rows;
 }
 
-// The same check the Header applies, with a workspace root that is always there: the row brings
-// its own folder, so a missing workspace root cannot block an agent started from a row.
-function agentCommandReason(action: Action): string | null {
-  return actionAvailability(action, { vars: { workspace: "-" }, shell: "posix" });
+// An agent started from a row needs a command that is safe to type and a folder the runner would
+// accept; the workspace root does not matter, because the row brings its own folder.
+function agentReason(action: Action, folder: string): string | null {
+  return agentCommandProblem(action.command) ?? scriptCwdProblem(folder);
 }
 
 /** Every Action a folder or file row offers, grouped and ordered as the Header combo does
