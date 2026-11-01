@@ -201,7 +201,7 @@ fn search_tree(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_grep(
     pattern: String,
     root: String,
@@ -243,7 +243,7 @@ pub fn fs_grep(
 
 /// Interactive content search for the command palette. Treats the query as a
 /// literal (smart-case), and self-cancels when a newer query arrives.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_grep_interactive(
     state: tauri::State<'_, ContentSearchState>,
     pattern: String,
@@ -305,7 +305,7 @@ pub struct GlobResponse {
     pub truncated: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_glob(
     pattern: String,
     root: String,

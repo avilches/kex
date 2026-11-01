@@ -62,7 +62,7 @@ fn git_non_ignored_names(dir: &Path, show_hidden: bool) -> HashSet<String> {
 /// case-insensitively. Dot-prefixed entries (files and dirs) are hidden unless
 /// `show_hidden` is set. `git_decorations` opts into the per-entry `gitignored`
 /// flag; off by default so non-explorer callers pay nothing.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_read_dir(
     path: String,
     show_hidden: bool,
@@ -149,7 +149,7 @@ pub fn fs_read_dir(
 ///
 /// Symlinks to directories are included (matches shell `cd` semantics).
 /// Hidden entries are filtered by dot-prefix only.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_subdirs(
     path: String,
     show_hidden: bool,

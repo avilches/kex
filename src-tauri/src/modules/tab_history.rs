@@ -191,7 +191,7 @@ fn still_exists(record: &TabHistoryRecord) -> bool {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tab_history_list() -> Result<Vec<TabHistoryRecord>, String> {
     let path = store_path().ok_or_else(|| "tab-history store not initialized".to_string())?;
     let mut entries = list_at(&path);
@@ -199,13 +199,13 @@ pub fn tab_history_list() -> Result<Vec<TabHistoryRecord>, String> {
     Ok(entries)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tab_history_record(kind: String, path: String, workspace_id: String) -> Result<(), String> {
     let store = store_path().ok_or_else(|| "tab-history store not initialized".to_string())?;
     record_at(&store, &kind, &path, &workspace_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tab_history_touch(entries: Vec<TabUse>) -> Result<(), String> {
     let path = store_path().ok_or_else(|| "tab-history store not initialized".to_string())?;
     touch_at(&path, &entries)

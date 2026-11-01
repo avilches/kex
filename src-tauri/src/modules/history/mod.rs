@@ -126,13 +126,13 @@ fn ensure(state: &HistoryState) -> std::sync::MutexGuard<'_, Option<Index>> {
     guard
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_suggest(state: tauri::State<'_, HistoryState>, line: String) -> Option<String> {
     let guard = ensure(&state);
     suggest(&guard.as_ref()?.entries, &line)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_commands(
     state: tauri::State<'_, HistoryState>,
     prefix: String,
@@ -145,7 +145,7 @@ pub fn history_commands(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_list(
     state: tauri::State<'_, HistoryState>,
     query: String,
@@ -161,7 +161,7 @@ pub fn history_list(
 // Called on every accepted command so in-memory history stays hot without a
 // re-read. Only ever fed prompt-mode commands, never raw running-mode input,
 // so passwords typed into a running command never enter history.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_record(state: tauri::State<'_, HistoryState>, command: String) {
     let cmd = command.trim();
     if cmd.is_empty() {
