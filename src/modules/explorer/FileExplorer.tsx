@@ -435,9 +435,10 @@ export const FileExplorer = memo(
     const canEditRoot =
       rootMode === "filesystem" && !!rootPath && !!onSubmitRootPath;
     const startEditRoot = useCallback(() => {
+      if (isSearchOpen) return;
       editOriginRef.current = rootPath;
       setIsEditingRoot(true);
-    }, [rootPath]);
+    }, [rootPath, isSearchOpen]);
     const rootNode = rootPath ? tree.nodes[rootPath] : undefined;
     const rootDirNames = useMemo<string[] | null>(
       () =>
@@ -926,7 +927,9 @@ export const FileExplorer = memo(
         editRoot: () => {
           if (canEditRoot) startEditRoot();
         },
-        refresh: (path: string) => tree.refresh(path),
+        refresh: (path: string) => {
+          if (!isSearchOpen) tree.refresh(path);
+        },
       }),
       [
         entryPaths,
@@ -936,6 +939,7 @@ export const FileExplorer = memo(
         tree.refresh,
         canEditRoot,
         startEditRoot,
+        isSearchOpen,
       ],
     );
 
@@ -1118,6 +1122,7 @@ export const FileExplorer = memo(
               onAddToGitignore={onAddToGitignore}
               gitRootPath={gitRootPath}
               onEnterFolder={rootMode === "filesystem" ? onEnterFolder : undefined}
+              searchOpen={isSearchOpen}
               previewOnClick={previewOnClick}
               hasClipboard={tree.clipboard !== null}
               isCutSource={
@@ -1141,6 +1146,7 @@ export const FileExplorer = memo(
               onRefresh={tree.refresh}
               onPaste={tree.pasteEntry}
               canPaste={tree.clipboard !== null}
+              searchOpen={isSearchOpen}
             />
           );
         case "fs-up":
@@ -1151,6 +1157,7 @@ export const FileExplorer = memo(
               onNavigateUp={onNavigateUp}
               onRevealInTerminal={onRevealInTerminal}
               onRefresh={() => tree.refresh(rootPath)}
+              searchOpen={isSearchOpen}
             />
           );
         case "pending":
@@ -1272,6 +1279,7 @@ export const FileExplorer = memo(
               >
                 <ContextMenuItem
                   className={COMPACT_ITEM}
+                  disabled={isSearchOpen}
                   onSelect={() => {
                     editRootFromMenuRef.current = true;
                     startEditRoot();
@@ -1296,6 +1304,7 @@ export const FileExplorer = memo(
                   onRefresh={tree.refresh}
                   onPaste={tree.pasteEntry}
                   canPaste={tree.clipboard !== null}
+                  searchOpen={isSearchOpen}
                 />
               </ContextMenuContent>
             </ContextMenu>
@@ -1488,6 +1497,7 @@ export const FileExplorer = memo(
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
+                    disabled={isSearchOpen}
                     onSelect={() => tree.beginCreate(rootPath, "file")}
                   >
                     <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
@@ -1495,6 +1505,7 @@ export const FileExplorer = memo(
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
+                    disabled={isSearchOpen}
                     onSelect={() => tree.beginCreate(rootPath, "dir")}
                   >
                     <HugeiconsIcon
@@ -1521,6 +1532,7 @@ export const FileExplorer = memo(
                   <CopyPathMenu path={rootPath} isDir workspaceRoot={workspaceRootPath} repoRoot={gitRootPath} />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
+                    disabled={isSearchOpen}
                     onSelect={() => tree.refresh(rootPath)}
                   >
                     <HugeiconsIcon
