@@ -4344,7 +4344,7 @@ export default function App() {
             activeWorkspaceId={activeWorkspaceId}
             onActivate={onActivateAgent}
           />
-          <OnboardingHost />
+          <OnboardingHost onRestoreFocus={restoreLeafFocus} />
           <Toaster position="bottom-right" />
           <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>

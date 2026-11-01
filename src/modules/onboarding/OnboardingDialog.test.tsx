@@ -67,6 +67,17 @@ describe("OnboardingDialog", () => {
     expect(onboarding()).toMatchObject({ step: "permissions", finished: false });
   });
 
+  it("gives the focus back to the active tab when it closes", async () => {
+    setOnboarding({ step: "style" });
+    const restore = vi.fn();
+    render(<OnboardingDialog isMac onRestoreFocus={restore} />);
+    act(() => openOnboarding());
+    await screen.findByText("Pick your style");
+    expect(restore).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
+    await waitFor(() => expect(restore).toHaveBeenCalledTimes(1));
+  });
+
   it("Escape closes it like Continue later", async () => {
     setOnboarding({ step: "style" });
     render(<OnboardingDialog isMac />);

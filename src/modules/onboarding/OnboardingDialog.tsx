@@ -43,7 +43,13 @@ const VIEWS: Record<OnboardingStep, StepView> = {
   },
 };
 
-export function OnboardingDialog({ isMac = IS_MAC }: { isMac?: boolean }) {
+type Props = {
+  isMac?: boolean;
+  /** Puts the focus back on the active tab once the dialog has closed. */
+  onRestoreFocus?: () => void;
+};
+
+export function OnboardingDialog({ isMac = IS_MAC, onRestoreFocus }: Props) {
   const open = useOnboardingUi((s) => s.open);
   const saved = usePreferencesStore((s) => s.onboarding.step);
   const steps = visibleSteps(isMac);
@@ -73,7 +79,14 @@ export function OnboardingDialog({ isMac = IS_MAC }: { isMac?: boolean }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && (last ? complete() : closeOnboarding())}>
-      <DialogContent showCloseButton={false} className="gap-5 sm:max-w-xl">
+      <DialogContent
+        showCloseButton={false}
+        className="gap-5 sm:max-w-xl"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          onRestoreFocus?.();
+        }}
+      >
         <div className="flex items-center gap-3">
           <Progress
             value={((index + 1) / steps.length) * 100}

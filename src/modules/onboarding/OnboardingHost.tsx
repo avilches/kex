@@ -21,7 +21,7 @@ function remind(): void {
 // Until hydration the stored state is the default, which says finished, so deciding earlier
 // would never show anything. Only the window that wins the per-process claim decides, so
 // restored or new windows never repeat the modal or eat the reminder of the next launch.
-export function OnboardingHost() {
+export function OnboardingHost({ onRestoreFocus }: { onRestoreFocus?: () => void }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -58,5 +58,5 @@ export function OnboardingHost() {
     };
   }, []);
 
-  return <OnboardingDialog />;
+  return <OnboardingDialog onRestoreFocus={onRestoreFocus} />;
 }
