@@ -26,7 +26,8 @@
     "size": "size-limit",
     "knip": "knip",
     "bump-version": "node scripts/bump-version.mjs",
-    "build:local": "bash scripts/build-local-app.sh"
+    "build:local": "bash scripts/build-local-app.sh",
+    "dev:onboarding": "bash scripts/run-onboarding.sh"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

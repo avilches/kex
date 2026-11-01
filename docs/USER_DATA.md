@@ -26,7 +26,7 @@ son la integración con Claude Code y con la shell, no datos de usuario, y se co
 entre ambas versiones.
 
 **`KEX_PROFILE=<nombre>` arranca Kex con datos aparte**, por ejemplo para probar el onboarding desde cero:
-`KEX_PROFILE=onboarding pnpm tauri dev`. Añade el nombre al identifier en tiempo de ejecución
+`KEX_PROFILE=onboarding pnpm tauri dev`, o `pnpm dev:onboarding` (`scripts/run-onboarding.sh`), que además borra antes los datos del perfil. Añade el nombre al identifier en tiempo de ejecución
 (`modules/profile.rs`, antes de construir la app), así que `support` y `logs` pasan a
 `~/Library/Application Support/app.betauer.kex.dev.onboarding` y `~/Library/Logs/app.betauer.kex.dev.onboarding`
 (sin `.dev` en el build de release). No recompila: basta cambiar la variable. Para empezar de cero se borra esa
