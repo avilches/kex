@@ -107,6 +107,7 @@ export type CommandPaletteActionContext = {
   toggleZenMode: () => void;
   hasActiveTerminal: boolean;
   hibernated: boolean;
+  onboardingOpen: boolean;
   activePaneTabCount: number;
   hasActiveTab: boolean;
   hasActiveTabTitle: boolean;
@@ -126,6 +127,11 @@ export type CommandPaletteActionContext = {
 };
 
 const noop = () => {};
+
+// While an onboarding dialog is open, no other window may start a second one.
+export function commandBlockedByOnboarding(commandId: string): boolean {
+  return commandId === "window.new";
+}
 
 export function createCommandItems(
   ctx: CommandPaletteActionContext,
@@ -441,9 +447,13 @@ export function createCommandItems(
     icon: section.icon,
     run: () => ctx.openSettingsSection(section.id),
   }));
-  const all = [...base, ...generated, ...settings];
-  if (!ctx.hibernated) return all;
-  return all.map((item) =>
-    commandBlockedWhileHibernated(item.id) ? { ...item, disabledReason: "Tab hibernated" } : item,
-  );
+  return [...base, ...generated, ...settings].map((item) => {
+    if (ctx.onboardingOpen && commandBlockedByOnboarding(item.id)) {
+      return { ...item, disabledReason: "Setup in progress" };
+    }
+    if (ctx.hibernated && commandBlockedWhileHibernated(item.id)) {
+      return { ...item, disabledReason: "Tab hibernated" };
+    }
+    return item;
+  });
 }

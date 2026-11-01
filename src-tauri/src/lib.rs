@@ -180,6 +180,7 @@ struct DynMenuItems {
     sidebar_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
+    new_window: tauri::menu::MenuItem<tauri::Wry>,
 }
 
 #[cfg(target_os = "macos")]
@@ -241,6 +242,22 @@ pub fn refresh_dock_menu(app: &tauri::AppHandle) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn refresh_dock_menu(_app: &tauri::AppHandle) {}
+
+/// Applies the onboarding block after it turned on or off: New Window is greyed out in the
+/// native menu while an onboarding dialog is open.
+pub(crate) fn onboarding_block_changed(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let blocked = app.state::<onboarding::OnboardingBlock>().active();
+        let handles = app.state::<MenuHandles>();
+        let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
+        if let Some(items) = guard.as_ref() {
+            let _ = items.new_window.set_enabled(!blocked);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
 
 #[tauri::command]
 fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
@@ -356,6 +373,12 @@ fn create_app_window(
         }
         WindowEvent::Destroyed => {
             forget_destroyed_window(&app_handle);
+            if app_handle
+                .state::<onboarding::OnboardingBlock>()
+                .set(&win_label, false)
+            {
+                onboarding_block_changed(&app_handle);
+            }
             // Count live main windows after this one is gone.
             let live = app_handle
                 .webview_windows()
@@ -482,7 +505,12 @@ async fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
     create_new_window(&app)
 }
 
+/// Refused, as a no-op, while an onboarding dialog is open: two onboardings must never run at once.
 fn create_new_window(app: &tauri::AppHandle) -> Result<(), String> {
+    if app.state::<onboarding::OnboardingBlock>().active() {
+        log::info!("[window] new window refused: the onboarding dialog is open");
+        return Ok(());
+    }
     let id = window_state::generate_window_id();
     {
         let mgr = app.state::<window_state::WindowStateManager>();
@@ -938,6 +966,7 @@ pub fn run() {
                     sidebar_side,
                     dock_browser,
                     dock_all_browsers,
+                    new_window,
                 }))));
 
                 app.on_menu_event(|app, event| {
@@ -1082,6 +1111,7 @@ pub fn run() {
             registry
         })
         .manage(QuitGuard::default())
+        .manage(onboarding::OnboardingBlock::default())
         .manage(PendingOpenFolders::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
         .manage(float_browser::FloatBrowserState::new())
@@ -1165,6 +1195,7 @@ pub fn run() {
             update_guard::claim_update_install,
             update_guard::release_update_install,
             onboarding::claim_onboarding_startup,
+            onboarding::set_onboarding_open,
             actions::action_spawn,
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,

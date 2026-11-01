@@ -72,6 +72,7 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     toggleProfiler: fn(),
     hasActiveTerminal: true,
     hibernated: false,
+    onboardingOpen: false,
     activePaneTabCount: 2,
     hasActiveTab: true,
     hasActiveTabTitle: true,
@@ -257,5 +258,15 @@ describe("createCommandItems while the focused tab is hibernated", () => {
 
   it("changes nothing for an awake tab", () => {
     expect(byId(false).get("tab.new")?.disabledReason).toBeUndefined();
+  });
+});
+
+describe("createCommandItems while the onboarding dialog is open", () => {
+  const byId = (onboardingOpen: boolean) =>
+    new Map(createCommandItems(ctx({ onboardingOpen })).map((i) => [i.id, i]));
+
+  it("disables New window, and enables it again once the dialog is closed", () => {
+    expect(byId(true).get("window.new")?.disabledReason).toBe("Setup in progress");
+    expect(byId(false).get("window.new")?.disabledReason).toBeUndefined();
   });
 });

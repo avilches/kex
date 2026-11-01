@@ -25,6 +25,11 @@ vi.mock("@/modules/settings/store", async (orig) => {
     },
   };
 });
+const setOnboardingOpen = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/lib/native", async (orig) => {
+  const real = await orig<typeof import("@/lib/native")>();
+  return { ...real, native: { ...real.native, setOnboardingOpen } };
+});
 vi.mock("@/modules/permissions", () => ({ PermissionsList: () => <div>permissions list</div> }));
 vi.mock("@/settings/sections/AgentIntegrations", () => ({
   AgentIntegrations: () => <div>agent integrations</div>,
@@ -44,6 +49,7 @@ function setOnboarding(state: Partial<OnboardingState>) {
 const onboarding = () => usePreferencesStore.getState().onboarding;
 
 beforeEach(() => {
+  setOnboardingOpen.mockClear();
   setters.scheme.mockClear();
   setters.preview.mockClear();
   closeOnboarding();
@@ -77,6 +83,28 @@ describe("OnboardingDialog", () => {
     expect(restore).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
     await waitFor(() => expect(restore).toHaveBeenCalledTimes(1));
+  });
+
+  it("tells Rust the dialog is open, and releases it when it closes", async () => {
+    setOnboarding({ step: "style" });
+    render(<OnboardingDialog isMac />);
+    expect(setOnboardingOpen.mock.calls).toEqual([[false]]);
+    act(() => openOnboarding());
+    await screen.findByText("Pick your style");
+    expect(setOnboardingOpen).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
+    expect(setOnboardingOpen).toHaveBeenLastCalledWith(false);
+    expect(setOnboardingOpen.mock.calls).toEqual([[false], [true], [false]]);
+  });
+
+  it("releases the block when it unmounts while open", async () => {
+    setOnboarding({ step: "style" });
+    const { unmount } = render(<OnboardingDialog isMac />);
+    act(() => openOnboarding());
+    await screen.findByText("Pick your style");
+    expect(setOnboardingOpen).toHaveBeenLastCalledWith(true);
+    unmount();
+    expect(setOnboardingOpen).toHaveBeenLastCalledWith(false);
   });
 
   it("Escape closes it like Continue later", async () => {

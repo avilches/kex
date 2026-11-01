@@ -6,6 +6,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { type ReactNode, useState } from "react";
 import { finish, type OnboardingStep, stepAfter, stepBefore, visibleSteps, withStep } from "./lib/onboardingState";
 import { persistOnboarding } from "./lib/persistOnboarding";
+import { useOnboardingBlock } from "./lib/useOnboardingBlock";
 import { closeOnboarding, useOnboardingUi } from "./onboardingUi";
 import { AgentsStep } from "./steps/AgentsStep";
 import { DoneStep } from "./steps/DoneStep";
@@ -51,6 +52,7 @@ type Props = {
 
 export function OnboardingDialog({ isMac = IS_MAC, onRestoreFocus }: Props) {
   const open = useOnboardingUi((s) => s.open);
+  useOnboardingBlock(open);
   const saved = usePreferencesStore((s) => s.onboarding.step);
   const steps = visibleSteps(isMac);
   const resume = () => (steps.includes(saved) ? saved : steps[0]);

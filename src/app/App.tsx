@@ -45,7 +45,7 @@ import { isMarkdownPath } from "@/lib/utils";
 import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
 import { findReplaceableFilePreview, isFilePreviewTab } from "@/modules/workspaces/lib/fileTabPreview";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
-import { isOnboardingOpen, OnboardingHost } from "@/modules/onboarding";
+import { isOnboardingOpen, OnboardingHost, useOnboardingUi } from "@/modules/onboarding";
 import { buildAgentEntries, entriesByWorkspace } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -3890,6 +3890,7 @@ export default function App() {
     [setActiveWorkspaceId],
   );
 
+  const onboardingOpen = useOnboardingUi((s) => s.open);
   const commandPaletteItems = useMemo(
     () =>
       commandPaletteOpen
@@ -3959,10 +3960,12 @@ export default function App() {
             },
             profilerRunning: performanceProfiler,
             toggleProfiler: () => void setPerformanceProfiler(!performanceProfiler),
+            onboardingOpen,
           })
         : [],
     [
       commandPaletteOpen,
+      onboardingOpen,
       activeWorkspace,
       workspacePaneLimit,
       performanceProfiler,

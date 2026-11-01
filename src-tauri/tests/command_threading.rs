@@ -61,6 +61,10 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("fs_duplicate_cancel", "flips an atomic"),
     ("claim_startup_scan", "process-wide flag"),
     ("claim_onboarding_startup", "process-wide flag"),
+    (
+        "set_onboarding_open",
+        "a set in memory, and the menu API when the block turns on or off",
+    ),
     ("claim_update_check", "process-wide flag"),
     ("claim_update_install", "process-wide flag"),
     ("release_update_install", "process-wide flag"),
