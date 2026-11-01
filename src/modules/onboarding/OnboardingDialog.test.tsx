@@ -30,6 +30,8 @@ vi.mock("@/lib/native", async (orig) => {
   const real = await orig<typeof import("@/lib/native")>();
   return { ...real, native: { ...real.native, setOnboardingOpen } };
 });
+const busy = vi.hoisted(() => ({ value: false }));
+vi.mock("./lib/useOnboardingBusy", () => ({ useOnboardingBusy: () => busy.value }));
 vi.mock("@/modules/permissions", () => ({ PermissionsList: () => <div>permissions list</div> }));
 vi.mock("@/settings/sections/AgentIntegrations", () => ({
   AgentIntegrations: () => <div>agent integrations</div>,
@@ -49,6 +51,7 @@ function setOnboarding(state: Partial<OnboardingState>) {
 const onboarding = () => usePreferencesStore.getState().onboarding;
 
 beforeEach(() => {
+  busy.value = false;
   setOnboardingOpen.mockClear();
   setters.scheme.mockClear();
   setters.preview.mockClear();
@@ -223,5 +226,35 @@ describe("OnboardingChip", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Dismiss setup" }));
     await waitFor(() => expect(onboarding().finished).toBe(true));
     expect(screen.queryByRole("button", { name: /Finish setup/ })).toBeNull();
+  });
+
+  it("is dimmed and does nothing while another window has its dialog open", async () => {
+    setOnboarding({ step: "style" });
+    busy.value = true;
+    render(<OnboardingChip isMac />);
+    const main = screen.getByRole("button", { name: /Finish setup/ }) as HTMLButtonElement;
+    const options = screen.getByRole("button", { name: "Setup options" }) as HTMLButtonElement;
+    expect(main.disabled).toBe(true);
+    expect(options.disabled).toBe(true);
+    fireEvent.click(main);
+    expect(setOnboardingOpen).not.toHaveBeenCalled();
+    expect(useOnboardingUi.getState().open).toBe(false);
+  });
+
+  it("keeps showing the step it was left on while dimmed", () => {
+    setOnboarding({ step: "agents" });
+    busy.value = true;
+    render(<OnboardingChip isMac />);
+    expect(screen.getByRole("button", { name: "Finish setup 4/5" })).toBeTruthy();
+  });
+
+  it("is usable again once the other window's dialog is gone", () => {
+    setOnboarding({ step: "style" });
+    busy.value = true;
+    const { rerender } = render(<OnboardingChip isMac />);
+    expect((screen.getByRole("button", { name: /Finish setup/ }) as HTMLButtonElement).disabled).toBe(true);
+    busy.value = false;
+    rerender(<OnboardingChip isMac />);
+    expect((screen.getByRole("button", { name: /Finish setup/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

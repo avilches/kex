@@ -258,6 +258,11 @@ pub(crate) fn onboarding_block_changed(app: &tauri::AppHandle) {
             let _ = items.settings.set_enabled(!blocked);
         }
     }
+    // Every window hears it, so the setup chip of the others dims while one dialog is open.
+    let _ = app.emit(
+        onboarding::BLOCK_EVENT,
+        onboarding::block_payload(&app.state::<onboarding::OnboardingBlock>()),
+    );
     if blocked {
         close_settings_window(app);
     }
@@ -1261,6 +1266,7 @@ pub fn run() {
             update_guard::release_update_install,
             onboarding::claim_onboarding_startup,
             onboarding::set_onboarding_open,
+            onboarding::onboarding_block_holder,
             request_onboarding_restart,
             actions::action_spawn,
             workspace::wsl_list_distros,

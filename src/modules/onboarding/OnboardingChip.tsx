@@ -11,10 +11,12 @@ import { Cancel01Icon, MoreHorizontalIcon, SparklesIcon } from "@hugeicons/core-
 import { HugeiconsIcon } from "@hugeicons/react";
 import { chipLabel, finish, showChip } from "./lib/onboardingState";
 import { persistOnboarding } from "./lib/persistOnboarding";
+import { useOnboardingBusy } from "./lib/useOnboardingBusy";
 import { openOnboarding } from "./onboardingUi";
 
 export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
   const state = usePreferencesStore((s) => s.onboarding);
+  const busy = useOnboardingBusy();
   if (!showChip(state)) return null;
   const label = chipLabel(state, isMac);
 
@@ -24,7 +26,8 @@ export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
         variant="ghost"
         size="sm"
         className="h-full gap-1.5 rounded-none border-0 px-2 focus-visible:ring-0 focus-visible:inset-ring-2 focus-visible:inset-ring-ring/50 text-[11px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground"
-        title="Pick up the setup where you left it"
+        title={busy ? "The setup is open in another window" : "Pick up the setup where you left it"}
+        disabled={busy}
         onClick={() => void openOnboarding()}
       >
         <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} className="text-primary" />
@@ -37,6 +40,7 @@ export function OnboardingChip({ isMac = IS_MAC }: { isMac?: boolean }) {
             size="icon-sm"
             aria-label="Setup options"
             title="Setup options"
+            disabled={busy}
             className="h-full w-6 rounded-none border-0 border-l border-border/70 focus-visible:ring-0 focus-visible:inset-ring-2 focus-visible:inset-ring-ring/50 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <HugeiconsIcon icon={MoreHorizontalIcon} size={13} strokeWidth={1.75} />
