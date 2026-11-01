@@ -1099,7 +1099,7 @@ export const FileExplorer = memo(
               onSetAsRoot={onSetAsRoot}
               onAddToGitignore={onAddToGitignore}
               gitRootPath={gitRootPath}
-              onEnterFolder={onEnterFolder}
+              onEnterFolder={rootMode === "filesystem" ? onEnterFolder : undefined}
               previewOnClick={previewOnClick}
               hasClipboard={tree.clipboard !== null}
               isCutSource={
