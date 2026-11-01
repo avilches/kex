@@ -714,6 +714,16 @@ async fn check_launch_dir(path: String) -> Option<String> {
         .flatten()
 }
 
+#[tauri::command]
+async fn check_plain_launch_dir(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        modules::workspace::plain_dir_problem(&path, dirs::home_dir().as_deref())
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 /// Folders handed to a window by a second launch that it has not picked up yet. The event only
 /// says "look", because a window that is still starting has no listener to receive a payload.
 #[derive(Default)]
@@ -1305,6 +1315,7 @@ pub fn run() {
             tab_history::tab_history_record,
             tab_history::tab_history_touch,
             check_launch_dir,
+            check_plain_launch_dir,
             history::history_suggest,
             history::history_commands,
             history::history_record,

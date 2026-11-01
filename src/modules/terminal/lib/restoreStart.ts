@@ -20,10 +20,17 @@ type StartInput = {
   initialCwd: string | undefined;
 };
 
-// A saved command with no agent plan is the only start whose directory nobody has checked yet. A
-// shell with nothing to run needs no check: Rust starts it in the nearest folder that exists.
+// A start with no agent plan is the one whose directory nobody has checked yet. A saved command is
+// checked for the folder itself; a shell with nothing to run is checked by `check_plain_launch_dir`,
+// which accepts a folder gone as long as one above it lives under the user's home (Rust starts the
+// shell there) and reports a problem otherwise, so a path on an unmounted disk never opens somewhere else.
 export function needsDirCheck(i: StartInput): boolean {
-  return !i.plan && !!i.persistentCommand && !!i.initialCwd;
+  return !i.plan && !!i.initialCwd;
+}
+
+// The Rust command that judges the folder of this start.
+export function dirCheckCommand(i: StartInput): "check_launch_dir" | "check_plain_launch_dir" {
+  return i.persistentCommand ? "check_launch_dir" : "check_plain_launch_dir";
 }
 
 export function decideStart(i: StartInput & { dirProblem: string | null }): StartDecision {
@@ -49,6 +56,12 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
       };
     }
     return { kind: "spawn", cwd: i.initialCwd, inject: "command" };
+  }
+  if (!plan && i.initialCwd && i.dirProblem) {
+    return {
+      kind: "blocked",
+      block: { reason: i.dirProblem, dir: i.initialCwd, command: "", restorable: true },
+    };
   }
   return { kind: "spawn", cwd: i.initialCwd, inject: "none" };
 }

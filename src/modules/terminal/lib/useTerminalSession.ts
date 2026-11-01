@@ -47,6 +47,7 @@ import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import { withRestoreBusy } from "./restoreBusy";
 import {
   decideStart,
+  dirCheckCommand,
   needsDirCheck,
   openFailureBlock,
   refreshHeldBlock,
@@ -1019,7 +1020,9 @@ async function startLeaf(leafId: string, s: Session): Promise<void> {
     persistentCommand: s.persistentCommand,
     initialCwd: s.initialCwd,
   };
-  const dirProblem = needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
+  const dirProblem = needsDirCheck(input)
+    ? await invoke<string | null>(dirCheckCommand(input), { path: s.initialCwd ?? "" }).catch(() => null)
+    : null;
   const decision = decideStart({ ...input, dirProblem });
   if (s.disposed || s.pty) {
     s.ptyOpening = false;
