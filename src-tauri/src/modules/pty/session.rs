@@ -58,6 +58,10 @@ pub struct Session {
     /// The frontend tab the session belongs to, which the Actions runner knows.
     pub script_tab_id: Option<String>,
     pub killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// Where `pty_write` hands the keystrokes: a thread of this session does the blocking write.
+    /// Before `writer` on purpose: dropping it ends that thread, which holds `writer` meanwhile.
+    pub input: super::input::InputQueue,
+    #[allow(dead_code)] // owned here for the drop order; the input thread and the DA filter write through their own clones
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub master: Mutex<Box<dyn MasterPty + Send>>,
     // Set by the waiter once the child exits, so pty_open can reap a shell
@@ -202,6 +206,7 @@ pub fn spawn(
         shell_pid,
         script_tab_id: tab_id.clone(),
         killer: Mutex::new(killer),
+        input: super::input::InputQueue::start(writer.clone()),
         writer: writer.clone(),
         master: Mutex::new(pair.master),
         exited: exited.clone(),
@@ -434,6 +439,7 @@ mod tests {
             shell_pid: child.process_id().unwrap_or(0),
             script_tab_id: None,
             killer: Mutex::new(killer),
+            input: crate::modules::pty::input::InputQueue::start(writer.clone()),
             writer,
             master: Mutex::new(pair.master),
             exited: Arc::new(AtomicBool::new(false)),
@@ -486,6 +492,7 @@ mod tests {
             shell_pid: 0,
             script_tab_id: None,
             killer: Mutex::new(killer),
+            input: crate::modules::pty::input::InputQueue::start(writer.clone()),
             writer,
             master: Mutex::new(pair.master),
             exited: Arc::new(AtomicBool::new(false)),

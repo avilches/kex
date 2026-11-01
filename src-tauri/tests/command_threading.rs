@@ -30,10 +30,9 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("window_save_workspace_bar", "in-memory update in call order, the disk write is queued"),
     ("window_save_collapsed_groups", "in-memory update in call order, the disk write is queued"),
     ("window_save_groups", "in-memory update in call order, the disk write is queued"),
-    // Per keystroke, and the order of the writes is the order of the input.
-    // Known risk: write_all blocks if the child stops reading and the kernel buffer fills, which
-    // would freeze the UI. Order is the reason it stays; a writer thread per session would fix both.
-    ("pty_write", "ordered input to the shell"),
+    // Per keystroke, and the order of the writes is the order of the input: it only queues the bytes
+    // for the session's input thread, which does the blocking write.
+    ("pty_write", "ordered hand-off to the session's input thread"),
     ("pty_resize", "ordered with the output it reflows"),
     (
         "pty_close",
