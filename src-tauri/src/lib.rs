@@ -4,7 +4,8 @@ mod window_log;
 
 use modules::{
     actions, agent, custom_themes, editors, float_browser, fs, git, hibernate_lines, history,
-    menu_route, onboarding, permissions, pty, shell, tab_history, update_guard, window_state, workspace,
+    menu_route, onboarding, permissions, pty, shell, tab_history, update_guard, window_state,
+    workspace,
 };
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
