@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   initialConsumedNonce,
+  replayKey,
   revealForWorkspace,
+  shouldReplayReveal,
   shouldConsumeReveal,
   type RevealRequest,
 } from "./revealRequest";
@@ -39,5 +41,19 @@ describe("revealForWorkspace", () => {
     expect(revealForWorkspace(req(2, "ws-b"), "ws-a")).toBeNull();
     expect(revealForWorkspace(req(2, "ws-b"), null)).toBeNull();
     expect(revealForWorkspace(null, "ws-a")).toBeNull();
+  });
+});
+
+describe("shouldReplayReveal", () => {
+  const under = (p: string, r: string) => p.startsWith(r);
+  it("replays once for a root that contains the path", () => {
+    const r = req(3);
+    expect(shouldReplayReveal(r, "/p", new Set(), under)).toBe(true);
+    expect(shouldReplayReveal(r, "/p", new Set([replayKey(r, "/p")]), under)).toBe(false);
+  });
+  it("skips roots that do not contain the path and destructive actions", () => {
+    expect(shouldReplayReveal(req(3), "/q", new Set(), under)).toBe(false);
+    expect(shouldReplayReveal({ ...req(3), pendingAction: "delete" }, "/p", new Set(), under)).toBe(false);
+    expect(shouldReplayReveal(null, "/p", new Set(), under)).toBe(false);
   });
 });
