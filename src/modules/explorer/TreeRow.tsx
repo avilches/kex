@@ -284,7 +284,7 @@ function EntryRowImpl(props: EntryRowProps) {
               <span className="size-4 shrink-0" />
             )}
             <span
-              className="min-w-0 flex-1 truncate"
+              className={cn("min-w-0 truncate", !isDir && "flex-1")}
               style={
                 !gitignored && gitStatusCode
                   ? {
@@ -315,6 +315,7 @@ function EntryRowImpl(props: EntryRowProps) {
                 Open
               </span>
             )}
+            {isDir && <span className="flex-1" />}
             {isOpenInTab && (
               <span
                 role="button"

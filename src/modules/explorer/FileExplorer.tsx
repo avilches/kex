@@ -1167,11 +1167,12 @@ export const FileExplorer = memo(
       <div
         ref={containerRef}
         data-file-explorer
-        className="relative flex h-full flex-col outline-none"
+        className="group/explorer relative flex h-full flex-col outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {rootMode !== "workspace" && (
         <div className="flex h-8 shrink-0 items-center gap-1 pl-1.5 pr-9">
           {!canEditRoot ? (
             <div
@@ -1212,7 +1213,7 @@ export const FileExplorer = memo(
                   </span>
                   <HugeiconsIcon
                     icon={PencilEdit02Icon}
-                    size={12}
+                    size={13}
                     strokeWidth={2}
                     className="pointer-events-none ml-1.5 hidden shrink-0 group-hover/root:block"
                   />
@@ -1234,6 +1235,7 @@ export const FileExplorer = memo(
           )}
 
         </div>
+        )}
 
         {rootMode === "workspace" &&
         (workspaceRootPath === null || root?.status === "error") ? (
@@ -1495,7 +1497,7 @@ export const FileExplorer = memo(
           />
         )}
         </div>
-        <div className="absolute right-1.5 top-1 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 backdrop-blur-sm">
+        <div className="absolute right-1.5 top-1 z-10 flex flex-col items-center gap-0.5 rounded-md bg-sidebar/80 p-0.5 opacity-0 backdrop-blur-sm transition-opacity focus-within:opacity-100 group-hover/explorer:opacity-100">
           {rootMode === "filesystem" && homePath && (
             <Button
               variant="ghost"
