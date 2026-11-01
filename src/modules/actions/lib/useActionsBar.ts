@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Workspace } from "@/modules/workspaces/lib/types";
-import { byKind, buildActionsBarModel, CONTEXT_RESERVE, hasContextActions, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
+import { byKind, buildActionsBarModel, ownButtonCandidates, ownButtonsThatFit, type BarModel } from "./actionsBar";
 import type { Action } from "./types";
 import type { RunOverlay } from "./useActionRunner";
 import { useActionContext } from "./useActionContext";
@@ -49,11 +49,7 @@ export function useActionsBarModel({ workspace, room, arranging }: Input): BarMo
     () =>
       room === undefined
         ? undefined
-        : ownButtonsThatFit(
-            ownButtonCandidates(byKind(local), byKind(global), states),
-            room,
-            hasContextActions(local, global) ? CONTEXT_RESERVE : 0,
-          ),
+        : ownButtonsThatFit(ownButtonCandidates(byKind(local), byKind(global), states), room),
     [local, global, room, states],
   );
   return useMemo(

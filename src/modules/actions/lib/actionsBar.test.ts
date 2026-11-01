@@ -10,7 +10,6 @@ import {
   buildActionsBarModel,
   BAR_GAP,
   COMPACT_WIDTH,
-  CONTEXT_RESERVE,
   NO_CONTEXT_REASON,
   hasContextActions,
   onBar,
@@ -52,6 +51,16 @@ const app = (o: Partial<Action> = {}): Action => ({
   kind: "app",
   command: "pycharm {workspace}",
   ownButton: false,
+  ...o,
+});
+
+const claude = (o: Partial<Action> = {}): Action => ({
+  id: "g1",
+  name: "Claude Code",
+  kind: "agent",
+  command: "claude",
+  appId: "claude",
+  ownButton: true,
   ...o,
 });
 
@@ -205,11 +214,10 @@ describe("ownButtonsThatFit", () => {
     expect(Number.isInteger(ownButtonsThatFit(four, 333.7))).toBe(true);
   });
 
-  it("leaves room for the context combo when there is one", () => {
+  it("fits every button when the room is the buttons plus the menu", () => {
     const total = four.reduce((n, a) => n + ownButtonWidth(a) + BAR_GAP, 0) + MENUS_RESERVE;
     expect(ownButtonsThatFit(four, total)).toBe(4);
-    expect(ownButtonsThatFit(four, total, CONTEXT_RESERVE)).toBeLessThan(4);
-    expect(ownButtonsThatFit(four, total + CONTEXT_RESERVE, CONTEXT_RESERVE)).toBe(4);
+    expect(ownButtonsThatFit(four, total - 1)).toBeLessThan(4);
   });
 
   it("a folder button never takes a slot nor folds a workspace one out of the bar", () => {
@@ -238,10 +246,10 @@ describe("buildActionsBarModel", () => {
   ];
 
 
-  it("puts scripts before apps, each kind in user order", () => {
+  it("puts scripts before apps, each kind in user order, and never makes an app a button", () => {
     const m = buildActionsBarModel({ local: actions, context: ctx, states: new Map(), activeId: undefined });
-    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3", "a1"]);
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a2"]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["s1", "s3"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s2", "a1", "a2"]);
     expect(m.empty).toBe(false);
   });
 
@@ -259,7 +267,7 @@ describe("buildActionsBarModel", () => {
 
   it("carries the run state, the active mark and the disabled reason", () => {
     const m = buildActionsBarModel({
-      local: [script({ id: "s1", ownButton: true }), app({ id: "a1", command: "code {workspace}", ownButton: true })],
+      local: [script({ id: "s1", ownButton: true }), script({ id: "a1", command: "code {workspace}", ownButton: true })],
       context: { ...ctx, vars: { ...vars, workspace: "" } },
       states: new Map([["s1", "running"]]),
       activeId: "s1",
@@ -291,24 +299,24 @@ describe("buildActionsBarModel", () => {
       states: new Map(),
       activeId: undefined,
     });
-    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["s1", "a0"]);
     expect(m.menu.global.map((b) => b.id)).toEqual(["s2", "a1"]);
     expect(m.empty).toBe(false);
   });
 
   it("draws a button as its icon alone only when it is the sole button of its app", () => {
-    const zedWs = app({ id: "z1", appId: "zed", name: "Zed {workspace}", ownButton: true });
-    const zedFile = app({ id: "z2", appId: "zed", name: "Zed docs {workspace}", command: "zed {workspace}/docs", ownButton: true });
-    const code = app({ id: "c1", appId: "code", name: "Code {workspace}", ownButton: true });
-    const custom = app({ id: "u1", name: "Mine", ownButton: true });
+    const zedWs = claude({ id: "z1", appId: "zed", name: "Zed {workspace}" });
+    const zedFile = claude({ id: "z2", appId: "zed", name: "Zed docs {workspace}", command: "zed {workspace}/docs" });
+    const code = claude({ id: "c1", appId: "code", name: "Code {workspace}" });
+    const custom = claude({ id: "u1", appId: undefined, name: "Mine" });
     const dev = script({ id: "s1", ownButton: true });
     const m = buildActionsBarModel({ local: [zedWs, zedFile, code], global: [custom, dev], context: ctx, states: new Map(), activeId: undefined });
     expect(m.buttons.map((b) => [b.id, b.iconOnly])).toEqual([
       ["z1", false],
       ["z2", false],
       ["c1", true],
-      ["s1", false],
       ["u1", false],
+      ["s1", false],
     ]);
     expect(soleIconButtons([zedWs, zedFile, code])).toEqual(new Set(["c1"]));
   });
@@ -325,7 +333,7 @@ describe("buildActionsBarModel", () => {
   it("an own button of either scope still competes for the same bar room", () => {
     const m = buildActionsBarModel({
       local: [script({ id: "s1", ownButton: true })],
-      global: [app({ id: "a1", ownButton: true })],
+      global: [claude({ id: "a1" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
@@ -337,7 +345,7 @@ describe("buildActionsBarModel", () => {
 
   it("labels an unnamed Action", () => {
     const m = buildActionsBarModel({
-      local: [app({ name: "  ", ownButton: true })],
+      local: [script({ name: "  ", ownButton: true })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
@@ -574,7 +582,7 @@ describe("Settings labels", () => {
 
 describe("buildActionsBarModel without a limit", () => {
   it("draws every own button the room allows, however many", () => {
-    const own = (id: string) => app({ id, name: id, ownButton: true });
+    const own = (id: string) => script({ id, name: id, ownButton: true });
     const m = buildActionsBarModel({
       local: ["a", "b", "c", "d", "e"].map(own),
       global: ["g1", "g2", "g3", "g4"].map(own),
@@ -591,7 +599,7 @@ describe("resolveDrop", () => {
   const b = (id: string, over: { global?: boolean; script?: boolean } = {}) => ({
     id,
     global: over.global ?? false,
-    action: over.script ? script({ id }) : app({ id }),
+    action: over.script ? script({ id }) : claude({ id }),
   });
   const bar = [b("w1"), b("w2"), b("ws", { script: true }), b("g1", { global: true }), b("g2", { global: true })];
   const menu = [
@@ -615,16 +623,16 @@ describe("resolveDrop", () => {
     expect(drop("w1", "g1")).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g1" });
     expect(drop("w1", "g1", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: "g2" });
     expect(drop("w1", "g2", true)).toEqual({ id: "w1", from: "workspace", to: "global", ...base, placeBefore: null });
-    expect(drop("w1", barZoneId("global", "app"))).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
-    expect(drop("g1", barZoneId("workspace", "app"))).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
-    expect(drop("w1", barZoneId("workspace", "app"))).toBeNull();
+    expect(drop("w1", barZoneId("global", "agent"))).toEqual({ id: "w1", from: "workspace", to: "global", ...base });
+    expect(drop("g1", barZoneId("workspace", "agent"))).toEqual({ id: "g1", from: "global", to: "workspace", ...base });
+    expect(drop("w1", barZoneId("workspace", "agent"))).toBeNull();
   });
 
   it("takes a bar zone only for its own kind", () => {
     expect(drop("w1", barZoneId("global", "script"))).toBeNull();
-    expect(drop("ws", barZoneId("global", "app"))).toBeNull();
+    expect(drop("ws", barZoneId("global", "agent"))).toBeNull();
     expect(drop("ws", barZoneId("global", "script"))).toEqual({ id: "ws", from: "workspace", to: "global", ...base });
-    expect(drop(row("ms"), barZoneId("workspace", "app"))).toBeNull();
+    expect(drop(row("ms"), barZoneId("workspace", "agent"))).toBeNull();
     expect(drop(row("ms"), barZoneId("workspace", "script"))).toEqual({ id: "ms", from: "workspace", to: "workspace", wasButton: false, button: true });
     expect(parseBarZone("zone:menu")).toBeNull();
     expect(parseBarZone(barZoneId("global", "script"))).toEqual({ scope: "global", kind: "script" });
@@ -680,8 +688,23 @@ describe("resolveDrop", () => {
     expect(drop(row("m1"), "w1", true)).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show, placeBefore: "w2" });
     expect(drop(row("m1"), "ws")).toBeNull();
     expect(drop(row("m1"), "g1")).toEqual({ id: "m1", from: "workspace", to: "global", ...show, placeBefore: "g1" });
-    expect(drop(row("m1"), barZoneId("workspace", "app"))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
-    expect(drop(row("m1"), barZoneId("global", "app"))).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
+    expect(drop(row("m1"), barZoneId("workspace", "agent"))).toEqual({ id: "m1", from: "workspace", to: "workspace", ...show });
+    expect(drop(row("m1"), barZoneId("global", "agent"))).toEqual({ id: "m1", from: "workspace", to: "global", ...show });
+  });
+
+  it("never makes an app a button: not on a bar button, not on the menu trigger of a row", () => {
+    const apps = [...bar, { id: "app1", global: false, action: app({ id: "app1" }) }];
+    const appRows = [...menu, { id: "mapp", global: false, action: app({ id: "mapp" }) }];
+    expect(resolveDrop(apps, appRows, row("mapp"), "w1")).toBeNull();
+    expect(resolveDrop(apps, appRows, row("mapp"), barZoneId("workspace", "agent"))).toBeNull();
+    expect(resolveDrop(apps, appRows, row("mapp"), DROP_MENU_GLOBAL)).toEqual({
+      id: "mapp",
+      from: "workspace",
+      to: "global",
+      wasButton: false,
+      button: false,
+    });
+    expect(parseBarZone("zone:workspace:apps")).toBeNull();
   });
 
   it("makes the menu trigger no target for a row, and ignores itself and the unknown", () => {
@@ -805,10 +828,10 @@ describe("agents", () => {
     expect(m.buttons[0]?.title).toBe("Run Claude Code");
   });
 
-  it("is drawn as its icon alone when it is the sole one of its agent, apart from apps", () => {
+  it("is drawn as its icon alone when it is the sole one of its agent, whatever the scope", () => {
     const m = buildActionsBarModel({
       local: [agent({ id: "g1" }), agent({ id: "g2", appId: "codex", command: "codex" }), agent({ id: "g3", appId: "codex", command: "codex" })],
-      global: [app({ id: "c1", appId: "claude", ownButton: true })],
+      global: [agent({ id: "c1", appId: "gemini", command: "gemini" })],
       context: ctx,
       states: new Map(),
       activeId: undefined,
@@ -837,7 +860,7 @@ describe("agents", () => {
     expect(resolveDrop(bar, [], "a", "g")).toBeNull();
     expect(resolveDrop(bar, [], "g", "s")).toBeNull();
     expect(resolveDrop([...bar, { id: "ga", global: true, action: app({ id: "ga" }) }], [], "a", "gg")).toBeNull();
-    expect(resolveDrop(bar, [], "a", "gg")).toEqual({ id: "a", from: "workspace", to: "global", wasButton: true, button: true });
+    expect(resolveDrop(bar, [], "a", "gg")).toBeNull();
   });
 });
 
@@ -927,7 +950,6 @@ describe("buildActionsBarModel arranging", () => {
     const m = build(true, ctx, { file: false, folder: true });
     expect(lines(m.buttons)).toEqual([
       ["Workspace root", "root"],
-      [null, null],
     ]);
     expect(lines(m.contextCombo.workspace)).toEqual([["Current folder", "tab"]]);
     expect(lines(build(true, onFile, { file: true, folder: false }).contextCombo.workspace)).toEqual([
@@ -941,7 +963,6 @@ describe("buildActionsBarModel arranging", () => {
     const m = build(false, ctx, { file: false, folder: true });
     expect(lines(m.buttons)).toEqual([
       [vars.workspace, "root"],
-      [null, null],
     ]);
     expect(lines(m.contextCombo.workspace)).toEqual([["/p", "tab"]]);
     const file = build(false, onFile, { file: true, folder: false });

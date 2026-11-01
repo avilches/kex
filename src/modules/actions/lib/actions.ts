@@ -69,7 +69,7 @@ export function normalizeAction(raw: unknown): Action | null {
     name: name || command,
     kind,
     command,
-    ownButton: r.ownButton === true,
+    ownButton: kind !== "app" && r.ownButton === true,
   };
   if (typeof r.appId === "string" && r.appId) action.appId = r.appId;
   if (typeof r.iconId === "string" && r.iconId) action.iconId = r.iconId;

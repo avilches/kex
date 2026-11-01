@@ -24,8 +24,6 @@ const RUN_ZONE = 24;
 const ICON = 18;
 // The width fits the main name only: the variable line fronts underneath it, past the cap.
 export const MENUS_RESERVE = 78;
-// The context combo: its icon, a name capped at about 100 px and the chevron.
-export const CONTEXT_RESERVE = 140;
 
 export function ownButtonWidth(action: Pick<Action, "name" | "kind">, iconOnly = false): number {
   if (iconOnly) return PADDING + ICON;
@@ -48,10 +46,10 @@ export function onBar(action: Action, state: ScriptState | "idle"): boolean {
 }
 
 // How many of the own buttons, taken in the user's order, fit in the room the bar has once the
-// menus have taken theirs; `reserve` is the room of the context combo. The rest fold into the
-// menu, so the bar never pushes the search box and the window controls out.
-export function ownButtonsThatFit(actions: readonly Action[], room: number, reserve = 0): number {
-  let left = Math.floor(room) - MENUS_RESERVE - reserve;
+// menus have taken theirs. The rest fold into the menu, so the bar never pushes the search box
+// and the window controls out.
+export function ownButtonsThatFit(actions: readonly Action[], room: number): number {
+  let left = Math.floor(room) - MENUS_RESERVE;
   let shown = 0;
   const sole = soleIconButtons(actions);
   for (const action of actions) {
@@ -305,13 +303,13 @@ export function byKind<T extends Pick<Action, "kind">>(actions: readonly T[]): T
 }
 
 // The own buttons the bar may draw, in order: those flagged as buttons that the bar carries.
-// Each list comes already in bar order, the workspace one before the global one.
+// An app is never one, it lives in the menus whatever its flag says. Each list comes already in bar order, the workspace one before the global one.
 export function ownButtonCandidates(
   local: readonly Action[],
   global: readonly Action[],
   states: ReadonlyMap<string, ScriptState>,
 ): Action[] {
-  return [...local, ...global].filter((action) => action.ownButton && onBar(action, stateOf(action, states)));
+  return [...local, ...global].filter((action) => action.ownButton && !isApp(action) && onBar(action, stateOf(action, states)));
 }
 
 // A button of a detected app or agent that is the only one of it in the bar needs no words:
@@ -337,12 +335,12 @@ export const DROP_MENU_GLOBAL = "mzone:global";
 
 type Scope = "workspace" | "global";
 
-// The bar has one zone per scope and kind: apps, agents and scripts of the workspace, and
-// the same of the global scope. Each one takes only its own kind.
+// The bar has one zone per scope and kind: agents and scripts of the workspace, and the same
+// of the global scope. Each one takes only its own kind. Apps have none: they stay in the menus.
 export const barZoneId = (scope: Scope, kind: ActionKind) => `zone:${scope}:${kind}s`;
 
 export function parseBarZone(id: string): { scope: Scope; kind: ActionKind } | null {
-  const m = /^zone:(workspace|global):(app|agent|script)s$/.exec(id);
+  const m = /^zone:(workspace|global):(agent|script)s$/.exec(id);
   return m ? { scope: m[1] as Scope, kind: m[2] as ActionKind } : null;
 }
 
@@ -414,6 +412,7 @@ export function resolveDrop(
     button = true;
     list = buttons;
   }
+  if (button && isApp(from.action)) return null;
   const wasButton = !fromMenu;
   let reorderOver: string | undefined;
   let placeBefore: string | null | undefined;
