@@ -134,7 +134,7 @@ type Props = {
 
 // A left-to-right mark anchors the leading "/" so the rtl-based left-truncation
 // does not reorder it (otherwise "/Users/foo" renders as "Users/foo/").
-const LRM = "‎";
+const LRM = "\u200e";
 
 export type Row =
   | {

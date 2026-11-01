@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { MISSING_ROOT_ITEM } from "./SetWorkspaceRootItem";
+import { REVEAL_LABEL } from "./lib/contextActions";
 
 type MockRow = { name: string; depth: number; open?: boolean; target?: boolean };
 
@@ -74,7 +75,7 @@ export function SetRootHint() {
         </div>
         <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} className="shrink-0" />
-          Reveal in Finder
+          {REVEAL_LABEL}
         </div>
         <div className={cn("flex items-center whitespace-nowrap", COMPACT_ITEM)}>
           <HugeiconsIcon icon={DashboardSquareAddIcon} size={14} strokeWidth={2} className="shrink-0" />

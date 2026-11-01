@@ -313,7 +313,9 @@ function EntryRowImpl(props: EntryRowProps) {
             {isDir && onEnterFolder && (
               <span
                 role="button"
+                tabIndex={0}
                 title="Open this folder as the explorer root"
+                onKeyDown={chipKey(() => onEnterFolder(path))}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -324,7 +326,7 @@ function EntryRowImpl(props: EntryRowProps) {
                   onEnterFolder(path);
                 }}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+                className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:inline group-hover:inline"
               >
                 Open
               </span>
@@ -333,6 +335,8 @@ function EntryRowImpl(props: EntryRowProps) {
             {isOpenInTab && (
               <span
                 role="button"
+                tabIndex={0}
+                onKeyDown={chipKey(() => onOpenFile(path, true))}
                 title={
                   isPreviewTab
                     ? "Focus the preview tab with this file"
@@ -539,6 +543,18 @@ export type PendingRowProps = {
   onCommit: (name: string) => void | Promise<void>;
   onCancel: () => void;
 };
+
+
+// Enter or Space on a chip that is a span (it sits inside a row that is itself a button, where a real
+// button cannot go) does what its click does.
+function chipKey(run: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    run();
+  };
+}
 
 export function PendingRow({
   depth,
@@ -750,11 +766,11 @@ export function FsRootRow({
             className="size-4 shrink-0"
           />
           <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
-            {"‎" + path}
+            {"\u200e" + path}
           </span>
           {isWorkspaceRoot && onOpenInExplorer && (
-            <span
-              role="button"
+            <button
+              type="button"
               title="Open the workspace root in the file system explorer"
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
@@ -766,10 +782,10 @@ export function FsRootRow({
                 onOpenInExplorer(path);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover/fsroot:inline"
+              className="hidden shrink-0 cursor-pointer rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:inline group-hover/fsroot:inline"
             >
               Open
-            </span>
+            </button>
           )}
         </div>
       </ContextMenuTrigger>
@@ -819,8 +835,12 @@ export function FsUpRow({
           {...listeners}
           {...attributes}
           onMouseDown={keepScratchpadFocus}
+          role="button"
+          tabIndex={0}
+          aria-label="Go to parent folder"
+          onKeyDown={chipKey(() => onNavigateUp?.())}
           className={cn(
-            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85",
+            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 focus-visible:bg-accent/70 focus-visible:outline-none",
             isDragging && "opacity-50",
           )}
           style={{ paddingLeft: 6 }}
@@ -849,7 +869,7 @@ export function FsUpRow({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onNavigateUp?.()}
-            className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline"
+            className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:inline group-focus-visible:inline"
           >
             Go to parent
           </button>
