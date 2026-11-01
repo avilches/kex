@@ -142,4 +142,14 @@ describe("AgentIntegrations", () => {
     expect((screen.getByRole("button", { name: "Install all" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Uninstall all" }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("Install all is the last control of the bulk row, with Uninstall all right before it", async () => {
+    detect([]);
+    render(<AgentIntegrations />);
+    await screen.findAllByText("Not detected");
+    const install = screen.getByRole("button", { name: "Install all" });
+    const row = install.parentElement as HTMLElement;
+    expect(row.lastElementChild).toBe(install);
+    expect(install.previousElementSibling).toBe(screen.getByRole("button", { name: "Uninstall all" }));
+  });
 });

@@ -114,15 +114,7 @@ export function AgentIntegrations() {
           text="Undo a closed tab or hibernate one without losing your session transcript."
         />
       </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          className="h-8 px-2.5 text-[11px]"
-          disabled={installPlan.length === 0 || bulkBusy}
-          onClick={() => void installAll()}
-        >
-          Install all
-        </Button>
+      <div className="flex justify-end gap-2">
         <Button
           size="sm"
           variant="destructive"
@@ -131,6 +123,14 @@ export function AgentIntegrations() {
           onClick={() => setConfirmingRemove(true)}
         >
           Uninstall all
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 px-2.5 text-[11px]"
+          disabled={installPlan.length === 0 || bulkBusy}
+          onClick={() => void installAll()}
+        >
+          Install all
         </Button>
       </div>
       <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border/60 bg-card/60">
