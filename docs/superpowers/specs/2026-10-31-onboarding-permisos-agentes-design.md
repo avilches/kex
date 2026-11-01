@@ -24,7 +24,7 @@ perder el hilo. Además, los mismos controles viven en Settings para poder revis
    "Install all" y "Uninstall all" para las integraciones.
 4. Settings, sección nueva de permisos (solo macOS): estado de cada acceso a disco, con un botón para
    volver a comprobarlo y, si está denegado, para abrir el panel exacto de Privacidad.
-5. Mantener cámara y micrófono en el `Info.plist` y en `entitlements.plist`, con el texto de Kex:
+5. Mantener cámara y micrófono en el `Info.plist` y en `entitlements.plist` (`com.apple.security.device.camera` y `com.apple.security.device.audio-input`, la clave del micrófono para el Hardened Runtime, porque Kex no usa App Sandbox), con el texto de Kex:
    macOS atribuye a Kex lo que pide un programa lanzado en uno de sus terminales (ffmpeg con
    avfoundation, sox, la entrada de voz de un agente), y sin ellos se lo deniega sin avisar. Una
    primera versión los quitó y se restauraron.
