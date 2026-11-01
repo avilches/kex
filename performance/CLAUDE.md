@@ -101,8 +101,8 @@ Cuando contestes: primero el resultado en una frase, después lo medido, y marca
   que limitan el tamaño de función que el JIT intenta optimizar. Sin argumentos aplica los topes por defecto del script;
   acepta `NOMBRE=VALOR` para probar otros y `--verify` para registrar las opciones recibidas. Se niega a arrancar si
   Kex ya corre, porque el entorno solo vale al lanzar el proceso.
-- **`src-tauri/src/panic_log.rs`**: hook de panic instalado al principio de `run()`. Con `panic = "abort"` en el perfil
-  release un panic de Rust mata la app y su mensaje va a stderr, que se pierde cuando Kex se lanza con `open` o desde
+- **`src-tauri/src/panic_log.rs`**: hook de panic instalado al principio de `run()`. Hasta el 2026-11-01 el perfil release
+  llevaba `panic = "abort"` (ahora `unwind`, ver "Crashes de Kex"); con `abort` un panic de Rust mata la app y su mensaje va a stderr, que se pierde cuando Kex se lanza con `open` o desde
   el Dock (también con `scripts/run-performance.sh`). El hook escribe en `Kex.log` una línea
   `[panic] thread '...' panicked at fichero:línea: mensaje` más el backtrace, y encadena el hook anterior para que
   stderr siga recibiéndolo. Se busca con `grep '\[panic\]' user-data/logs/Kex.log`. TASK-912.
@@ -237,14 +237,23 @@ leen con `json.JSONDecoder().raw_decode`). Hay dos tipos distintos y no se deben
   `docs/crash-evidence/2026-11-01-sigabrt-tao-unified-log.txt`. El volcado `sample-auto-20261101-091241` es 40 s anterior
   y no describe los segundos previos (`busy`, hilo principal dormido el 46,5 %).
 
-  **Por qué sigue abortando (hipótesis, no probada):** `send_event` es `extern "C-unwind"` en `tao` 0.37.2 (medido
-  leyendo `src/platform_impl/macos/app.rs` del registro de cargo), pero el perfil release de Kex tiene `panic = "abort"`
-  (`src-tauri/Cargo.toml`, `[profile.release]`). Con `panic = "abort"` rustc compila los frames como `nounwind` aunque el
-  ABI sea `C-unwind`, y una excepción de Objective-C que los atraviesa llega a `panic_cannot_unwind`. Encaja con la pila
-  (el `[panic]` aparece sin panic de Rust previo), pero no se ha probado con una compilación sin `panic = "abort"` ni se
-  ha podido reproducir la excepción. Tres posibles arreglos, de más barato a más caro: quitar `panic = "abort"` del
-  release (coste: tamaño y rendimiento, sin medir); parchear `tao` para capturar la excepción en `send_event`; evitar el
-  afordance. Seguimiento en TASK-914.1 (hija de TASK-914); TASK-917 queda en Done con su criterio 3 sin cumplir.
+  **Por qué seguía abortando (medido en un experimento mínimo, no en Kex):** `send_event` es `extern "C-unwind"` en
+  `tao` 0.37.2 (medido leyendo `src/platform_impl/macos/app.rs` del registro de cargo), pero el perfil release de Kex
+  tenía `panic = "abort"` (`src-tauri/Cargo.toml`, `[profile.release]`). Una función Rust `extern "C-unwind"` que
+  llama a un callback de Objective-C que lanza un `NSException`, compilada con `-C panic=abort`, aborta con
+  `panic in a function that cannot unwind` (el mensaje exacto del crash); con `-C panic=unwind` el `@catch` de
+  Objective-C recibe la excepción y el programa sigue. Fuente del experimento: `/tmp/unwind-exp` (un `lib.rs` de cuatro
+  líneas y un `main.m`; no se versionó, se rehace en cinco minutos).
+
+  **Arreglo (2026-11-01, TASK-914.1):** `panic = "unwind"` en `[profile.release]`, con un test en `panic_log.rs`
+  (`release_profile_keeps_unwinding_...`, verificado en rojo con `abort` y en verde con `unwind`) que impide volver
+  atrás. Cuesta tamaño: medido sobre el mismo commit y el mismo perfil salvo `panic`, el ejecutable pasa de 10,42 MB
+  (`abort`) a 13,90 MB (`unwind`), +3,48 MB (+33 %). El rendimiento en tiempo de ejecución no se midió. No se pudo
+  comparar contra el binario instalado: tiene otro número de símbolos (15.316 frente a 16.578 y 24.701) y se recompiló
+  hoy a las 09:32 con un perfil desconocido. **Sin confirmar en Kex real**: el experimento prueba el mecanismo, pero
+  la excepción del afordance no se ha podido provocar a voluntad. Se da por arreglado solo si no reaparece en varios
+  días de uso tras reinstalar; si reaparece con `unwind`, la causa es otra. Si el tamaño molesta, la alternativa es
+  parchear `tao` para capturar la excepción en `send_event` y volver a `abort`, sin probar.
 
 Las horas de `Kex.log` están en UTC y las de los informes de macOS en hora local: 16:12 en el log es 12:12 en UTC-4.
 `scripts/run-performance.sh` abre la app con `open`, así que no se ve stderr. `useFTLJIT=false` y los topes del JIT no
@@ -253,11 +262,12 @@ es de Kex); si se usan, anota desde qué fecha, porque confunden la comparación
 
 ## Hipótesis abiertas (no confirmadas) y cómo comprobarlas
 
--1. **`panic = "abort"` impide que `send_event` de `tao` 0.37.2 desenrolle la excepción del afordance de AppKit.**
-   Ver "Crashes de Kex". Prueba barata: compilar un release con `panic = "unwind"` (o un `tao` parcheado) y usarlo con
-   el ratón quieto sobre texto hasta que salga "show affordance" en el registro unificado; sin `[panic]` ni
-   `SIGABRT` y con la `Assertion failure` en el registro, la hipótesis queda confirmada. Medir el coste en tamaño
-   (hoy 13,4 MB) y rendimiento antes de dejarlo. TASK-914.1.
+-1. **`panic = "abort"` impedía que `send_event` de `tao` 0.37.2 desenrollara la excepción del afordance de AppKit.**
+   Mecanismo medido en un experimento mínimo y arreglado con `panic = "unwind"` (ver "Crashes de Kex"); falta
+   confirmarlo en Kex real. Prueba: reinstalar con este perfil y usarlo varios días; en el registro unificado debe
+   poder aparecer `Assertion failure in NSCampoLightweightUIController` sin que le siga `[panic]` ni `SIGABRT`. Si el
+   crash reaparece, la hipótesis era incompleta. Pendiente de medir: coste de rendimiento de `unwind` (el de tamaño ya
+   está: +3,48 MB). TASK-914.1.
 
 0. **Qué función de JavaScript dispara la compilación DFG que congela la webview.** El volcado nativo no la nombra.
    Prueba: ningún método nombra la función (el registro del JIT mata la webview). Se prueba por efecto con `scripts/run-performance.sh`.
