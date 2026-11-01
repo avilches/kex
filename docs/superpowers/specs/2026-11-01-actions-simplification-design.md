@@ -54,7 +54,8 @@ Default for a new script: **Workspace root only**.
 Only `{target}` exists.
 
 - Apps: `{target}`, as today (the folder or file they open; the workspace root in the Header).
-- Scripts with `runs` of `folder` or `file`: `{target}` is allowed and optional (a folder script that only runs `pnpm install` does not need it, because it already runs in the folder).
+- Scripts with `runs` of `folder`: `{target}` is allowed and optional (a folder script that only runs `pnpm install` does not need it, because it already runs in the folder).
+- Scripts with `runs` of `file`: `{target}` is required, because a file script that never names the file does nothing with it. `commandProblem` rejects the command at save time without it.
 - Scripts with `runs` of `workspace` or `fixed`, and agents: no variable. `{target}` is rejected with a clear message from `commandProblem` ("{target} needs a script that runs on any folder or any file"). Agents keep treating braces as literal text.
 - `{cwd}`, `{dir}`, `{branch}`, `{repo}`, `{workspace}`, `{filename}`, `{filepath}` and `{host}` are removed everywhere: the command template parser, `buildCommandVars`, the variable list in the edit modal, the Settings labels (`SETTINGS_LABELS`), the docs. A command that uses one is rejected as unknown at save time and at run time. A user who wants the branch writes `git branch --show-current` in the command.
 
@@ -107,7 +108,7 @@ The Add combo, the Settings rows and the palette read the second line from the t
 - Project rules apply: no migration code, no em-dash, no emojis, ids through `nid()`, shortcuts untouched, comments only for the why.
 - New or changed logic is pure and dependency-light (`actionTargets.ts`, `actionsBar.ts`, `contextActionEntries.ts`); React components stay thin.
 - Settings controls are shadcn (`RadioGroup`, `Checkbox`), inputs use `INPUT_CLASS` (`docs/SETTINGS_UI.md`).
-- A change to a core subsystem needs a test that locks the invariant. Required invariants: a script's `runs` decides the places it is offered and nothing else; unknown variables are rejected; an agent never gets file entries; an app is never a button; icon is unchanged by editing the command; two agents with the same logo never render icon-only.
+- A change to a core subsystem needs a test that locks the invariant. Required invariants: a script's `runs` decides the places it is offered and nothing else; unknown variables are rejected; a `file` script without `{target}` is rejected; an agent never gets file entries; an app is never a button; icon is unchanged by editing the command; two agents with the same logo never render icon-only.
 - Docs updated in the same commit as the code: `CLAUDE.md` (the Action row of the glossary, which shrinks a lot), `docs/ARCHITECTURE.md` (Header bar, What an app opens, Context menus, Action model table), `docs/SETTINGS_UI.md`, `docs/FORK.md` if the divergence list mentions variables.
 
 ## Left to the builder
@@ -120,7 +121,7 @@ The Add combo, the Settings rows and the palette read the second line from the t
 ## My calls (flag if you disagree)
 
 - Default for a new script is "Workspace root only".
-- Scripts `folder` and `file` allow `{target}` but do not require it.
+- Scripts `folder` allow `{target}` but do not require it; scripts `file` require it.
 - Scripts `workspace` and `fixed` show a second line; `folder` and `file` do not.
 - The submenu of the focused tab reuses the context menu of that tab, including muted app rows.
 - Old Actions that do not fit the new shape are dropped, not repaired.
