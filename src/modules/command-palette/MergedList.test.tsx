@@ -145,8 +145,22 @@ describe("MergedList", () => {
     expect(text.indexOf("Recent")).toBeLessThan(text.indexOf("plain"));
     cleanup();
     mount([mk("plain", null)], false);
+    expect(screen.queryByText("Running commands")).toBeNull();
     expect(screen.queryByText("Need attention")).toBeNull();
     expect(screen.queryByText("Busy agents")).toBeNull();
+  });
+
+  it("draws a Running commands section between Busy agents and Recent", () => {
+    const mk = (id: string, over: Partial<TabEntry>): MergedRow => ({
+      kind: "tab",
+      key: `tab:${id}`,
+      entry: { ...tab, tabId: id, title: id, tab: { id, kind: "terminal" }, ...over },
+    });
+    mount([mk("plain", { indicator: null }), mk("dev", { indicator: null, running: true }), mk("works", { indicator: "working" })], false);
+    const text = document.body.textContent ?? "";
+    expect(text.indexOf("Busy agents")).toBeLessThan(text.indexOf("Running commands"));
+    expect(text.indexOf("Running commands")).toBeLessThan(text.indexOf("dev"));
+    expect(text.indexOf("dev")).toBeLessThan(text.indexOf("Recent"));
   });
 
   it("draws the active workspace as a row marked active, next to the others", () => {
