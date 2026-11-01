@@ -113,7 +113,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   // Tracks the path of the currently selected item so phase-2 can restore selection.
   const selectedPathRef = useRef<string | null>(null);
 
-  const active = query.trim().length > 0;
+  const active = query.trim().length >= MIN_QUERY_LEN;
 
   // Keep selectedPathRef current whenever the selected item changes.
   useEffect(() => {
@@ -283,6 +283,10 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   handleSelect(results[selectedIndex]);
                 }
               }
+            }}
+            onBlur={() => {
+              if (!document.hasFocus()) return;
+              if (query.trim().length < MIN_QUERY_LEN) onRequestClose();
             }}
             placeholder="Search files…"
             className="h-7 pr-7 pl-6.5 text-xs"

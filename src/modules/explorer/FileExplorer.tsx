@@ -461,6 +461,20 @@ export const FileExplorer = memo(
       null,
     );
     const searchRevealNonce = useRef(0);
+    const enterFolderClosingSearch = useCallback(
+      (path: string) => {
+        closeSearch();
+        onEnterFolder?.(path);
+      },
+      [closeSearch, onEnterFolder],
+    );
+    const openInExplorerClosingSearch = useCallback(
+      (path: string) => {
+        closeSearch();
+        onOpenInExplorer?.(path);
+      },
+      [closeSearch, onOpenInExplorer],
+    );
     const revealInExplorer = useCallback(
       (path: string) => {
         searchRevealNonce.current += 1;
@@ -1121,7 +1135,9 @@ export const FileExplorer = memo(
               onSetAsRoot={onSetAsRoot}
               onAddToGitignore={onAddToGitignore}
               gitRootPath={gitRootPath}
-              onEnterFolder={rootMode === "filesystem" ? onEnterFolder : undefined}
+              onEnterFolder={
+                rootMode === "filesystem" ? enterFolderClosingSearch : undefined
+              }
               searchOpen={isSearchOpen}
               previewOnClick={previewOnClick}
               hasClipboard={tree.clipboard !== null}
@@ -1139,7 +1155,7 @@ export const FileExplorer = memo(
               workspaceRoot={workspaceRootPath}
               flashToken={flash.path === row.path ? flash.token : 0}
               onSetAsRoot={onSetAsRoot}
-              onOpenInExplorer={onOpenInExplorer}
+              onOpenInExplorer={openInExplorerClosingSearch}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onRevealInTerminal={onRevealInTerminal}
               onBeginCreate={tree.beginCreate}
