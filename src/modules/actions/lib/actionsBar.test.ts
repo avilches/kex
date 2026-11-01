@@ -23,7 +23,6 @@ import {
   isCompactBar,
   menuEntries,
   MENUS_RESERVE,
-  ownButtonCandidates,
   ownButtonsThatFit,
   ownButtonWidth,
   paletteActions,
@@ -31,7 +30,6 @@ import {
   resolveDrop,
   SETTINGS_LABELS,
   scriptSubtitle,
-  twinIds,
   soleIconButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
@@ -670,7 +668,6 @@ describe("agents", () => {
     kind: "agent",
     command: "claude",
     appId: "claude",
-    cwdMode: "context",
     ownButton: true,
     ...o,
   });
@@ -711,43 +708,23 @@ describe("agents", () => {
     expect(m.buttons[0]?.disabledReason).toBeNull();
   });
 
-  it("shows the folder it starts in on its second line", () => {
-    const sub = (o: Partial<Action>, c: Parameters<typeof scriptSubtitle>[1] = ctx) => scriptSubtitle(agent(o), c);
-    expect(sub({ cwdMode: "workspace" })).toEqual({ text: "/p", startTrim: true, lead: "root" });
-    expect(sub({ cwdMode: "context" })).toEqual({ text: "/p", startTrim: true, lead: "tab" });
-    expect(sub({ cwdMode: "home" }).text).toBe("Home");
-    expect(sub({ cwdMode: "fixed", cwd: "/srv" })).toEqual({ text: "/srv", startTrim: true });
-    expect(sub({ cwdMode: "context" }, SETTINGS_LABELS).text).toBe("Current folder");
-    expect(sub({ cwdMode: "workspace" }, SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
+  it("says on its second line that it starts in the workspace root, the real one or the words for it", () => {
+    expect(scriptSubtitle(agent(), ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
+    expect(scriptSubtitle(agent(), SETTINGS_LABELS)).toEqual({ text: "Workspace root", startTrim: false, lead: "root" });
   });
 
-  it("names the folder the runner falls back to when the focused tab has none", () => {
-    const sub = (o: Partial<Action>, folders: NonNullable<Parameters<typeof scriptSubtitle>[1]>["folders"]) =>
-      scriptSubtitle(agent(o), { ...ctx, folders });
-    const noFocus = { focusFolder: null, workspaceRoot: "/root", workspaceCwd: "/cwd" };
-    expect(sub({ cwdMode: "context" }, noFocus)).toEqual({ text: "/root", startTrim: true, lead: "tab" });
-    expect(sub({ cwdMode: "context" }, { ...noFocus, workspaceRoot: null })).toEqual({ text: "/cwd", startTrim: true, lead: "tab" });
-    expect(sub({ cwdMode: "context" }, { ...noFocus, focusFolder: "/root/src" })).toEqual({ text: "/root/src", startTrim: true, lead: "tab" });
-    expect(sub({ cwdMode: "context" }, { focusFolder: null, workspaceRoot: null, workspaceCwd: null }).text).toBeNull();
-    expect(sub({ cwdMode: "context" }, noFocus).text).not.toBe("Current folder");
+  it("ignores any leftover folder mode: it never says Home, a fixed folder or the current folder", () => {
+    for (const o of [{ cwdMode: "home" as const }, { cwdMode: "context" as const }, { cwdMode: "fixed" as const, cwd: "/srv" }]) {
+      expect(scriptSubtitle(agent(o), ctx)).toEqual({ text: "/p", startTrim: true, lead: "root" });
+      expect(scriptSubtitle(agent(o), SETTINGS_LABELS).text).toBe("Workspace root");
+    }
   });
 
-  it("names the workspace folder the run falls back to for a fixed mode with no folder", () => {
-    const folders = { focusFolder: "/root/src", workspaceRoot: "/root", workspaceCwd: "/cwd" };
-    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "" }), { ...ctx, folders })).toEqual({ text: "/root", startTrim: true, lead: "root" });
-    expect(scriptSubtitle(agent({ cwdMode: "fixed", cwd: "  " }), { ...ctx, folders: { ...folders, workspaceRoot: null } })).toEqual({
-      text: "/cwd",
-      startTrim: true,
-      lead: "root",
-    });
-    expect(scriptSubtitle(agent({ cwdMode: "fixed" }), SETTINGS_LABELS).text).toBe("Workspace root");
-  });
-
-  it("is grey with the root message when it starts in a rootless workspace", () => {
+  it("is grey with the root message when the workspace has no root, whatever else it says", () => {
     const rootless = { ...ctx, vars: { ...vars, workspace: "" } };
-    const m = buildActionsBarModel({ local: [agent({ cwdMode: "workspace" })], context: rootless, states: new Map(), activeId: undefined });
+    const m = buildActionsBarModel({ local: [agent()], context: rootless, states: new Map(), activeId: undefined });
     expect(m.buttons[0]).toMatchObject({ disabledReason: WORKSPACE_UNSET, subtitle: WORKSPACE_UNSET });
-    expect(actionAvailability(agent({ cwdMode: "context" }), rootless)).toBeNull();
+    expect(actionAvailability(agent(), rootless)).toBe(WORKSPACE_UNSET);
   });
 
   it("reads braces and quotes literally, and refuses a control character", () => {
@@ -832,171 +809,6 @@ describe("paletteActions", () => {
       activeId: undefined,
     });
     expect(paletteActions(model).map((i) => i.id)).toEqual(["s1"]);
-  });
-});
-
-describe("twinIds", () => {
-  const agent = (o: Partial<Action> = {}): Action => ({
-    id: "g1",
-    name: "Claude Code",
-    kind: "agent",
-    command: "claude",
-    appId: "claude",
-    cwdMode: "workspace",
-    ownButton: true,
-    ...o,
-  });
-  const at = (focus: string | null, root: string | null = "/p"): BarContext => ({
-    vars: { ...vars, workspace: root ?? "", cwd: focus ?? "" },
-    shell: "posix",
-    folders: { focusFolder: focus, workspaceRoot: root, workspaceCwd: root },
-  });
-  const none = new Map<string, "running" | "waiting">();
-  const ids = (actions: Action[], c: BarContext | null, states = none) => [...twinIds(actions, c, states)].sort();
-  const workspaceAgent = agent({ id: "w" });
-  const contextAgent = agent({ id: "c", cwdMode: "context" });
-
-  it("hides the agent in the current folder when it is the workspace one", () => {
-    expect(ids([workspaceAgent, contextAgent], at("/p"))).toEqual(["c"]);
-    expect(ids([contextAgent, workspaceAgent], at("/p"))).toEqual(["c"]);
-  });
-
-  it("shows both once the focus leaves the root", () => {
-    expect(ids([workspaceAgent, contextAgent], at("/p/sub"))).toEqual([]);
-  });
-
-  it("hides the context agent with a browser focused, which has no folder", () => {
-    expect(ids([workspaceAgent, contextAgent], at(null))).toEqual(["c"]);
-  });
-
-  it("compares folders the way the runner does, trailing slash included", () => {
-    expect(ids([workspaceAgent, contextAgent], at("/p/"))).toEqual(["c"]);
-    expect(ids([workspaceAgent, contextAgent], at("/p", "/p/"))).toEqual(["c"]);
-  });
-
-  it("hides an app opened on the current folder when the workspace one opens the same", () => {
-    const byWorkspace = app({ id: "w", command: "code {workspace}" });
-    const byCwd = app({ id: "c", command: "code {cwd}" });
-    expect(ids([byWorkspace, byCwd], at("/p"))).toEqual(["c"]);
-    expect(ids([byWorkspace, byCwd], at("/p/sub"))).toEqual([]);
-  });
-
-  it("hides a script run in the current folder when the workspace one runs in the same", () => {
-    const inWorkspace = script({ id: "w", cwdMode: "workspace" });
-    const inContext = script({ id: "c", cwdMode: "context" });
-    expect(ids([inWorkspace, inContext], at("/p"))).toEqual(["c"]);
-    expect(ids([inWorkspace, inContext], at("/p/sub"))).toEqual([]);
-  });
-
-  it("hides a dynamic script whose variable expands to the static command", () => {
-    const fixed = script({ id: "w", command: "ls {workspace}", cwdMode: "workspace" });
-    const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "workspace" });
-    expect(ids([fixed, dynamic], at("/p"))).toEqual(["c"]);
-  });
-
-  it("keeps the context Action while the workspace one is blocked for lack of a root", () => {
-    expect(ids([workspaceAgent, contextAgent], at("/p/sub", null))).toEqual([]);
-    expect(ids([script({ id: "w" }), script({ id: "c", cwdMode: "context" })], at("/p/sub", null))).toEqual([]);
-  });
-
-  it("never hides or keeps a blocked Action", () => {
-    const blocked = app({ id: "b", command: "code {workspace}" });
-    const dynamic = app({ id: "c", command: "code {cwd}" });
-    expect(ids([blocked, dynamic], { ...at("/p"), vars: { ...vars, workspace: "", cwd: "/p" } })).toEqual([]);
-  });
-
-  it("keeps two static Actions or two dynamic ones, made on purpose", () => {
-    expect(ids([agent({ id: "a" }), agent({ id: "b" })], at("/p"))).toEqual([]);
-    expect(ids([agent({ id: "a", cwdMode: "context" }), agent({ id: "b", cwdMode: "context" })], at("/p"))).toEqual([]);
-  });
-
-  it("hides the one in the menu, whichever is dynamic, when only one has a button", () => {
-    const menu = agent({ id: "m", ownButton: false });
-    expect(ids([menu, agent({ id: "b", cwdMode: "context" })], at("/p"))).toEqual(["m"]);
-    expect(ids([contextAgent, agent({ id: "m", ownButton: false })], at("/p"))).toEqual(["m"]);
-    expect(ids([agent({ id: "m", cwdMode: "context", ownButton: false }), workspaceAgent], at("/p"))).toEqual(["m"]);
-  });
-
-  it("hides the dynamic one only when a static one survives, after the menu pass", () => {
-    const staticMenu = agent({ id: "sm", ownButton: false });
-    const dynamicButton = agent({ id: "db", cwdMode: "context" });
-    expect(ids([staticMenu, dynamicButton], at("/p"))).toEqual(["sm"]);
-  });
-
-  it("never hides a script that is not idle, and it keeps the others hidden", () => {
-    const inWorkspace = script({ id: "w", cwdMode: "workspace", ownButton: true });
-    const inContext = script({ id: "c", cwdMode: "context", ownButton: true });
-    expect(ids([inWorkspace, inContext], at("/p"), new Map([["c", "running"]]))).toEqual([]);
-    expect(ids([inWorkspace, inContext], at("/p"), new Map([["w", "running"]]))).toEqual(["c"]);
-    expect(ids([inWorkspace, inContext], at("/p"), new Map([["c", "waiting"]]))).toEqual([]);
-    const menu = script({ id: "m", cwdMode: "workspace", ownButton: false });
-    expect(ids([menu, inWorkspace], at("/p"), new Map([["m", "running"]]))).toEqual([]);
-  });
-
-  it("does nothing without a context, or in Settings", () => {
-    expect(ids([workspaceAgent, contextAgent], null)).toEqual([]);
-    expect(ids([workspaceAgent, contextAgent], { ...at("/p"), labels: true })).toEqual([]);
-  });
-
-  it("leaves alone an Action it cannot compare", () => {
-    const broken = script({ id: "x", command: 'echo "{cwd}"', cwdMode: "context" });
-    const other = script({ id: "y", command: 'echo "{cwd}"', cwdMode: "workspace" });
-    expect(ids([broken, other], at("/p"))).toEqual([]);
-    expect(ids([app({ id: "n", command: "code {filepath}" }), app({ id: "m", command: "code {filepath}" })], at("/p"))).toEqual([]);
-  });
-
-  it("never compares an Action whose start folder the runner would refuse", () => {
-    const broken = script({ id: "b", command: "ls", cwdMode: "fixed", cwd: "\\foo", ownButton: true });
-    const working = script({ id: "w", command: "ls", cwdMode: "fixed", cwd: "/foo", ownButton: false });
-    expect(ids([broken, working], at("/p"))).toEqual([]);
-    const control = script({ id: "k", command: "ls", cwdMode: "fixed", cwd: "/foo\u0001", ownButton: true });
-    expect(ids([control, working], at("/p"))).toEqual([]);
-  });
-
-  it("never compares anything that starts at the root folder, script or app", () => {
-    const rootCtx = at("/", "/");
-    expect(ids([script({ id: "a", ownButton: true }), script({ id: "b", cwdMode: "context" })], rootCtx)).toEqual([]);
-    expect(ids([app({ id: "c", command: "code /x" }), app({ id: "d", command: "code /x" })], rootCtx)).toEqual([]);
-  });
-
-  it("never compares Actions whose start folder is unknown", () => {
-    const noFolders: BarContext = { vars: { ...vars, workspace: "", cwd: "/x" }, shell: "posix", folders: { focusFolder: null, workspaceRoot: null, workspaceCwd: null } };
-    const dynamic = script({ id: "c", command: "ls {cwd}", cwdMode: "context" });
-    const home = script({ id: "h", command: "ls /x", cwdMode: "home" });
-    expect(ids([dynamic, home], noFolders)).toEqual([]);
-  });
-
-  it("hides the menu copy of a button even when both are static", () => {
-    const button = script({ id: "b", ownButton: true });
-    const menu = script({ id: "m", ownButton: false });
-    expect(ids([button, menu], at("/p"))).toEqual(["m"]);
-  });
-
-  it("finds a twin across the workspace and global scopes", () => {
-    expect(ids([workspaceAgent, { ...contextAgent, id: "g" }], at("/p"))).toEqual(["g"]);
-  });
-
-  it("leaves at least the static button in a three-way set", () => {
-    const staticButton = agent({ id: "s" });
-    const dynamicMenu = agent({ id: "dm", cwdMode: "context", ownButton: false });
-    const dynamicButton = agent({ id: "db", cwdMode: "context" });
-    const hidden = ids([dynamicButton, dynamicMenu, staticButton], at("/p"));
-    expect(hidden).toEqual(["db", "dm"]);
-  });
-
-  it("leaves the Header bar alone: both twins stay, in the bar and in the menu", () => {
-    const context = at("/p");
-    const model = buildActionsBarModel({ local: [workspaceAgent, contextAgent], context, states: none, activeId: undefined });
-    expect(model.buttons.map((b) => b.id)).toEqual(["w", "c"]);
-    const asMenu = buildActionsBarModel({
-      local: [{ ...workspaceAgent, ownButton: false }, { ...contextAgent, ownButton: false }],
-      context,
-      states: none,
-      activeId: undefined,
-    });
-    expect(asMenu.menu.workspace.map((i) => i.id)).toEqual(["w", "c"]);
-    expect(paletteActions(model).map((i) => i.id)).toEqual(["w", "c"]);
-    expect(ownButtonCandidates([workspaceAgent, contextAgent], [], none).map((a) => a.id)).toEqual(["w", "c"]);
   });
 });
 

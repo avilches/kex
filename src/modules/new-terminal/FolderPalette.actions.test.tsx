@@ -10,8 +10,8 @@ import type { Workspace } from "@/modules/workspaces/lib/types";
 import { FolderPalette } from "./FolderPalette";
 import type { FolderGroup, FolderRow } from "./lib/folderEntries";
 
-const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", cwdMode: "context", ownButton: true };
-const rootAgent: Action = { id: "g2", name: "Codex", kind: "agent", command: "codex", cwdMode: "workspace", ownButton: true };
+const agent: Action = { id: "g1", name: "Claude Code", kind: "agent", command: "claude", ownButton: true };
+const rootAgent: Action = { id: "g2", name: "Codex", kind: "agent", command: "codex", ownButton: true };
 const devScript: Action = { id: "s1", name: "Dev {cwd}", kind: "script", command: "echo {cwd}", cwdMode: "workspace", ownButton: false };
 const app: Action = { id: "a1", name: "Zed {cwd}", kind: "app", command: "zed {cwd}", ownButton: false };
 
@@ -86,21 +86,24 @@ describe("FolderPalette row menu Actions", () => {
     usePreferencesStore.setState({ actions: [] });
   });
 
-  it("in a subfolder lists the agents of the current directory, never a script, an app or a workspace one", async () => {
+  it("in a subfolder lists every agent, started in that folder, and never a script or an app", async () => {
     mount("/o/src", workspace());
     await openMenu();
     expect(menuLabels()).toEqual([
       expect.stringContaining("Open in Terminal"),
       expect.stringContaining("Copy Absolute Path"),
       expect.stringContaining("Claude Code"),
+      expect.stringContaining("Codex"),
     ]);
   });
 
-  it("at the workspace folder adds the workspace agent", async () => {
+  it("offers the same agents at the workspace folder: an agent has no folder of its own to filter by", async () => {
     mount("/o", workspace());
     await openMenu();
-    expect(menuLabels().some((l) => l?.startsWith("Codex"))).toBe(true);
+    const agents = menuLabels().filter((l) => l?.startsWith("Claude Code") || l?.startsWith("Codex"));
+    expect(agents).toHaveLength(2);
     expect(menuLabels().some((l) => l?.startsWith("Zed"))).toBe(false);
+    expect(menuLabels().some((l) => l?.startsWith("Dev"))).toBe(false);
   });
 
   it("running one closes the palette and runs it in the workspace of the row", async () => {

@@ -14,8 +14,7 @@ const preset: Action = { id: "ac-3", name: "Zed {workspace}", kind: "app", comma
 
 const zed: AppSuggestion = { key: "zed:workspace", appId: "zed", name: "Zed {workspace}", iconId: "zed", defaultCommand: "zed {workspace}", kind: "app" };
 const bbedit: AppSuggestion = { key: "bbedit:path", appId: "bbedit", name: "BBEdit {filepath}", iconId: "bbedit", defaultCommand: "bbedit {filepath}", kind: "app" };
-const claudeWs: AppSuggestion = { key: "claude:workspace", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent", cwdMode: "workspace" };
-const claudeCtx: AppSuggestion = { ...claudeWs, key: "claude:context", cwdMode: "context" };
+const claude: AppSuggestion = { key: "claude:agent", appId: "claude", name: "Claude Code", iconId: "claude", defaultCommand: "claude", kind: "agent" };
 
 type Handlers = { onAdd: ReturnType<typeof vi.fn>; onUpdate: ReturnType<typeof vi.fn>; onRemove: ReturnType<typeof vi.fn>; onReorder: ReturnType<typeof vi.fn> };
 
@@ -197,7 +196,7 @@ describe("ActionsColumns", () => {
   });
 
   it("lists agents, scripts and apps in three groups of each column", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "context", ownButton: true };
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
     const { container, unmount } = mount([agent, savedApp, saved]);
     const text = column(container, "global").textContent ?? "";
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Scripts"));
@@ -205,33 +204,29 @@ describe("ActionsColumns", () => {
     expect(text.indexOf("Agents")).toBeLessThan(text.indexOf("Claude Code"));
     expect(text.indexOf("Claude Code")).toBeLessThan(text.indexOf("Scripts"));
     expect(text.indexOf("Applications")).toBeLessThan(text.indexOf("Zed"));
-    expect(text).toContain("Current folder");
+    expect(text).toContain("Workspace");
     unmount();
   });
 
-  it("an agent preset goes straight to the store as an agent with its start folder", () => {
-    const { container, g, unmount } = mount([], [], { suggestions: [claudeWs, claudeCtx] });
+  it("an agent preset goes straight to the store as an agent with no folder of its own", () => {
+    const { container, g, unmount } = mount([], [], { suggestions: [claude] });
     click(addTrigger(container, "global"));
     const entries = options().filter((o) => o.textContent?.startsWith("Claude Code"));
-    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace root", "Claude CodeCurrent folder"]);
-    click(entries[1]);
-    expect(g.onAdd.mock.calls[0]![0]).toMatchObject({
-      name: "Claude Code",
-      kind: "agent",
-      command: "claude",
-      appId: "claude",
-      cwdMode: "context",
-    });
+    expect(entries.map((o) => o.textContent)).toEqual(["Claude CodeWorkspace root"]);
+    click(entries[0]);
+    const added = g.onAdd.mock.calls[0]![0] as Action;
+    expect(added).toMatchObject({ name: "Claude Code", kind: "agent", command: "claude", appId: "claude" });
+    expect(added.cwdMode).toBeUndefined();
     expect(commandField()).toBeNull();
     unmount();
   });
 
-  it("the modal of an agent has Run in folder, name and command, and no variables", () => {
-    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", appId: "claude", cwdMode: "workspace", ownButton: true };
+  it("the modal of an agent has name and command and no Run in folder or variables: it has no folder of its own", () => {
+    const agent: Action = { id: "ac-g", name: "Claude Code", kind: "agent", command: "claude {x}", appId: "claude", ownButton: true };
     const { container, unmount } = mount([agent]);
     click(pencil(container));
     expect(document.querySelector("[role='dialog']")?.textContent).toContain("Edit agent");
-    expect(document.querySelector("[aria-label='Run in folder']")).not.toBeNull();
+    expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
     expect(nameField()!.value).toBe("Claude Code");
     expect(commandField()!.value).toBe("claude {x}");
     expect(dialogButton("Show variables")).toBeUndefined();
@@ -243,23 +238,23 @@ describe("ActionsColumns", () => {
   describe("a custom agent and a chosen icon", () => {
     const iconButton = () => document.querySelector("button[aria-label='Choose an icon']") as HTMLElement | null;
     const tile = (label: string) => document.querySelector(`[role='listbox'] [aria-label='${label}']`) as HTMLElement | null;
-    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", cwdMode: "workspace", ownButton: true };
+    const detected: Action = { id: "ac-d", name: "Claude Code", kind: "agent", command: "claude", appId: "claude", ownButton: true };
 
     it("Custom agent opens an agent draft and reaches the store only once it has a command", async () => {
       const { container, g, unmount } = mount([], [], { suggestions: [] });
       click(addTrigger(container, "global"));
       click(options().find((o) => o.textContent?.startsWith("Custom agent")));
       expect(document.querySelector("[role='dialog']")?.textContent).toContain("New agent");
-      expect(document.querySelector("[aria-label='Run in folder']")).not.toBeNull();
+      expect(document.querySelector("[aria-label='Run in folder']")).toBeNull();
       expect(g.onAdd).not.toHaveBeenCalled();
       typeField(commandField()!, "my-agent --fast");
       await tick();
-      expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "my-agent --fast", cwdMode: "workspace" });
+      expect(g.onAdd.mock.calls[0]![0]).toMatchObject({ kind: "agent", command: "my-agent --fast" });
       unmount();
     });
 
     it("lets a second agent exist next to a detected one with the same binary", async () => {
-      const { container, g, unmount } = mount([detected], [], { suggestions: [claudeWs, claudeCtx] });
+      const { container, g, unmount } = mount([detected], [], { suggestions: [claude] });
       click(addTrigger(container, "global"));
       expect(options().some((o) => o.textContent?.startsWith("Custom agent"))).toBe(true);
       click(options().find((o) => o.textContent?.startsWith("Custom agent")));
@@ -352,7 +347,6 @@ describe("ActionsColumns", () => {
       name: "Agent",
       kind: "agent",
       command,
-      cwdMode: "workspace",
       ownButton: true,
       ...over,
     });

@@ -15,7 +15,7 @@ export type Action = {
   iconId?: string;
   /** The icon the user picked (`app:<id>`, `agent:<id>` or `glyph:<name>`); wins over appId and iconId. */
   icon?: string;
-  /** Scripts and agents; absent means home. */
+  /** Scripts only; absent means home. An agent has no folder of its own. */
   cwdMode?: ScriptCwdMode;
   /** Only used when cwdMode is "fixed". */
   cwd?: string;

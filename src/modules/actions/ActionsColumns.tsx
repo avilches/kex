@@ -70,7 +70,7 @@ function blankApp(): Action {
 }
 
 function blankAgent(): Action {
-  return { id: newActionId(), name: "", kind: "agent", command: "", cwdMode: "workspace", ownButton: false };
+  return { id: newActionId(), name: "", kind: "agent", command: "", ownButton: false };
 }
 
 // A preset carries its own kind: an app preset is an app, an agent preset an agent that starts

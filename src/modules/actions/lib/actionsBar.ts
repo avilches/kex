@@ -1,7 +1,7 @@
-import { folderKey, resolveScriptCwd, scriptCwdProblem, type ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
+import type { ScriptCwdInput } from "@/modules/workspaces/lib/scriptCwd";
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
-import { commandProblem, commandVariablesUsed, expandCommandArgv, expandCommandShell, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
+import { commandProblem, commandVariablesUsed, missingVariables, unsafeVariables, type CommandShell } from "./commandTemplate";
 import { isAgent, isApp, isScript, usesTerminal, type Action, type ActionKind } from "./types";
 
 export const COMPACT_WIDTH = 720;
@@ -178,7 +178,7 @@ export function actionSubtitle(name: string, ctx: BarContext | null): ActionSubt
 // of a terminal or editor, or its fixed folder. The name's variable, when it has one, still
 // wins because that is what the Action points at.
 export function scriptSubtitle(action: Pick<Action, "name" | "kind" | "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
-  if (isAgent(action)) return agentSubtitle(action, ctx);
+  if (isAgent(action)) return agentSubtitle(ctx);
   const named = actionSubtitle(action.name, ctx);
   if (!isScript(action) || named.text !== null) return named;
   const mode = action.cwdMode ?? "home";
@@ -201,23 +201,10 @@ function workspaceLine(ctx: BarContext | null): ActionSubtitle {
   return { text: root!, startTrim: true, lead: "root" };
 }
 
-// An agent has no template, so its name has no variable: the line always says the folder it
-// starts in, the real one in the bar and the words for it in Settings.
-function agentSubtitle(action: Pick<Action, "cwdMode" | "cwd">, ctx: BarContext | null): ActionSubtitle {
-  const mode = action.cwdMode ?? "home";
-  const real = ctx && !ctx.labels ? ctx : null;
-  const fixed = action.cwd?.trim() || undefined;
-  if (mode === "home") return { text: "Home", startTrim: false, lead: "home" };
-  if (mode === "fixed" && fixed) return { text: fixed, startTrim: true };
-  if (mode === "workspace" && ctx && !ctx.vars.workspace) return { text: WORKSPACE_UNSET, startTrim: false };
-  // A fixed mode with no folder runs in the workspace folder, as resolveScriptCwd does.
-  if (!real) return mode === "context" ? { text: "Current folder", startTrim: false, lead: "tab" } : workspaceLine(ctx);
-  const start = real.folders
-    ? resolveScriptCwd({ mode, fixedFolder: fixed, ...real.folders })
-    : mode === "context"
-      ? real.vars.cwd
-      : real.vars.workspace;
-  return start ? { text: start, startTrim: true, lead: mode === "context" ? "tab" : "root" } : { text: null, startTrim: false };
+// An agent has no template and no folder of its own: the Header starts it in the workspace root,
+// so its line is the root itself, or the words for it in Settings.
+function agentSubtitle(ctx: BarContext | null): ActionSubtitle {
+  return workspaceLine(ctx);
 }
 
 // An agent has nothing to open: its hover says it runs, or why it cannot.
@@ -250,7 +237,7 @@ export function actionRowTitle(
 // script only when it was told to run there. A script in Home, in the tab's folder or in a
 // fixed folder never needs the root.
 export function needsWorkspaceRoot(action: Pick<Action, "kind" | "cwdMode">): boolean {
-  return isApp(action) || action.cwdMode === "workspace";
+  return isApp(action) || isAgent(action) || action.cwdMode === "workspace";
 }
 
 // Why an Action cannot run right now, or null when it can. Scripts are typed into a
@@ -262,7 +249,7 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
   if (isAgent(action)) {
     const problem = agentCommandProblem(action.command);
     if (problem) return problem;
-    return ctx && action.cwdMode === "workspace" && !ctx.vars.workspace ? WORKSPACE_UNSET : null;
+    return ctx && !ctx.vars.workspace ? WORKSPACE_UNSET : null;
   }
   if (!ctx) return VARIABLE.test(action.command) ? "needs a workspace" : null;
   const used = commandVariablesUsed(action.command);
@@ -277,77 +264,6 @@ export function actionAvailability(action: Action, ctx: BarContext | null): stri
     if (unsafe.length > 0) return `${unsafe.map((n) => `{${n}}`).join(", ")} holds characters that are unsafe to type into a terminal`;
   }
   return null;
-}
-
-const DYNAMIC_VARS = ["cwd", "dir", "branch", "repo"];
-
-// Its values or its start folder come from the focused tab, so it changes with the focus.
-export function dependsOnFocusedTab(action: Action): boolean {
-  if (action.cwdMode === "context") return true;
-  return !isAgent(action) && DYNAMIC_VARS.some((v) => commandVariablesUsed(action.command).has(v));
-}
-
-// What running the Action here would do: its kind, the command it ends up with and the
-// folder it starts in. Null when that cannot be told (a variable with no value, a command
-// that does not expand, a start folder that is unknown), so such an Action is never compared.
-function effectKey(action: Action, ctx: BarContext): string | null {
-  const folders = ctx.folders ?? {};
-  try {
-    if (isApp(action)) {
-      if (missingVariables(action.command, ctx.vars).length > 0) return null;
-      const spawn = folderKey(folders.workspaceRoot?.trim() || folders.workspaceCwd);
-      return spawn ? JSON.stringify([action.kind, expandCommandArgv(action.command, ctx.vars), spawn]) : null;
-    }
-    const raw = resolveScriptCwd({ mode: action.cwdMode, fixedFolder: action.cwd, ...folders });
-    if (!raw || scriptCwdProblem(raw)) return null;
-    const start = folderKey(raw);
-    if (!start) return null;
-    if (isAgent(action)) return JSON.stringify([action.kind, action.command, start]);
-    if (missingVariables(action.command, ctx.vars).length > 0) return null;
-    return JSON.stringify([action.kind, expandCommandShell(action.command, ctx.vars, ctx.shell), start]);
-  } catch {
-    return null;
-  }
-}
-
-// Twins: Actions that depend on the focused tab and would do exactly what another one does
-// right now (an agent in the workspace folder and the same agent in the current folder, with
-// the focus at the root). Only the new-terminal surfaces use this, so the same agent is not
-// offered twice for a folder; the Header bar hides nothing. With the same effect, a button
-// beats a menu entry even when both are static; with the same placement, a static Action beats
-// a dynamic one, and two of the same sort are the user's own doing, so both stay. A script that
-// is not idle is never hidden, and a blocked Action (or one whose start folder the runner would
-// refuse) neither hides nor survives. Nothing is hidden without a real context.
-export function twinIds(
-  actions: readonly Action[],
-  ctx: BarContext | null,
-  states: ReadonlyMap<string, ScriptState>,
-): Set<string> {
-  const hidden = new Set<string>();
-  if (!ctx || ctx.labels) return hidden;
-  const groups = new Map<string, { action: Action; dynamic: boolean; idle: boolean }[]>();
-  for (const action of actions) {
-    const state = stateOf(action, states);
-    if (state === "idle" && actionAvailability(action, ctx) !== null) continue;
-    const key = effectKey(action, ctx);
-    if (!key) continue;
-    const dynamic = dependsOnFocusedTab(action);
-    const group = groups.get(key) ?? [];
-    group.push({ action, dynamic, idle: state === "idle" });
-    groups.set(key, group);
-  }
-  for (const group of groups.values()) {
-    if (group.length < 2) continue;
-    let kept = group;
-    if (new Set(group.map((c) => !!c.action.ownButton)).size > 1) {
-      for (const c of group) if (!c.action.ownButton && c.idle) hidden.add(c.action.id);
-      kept = group.filter((c) => !hidden.has(c.action.id));
-    }
-    if (kept.some((c) => !c.dynamic)) {
-      for (const c of kept) if (c.dynamic && c.idle) hidden.add(c.action.id);
-    }
-  }
-  return hidden;
 }
 
 export type BarItem = {

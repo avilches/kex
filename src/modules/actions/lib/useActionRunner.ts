@@ -41,7 +41,7 @@ export type RunOverlay = {
   /** The full map of values the row stands for; it replaces the focused tab's. */
   vars?: RunContext["vars"];
   focusFolder?: string;
-  /** Where a spawned app is launched from; the folder or file folder of the row. */
+  /** Where a spawned app or an agent is launched from; the folder or file folder of the row. */
   spawnCwd?: string;
   /** The workspace to run in when it is not the active one (a row of the new terminal palette). */
   workspaceId?: string;
@@ -132,6 +132,7 @@ function contextFor(action: Action | null, ws: Workspace, deps: ActionRunnerDeps
       workspaceCwd: ws.cwd,
       home: cachedHomeDir(),
     },
+    startFolder: overlay?.spawnCwd,
     link: action && isScript(action) ? linkFor(action.id, deps) : null,
     scriptPaneExists: !!ws.scriptPaneId && !!findPane(ws.paneTree, ws.scriptPaneId),
     atPaneLimit: allPanes(ws.paneTree).length >= workspacePaneLimit,
