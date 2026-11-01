@@ -22,8 +22,8 @@ const MAIN_THREAD: &[(&str, &str)] = &[
         "counts the windows that flushed; the exit has to be requested from here",
     ),
     ("cancel_quit", "flips an atomic and emits an event"),
-    // Window state is written in call order: a second save must not overtake the first, and
-    // that needs a single-writer queue before these can leave the main thread.
+    // Known debt: these write the state to disk on the main thread. They stay here only because
+    // a second save must not overtake the first; a single-writer queue would let them leave.
     ("window_get_state", "reads the in-memory state"),
     ("window_save_workspace_state", "ordered write, see above"),
     ("window_save_sidebar", "ordered write, see above"),
@@ -31,6 +31,8 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("window_save_collapsed_groups", "ordered write, see above"),
     ("window_save_groups", "ordered write, see above"),
     // Per keystroke, and the order of the writes is the order of the input.
+    // Known risk: write_all blocks if the child stops reading and the kernel buffer fills, which
+    // would freeze the UI. Order is the reason it stays; a writer thread per session would fix both.
     ("pty_write", "ordered input to the shell"),
     ("pty_resize", "ordered with the output it reflows"),
     (
@@ -42,9 +44,13 @@ const MAIN_THREAD: &[(&str, &str)] = &[
         "kills the shells and hands each drop to its own thread",
     ),
     // The watch table counts references, so an add must not be overtaken by its remove.
+    // fs_watch_add also canonicalizes and stats every path it is given, so it is cheap only on a
+    // healthy disk.
     ("fs_watch_add", "ordered reference counting"),
     ("fs_watch_remove", "ordered reference counting"),
     // One filesystem call.
+    // A single call, but one that blocks on a hung mount (a network share, the vault while it is
+    // being unlocked).
     ("fs_stat", "one metadata call"),
     ("fs_canonicalize", "one filesystem call"),
     ("fs_create_dir", "one filesystem call"),
@@ -69,7 +75,7 @@ const MAIN_THREAD: &[(&str, &str)] = &[
     ("shell_session_close", "drops an in-memory session"),
     (
         "agent_os_notify",
-        "hands the notification to its own thread",
+        "macOS hands the notification to its own thread; elsewhere the plugin call runs here",
     ),
 ];
 
