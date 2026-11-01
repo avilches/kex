@@ -31,7 +31,7 @@ import {
   soleIconButtons,
   WORKSPACE_UNSET,
 } from "./actionsBar";
-import { inCombo } from "./actionTargets";
+import { offeredAt } from "./actionTargets";
 import type { BarContext, BarItem } from "./actionsBar";
 import type { Action } from "./types";
 
@@ -214,19 +214,20 @@ describe("ownButtonsThatFit", () => {
     expect(ownButtonsThatFit(four, total - 1)).toBeLessThan(4);
   });
 
-  it("a folder button never takes a slot nor folds a workspace one out of the bar", () => {
+  it("a folder script takes a slot of the Header like any other, and a file script never does", () => {
     const folder = script({ id: "folder", command: "agent {target}", runs: "folder", ownButton: true });
     const workspace = script({ id: "workspace", runs: "workspace", ownButton: true });
+    const file = script({ id: "file", command: "wc {target}", runs: "file", ownButton: true });
     const m = buildActionsBarModel({
-      local: [folder, workspace],
+      local: [folder, workspace, file],
       context: ctx,
       states: new Map(),
       activeId: undefined,
       ownButtonsShown: 1,
       place: { file: false, folder: true },
     });
-    expect(m.buttons.map((b) => b.id)).toEqual(["workspace"]);
-    expect(m.menu.workspace).toEqual([]);
+    expect(m.buttons.map((b) => b.id)).toEqual(["folder"]);
+    expect(m.menu.workspace.map((b) => b.id)).toEqual(["workspace"]);
   });
 });
 
@@ -425,46 +426,53 @@ describe("where an Action is offered", () => {
   const barIds = (m: ReturnType<typeof build>) => [...m.buttons, ...m.menu.workspace].map((i) => i.id).sort();
   const comboIds = (m: ReturnType<typeof build>) => m.contextCombo.workspace.map((i) => i.id).sort();
 
-  it("puts in the bar the agent, the apps that take a folder and the scripts that always run in one place", () => {
-    expect(barIds(build(onFolderCtx, { file: false, folder: true }))).toEqual(["ag", "both", "folder", "sp", "sx"]);
+  it("puts in the Header what acts on the workspace root: the agent, the apps that take a folder and every script but the file ones", () => {
+    expect(barIds(build(onFolderCtx, { file: false, folder: true }))).toEqual(["ag", "both", "folder", "sc", "sp", "sx"]);
   });
 
-  it("keeps the bar the same whatever tab is focused", () => {
+  it("keeps the Header the same whatever tab is focused", () => {
     const onFolder = barIds(build(onFolderCtx, { file: false, folder: true }));
     expect(barIds(build(onFileCtx, { file: true, folder: false }))).toEqual(onFolder);
     expect(barIds(build(ctx, { file: false, folder: false }))).toEqual(onFolder);
     expect(barIds(build(ctx, undefined))).toEqual(onFolder);
   });
 
-  it("lists in the combo, on a terminal, only the folder scripts and no app", () => {
+  it("offers on a focused terminal everything that acts on a folder, the agent and the apps included", () => {
     const m = build(onFolderCtx, { file: false, folder: true });
-    expect(comboIds(m)).toEqual(["sc"]);
+    expect(comboIds(m)).toEqual(["ag", "both", "folder", "sc"]);
     expect(m.contextCombo).toMatchObject({ exists: true, kind: "folder", path: "/p/src", reason: null });
   });
 
-  it("lists in the combo, on a file, the apps that take a file and the file scripts", () => {
+  it("offers on a focused file the apps that take a file and the file scripts, never the agent", () => {
     const m = build(onFileCtx, { file: true, folder: false });
     expect(comboIds(m)).toEqual(["both", "file", "sf"]);
     expect(m.contextCombo).toMatchObject({ exists: true, kind: "file", label: "a.ts", path: "/p/a.ts", reason: null });
   });
 
-  it("lists an app that takes both once on a terminal (the bar) and once on a file (the combo), never twice", () => {
-    const onFolder = build(onFolderCtx, { file: false, folder: true });
-    expect(barIds(onFolder)).toContain("both");
-    expect(comboIds(onFolder)).not.toContain("both");
-    const onFile = build(onFileCtx, { file: true, folder: false });
-    expect(comboIds(onFile)).toContain("both");
-    expect(comboIds(onFile)).not.toContain("ag");
-    expect(comboIds(onFile)).not.toContain("sp");
+  it("lists what acts on a folder in the Header and in the terminal's submenu, with a different target in each", () => {
+    const m = build(onFolderCtx, { file: false, folder: true });
+    for (const id of ["ag", "both", "sc"]) {
+      expect(barIds(m), id).toContain(id);
+      expect(comboIds(m), id).toContain(id);
+    }
+    const inBar = [...m.buttons, ...m.menu.workspace].find((i) => i.id === "sc")!;
+    expect(inBar.runTarget).toBeUndefined();
+    expect(m.contextCombo.workspace.find((i) => i.id === "sc")).toMatchObject({ runTarget: "/p/src", runTargetKind: "folder" });
   });
 
-  it("leaves the combo empty, with its reason, when the focused tab gives neither a folder nor a file", () => {
+  it("leaves the submenu empty, with its reason, when the focused tab gives neither a folder nor a file", () => {
     const m = build(ctx, { file: false, folder: false });
     expect(comboIds(m)).toEqual([]);
     expect(m.contextCombo).toMatchObject({ exists: true, kind: null, reason: NO_CONTEXT_REASON });
   });
 
-  it("opens the workspace root from the bar and the focused file from the combo", () => {
+  it("starts an agent offered from the submenu in the focused folder, not in the root", () => {
+    const m = build(onFolderCtx, { file: false, folder: true });
+    expect(m.contextCombo.workspace.find((i) => i.id === "ag")).toMatchObject({ runTarget: "/p/src", runTargetKind: "folder" });
+    expect([...m.buttons, ...m.menu.workspace].find((i) => i.id === "ag")!.runTarget).toBeUndefined();
+  });
+
+  it("opens the workspace root from the Header and the focused file from the submenu", () => {
     const folder = build(onFolderCtx, { file: false, folder: true });
     const inBar = [...folder.buttons, ...folder.menu.workspace].find((i) => i.id === "both")!;
     expect(inBar.runTarget).toBeUndefined();
@@ -472,40 +480,41 @@ describe("where an Action is offered", () => {
     expect(file.contextCombo.workspace.find((i) => i.id === "both")).toMatchObject({ runTarget: "/p/a.ts", runTargetKind: "file" });
   });
 
-  it("has no combo at all while nothing could ever be listed in it", () => {
-    const m = buildActionsBarModel({ local: [rootScript, agentAction], context: ctx, states: new Map(), activeId: undefined, place: { file: false, folder: true } });
+  it("has no submenu at all while nothing could ever be offered on a folder or a file", () => {
+    const m = buildActionsBarModel({ local: [rootScript, fixedScript], context: ctx, states: new Map(), activeId: undefined, place: { file: false, folder: true } });
     expect(m.contextCombo.exists).toBe(false);
-    expect(hasContextActions([rootScript, agentAction], [])).toBe(false);
+    expect(hasContextActions([rootScript, fixedScript], [])).toBe(false);
+    expect(hasContextActions([agentAction], [])).toBe(true);
     expect(hasContextActions([rootScript], [withAccepts("a", "file")])).toBe(true);
   });
 
-  it("keeps a running folder script in the bar menu so it can be stopped, and out of the combo", () => {
+  it("keeps a running folder script in the Header menu so it can be stopped, and out of the submenu", () => {
     const m = build(onFileCtx, { file: true, folder: false }, new Map([["sc", "running"]]));
     expect([...m.menu.workspace].map((i) => i.id)).toContain("sc");
     expect(m.menu.workspace.find((i) => i.id === "sc")).toMatchObject({ stoppable: true, disabledReason: null });
     expect(comboIds(m)).not.toContain("sc");
   });
 
-  it("onBar holds agents, root and fixed scripts, apps that take a folder and anything not idle", () => {
+  it("onBar holds agents, every script but the file ones, apps that take a folder and anything not idle", () => {
     expect(onBar(agentAction, "idle")).toBe(true);
     expect(onBar(rootScript, "idle")).toBe(true);
     expect(onBar(fixedScript, "idle")).toBe(true);
+    expect(onBar(folderScript, "idle")).toBe(true);
     expect(onBar(withAccepts("a", "folder"), "idle")).toBe(true);
     expect(onBar(withAccepts("a", "both"), "idle")).toBe(true);
     expect(onBar(withAccepts("a", "file"), "idle")).toBe(false);
-    expect(onBar(folderScript, "idle")).toBe(false);
     expect(onBar(fileScript, "idle")).toBe(false);
-    expect(onBar(folderScript, "running")).toBe(true);
+    expect(onBar(fileScript, "running")).toBe(true);
   });
 
-  it("treats an app that never said what it accepts as a folder app: in the bar, never in the combo", () => {
+  it("treats an app that never said what it accepts as a folder app: in the Header and on a folder, never on a file", () => {
     const bare = app({ id: "b", command: "zed {target}" });
     expect(onBar(bare, "idle")).toBe(true);
-    expect(inCombo(bare, { file: true, folder: false })).toBe(false);
-    expect(inCombo(bare, { file: false, folder: true })).toBe(false);
+    expect(offeredAt(bare, "folder")).toBe(true);
+    expect(offeredAt(bare, "file")).toBe(false);
   });
 
-  it("gives a file script in the combo no line, and leaves the app free to run", () => {
+  it("gives a file script in the submenu no line, and leaves the app free to run", () => {
     const m = build(onFileCtx, { file: true, folder: false });
     expect(m.contextCombo.workspace.find((i) => i.id === "sf")?.subtitle).toBeNull();
     expect(m.contextCombo.workspace.find((i) => i.id === "file")!.disabledReason).toBeNull();
@@ -889,15 +898,15 @@ describe("buildActionsBarModel arranging", () => {
 
   it("names where the root script runs instead of today's value, and nothing for the others", () => {
     const m = build(true, onFolder, { file: false, folder: true });
-    expect(lines(m.buttons)).toEqual([["Workspace root", "root"]]);
+    expect(lines(m.buttons)).toEqual([["Workspace root", "root"], [null, null]]);
     expect(m.buttons[0]?.title).toBe("Run Build in Workspace root");
-    expect(lines(m.contextCombo.workspace)).toEqual([[null, null]]);
+    expect(lines(m.contextCombo.workspace)).toEqual([[null, null], [null, null]]);
   });
 
-  it("shows the real root in the bar and no line in the combo, where the row already names the place", () => {
+  it("shows the real root in the Header and no line in the submenu, where the row already names the place", () => {
     const m = build(false, onFolder, { file: false, folder: true });
-    expect(lines(m.buttons)).toEqual([["/p", "root"]]);
-    expect(lines(m.contextCombo.workspace)).toEqual([[null, null]]);
+    expect(lines(m.buttons)).toEqual([["/p", "root"], [null, null]]);
+    expect(lines(m.contextCombo.workspace)).toEqual([[null, null], [null, null]]);
     expect(lines(build(false, onFile, { file: true, folder: false }).contextCombo.workspace)).toEqual([
       [null, null],
       [null, null],

@@ -1,6 +1,6 @@
 import type { ScriptState } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { splitActionName } from "./actionName";
-import { comboCandidate, inBar, inCombo, type FocusPlace } from "./actionTargets";
+import { inHeader, offeredAt, type FocusPlace } from "./actionTargets";
 export { actionTarget, type ActionTarget, type FocusPlace } from "./actionTargets";
 import { commandProblem, unsafeVariables, type CommandShell } from "./commandTemplate";
 import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
@@ -38,11 +38,10 @@ export function stateOf(action: Action, states: ReadonlyMap<string, ScriptState>
 }
 
 // Whether the Header bar (own buttons and the Actions menu) carries this Action. The bar is
-// the same whatever tab is focused, so it only holds what does not depend on the tab: agents
-// (their target is the workspace) and workspace Actions. A folder or file Action lives in the
-// context combo instead, except a script that is not idle, which stays so it can be stopped.
+// the same whatever tab is focused, so it only holds what acts on the workspace root (`inHeader`).
+// A script that is not idle stays whatever it is, so it can be stopped.
 export function onBar(action: Action, state: ScriptState | "idle"): boolean {
-  return state !== "idle" || inBar(action);
+  return state !== "idle" || inHeader(action);
 }
 
 // How many of the own buttons, taken in the user's order, fit in the room the bar has once the
@@ -423,8 +422,11 @@ type BuildInput = {
   arranging?: boolean;
 };
 
+// Whether the focused-tab submenu has anything it could ever offer on some folder or file, which
+// decides if it is drawn at all.
 export function hasContextActions(local: readonly Action[], global: readonly Action[]): boolean {
-  return local.some(comboCandidate) || global.some(comboCandidate);
+  const any = (a: Action) => offeredAt(a, "folder") || offeredAt(a, "file");
+  return local.some(any) || global.some(any);
 }
 
 const lastSegment = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -494,15 +496,15 @@ export function buildActionsBarModel({ local, global = [], context, states, acti
       .slice(0, limit)
       .map((a) => a.id),
   );
-  // An app in the combo opens what the combo is on, so it is judged against its own {target}.
+  // What the combo offers acts on what the combo is on, so each is judged against its own {target}.
   const comboContext: BarContext | null =
     context && comboPath && kind ? { ...context, vars: { ...context.vars, target: comboPath }, targetKind: kind } : context;
   for (const [action, isGlobal] of ordered) {
     const state = stateOf(action, states);
     let barItem: BarItem | undefined;
     const item = () => (barItem ??= toItem(action, isGlobal));
-    if (kind && !(isScript(action) && state !== "idle") && inCombo(action, { folder: kind === "folder", file: kind === "file" })) {
-      const comboItem = isApp(action) ? toItem(action, isGlobal, comboContext, comboPath, kind) : item();
+    if (kind && !(isScript(action) && state !== "idle") && offeredAt(action, kind)) {
+      const comboItem = toItem(action, isGlobal, comboContext, comboPath, kind);
       (isGlobal ? model.contextCombo.global : model.contextCombo.workspace).push(comboItem);
     }
     if (!onBar(action, state)) continue;

@@ -288,23 +288,50 @@ describe("ActionsColumns", () => {
       unmount();
     });
 
-    it("says where an app lives and never offers it an own button", () => {
+    it("says where an app lives, from the two rules the Header and the menus use, and never offers it an own button", () => {
       const folders = mount([{ ...savedApp, accepts: "folder" }]);
       click(pencil(folders.container));
-      expect(note()).toContain("It lives in the Actions menu.");
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder.");
       expect(note()).toContain("never gets a button of its own");
       expect(preview()).toBeNull();
       folders.unmount();
       const both = mount([{ ...savedApp, accepts: "both" }]);
       click(pencil(both.container));
-      expect(note()).toContain("and in the submenu of the focused file");
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder or a file.");
       expect(preview()).toBeNull();
       both.unmount();
       const files = mount([{ ...savedApp, accepts: "file" }]);
       click(pencil(files.container));
-      expect(note()).toContain("submenu of the Actions menu named after the focused file");
+      expect(note()).toContain("It lives in the submenu of a file.");
       expect(preview()).toBeNull();
       files.unmount();
+    });
+
+    it("lists Open folders before Edit files", () => {
+      const { container, unmount } = mount([savedApp]);
+      click(pencil(container));
+      const labels = [...document.querySelectorAll("[aria-label='What it opens'] label")].map((l) => l.textContent);
+      expect(labels).toEqual(["Open folders", "Edit files"]);
+      unmount();
+    });
+
+    it("says where a script lives, and offers an own button only to the ones the Header carries", () => {
+      const root = mount([saved]);
+      click(pencil(root.container));
+      expect(note()).toContain("It lives in the Header.");
+      expect(preview()).not.toBeNull();
+      root.unmount();
+      const folder = mount([{ ...saved, runs: "folder" }]);
+      click(pencil(folder.container));
+      expect(note()).toContain("It lives in the Header and in the submenu of a folder.");
+      expect(preview()).not.toBeNull();
+      folder.unmount();
+      const file = mount([{ ...saved, runs: "file", command: "wc {target}" }]);
+      click(pencil(file.container));
+      expect(note()).toContain("It lives in the submenu of a file.");
+      expect(note()).toContain("never gets a button of its own");
+      expect(preview()).toBeNull();
+      file.unmount();
     });
 
     it("lists {target} for an app and for a folder script, and no variables for a script that runs in the root", () => {

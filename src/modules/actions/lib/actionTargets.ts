@@ -24,12 +24,6 @@ export const ACCEPTS_LABELS: Record<AppAccepts, string> = {
 export const acceptsFolder = (a: AppAccepts): boolean => a !== "file";
 export const acceptsFile = (a: AppAccepts): boolean => a !== "folder";
 
-/** Which combos of the Header an app shows up in, for the preview of the edit modal: the Actions
- * menu when it opens folders, the File combo when it edits files. Neither means it is not offered. */
-export function appCombos(accepts: AppAccepts): { actions: boolean; file: boolean } {
-  return { actions: acceptsFolder(accepts), file: acceptsFile(accepts) };
-}
-
 /** The two switches of the edit modal as one value. With neither on there is nothing to open, so
  * it returns the current value: the last switch cannot be turned off. */
 export function acceptsFromSwitches(files: boolean, folders: boolean, current: AppAccepts): AppAccepts {
@@ -42,34 +36,20 @@ export function acceptsFromSwitches(files: boolean, folders: boolean, current: A
 /** Where the focused tab is: a terminal gives a folder, a tab with a path gives a file. */
 export type FocusPlace = { file: boolean; folder: boolean };
 
-/** The Header bar never changes with the focused tab, so it carries only what needs no tab: an
- * agent, an Action of the workspace, and an app that takes a folder (it opens the workspace root). */
-export function inBar(action: Action): boolean {
+/** Whether the Header carries the Action. The Header never changes with the focused tab, so it carries
+ * what acts on the workspace root: an agent, an app that takes a folder, and a script that runs on any
+ * folder (it acts on the root from there), only in the root or in one fixed folder. A script on any file
+ * and an app that only edits files need a file, which the Header does not have. */
+export function inHeader(action: Action): boolean {
   if (isAgent(action)) return true;
   if (isApp(action)) return acceptsFolder(appAccepts(action));
-  return action.runs === "workspace" || action.runs === "fixed";
+  return action.runs !== "file";
 }
 
-/** Whether the context combo lists the Action for the focused tab. An agent never, and an app
- * only for a file: a folder is reached from the Header or the Actions menu of a row. */
-export function inCombo(action: Action, place: FocusPlace): boolean {
-  if (isAgent(action)) return false;
-  if (isApp(action)) return place.file && acceptsFile(appAccepts(action));
-  const target = actionTarget(action);
-  return target === "file" ? place.file : target === "folder" ? place.folder : false;
-}
-
-/** Whether an Action in the context combo only ever works on a file, which words its note. */
-export function acceptsOnlyFile(action: Action): boolean {
-  if (isApp(action)) return appAccepts(action) === "file";
-  return actionTarget(action) === "file";
-}
-
-/** Whether the combo has anything it could ever list, which decides if it is drawn at all. */
-export function comboCandidate(action: Action): boolean {
-  if (isAgent(action)) return false;
-  if (isApp(action)) return acceptsFile(appAccepts(action));
-  return action.runs === "file";
+/** Whether a menu or the focused-tab submenu on a folder or a file offers the Action: exactly what it
+ * acts on. A script that always runs in the root or in one fixed folder acts on no row. */
+export function offeredAt(action: Action, place: "folder" | "file"): boolean {
+  return takes(action)[place];
 }
 
 /** What an Action can act on: an agent a folder, an app what it says it accepts, a script the one

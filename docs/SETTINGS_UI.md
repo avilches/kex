@@ -74,10 +74,12 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   root only" o "One fixed folder" lo tiene prohibido, y un agente no lee plantillas. Solo la lista de
   variables de esos casos lo muestra (`commandVariableDocs`). Una app se anade una sola vez, ya no una
   por variable; el catalogo dice si acepta ficheros, carpetas o ambas (JetBrains solo
-  carpetas), y el modal pregunta "What it opens" con dos casillas, Edit files y Open folders, de las que
-  siempre queda una marcada (la ultima no se deja desmarcar). El modal de una app lleva
-  una nota con donde vive (el menu Actions, el submenu del fichero enfocado, o los dos) y que
-  nunca tiene boton propio: no lleva radio de Own button ni vista previa.
+  carpetas), y el modal pregunta "What it opens" con dos casillas, Open folders y Edit files (en ese orden), de las que
+  siempre queda una marcada (la ultima no se deja desmarcar). El modal de toda Action lleva
+  una nota con donde vive (`placeNote`, de `inHeader` y `offeredAt`: "It lives in the Header",
+  "...and in the submenu of a folder", "...of a file"), y una app o un script
+  Any file ademas dicen "It never gets a button of its own": no llevan radio de Own button
+  ni vista previa.
 - **Boton "+"**: sin acciones, la ActionsBar muestra el trigger punteado "+" (solo el
   simbolo, sin palabra) que abre Settings > Actions directamente, sin menu intermedio
   ni borrador de script. Con acciones, el trigger reaparece al pasar el raton por la barra.
@@ -100,8 +102,8 @@ Folder / Workspace Root / Main Checkout / Home, y Show or Hide Worktrees) y "Com
   campo de ruta, Browse y el boton de la carpeta personal; la eleccion de One fixed folder vive en el modal
   hasta que hay ruta), comando y variables, y
   `OwnButtonChoice` (radio Own button / Inside the combo con una vista previa de la barra, solo
-  para agentes y scripts de workspace; una app, y un script de carpeta o de fichero, llevan en su lugar una nota,
-  porque viven en el menu Actions (la carpeta o el fichero enfocados, en un submenu con su nombre) y nunca tienen boton propio);
+  para lo que lleva el Header y no es una app: agentes y scripts Workspace root only, One fixed folder y Any folder;
+  una app y un script Any file llevan en su lugar la nota de que nunca tienen boton propio);
   guarda al escribir y se sale con Done. Arrastrar una fila a la otra columna la
   mueve de ambito (al final de su tipo); si es una app y el destino ya tiene otra con
   exactamente el mismo comando, la sobreescribe en su sitio con el nombre de la que llega
